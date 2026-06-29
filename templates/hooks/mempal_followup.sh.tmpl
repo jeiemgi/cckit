@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+# SessionEnd hook — capture UNSYNCED local work to MemPalace so an abrupt close
+# doesn't silently lose it (wing={{WING}}).
+#
+# Triggers a "resume here" note ONLY when the current branch has work that isn't
+# pushed: a dirty tree or commits ahead of upstream. Gone-remote branches, stashes
+# and extra worktrees persist across sessions, so they're the SessionStart
+# repo-hygiene hook's job (read-only warnings) + /kit-gc — including them here would
+# spam a note every session. Stashes are listed as context when something else fires.
+#
+# Claude is also instructed (CLAUDE.md / .claude/rules/mempalace.md) to write this
+# follow-up via mempalace_add_drawer (room=planning) when wrapping up — this bash
+# hook is the safety net for when it didn't. Never blocks the session (always exit 0).
+set -uo pipefail
+
+WING="{{WING}}"
+ROOT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}"
+cd "$ROOT" 2>/dev/null || exit 0
+git rev-parse --is-inside-work-tree >/dev/null 2>&1 || exit 0
+
+branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+
+dirty=$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+up=$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || true)
+if [[ -n "$up" ]]; then
+  ahead=$(git rev-list --count "${up}..HEAD" 2>/dev/null || echo 0)
+else
+  ahead=$(git rev-list --count "origin/develop..HEAD" 2>/dev/null || echo 0)
+fi
+
+# Fully synced — nothing to capture.
+[[ "${dirty:-0}" -eq 0 && "${ahead:-0}" -eq 0 ]] && exit 0
+
+# Dedupe: identical (branch + HEAD + dirty fileset) -> one note across sessions.
+head=$(git rev-parse --short HEAD 2>/dev/null || echo none)
+sig=$(printf '%s|%s|%s' "$branch" "$head" "$(git status --porcelain 2>/dev/null)" | cksum | cut -d' ' -f1)
+
+OUTDIR="${HOME}/.claude/kit-followups/${WING}"
+mkdir -p "$OUTDIR" 2>/dev/null || exit 0
+slug=$(printf '%s' "$branch" | tr -c 'A-Za-z0-9._-' '-')
+NOTE="${OUTDIR}/resume-${slug}-${sig}.md"
+[[ -f "$NOTE" ]] && exit 0   # this exact state already captured
+
+ts=$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo unknown)
+dtip=$(git log -1 --format='%h %s' origin/develop 2>/dev/null || echo unknown)
+
+{
+  echo "# Resume — unsynced local work on \`$branch\` ($ts)"
+  echo
+  echo "Session ended with work that was **not pushed**. Pick up here next session."
+  echo
+  echo "- wing: $WING - branch: \`$branch\` - HEAD: \`$head\`"
+  echo "- develop tip: $dtip"
+  if [[ "${ahead:-0}" -gt 0 ]]; then
+    echo "- unpushed commits ($ahead):"
+    git log --format='  - %h %s' "${up:-origin/develop}..HEAD" 2>/dev/null | head -20
+  fi
+  if [[ "${dirty:-0}" -gt 0 ]]; then
+    echo "- uncommitted changes ($dirty):"
+    git status --porcelain 2>/dev/null | head -40 | sed 's/^/  - /'
+  fi
+  st=$(git stash list 2>/dev/null | wc -l | tr -d ' ')
+  [[ "${st:-0}" -gt 0 ]] && echo "- stashes present: $st (review: git stash list)"
+  if command -v gh >/dev/null 2>&1; then
+    prs=$(gh pr list --head "$branch" --json number,title -q '.[]|"  - #\(.number) \(.title)"' 2>/dev/null)
+    [[ -n "$prs" ]] && { echo "- open PR(s) for this branch:"; printf '%s\n' "$prs"; }
+  fi
+  echo
+  echo "_Next: \`git checkout $branch\` then commit + push / open a PR. If this is orphaned WIP on a base branch, move it onto a \`<kind>/<issue>-<slug>\` branch first._"
+} > "$NOTE" 2>/dev/null || exit 0
+
+# Local model layer: when a local mlx_lm.server is alive (scripts/lib/kit-local.sh), prepend a
+# terse drafted "resume here" summary (branch, pending, next step, refs) at $0 API cost.
+# Fallback always: server down / lib missing / draft empty -> deterministic note as-is.
+if [[ -f scripts/lib/kit-local.sh ]]; then
+  # shellcheck source=/dev/null
+  if source scripts/lib/kit-local.sh 2>/dev/null && kit_local_alive; then
+    summary=$(KIT_LOCAL_TIMEOUT=20 kit_local_chat \
+      "You are the kit assistant. Draft a terse 'resume here' note as 3-5 bullets: branch, what is pending, the concrete next step, PR/issue refs if present. Bullets only, no title, no closing line." \
+      "$(cat "$NOTE" 2>/dev/null)" 300 2>/dev/null || true)
+    if [[ -n "${summary:-}" ]]; then
+      tmp="${NOTE}.tmp"
+      {
+        echo "## Summary (local: $(kit_local_model_tag))"
+        echo
+        printf '%s\n\n' "$summary"
+        cat "$NOTE"
+      } > "$tmp" 2>/dev/null && mv "$tmp" "$NOTE" 2>/dev/null || rm -f "$tmp" 2>/dev/null
+    fi
+  fi
+fi
+
+# Keep the followups dir bounded (last 20 notes).
+ls -t "$OUTDIR"/resume-*.md 2>/dev/null | tail -n +21 | while read -r old; do rm -f "$old" 2>/dev/null; done
+
+mempalace mine "$OUTDIR" --wing "$WING" --no-gitignore >/dev/null 2>&1 || true
+exit 0

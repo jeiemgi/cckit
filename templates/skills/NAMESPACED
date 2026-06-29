@@ -1,0 +1,13 @@
+# Kit-namespaced skills — these take the project's `skillPrefix` (e.g. kit-) on scaffold/upgrade.
+# The kit-workflow skills only; content skills (morning-briefing, karpathy-guidelines, speckit,
+# feature-build-refine, supabase-patterns) are intentionally absent and stay bare.
+# One skill name per line; blank lines and #-comments ignored. See scripts/init.sh (_is_namespaced).
+#
+# v2 (#370 + #853): the task-* AND effort-* lifecycle skills are no longer SCAFFOLDED per-project —
+# the plugin provides them directly as `kit-task-*` / `kit-effort-*` under skills/, resolved via
+# ${CLAUDE_PLUGIN_ROOT}. No template ships for them, and no profile lists them, so /kit-init and
+# /kit-update never (re)scaffold a bare-name duplicate (idempotency: no /kit-update resurrection).
+# This file is now empty of workflow skills; it stays so the upgrade rename map
+# (kit.config upgrade.renamed) and _is_namespaced keep reading cleanly for projects that previously
+# scaffolded kit-task-* / kit-effort-* — their existing scaffolded copies are preserved, the
+# plugin-direct skills take over.

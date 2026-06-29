@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# PreToolUse(Bash) gate — runs a project-defined check before `git push`.
+# Scaffolded by claude-kit. SELF-PASSING by design:
+#   - only acts on Bash commands containing 'git push'
+#   - passes (continue:true) if prePush is disabled or no command is configured
+#   - blocks (continue:false) only when the configured check command exits non-zero
+# Config lives in .claude/kit.config.json -> .prePush { enabled, command }.
+set -uo pipefail
+
+INPUT="$(cat)"
+CMD="$(printf '%s' "$INPUT" | jq -r '.tool_input.command // ""' 2>/dev/null)"
+
+# Not a push? let it through.
+case "$CMD" in
+  *"git push"*) ;;
+  *) echo '{"continue": true}'; exit 0 ;;
+esac
+
+CFG=".claude/kit.config.json"
+ENABLED="$(jq -r '.prePush.enabled // false' "$CFG" 2>/dev/null)"
+CHECK="$(jq -r '.prePush.command // ""'      "$CFG" 2>/dev/null)"
+
+# Disabled or nothing to verify? let it through (projects without a check never block).
+if [[ "$ENABLED" != "true" || -z "$CHECK" ]]; then
+  echo '{"continue": true}'; exit 0
+fi
+
+# Run the check and gate on its exit code.
+OUT="$(eval "$CHECK" 2>&1)"; RC=$?
+if [[ $RC -eq 0 ]]; then
+  echo '{"continue": true}'
+else
+  REASON="$(printf 'pre-push check failed (%s):\n%s' "$CHECK" "$OUT" | tail -c 800 | jq -Rs .)"
+  echo "{\"continue\": false, \"stopReason\": $REASON}"
+fi
+exit 0

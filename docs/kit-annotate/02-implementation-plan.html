@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>kit-annotate — implementation plan</title>
+<style>
+  :root{--bg:#fbfbfd;--ink:#1d1d22;--muted:#6b6b78;--line:#e6e6ee;--accent:#5b6cff;--accent-soft:#eef0ff;
+    --code-bg:#0f1222;--code-ink:#e6e7f0;--ok:#0f9d6b;--ok-bg:#eafaf3;--warn:#c2410c;--warn-bg:#fff4ec;--info:#2563eb;--info-bg:#eff6ff;--max:900px;}
+  *{box-sizing:border-box}html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.62 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+  a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+  .wrap{display:grid;grid-template-columns:240px 1fr;max-width:1260px;margin:0 auto}
+  nav{position:sticky;top:0;align-self:start;height:100vh;overflow:auto;padding:28px 18px 60px;border-right:1px solid var(--line);font-size:13.5px}
+  nav .brand{font-weight:700;font-size:15px}nav .brand small{display:block;font-weight:500;color:var(--muted);font-size:12px;margin-top:3px}
+  nav ol{list-style:none;margin:18px 0 0;padding:0;counter-reset:s}
+  nav a{display:block;color:var(--muted);padding:5px 9px;border-radius:7px;counter-increment:s}
+  nav a::before{content:counter(s)". ";color:#b7b7c6}
+  nav a:hover{background:var(--accent-soft);color:var(--ink);text-decoration:none}
+  nav a.active{background:var(--accent);color:#fff}nav a.active::before{color:#cdd3ff}
+  main{padding:46px 54px 140px;max-width:calc(var(--max) + 108px)}
+  .kicker{color:var(--accent);font-weight:700;font-size:13px;letter-spacing:.12em;text-transform:uppercase}
+  h1{font-size:36px;line-height:1.1;letter-spacing:-.7px;margin:.25em 0 .3em}
+  .lede{font-size:18px;color:#3c3c46;max-width:64ch}
+  h2{font-size:24px;letter-spacing:-.4px;margin:58px 0 6px;padding-top:12px}h2 .num{color:#c3c3d2;margin-right:10px;font-weight:700}
+  h3{font-size:17px;margin:24px 0 6px}
+  p{max-width:70ch}section{scroll-margin-top:24px}
+  hr{border:0;border-top:1px solid var(--line);margin:46px 0}
+  code{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:.87em;background:#f0f0f6;padding:.1em .4em;border-radius:5px;color:#3a3a52}
+  pre{background:var(--code-bg);color:var(--code-ink);padding:16px 18px;border-radius:12px;overflow:auto;font-size:13px;line-height:1.55;margin:14px 0}
+  pre code{background:none;color:inherit;padding:0}
+  .box{border-radius:12px;padding:15px 17px 15px 44px;margin:16px 0;position:relative;border:1px solid;font-size:15px}
+  .box .tag{position:absolute;left:15px;top:15px;font-weight:800}.box p{margin:.35em 0;max-width:66ch}.box p:first-child{margin-top:0}.box p:last-child{margin-bottom:0}
+  .ok{background:var(--ok-bg);border-color:#bfe9d6;color:#0a4a36}.ok .tag{color:var(--ok)}
+  .warn{background:var(--warn-bg);border-color:#fcd9c2;color:#7a2e0e}.warn .tag{color:var(--warn)}
+  .info{background:var(--info-bg);border-color:#cfe0ff;color:#15315e}.info .tag{color:var(--info)}
+  table{border-collapse:collapse;width:100%;margin:16px 0;font-size:14px}
+  th,td{text-align:left;padding:10px 13px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border-bottom:2px solid var(--line)}
+  td:first-child{font-weight:600;white-space:nowrap}
+  .tree{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px 18px;font-family:"SF Mono",ui-monospace,Menlo,monospace;font-size:13px;line-height:1.7;overflow:auto;color:#3a3a52}
+  .tree .d{color:var(--accent);font-weight:600}.tree .n{color:#9aa}.tree .done{color:#0f9d6b;font-weight:700}
+  .phase{border:1px solid var(--line);border-radius:14px;background:#fff;margin:14px 0;overflow:hidden}
+  .phase .top{display:flex;align-items:center;gap:12px;padding:13px 18px;background:#f7f8ff;border-bottom:1px solid var(--line)}
+  .phase .pn{background:var(--accent);color:#fff;border-radius:8px;font-weight:800;font-size:12.5px;padding:4px 10px;white-space:nowrap}
+  .phase.done .pn{background:var(--ok)}.phase .pt{font-weight:700}.phase .goal{color:var(--muted);font-size:14px;margin-left:auto;text-align:right;max-width:44ch}
+  .phase .mid{padding:13px 18px}.phase ul{margin:0;padding-left:18px}.phase li{margin:3px 0;font-size:14.5px}
+  .badge{display:inline-block;font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;margin-left:8px}
+  .b-done{background:var(--ok-bg);color:var(--ok)}.b-next{background:var(--info-bg);color:var(--info)}.b-later{background:#f0f0f6;color:#6b6b78}
+  .foot{margin-top:60px;color:var(--muted);font-size:13.5px;border-top:1px solid var(--line);padding-top:20px}
+  .toplink{position:fixed;right:24px;bottom:24px;background:var(--ink);color:#fff;border-radius:999px;padding:10px 16px;font-size:13px;font-weight:600;box-shadow:0 6px 20px rgba(0,0,0,.18);opacity:0;transition:opacity .2s;pointer-events:none}
+  .toplink.show{opacity:.92;pointer-events:auto}
+  @media(max-width:920px){.wrap{grid-template-columns:1fr}nav{display:none}main{padding:30px 22px 120px}.phase .top{flex-wrap:wrap}.phase .goal{margin-left:0;text-align:left}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav>
+    <div class="brand">kit-annotate<small>Implementation plan</small></div>
+    <ol>
+      <li><a href="#goal">Goal &amp; decision</a></li>
+      <li><a href="#built">What was built</a></li>
+      <li><a href="#flow">Setup &amp; session flow</a></li>
+      <li><a href="#config">Config &amp; data flow</a></li>
+      <li><a href="#phases">Phases</a></li>
+      <li><a href="#roadmap">Roadmap: upgrades &amp; multi-project</a></li>
+      <li><a href="#decisions">Open decisions</a></li>
+    </ol>
+  </nav>
+  <main>
+    <div class="kicker">Build reference · for the kit</div>
+    <h1>kit-annotate — implementation plan</h1>
+    <p class="lede">What was added to claude-kit to wire Agentation into Claude, how it flows, what's verified, and what's next. Read <a href="01-explainer.html">01-explainer.html</a> first for the concepts.</p>
+
+    <div class="info" style="margin-top:22px"><span class="tag">ℹ</span><p><b>Decision (verified, unanimous in an 18-agent design pass):</b> the <em>Hybrid</em> — ship a claude-kit scaffolder now whose default backend is <b>Agentation</b>, behind a named-backend seam so a kit-owned backend can slot in later if richer capture (live prop/state values) is ever needed. Scope: <b>Claude Code only</b>.</p></div>
+
+    <!-- 1 -->
+    <section id="goal">
+      <h2><span class="num">1</span>Goal &amp; decision</h2>
+      <p><b>Goal:</b> in-app, click-to-annotate UI feedback for React projects, wired into Claude via claude-kit — so the kit's job is the <em>wiring</em>, not the capture engine. <b>Why adopt Agentation:</b> it's source-available + standard MCP (passes the "inspectable" bar onUI failed), ~3.4M downloads/mo, and already an in-app wrapper across Next/Vite/SSR. <b>License:</b> PolyForm Shield 1.0.0 — a noncompete; installing it as the user's own dev dependency is fully permitted; the kit must not vendor its code.</p>
+      <div class="warn"><span class="tag">⚠</span><p><b>Capability boundary, verified against Agentation's source:</b> it captures component-name tree + selectors + computed styles + a source path — <b>not live prop/state values</b>. That sanitized props/state snapshot is the one thing only a kit-owned backend could add; it stays parked until the need is validated on a real PWA.</p></div>
+    </section>
+
+    <!-- 2 -->
+    <section id="built">
+      <h2><span class="num">2</span>What was built <span class="badge b-done">shipped in 0.5.0</span></h2>
+      <div class="tree">
+<span class="d">claude-kit/</span>
+├─ <span class="d">skills/kit-annotate/</span>SKILL.md          <span class="done">✓ new</span> <span class="n">— /kit-annotate: setup · watch · review · status (auto-activates)</span>
+├─ <span class="d">scripts/</span>annotate-setup.sh             <span class="done">✓ new</span> <span class="n">— install agentation · register MCP · write rule · merge config · --dry-run</span>
+├─ <span class="d">scripts/lib/</span>react-detect.sh           <span class="done">✓ new</span> <span class="n">— Next → React-Router-v7 → Vite → generic React (specificity-ordered)</span>
+├─ <span class="d">templates/rules/</span>react-annotate.md     <span class="done">✓ new</span> <span class="n">— the annotate→locate→fix→resolve loop + honest limits + memory block</span>
+├─ <span class="d">scripts/lib/</span>kit-config.sh             <span class="n">~ edit — exports KIT_ANNOTATE_*</span>
+├─ <span class="d">commands/</span>kit-init.md                  <span class="n">~ edit — points React projects to /kit-annotate</span>
+├─ <span class="d">.claude-plugin/</span>plugin.json            <span class="n">~ edit — 0.4.1 → 0.5.0 + description</span>
+└─ CHANGELOG.md                              <span class="done">✓ new</span> <span class="n">— Keep a Changelog</span>
+      </div>
+      <p><b>Validated:</b> <code>react-detect.sh</code> correctly classifies Vite, Next (even with vitest present), React Router v7, and non-React; <code>annotate-setup.sh --dry-run</code> prints the right per-framework plan and snippet. Both pass <code>bash -n</code>.</p>
+    </section>
+
+    <!-- 3 -->
+    <section id="flow">
+      <h2><span class="num">3</span>Setup &amp; session flow</h2>
+      <h3>Setup (<code>/kit-annotate setup</code>)</h3>
+      <ol>
+        <li>Dry-run the engine → show framework, entry file, and plan.</li>
+        <li>Explain capabilities + honest limits + license; ask consent (Install / Preview / Skip).</li>
+        <li>Engine: <code>npm i -D agentation</code> → <code>claude mcp add agentation -- npx -y agentation-mcp server</code> → write <code>.claude/rules/react-annotate.md</code> → merge <code>.annotate</code> into <code>kit.config.json</code>.</li>
+        <li>Wire <code>&lt;Agentation /&gt;</code> into the entry via <b>Edit</b> (diff shown, dev-gated), per framework:
+          <table>
+            <tr><th>Framework</th><th>Entry</th><th>Gate</th></tr>
+            <tr><td>Next.js (App)</td><td><code>app/layout.tsx</code> (client)</td><td><code>process.env.NODE_ENV === "development"</code></td></tr>
+            <tr><td>Next.js (Pages)</td><td><code>pages/_app.tsx</code></td><td>same</td></tr>
+            <tr><td>Vite</td><td><code>src/main.tsx</code></td><td><code>import.meta.env.DEV</code></td></tr>
+            <tr><td>React Router v7</td><td><code>app/root.tsx</code></td><td><code>import.meta.env.DEV</code></td></tr>
+          </table>
+        </li>
+        <li>Restart Claude Code (loads the MCP) → run dev server → <code>npx agentation-mcp doctor</code>.</li>
+      </ol>
+      <h3>Session (<code>/kit-annotate watch</code> / <code>review</code>)</h3>
+      <p>The loop, also encoded in the rule: pull (<code>agentation_get_all_pending</code> or hands-free <code>agentation_watch_annotations</code>) → <code>agentation_acknowledge</code> → locate (source pointer or grep selector/component) → fix → <code>agentation_resolve</code> with a summary (or <code>agentation_dismiss</code> / <code>agentation_reply</code>). On close, optional MemPalace summary to the project wing.</p>
+    </section>
+
+    <!-- 4 -->
+    <section id="config">
+      <h2><span class="num">4</span>Config &amp; data flow</h2>
+      <p>The choice persists in <code>.claude/kit.config.json</code> under a <b>named-backend</b> block (so a future kit-owned backend slots in without a schema break):</p>
+      <pre><code>"annotate": {
+  "enabled": true,
+  "backend": "agentation",          // ← named, swappable
+  "framework": "next",
+  "reactVersion": "19.2.0",
+  "entryFile": "app/layout.tsx",
+  "package": "agentation",
+  "mcp": { "name": "agentation", "server": "agentation-mcp", "httpPort": 4747 }
+}</code></pre>
+      <pre><code>browser toolbar ──POST :4747──▶ agentation-mcp (SQLite) ──MCP stdio──▶ Claude Code
+                                                                          │
+                                          .claude/rules/react-annotate.md ┘ (teaches the loop)</code></pre>
+    </section>
+
+    <!-- 5 -->
+    <section id="phases">
+      <h2><span class="num">5</span>Phases</h2>
+      <div class="phase done"><div class="top"><span class="pn">Phase 1</span><span class="pt">Scaffolder + Agentation default<span class="badge b-done">done</span></span><span class="goal">Working loop, zero capture code owned.</span></div>
+        <div class="mid"><ul><li>Detection, setup engine, skill, rule, config, version bump, changelog — all shipped in 0.5.0.</li></ul></div></div>
+      <div class="phase"><div class="top"><span class="pn">Phase 2</span><span class="pt">Verification pass<span class="badge b-next">next</span></span><span class="goal">Prove it on the real apps.</span></div>
+        <div class="mid"><ul>
+          <li>Run <code>/kit-annotate setup</code> on your React 19 Vite, Next, and React Router apps at <code>localhost:4000</code>.</li>
+          <li>Confirm: the toolbar appears in dev, annotations reach Claude via MCP, and the gated <code>&lt;Agentation /&gt;</code> tree-shakes out of the production build.</li>
+          <li>Validate the one open question: is component-tree + source-path + grep enough day-to-day, or do you actually want live prop/state values?</li>
+        </ul></div></div>
+      <div class="phase"><div class="top"><span class="pn">Phase 3</span><span class="pt">Kit-owned backend<span class="badge b-later">only if needed</span></span><span class="goal">Fill the reserved seam — same UX.</span></div>
+        <div class="mid"><ul><li>Only if Phase 2 confirms a real need: a dev-only Provider + sanitized <code>safeSnapshot</code> (props/state) behind the same <code>/kit-annotate</code> contract, set <code>backend: "kann"</code>.</li></ul></div></div>
+    </section>
+
+    <!-- 6 -->
+    <section id="roadmap">
+      <h2><span class="num">6</span>Roadmap: upgrades &amp; multi-project <span class="badge b-next">in design</span></h2>
+      <p>A separate workstream you raised, now folded into the kit's direction (designed next, implemented after scoping):</p>
+      <table>
+        <tr><th>Requirement</th><th>Sketch</th></tr>
+        <tr><td>Surface the changelog on update</td><td>After <code>claude plugin update</code>, detect the version delta and show new <code>CHANGELOG.md</code> entries + a "here's what's new and how to try it" walkthrough.</td></tr>
+        <tr><td>Enforce re-scaffold / explore</td><td>Nudge each project to re-run <code>/kit-init</code> (preview-first) to surface new features/config that the older scaffold lacks.</td></tr>
+        <tr><td>Honor custom configs on re-scaffold</td><td>Merge, don't clobber: preserve the project's own <code>.claude/</code> edits + <code>kit.config.json</code> values; only add/patch what's new; always diff-preview.</td></tr>
+        <tr><td>Multi-project organization</td><td>When the kit lives in a folder of many projects, detect loose markdown/folders and suggest a clean layout (one <code>.claude/</code> per project; shared docs up top).</td></tr>
+        <tr><td>Per-folder preferences</td><td>A <code>.claudekit/</code> folder governs kit preferences for its subtree — precedence + inheritance rules to be defined.</td></tr>
+        <tr><td>Secure git storage</td><td>Guidance for committing the kit safely (what to commit vs <code>.gitignore</code>, secrets posture), GitHub recommended.</td></tr>
+      </table>
+      <p>This is being designed now; see the decisions below.</p>
+    </section>
+
+    <!-- 7 -->
+    <section id="decisions">
+      <h2><span class="num">7</span>Open decisions</h2>
+      <ol>
+        <li><b>Phase 2 verification</b> on your three real apps — and the props/state need: confirm whether to keep Phase 3 parked.</li>
+        <li><b>Agentation version pin</b> — pin a range in <code>annotate-setup.sh</code> to reduce "changes under you" risk vs. always-latest.</li>
+        <li><b>The upgrade/multi-project roadmap (§6)</b> — scope + the per-folder <code>.claudekit</code> precedence model. (Being addressed in the next round.)</li>
+      </ol>
+      <div class="foot">kit-annotate · implementation plan · companion: <a href="01-explainer.html">01-explainer.html</a> · changelog: <code>CHANGELOG.md</code></div>
+    </section>
+  </main>
+</div>
+<a href="#" class="toplink" id="toplink">↑ Top</a>
+<script>
+  const links=[...document.querySelectorAll('nav a')];
+  const map=new Map(links.map(a=>[a.getAttribute('href').slice(1),a]));
+  const obs=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){links.forEach(l=>l.classList.remove('active'));const a=map.get(e.target.id);if(a)a.classList.add('active');}});},{rootMargin:'-10% 0px -80% 0px'});
+  document.querySelectorAll('section[id]').forEach(s=>obs.observe(s));
+  const t=document.getElementById('toplink');
+  addEventListener('scroll',()=>{t.classList.toggle('show',scrollY>700)});
+  t.addEventListener('click',e=>{e.preventDefault();scrollTo({top:0,behavior:'smooth'})});
+</script>
+</body>
+</html>

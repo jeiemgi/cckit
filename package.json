@@ -1,0 +1,11 @@
+{
+  "name": "cckit",
+  "version": "0.0.0",
+  "private": false,
+  "license": "MIT OR Apache-2.0",
+  "description": "cckit — a project operating system for coding agents (CLI + Claude Code plugin).",
+  "homepage": "https://cckit.dev",
+  "repository": { "type": "git", "url": "https://github.com/jeiemgi/cckit.git" },
+  "bin": { "cckit": "bin/cckit" },
+  "files": [".claude-plugin", "bin", "scripts", "commands", "skills", "profiles", "templates", "docs"]
+}

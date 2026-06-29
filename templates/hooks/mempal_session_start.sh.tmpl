@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# SessionStart hook — load MemPalace wake-up context for this project (wing={{WING}}).
+# Scaffolded by claude-kit. stdout is injected into the session context by Claude Code.
+# Safe no-op if the `mempalace` CLI is not installed.
+# NOTE: uses `wake-up --wing` on purpose, NOT `mempalace hook run --hook session-start` —
+# `hook run` derives the wing implicitly and can file into the wrong wing; `--wing` is explicit.
+command -v mempalace >/dev/null 2>&1 || exit 0
+mempalace wake-up --wing {{WING}} 2>/dev/null || true

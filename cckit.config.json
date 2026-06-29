@@ -1,0 +1,34 @@
+{
+  "$schema": "./kit.config.schema.json",
+  "kitVersion": "0.0.0",
+  "project": {
+    "name": "cckit",
+    "slug": "cckit",
+    "owner": "jeiemgi",
+    "language": "en"
+  },
+  "profile": "software",
+  "skillPrefix": "",
+  "github": {
+    "repo": "jeiemgi/cckit",
+    "owner": "jeiemgi",
+    "baseBranch": "main",
+    "projectsV2": false,
+    "projectNumber": null,
+    "projectTitle": null
+  },
+  "plans": {
+    "format": "github",
+    "dir": ""
+  },
+  "knowledge": {
+    "dir": "docs"
+  },
+  "memory": {
+    "enabled": false,
+    "wing": "cckit"
+  },
+  "engine": {
+    "mode": "off"
+  }
+}

@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# kit-local-status.sh — SessionStart hook. Announces the local model layer (mlx_lm.server)
+# when it is enabled AND alive: one branded banner line so the session knows local chores
+# (digest, summaries, board sync) run at $0 API cost. Silent when disabled.
+#
+# Enabled + DOWN (#313): prints a persistent notice EVERY session until the server is up
+# or the user dismisses it (kit-doctor --dismiss-local, or KIT_LOCAL_DISMISS=1) — a dismiss
+# sticks until the next x.y kit update. Never blocks the session (always exit 0).
+#
+# Setup + API: scripts/lib/kit-local.sh (plan #285, issues #286 #313).
+
+set -uo pipefail
+ROOT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}"
+cd "$ROOT" 2>/dev/null || exit 0
+
+[[ -f scripts/lib/kit-local.sh ]] || exit 0
+# shellcheck source=/dev/null
+source scripts/lib/kit-local.sh 2>/dev/null || exit 0
+
+if kit_local_alive; then
+  NOTE="local: $(kit_local_model_tag) viva @ :${KIT_LOCAL_PORT} · chores NL a \$0"
+elif [[ "$KIT_LOCAL_ENABLED" == "true" ]] && ! kit_local_dismissed; then
+  # persistent until resolved or dismissed (#313) — re-shown every SessionStart
+  NOTE="local: capa caída @ :${KIT_LOCAL_PORT} — /kit-doctor la instala/levanta · dismiss: /kit-doctor --dismiss-local (o KIT_LOCAL_DISMISS=1)"
+else
+  exit 0
+fi
+
+if [[ -f .claude/lib/kit-sigil.sh ]]; then
+  # shellcheck source=/dev/null
+  source .claude/lib/kit-sigil.sh 2>/dev/null && kit_sigil "kit-local" "$NOTE" && exit 0
+fi
+echo "claude-kit · kit-local · $NOTE"
+exit 0

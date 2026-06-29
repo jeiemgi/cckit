@@ -1,0 +1,31 @@
+{
+  "name": "minimal",
+  "label": "Minimal",
+  "description": "Lean setup: a project manager plus a generalist that flexes to any task.",
+  "agents": [
+    "pm",
+    "generalist"
+  ],
+  "skills": [
+    "karpathy-guidelines"
+  ],
+  "rules": [
+    "communication-style",
+    "task-management",
+    "mempalace",
+    "branch-naming"
+  ],
+  "roles": [
+    "PM",
+    "Generalist"
+  ],
+  "milestones": [
+    "Backlog",
+    "Doing",
+    "Done"
+  ],
+  "defaults": {
+    "plans_format": "none",
+    "memory": "off"
+  }
+}

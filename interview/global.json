@@ -1,0 +1,66 @@
+{
+  "tier": "global",
+  "title": "Who you are (asked once, ever)",
+  "intro": "Wide-range profile. Runs once in your life, writes ~/.claude/kit.profile.<user>.json. Every new project pre-fills from these answers — you can always override per project.",
+  "questions": [
+    {
+      "key": "name",
+      "header": "Your name",
+      "question": "What's your name? (used to label your global profile and as the default project owner)",
+      "type": "text",
+      "target": "name",
+      "default": "",
+      "prefillFrom": "profile.name"
+    },
+    {
+      "key": "language",
+      "header": "Language",
+      "question": "What language should the kit and agents speak with you?",
+      "type": "select",
+      "default": "mixed",
+      "prefillFrom": "profile.language",
+      "options": [
+        { "label": "Mixed EN/ES", "value": "mixed", "recommended": true, "description": "Switch freely between English and Spanish.", "set": [{ "path": "language", "value": "mixed", "valtype": "string" }] },
+        { "label": "English", "value": "en", "description": "English only.", "set": [{ "path": "language", "value": "en", "valtype": "string" }] },
+        { "label": "Español", "value": "es", "description": "Solo español.", "set": [{ "path": "language", "value": "es", "valtype": "string" }] }
+      ]
+    },
+    {
+      "key": "mode",
+      "header": "Strictness",
+      "question": "Default strictness for NEW projects? draft = guardrails off (explore freely) · guided = warnings only · enforced = block (worktree-only, PR-per-issue).",
+      "type": "select",
+      "default": "guided",
+      "prefillFrom": "profile.defaults.mode",
+      "options": [
+        { "label": "Guided", "value": "guided", "recommended": true, "description": "Warnings, never blocks. Safe default — local-first.", "set": [{ "path": "defaults.mode", "value": "guided", "valtype": "string" }] },
+        { "label": "Draft", "value": "draft", "description": "Guardrails off. Pure exploration.", "set": [{ "path": "defaults.mode", "value": "draft", "valtype": "string" }] },
+        { "label": "Enforced", "value": "enforced", "description": "Blocks: worktree-only + PR-per-issue from the start.", "set": [{ "path": "defaults.mode", "value": "enforced", "valtype": "string" }] }
+      ]
+    },
+    {
+      "key": "plans_format",
+      "header": "Plans",
+      "question": "Default plan format for new projects?",
+      "type": "select",
+      "default": "markdown",
+      "prefillFrom": "profile.defaults.plans_format",
+      "options": [
+        { "label": "Markdown", "value": "markdown", "recommended": true, "description": "Plain markdown in plans/ — portable, zero build.", "set": [{ "path": "defaults.plans_format", "value": "markdown", "valtype": "string" }] },
+        { "label": "None", "value": "none", "description": "No plan files.", "set": [{ "path": "defaults.plans_format", "value": "none", "valtype": "string" }] }
+      ]
+    },
+    {
+      "key": "memory",
+      "header": "Memory",
+      "question": "Enable persistent memory (MemPalace) by default on new projects?",
+      "type": "select",
+      "default": "off",
+      "prefillFrom": "profile.defaults.memory",
+      "options": [
+        { "label": "Off", "value": "off", "recommended": true, "description": "No memory layer unless you turn it on per project.", "set": [{ "path": "defaults.memory", "value": "off", "valtype": "string" }] },
+        { "label": "On", "value": "on", "description": "Wire MemPalace + hooks on new projects.", "set": [{ "path": "defaults.memory", "value": "on", "valtype": "string" }] }
+      ]
+    }
+  ]
+}

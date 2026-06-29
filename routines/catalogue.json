@@ -1,0 +1,84 @@
+{
+  "schema": 1,
+  "description": "Kit-managed suggested routines. The kit SUGGESTS; the user accepts; nothing is created without opt-in. Each entry maps to one OS cron job (crontab) scoped to the project path.",
+  "routines": [
+    {
+      "id": "briefing",
+      "name": "Morning briefing",
+      "description": "Runs /morning-briefing at the start of the work day — open issues, board state, next actions.",
+      "command": "${KIT_SCRIPTS}/task-sync.sh --briefing",
+      "cadence": "daily",
+      "cron": "0 8 * * 1-5",
+      "tier": "A",
+      "cost": "low",
+      "requiresModule": null,
+      "suggested": true,
+      "tags": ["board", "daily", "focus"]
+    },
+    {
+      "id": "board-sweep",
+      "name": "Board sweep",
+      "description": "Scans for orphan issues (no project card), stale In-Progress, and merged PRs whose issue was not closed. Reports drift.",
+      "command": "${KIT_SCRIPTS}/task-sync.sh --sweep",
+      "cadence": "daily",
+      "cron": "30 8 * * 1-5",
+      "tier": "B",
+      "cost": "low",
+      "requiresModule": "software",
+      "suggested": true,
+      "tags": ["board", "daily", "hygiene"]
+    },
+    {
+      "id": "gc",
+      "name": "Repo GC",
+      "description": "Prunes merged worktrees and branches (dry-run only — reports what would be cleaned, never auto-deletes).",
+      "command": "${KIT_SCRIPTS}/lib/kit-gc.sh --dry-run --report",
+      "cadence": "weekly",
+      "cron": "0 9 * * 1",
+      "tier": "B",
+      "cost": "low",
+      "requiresModule": "software",
+      "suggested": true,
+      "tags": ["gc", "weekly", "hygiene"]
+    },
+    {
+      "id": "knowledge-lint",
+      "name": "Knowledge lint",
+      "description": "Validates knowledge/ frontmatter, INDEX completeness, and live references. Reports broken docs.",
+      "command": "${KIT_SCRIPTS}/knowledge-lint.sh --report",
+      "cadence": "weekly",
+      "cron": "0 9 * * 2",
+      "tier": "A",
+      "cost": "low",
+      "requiresModule": null,
+      "suggested": false,
+      "tags": ["knowledge", "weekly", "lint"]
+    },
+    {
+      "id": "kit-wire-check",
+      "name": "Kit wire check",
+      "description": "Verifies the kit wiring is up to date (statusline shim, hook permissions, cron entries). Self-heals on drift.",
+      "command": "${KIT_SCRIPTS}/kit-wire.sh --check",
+      "cadence": "weekly",
+      "cron": "0 10 * * 1",
+      "tier": "B",
+      "cost": "low",
+      "requiresModule": null,
+      "suggested": false,
+      "tags": ["wire", "weekly", "self-heal"]
+    },
+    {
+      "id": "security-sweep",
+      "name": "Security sweep",
+      "description": "Runs a dependency CVE scan (npm audit / pip-audit / cargo audit) and reports new high/critical findings.",
+      "command": "${KIT_SCRIPTS}/lib/kit-gc.sh --security-scan",
+      "cadence": "weekly",
+      "cron": "0 9 * * 3",
+      "tier": "B",
+      "cost": "medium",
+      "requiresModule": "software",
+      "suggested": false,
+      "tags": ["security", "weekly", "deps"]
+    }
+  ]
+}

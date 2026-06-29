@@ -1,0 +1,32 @@
+{
+  "name": "software",
+  "label": "Software product",
+  "description": "Full engineering org: product, architecture, design, infra, backend, frontend, QA, security.",
+  "agents": ["pm", "tech-lead", "designer", "devops", "backend", "frontend", "qa", "security"],
+  "skills": [
+    "morning-briefing",
+    "speckit",
+    "feature-build-refine",
+    "supabase-patterns",
+    "karpathy-guidelines"
+  ],
+  "rules": [
+    "branch-naming",
+    "communication-style",
+    "design-routing",
+    "knowledge-base",
+    "mempalace",
+    "plan-output-format",
+    "effort-model",
+    "delegation-brief",
+    "skill-gaps",
+    "task-management"
+  ],
+  "roles": ["PM", "Tech Lead", "Designer", "DevOps", "Backend", "Frontend", "QA", "Security"],
+  "milestones": ["Foundation", "MVP", "Beta", "GA"],
+  "defaults": {
+    "plans_format": "markdown",
+    "memory": "off",
+    "speckit": "off"
+  }
+}

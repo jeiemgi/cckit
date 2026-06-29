@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Stop hook — sweep this project's Claude sessions into MemPalace (wing={{WING}}).
+# Scaffolded by claude-kit. Safe no-op if `mempalace` CLI is not installed.
+mempalace mine ~/.claude/projects/{{CLAUDE_PROJECT_SLUG}}/ --mode convos --wing {{WING}} 2>/dev/null || true
