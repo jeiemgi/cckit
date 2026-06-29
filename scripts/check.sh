@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# check.sh — cckit local gate. Runs the fast, dependency-light checks that must pass before a PR.
+# check.sh - cckit local gate. Runs the fast, dependency-light checks that must pass before a PR.
 # No CI required; this is the bar. Exit non-zero on the first failure.
 set -uo pipefail
 cd "$(cd "$(dirname "$0")/.." && pwd)"
@@ -19,23 +19,34 @@ if command -v jq >/dev/null 2>&1; then
   jq -e . .claude-plugin/plugin.json >/dev/null || { note "x invalid plugin.json"; fail=1; }
   jq -e . cckit.config.json >/dev/null || { note "x invalid cckit.config.json"; fail=1; }
 else
-  note "  (jq absent — skipping JSON validation)"
+  note "  (jq absent - skipping JSON validation)"
 fi
 
-# 3. No tedos branding leaked into the standalone (the de-tedos-ification gate).
-note "==> no tedos branding (grep -ri tedos)"
-if grep -rniI --exclude-dir=.git --exclude-dir=node_modules --exclude=check.sh tedos . >/dev/null 2>&1; then
-  note "x found 'tedos' references — cckit must be tedos-free:"
-  grep -rniI --exclude-dir=.git --exclude-dir=node_modules --exclude=check.sh tedos . | head -20 >&2
+# 3. No tedos branding leaked into what SHIPS (the de-tedos-ification gate). Scans TRACKED files
+# only (git grep) so gitignored runtime state (.cckit/), build output (dist/), and deps never trip
+# a false positive - only committed content must be tedos-free. Falls back to a filtered recursive
+# grep outside a git work tree.
+note "==> no tedos branding (tracked files)"
+_tedos_scan() {
+  if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    git grep -inI tedos -- . ':!scripts/check.sh'
+  else
+    grep -rniI --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=.cckit \
+      --exclude-dir=dist --exclude=check.sh tedos .
+  fi
+}
+if _tedos_scan >/dev/null 2>&1; then
+  note "x found 'tedos' references - cckit must be tedos-free:"
+  _tedos_scan | head -20 >&2
   fail=1
 fi
 
-# 4. Secret + privacy guard — no secrets, keys, env, or private data in anything publishable.
+# 4. Secret + privacy guard - no secrets, keys, env, or private data in anything publishable.
 note "==> secret + privacy guard"
 if [ -f scripts/lib/secret-guard.sh ]; then
   . scripts/lib/secret-guard.sh
   secret_guard_scan || fail=1
 fi
 
-[ "$fail" -eq 0 ] && note "✓ cckit check passed" || note "✗ cckit check FAILED"
+[ "$fail" -eq 0 ] && note "PASS cckit check passed" || note "FAIL cckit check FAILED"
 exit "$fail"
