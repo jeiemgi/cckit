@@ -151,7 +151,13 @@ case "$cmd" in
   orchestrate) exec "$ROOT/scripts/orchestrate.sh" "$@" ;;
   autopilot)   exec "$ROOT/scripts/autopilot.sh" "$@" ;;
   # Ops exposed so an agent/autopilot can run the whole lifecycle through the one CLI (#16).
-  release)     exec "$ROOT/scripts/publish.sh" "$@" ;;
+  release)
+    # `--next` reports the version the conventional commits imply; otherwise cut a release.
+    case "${1:-}" in
+      --next) exec "$ROOT/scripts/lib/version-bump.sh" --next ;;
+      *)      exec "$ROOT/scripts/publish.sh" "$@" ;;
+    esac
+    ;;
   update)      exec "$ROOT/scripts/kit-version-check.sh" "$@" ;;
   migrate)     exec "$ROOT/scripts/kit-migrate.sh" "$@" ;;
   adopt)       exec "$ROOT/scripts/kit-adopt.sh" "$@" ;;
