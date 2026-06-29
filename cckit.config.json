@@ -1,6 +1,6 @@
 {
   "$schema": "./kit.config.schema.json",
-  "kitVersion": "0.1.3",
+  "kitVersion": "0.1.4",
   "project": {
     "name": "cckit",
     "slug": "cckit",
