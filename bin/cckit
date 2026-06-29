@@ -44,8 +44,29 @@ done
 BIN="$(cd -P "$(dirname "$SOURCE")" && pwd)"
 ROOT="$(cd "$BIN/.." && pwd)"
 LIB="$ROOT/scripts/lib"
-export KIT_CONFIG="${KIT_CONFIG:-$ROOT/cckit.config.json}"
-cd "$ROOT"
+
+# Resolve the PROJECT config from the directory cckit was invoked in (walk upward for
+# cckit.config.json, or .claude/kit.config.json), so board/lifecycle verbs act on the project you
+# ran cckit in — NOT cckit's own install dir. Running inside the cckit repo resolves to its own
+# cckit.config.json naturally (self-hosting); outside any project we fall back to cckit's config.
+# An explicit KIT_CONFIG in the environment always wins.
+_cckit_find_config() {
+  local d="$1"
+  while [ -n "$d" ] && [ "$d" != "/" ]; do
+    [ -f "$d/cckit.config.json" ]       && { printf '%s\n' "$d/cckit.config.json";       return 0; }
+    [ -f "$d/.claude/kit.config.json" ] && { printf '%s\n' "$d/.claude/kit.config.json"; return 0; }
+    d="$(dirname "$d")"
+  done
+  return 1
+}
+if [ -z "${KIT_CONFIG:-}" ]; then
+  KIT_CONFIG="$(_cckit_find_config "$PWD" || true)"
+  [ -n "$KIT_CONFIG" ] || KIT_CONFIG="$ROOT/cckit.config.json"
+fi
+export KIT_CONFIG
+# No `cd "$ROOT"`: cckit's own files are referenced via absolute $ROOT/$LIB/$BIN paths, while
+# project verbs (sync/start/pr/close/gc/scan/status/effort/…) must run in the invoking directory.
+# Verbs that act on cckit itself (release, contribute) cd into $ROOT locally below.
 
 # Structured-output helpers (cckit_is_json / cckit_json) — wired into every verb below.
 # shellcheck source=/dev/null
@@ -73,7 +94,8 @@ cmd="${1:-resume}"; shift || true
 
 case "$cmd" in
   version)
-    v="$(jq -r '.kitVersion // "0.0.0"' "$KIT_CONFIG" 2>/dev/null || echo 0.0.0)"
+    # The installed cckit version is cckit's OWN config, independent of the project we're invoked in.
+    v="$(jq -r '.kitVersion // "0.0.0"' "$ROOT/cckit.config.json" 2>/dev/null || echo 0.0.0)"
     if cckit_is_json; then cckit_json version "$v"; else echo "cckit $(ui_paint '1;36' "$v")"; fi
     ;;
   effort)
@@ -152,6 +174,8 @@ case "$cmd" in
   autopilot)   exec "$ROOT/scripts/autopilot.sh" "$@" ;;
   # Ops exposed so an agent/autopilot can run the whole lifecycle through the one CLI (#16).
   release)
+    # Acts on cckit's own repo, so run from the install root regardless of where it was invoked.
+    cd "$ROOT"
     # `--next` reports the version the conventional commits imply; otherwise cut a release.
     case "${1:-}" in
       --next) exec "$ROOT/scripts/lib/version-bump.sh" --next ;;
@@ -166,7 +190,7 @@ case "$cmd" in
   scan)        source "$LIB/project-scan.sh"; project_scan "$@" ;;
   encode-context) source "$LIB/toon.sh"; toon_encode ;;
   debug)       exec "$ROOT/scripts/debug.sh" "$@" ;;
-  contribute)  exec "$ROOT/scripts/contribute.sh" "$@" ;;
+  contribute)  cd "$ROOT"; exec "$ROOT/scripts/contribute.sh" "$@" ;;
   status|ui)   exec "$ROOT/scripts/status.sh" "$@" ;;
   resume)      source "$LIB/handoff.sh"; handoff_read ;;
   handoff)     source "$LIB/handoff.sh"; handoff_write "$@" ;;
