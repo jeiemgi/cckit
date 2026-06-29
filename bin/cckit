@@ -13,6 +13,12 @@
 #   cckit orchestrate <a> <b> …     run N flows in parallel worktrees (--dry-run/--cap/--agent)
 #   cckit autopilot [<a> …]         unattended multi-flow: drive (or auto-pick) issues under a cap
 #   cckit gc                        prune merged branches + worktrees
+#   cckit scan [--llm]              detect this repo's stack + kit state (JSON)
+#   cckit doctor                    onboarding preflight (deps, gh auth)
+#   cckit update                    check whether this project is behind the installed cckit
+#   cckit migrate                   reshuffle an old kit layout to the current one
+#   cckit digest                    summarize recent activity
+#   cckit release <ver> [--publish] cut a release (dry-run by default)
 #   cckit version [--llm]           the installed cckit version
 #   cckit help
 set -eu
@@ -122,6 +128,13 @@ case "$cmd" in
     ;;
   orchestrate) exec "$ROOT/scripts/orchestrate.sh" "$@" ;;
   autopilot)   exec "$ROOT/scripts/autopilot.sh" "$@" ;;
+  # Ops exposed so an agent/autopilot can run the whole lifecycle through the one CLI (#16).
+  release)     exec "$ROOT/scripts/publish.sh" "$@" ;;
+  update)      exec "$ROOT/scripts/kit-version-check.sh" "$@" ;;
+  migrate)     exec "$ROOT/scripts/kit-migrate.sh" "$@" ;;
+  doctor)      exec "$ROOT/scripts/kit-doctor.sh" "$@" ;;
+  digest)      exec "$ROOT/scripts/kit-digest.sh" "$@" ;;
+  scan)        source "$LIB/project-scan.sh"; project_scan "$@" ;;
   init)        exec "$ROOT/scripts/init.sh" "$@" ;;
   help|--help|-h) usage ;;
   *) echo "cckit: unknown command '$cmd' — run 'cckit help'" >&2; exit 2 ;;

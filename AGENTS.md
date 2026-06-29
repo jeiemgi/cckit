@@ -32,6 +32,19 @@ Every verb accepts a global `--llm` (alias `--output=json`); verbs that produce 
 single JSON object/array on stdout, with human text on stderr. Interactive/launch verbs
 (`init`, `orchestrate`, `autopilot`) have no JSON result — use `--dry-run` to inspect their plan.
 
+### Lifecycle ops (so autopilot runs unattended)
+
+Every operation an unattended run needs is reachable through the one CLI:
+
+| Verb | Purpose |
+| --- | --- |
+| `cckit scan` | detect the repo's stack + kit state (emits JSON) |
+| `cckit doctor` | onboarding preflight (deps, gh auth) |
+| `cckit update` | report whether the project is behind the installed cckit |
+| `cckit migrate` | reshuffle an old kit layout to the current one |
+| `cckit digest` | summarize recent activity |
+| `cckit release <ver>` | cut a release — **dry-run by default**, `--publish` to act |
+
 ### Orchestration flags (`orchestrate` / `autopilot`)
 
 | Flag | Effect |
