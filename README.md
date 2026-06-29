@@ -8,10 +8,10 @@
 
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
 [![Built for Claude Code](https://img.shields.io/badge/built%20for-Claude%20Code-8A63D2.svg)](https://docs.claude.com/claude-code)
-[![Docs](https://img.shields.io/badge/docs-cckit.dev-0A7E8C.svg)](https://cckit.dev)
+[![Docs](https://img.shields.io/badge/docs-cckit.vercel.app-0A7E8C.svg)](https://cckit.vercel.app)
 [![Platforms: macOS · Linux · WSL](https://img.shields.io/badge/platforms-macOS%20%C2%B7%20Linux%20%C2%B7%20WSL-555.svg)](#platforms--requirements)
 
-**[📖 Documentation](https://cckit.dev)** · [Quick start](#quick-start) · [Contributing](CONTRIBUTING.md) · [Code of Conduct](CODE_OF_CONDUCT.md)
+**[📖 Documentation](https://cckit.vercel.app)** · [Quick start](#quick-start) · [Contributing](CONTRIBUTING.md) · [Code of Conduct](CODE_OF_CONDUCT.md)
 
 [![Deploy the docs with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/jeiemgi/cckit&project-name=cckit-docs&root-directory=docs-site)
 
@@ -93,7 +93,7 @@ cckit effort plan --llm    # the session-fit work plan as data
 
 ## Documentation
 
-Full docs, the [cookbook](https://cckit.dev/cookbook/) of lifecycle recipes, and the [CLI reference](https://cckit.dev/cli-reference/) live at **[cckit.dev](https://cckit.dev)**.
+Full docs, the [cookbook](https://cckit.vercel.app/cookbook/) of lifecycle recipes, and the [CLI reference](https://cckit.vercel.app/cli-reference/) live at **[cckit.vercel.app](https://cckit.vercel.app)**.
 
 ## Project layout
 
@@ -104,7 +104,7 @@ cckit/
   .claude-plugin/        # the Claude Code plugin manifest
   skills/ commands/      # Claude Code skills + slash commands
   profiles/ templates/   # init profiles + scaffold templates
-  docs-site/             # documentation source — Astro/Starlight (deployed to cckit.dev)
+  docs-site/             # documentation source — Astro/Starlight (deployed to cckit.vercel.app)
   cckit.config.json      # project configuration (no hardcoded org/repo)
 ```
 

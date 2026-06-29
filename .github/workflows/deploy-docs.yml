@@ -1,0 +1,44 @@
+name: deploy-docs
+
+# Auto-deploy the docs site to Vercel production whenever docs-site changes land on main — including
+# the `chore(release): vX` commit, which bumps docs-site/package.json (the version badge), so the
+# live site never drifts behind a release again. Manual `vercel deploy` is no longer the only path.
+#
+# Requires one repo secret: VERCEL_TOKEN (Account Settings → Tokens). The org/project IDs below are
+# identifiers, not secrets (they live in docs-site/.vercel/project.json).
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs-site/**'
+      - '.github/workflows/deploy-docs.yml'
+  workflow_dispatch: {}   # allow a manual redeploy from the Actions tab
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-docs
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: team_BX1Rt1M4OsWTWR5ES8FKhAGW
+      VERCEL_PROJECT_ID: prj_MB2rFra6JH28e5tiwCijWi3CnaPu
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Deploy docs-site to Vercel (production)
+        if: ${{ env.VERCEL_TOKEN != '' }}
+        working-directory: docs-site
+        run: |
+          npm i -g vercel@latest
+          vercel deploy --prod --yes --token="$VERCEL_TOKEN"
+      - name: No token configured
+        if: ${{ env.VERCEL_TOKEN == '' }}
+        run: echo "::warning::VERCEL_TOKEN secret not set — skipping deploy. Add it in Settings → Secrets and variables → Actions."
