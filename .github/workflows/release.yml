@@ -1,0 +1,47 @@
+name: release
+
+# Auto-release on merge to main, driven by Conventional Commits + SemVer (scripts/lib/version-bump.sh
+# is the single source of the bump rules, shared with `cckit release`). Computes the next version
+# from the commits since the last tag; if release-worthy, bumps the manifests, tags, and cuts a
+# GitHub Release with generated notes. npm/Homebrew publishing stays manual (`cckit release <v>
+# --publish`, which needs tokens) until the secrets are wired.
+on:
+  push:
+    branches: [main]
+
+# The version-bump commit + tag are pushed back to main, so it needs write access.
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    # Never react to our own release commit (no loop).
+    if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0      # full history + tags for the version computation
+
+      - name: Compute next version (Conventional Commits)
+        id: ver
+        run: bash scripts/lib/version-bump.sh --emit >> "$GITHUB_OUTPUT"
+
+      - name: Tag + GitHub Release
+        if: ${{ steps.ver.outputs.bump != 'none' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          v="${{ steps.ver.outputs.next }}"
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          bash scripts/lib/version-bump.sh --write "$v"
+          git commit -am "chore(release): v$v"
+          git tag -a "v$v" -m "v$v"
+          git push origin HEAD:main --follow-tags
+          gh release create "v$v" --title "v$v" --generate-notes
