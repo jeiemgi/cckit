@@ -75,6 +75,18 @@ cckit/
   cckit.config.json      # project configuration (no hardcoded org/repo)
 ```
 
+## Built with cckit
+
+Using cckit in your project? Add a badge (optional, but appreciated):
+
+[![Built with cckit](https://img.shields.io/badge/built%20with-cckit-0A7E8C.svg)](https://github.com/jeiemgi/cckit)
+
+```markdown
+[![Built with cckit](https://img.shields.io/badge/built%20with-cckit-0A7E8C.svg)](https://github.com/jeiemgi/cckit)
+```
+
+More variants (HTML, flat-square): [docs/badge.md](docs/badge.md).
+
 ## Contributing
 
 Issues and PRs welcome — see [`CONTRIBUTING.md`](CONTRIBUTING.md). cckit develops itself with its
