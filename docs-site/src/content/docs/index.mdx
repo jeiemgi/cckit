@@ -1,0 +1,34 @@
+---
+title: cckit
+description: A project operating system for coding agents — the full GitHub work lifecycle as a CLI, drivable by Claude Code and any agent.
+template: splash
+hero:
+  tagline: A project operating system for coding agents. The full GitHub work lifecycle as a CLI — drivable by Claude Code and any other agent.
+  actions:
+    - text: Get started
+      link: /getting-started/
+      icon: right-arrow
+    - text: View on GitHub
+      link: https://github.com/jeiemgi/cckit
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## Why cckit
+
+<CardGrid stagger>
+  <Card title="One lifecycle" icon="seti:todo">
+    Start an issue, get an isolated worktree and branch, open a PR, merge, clean up — each step is one command, correct by construction.
+  </Card>
+  <Card title="Agent-operable" icon="puzzle">
+    Every verb has a machine-readable mode (`cckit <verb> --llm`) and an `AGENTS.md` contract, so agents drive the kit without scraping human output.
+  </Card>
+  <Card title="Zero hard dependencies" icon="approve-check">
+    Pure bash with graceful fallbacks; it auto-detects optional tools and degrades instead of failing.
+  </Card>
+  <Card title="Portable" icon="setting">
+    No company, framework, or repo is baked in — everything is driven from `cckit.config.json`.
+  </Card>
+</CardGrid>

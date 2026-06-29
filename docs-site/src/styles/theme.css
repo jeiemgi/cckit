@@ -1,0 +1,6 @@
+/* cckit docs theme — DESIGNER-OWNED.
+   This is the single place the visual theme lives. Current state: Starlight defaults only
+   (placeholder). The Designer replaces this with the real spec:
+     - elegant + sober
+     - cckit's own identity — NEVER Anthropic/Claude colors (no rust-orange/clay)
+   Override Starlight's CSS custom properties here (--sl-color-accent*, fonts, etc.). */
