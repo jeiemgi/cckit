@@ -10,12 +10,19 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --role) ROLE_FILTER="$2"; shift 2 ;;
     --milestone) MS_FILTER="$2"; shift 2 ;;
+    --llm|--output=json) CCKIT_OUTPUT=json; shift ;;
     *) echo "unknown flag: $1" >&2; exit 1 ;;
   esac
 done
 
 ISSUES=$(gh issue list --repo "$KIT_REPO" --state open --limit 200 \
   --json number,title,labels,milestone,assignees,updatedAt,body)
+
+# Structured output for agents: emit the open board as a JSON array and stop (--llm / CCKIT_OUTPUT).
+if [ "${CCKIT_OUTPUT:-human}" = "json" ]; then
+  echo "$ISSUES" | jq -c '[.[] | {number, title, labels: [.labels[].name], milestone: (.milestone.title // null), blocked: ((.body // "") | test("Blocked by"))}]'
+  exit 0
+fi
 
 echo "## Board — $KIT_REPO"
 echo ""
