@@ -22,6 +22,7 @@
 #   cckit doctor                    onboarding preflight (deps, gh auth)
 #   cckit update                    check whether this project is behind the installed cckit
 #   cckit migrate                   reshuffle an old kit layout to the current one
+#   cckit adopt                     record kit-shaped files a repo already has into the manifest
 #   cckit digest                    summarize recent activity
 #   cckit release <ver> [--publish] cut a release (dry-run by default)
 #   cckit version [--llm]           the installed cckit version
@@ -146,6 +147,7 @@ case "$cmd" in
   release)     exec "$ROOT/scripts/publish.sh" "$@" ;;
   update)      exec "$ROOT/scripts/kit-version-check.sh" "$@" ;;
   migrate)     exec "$ROOT/scripts/kit-migrate.sh" "$@" ;;
+  adopt)       exec "$ROOT/scripts/kit-adopt.sh" "$@" ;;
   doctor)      exec "$ROOT/scripts/kit-doctor.sh" "$@" ;;
   digest)      exec "$ROOT/scripts/kit-digest.sh" "$@" ;;
   scan)        source "$LIB/project-scan.sh"; project_scan "$@" ;;
