@@ -4,7 +4,7 @@
 # A stable `url`/`sha256` block is added automatically by the release workflow on the first tag.
 class Cckit < Formula
   desc "Project operating system for coding agents — the full GitHub work lifecycle as a CLI"
-  homepage "https://cckit.dev"
+  homepage "https://cckit.vercel.app"
   license any_of: ["MIT", "Apache-2.0"]
   head "https://github.com/jeiemgi/cckit.git", branch: "main"
 

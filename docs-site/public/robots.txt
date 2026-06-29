@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://cckit.dev/sitemap-index.xml
+Sitemap: https://cckit.vercel.app/sitemap-index.xml
