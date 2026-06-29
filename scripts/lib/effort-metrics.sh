@@ -360,7 +360,7 @@ ${diff}${truncated_note}"
   # Idempotent re-judge: no null-judge row found → overwrite the LAST row for this effort.
   if (( applied == 0 )); then
     : > "$tmp"
-    local lastline; lastline="$(grep -n "\"effort\":$num[,}]" "$f" 2>/dev/null | tail -1 | cut -d: -f1)"
+    local lastline; lastline="$(grep -n "\"effort\":${num}[,}]" "$f" 2>/dev/null | tail -1 | cut -d: -f1)"
     local i=0
     while IFS= read -r rec; do
       i=$((i+1))
