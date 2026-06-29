@@ -92,7 +92,7 @@ wt_bootstrap() {
 # unsure, don't reuse; fall through to create):
 #   • it lives under .claude/worktrees/ (a pooled tree — never the main checkout or the target)
 #   • it is not locked
-#   • its branch is already merged into origin/develop (the committed work landed — recycling it
+#   • its branch is already merged into origin/${KIT_BASE_BRANCH:-main} (the committed work landed — recycling it
 #     destroys nothing; the old branch ref survives in the object store regardless)
 #   • its working tree is clean (no staged/unstaged/untracked changes — recover-before-prune)
 #   • no LIVE session owns it (kit-sessions registry: no live pid sitting in that dir)
@@ -116,11 +116,11 @@ _wt_list() {
   [[ -n "$wt_path" ]] && printf '%s\t%s\t%s\n' "$wt_path" "${branch:--}" "$locked"
 }
 
-# _wt_branch_merged <root> <branch> — true when <branch> is an ancestor of origin/develop (landed).
+# _wt_branch_merged <root> <branch> — true when <branch> is an ancestor of origin/${KIT_BASE_BRANCH:-main} (landed).
 _wt_branch_merged() {
   local root="$1" branch="$2"
   [[ -n "$branch" && "$branch" != "-" ]] || return 1
-  git -C "$root" merge-base --is-ancestor "refs/heads/$branch" origin/develop 2>/dev/null
+  git -C "$root" merge-base --is-ancestor "refs/heads/$branch" origin/${KIT_BASE_BRANCH:-main} 2>/dev/null
 }
 
 # _wt_is_clean <path> — true only when the worktree exists AND has no staged/unstaged/untracked
@@ -178,7 +178,7 @@ wt_pool_status() {
   root="$(git worktree list --porcelain | awk '/^worktree /{print $2; exit}')"
   [[ -n "$root" ]] || { echo "wt_pool_status: not in a git repo" >&2; return 1; }
   wtdir="$root/.claude/worktrees/"
-  git -C "$root" fetch origin develop --quiet 2>/dev/null || true
+  git -C "$root" fetch origin "${KIT_BASE_BRANCH:-main}" --quiet 2>/dev/null || true
   printf '%-44s %-26s %-7s %-6s %-8s %s\n' "WORKTREE" "BRANCH" "MERGED" "CLEAN" "SESSION" "REUSABLE"
   while IFS=$'\t' read -r wt_path branch locked; do
     [[ -n "$wt_path" ]] || continue
@@ -223,7 +223,7 @@ wt_start() {
   branch="$kind/$num-$slug"
   wt="$root/.claude/worktrees/${kind}+${num}-${slug}"
 
-  git -C "$root" fetch origin develop --quiet
+  git -C "$root" fetch origin "${KIT_BASE_BRANCH:-main}" --quiet
   if git -C "$root" worktree list --porcelain | grep -q "/${kind}+${num}-${slug}$"; then
     echo "[#$num] reusing worktree $wt" >&2
   else
@@ -239,13 +239,13 @@ wt_start() {
         # The recycled tree is now at the conventional path with its env + dependencies intact
         # (they moved with the dir — the pool's whole payoff). Re-point it to a fresh branch off
         # the latest develop; the clean+merged+branch-absent preconditions make -B reliable.
-        git -C "$wt" checkout -B "$branch" origin/develop >/dev/null 2>&1 || true
+        git -C "$wt" checkout -B "$branch" origin/${KIT_BASE_BRANCH:-main} >/dev/null 2>&1 || true
         reused="1"
         echo "[#$num] reused idle worktree $wt" >&2
       fi
     fi
     if [[ -z "$reused" ]]; then
-      git -C "$root" worktree add -B "$branch" "$wt" origin/develop >/dev/null 2>&1 \
+      git -C "$root" worktree add -B "$branch" "$wt" origin/${KIT_BASE_BRANCH:-main} >/dev/null 2>&1 \
         || { echo "[#$num] worktree add failed (branch $branch may exist elsewhere)" >&2; return 1; }
       echo "[#$num] created worktree $wt (branch $branch)" >&2
     fi
