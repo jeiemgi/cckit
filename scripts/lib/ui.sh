@@ -7,8 +7,19 @@
 # ui_tty - true only when stdout is a real terminal (so pipes/redirects stay plain).
 ui_tty() { [ -t 1 ]; }
 
-# ui_color - true when we should emit ANSI color: a TTY, NO_COLOR unset, TERM not "dumb".
-ui_color() { ui_tty && [ -z "${NO_COLOR:-}" ] && [ "${TERM:-}" != "dumb" ]; }
+# ui_color - true when we should emit ANSI color. NO_COLOR always wins (disables). Otherwise
+# CCKIT_FORCE_COLOR forces color even without a TTY (screenshots, CI, demos); failing that, color
+# needs a real TTY with a non-"dumb" TERM.
+#
+# We deliberately use a cckit-PRIVATE variable rather than the conventional CLICOLOR_FORCE/
+# FORCE_COLOR: those leak into the subprocesses cckit shells out to, and `gh` (mis)honors
+# CLICOLOR_FORCE by coloring even its `--json` output, which corrupts the JSON cckit then pipes to
+# jq. A private flag colors cckit's own output without poisoning child-process machine output.
+ui_color() {
+  [ -z "${NO_COLOR:-}" ] || return 1
+  [ -n "${CCKIT_FORCE_COLOR:-}" ] && return 0
+  ui_tty && [ "${TERM:-}" != "dumb" ]
+}
 
 # ui_paint <ansi-code> <text> - color text when ui_color, else plain.
 ui_paint() {

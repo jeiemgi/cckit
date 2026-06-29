@@ -40,6 +40,7 @@ export default defineConfig({
           { label: 'Introduction', slug: 'index' },
           { label: 'Getting started', slug: 'getting-started' },
           { label: 'Installing cckit', slug: 'install' },
+          { label: 'Showcase', slug: 'showcase' },
         ]},
         { label: 'Guides', items: [
           { label: 'CLI reference', slug: 'cli-reference' },
