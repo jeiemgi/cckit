@@ -96,6 +96,12 @@ More variants (HTML, flat-square): [docs/badge.md](docs/badge.md).
 Issues and PRs welcome — see [`CONTRIBUTING.md`](CONTRIBUTING.md). cckit develops itself with its
 own lifecycle (`cckit start` / `cckit pr`).
 
+## Support
+
+If cckit saves you time, you can support its development:
+
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-jeiemgi-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/jeiemgi)
+
 ## License
 
 Licensed under either of
