@@ -8,7 +8,8 @@
 #   version-bump.sh --write <version> set the version in cckit.config.json + plugin.json + package.json
 #
 # Bump rules (Conventional Commits): a `feat!:`/`type!:` or a `BREAKING CHANGE` footer -> major;
-# `feat:` -> minor; `fix|perf|refactor|revert:` -> patch; any other commits since the tag -> patch;
+# `feat:` -> minor; `fix|perf|refactor|revert:` -> patch; non-functional types
+# (`docs|chore|style|test|ci|build`) and anything else -> none (no release).
 # no commits -> none (no release).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -21,7 +22,9 @@ vb_level() {
   [ -n "$log" ] || { echo none; return; }
   if printf '%s\n' "$log" | grep -qE '(^|[[:space:]])BREAKING CHANGE|^[a-z]+(\([^)]*\))?!:'; then echo major; return; fi
   if printf '%s\n' "$log" | grep -qE '^feat(\([^)]*\))?:'; then echo minor; return; fi
-  echo patch
+  if printf '%s\n' "$log" | grep -qE '^(fix|perf|refactor|revert)(\([^)]*\))?:'; then echo patch; return; fi
+  # Only non-functional commits (docs/chore/style/test/ci/build, or untyped) -> no release.
+  echo none
 }
 
 vb_next() {
