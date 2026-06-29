@@ -163,6 +163,21 @@ body {
 	margin-top: 1.75rem;
 }
 
+/* Disabled "coming soon" pill — the future cckit.dev domain isn't live yet, so it
+   reads as an inert, muted chip beside the real action buttons (no href, no accent). */
+.coming-soon {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4em;
+	padding: 0.4rem 0.85rem;
+	font-size: var(--sl-text-sm);
+	color: var(--sl-color-gray-3);
+	border: 1px dashed var(--sl-color-hairline);
+	border-radius: 999px;
+	cursor: not-allowed;
+	user-select: none;
+}
+
 /* ── Card icons — unify to the steel-cyan identity ────────────────────── */
 /* Starlight rotates card-icon backgrounds through a multicolor palette (amber/
    lavender/green/pink) that clashes with the sober identity and washes out on
