@@ -43,6 +43,7 @@ export default defineConfig({
         ]},
         { label: 'Guides', items: [
           { label: 'CLI reference', slug: 'cli-reference' },
+          { label: 'Cookbook', slug: 'cookbook' },
           { label: 'Driving cckit from agents', slug: 'agents' },
           { label: 'Adopting cckit', slug: 'adoption' },
           { label: 'Config & permissions', slug: 'config-and-permissions' },

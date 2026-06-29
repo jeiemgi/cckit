@@ -93,7 +93,7 @@ cckit effort plan --llm    # the session-fit work plan as data
 
 ## Documentation
 
-Full docs, the workflows cookbook, and the API reference live at **[cckit.dev](https://cckit.dev)**.
+Full docs, the [cookbook](https://cckit.dev/cookbook/) of lifecycle recipes, and the [CLI reference](https://cckit.dev/cli-reference/) live at **[cckit.dev](https://cckit.dev)**.
 
 ## Project layout
 
@@ -104,7 +104,7 @@ cckit/
   .claude-plugin/        # the Claude Code plugin manifest
   skills/ commands/      # Claude Code skills + slash commands
   profiles/ templates/   # init profiles + scaffold templates
-  docs/                  # documentation source (deployed to cckit.dev)
+  docs-site/             # documentation source — Astro/Starlight (deployed to cckit.dev)
   cckit.config.json      # project configuration (no hardcoded org/repo)
 ```
 
