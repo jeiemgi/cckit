@@ -163,6 +163,44 @@ body {
 	margin-top: 1.75rem;
 }
 
+/* Disabled "coming soon" pill — the future cckit.dev domain isn't live yet, so it
+   reads as an inert, muted chip beside the real action buttons (no href, no accent). */
+.coming-soon {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4em;
+	padding: 0.4rem 0.85rem;
+	font-size: var(--sl-text-sm);
+	color: var(--sl-color-gray-3);
+	border: 1px dashed var(--sl-color-hairline);
+	border-radius: 999px;
+	cursor: not-allowed;
+	user-select: none;
+}
+
+/* Header version badge — a quiet, monospace pill before the social icons. Tells readers which
+   cckit version these docs describe; links to the releases list for older versions. */
+.site-version {
+	display: inline-flex;
+	align-items: center;
+	padding: 0.15rem 0.5rem;
+	margin-inline-end: 0.5rem;
+	font-family: var(--__sl-font-mono, ui-monospace, monospace);
+	font-size: var(--sl-text-xs);
+	font-weight: 600;
+	line-height: 1.4;
+	color: var(--sl-color-accent);
+	background-color: var(--sl-color-accent-low);
+	border: 1px solid var(--sl-color-hairline);
+	border-radius: 999px;
+	text-decoration: none;
+	white-space: nowrap;
+}
+.site-version:hover {
+	color: var(--sl-color-white);
+	background-color: var(--sl-color-accent);
+}
+
 /* ── Card icons — unify to the steel-cyan identity ────────────────────── */
 /* Starlight rotates card-icon backgrounds through a multicolor palette (amber/
    lavender/green/pink) that clashes with the sober identity and washes out on
