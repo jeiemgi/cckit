@@ -15,6 +15,9 @@ adapter one) — is described in [`docs/adapters.md`](docs/adapters.md).
   (pretty) output is the default; agents should prefer `--llm`.
 - **Idempotent + safe.** Re-running a verb on an already-done step is a no-op, not an error.
 - **Never invent paths or config.** Everything resolves from `cckit.config.json`.
+- **Hand off when you stop with unfinished work.** `cckit handoff "<what's pending, next step, refs>"`
+  saves a local resume-here note; bare `cckit` (no verb) prints it so the next session resumes
+  exactly where this one stopped.
 
 ## Core verbs
 

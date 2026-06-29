@@ -4,6 +4,8 @@
 # Driven entirely from cckit.config.json — no org/repo is hardcoded. See AGENTS.md.
 #
 # Usage:
+#   cckit                           resume: print the last session's resume-here handoff
+#   cckit handoff "<note>"          save a resume-here note for the next session
 #   cckit init                      scaffold cckit.config.json + .claude/ for this repo
 #   cckit start <issue> [slug]      isolated worktree + branch for an issue
 #   cckit pr <issue> <summary>      commit + push + open the PR
@@ -56,7 +58,8 @@ done
 set -- "${args[@]+"${args[@]}"}"
 export CCKIT_OUTPUT
 
-cmd="${1:-help}"; shift || true
+# Bare `cckit` (no verb) resumes the last session's handoff (locked behavior).
+cmd="${1:-resume}"; shift || true
 
 case "$cmd" in
   version)
@@ -145,6 +148,8 @@ case "$cmd" in
   digest)      exec "$ROOT/scripts/kit-digest.sh" "$@" ;;
   scan)        source "$LIB/project-scan.sh"; project_scan "$@" ;;
   debug)       exec "$ROOT/scripts/debug.sh" "$@" ;;
+  resume)      source "$LIB/handoff.sh"; handoff_read ;;
+  handoff)     source "$LIB/handoff.sh"; handoff_write "$@" ;;
   init)        exec "$ROOT/scripts/init.sh" "$@" ;;
   help|--help|-h) usage ;;
   *) echo "cckit: unknown command '$cmd' — run 'cckit help'" >&2; exit 2 ;;
