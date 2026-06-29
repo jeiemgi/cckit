@@ -1,0 +1,194 @@
+/* cckit docs theme — DESIGNER-OWNED.
+   This is the single place the visual theme lives. The Designer's spec:
+     - elegant + sober: restrained, high-contrast, calm developer-tool aesthetic
+     - cckit's own identity — NEVER Anthropic/Claude colors (no rust-orange/terracotta/clay)
+   Identity: a sober STEEL-CYAN accent (hue ~195°). Cyan sits opposite Anthropic's warm
+   rust on the color wheel, so "not Anthropic" is structural, not incidental; the steel
+   (desaturated) variant keeps it technical and calm rather than tropical or neon. Accent is
+   a ≤10% spotlight (links + active state only); everything else is cool-tinted neutral.
+   Dark-by-default (devs read beside a dark editor); the light theme is the same brand by day.
+   Override Starlight's CSS custom properties below. Color tokens are hex for predictability;
+   fonts use system stacks only (portable — no web-font downloads, no dependencies). */
+
+/* ── Dark theme (default) ─────────────────────────────────────────────── */
+:root,
+::backdrop {
+	/* Neutrals — cool-charcoal, tinted toward the accent hue. No pure #000. */
+	--sl-color-white: #f1f6f7; /* highest-contrast text */
+	--sl-color-gray-1: #e3e9eb;
+	--sl-color-gray-2: #b5c0c4; /* body text */
+	--sl-color-gray-3: #889399; /* muted / secondary */
+	--sl-color-gray-4: #515b61;
+	--sl-color-gray-5: #2d363a;
+	--sl-color-gray-6: #1a2125; /* panels, inline-code, hairlines */
+	--sl-color-black: #0e1316; /* page background */
+
+	/* Accent — steel cyan (≤10% of the surface: links + active states) */
+	--sl-color-accent-low: #0f3038; /* selection / subtle accent fill */
+	--sl-color-accent: #2c8fa6; /* solid brand accent (active markers, buttons) */
+	--sl-color-accent-high: #8ed3df; /* light accent — headings-on-accent, badge text */
+
+	/* Roles */
+	--sl-color-text: var(--sl-color-gray-2);
+	--sl-color-text-accent: #7ecdda; /* link text — AA on the dark page bg */
+	--sl-color-text-invert: var(--sl-color-black);
+	--sl-color-bg: var(--sl-color-black);
+	--sl-color-bg-nav: #0b1013; /* chrome recedes a touch below content */
+	--sl-color-bg-sidebar: #0b1013;
+	--sl-color-bg-inline-code: var(--sl-color-gray-6);
+	--sl-color-bg-accent: var(--sl-color-accent);
+
+	/* Hairlines — tighter and quieter than the default black-on-black */
+	--sl-color-hairline-light: #2f383c;
+	--sl-color-hairline: #232b2f;
+	--sl-color-hairline-shade: #161d20;
+
+	--sl-color-backdrop-overlay: hsla(198, 22%, 6%, 0.72);
+
+	/* Softer shadows — sober, no heavy drop on dark */
+	--sl-shadow-sm: 0 1px 1px hsla(198, 30%, 3%, 0.4);
+	--sl-shadow-md: 0 2px 2px hsla(198, 30%, 3%, 0.3), 0 4px 6px hsla(198, 30%, 3%, 0.35);
+	--sl-shadow-lg: 0 4px 8px hsla(198, 30%, 3%, 0.3), 0 12px 24px hsla(198, 30%, 3%, 0.45);
+
+	/* Typography — refined system stacks (portable, no downloads).
+	   system-ui resolves to SF Pro / Segoe UI; ui-monospace to SF Mono / Cascadia. */
+	--sl-font: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+		'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+	--sl-font-mono: ui-monospace, 'SF Mono', 'SFMono-Regular', 'Cascadia Code', 'Cascadia Mono',
+		Menlo, Consolas, 'Liberation Mono', 'Roboto Mono', monospace;
+}
+
+/* ── Light theme ──────────────────────────────────────────────────────── */
+:root[data-theme='light'],
+[data-theme='light'] ::backdrop {
+	/* Neutrals — faintly cool paper; near-black ink, never pure #fff. */
+	--sl-color-white: #101719; /* highest-contrast text (ink) */
+	--sl-color-gray-1: #1b2327;
+	--sl-color-gray-2: #39444a; /* body text */
+	--sl-color-gray-3: #5b676d; /* muted / secondary */
+	--sl-color-gray-4: #8a969c;
+	--sl-color-gray-5: #c6ced2;
+	--sl-color-gray-6: #eef2f3;
+	--sl-color-gray-7: #f5f8f8;
+	--sl-color-black: #fbfdfd; /* page background */
+
+	/* Accent — the same steel cyan, darkened for contrast on light paper */
+	--sl-color-accent-low: #d7eef2; /* subtle accent fill */
+	--sl-color-accent: #157387; /* solid brand accent */
+	--sl-color-accent-high: #0a4250; /* deep accent — headings-on-accent */
+
+	/* Roles */
+	--sl-color-text: var(--sl-color-gray-2);
+	--sl-color-text-accent: #0a5666; /* link text — AA on the light page bg */
+	--sl-color-text-invert: var(--sl-color-white);
+	--sl-color-bg: var(--sl-color-black);
+	--sl-color-bg-nav: #f4f8f8;
+	--sl-color-bg-sidebar: #f4f8f8;
+	--sl-color-bg-inline-code: var(--sl-color-gray-6);
+	--sl-color-bg-accent: var(--sl-color-accent);
+
+	/* Hairlines */
+	--sl-color-hairline-light: #eef2f3;
+	--sl-color-hairline: #dde5e7;
+	--sl-color-hairline-shade: #e6eced;
+
+	--sl-color-backdrop-overlay: hsla(198, 18%, 30%, 0.33);
+
+	--sl-shadow-sm: 0 1px 1px hsla(198, 24%, 24%, 0.07), 0 2px 1px hsla(198, 24%, 24%, 0.05);
+	--sl-shadow-md: 0 2px 2px hsla(198, 24%, 24%, 0.06), 0 4px 6px hsla(198, 24%, 24%, 0.08);
+	--sl-shadow-lg: 0 4px 8px hsla(198, 24%, 24%, 0.06), 0 12px 24px hsla(198, 24%, 24%, 0.1);
+}
+
+/* ── Restrained polish ────────────────────────────────────────────────── */
+
+/* Crisp text rendering — small detail, compounds across long docs. */
+body {
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+/* Selection uses the accent, quietly — reinforces identity without shouting. */
+::selection {
+	background: var(--sl-color-accent-low);
+	color: var(--sl-color-white);
+}
+
+/* Tighten heading tracking a hair for a more editorial, composed feel. */
+:where(h1, h2, h3, h4) {
+	letter-spacing: -0.012em;
+}
+
+/* The site title (cckit) is a CLI name — set it in the mono face so the
+   wordmark reads as a tool, not a brand logotype. Sober, on-identity. */
+.site-title {
+	font-family: var(--__sl-font-mono);
+	letter-spacing: -0.02em;
+}
+
+/* ── Homepage hero ────────────────────────────────────────────────────── */
+
+/* Accessible page heading — the wordmark in the banner image carries it
+   visually, so the real <h1> is for screen readers / SEO only. */
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+/* Banner: full-width within the splash column, framed by a quiet hairline.
+   Short by design (3:1) — a header, not a tall billboard. */
+.hero-banner img {
+	display: block;
+	width: 100%;
+	height: auto;
+	border-radius: 0.75rem;
+	border: 1px solid var(--sl-color-hairline);
+	box-shadow: var(--sl-shadow-md);
+}
+
+/* Action links below the banner: one centered row, the accent lives on the
+   primary "Get started" button only (≤10% accent budget). */
+.hero-actions {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	align-items: center;
+	gap: 0.75rem;
+	margin-top: 1.75rem;
+}
+
+/* ── Card icons — unify to the steel-cyan identity ────────────────────── */
+/* Starlight rotates card-icon backgrounds through a multicolor palette (amber/
+   lavender/green/pink) that clashes with the sober identity and washes out on
+   light paper. Force one calm accent treatment, consistent in both themes. */
+.card .icon {
+	background-color: var(--sl-color-accent-low);
+	color: var(--sl-color-accent);
+	border: 1px solid var(--sl-color-hairline);
+}
+
+/* ── Home splash: banner is the visual hero ───────────────────────────── */
+/* The hero banner image carries the title visually, so the auto-generated
+   page <h1> is hidden on the home only (scoped via :has) — it stays in the DOM
+   as the single semantic h1 for SEO/a11y. No duplicate headings. */
+:where(body):has(.hero-banner) h1#_top {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+/* Starlight's per-card icon background palette out-specifies the rule above in the production
+   build (the color won, the background did not). Force one calm steel-cyan tint, both themes. */
+.card .icon { background-color: var(--sl-color-accent-low) !important; }
