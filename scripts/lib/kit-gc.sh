@@ -70,3 +70,48 @@ kit_gc_analyze() {
 kit_gc_has_prunable() {
   kit_gc_analyze 2>/dev/null | grep -q '> SAFE '
 }
+
+# kit_gc_prune [--yes] - remove worktrees + local branches whose PR is MERGED (the SAFE rows).
+# DRY-RUN by default (lists what it WOULD remove); --yes performs the deletions. Never touches a
+# PROTECTED/ACTIVE/ORPHAN branch, and never a DIRTY worktree (recover-before-prune): a worktree with
+# staged/unstaged/untracked changes is skipped with a warning, not destroyed. The remote branch is
+# already deleted at merge time (gh pr merge --delete-branch); this cleans up the local side.
+kit_gc_prune() {
+  _kit_gc_load_deps
+  local repo="$KIT_GC_REPO" yes=0 a path ref b pr
+  for a in "$@"; do case "$a" in --yes|-y) yes=1 ;; esac; done
+
+  # Worktrees first - a branch's worktree must be removed before the branch can be deleted.
+  git worktree list --porcelain 2>/dev/null \
+    | awk '/^worktree /{w=$2} /^branch /{print w" "$2}' \
+    | while read -r path ref; do
+        b="${ref#refs/heads/}"
+        case "$b" in develop|main|"") continue ;; esac
+        [ -n "$(wt_protected_reason "$b" "$repo" 2>/dev/null || true)" ] && continue
+        pr="$(gh pr list --repo "$repo" --head "$b" --state all --json state --jq '.[0].state' 2>/dev/null || true)"
+        [ "$pr" = "MERGED" ] || continue
+        if [ -n "$(git -C "$path" status --porcelain 2>/dev/null)" ]; then
+          echo "  SKIP dirty worktree $path [$b] - commit/recover before pruning" >&2; continue
+        fi
+        if [ "$yes" -eq 1 ]; then
+          git worktree remove --force "$path" 2>/dev/null && echo "  removed worktree $path [$b]"
+        else
+          echo "  would remove worktree $path [$b] (PR MERGED)"
+        fi
+      done
+  git worktree prune 2>/dev/null || true
+
+  # Then local branches whose PR merged (worktree now gone).
+  for b in $(git branch --format='%(refname:short)' 2>/dev/null); do
+    case "$b" in develop|main) continue ;; esac
+    [ -n "$(wt_protected_reason "$b" "$repo" 2>/dev/null || true)" ] && continue
+    pr="$(gh pr list --repo "$repo" --head "$b" --state all --json state --jq '.[0].state' 2>/dev/null || true)"
+    [ "$pr" = "MERGED" ] || continue
+    if [ "$yes" -eq 1 ]; then
+      git branch -D "$b" >/dev/null 2>&1 && echo "  deleted local branch $b (PR MERGED)"
+    else
+      echo "  would delete local branch $b (PR MERGED)"
+    fi
+  done
+  [ "$yes" -eq 1 ] && echo "gc prune: done" || echo "gc prune: DRY RUN - pass --yes to delete"
+}
