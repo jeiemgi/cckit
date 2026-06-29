@@ -1,0 +1,40 @@
+---
+title: cckit — a project OS for coding agents
+description: A project operating system for coding agents — the full GitHub work lifecycle as a CLI, drivable by Claude Code and any agent.
+template: splash
+---
+
+import { Image } from 'astro:assets';
+import { Card, CardGrid, LinkButton } from '@astrojs/starlight/components';
+import banner from '../../assets/hero-banner.png';
+
+<div class="hero-banner">
+  <Image
+    src={banner}
+    alt="cckit — the full GitHub work lifecycle as a CLI, drivable by Claude Code and any agent"
+    loading="eager"
+  />
+</div>
+
+<div class="hero-actions">
+  <LinkButton href="/getting-started/" icon="right-arrow" iconPlacement="end">Get started</LinkButton>
+  <LinkButton href="https://github.com/jeiemgi/cckit" variant="secondary" icon="external">GitHub</LinkButton>
+  <LinkButton href="https://vercel.com/new/clone?repository-url=https://github.com/jeiemgi/cckit" variant="minimal" icon="external">Deploy to Vercel</LinkButton>
+</div>
+
+## Why cckit
+
+<CardGrid stagger>
+  <Card title="One lifecycle" icon="seti:todo">
+    Start an issue, get an isolated worktree and branch, open a PR, merge, clean up — each step is one command, correct by construction.
+  </Card>
+  <Card title="Agent-operable" icon="puzzle">
+    Every verb has a machine-readable mode (`cckit <verb> --llm`) and an `AGENTS.md` contract, so agents drive the kit without scraping human output.
+  </Card>
+  <Card title="Zero hard dependencies" icon="approve-check">
+    Pure bash with graceful fallbacks; it auto-detects optional tools and degrades instead of failing.
+  </Card>
+  <Card title="Portable" icon="setting">
+    No company, framework, or repo is baked in — everything is driven from `cckit.config.json`.
+  </Card>
+</CardGrid>

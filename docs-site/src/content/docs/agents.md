@@ -1,50 +1,37 @@
-# AGENTS.md — driving cckit from an agent
+---
+title: Driving cckit from agents
+description: cckit is agent-agnostic — any agent that can run a shell can drive the full lifecycle.
+---
 
-cckit is agent-agnostic. Claude Code is first-class (skills + slash commands), but any agent that
-can run a shell can drive the full lifecycle. This file is the contract.
+cckit is agent-agnostic. Claude Code is first-class (skills + slash commands), but any agent that can
+run a shell can drive the full lifecycle. The contract lives in `AGENTS.md` at the repo root.
 
 ## Ground rules
 
 - **Read state before acting.** `cckit sync --llm` returns the board as JSON. Decide from data.
 - **One issue = one branch = one worktree = one PR.** `cckit start <issue>` creates the isolated
   worktree; do all work there; `cckit pr <issue>` opens the PR. Never commit to the base branch.
-- **Structured output.** Append `--llm` to any verb for machine-readable (JSON) output. Human
-  (pretty) output is the default; agents should prefer `--llm`.
+- **Structured output.** Append `--llm` to any verb for machine-readable (JSON) output.
 - **Idempotent + safe.** Re-running a verb on an already-done step is a no-op, not an error.
 - **Never invent paths or config.** Everything resolves from `cckit.config.json`.
 
-## Core verbs
-
-| Verb | Purpose | LLM mode |
-| --- | --- | --- |
-| `cckit init` | scaffold config + `.claude/` | — |
-| `cckit sync` | board state / what's unblocked | `--llm` → JSON |
-| `cckit start <issue> [slug]` | isolated worktree + branch | `--llm` |
-| `cckit pr <issue> <summary>` | commit + push + open PR | `--llm` |
-| `cckit close <issue> <summary>` | close issue + mark done | `--llm` |
-| `cckit effort plan` | session-fit work plan | `--llm` → JSON |
-| `cckit orchestrate <a> <b> …` | run N flows in parallel worktrees | — |
-| `cckit gc` | prune merged branches + worktrees | `--llm` |
-| `cckit version` | the installed cckit version | `--llm` |
-
-## The agent loop (reference)
+## The agent loop
 
 1. `cckit sync --llm` → pick an unblocked issue.
 2. `cckit start <issue>` → enter the worktree it prints.
 3. Implement; commit early and often.
 4. `cckit pr <issue> "<summary>"` → open the PR; report the URL.
-5. Stop. Merging is a human/captain decision unless an approved plan says otherwise.
+5. Stop. Merging is a human decision unless an approved plan says otherwise.
 
 ## Model endpoint
 
 cckit shells out to whatever agent invokes it; it does not embed a model. For verbs that synthesize
-text (digests, ingest), the model endpoint is configurable via environment — see `docs/` on
-[cckit.dev](https://cckit.dev).
+text, the model endpoint is configurable via environment.
 
 ## Paste-ready agent prompt
 
-Drop this verbatim into your agent's system prompt (or the first message of a session) to make it
-operate the repo through cckit. It is self-contained.
+Drop this verbatim into your agent's system prompt (or the first message of a session). It is
+self-contained and not repo-specific, so it works for any project that has run `cckit init`.
 
 ```text
 You operate this repository through cckit, a CLI that runs the full GitHub work lifecycle.
@@ -62,6 +49,3 @@ Operating rules:
    everything resolves from cckit.config.json.
 7. If a command fails, read its stderr and fix the cause. Do not work around the kit.
 ```
-
-Copy the fenced block above. Nothing in it is repo-specific, so it works for any project that has
-run `cckit init`.
