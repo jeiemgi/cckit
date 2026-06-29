@@ -1,0 +1,22 @@
+{
+  "$comment": "Showcase dataset — read-only / dry-run cckit invocations rendered to screenshots by scripts/showcase.sh (charmbracelet/freeze). Each entry: name (file slug), group, title, cmd (executed via freeze --execute), show (optional display string for the gallery). NO mutating verbs here — every command is safe to run repeatedly.",
+  "commands": [
+    { "name": "version",        "group": "Basics",            "title": "Print the installed version",                "cmd": "cckit version" },
+    { "name": "version-json",   "group": "Basics",            "title": "Version as structured data (--llm)",          "cmd": "cckit version --llm" },
+    { "name": "help",           "group": "Basics",            "title": "The full verb list",                          "cmd": "cckit help" },
+    { "name": "commands",       "group": "Basics",            "title": "The command catalog",                         "cmd": "cckit commands" },
+    { "name": "completions",    "group": "Basics",            "title": "Generate shell completion",                   "cmd": "cckit completions bash" },
+
+    { "name": "sync",           "group": "Board & lifecycle", "title": "Board state — what's open and unblocked",     "cmd": "cckit sync" },
+    { "name": "sync-json",      "group": "Board & lifecycle", "title": "Board state as data for an agent (--llm)",    "cmd": "cckit sync --llm" },
+    { "name": "status",         "group": "Board & lifecycle", "title": "Thin dashboard — board, worktrees, handoff",  "cmd": "cckit status" },
+
+    { "name": "scan",           "group": "Project intelligence", "title": "Detect this repo's stack + kit state",     "cmd": "cckit scan" },
+    { "name": "scan-json",      "group": "Project intelligence", "title": "Stack + kit state as JSON (--llm)",        "cmd": "cckit scan --llm" },
+    { "name": "gc",             "group": "Project intelligence", "title": "Report merged branches + worktrees",       "cmd": "cckit gc" },
+
+    { "name": "orchestrate",    "group": "Orchestration",     "title": "Plan N parallel flows (dry-run)",             "cmd": "cckit orchestrate --dry-run 46 47 48" },
+
+    { "name": "encode-context", "group": "Utilities",         "title": "Compact uniform JSON into TOON",              "cmd": "printf '[{\"issue\":46,\"title\":\"test runner\",\"state\":\"open\"},{\"issue\":47,\"title\":\"lifecycle verbs\",\"state\":\"open\"}]' | cckit encode-context", "show": "echo '[…uniform array…]' | cckit encode-context" }
+  ]
+}
