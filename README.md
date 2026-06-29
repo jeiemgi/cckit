@@ -6,6 +6,10 @@
 [![Built for Claude Code](https://img.shields.io/badge/built%20for-Claude%20Code-8A63D2.svg)](https://docs.claude.com/claude-code)
 [![Docs](https://img.shields.io/badge/docs-cckit.dev-0A7E8C.svg)](https://cckit.dev)
 
+**[📖 Documentation](https://cckit.dev)** · [Quick start](#quick-start) · [Contributing](CONTRIBUTING.md) · [Code of Conduct](CODE_OF_CONDUCT.md)
+
+[![Deploy the docs with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/jeiemgi/cckit&project-name=cckit-docs&root-directory=docs-site)
+
 cckit turns a Git repository into a structured, agent-operable workspace. It ships the entire
 GitHub lifecycle — issues, branches, isolated worktrees, PRs, the merge flow, garbage collection,
 and a multi-agent orchestrator — as a single bash CLI plus a Claude Code plugin (skills, rules,
