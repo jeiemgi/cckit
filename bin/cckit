@@ -16,7 +16,15 @@
 #   cckit help
 set -eu
 
-BIN="$(cd "$(dirname "$0")" && pwd)"
+# Resolve this script through symlinks — Homebrew and scripts/install.sh link bin/cckit onto
+# PATH, so $0 may be a symlink; follow it to find the real repo root (where scripts/lib lives).
+SOURCE="${BASH_SOURCE[0]:-$0}"
+while [ -h "$SOURCE" ]; do
+  _dir="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  case "$SOURCE" in /*) ;; *) SOURCE="$_dir/$SOURCE" ;; esac
+done
+BIN="$(cd -P "$(dirname "$SOURCE")" && pwd)"
 ROOT="$(cd "$BIN/.." && pwd)"
 LIB="$ROOT/scripts/lib"
 export KIT_CONFIG="${KIT_CONFIG:-$ROOT/cckit.config.json}"
