@@ -1,0 +1,20 @@
+---
+// Override of Starlight's header SocialIcons slot: prepend a version badge that links to the
+// GitHub releases list, then render the default social icons. The badge tells readers which
+// cckit version these docs describe; the release list is how older docs are reached (each
+// release is a git tag — browse the repo at that tag for the docs of the day).
+import Default from '@astrojs/starlight/components/SocialIcons.astro';
+
+const version = __CCKIT_VERSION__;
+---
+
+<a
+  class="site-version"
+  href="https://github.com/jeiemgi/cckit/releases"
+  target="_blank"
+  rel="noopener noreferrer"
+  title={`cckit v${version} — browse all releases (older docs live at each tag)`}
+>
+  v{version}
+</a>
+<Default><slot /></Default>
