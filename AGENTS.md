@@ -3,6 +3,9 @@
 cckit is agent-agnostic. Claude Code is first-class (skills + slash commands), but any agent that
 can run a shell can drive the full lifecycle. This file is the contract.
 
+The two-layer split — an agnostic core (this contract) and per-agent adapters (Claude Code is
+adapter one) — is described in [`docs/adapters.md`](docs/adapters.md).
+
 ## Ground rules
 
 - **Read state before acting.** `cckit sync --llm` returns the board as JSON. Decide from data.
