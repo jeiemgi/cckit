@@ -22,7 +22,7 @@
     "dir": ""
   },
   "knowledge": {
-    "dir": "docs"
+    "dir": "docs-site/src/content/docs"
   },
   "memory": {
     "enabled": false,

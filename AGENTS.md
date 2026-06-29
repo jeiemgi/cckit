@@ -4,7 +4,7 @@ cckit is agent-agnostic. Claude Code is first-class (skills + slash commands), b
 can run a shell can drive the full lifecycle. This file is the contract.
 
 The two-layer split — an agnostic core (this contract) and per-agent adapters (Claude Code is
-adapter one) — is described in [`docs/adapters.md`](docs/adapters.md).
+adapter one) — is described in [the Adapters page](docs-site/src/content/docs/adapters.md).
 
 ## Ground rules
 
@@ -72,7 +72,7 @@ Every operation an unattended run needs is reachable through the one CLI:
 ## Model endpoint
 
 cckit shells out to whatever agent invokes it; it does not embed a model. For verbs that synthesize
-text (digests, ingest), the model endpoint is configurable via environment — see `docs/` on
+text (digests, ingest), the model endpoint is configurable via environment — see the docs site (
 [cckit.dev](https://cckit.dev).
 
 ## Paste-ready agent prompt
