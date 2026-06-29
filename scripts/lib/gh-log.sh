@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # gh-log.sh — log every GitHub API call the kit makes + estimate its secondary
 # rate-limit POINT cost, so throttling is diagnosable instead of mysterious.
 #

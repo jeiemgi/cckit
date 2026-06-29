@@ -667,7 +667,7 @@ for s in $SKILLS; do
   # If prefixed AND this was a FRESH scaffold (frontmatter still bare), rewrite name + sibling refs.
   # An existing (preserved) skill already reads `name: $dest_name`, so the guard skips it.
   if [[ "$dest_name" != "$s" && -f "$TARGET/.claude/skills/$dest_name/SKILL.md" ]] \
-     && grep -qE "^name:[[:space:]]*$s[[:space:]]*\$" "$TARGET/.claude/skills/$dest_name/SKILL.md"; then
+     && grep -qE "^name:[[:space:]]*${s}[[:space:]]*\$" "$TARGET/.claude/skills/$dest_name/SKILL.md"; then
     _prefix_skill_file "$TARGET/.claude/skills/$dest_name/SKILL.md"
   fi
   echo "  + .claude/skills/$dest_name/SKILL.md"
