@@ -1,4 +1,7 @@
-# Adapters — the agnostic core and its agent layers
+---
+title: Adapters
+description: The agnostic core and the per-agent adapters (Claude Code is adapter one).
+---
 
 cckit is split in two so that **any** coding agent can drive it, while a specific agent (Claude
 Code) gets a first-class, native experience. Understanding this split is the key to extending
@@ -17,7 +20,7 @@ nothing in it is specific to any agent.
 | `scripts/*.sh` | the runnable ops (publish, migrate, doctor, digest, ...) |
 | `cckit.config.json` | the only source of repo/owner/base-branch/config — nothing is hardcoded |
 
-The contract the core exposes to agents is in [`AGENTS.md`](../AGENTS.md): every verb, its args, and
+The contract the core exposes to agents is in [`AGENTS.md`](https://github.com/jeiemgi/cckit/blob/main/AGENTS.md): every verb, its args, and
 its `--llm` (JSON) output. An agent that can run a shell and parse JSON can drive the whole
 lifecycle through this contract alone. The core never assumes a particular agent is calling it.
 
