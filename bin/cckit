@@ -105,7 +105,21 @@ case "$cmd" in
     esac
     ;;
   sync)        exec "$ROOT/scripts/task-sync.sh" "$@" ;;
-  gc)          source "$LIB/kit-gc.sh"; kit_gc_report "$@" ;;
+  gc)
+    # shellcheck source=/dev/null
+    source "$LIB/kit-config.sh" && load_kit_config
+    # shellcheck source=/dev/null
+    source "$LIB/kit-gc.sh"
+    if cckit_is_json; then
+      out="$(kit_gc_analyze 2>/dev/null || true)"
+      safe="$(printf '%s\n' "$out" | grep -c '> SAFE ' || true)"
+      protected="$(printf '%s\n' "$out" | grep -c 'PROTECTED:' || true)"
+      orphan="$(printf '%s\n' "$out" | grep -c 'ORPHAN' || true)"
+      cckit_json verb gc safe "$safe" protected "$protected" orphan "$orphan"
+    else
+      kit_gc_analyze "$@"
+    fi
+    ;;
   orchestrate) exec "$ROOT/scripts/orchestrate.sh" "$@" ;;
   autopilot)   exec "$ROOT/scripts/autopilot.sh" "$@" ;;
   init)        exec "$ROOT/scripts/init.sh" "$@" ;;

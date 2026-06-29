@@ -23,9 +23,24 @@ can run a shell can drive the full lifecycle. This file is the contract.
 | `cckit pr <issue> <summary>` | commit + push + open PR | `--llm` |
 | `cckit close <issue> <summary>` | close issue + mark done | `--llm` |
 | `cckit effort plan` | session-fit work plan | `--llm` → JSON |
-| `cckit orchestrate <a> <b> …` | run N flows in parallel worktrees | — |
-| `cckit gc` | prune merged branches + worktrees | `--llm` |
+| `cckit orchestrate <a> <b> …` | run N flows in parallel worktrees | — (use `--dry-run`) |
+| `cckit autopilot [<a> …]` | unattended multi-flow: drive (or auto-pick) issues under a cap | — (use `--dry-run`) |
+| `cckit gc` | report prunable branches + worktrees | `--llm` → JSON counts |
 | `cckit version` | the installed cckit version | `--llm` |
+
+Every verb accepts a global `--llm` (alias `--output=json`); verbs that produce a result emit a
+single JSON object/array on stdout, with human text on stderr. Interactive/launch verbs
+(`init`, `orchestrate`, `autopilot`) have no JSON result — use `--dry-run` to inspect their plan.
+
+### Orchestration flags (`orchestrate` / `autopilot`)
+
+| Flag | Effect |
+| --- | --- |
+| `--dry-run` | resolve + print the launch plan; create no worktrees, start nothing |
+| `--cap <N>` | concurrency cap (default 4); flows past the cap are queued + reported |
+| `--agent <cmd>` | per-pane agent command (default `claude`, or `CCKIT_AGENT=`) — drive any CLI agent |
+| `--force` | launch even if an issue is `blocked_by` an OPEN issue (the gate is on by default) |
+| `--no-seed` | start the agent without an auto-prompt |
 
 ## The agent loop (reference)
 
