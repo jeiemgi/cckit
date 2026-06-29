@@ -26,6 +26,8 @@
 #   cckit digest                    summarize recent activity
 #   cckit release <ver> [--publish] cut a release (dry-run by default)
 #   cckit version [--llm]           the installed cckit version
+#   cckit commands [--llm]          list every verb (the command catalog)
+#   cckit completions [bash|zsh]    print a shell-completion script to source
 #   cckit help
 set -eu
 
@@ -46,6 +48,9 @@ cd "$ROOT"
 # Structured-output helpers (cckit_is_json / cckit_json) — wired into every verb below.
 # shellcheck source=/dev/null
 source "$LIB/cckit-output.sh"
+# Terminal ergonomics (color/tty gating, optional glow/fzf) — detect-or-fallback, never required.
+# shellcheck source=/dev/null
+source "$LIB/ui.sh"
 
 usage() { sed -n '/^# Usage:/,/^[^#]/p' "$BIN/cckit" | sed '1d;$d;s/^# \{0,1\}//'; }
 
@@ -67,7 +72,7 @@ cmd="${1:-resume}"; shift || true
 case "$cmd" in
   version)
     v="$(jq -r '.kitVersion // "0.0.0"' "$KIT_CONFIG" 2>/dev/null || echo 0.0.0)"
-    if cckit_is_json; then cckit_json version "$v"; else echo "cckit $v"; fi
+    if cckit_is_json; then cckit_json version "$v"; else echo "cckit $(ui_paint '1;36' "$v")"; fi
     ;;
   effort)
     # shellcheck source=/dev/null
@@ -157,6 +162,18 @@ case "$cmd" in
   resume)      source "$LIB/handoff.sh"; handoff_read ;;
   handoff)     source "$LIB/handoff.sh"; handoff_write "$@" ;;
   init)        exec "$ROOT/scripts/init.sh" "$@" ;;
+  commands)
+    # The command catalog - verbs parsed from this dispatcher's own case labels (single source).
+    verbs="$(grep -oE '^  [a-z][a-z|-]*\)' "$BIN/cckit" | sed 's/[) ]//g' | tr '|' '\n' | grep -vE '^(-|$)' | sort -u)"
+    if cckit_is_json; then printf '%s\n' "$verbs" | jq -R . | jq -cs .; else printf '%s\n' "$verbs" | tr '\n' ' '; echo; fi
+    ;;
+  completions)
+    case "${1:-bash}" in
+      bash) cat "$ROOT/completions/cckit.bash" ;;
+      zsh)  echo "autoload -Uz bashcompinit && bashcompinit"; cat "$ROOT/completions/cckit.bash" ;;
+      *)    echo "cckit completions [bash|zsh]" >&2; exit 2 ;;
+    esac
+    ;;
   help|--help|-h) usage ;;
   *) echo "cckit: unknown command '$cmd' — run 'cckit help'" >&2; exit 2 ;;
 esac
