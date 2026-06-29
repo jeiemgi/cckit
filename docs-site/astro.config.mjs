@@ -26,13 +26,18 @@ export default defineConfig({
         { label: 'Start', items: [
           { label: 'Introduction', slug: 'index' },
           { label: 'Getting started', slug: 'getting-started' },
+          { label: 'Installing cckit', slug: 'install' },
         ]},
         { label: 'Guides', items: [
           { label: 'CLI reference', slug: 'cli-reference' },
           { label: 'Driving cckit from agents', slug: 'agents' },
+          { label: 'Adopting cckit', slug: 'adoption' },
           { label: 'Config & permissions', slug: 'config-and-permissions' },
+          { label: 'Browser debug', slug: 'debug' },
         ]},
         { label: 'Reference', items: [
+          { label: 'Adapters', slug: 'adapters' },
+          { label: 'Releasing', slug: 'releasing' },
           { label: 'Security & secret guard', slug: 'security' },
           { label: '"Built with cckit" badge', slug: 'badge' },
         ]},

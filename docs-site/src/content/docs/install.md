@@ -1,4 +1,7 @@
-# Installing cckit
+---
+title: Installing cckit
+description: "Put cckit on your PATH: install paths, dependencies, IDE config, and the safety gate."
+---
 
 cckit is pure bash over `git`, `gh`, and `jq`. There is no build step — installing it just puts the
 `cckit` dispatcher on your PATH. Pick whichever fits.
@@ -47,14 +50,14 @@ cckit scan          # what's here already
 cckit init          # scaffold cckit.config.json + .claude/ (greenfield)
 ```
 
-See [adoption.md](adoption.md) for adopting an existing kit-shaped repo.
+See [adoption.md](/adoption/) for adopting an existing kit-shaped repo.
 
 ## Claude Code (IDE) config
 
 cckit ships as a Claude Code plugin (`.claude-plugin/plugin.json` + `commands/` + `skills/`). With
 the repo present, Claude Code discovers the `/kit-*` slash commands and skills. `cckit init`
 scaffolds a project's `.claude/` (agents, hooks, rules, settings) from a profile, so the editor
-picks up the kit's conventions. Other agents drive the same CLI via [AGENTS.md](../AGENTS.md) — no
+picks up the kit's conventions. Other agents drive the same CLI via [AGENTS.md](https://github.com/jeiemgi/cckit/blob/main/AGENTS.md) — no
 IDE required.
 
 ## Safety / permission gate

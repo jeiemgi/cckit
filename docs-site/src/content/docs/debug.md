@@ -1,4 +1,7 @@
-# Browser debug (`cckit debug`) — optional capability
+---
+title: Browser debug
+description: Optional, auto-detected browser debugging via chrome-devtools-axi.
+---
 
 `cckit debug` gives an agent a token-efficient, scriptable browser-debug path — screenshots,
 accessibility snapshots, console + network logs, Lighthouse — by driving

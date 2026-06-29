@@ -1,4 +1,7 @@
-# Adopting cckit in a repo
+---
+title: Adopting cckit
+description: Issue-driven, incremental adoption of cckit in any repo.
+---
 
 Adoption is **issue-driven** and incremental: file an issue for it, then walk the steps below. Every
 step is a single cckit verb, so an agent can perform the whole adoption unattended and report back.

@@ -1,4 +1,7 @@
-# Releasing cckit — the versioning protocol
+---
+title: Releasing
+description: SemVer + Conventional Commits versioning, with auto-release on merge.
+---
 
 cckit follows **[Semantic Versioning](https://semver.org/)** driven by
 **[Conventional Commits](https://www.conventionalcommits.org/)**. Versioning is automatic: the
