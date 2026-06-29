@@ -14,6 +14,7 @@
 #   cckit autopilot [<a> …]         unattended multi-flow: drive (or auto-pick) issues under a cap
 #   cckit gc [--prune [--yes]]      report (default) or prune merged branches + worktrees
 #   cckit scan [--llm]              detect this repo's stack + kit state (JSON)
+#   cckit debug [--check] <args>    optional browser-debug via chrome-devtools-axi (auto-detected)
 #   cckit doctor                    onboarding preflight (deps, gh auth)
 #   cckit update                    check whether this project is behind the installed cckit
 #   cckit migrate                   reshuffle an old kit layout to the current one
@@ -143,6 +144,7 @@ case "$cmd" in
   doctor)      exec "$ROOT/scripts/kit-doctor.sh" "$@" ;;
   digest)      exec "$ROOT/scripts/kit-digest.sh" "$@" ;;
   scan)        source "$LIB/project-scan.sh"; project_scan "$@" ;;
+  debug)       exec "$ROOT/scripts/debug.sh" "$@" ;;
   init)        exec "$ROOT/scripts/init.sh" "$@" ;;
   help|--help|-h) usage ;;
   *) echo "cckit: unknown command '$cmd' — run 'cckit help'" >&2; exit 2 ;;
