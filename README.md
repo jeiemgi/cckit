@@ -1,3 +1,7 @@
+<p align="center">
+  <img src=".github/banner.png" alt="cckit — a project operating system for coding agents" width="100%">
+</p>
+
 # cckit
 
 > A project operating system for coding agents — the full GitHub work lifecycle as a CLI, drivable by Claude Code and any other agent.
@@ -5,6 +9,11 @@
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
 [![Built for Claude Code](https://img.shields.io/badge/built%20for-Claude%20Code-8A63D2.svg)](https://docs.claude.com/claude-code)
 [![Docs](https://img.shields.io/badge/docs-cckit.dev-0A7E8C.svg)](https://cckit.dev)
+[![Platforms: macOS · Linux · WSL](https://img.shields.io/badge/platforms-macOS%20%C2%B7%20Linux%20%C2%B7%20WSL-555.svg)](#platforms--requirements)
+
+**[📖 Documentation](https://cckit.dev)** · [Quick start](#quick-start) · [Contributing](CONTRIBUTING.md) · [Code of Conduct](CODE_OF_CONDUCT.md)
+
+[![Deploy the docs with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/jeiemgi/cckit&project-name=cckit-docs&root-directory=docs-site)
 
 cckit turns a Git repository into a structured, agent-operable workspace. It ships the entire
 GitHub lifecycle — issues, branches, isolated worktrees, PRs, the merge flow, garbage collection,
@@ -25,14 +34,38 @@ a shell can drive every operation.
 
 ## Install
 
-```bash
-# Homebrew (planned)
-# brew install jeiemgi/tap/cckit
+**One-liner (macOS · Linux · WSL):**
 
-# From source
+```bash
+curl -fsSL https://raw.githubusercontent.com/jeiemgi/cckit/main/scripts/web-install.sh | bash
+```
+
+**Homebrew** (once the tap is published):
+
+```bash
+brew tap jeiemgi/cckit && brew install cckit
+```
+
+**npm** (the bare `cckit` name is taken, so cckit is scoped):
+
+```bash
+npm install -g @jeiemgi/cckit
+```
+
+**From source:**
+
+```bash
 git clone https://github.com/jeiemgi/cckit.git
 cd cckit && ./scripts/install.sh    # symlinks bin/cckit onto your PATH
 ```
+
+### Platforms & requirements
+
+| Platform | Supported |
+| --- | --- |
+| macOS | ✅ native |
+| Linux | ✅ native |
+| Windows | ✅ via WSL or Git Bash (not native cmd/PowerShell) |
 
 Requirements: `bash` 4+, `git`, and `gh` (GitHub CLI) authenticated. `jq` recommended.
 
@@ -91,6 +124,12 @@ More variants (HTML, flat-square): [docs/badge.md](docs/badge.md).
 
 Issues and PRs welcome — see [`CONTRIBUTING.md`](CONTRIBUTING.md). cckit develops itself with its
 own lifecycle (`cckit start` / `cckit pr`).
+
+## Support
+
+If cckit saves you time, you can support its development:
+
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-jeiemgi-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/jeiemgi)
 
 ## License
 
