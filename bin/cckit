@@ -101,6 +101,8 @@ case "$cmd" in
   effort)
     # shellcheck source=/dev/null
     source "$LIB/effort.sh"
+    # shellcheck source=/dev/null
+    source "$LIB/effort-ops.sh"   # the new|start|pr|close lifecycle ops (compose effort.sh helpers)
     sub="${1:-}"; shift || true
     case "$sub" in
       new)   effort_new   "$@" ;;
