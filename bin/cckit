@@ -7,7 +7,7 @@
 #   cckit                           resume: print the last session's resume-here handoff
 #   cckit handoff "<note>"          save a resume-here note for the next session
 #   cckit install [bin-dir]         symlink cckit onto your PATH (global install)
-#   cckit init                      scaffold cckit.config.json + .claude/ for this repo
+#   cckit init --profile <p>        scaffold cckit.config.json + .claude/ (--profile required)
 #   cckit start <issue> [slug]      isolated worktree + branch for an issue
 #   cckit pr <issue> <summary>      commit + push + open the PR
 #   cckit close <issue> <summary>   close issue + mark done
@@ -25,7 +25,7 @@
 #   cckit update                    check whether this project is behind the installed cckit
 #   cckit migrate                   reshuffle an old kit layout to the current one
 #   cckit adopt                     record kit-shaped files a repo already has into the manifest
-#   cckit digest                    summarize recent activity
+#   cckit digest <path|url>         summarize a file or URL (local model)
 #   cckit release <ver> [--publish] cut a release (dry-run by default)
 #   cckit version [--llm]           the installed cckit version
 #   cckit commands [--llm]          list every verb (the command catalog)
