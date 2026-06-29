@@ -10,7 +10,8 @@
 #   cckit close <issue> <summary>   close issue + mark done
 #   cckit sync [--llm]              board state / what's unblocked
 #   cckit effort <new|start|pr|close|plan>   the effort lifecycle
-#   cckit orchestrate <a> <b> …     run N flows in parallel worktrees
+#   cckit orchestrate <a> <b> …     run N flows in parallel worktrees (--dry-run/--cap/--agent)
+#   cckit autopilot [<a> …]         unattended multi-flow: drive (or auto-pick) issues under a cap
 #   cckit gc                        prune merged branches + worktrees
 #   cckit version [--llm]           the installed cckit version
 #   cckit help
@@ -106,6 +107,7 @@ case "$cmd" in
   sync)        exec "$ROOT/scripts/task-sync.sh" "$@" ;;
   gc)          source "$LIB/kit-gc.sh"; kit_gc_report "$@" ;;
   orchestrate) exec "$ROOT/scripts/orchestrate.sh" "$@" ;;
+  autopilot)   exec "$ROOT/scripts/autopilot.sh" "$@" ;;
   init)        exec "$ROOT/scripts/init.sh" "$@" ;;
   help|--help|-h) usage ;;
   *) echo "cckit: unknown command '$cmd' — run 'cckit help'" >&2; exit 2 ;;
