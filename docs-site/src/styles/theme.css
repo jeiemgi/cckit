@@ -172,3 +172,19 @@ body {
 	color: var(--sl-color-accent);
 	border: 1px solid var(--sl-color-hairline);
 }
+
+/* ── Home splash: banner is the visual hero ───────────────────────────── */
+/* The hero banner image carries the title visually, so the auto-generated
+   page <h1> is hidden on the home only (scoped via :has) — it stays in the DOM
+   as the single semantic h1 for SEO/a11y. No duplicate headings. */
+:where(body):has(.hero-banner) h1#_top {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
