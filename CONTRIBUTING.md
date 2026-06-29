@@ -26,7 +26,7 @@ cckit pr <issue> "<summary>" # open the PR
 
 - **bash CLI + lib** → `bin/cckit`, `scripts/lib/*.sh`.
 - **Claude Code plugin** → `skills/`, `commands/`, `.claude-plugin/`.
-- **Docs** → `docs/` (published to [cckit.dev](https://cckit.dev)).
+- **Docs** → `docs/` (published to [cckit.vercel.app](https://cckit.vercel.app)).
 
 ## License
 

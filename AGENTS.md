@@ -73,7 +73,7 @@ Every operation an unattended run needs is reachable through the one CLI:
 
 cckit shells out to whatever agent invokes it; it does not embed a model. For verbs that synthesize
 text (digests, ingest), the model endpoint is configurable via environment — see the docs site (
-[cckit.dev](https://cckit.dev).
+[cckit.vercel.app](https://cckit.vercel.app).
 
 ## Paste-ready agent prompt
 
