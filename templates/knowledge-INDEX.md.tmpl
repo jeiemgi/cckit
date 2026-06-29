@@ -1,0 +1,12 @@
+# Knowledge Index — {{PROJECT_NAME}}
+
+Manifest of the knowledge base. Rules (`.claude/rules/knowledge-base.md`):
+
+- **If a file exists in `knowledge/`, it is current.** Superseded docs get DELETED — git is the archive.
+- **The latest decision wins.** Conflicts resolve by decision log + `updated` date.
+- Every doc carries frontmatter `status / owner / updated`. `canonical` = source of truth ·
+  `reference` = consultable, not normative · `historical` = context only.
+- New doc → add a row here in the same PR (`scripts/knowledge-lint.sh` enforces it).
+
+| File | Topic | Status | Owner | Updated |
+| ---- | ----- | ------ | ----- | ------- |

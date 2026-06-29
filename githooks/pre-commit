@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# cckit pre-commit — block secrets / keys / env / private data before they enter history.
+# Agnostic: ships with cckit, works in any repo. Wire it: git config core.hooksPath githooks
+set -uo pipefail
+root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+guard="$root/scripts/lib/secret-guard.sh"
+[ -f "$guard" ] || guard="$(dirname "$0")/../scripts/lib/secret-guard.sh"
+# shellcheck source=/dev/null
+. "$guard" 2>/dev/null || { echo "cckit pre-commit: secret-guard not found, skipping" >&2; exit 0; }
+staged=()
+while IFS= read -r line; do staged+=("$line"); done < <(git diff --cached --name-only --diff-filter=ACM 2>/dev/null)
+[ "${#staged[@]}" -eq 0 ] && exit 0
+if ! secret_guard_scan "${staged[@]}"; then
+  echo "cckit pre-commit: commit blocked by secret-guard. Fix the findings above," >&2
+  echo "or (if a true false positive) bypass once by re-committing with the --no-verify flag." >&2
+  exit 1
+fi
+exit 0

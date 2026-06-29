@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# PreCompact hook — emergency sweep before context compression (wing={{WING}}).
+# Claude is instructed via CLAUDE.md to call MCP save tools first; this is the safety net.
+mempalace mine ~/.claude/projects/{{CLAUDE_PROJECT_SLUG}}/ --mode convos --wing {{WING}} 2>/dev/null || true

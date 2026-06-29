@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>kit-annotate — what it is &amp; how to use it</title>
+<style>
+  :root{
+    --bg:#fbfbfd;--ink:#1d1d22;--muted:#6b6b78;--line:#e6e6ee;--accent:#5b6cff;--accent-soft:#eef0ff;
+    --concept:#2563eb;--concept-bg:#eff6ff;--why:#0f9d6b;--why-bg:#eafaf3;
+    --gotcha:#c2410c;--gotcha-bg:#fff4ec;--analogy:#7c3aed;--analogy-bg:#f5efff;--decision:#0e7490;--decision-bg:#ecfbfe;
+    --code-bg:#0f1222;--code-ink:#e6e7f0;--max:880px;
+  }
+  *{box-sizing:border-box}html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+  a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+  .wrap{display:grid;grid-template-columns:240px 1fr;max-width:1240px;margin:0 auto}
+  nav{position:sticky;top:0;align-self:start;height:100vh;overflow:auto;padding:28px 18px 60px;border-right:1px solid var(--line);font-size:13.5px}
+  nav .brand{font-weight:700;font-size:15px;letter-spacing:-.2px}nav .brand small{display:block;font-weight:500;color:var(--muted);font-size:12px;margin-top:3px}
+  nav ol{list-style:none;margin:18px 0 0;padding:0;counter-reset:s}nav li{margin:2px 0}
+  nav a{display:block;color:var(--muted);padding:5px 9px;border-radius:7px;counter-increment:s}
+  nav a::before{content:counter(s)". ";color:#b7b7c6}
+  nav a:hover{background:var(--accent-soft);color:var(--ink);text-decoration:none}
+  nav a.active{background:var(--accent);color:#fff}nav a.active::before{color:#cdd3ff}
+  main{padding:46px 54px 140px;max-width:calc(var(--max) + 108px)}
+  .kicker{color:var(--accent);font-weight:700;font-size:13px;letter-spacing:.12em;text-transform:uppercase}
+  h1{font-size:38px;line-height:1.1;letter-spacing:-.8px;margin:.25em 0 .3em}
+  .lede{font-size:18.5px;color:#3c3c46;max-width:62ch}
+  h2{font-size:25px;letter-spacing:-.4px;margin:60px 0 6px;padding-top:12px}
+  h2 .num{color:#c3c3d2;margin-right:10px;font-weight:700}
+  h3{font-size:18px;margin:28px 0 6px}
+  p{max-width:68ch}section{scroll-margin-top:24px}
+  hr{border:0;border-top:1px solid var(--line);margin:50px 0}
+  code{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;font-size:.88em;background:#f0f0f6;padding:.1em .42em;border-radius:5px;color:#3a3a52}
+  pre{background:var(--code-bg);color:var(--code-ink);padding:16px 18px;border-radius:12px;overflow:auto;font-size:13.5px;line-height:1.55;margin:16px 0}
+  pre code{background:none;color:inherit;padding:0}
+  .cmd{color:#82aaff}.c{color:#7e84a3}.out{color:#c3e88d}
+  .box{border-radius:12px;padding:16px 18px 16px 46px;margin:18px 0;position:relative;border:1px solid;font-size:15px}
+  .box .tag{position:absolute;left:16px;top:16px;font-weight:800}
+  .box p{margin:.4em 0;max-width:64ch}.box p:first-child{margin-top:0}.box p:last-child{margin-bottom:0}
+  .concept{background:var(--concept-bg);border-color:#cfe0ff;color:#15315e}.concept .tag{color:var(--concept)}
+  .why{background:var(--why-bg);border-color:#bfe9d6;color:#0a4a36}.why .tag{color:var(--why)}
+  .gotcha{background:var(--gotcha-bg);border-color:#fcd9c2;color:#7a2e0e}.gotcha .tag{color:var(--gotcha)}
+  .analogy{background:var(--analogy-bg);border-color:#e0d2fb;color:#43227e}.analogy .tag{color:var(--analogy)}
+  .decision{background:var(--decision-bg);border-color:#bfe9f3;color:#0a4a5c}.decision .tag{color:var(--decision);font-size:13px;top:18px}
+  table{border-collapse:collapse;width:100%;margin:18px 0;font-size:14.5px}
+  th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border-bottom:2px solid var(--line)}
+  td:first-child{font-weight:600;white-space:nowrap}td code{font-size:.85em}
+  .chips{display:flex;flex-wrap:wrap;gap:10px;margin:16px 0}
+  .chip{background:#fff;border:1px solid var(--line);border-radius:11px;padding:12px 14px;flex:1 1 200px}
+  .chip b{display:block;font-size:14px}.chip span{color:var(--muted);font-size:13px}
+  .flow{margin:20px 0;display:flex;flex-direction:column}
+  .step{display:grid;grid-template-columns:34px 1fr;gap:16px;position:relative;padding:0 0 20px}
+  .step:not(:last-child)::before{content:"";position:absolute;left:16px;top:30px;bottom:-4px;width:2px;background:var(--line)}
+  .step .dot{width:34px;height:34px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;font-weight:700;font-size:14px;z-index:1}
+  .step .body{padding-top:4px}.step .body b{display:block;margin-bottom:2px}.step .body span{color:var(--muted);font-size:14.5px}
+  .uc{border:1px solid var(--line);border-radius:14px;background:#fff;margin:18px 0;overflow:hidden}
+  .uc .h{padding:13px 18px;background:#f7f8ff;border-bottom:1px solid var(--line);font-weight:700}
+  .uc .b{padding:14px 18px}.uc .b p{margin:.3em 0}
+  .foot{margin-top:60px;color:var(--muted);font-size:13.5px;border-top:1px solid var(--line);padding-top:20px}
+  .toplink{position:fixed;right:24px;bottom:24px;background:var(--ink);color:#fff;border-radius:999px;padding:10px 16px;font-size:13px;font-weight:600;box-shadow:0 6px 20px rgba(0,0,0,.18);opacity:0;transition:opacity .2s;pointer-events:none}
+  .toplink.show{opacity:.92;pointer-events:auto}
+  @media(max-width:920px){.wrap{grid-template-columns:1fr}nav{display:none}main{padding:30px 22px 120px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav>
+    <div class="brand">kit-annotate<small>What it is &amp; how to use it</small></div>
+    <ol>
+      <li><a href="#what">What it does</a></li>
+      <li><a href="#shift">How the plan evolved</a></li>
+      <li><a href="#pieces">The four pieces</a></li>
+      <li><a href="#flow">How it works</a></li>
+      <li><a href="#use">Real use cases + commands</a></li>
+      <li><a href="#limits">Honest limits</a></li>
+      <li><a href="#why">Why adopt, not build</a></li>
+      <li><a href="#glossary">Glossary</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <div class="kicker">Plain-language explainer · updated for the Agentation direction</div>
+    <h1>Point at a component, tell Claude what to fix</h1>
+    <p class="lede">kit-annotate lets you click any component in your running dev app, leave a note, and have Claude read a precise, structured record and fix the code. It's <b>wired into claude-kit for Claude Code</b>, and it runs on a maintained open package called <b>Agentation</b> rather than something we hand-build. Here's the whole thing in your language.</p>
+
+    <!-- 1 -->
+    <section id="what">
+      <h2><span class="num">1</span>What it does</h2>
+      <p>Today you tell Claude <em>"the spacing on the admin card is too tight"</em> and it guesses which file. With kit-annotate you instead <b>click the actual component</b>, type the note right there, and Claude receives: <em>the component (e.g. <code>&lt;AdminCard&gt;</code>), its place in the tree, a source-file pointer, and your comment.</em> Then it opens the code and fixes it.</p>
+      <div class="analogy"><span class="tag">≈</span><p><b>Figma comments, but pinned to React components instead of pixels</b> — and the teammate who resolves them is Claude, working in your repo.</p></div>
+    </section>
+
+    <!-- 2 -->
+    <section id="shift">
+      <h2><span class="num">2</span>How the plan evolved (so the docs make sense)</h2>
+      <p>We considered three approaches before landing here. Knowing the path explains why the final design is shaped the way it is:</p>
+      <table>
+        <tr><th>Idea</th><th>Verdict</th></tr>
+        <tr><td>Extend <b>onUI</b> (a DOM-annotation extension you'd installed)</td><td>❌ Closed, version-pinned, DOM-only — couldn't model components.</td></tr>
+        <tr><td>Build our own <b>Chrome extension</b></td><td>❌ The "two worlds" problem, an install, a daemon, React-19 source headaches.</td></tr>
+        <tr><td>An <b>in-app wrapper</b> — and adopt <b>Agentation</b></td><td>✅ A maintained, open package already does this well. We wire it to Claude.</td></tr>
+      </table>
+      <div class="why"><span class="tag">✦</span><p>An <b>in-app wrapper</b> (a React component you render) has full, direct access to React — no extension sandbox, no install, and source location comes from your dev build, not a browser hack. Agentation is exactly that wrapper, already shipping, so we adopt it and focus claude-kit on the <b>wiring</b>.</p></div>
+    </section>
+
+    <!-- 3 -->
+    <section id="pieces">
+      <h2><span class="num">3</span>The four pieces</h2>
+      <div class="chips">
+        <div class="chip"><b>① <code>&lt;Agentation /&gt;</code></b><span>A dev-only React component you render once in your app. Draws the bottom-right toolbar; captures what you click.</span></div>
+        <div class="chip"><b>② <code>agentation-mcp</code></b><span>A small local server. Receives annotations from the toolbar (HTTP :4747) and exposes them to Claude over MCP.</span></div>
+        <div class="chip"><b>③ <code>/kit-annotate</code></b><span>The claude-kit skill that installs ①, registers ② for Claude, and runs the fix loop. Your entry point.</span></div>
+        <div class="chip"><b>④ the rule</b><span><code>.claude/rules/react-annotate.md</code> — teaches Claude the annotate → locate → fix → resolve loop and the honest limits.</span></div>
+      </div>
+      <div class="concept"><span class="tag">ℹ</span><p><b>You already know most of this.</b> ① is just a React component. ② is a <code>localhost</code> server like your Vite dev server. <b>MCP</b> is "a REST API whose client is Claude" — the same mechanism that already lets Claude read tool results. ③ a slash command. ④ a markdown instruction file.</p></div>
+    </section>
+
+    <!-- 4 -->
+    <section id="flow">
+      <h2><span class="num">4</span>How it works, end to end</h2>
+      <pre><code>  Your dev app (localhost) ──&lt;Agentation/&gt; toolbar──▶ you click + note
+            │  HTTP POST :4747
+            ▼
+      agentation-mcp  (local server + SQLite)
+            │  MCP (stdio)
+            ▼
+      Claude Code  ──reads annotations, greps to the file, fixes, marks resolved</code></pre>
+      <div class="flow">
+        <div class="step"><div class="dot">1</div><div class="body"><b>Set up once</b><span>Run <code>/kit-annotate</code>. It detects your framework, installs <code>agentation</code>, registers its MCP for Claude, adds the rule, and helps you drop <code>&lt;Agentation /&gt;</code> into your app entry.</span></div></div>
+        <div class="step"><div class="dot">2</div><div class="body"><b>Run your dev server &amp; annotate</b><span>Start the app, click the bottom-right toolbar, click a component, type your note (with intent + severity).</span></div></div>
+        <div class="step"><div class="dot">3</div><div class="body"><b>Claude reads the queue</b><span>It calls the Agentation MCP — either on demand (<code>agentation_get_all_pending</code>) or hands-free (<code>agentation_watch_annotations</code>, which waits for new notes).</span></div></div>
+        <div class="step"><div class="dot">4</div><div class="body"><b>Locate → fix → resolve</b><span>For each note: it acknowledges, finds the code (source pointer or grep by component/selector), makes the change, and marks it resolved with a one-line summary.</span></div></div>
+      </div>
+      <div class="concept"><span class="tag">ℹ</span><p><b>Who drives what:</b> <em>you</em> click and annotate (a real click in your browser); <em>Claude</em> reads and fixes. In hands-free "watch mode" you just keep annotating while Claude resolves them in the background.</p></div>
+    </section>
+
+    <!-- 5 -->
+    <section id="use">
+      <h2><span class="num">5</span>Real use cases + the exact commands</h2>
+
+      <div class="uc"><div class="h">A. First-time setup on a React app</div><div class="b">
+        <pre><code><span class="c"># preview what it will do — no changes</span>
+<span class="cmd">/kit-annotate --dry-run</span>
+<span class="c"># → React: yes (v19.2)  Framework: next  Entry: app/layout.tsx
+#   would: npm i -D agentation · register MCP · write rule · wire &lt;Agentation/&gt;</span>
+
+<span class="c"># do it (asks consent, shows the layout diff before saving)</span>
+<span class="cmd">/kit-annotate setup</span></code></pre>
+        <p>Then: restart Claude Code (loads the MCP), run your dev server, and <code>npx agentation-mcp doctor</code> to verify.</p>
+      </div></div>
+
+      <div class="uc"><div class="h">B. Fix a spacing bug you can see</div><div class="b">
+        <p>App is running. You click the cramped admin card in the toolbar and type <em>"spacing too tight — apply the 24px section rhythm."</em> Then in Claude:</p>
+        <pre><code><span class="cmd">/kit-annotate review</span>
+<span class="c"># Claude: pulls the note → it's &lt;AdminCard&gt; (app/admin/AdminCard.tsx)
+#   → opens the file, adjusts the spacing tokens → marks it resolved.</span></code></pre>
+        <p>Or just say it in plain language: <em>"review my UI annotations and fix them."</em></p>
+      </div></div>
+
+      <div class="uc"><div class="h">C. Hands-free "watch mode" — annotate while Claude fixes</div><div class="b">
+        <pre><code><span class="cmd">/kit-annotate watch</span>
+<span class="c"># Claude calls agentation_watch_annotations in a loop.
+# You keep clicking + noting across the page; each note is picked up,
+# fixed, and resolved with a summary — until you say stop.</span></code></pre>
+        <p>Great for a focused design-polish pass across a whole screen.</p>
+      </div></div>
+
+      <div class="uc"><div class="h">D. Check status / triage later</div><div class="b">
+        <pre><code><span class="cmd">/kit-annotate status</span>
+<span class="c"># shows the .annotate config, runs `agentation-mcp doctor`,
+# and lists active annotation sessions.</span></code></pre>
+      </div></div>
+
+      <div class="concept"><span class="tag">ℹ</span><p><code>/kit-annotate</code> with no argument is smart: if the project isn't set up yet it runs <b>setup</b>; if it is, it starts a <b>session</b>. It also auto-activates on natural language like <em>"set up visual annotation"</em> or <em>"watch mode for UI feedback."</em></p></div>
+    </section>
+
+    <!-- 6 -->
+    <section id="limits">
+      <h2><span class="num">6</span>Honest limits (so nothing surprises you)</h2>
+      <div class="gotcha"><span class="tag">⚠</span><p><b>Dev-only.</b> The toolbar is gated behind a dev check and stripped from production. You always annotate against the dev server.</p></div>
+      <div class="gotcha"><span class="tag">⚠</span><p><b>Identity, not live values.</b> Agentation gives Claude the component name + tree + a source pointer + your selector — <em>not</em> the live prop/state <em>values</em>. Claude greps to the file using those. (Capturing sanitized props/state was our original "build-your-own" idea; it's parked unless you find you truly need it day-to-day.)</p></div>
+      <div class="gotcha"><span class="tag">⚠</span><p><b>React Server Components</b> render on the server and have no client component to point at — a clicked server-rendered node falls back to a CSS selector. Client components annotate fully.</p></div>
+      <div class="gotcha"><span class="tag">⚠</span><p><b>It's a third-party package.</b> Agentation is open and source-available (PolyForm Shield license), installed as <em>your</em> dev dependency. The kit never copies its code — it only wires it up.</p></div>
+    </section>
+
+    <!-- 7 -->
+    <section id="why">
+      <h2><span class="num">7</span>Why we adopt Agentation instead of building our own</h2>
+      <p>The earlier lesson — <em>don't depend on a closed tool you can't inspect</em> (that's why we dropped onUI) — still holds, but Agentation passes the test where onUI failed: it's <b>source-available</b> (you can read, pin, or fork it) and speaks <b>standard MCP</b> (inspectable). So the risk shrinks to ordinary "someone else maintains it," which we contain by keeping claude-kit's own layer — the command, the rule, your config — as the stable contract.</p>
+      <div class="why"><span class="tag">✦</span><p><b>Net:</b> you get a working loop in days instead of weeks, hand the hard browser/React-internals work to a maintained package, and keep the door open to a kit-owned backend later <em>only if</em> you discover you need richer capture (like live prop/state values). Build-vs-adopt details are in the implementation plan.</p></div>
+      <div class="decision"><span class="tag">NEXT</span><p>See <a href="02-implementation-plan.html">02-implementation-plan.html</a> for exactly what was built in claude-kit, the phased plan, and the open decisions.</p></div>
+    </section>
+
+    <hr>
+    <section id="glossary">
+      <h2><span class="num">8</span>Glossary</h2>
+      <table>
+        <tr><th>Term</th><th>In one line</th></tr>
+        <tr><td>Agentation</td><td>The open npm package that provides the in-app annotation toolbar + MCP.</td></tr>
+        <tr><td><code>&lt;Agentation /&gt;</code></td><td>The dev-only React component you render once in your app.</td></tr>
+        <tr><td><code>agentation-mcp</code></td><td>The local server: HTTP :4747 (from the toolbar) + MCP stdio (to Claude).</td></tr>
+        <tr><td>MCP</td><td>Model Context Protocol — a standard for giving Claude tools &amp; data (a REST API for Claude).</td></tr>
+        <tr><td>Fiber / component tree</td><td>React's internal component tree — what DevTools shows; how the toolbar names what you clicked.</td></tr>
+        <tr><td>RSC</td><td>React Server Components — render on the server, so they degrade to a selector when clicked.</td></tr>
+        <tr><td>Watch mode</td><td>Hands-free loop: Claude waits for new notes and resolves them as you annotate.</td></tr>
+        <tr><td>PolyForm Shield</td><td>Agentation's license: free to use; only forbids building a competitor with it.</td></tr>
+      </table>
+      <div class="foot">kit-annotate · explainer · companion: <a href="02-implementation-plan.html">02-implementation-plan.html</a></div>
+    </section>
+  </main>
+</div>
+<a href="#" class="toplink" id="toplink">↑ Top</a>
+<script>
+  const links=[...document.querySelectorAll('nav a')];
+  const map=new Map(links.map(a=>[a.getAttribute('href').slice(1),a]));
+  const obs=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){links.forEach(l=>l.classList.remove('active'));const a=map.get(e.target.id);if(a)a.classList.add('active');}});},{rootMargin:'-10% 0px -80% 0px'});
+  document.querySelectorAll('section[id]').forEach(s=>obs.observe(s));
+  const t=document.getElementById('toplink');
+  addEventListener('scroll',()=>{t.classList.toggle('show',scrollY>700)});
+  t.addEventListener('click',e=>{e.preventDefault();scrollTo({top:0,behavior:'smooth'})});
+</script>
+</body>
+</html>

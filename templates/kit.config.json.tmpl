@@ -1,0 +1,32 @@
+{
+  "$schema": "https://github.com/tuempresadigital/claude-kit/kit.config.schema.json",
+  "kitVersion": "0.1.0",
+  "mode": "guided",
+  "project": {
+    "name": "{{PROJECT_NAME}}",
+    "slug": "{{PROJECT_SLUG}}",
+    "owner": "{{OWNER_NAME}}",
+    "language": "{{COMMS_LANG}}",
+    "path": "{{PROJECT_PATH}}"
+  },
+  "profile": "{{PROFILE}}",
+  "roles": [{{ROLES_JSON}}],
+  "github": {
+    "repo": "{{GH_REPO}}",
+    "owner": "{{GH_OWNER}}",
+    "projectsV2": {{PROJECTS_V2}},
+    "projectNumber": {{PROJECT_NUMBER}},
+    "projectTitle": "{{PROJECT_BOARD_TITLE}}"
+  },
+  "milestones": [{{MILESTONES_JSON}}],
+  "plans": {
+    "format": "{{PLANS_FORMAT}}",
+    "dir": "{{PLANS_DIR}}"
+  },
+  "memory": {
+    "enabled": {{MEMORY_ENABLED}},
+    "provider": "mempalace",
+    "wing": "{{WING}}",
+    "claudeProjectSlug": "{{CLAUDE_PROJECT_SLUG}}"
+  }
+}

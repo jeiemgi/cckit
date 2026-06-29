@@ -1,0 +1,35 @@
+# dependencies / build
+node_modules/
+dist/
+.astro/
+.cache/
+.turbo/
+
+# secrets, keys, env — NEVER commit (the secret-guard enforces this too)
+.env
+.env.*
+*.env
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+*.jks
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+.netrc
+.pgpass
+*.tfvars
+.project-ids.env
+*.project-ids*
+
+# cckit runtime + the user's private denylist (the .example is committed, the real one is not)
+.cckit/
+privacy-denylist
+!privacy-denylist.example
+
+# os / editor
+.DS_Store
+*.swp

@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# guard-base-branch-commit.sh — PreToolUse(Bash) hook. Scaffolded by claude-kit.
+#
+# Enforces the hard project rule: NO direct commits to the base branch (main/develop).
+# Every change lands through a PR from a <kind>/<issue>-<slug> branch.
+#
+# Reads the tool call JSON on stdin. If the Bash command is a `git commit`
+# and HEAD is on the base branch, it blocks the tool (exit 2 → Claude sees the
+# reason and must branch first). Anything else passes through (exit 0).
+# Depends on jq for the stdin parse.
+#
+# This is local fast-feedback. The durable enforcement is branch protection
+# on GitHub (see .claude/rules/branch-naming.md → "Leverage GitHub automations").
+
+set -uo pipefail
+
+input=$(cat 2>/dev/null)
+cmd=$(printf '%s' "$input" | jq -r '.tool_input.command // empty' 2>/dev/null)
+[[ -z "$cmd" ]] && exit 0
+
+# Only care about commit commands (not log/show/commit-graph/etc.)
+printf '%s' "$cmd" | grep -Eq '(^|[;&|[:space:]])git[[:space:]]+(.*[[:space:]])?commit([[:space:]]|$)' || exit 0
+
+# Resolve the directory the commit will actually run in — NOT CLAUDE_PROJECT_DIR,
+# which is always the main checkout. An agent in a linked worktree commits via
+# `cd <worktree> && git commit` or `git -C <worktree> commit`; honor that so we
+# read the worktree's real branch instead of false-blocking on the main checkout.
+dir=""
+if [[ "$cmd" =~ git[[:space:]]+-C[[:space:]]+([^[:space:]]+) ]]; then
+  dir="${BASH_REMATCH[1]}"
+elif [[ "$cmd" =~ (^|[\&\;\|])[[:space:]]*cd[[:space:]]+([^[:space:]\&\;\|]+) ]]; then
+  dir="${BASH_REMATCH[2]}"
+fi
+dir="${dir:-${CLAUDE_PROJECT_DIR:-$PWD}}"
+# strip surrounding quotes
+dir="${dir%\"}"; dir="${dir#\"}"; dir="${dir%\'}"; dir="${dir#\'}"
+branch=$(git -C "$dir" rev-parse --abbrev-ref HEAD 2>/dev/null) || exit 0
+
+if [[ "$branch" == "main" || "$branch" == "develop" ]]; then
+  echo "BLOCKED: direct commit to '$branch'. No direct commits to the base branch." >&2
+  echo "Start a branch first: /task-start <issue>  (or git checkout -B <kind>/<issue>-<slug> origin/$branch)." >&2
+  echo "Then commit there and open a PR. See .claude/rules/branch-naming.md." >&2
+  exit 2
+fi
+exit 0

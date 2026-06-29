@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+# claude-kit terminal identity — the seed-head sigil, brand palette, glyph vocabulary.
+# Canonical brief: claude-kit terminal identity (kit docs; see cckit.dev:
+# apps/admin/src/plans/terminal-identity brief) #
+# The line-leader is the LOCKED seed-head: ⡶ (U+2876) in Azafrán — the n=13 Vogel
+# seed-head reduced to one Braille cell. One Azafrán per line: the seed only;
+# the slash + wordmark are ink-dim; the note is Polvo. ASCII fallback: o.
+#
+# Public API (source this file, then call):
+#   kit_sigil [skill] [note]   -> the "⡶ / claude-kit" line-leader lockup (footer)
+#   kit_seed                   -> just the leader glyph in Azafrán (⡶ / o)
+#   kit_glyph <name>           -> one state glyph (unicode, or its ASCII fallback)
+#   kit_paint <token> <text…>  -> text wrapped in a brand color (no-op when color is off)
+#
+# After the first call, mode + palette are exposed as KIT_* variables.
+
+# ---- color / glyph mode detection ---------------------------------------
+# Two INDEPENDENT axes — the brand glyph is not gated on the TTY (Claude Code
+# and most pipes render UTF-8 fine; only color is unsafe down a pipe):
+#   Color  : on when FORCE_COLOR=1, or (stdout is a TTY and NO_COLOR is unset).
+#   Unicode: on whenever the locale can render it (UTF-8), off only on an
+#            explicit KIT_ASCII=1 opt-out or a non-UTF-8 locale (braille needs UTF-8).
+#
+#   surface                         | glyph | color
+#   ------------------------------- | ----- | -----
+#   TTY, NO_COLOR unset             | ⡶     | Azafrán
+#   FORCE_COLOR=1 (piped)           | ⡶     | Azafrán   (previews)
+#   piped/redirect (e.g. Claude Code)| ⡶    | none      ← seed-head kept, color stripped
+#   NO_COLOR set                    | ⡶     | none
+#   KIT_ASCII=1 or non-UTF-8 locale | o     | none
+kit_color_mode() {
+  # Unicode axis — capable unless explicitly opted out or the locale isn't UTF-8.
+  local loc="${LC_ALL:-${LC_CTYPE:-${LANG:-}}}"
+  if [ "${KIT_ASCII:-}" = "1" ]; then
+    KIT_UNICODE=0
+  elif printf '%s' "$loc" | grep -qiE 'utf-?8'; then
+    KIT_UNICODE=1
+  else
+    KIT_UNICODE=0
+  fi
+
+  # Color axis — forced, or a TTY without NO_COLOR. Never down a plain pipe.
+  if [ "${FORCE_COLOR:-}" = "1" ]; then
+    KIT_COLOR=1
+  elif [ -t 1 ] && [ -z "${NO_COLOR+x}" ]; then
+    KIT_COLOR=1
+  else
+    KIT_COLOR=0
+  fi
+
+  if [ "$KIT_COLOR" = 1 ]; then
+    KIT_AZAFRAN=$'\033[38;2;201;122;44m'   # #C97A2C — THE accent (the seed / destello)
+    KIT_AZAFRAN_DEEP=$'\033[38;2;168;100;38m' # #A86426 — inner band depth (hero only)
+    KIT_INK=$'\033[2m'                     # terminal default-fg, dimmed — inverts with theme
+    KIT_POLVO=$'\033[38;2;168;160;151m'    # #A8A097 — meta · captions · table rules
+    KIT_VERDE=$'\033[38;2;52;101;56m'      # #346538 — success
+    KIT_AMBAR=$'\033[38;2;149;100;0m'      # #956400 — warning
+    KIT_ROJO=$'\033[38;2;159;47;45m'       # #9F2F2D — danger / error
+    KIT_AZUL=$'\033[38;2;31;108;159m'      # #1F6C9F — info
+    KIT_RESET=$'\033[0m'
+  else
+    KIT_AZAFRAN=''; KIT_AZAFRAN_DEEP=''; KIT_INK=''; KIT_POLVO=''
+    KIT_VERDE=''; KIT_AMBAR=''; KIT_ROJO=''; KIT_AZUL=''; KIT_RESET=''
+  fi
+}
+
+# ---- color wrapper -------------------------------------------------------
+# kit_paint <token> <text…>  — token ∈ azafran|azafran-deep|ink|polvo|verde|ambar|rojo|azul
+#                              (success|warn|danger|info aliases accepted).
+kit_paint() {
+  kit_color_mode
+  local token="$1"; shift
+  local code=""
+  case "$token" in
+    azafran)        code="$KIT_AZAFRAN" ;;
+    azafran-deep)   code="$KIT_AZAFRAN_DEEP" ;;
+    ink)            code="$KIT_INK" ;;
+    polvo)          code="$KIT_POLVO" ;;
+    verde|success)  code="$KIT_VERDE" ;;
+    ambar|warn)     code="$KIT_AMBAR" ;;
+    rojo|danger)    code="$KIT_ROJO" ;;
+    azul|info)      code="$KIT_AZUL" ;;
+  esac
+  printf '%s%s%s' "$code" "$*" "${code:+$KIT_RESET}"
+}
+
+# ---- glyph vocabulary ----------------------------------------------------
+# kit_glyph <name> — emits the brand glyph, or its 7-bit ASCII fallback off-TTY.
+# Grammar: solid seeds (●) + lines and points (▸ › ·). No rings, no AI sparkle.
+kit_glyph() {
+  kit_color_mode
+  case "$1" in
+    leader)        [ "$KIT_UNICODE" = 1 ] && printf '⡶'  || printf 'o' ;;  # U+2876 — the seed-head
+    agent)         [ "$KIT_UNICODE" = 1 ] && printf '●'  || printf '*' ;;  # U+25CF
+    workflow|run)  [ "$KIT_UNICODE" = 1 ] && printf '▸'  || printf '>' ;;  # U+25B8
+    skill)         [ "$KIT_UNICODE" = 1 ] && printf '›'  || printf '>' ;;  # U+203A
+    task|sep)      [ "$KIT_UNICODE" = 1 ] && printf '·'  || printf '-' ;;  # U+00B7
+    success)       [ "$KIT_UNICODE" = 1 ] && printf '●'  || printf 'ok' ;; # U+25CF (verde)
+    warning)       [ "$KIT_UNICODE" = 1 ] && printf '◆'  || printf '!' ;;  # U+25C6 (ámbar)
+    danger|error)  [ "$KIT_UNICODE" = 1 ] && printf '▪'  || printf 'x' ;;  # U+25AA (rojo)
+    info)          [ "$KIT_UNICODE" = 1 ] && printf '·'  || printf 'i' ;;  # U+00B7 (azul)
+    progress|pr)   [ "$KIT_UNICODE" = 1 ] && printf '▸'  || printf '~' ;;  # U+25B8 (azafrán)
+    memory|save)   [ "$KIT_UNICODE" = 1 ] && printf '●'  || printf '+' ;;  # U+25CF (azafrán)
+    version)       printf '+' ;;                                           # U+002B (azafrán)
+    *)             printf '%s' "$1" ;;
+  esac
+}
+
+# ---- the seed (leader glyph, Azafrán) ------------------------------------
+kit_seed() { kit_paint azafran "$(kit_glyph leader)"; }
+
+# ---- the line-leader lockup ----------------------------------------------
+# kit_sigil                       ->  ⡶ / claude-kit
+# kit_sigil "kit-task-pr"         ->  ⡶ / claude-kit · kit-task-pr
+# kit_sigil "" "memoria guardada" ->  ⡶ / claude-kit  memoria guardada
+# One Azafrán per line (the seed); slash + wordmark ink-dim; separator + note Polvo.
+kit_sigil() {
+  kit_color_mode
+  local skill="$1" note="$2" line
+  line="$(kit_seed)$(kit_paint ink ' / claude-kit')"
+  [ -n "$skill" ] && line+="$(kit_paint polvo ' · ')$(kit_paint ink "$skill")"
+  [ -n "$note" ]  && line+="$(kit_paint polvo "  ${note}")"
+  printf '\n%s\n' "$line"
+}

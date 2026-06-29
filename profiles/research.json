@@ -1,0 +1,37 @@
+{
+  "name": "research",
+  "label": "Research / analysis",
+  "description": "Investigation and synthesis: planning, primary research, and data analysis.",
+  "agents": [
+    "pm",
+    "researcher",
+    "analyst"
+  ],
+  "skills": [
+    "morning-briefing",
+    "karpathy-guidelines"
+  ],
+  "rules": [
+    "branch-naming",
+    "communication-style",
+    "knowledge-base",
+    "mempalace",
+    "plan-output-format",
+    "task-management"
+  ],
+  "roles": [
+    "PM",
+    "Researcher",
+    "Analyst"
+  ],
+  "milestones": [
+    "Scope",
+    "Gather",
+    "Analyze",
+    "Report"
+  ],
+  "defaults": {
+    "plans_format": "markdown",
+    "memory": "off"
+  }
+}

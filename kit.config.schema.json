@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tuempresadigital/claude-kit/kit.config.schema.json",
+  "title": "claude-kit project config (v2)",
+  "description": "Identity layer of a kit project. Resolved in cascade workspace -> project -> island by scripts/lib/kit-config-resolve.sh; the nearest layer wins. The $schema reference in kit.config.json points here so editors validate + autocomplete.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "$schema": { "type": "string" },
+    "kitVersion": {
+      "type": "string",
+      "description": "Kit version that last wrote/wired this config. Drives self-heal: when it differs from the installed plugin, kit-wire re-converges."
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["draft", "guided", "enforced"],
+      "default": "guided",
+      "description": "How strict the kit is HERE. draft = guardrails off (explore freely); guided = warnings, never block; enforced = guardrails block (worktree-only, PR-per-issue). Set per cascade level — an island can be enforced while its parent workspace is guided."
+    },
+    "workspace": {
+      "type": "object",
+      "description": "Present only in kit.workspace.json (the workspace-root marker). Holds settings shared across every project under the workspace.",
+      "additionalProperties": true,
+      "properties": {
+        "name": { "type": "string" },
+        "commons": {
+          "type": "string",
+          "description": "Path (relative to the workspace root) of the promoted skills/agents commons. Default .claude/."
+        }
+      }
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "name": { "type": "string" },
+        "slug": { "type": "string" },
+        "owner": { "type": "string" },
+        "language": { "type": "string", "description": "Comms language, e.g. en, es, mixed." },
+        "path": { "type": "string" }
+      }
+    },
+    "profile": { "type": "string", "description": "Active role profile (minimal, software, content, research, automation, ...)." },
+    "skillPrefix": { "type": "string", "description": "Namespace prepended to kit-namespaced workflow skills on scaffold/upgrade (e.g. \"kit-\" -> kit-task-close). Empty = bare names. See templates/skills/NAMESPACED." },
+    "modules": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Stackable modules added on top of the profile (e.g. \"software\"). Empty/absent = base project."
+    },
+    "roles": { "type": "array", "items": { "type": "string" } },
+    "github": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "repo": { "type": "string" },
+        "owner": { "type": "string" },
+        "baseBranch": { "type": "string", "description": "Integration branch the lifecycle skills branch from and merge into (default: main; e.g. develop)." },
+        "projectsV2": { "type": "boolean" },
+        "projectNumber": { "type": ["integer", "null"] },
+        "projectTitle": { "type": ["string", "null"] }
+      }
+    },
+    "milestones": { "type": "array", "items": { "type": "string" } },
+    "plans": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "format": { "type": "string", "description": "none | markdown | mdx" },
+        "dir": { "type": "string" }
+      }
+    },
+    "memory": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "provider": { "type": "string" },
+        "wing": { "type": "string" },
+        "claudeProjectSlug": { "type": "string" }
+      }
+    },
+    "routines": {
+      "type": "array",
+      "description": "Opt-in scheduled routines accepted by the user (briefing, board sweep, gc, ...). The kit SUGGESTS; the user accepts; nothing is created without opt-in.",
+      "items": { "type": "string" }
+    },
+    "upgrade": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Tells `init.sh --upgrade` which scaffolded paths the project deleted/renamed ON PURPOSE so they are never re-added (#334). Paths are repo-relative (e.g. \".claude/skills/task-new\"); a directory entry covers everything beneath it.",
+      "properties": {
+        "removed": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Scaffolded paths the project deleted on purpose — the upgrade will not re-create them."
+        },
+        "renamed": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Map of original scaffolded path -> the project's new name. The original (key) is treated as removed (never re-added); the value documents where it went."
+        }
+      }
+    }
+  }
+}

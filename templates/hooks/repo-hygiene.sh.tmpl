@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# repo-hygiene.sh — SessionStart hook (READ-ONLY). Scaffolded by claude-kit.
+#
+# Surfaces repo state that silently accumulates into a mess:
+#   - working on the base branch (main) directly, or a non-conventional branch name
+#   - branch sitting on a stale base (commits behind the base branch)
+#   - dirty / uncommitted working tree
+#   - stashes piling up
+#   - local branches whose remote is gone (merged + remote-deleted → prune them)
+#   - extra worktrees lingering
+#
+# Prints nothing when the repo is clean. Never fails the session (always exit 0).
+# Enforcement that needs the network or affects everyone belongs in GitHub
+# automations (see .claude/rules/branch-naming.md); this is fast local feedback.
+
+set -uo pipefail
+ROOT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}"
+cd "$ROOT" 2>/dev/null || exit 0
+git rev-parse --is-inside-work-tree >/dev/null 2>&1 || exit 0
+
+BASE="origin/main"
+WARN=()
+
+branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+
+# 1. On the base branch directly?
+if [[ "$branch" == "main" || "$branch" == "develop" ]]; then
+  WARN+=("• On '$branch' directly — start work with /task-start <issue> (no direct commits to the base branch).")
+# 2. Non-conventional branch name (not <kind>/<issue>-<slug> and not a bot branch)?
+elif [[ ! "$branch" =~ ^(feat|fix|task|chore|security|scaffold|ci|adr|spike|plan)/[0-9]+- ]] \
+   && [[ ! "$branch" =~ ^(agent|claude)/ ]]; then
+  WARN+=("• Branch '$branch' doesn't match <kind>/<issue>-<slug> — see .claude/rules/branch-naming.md.")
+fi
+
+# 3. Stale base — commits behind the base branch (uses last fetch; no network here)
+if git rev-parse --verify "$BASE" >/dev/null 2>&1 && [[ "$branch" != "main" && "$branch" != "develop" ]]; then
+  behind=$(git rev-list --count "HEAD..$BASE" 2>/dev/null || echo 0)
+  if [[ "${behind:-0}" -gt 10 ]]; then
+    WARN+=("• Branch is $behind commits behind $BASE (stale base, last fetch) — rebase before committing to avoid reverting merged work.")
+  fi
+fi
+
+# 4. Dirty working tree
+dirty=$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+[[ "${dirty:-0}" -gt 0 ]] && WARN+=("• Working tree has $dirty uncommitted change(s) — commit, PR, or discard; don't let work go stale.")
+
+# 5. Stashes
+stashes=$(git stash list 2>/dev/null | wc -l | tr -d ' ')
+[[ "${stashes:-0}" -gt 0 ]] && WARN+=("• $stashes stash(es) present — review with: git stash list (old WIP rots fast).")
+
+# 6. Local branches whose upstream is gone (merged + remote-deleted → safe to prune)
+gone=$(git branch -vv 2>/dev/null | grep ': gone]' | wc -l | tr -d ' ')
+[[ "${gone:-0}" -gt 0 ]] && WARN+=("• $gone local branch(es) with a deleted remote — run /task-gc to prune merged branches + worktrees.")
+
+# 7. Extra worktrees
+wt=$(git worktree list 2>/dev/null | wc -l | tr -d ' ')
+[[ "${wt:-0}" -gt 2 ]] && WARN+=("• $wt worktrees active — /task-gc removes ones whose PR already merged.")
+
+if [[ ${#WARN[@]} -gt 0 ]]; then
+  # claude-kit terminal identity — the locked ⡶ seed-head leader, once, only when
+  # there's output. We cd'd to $ROOT, so the lib path is reliable; fall back inline.
+  if [ -f "$ROOT/.claude/lib/kit-sigil.sh" ]; then
+    # shellcheck source=/dev/null
+    source "$ROOT/.claude/lib/kit-sigil.sh"
+    kit_sigil "" "repo hygiene · $branch"
+  else
+    printf '\n· claude-kit  repo hygiene · %s\n' "$branch"
+  fi
+  printf '%s\n' "${WARN[@]}"
+  echo "   (read-only check — run /task-gc to clean, /task-sync for board state)"
+fi
+exit 0

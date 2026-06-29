@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# cckit — the CLI dispatcher. A thin bash front-end over the git-mechanics bundle (scripts/lib).
+# Agent-agnostic: every verb runs from a shell; append --llm for machine-readable output.
+# Driven entirely from cckit.config.json — no org/repo is hardcoded. See AGENTS.md.
+#
+# Usage:
+#   cckit init                      scaffold cckit.config.json + .claude/ for this repo
+#   cckit start <issue> [slug]      isolated worktree + branch for an issue
+#   cckit pr <issue> <summary>      commit + push + open the PR
+#   cckit close <issue> <summary>   close issue + mark done
+#   cckit sync [--llm]              board state / what's unblocked
+#   cckit effort <new|start|pr|close|plan>   the effort lifecycle
+#   cckit orchestrate <a> <b> …     run N flows in parallel worktrees
+#   cckit gc                        prune merged branches + worktrees
+#   cckit version [--llm]           the installed cckit version
+#   cckit help
+set -eu
+
+BIN="$(cd "$(dirname "$0")" && pwd)"
+ROOT="$(cd "$BIN/.." && pwd)"
+LIB="$ROOT/scripts/lib"
+export KIT_CONFIG="${KIT_CONFIG:-$ROOT/cckit.config.json}"
+cd "$ROOT"
+
+usage() { sed -n '/^# Usage:/,/^[^#]/p' "$BIN/cckit" | sed '1d;$d;s/^# \{0,1\}//'; }
+
+# --llm flag → structured output (parsed by agents). Strip it from positional args, export a flag.
+CCKIT_OUTPUT="human"
+args=()
+for a in "$@"; do
+  case "$a" in
+    --llm|--output=json) CCKIT_OUTPUT="json" ;;
+    *) args+=("$a") ;;
+  esac
+done
+set -- "${args[@]:-}"
+export CCKIT_OUTPUT
+
+cmd="${1:-help}"; shift || true
+
+case "$cmd" in
+  version)
+    v="$(jq -r '.kitVersion // "0.0.0"' "$KIT_CONFIG" 2>/dev/null || echo 0.0.0)"
+    if [ "$CCKIT_OUTPUT" = json ]; then printf '{"version":"%s"}\n' "$v"; else echo "cckit $v"; fi
+    ;;
+  effort)
+    # shellcheck source=/dev/null
+    source "$LIB/effort.sh"
+    sub="${1:-}"; shift || true
+    case "$sub" in
+      new)   effort_new   "$@" ;;
+      start) effort_start "$@" ;;
+      pr)    effort_pr    "$@" ;;
+      close) effort_close "$@" ;;
+      plan)  source "$LIB/effort-plan.sh"; effort_plan "$@" ;;
+      *) echo "cckit effort <new|start|pr|close|plan>" >&2; exit 2 ;;
+    esac
+    ;;
+  start|pr|close)
+    # shellcheck source=/dev/null
+    source "$LIB/role-identity.sh"; source "$LIB/gh-project.sh"; source "$LIB/kit-task-ops.sh"
+    case "$cmd" in
+      start) kto_task_start "$@" ;;
+      pr)    kto_task_pr    "$@" ;;
+      close) kto_task_close "$@" ;;
+    esac
+    ;;
+  sync)        exec "$ROOT/scripts/task-sync.sh" "$@" ;;
+  gc)          source "$LIB/kit-gc.sh"; kit_gc_report "$@" ;;
+  orchestrate) exec "$ROOT/scripts/orchestrate.sh" "$@" ;;
+  init)        exec "$ROOT/scripts/init.sh" "$@" ;;
+  help|--help|-h) usage ;;
+  *) echo "cckit: unknown command '$cmd' — run 'cckit help'" >&2; exit 2 ;;
+esac

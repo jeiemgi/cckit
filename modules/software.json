@@ -1,0 +1,48 @@
+{
+  "module": "software",
+  "tier": "software",
+  "label": "Software product",
+  "description": "Turns a free workspace into a GitHub-managed software island: versioning, deploy, CI, worktree+PR guardrails. Opt-in per island (D4) — the parent workspace stays untouched.",
+  "profile": "software",
+  "title": "Software island wizard",
+  "intro": "The kit recommends a sensible default per choice; you decide. These write into THIS island's .claude/kit.config.json — nothing above it is touched.",
+  "sets": [
+    { "path": "modules", "value": "[\"software\"]", "valtype": "json" }
+  ],
+  "questions": [
+    {
+      "key": "versioning",
+      "header": "Versioning",
+      "question": "How is this island versioned?",
+      "type": "select",
+      "default": "github",
+      "options": [
+        { "label": "GitHub (recommended)", "value": "github", "recommended": true, "description": "GitHub-managed: issues + Projects v2 board + PR-per-issue. git != GitHub (D4).", "set": [{ "path": "github.projectsV2", "value": "true", "valtype": "bool" }] },
+        { "label": "Local git only", "value": "git-local", "description": "Silent local git, no GitHub board.", "set": [{ "path": "github.projectsV2", "value": "false", "valtype": "bool" }] }
+      ]
+    },
+    {
+      "key": "deploy",
+      "header": "Deploy",
+      "question": "Where does this island deploy?",
+      "type": "select",
+      "default": "none",
+      "options": [
+        { "label": "None for now", "value": "none", "recommended": true, "description": "Decide later — no deploy config written.", "set": [{ "path": "deploy.target", "value": "none", "valtype": "string" }] },
+        { "label": "Vercel", "value": "vercel", "description": "Vercel project (web app / Next.js).", "set": [{ "path": "deploy.target", "value": "vercel", "valtype": "string" }] },
+        { "label": "Other", "value": "other", "description": "Self-managed / other host.", "set": [{ "path": "deploy.target", "value": "other", "valtype": "string" }] }
+      ]
+    },
+    {
+      "key": "ci",
+      "header": "CI",
+      "question": "Continuous integration?",
+      "type": "select",
+      "default": "github-actions",
+      "options": [
+        { "label": "GitHub Actions (recommended)", "value": "github-actions", "recommended": true, "description": "CI on PRs to the integration branch — gates merges.", "set": [{ "path": "ci.provider", "value": "github-actions", "valtype": "string" }] },
+        { "label": "None", "value": "none", "description": "No CI yet.", "set": [{ "path": "ci.provider", "value": "none", "valtype": "string" }] }
+      ]
+    }
+  ]
+}

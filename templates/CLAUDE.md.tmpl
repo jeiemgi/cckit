@@ -1,0 +1,106 @@
+# {{PROJECT_NAME}}
+
+> Scaffolded by [claude-kit](https://github.com/tuempresadigital/claude-kit) — profile `{{PROFILE}}`.
+> Project config lives in `.claude/kit.config.json`. Edit freely; this file is yours now.
+
+<!-- IF:MEMORY -->
+## MANDATORY — Session Start Protocol
+
+**Do this before answering anything else:**
+
+1. Call `mempalace_status` — loads the MemPalace overview and recent decisions
+2. If the user's first message mentions a specific topic, call `mempalace_search "<topic>" wing={{WING}}`
+
+Skip only if the message is a pure file lookup with no decision context needed.
+<!-- /IF:MEMORY -->
+
+## Agents
+
+Spawn the matching agent for any domain task — do not answer domain decisions from the orchestrator level.
+
+{{AGENT_TABLE}}
+
+Agent definitions: `.claude/agents/<name>/AGENT.md`.
+
+## Skills
+
+{{SKILL_TABLE}}
+
+Invoke a skill when the user types `/<skill-name>` or when its `when_to_use` matches.
+
+<!-- IF:STACK_SKILLS -->
+## Stack conventions (auto-applying skills)
+
+Build conventions are **stack-gated skills** — each applies **only when its technology is in this
+project's `package.json`**. Before building features, check which apply:
+
+- `feature-build-refine` — when **RefineDev** (`@refinedev/*`) is present
+- `supabase-patterns` — when **Supabase** (`@supabase/supabase-js`) is present
+
+If the matching technology isn't in the stack, the skill simply doesn't apply. Add more per
+technology the same way. None are mandatory across the board.
+<!-- /IF:STACK_SKILLS -->
+
+<!-- IF:SPECKIT -->
+## Spec-driven development (Spec Kit)
+
+This project uses **Spec Kit** for feature work. Build through the SDD lifecycle with review gates:
+
+`/speckit-specify → /speckit-clarify → /speckit-plan → /speckit-tasks → /speckit-analyze → /speckit-implement`
+
+Run `/speckit-constitution` once per project. The `speckit` skill installs/identifies Spec Kit and
+explains the lifecycle.<!-- IF:STACK_SKILLS --> Any stack convention skill that matches the stack
+becomes the Spec Kit `feature-module.md` override.<!-- /IF:STACK_SKILLS --> Pick one branch authority
+— Spec Kit's git extension OR the kit's `task-*` skills — not both.
+<!-- /IF:SPECKIT -->
+
+## Task management
+
+- **Source of truth:** GitHub issues<!-- IF:PROJECTS_V2 --> + Projects v2 board (`https://github.com/users/{{GH_OWNER}}/projects/{{PROJECT_NUMBER}}`)<!-- /IF:PROJECTS_V2 -->
+- Repo: `{{GH_REPO}}`
+- **Never** maintain task lists in markdown — use `gh issue` + the `task-*` skills
+- Milestones: {{MILESTONES_HUMAN}}
+<!-- IF:PLANS -->
+- Plans live in `{{PLANS_DIR}}` (format: `{{PLANS_FORMAT}}`) — see `.claude/rules/plan-output-format.md`
+<!-- /IF:PLANS -->
+
+## PR workflow
+
+Every issue lands on `main` through a Pull Request. No direct commits to `main`.
+
+| Step              | Skill              | What it does                                            |
+| ----------------- | ------------------ | ------------------------------------------------------- |
+| 1. Pick an issue  | `/kit-task-sync`       | See the open board, choose what's unblocked             |
+| 2. Start work     | `/kit-task-start <N>`  | Branch `<kind>/<N>-<slug>` from main + mark In Progress |
+| 3. Do the work    | —                  | Code, write plans, etc.                                 |
+| 4. Open PR        | `/kit-task-pr <N>`     | Commit + push + open PR with template/labels/milestone  |
+| 5. Review + merge | `/kit-task-pr-merge`   | Squash-merge PR, switch to main, pull                   |
+| 6. Close          | `/kit-task-close <N>`  | Close issue (auto on `Closes #N`) + archive plan        |
+
+### Branch naming
+
+`<kind>/<issue-number>-<slug>` — kinds: `task`, `plan`, `adr`, `scaffold`, `spike`.
+
+### PR conventions
+
+- Title = exact issue title · Body includes `Closes #N`
+- Labels + milestone inherited from the issue · One PR per issue (coupled migration chains group into one) · Squash merge, linear history
+
+## Rules
+
+- Keep this file tight — point to files, don't duplicate content.
+- Bullets and tables preferred. No long intros.
+- Communication style → `.claude/rules/communication-style.md`
+<!-- IF:DESIGN -->
+- All design + adjustment questions → Designer agent (`.claude/rules/design-routing.md`)
+<!-- /IF:DESIGN -->
+<!-- IF:PLANS -->
+- Plan output format → `.claude/rules/plan-output-format.md`
+<!-- /IF:PLANS -->
+<!-- IF:MEMORY -->
+- Persistent memory protocol → `.claude/rules/mempalace.md`
+<!-- /IF:MEMORY -->
+
+## Language
+
+Default working language: {{COMMS_LANG}}. Match the language {{OWNER_NAME}} uses.

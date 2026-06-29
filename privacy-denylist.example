@@ -1,0 +1,8 @@
+# cckit privacy denylist — terms that must NEVER appear in anything cckit publishes.
+# Copy to .cckit/privacy-denylist (gitignored) and add YOUR private terms, one per line.
+# The guard fails the commit/gate if any term is found in a tracked file. Examples of what to add:
+#   your-company.com
+#   your-org-name
+#   you@example.com
+#   internal-host.example
+# cckit ships this list EMPTY by design — it is agnostic; you declare what is yours.

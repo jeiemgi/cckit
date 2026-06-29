@@ -1,0 +1,133 @@
+{
+  "tier": "project",
+  "title": "This project",
+  "intro": "One batched round, pre-filled from your global profile and what we detect in this directory. Confirm or change.",
+  "questions": [
+    {
+      "key": "name",
+      "header": "Project",
+      "question": "Project name?",
+      "type": "text",
+      "target": "project.name",
+      "default": "",
+      "prefillFrom": "repo.dir"
+    },
+    {
+      "key": "owner",
+      "header": "Owner",
+      "question": "Who owns this project?",
+      "type": "text",
+      "target": "project.owner",
+      "default": "",
+      "prefillFrom": "profile.name"
+    },
+    {
+      "key": "language",
+      "header": "Language",
+      "question": "Comms language for this project?",
+      "type": "select",
+      "default": "mixed",
+      "prefillFrom": "profile.language",
+      "options": [
+        {
+          "label": "Mixed EN/ES",
+          "value": "mixed",
+          "set": [{ "path": "project.language", "value": "mixed", "valtype": "string" }]
+        },
+        {
+          "label": "English",
+          "value": "en",
+          "set": [{ "path": "project.language", "value": "en", "valtype": "string" }]
+        },
+        {
+          "label": "Español",
+          "value": "es",
+          "set": [{ "path": "project.language", "value": "es", "valtype": "string" }]
+        }
+      ]
+    },
+    {
+      "key": "mode",
+      "header": "Strictness",
+      "question": "How strict here? draft = off · guided = warn · enforced = block (worktree + PR per issue).",
+      "type": "select",
+      "default": "guided",
+      "prefillFrom": "profile.defaults.mode",
+      "options": [
+        {
+          "label": "Guided",
+          "value": "guided",
+          "recommended": true,
+          "description": "Warnings only — local-first.",
+          "set": [{ "path": "mode", "value": "guided", "valtype": "string" }]
+        },
+        {
+          "label": "Draft",
+          "value": "draft",
+          "description": "Guardrails off.",
+          "set": [{ "path": "mode", "value": "draft", "valtype": "string" }]
+        },
+        {
+          "label": "Enforced",
+          "value": "enforced",
+          "description": "Worktree-only + PR-per-issue.",
+          "set": [{ "path": "mode", "value": "enforced", "valtype": "string" }]
+        }
+      ]
+    },
+    {
+      "key": "software",
+      "header": "Software?",
+      "question": "Start as a software island now (git/board/CI guardrails)? You can always add it later with `kit add software`.",
+      "type": "select",
+      "default": "no",
+      "control": "addModule:software",
+      "options": [
+        {
+          "label": "Not yet",
+          "value": "no",
+          "recommended": true,
+          "description": "Keep it a free workspace. Add the software module on demand."
+        },
+        {
+          "label": "Yes, software island",
+          "value": "yes",
+          "description": "Run the software wizard now (versioning/deploy/CI)."
+        }
+      ]
+    },
+    {
+      "key": "routines",
+      "header": "Suggested routines",
+      "question": "Wire a starter set of scheduled routines (morning briefing Mon–Fri 8am + board sweep 8:30am)? The kit SUGGESTS — you can accept, skip, or customize later with `kit-routines.sh list`.",
+      "type": "select",
+      "default": "none",
+      "options": [
+        {
+          "label": "None for now",
+          "value": "none",
+          "recommended": true,
+          "description": "Skip — run `kit-routines.sh list` to explore and accept any time."
+        },
+        {
+          "label": "Daily basics (briefing + board sweep)",
+          "value": "daily",
+          "description": "Morning briefing Mon–Fri 8am + board sweep 8:30am.",
+          "set": [{ "path": "routines", "value": ["briefing", "board-sweep"], "valtype": "json" }]
+        },
+        {
+          "label": "Full hygiene (daily basics + weekly GC + knowledge-lint)",
+          "value": "full",
+          "description": "Daily basics + weekly repo GC (Mon 9am) + weekly knowledge-lint (Tue 9am).",
+          "set": [
+            {
+              "path": "routines",
+              "value": ["briefing", "board-sweep", "gc", "knowledge-lint"],
+              "valtype": "json"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# SessionStart hook — surface a claude-kit update notice, CLI-style. Scaffolded by claude-kit.
+# stdout is injected into the session context by Claude Code. Best-effort + always a safe no-op:
+# it never blocks the session and exits 0 even when it can't determine versions.
+[[ -f ./scripts/kit-version-check.sh ]] && bash ./scripts/kit-version-check.sh --target "$(pwd)" 2>/dev/null
+exit 0
