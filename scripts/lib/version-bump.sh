@@ -41,7 +41,7 @@ vb_next() {
 vb_write() {
   local v="$1" f
   command -v jq >/dev/null || { echo "version-bump: jq required to --write" >&2; return 1; }
-  for f in cckit.config.json .claude-plugin/plugin.json package.json; do
+  for f in cckit.config.json .claude-plugin/plugin.json package.json docs-site/package.json; do
     [ -f "$ROOT/$f" ] || continue
     if [ "$f" = "cckit.config.json" ]; then jq --arg v "$v" '.kitVersion=$v' "$ROOT/$f" > "$ROOT/$f.tmp"
     else jq --arg v "$v" '.version=$v' "$ROOT/$f" > "$ROOT/$f.tmp"; fi
