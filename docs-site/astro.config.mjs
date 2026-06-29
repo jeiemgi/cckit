@@ -1,14 +1,23 @@
+import { readFileSync } from 'node:fs';
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+
+// Single source of truth for the documented version: the root package.json (kept in lockstep
+// with the git tags by the release workflow). Shown as a header badge so readers always know
+// which cckit version these docs describe, and can jump to older docs via the tagged releases.
+const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
 // https://astro.build/config
 export default defineConfig({
   // Live domain. cckit.dev is the future canonical home (DNS coming soon); until it
   // points here, the deployed site is cckit.vercel.app so canonical + OG resolve.
   site: 'https://cckit.vercel.app',
+  vite: { define: { __CCKIT_VERSION__: JSON.stringify(pkg.version) } },
   integrations: [
     starlight({
       title: 'cckit',
+      // Header version badge — prepended to the social icons (see src/components/SocialIcons.astro).
+      components: { SocialIcons: './src/components/SocialIcons.astro' },
       description: 'A project operating system for coding agents — the full GitHub work lifecycle as a CLI, drivable by Claude Code and any agent.',
       social: { github: 'https://github.com/jeiemgi/cckit' },
       favicon: '/favicon.svg',
