@@ -16,6 +16,7 @@
 #   cckit orchestrate <a> <b> …     run N flows in parallel worktrees (--dry-run/--cap/--agent)
 #   cckit autopilot [<a> …]         unattended multi-flow: drive (or auto-pick) issues under a cap
 #   cckit gc [--prune [--yes]]      report (default) or prune merged branches + worktrees
+#   cckit status                    thin dashboard: board + worktrees + resume handoff
 #   cckit scan [--llm]              detect this repo's stack + kit state (JSON)
 #   cckit debug [--check] <args>    optional browser-debug via chrome-devtools-axi (auto-detected)
 #   cckit encode-context            stdin JSON -> compact TOON (uniform arrays; JSON fallback)
@@ -159,6 +160,7 @@ case "$cmd" in
   encode-context) source "$LIB/toon.sh"; toon_encode ;;
   debug)       exec "$ROOT/scripts/debug.sh" "$@" ;;
   contribute)  exec "$ROOT/scripts/contribute.sh" "$@" ;;
+  status|ui)   exec "$ROOT/scripts/status.sh" "$@" ;;
   resume)      source "$LIB/handoff.sh"; handoff_read ;;
   handoff)     source "$LIB/handoff.sh"; handoff_write "$@" ;;
   init)        exec "$ROOT/scripts/init.sh" "$@" ;;
