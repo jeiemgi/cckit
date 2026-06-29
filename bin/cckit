@@ -30,6 +30,10 @@ LIB="$ROOT/scripts/lib"
 export KIT_CONFIG="${KIT_CONFIG:-$ROOT/cckit.config.json}"
 cd "$ROOT"
 
+# Structured-output helpers (cckit_is_json / cckit_json) — wired into every verb below.
+# shellcheck source=/dev/null
+source "$LIB/cckit-output.sh"
+
 usage() { sed -n '/^# Usage:/,/^[^#]/p' "$BIN/cckit" | sed '1d;$d;s/^# \{0,1\}//'; }
 
 # --llm flag → structured output (parsed by agents). Strip it from positional args, export a flag.
@@ -41,7 +45,7 @@ for a in "$@"; do
     *) args+=("$a") ;;
   esac
 done
-set -- "${args[@]:-}"
+set -- "${args[@]+"${args[@]}"}"
 export CCKIT_OUTPUT
 
 cmd="${1:-help}"; shift || true
@@ -49,7 +53,7 @@ cmd="${1:-help}"; shift || true
 case "$cmd" in
   version)
     v="$(jq -r '.kitVersion // "0.0.0"' "$KIT_CONFIG" 2>/dev/null || echo 0.0.0)"
-    if [ "$CCKIT_OUTPUT" = json ]; then printf '{"version":"%s"}\n' "$v"; else echo "cckit $v"; fi
+    if cckit_is_json; then cckit_json version "$v"; else echo "cckit $v"; fi
     ;;
   effort)
     # shellcheck source=/dev/null
@@ -64,11 +68,37 @@ case "$cmd" in
       *) echo "cckit effort <new|start|pr|close|plan>" >&2; exit 2 ;;
     esac
     ;;
-  start|pr|close)
+  start)
+    # Isolated worktree + branch for an issue (wt_start drives off cckit.config.json: repo + base
+    # branch). Config must be loaded so KIT_REPO / KIT_BASE_BRANCH are set before wt_start runs.
+    # shellcheck source=/dev/null
+    source "$LIB/kit-config.sh" && load_kit_config
+    # shellcheck source=/dev/null
+    source "$LIB/role-identity.sh"; source "$LIB/worktree-start.sh"
+    if cckit_is_json; then
+      out="$(wt_start "$@" 2>&1)"; rc=$?
+      cckit_json verb start issue "${1:-}" ok "$([ "$rc" -eq 0 ] && echo true || echo false)" \
+        detail "$(printf '%s' "$out" | tail -1)"
+      exit "$rc"
+    fi
+    wt_start "$@"
+    ;;
+  pr|close)
+    # shellcheck source=/dev/null
+    source "$LIB/kit-config.sh" && load_kit_config
     # shellcheck source=/dev/null
     source "$LIB/role-identity.sh"; source "$LIB/gh-project.sh"; source "$LIB/kit-task-ops.sh"
+    if cckit_is_json; then
+      case "$cmd" in
+        pr)    out="$(kto_task_pr    "$@" 2>&1)"; rc=$? ;;
+        close) out="$(kto_task_close "$@" 2>&1)"; rc=$? ;;
+      esac
+      url="$(printf '%s' "$out" | grep -oE 'https://[^ ]+/pull/[0-9]+' | tail -1)"
+      cckit_json verb "$cmd" issue "${1:-}" ok "$([ "$rc" -eq 0 ] && echo true || echo false)" \
+        url "$url" detail "$(printf '%s' "$out" | tail -1)"
+      exit "$rc"
+    fi
     case "$cmd" in
-      start) kto_task_start "$@" ;;
       pr)    kto_task_pr    "$@" ;;
       close) kto_task_close "$@" ;;
     esac

@@ -50,8 +50,8 @@ load_kit_config() {
   export KIT_LOCAL_MODEL="$(jq -r '.local.model // "mlx-community/Qwen3-8B-4bit"' "$cfg")"
 
   # Convenience arrays (newline-delimited)
-  KIT_ROLES="$(jq -r '.roles[]'       "$cfg")"
-  KIT_MILESTONES="$(jq -r '.milestones[]' "$cfg")"
+  KIT_ROLES="$(jq -r '.roles[]? // empty'       "$cfg")"
+  KIT_MILESTONES="$(jq -r '.milestones[]? // empty' "$cfg")"
   export KIT_ROLES KIT_MILESTONES
 
   # Apply per-folder .claudekit/ overrides (no-op when none exist).
