@@ -1,0 +1,22 @@
+name: test
+
+# The gate in CI. scripts/check.sh is the single source of truth (shell syntax, shellcheck,
+# JSON manifests, the legacy-branding scan, secret guard, and the behavioral *-test.sh suite); CI
+# just runs it. Ubuntu runners ship bash, shellcheck, and jq, so the optional checks always run here.
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tooling versions
+        run: |
+          bash --version | head -1
+          shellcheck --version | sed -n '2p'
+          jq --version
+      - name: Gate (scripts/check.sh)
+        run: bash scripts/check.sh

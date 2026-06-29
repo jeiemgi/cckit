@@ -13,6 +13,16 @@ while IFS= read -r f; do
   bash -n "$f" || { note "x syntax: $f"; fail=1; }
 done < <(find bin scripts -type f \( -name '*.sh' -o -perm -u+x \) 2>/dev/null | sort -u)
 
+# 1b. shellcheck at error severity — static analysis when available, skipped if not installed
+# (like jq below) so the gate stays dependency-light. CI installs shellcheck so this always runs there.
+note "==> shellcheck (errors)"
+if command -v shellcheck >/dev/null 2>&1; then
+  find bin scripts -type f \( -name '*.sh' -o -name 'cckit' \) -print0 \
+    | xargs -0 shellcheck --severity=error || fail=1
+else
+  note "  (shellcheck absent - skipping)"
+fi
+
 # 2. The plugin manifest is valid JSON.
 note "==> plugin manifest JSON"
 if command -v jq >/dev/null 2>&1; then
@@ -47,6 +57,10 @@ if [ -f scripts/lib/secret-guard.sh ]; then
   . scripts/lib/secret-guard.sh
   secret_guard_scan || fail=1
 fi
+
+# 5. Behavioral tests - run every *-test.sh through the test runner.
+note "==> behavioral tests"
+bash scripts/test.sh || fail=1
 
 [ "$fail" -eq 0 ] && note "PASS cckit check passed" || note "FAIL cckit check FAILED"
 exit "$fail"
