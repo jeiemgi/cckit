@@ -10,6 +10,7 @@
 #   cckit start <issue> [slug]      isolated worktree + branch for an issue
 #   cckit pr <issue> <summary>      commit + push + open the PR
 #   cckit close <issue> <summary>   close issue + mark done
+#   cckit contribute "<summary>"    open a contribution PR to cckit, gated on scripts/check.sh
 #   cckit sync [--llm]              board state / what's unblocked
 #   cckit effort <new|start|pr|close|plan>   the effort lifecycle
 #   cckit orchestrate <a> <b> …     run N flows in parallel worktrees (--dry-run/--cap/--agent)
@@ -148,6 +149,7 @@ case "$cmd" in
   digest)      exec "$ROOT/scripts/kit-digest.sh" "$@" ;;
   scan)        source "$LIB/project-scan.sh"; project_scan "$@" ;;
   debug)       exec "$ROOT/scripts/debug.sh" "$@" ;;
+  contribute)  exec "$ROOT/scripts/contribute.sh" "$@" ;;
   resume)      source "$LIB/handoff.sh"; handoff_read ;;
   handoff)     source "$LIB/handoff.sh"; handoff_write "$@" ;;
   init)        exec "$ROOT/scripts/init.sh" "$@" ;;
