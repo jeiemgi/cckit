@@ -1,3 +1,7 @@
+<p align="center">
+  <img src=".github/banner.png" alt="cckit — a project operating system for coding agents" width="100%">
+</p>
+
 # cckit
 
 > A project operating system for coding agents — the full GitHub work lifecycle as a CLI, drivable by Claude Code and any other agent.
