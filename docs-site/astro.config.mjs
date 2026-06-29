@@ -2,10 +2,12 @@ import { readFileSync } from 'node:fs';
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 
-// Single source of truth for the documented version: the root package.json (kept in lockstep
-// with the git tags by the release workflow). Shown as a header badge so readers always know
-// which cckit version these docs describe, and can jump to older docs via the tagged releases.
-const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+// Documented version, shown as a header badge so readers know which cckit version these docs
+// describe (and can jump to older docs via the tagged releases). Read from THIS package.json —
+// version-bump.sh keeps it in lockstep with the root version + git tags. Reading the local file
+// (not the repo root) keeps the build self-contained: Vercel's project root is docs-site, so the
+// repo root isn't uploaded on a CLI deploy.
+const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
 
 // https://astro.build/config
 export default defineConfig({
