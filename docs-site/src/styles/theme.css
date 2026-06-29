@@ -124,3 +124,51 @@ body {
 	font-family: var(--__sl-font-mono);
 	letter-spacing: -0.02em;
 }
+
+/* ── Homepage hero ────────────────────────────────────────────────────── */
+
+/* Accessible page heading — the wordmark in the banner image carries it
+   visually, so the real <h1> is for screen readers / SEO only. */
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+/* Banner: full-width within the splash column, framed by a quiet hairline.
+   Short by design (3:1) — a header, not a tall billboard. */
+.hero-banner img {
+	display: block;
+	width: 100%;
+	height: auto;
+	border-radius: 0.75rem;
+	border: 1px solid var(--sl-color-hairline);
+	box-shadow: var(--sl-shadow-md);
+}
+
+/* Action links below the banner: one centered row, the accent lives on the
+   primary "Get started" button only (≤10% accent budget). */
+.hero-actions {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	align-items: center;
+	gap: 0.75rem;
+	margin-top: 1.75rem;
+}
+
+/* ── Card icons — unify to the steel-cyan identity ────────────────────── */
+/* Starlight rotates card-icon backgrounds through a multicolor palette (amber/
+   lavender/green/pink) that clashes with the sober identity and washes out on
+   light paper. Force one calm accent treatment, consistent in both themes. */
+.card .icon {
+	background-color: var(--sl-color-accent-low);
+	color: var(--sl-color-accent);
+	border: 1px solid var(--sl-color-hairline);
+}

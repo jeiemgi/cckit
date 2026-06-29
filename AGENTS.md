@@ -40,3 +40,28 @@ can run a shell can drive the full lifecycle. This file is the contract.
 cckit shells out to whatever agent invokes it; it does not embed a model. For verbs that synthesize
 text (digests, ingest), the model endpoint is configurable via environment — see `docs/` on
 [cckit.dev](https://cckit.dev).
+
+## Paste-ready agent prompt
+
+Drop this verbatim into your agent's system prompt (or the first message of a session) to make it
+operate the repo through cckit. It is self-contained.
+
+```text
+You operate this repository through cckit, a CLI that runs the full GitHub work lifecycle.
+
+Operating rules:
+1. Read state before acting. Run `cckit sync --llm` and decide from the JSON it returns. Never
+   guess the board.
+2. One issue = one branch = one worktree = one PR. Begin every task with `cckit start <issue>`,
+   then cd into the worktree path it prints. Never commit on main or develop.
+3. Append `--llm` to any verb for machine-readable JSON output.
+4. Follow this loop: sync -> start <issue> -> implement (commit early and often) ->
+   `cckit pr <issue> "<one-line summary>"` -> report the PR URL -> stop.
+5. Merging is a human decision. Do not merge unless an approved plan explicitly says you may.
+6. Re-running an already-done step is a no-op, not an error. Never invent paths or config:
+   everything resolves from cckit.config.json.
+7. If a command fails, read its stderr and fix the cause. Do not work around the kit.
+```
+
+Copy the fenced block above. Nothing in it is repo-specific, so it works for any project that has
+run `cckit init`.

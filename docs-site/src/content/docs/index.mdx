@@ -2,19 +2,27 @@
 title: cckit
 description: A project operating system for coding agents — the full GitHub work lifecycle as a CLI, drivable by Claude Code and any agent.
 template: splash
-hero:
-  tagline: A project operating system for coding agents. The full GitHub work lifecycle as a CLI — drivable by Claude Code and any other agent.
-  actions:
-    - text: Get started
-      link: /getting-started/
-      icon: right-arrow
-    - text: View on GitHub
-      link: https://github.com/jeiemgi/cckit
-      icon: external
-      variant: minimal
 ---
 
-import { Card, CardGrid } from '@astrojs/starlight/components';
+import { Image } from 'astro:assets';
+import { Card, CardGrid, LinkButton } from '@astrojs/starlight/components';
+import banner from '../../assets/hero-banner.png';
+
+<h1 class="sr-only">cckit</h1>
+
+<div class="hero-banner">
+  <Image
+    src={banner}
+    alt="cckit — the full GitHub work lifecycle as a CLI, drivable by Claude Code and any agent"
+    loading="eager"
+  />
+</div>
+
+<div class="hero-actions">
+  <LinkButton href="/getting-started/" icon="right-arrow" iconPlacement="end">Get started</LinkButton>
+  <LinkButton href="https://github.com/jeiemgi/cckit" variant="secondary" icon="external">GitHub</LinkButton>
+  <LinkButton href="https://vercel.com/new/clone?repository-url=https://github.com/jeiemgi/cckit" variant="minimal" icon="external">Deploy to Vercel</LinkButton>
+</div>
 
 ## Why cckit
 
