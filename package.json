@@ -1,6 +1,6 @@
 {
   "name": "@jeiemgi/cckit",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": false,
   "license": "MIT OR Apache-2.0",
   "description": "cckit — a project operating system for coding agents (CLI + Claude Code plugin).",
