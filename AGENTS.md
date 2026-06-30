@@ -27,6 +27,7 @@ adapter one) — is described in [the Adapters page](docs-site/src/content/docs/
 | `cckit sync` | board state / what's unblocked | `--llm` → JSON |
 | `cckit next` | the next unblocked issue + how to start it | `--llm` → TOON |
 | `cckit plan` | wave plan: deps-ordered, file-disjoint, session-fit | `--llm` → TOON |
+| `cckit plan-next` | forward plan: inventory current skills/verbs/rules/docs → propose what to build next | `--llm` → TOON |
 | `cckit copilot` | Task-subagent fan-out brief + captain drive (the prompt machine) | `--llm` → TOON |
 | `cckit watch [--merge] [--loop]` | captain: gate open PRs, squash-merge CLEAN, advance the wave | — |
 | `cckit start <issue> [slug]` | isolated worktree + branch | `--llm` |
@@ -42,6 +43,11 @@ adapter one) — is described in [the Adapters page](docs-site/src/content/docs/
 Every verb accepts a global `--llm` (alias `--output=json`); verbs that produce a result emit a
 single JSON object/array on stdout, with human text on stderr. Interactive/launch verbs
 (`init`, `orchestrate`, `autopilot`) have no JSON result — use `--dry-run` to inspect their plan.
+
+> **`cckit plan-next` is the one exception to "feed verb output back to the model."** Its forward
+> plan is for the human/orchestrator's decision only — never inject it into a monitored model's
+> prompt or context (context-anxiety rule). Run it, decide, and hand only the chosen, scoped effort
+> to an agent. `cckit plan` / `cckit next` (ordering existing work) remain safe to reason over.
 
 ### Lifecycle ops (so autopilot runs unattended)
 

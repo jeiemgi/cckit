@@ -15,6 +15,11 @@ scripts; it never reimplements looping or orchestration.
 | **objective** | one long objective on the current branch                    | the built-in `/loop` + caps + a stop-check                    |
 | **plan**      | the planned, file-disjoint set of efforts/flows in parallel | `kit effort plan` + `orchestrate.sh` + `orchestrate-watch.sh` |
 
+> Need the plan first? `/kit-plan-next` (`cckit plan-next`) proposes what to build next from the
+> kit's current capabilities, then hands a chosen item to `/kit-effort-new` — the effort autopilot
+> later drives. Keep that planner output with the human/orchestrator; never feed it into a monitored
+> agent's context (context-anxiety rule).
+
 ## Established-plan autonomy (the default)
 
 **When the plan is already approved, the captain DECIDES + MERGES + CONTINUES — it does not bounce
