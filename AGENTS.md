@@ -25,13 +25,18 @@ adapter one) — is described in [the Adapters page](docs-site/src/content/docs/
 | --- | --- | --- |
 | `cckit init` | scaffold config + `.claude/` | — |
 | `cckit sync` | board state / what's unblocked | `--llm` → JSON |
+| `cckit next` | the next unblocked issue + how to start it | `--llm` → TOON |
+| `cckit plan` | wave plan: deps-ordered, file-disjoint, session-fit | `--llm` → TOON |
+| `cckit copilot` | Task-subagent fan-out brief + captain drive (the prompt machine) | `--llm` → TOON |
+| `cckit watch [--merge] [--loop]` | captain: gate open PRs, squash-merge CLEAN, advance the wave | — |
 | `cckit start <issue> [slug]` | isolated worktree + branch | `--llm` |
 | `cckit pr <issue> <summary>` | commit + push + open PR | `--llm` |
 | `cckit close <issue> <summary>` | close issue + mark done | `--llm` |
-| `cckit effort plan` | session-fit work plan | `--llm` → JSON |
+| `cckit effort plan` | session-fit effort plan | `--llm` → JSON |
 | `cckit orchestrate <a> <b> …` | run N flows in parallel worktrees | — (use `--dry-run`) |
 | `cckit autopilot [<a> …]` | unattended multi-flow: drive (or auto-pick) issues under a cap | — (use `--dry-run`) |
 | `cckit gc` | report prunable branches + worktrees | `--llm` → JSON counts |
+| `cckit render` | stdin markdown → rich (glow on a TTY; verbatim when piped) | — |
 | `cckit version` | the installed cckit version | `--llm` |
 
 Every verb accepts a global `--llm` (alias `--output=json`); verbs that produce a result emit a

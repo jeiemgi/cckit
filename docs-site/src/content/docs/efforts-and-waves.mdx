@@ -1,0 +1,64 @@
+---
+title: Efforts, waves & worktrees
+description: How cckit runs many issues at once without the changes colliding.
+---
+
+import { CardGrid, LinkCard, Steps, Aside } from '@astrojs/starlight/components';
+import EffortWaves from '../../components/diagrams/EffortWaves';
+import WorktreeIsolation from '../../components/diagrams/WorktreeIsolation';
+
+How cckit runs many issues at once without the changes colliding.
+
+<EffortWaves client:only="react" />
+
+A big piece of work is an **effort**. cckit breaks it into **sub-issues**, then sorts them into
+**waves** so the ones that don't depend on each other run together, and the ones that do wait their
+turn.
+
+## Efforts and sub-issues
+
+An **effort** is one goal that's too big for a single issue. It becomes a parent issue with
+**sub-issues** under it — each sub-issue is one shippable step. `cckit effort new` creates the
+effort and its subs.
+
+## Waves
+
+Some sub-issues depend on others: sub #4 can't start until sub #1 is merged. cckit reads those
+**blocked-by** links and groups the work into waves:
+
+<Steps>
+
+1. **Wave 0** — every sub-issue that nothing is blocking. These can all run at the same time.
+2. **Wave 1** — sub-issues whose blockers were all in wave 0. They start once wave 0 merges.
+3. …and so on, until everything is merged.
+
+</Steps>
+
+`cckit plan` shows the waves. Each wave is exactly "what can run in parallel right now".
+
+## Worktrees keep parallel work apart
+
+Running several issues at once raises one question: how do the changes not overwrite each other?
+The answer is a **worktree** — a separate working copy of the repo on disk, on its own branch.
+
+<WorktreeIsolation client:only="react" />
+
+Each issue gets its own branch and worktree, so each piece of work edits its own copy. The changes
+only meet again when their pull requests merge into `main` — and because the issues in a wave touch
+different files, they merge cleanly.
+
+<Aside type="tip" title="One command">
+`cckit start <issue>` makes the branch and the worktree for you. You don't manage worktrees by hand.
+</Aside>
+
+## Links to learn more
+
+- [The GitHub cycle](/github-cycle/) — the path one issue takes from start to merge.
+- [The copilot loop](/copilot/) — fan a whole wave out to agents and merge them automatically.
+
+---
+
+<CardGrid>
+  <LinkCard title="Next: The copilot loop" href="/copilot/" description="Let agents run a whole wave." />
+  <LinkCard title="The GitHub cycle" href="/github-cycle/" description="The path of a single issue." />
+</CardGrid>

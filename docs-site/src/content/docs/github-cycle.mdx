@@ -1,0 +1,66 @@
+---
+title: The GitHub cycle
+description: How one piece of work travels from an issue to merged code, step by step.
+---
+
+import { CardGrid, LinkCard, Steps, Aside } from '@astrojs/starlight/components';
+import GitHubCycle from '../../components/diagrams/GitHubCycle';
+
+How one piece of work travels from an idea to merged code.
+
+<GitHubCycle client:only="react" />
+
+Every change cckit makes follows this same path. Read it left to right: an **issue** says what to
+do, a **branch** gives the work a private place to happen, the work becomes a **pull request**,
+and **review** either merges it or sends it back. cckit gives you one command for each step.
+
+## The steps
+
+<Steps>
+
+1. **Issue** — a short note of one thing to do. It has a number (like `#42`) that follows the work
+   the whole way through.
+
+2. **Branch** — a private copy of the code to change, so your work never disturbs anyone else's.
+   `cckit start 42` makes the branch and an isolated worktree for issue #42.
+
+3. **Work** — make the change. Run `bash scripts/check.sh` (or your project's checks) until it
+   passes.
+
+4. **Pull request** — propose the change back to the main code. `cckit pr 42 "<summary>"` opens it
+   and links it to issue #42, so merging the request closes the issue.
+
+5. **Review** — automated checks run, and a person or an agent takes a look. If it's good, it
+   **merges** into `main`. If not, it comes back as **changes** and you return to step 3.
+
+</Steps>
+
+<Aside type="note" title="New to this?">
+A **pull request** (PR) is a request to add your branch's changes into the main code. **Merging**
+means accepting that request. **`main`** is the one official copy everyone shares. You don't need
+to memorize the terms — the commands above do each step for you.
+</Aside>
+
+## The commands, in order
+
+| Step | Command |
+| ---- | ------- |
+| Start the work | `cckit start <issue>` |
+| Open the request | `cckit pr <issue> "<summary>"` |
+| Close a no-op | `cckit close <issue> "<reason>"` |
+| See the board | `cckit sync` |
+| What's next | `cckit next` |
+
+Each command is explained in the [CLI reference](/cli-reference/).
+
+## Links to learn more
+
+- [Efforts, waves & worktrees](/efforts-and-waves/) — how many issues run at once without colliding.
+- [The copilot loop](/copilot/) — letting agents run the cycle for a whole wave of issues.
+
+---
+
+<CardGrid>
+  <LinkCard title="Next: Efforts, waves & worktrees" href="/efforts-and-waves/" description="Run many issues in parallel, safely." />
+  <LinkCard title="The copilot loop" href="/copilot/" description="Agents drive the cycle for you." />
+</CardGrid>

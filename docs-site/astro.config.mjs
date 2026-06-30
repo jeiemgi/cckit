@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import react from '@astrojs/react';
 
 // Documented version, shown as a header badge so readers know which cckit version these docs
 // describe (and can jump to older docs via the tagged releases). Read from THIS package.json —
@@ -16,6 +17,7 @@ export default defineConfig({
   site: 'https://cckit.vercel.app',
   vite: { define: { __CCKIT_VERSION__: JSON.stringify(pkg.version) } },
   integrations: [
+    react(),
     starlight({
       title: 'cckit',
       // Header version badge — prepended to the social icons (see src/components/SocialIcons.astro).
@@ -36,23 +38,36 @@ export default defineConfig({
       // never Claude/Anthropic colors). Placeholder until the Designer's spec lands.
       customCss: ['./src/styles/theme.css'],
       sidebar: [
-        { label: 'Start', items: [
+        { label: 'Installation', items: [
           { label: 'Introduction', slug: 'index' },
-          { label: 'Getting started', slug: 'getting-started' },
           { label: 'Installing cckit', slug: 'install' },
+        ]},
+        { label: 'Getting started', items: [
+          // Starred entry point — the place to begin.
+          { label: 'Getting started', slug: 'getting-started', badge: { text: 'Start here', variant: 'success' } },
           { label: 'Showcase', slug: 'showcase' },
         ]},
-        { label: 'Guides', items: [
+        { label: 'Learning', items: [
           { label: 'CLI reference', slug: 'cli-reference' },
           { label: 'Cookbook', slug: 'cookbook' },
-          { label: 'Driving cckit from agents', slug: 'agents' },
           { label: 'Adopting cckit', slug: 'adoption' },
           { label: 'Config & permissions', slug: 'config-and-permissions' },
+        ]},
+        { label: 'Agents', items: [
+          { label: 'Driving cckit from agents', slug: 'agents' },
+          { label: 'The copilot loop', slug: 'copilot' },
+          { label: 'Adapters', slug: 'adapters' },
           { label: 'Browser debug', slug: 'debug' },
         ]},
-        { label: 'Reference', items: [
-          { label: 'Adapters', slug: 'adapters' },
+        { label: 'Git mechanisms', items: [
+          { label: 'The GitHub cycle', slug: 'github-cycle' },
+          { label: 'Efforts, waves & worktrees', slug: 'efforts-and-waves' },
           { label: 'Releasing', slug: 'releasing' },
+        ]},
+        { label: 'Skills cckit ships', items: [
+          { label: 'Skills catalog', slug: 'skills' },
+        ]},
+        { label: 'Reference', items: [
           { label: 'Security & secret guard', slug: 'security' },
           { label: '"Built with cckit" badge', slug: 'badge' },
         ]},
