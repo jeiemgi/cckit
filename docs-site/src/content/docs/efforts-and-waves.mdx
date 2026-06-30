@@ -28,7 +28,10 @@ stays safe — you don't set any of it up manually.
 
 An **effort** is one goal that's too big for a single issue. It becomes a parent issue with
 **sub-issues** under it — each sub-issue is one shippable step. `cckit effort new` creates the
-effort and its subs.
+effort and its subs: it fills the parent's four-section plan body (Goal / Scope / For agents /
+Verification), applies the `ctx/kind/priority/role/flow` labels, and lints every title. The
+`/kit-effort-new` skill produces the identical effort — both call one shared core, so there is no
+drift between the verb and the skill.
 
 ## Waves
 
