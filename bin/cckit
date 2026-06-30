@@ -17,6 +17,7 @@
 #   cckit effort <new|start|pr|close|plan>   the effort lifecycle
 #   cckit orchestrate <a> <b> …     run N flows in parallel worktrees (--dry-run/--cap/--agent)
 #   cckit autopilot [<a> …]         unattended multi-flow: drive (or auto-pick) issues under a cap
+#   cckit watch [--merge] [--loop]  captain: gate open PRs, squash-merge CLEAN, advance the wave
 #   cckit gc [--prune [--yes]]      report (default) or prune merged branches + worktrees
 #   cckit status                    thin dashboard: board + worktrees + resume handoff
 #   cckit scan [--llm]              detect this repo's stack + kit state (JSON)
@@ -183,6 +184,21 @@ case "$cmd" in
     ;;
   orchestrate) exec "$ROOT/scripts/orchestrate.sh" "$@" ;;
   autopilot)   exec "$ROOT/scripts/autopilot.sh" "$@" ;;
+  watch)
+    # Captain: gate open PRs, squash-merge the CLEAN ones, advance to the next wave. Runs in the
+    # invoking project; needs config so KIT_REPO is set before captain reads it.
+    # shellcheck source=/dev/null
+    source "$LIB/kit-config.sh" && load_kit_config
+    # shellcheck source=/dev/null
+    source "$LIB/captain.sh"
+    watch_loop=0; watch_args=()
+    for a in "$@"; do case "$a" in --loop) watch_loop=1 ;; *) watch_args+=("$a") ;; esac; done
+    if [ "$watch_loop" = "1" ]; then
+      captain_loop "${watch_args[@]+"${watch_args[@]}"}"
+    else
+      captain_pass "${watch_args[@]+"${watch_args[@]}"}"
+    fi
+    ;;
   # Ops exposed so an agent/autopilot can run the whole lifecycle through the one CLI (#16).
   release)
     # Acts on cckit's own repo, so run from the install root regardless of where it was invoked.
