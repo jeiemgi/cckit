@@ -4,19 +4,26 @@
 # any shell or agent (not only via the effort-* skills). Thin: composes the git-mechanics helpers in
 # effort.sh (linking, snapshots, title lint) plus gh + git. bash 3.2 compatible. Requires: gh, jq, git.
 #
-#   effort_new "<name>" [<sub title> …]   parent issue (template) + native sub-issues, all linked
-#   effort_start <N> [<slug>]             effort/<N> branch + worktree from the base branch
-#   effort_pr [<N>]                       open the ONE PR effort/<N> → base branch
-#   effort_close <N>                      snapshot sub-diffs, squash-merge the PR, close parent + subs
+#   effort_new "<name>" [--slug <s>] [<sub title> …]   parent issue (template) + native sub-issues
+#   effort_start <slug|N> [<slug>]        effort/<N> branch + worktree from the base branch
+#   effort_pr [<slug|N>]                  open the ONE PR effort/<N> → base branch
+#   effort_close <slug|N>                 snapshot sub-diffs, squash-merge the PR, close parent + subs
 #
-# Repo + base branch come from kit.config.json (EFFORT_REPO / KIT_BASE_BRANCH), loaded by effort.sh.
+# Commands accept the human slug as well as the canonical number (#93): a pure-digits arg is a number,
+# anything else is resolved via effort_slug_resolve. Repo + base branch come from kit.config.json
+# (EFFORT_REPO / KIT_BASE_BRANCH), loaded by effort.sh.
+
+# Slug layer (#93): _eff_slug, _eff_title_slug, effort_display, effort_slug_resolve. One home in
+# effort-slug.sh; source it here so the lifecycle ops accept `<slug|N>` and render `slug #N`.
+if ! command -v effort_slug_resolve >/dev/null 2>&1; then
+  _eo_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+  # shellcheck source=/dev/null
+  [ -f "$_eo_dir/effort-slug.sh" ] && . "$_eo_dir/effort-slug.sh"
+  unset _eo_dir
+fi
 
 _eff_repo()  { printf '%s' "${EFFORT_REPO:-${KIT_REPO:-}}"; }
 _eff_base()  { printf '%s' "${KIT_BASE_BRANCH:-main}"; }
-_eff_slug()  { # <text> → a short branch-safe slug (mirrors wt_start)
-  printf '%s' "$1" | sed -E 's/^\[[^]]+\][[:space:]]*//' | tr '[:upper:]' '[:lower:]' \
-    | sed -E 's/[^a-z0-9]+/-/g; s/^-+|-+$//g' | cut -c1-40
-}
 _eff_need()  { command -v "$1" >/dev/null 2>&1 || { echo "effort: $1 is required" >&2; return 1; }; }
 
 # The parent-issue body template (rules/effort-model.md): the four sections double as the work record.
