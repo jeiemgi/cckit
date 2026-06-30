@@ -1,6 +1,6 @@
 {
   "name": "cckit",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "installationPreference": "beta",
   "description": "cckit — a project operating system for coding agents. The full GitHub work lifecycle (start/pr/close/sync, efforts, worktrees, orchestrate, gc) as agents + skills + rules, drivable by Claude Code and any other agent. Driven from cckit.config.json; no org or repo hardcoded.",
   "author": {
