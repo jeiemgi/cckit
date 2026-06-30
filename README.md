@@ -13,8 +13,6 @@
 
 **[📖 Documentation](https://cckit.vercel.app)** · [Quick start](#quick-start) · [Contributing](CONTRIBUTING.md) · [Code of Conduct](CODE_OF_CONDUCT.md)
 
-[![Deploy the docs with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/jeiemgi/cckit&project-name=cckit-docs&root-directory=docs-site)
-
 cckit turns a Git repository into a structured, agent-operable workspace. It ships the entire
 GitHub lifecycle — issues, branches, isolated worktrees, PRs, the merge flow, garbage collection,
 and a multi-agent orchestrator — as a single bash CLI plus a Claude Code plugin (skills, rules,
@@ -40,7 +38,7 @@ a shell can drive every operation.
 curl -fsSL https://raw.githubusercontent.com/jeiemgi/cckit/main/scripts/web-install.sh | bash
 ```
 
-**Homebrew** (once the tap is published):
+**Homebrew:**
 
 ```bash
 brew tap jeiemgi/cckit && brew install cckit
