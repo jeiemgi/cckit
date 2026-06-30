@@ -1,0 +1,18 @@
+---
+// Tag — an activation/category badge. Teaches HOW a thing is used or triggered, at a glance.
+// Each kind has its own colour, used consistently everywhere that kind appears (a learning aid).
+// Usage in MDX:  <Tag kind="conversational" />   ·   <Tag kind="command" label="cckit plan" />
+export const TAGS = {
+  conversational: { label: 'Conversational', color: '#e0863c', desc: 'Triggers while you talk to Claude — just say what you want.' },
+  command:        { label: 'Command',        color: '#2c8fa6', desc: 'A CLI verb you type in a terminal (cckit …).' },
+  skill:          { label: 'Skill',          color: '#38b06a', desc: 'A /slash skill you run inside Claude Code.' },
+  flow:           { label: 'Flow',           color: '#8b7cf6', desc: 'A defined end-to-end process other things build on.' },
+  hook:           { label: 'Hook',           color: '#d86fb0', desc: 'Runs automatically when an event happens.' },
+  agent:          { label: 'Agent',          color: '#4f8cf0', desc: 'Agent-facing — machine output (--llm / TOON).' },
+  concept:        { label: 'Concept',        color: '#8090a0', desc: 'A term worth knowing before you go further.' },
+};
+
+const { kind = 'concept', label } = Astro.props;
+const t = TAGS[kind] ?? TAGS.concept;
+---
+<span class="cckit-tag" style={`--tag:${t.color}`} title={t.desc}>{label ?? t.label}</span>

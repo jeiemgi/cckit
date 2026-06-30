@@ -1,0 +1,14 @@
+---
+// TagLegend — the key to the activation tags. Drop it once on a "how to read" page so readers learn
+// what each coloured tag means; every tag elsewhere then reads at a glance.
+import Tag, { TAGS } from './Tag.astro';
+const order = ['conversational', 'command', 'skill', 'flow', 'hook', 'agent', 'concept'];
+---
+<dl class="cckit-legend not-content">
+  {order.map((kind) => (
+    <div class="cckit-legend__row">
+      <dt><Tag kind={kind} /></dt>
+      <dd>{TAGS[kind].desc}</dd>
+    </div>
+  ))}
+</dl>

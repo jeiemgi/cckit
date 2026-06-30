@@ -45,6 +45,7 @@ export default defineConfig({
         { label: 'Getting started', items: [
           // Starred entry point — the place to begin.
           { label: 'Getting started', slug: 'getting-started', badge: { text: 'Start here', variant: 'success' } },
+          { label: 'How to read this guide', slug: 'how-to-read' },
           { label: 'Showcase', slug: 'showcase' },
         ]},
         { label: 'Learning', items: [
