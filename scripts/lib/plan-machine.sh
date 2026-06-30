@@ -202,6 +202,8 @@ EOF2
     done
   }
 
+  local here; here="$(dirname "${BASH_SOURCE[0]}")"
+
   # raw rows (wave<TAB>batch<TAB>number<TAB>ctx<TAB>blockers<TAB>title) — the copilot driver (#78)
   # consumes this; not a public output mode.
   if [ "$out" = "tsv" ]; then emit_rows; return 0; fi
@@ -214,37 +216,45 @@ EOF2
         | {wave:(.[0]|tonumber), batch:(.[1]|tonumber), number:(.[2]|tonumber),
            ctx:.[3], blockers:.[4], title:.[5]} ]')"
     # route through the TOON encoder (uniform array -> tabular; falls back to JSON under the gate).
-    local here; here="$(dirname "${BASH_SOURCE[0]}")"
     # shellcheck source=/dev/null
     . "$here/toon.sh"
     printf '%s' "$json" | toon_encode
     return 0
   fi
 
-  # human render (rich rendering polish lands in #82; this is the clean default).
-  # Render with awk -F'\t': unlike `read` with a whitespace IFS, awk never collapses the empty
-  # blockers field, so the columns stay aligned when an issue has no blockers.
-  printf '\n  cckit plan — %s  (session budget %s · ctx S=1 M=2 L=4 XL=8)\n' "$repo" "$budget"
-  emit_rows | awk -F'\t' '
-    BEGIN { lw=""; lb="" }
-    {
-      wv=$1; bt=$2; num=$3; ctx=$4; blk=$5; title=$6
-      if (wv != lw) { printf "\n  Wave %s — runs in parallel:\n", wv; lw=wv; lb="" }
-      if (bt != lb) { printf "    batch %s:\n", bt; lb=bt }
-      sub(/^\[Effort( [0-9]+)?\] [0-9]+ · ?/, "", title)
-      sub(/^\[[A-Za-z]+\] /, "", title)
-      dep=""
-      if (blk != "") { gsub(/,/, ", #", blk); dep="   (after #" blk ")" }
-      printf "      #%-4s [%-2s] %s%s\n", num, ctx, title, dep
-    }'
-  # externally-blocked issues never enter a wave — surface them so they aren't silently dropped.
-  local anyext=0
-  for i in "${!nums[@]}"; do [ -n "${ext[$i]}" ] && anyext=1; done
-  if [ "$anyext" = "1" ]; then
-    printf '\n  Blocked by open issues outside this set (not scheduled):\n'
-    for i in "${!nums[@]}"; do
-      [ -n "${ext[$i]}" ] && printf '      #%-4s waits on #%s\n' "${nums[$i]}" "${ext[$i]//,/, #}"
-    done
-  fi
-  printf '\n'
+  # human render: emit MARKDOWN (a table per wave) and route it through the rendering seam (#82) —
+  # rich via glow in a TTY, verbatim markdown otherwise (renders natively in Claude Code, pipe-safe).
+  # awk -F'\t' is used so the empty blockers field never collapses the columns.
+  # shellcheck source=/dev/null
+  . "$here/render.sh"
+  {
+    printf '# cckit plan — %s\n\n' "$repo"
+    printf '_session budget %s · ctx S=1 M=2 L=4 XL=8 · each wave runs in parallel_\n' "$budget"
+    emit_rows | awk -F'\t' '
+      BEGIN { lw="" }
+      {
+        wv=$1; bt=$2; num=$3; ctx=$4; blk=$5; title=$6
+        if (wv != lw) {
+          printf "\n## Wave %s\n\n", wv
+          print "| # | ctx | batch | issue | after |"
+          print "|---|-----|-------|-------|-------|"
+          lw=wv
+        }
+        sub(/^\[Effort( [0-9]+)?\] [0-9]+ · ?/, "", title)
+        sub(/^\[[A-Za-z]+\] /, "", title)
+        dep="—"
+        if (blk != "") { gsub(/,/, ", #", blk); dep="#" blk }
+        printf "| #%s | %s | %s | %s | %s |\n", num, ctx, bt, title, dep
+      }'
+    # externally-blocked issues never enter a wave — surface them so they aren't silently dropped.
+    local anyext=0
+    for i in "${!nums[@]}"; do [ -n "${ext[$i]}" ] && anyext=1; done
+    if [ "$anyext" = "1" ]; then
+      printf '\n## Blocked (open blockers outside this set — not scheduled)\n\n'
+      for i in "${!nums[@]}"; do
+        [ -n "${ext[$i]}" ] && printf -- '- #%s waits on #%s\n' "${nums[$i]}" "${ext[$i]//,/, #}"
+      done
+    fi
+    printf '\n'
+  } | cckit_render
 }

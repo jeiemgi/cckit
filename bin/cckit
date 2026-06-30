@@ -24,6 +24,7 @@
 #   cckit scan [--llm]              detect this repo's stack + kit state (JSON)
 #   cckit debug [--check] <args>    optional browser-debug via chrome-devtools-axi (auto-detected)
 #   cckit encode-context            stdin JSON -> compact TOON (uniform arrays; JSON fallback)
+#   cckit render                    stdin markdown -> rich (glow on a TTY; verbatim when piped)
 #   cckit doctor                    onboarding preflight (deps, gh auth)
 #   cckit update                    check whether this project is behind the installed cckit
 #   cckit migrate                   reshuffle an old kit layout to the current one
@@ -225,6 +226,7 @@ case "$cmd" in
   digest)      exec "$ROOT/scripts/kit-digest.sh" "$@" ;;
   scan)        source "$LIB/project-scan.sh"; project_scan "$@" ;;
   encode-context) source "$LIB/toon.sh"; toon_encode ;;
+  render)      source "$LIB/render.sh"; cckit_render ;;
   debug)       exec "$ROOT/scripts/debug.sh" "$@" ;;
   contribute)  cd "$ROOT"; exec "$ROOT/scripts/contribute.sh" "$@" ;;
   status|ui)   exec "$ROOT/scripts/status.sh" "$@" ;;

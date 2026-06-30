@@ -71,25 +71,31 @@ copilot_brief() {
     return 0
   fi
 
-  # human brief — the orchestration the agent enacts.
-  local n0; n0="$(printf '%s\n' "$wave0" | grep -c .)"
-  printf '\n# cckit copilot — %s%s\n' "$repo" "$([ -n "$effort" ] && echo " · effort #$effort")"
-  printf '\nThe plan machine laid out %s wave(s). You are the orchestrator: fan wave 0 out as parallel\nTask subagents, gate + merge with the captain, then re-run this brief for the next wave.\n' "$((waves_total + 1))"
+  # human brief — markdown the agent enacts, routed through the rendering seam (#82): rich via glow
+  # in a TTY, verbatim markdown otherwise (renders natively in Claude Code, pipe-safe).
+  # shellcheck source=/dev/null
+  . "$here/render.sh"
+  local n0 esfx; n0="$(printf '%s\n' "$wave0" | grep -c .)"
+  esfx="$([ -n "$effort" ] && echo " --effort $effort")"
+  {
+    printf '# cckit copilot — %s%s\n' "$repo" "$([ -n "$effort" ] && echo " · effort #$effort")"
+    printf '\nThe plan machine laid out %s wave(s). You are the orchestrator: fan wave 0 out as parallel\nTask subagents, gate + merge with the captain, then re-run this brief for the next wave.\n' "$((waves_total + 1))"
 
-  printf '\n## Wave 0 — spawn %s parallel Task subagent(s)\n' "$n0"
-  printf 'Each in its OWN worktree (Task isolation: "worktree", run in background). Branches are\nfile-disjoint within a wave, so they will not collide.\n\n'
-  printf '%s\n' "$wave0" | awk -F'\t' '{print $3"\t"$4"\t"$6}' \
-    | while IFS="$(printf '\t')" read -r num ctx title; do
-        [ -n "$num" ] || continue
-        disp="$(printf '%s' "$title" | sed -E 's/^\[Effort( [0-9]+)?\] [0-9]+ · ?//; s/^\[[A-Za-z]+\] //')"
-        printf '### #%s  [%s]  %s\n' "$num" "$ctx" "$disp"
-        printf '> %s\n\n' "$(_copilot_seed "$num" "$disp")"
-      done
+    printf '\n## Wave 0 — spawn %s parallel Task subagent(s)\n\n' "$n0"
+    printf 'Each in its OWN worktree (Task isolation: "worktree", run in background). Branches are\nfile-disjoint within a wave, so they will not collide.\n\n'
+    printf '%s\n' "$wave0" | awk -F'\t' '{print $3"\t"$4"\t"$6}' \
+      | while IFS="$(printf '\t')" read -r num ctx title; do
+          [ -n "$num" ] || continue
+          disp="$(printf '%s' "$title" | sed -E 's/^\[Effort( [0-9]+)?\] [0-9]+ · ?//; s/^\[[A-Za-z]+\] //')"
+          printf '### #%s · [%s] · %s\n\n' "$num" "$ctx" "$disp"
+          printf '> %s\n\n' "$(_copilot_seed "$num" "$disp")"
+        done
 
-  printf '## Between waves — drive the captain\n'
-  printf '1. When the wave-0 subagents have opened their PRs, gate + merge them:\n'
-  printf '   ```\n   cckit watch --merge%s\n   ```\n' "$([ -n "$effort" ] && echo " --effort $effort")"
-  printf '2. Merging unblocks the next wave. Re-run this brief to get it:\n'
-  printf '   ```\n   cckit copilot%s\n   ```\n' "$([ -n "$effort" ] && echo " --effort $effort")"
-  printf '3. Repeat until `cckit copilot` reports nothing to drive. To let the captain self-pace the\n   gate/merge passes, use `cckit watch --loop` (or drive this brief under `/loop`).\n\n'
+    printf '## Between waves — drive the captain\n\n'
+    printf '1. When the wave-0 subagents have opened their PRs, gate + merge them:\n'
+    printf '   ```\n   cckit watch --merge%s\n   ```\n' "$esfx"
+    printf '2. Merging unblocks the next wave. Re-run this brief to get it:\n'
+    printf '   ```\n   cckit copilot%s\n   ```\n' "$esfx"
+    printf '3. Repeat until `cckit copilot` reports nothing to drive. To let the captain self-pace the\n   gate/merge passes, use `cckit watch --loop` (or drive this brief under `/loop`).\n\n'
+  } | cckit_render
 }
