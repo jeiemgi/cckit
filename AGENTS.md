@@ -32,6 +32,7 @@ adapter one) — is described in [the Adapters page](docs-site/src/content/docs/
 | `cckit start <issue> [slug]` | isolated worktree + branch | `--llm` |
 | `cckit pr <issue> <summary>` | commit + push + open PR | `--llm` |
 | `cckit close <issue> <summary>` | close issue + mark done | `--llm` |
+| `cckit effort <new\|start\|pr\|close>` | effort lifecycle; `start`/`pr`/`close` take `<slug\|N>` | — |
 | `cckit effort plan` | session-fit effort plan | `--llm` → JSON |
 | `cckit orchestrate <a> <b> …` | run N flows in parallel worktrees | — (use `--dry-run`) |
 | `cckit autopilot [<a> …]` | unattended multi-flow: drive (or auto-pick) issues under a cap | — (use `--dry-run`) |

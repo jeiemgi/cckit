@@ -13,7 +13,7 @@ cckit is a thin bash dispatcher over a git-mechanics bundle. Every verb is drive
 | `cckit pr <issue> <summary>` | Commit, push, and open the PR. |
 | `cckit close <issue> <summary>` | Close the issue and mark it done. |
 | `cckit sync` | Board state / what's unblocked. |
-| `cckit effort <new\|start\|pr\|close\|plan>` | The effort lifecycle. |
+| `cckit effort <new\|start\|pr\|close\|plan>` | The effort lifecycle. `start`/`pr`/`close` accept a `<slug>` or the effort `<N>`. |
 | `cckit orchestrate <a> <b> …` | Run N flows in parallel worktrees. |
 | `cckit gc` | Prune merged branches + worktrees. |
 | `cckit version` | The installed cckit version. |

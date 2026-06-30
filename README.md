@@ -80,6 +80,23 @@ cckit gc                   # prune merged branches + worktrees
 
 Run `cckit help` for the full verb list, or `cckit <verb> --help` for any one.
 
+## Efforts and slug handles
+
+A big piece of work is an **effort** — a parent issue with sub-issues. The GitHub issue **number**
+stays the canonical key, but every effort also has a memorable **slug** handle (the one already in
+its `effort/<N>-<slug>` branch). Effort commands take the slug *or* the number interchangeably:
+
+```bash
+cckit effort new "Slug handles for efforts" --slug slug-handles   # optional explicit handle
+cckit effort start slug-handles                                   # same as: cckit effort start 93
+cckit effort pr slug-handles
+cckit effort close slug-handles
+```
+
+A pure-digits argument is always a number; anything else is resolved to the canonical number by
+matching `effort/*` branches, the `slug:<slug>` label, then open effort titles. An unknown or
+ambiguous slug fails with a clear error rather than guessing. Efforts render as `slug #N`.
+
 ## The copilot loop
 
 cckit turns the board into parallel agent work that gates and merges itself:
