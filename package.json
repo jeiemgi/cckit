@@ -7,7 +7,7 @@
   "homepage": "https://cckit.vercel.app",
   "repository": {
     "type": "git",
-    "url": "https://github.com/jeiemgi/cckit.git"
+    "url": "git+https://github.com/jeiemgi/cckit.git"
   },
   "bin": {
     "cckit": "bin/cckit"
