@@ -202,6 +202,10 @@ EOF2
     done
   }
 
+  # raw rows (wave<TAB>batch<TAB>number<TAB>ctx<TAB>blockers<TAB>title) — the copilot driver (#78)
+  # consumes this; not a public output mode.
+  if [ "$out" = "tsv" ]; then emit_rows; return 0; fi
+
   if [ "$out" = "json" ]; then
     # TOON-encode a uniform row array (wave,batch,number,ctx,blockers,title) for the copilot.
     local json

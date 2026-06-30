@@ -18,6 +18,7 @@
 #   cckit orchestrate <a> <b> …     run N flows in parallel worktrees (--dry-run/--cap/--agent)
 #   cckit autopilot [<a> …]         unattended multi-flow: drive (or auto-pick) issues under a cap
 #   cckit watch [--merge] [--loop]  captain: gate open PRs, squash-merge CLEAN, advance the wave
+#   cckit copilot [--effort N]      prompt machine: emit the wave-0 subagent fan-out + captain drive
 #   cckit gc [--prune [--yes]]      report (default) or prune merged branches + worktrees
 #   cckit status                    thin dashboard: board + worktrees + resume handoff
 #   cckit scan [--llm]              detect this repo's stack + kit state (JSON)
@@ -184,6 +185,14 @@ case "$cmd" in
     ;;
   orchestrate) exec "$ROOT/scripts/orchestrate.sh" "$@" ;;
   autopilot)   exec "$ROOT/scripts/autopilot.sh" "$@" ;;
+  copilot)
+    # The prompt machine: emit the wave-0 Task-subagent fan-out + the between-waves captain drive.
+    # Runs in the invoking project; needs config so KIT_REPO is set before copilot reads it.
+    # shellcheck source=/dev/null
+    source "$LIB/kit-config.sh" && load_kit_config
+    # shellcheck source=/dev/null
+    source "$LIB/copilot.sh"; copilot_brief "$@"
+    ;;
   watch)
     # Captain: gate open PRs, squash-merge the CLEAN ones, advance to the next wave. Runs in the
     # invoking project; needs config so KIT_REPO is set before captain reads it.
