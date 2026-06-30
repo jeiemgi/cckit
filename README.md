@@ -71,6 +71,7 @@ Requirements: `bash` 4+, `git`, and `gh` (GitHub CLI) authenticated. `jq` recomm
 
 ```bash
 cckit init                 # scaffold cckit.config.json + .claude/ for this repo
+cckit next                 # the next unblocked issue + how to start it
 cckit start 42             # isolated worktree + branch for issue #42
 cckit pr 42 "what changed" # commit, push, open the PR
 cckit sync                 # board state, what's unblocked
@@ -79,15 +80,31 @@ cckit gc                   # prune merged branches + worktrees
 
 Run `cckit help` for the full verb list, or `cckit <verb> --help` for any one.
 
+## The copilot loop
+
+cckit turns the board into parallel agent work that gates and merges itself:
+
+```bash
+cckit plan                 # the wave plan: deps-ordered, file-disjoint, session-fit
+cckit copilot              # a Task-subagent fan-out brief Claude Code enacts (the prompt machine)
+cckit watch --merge        # the captain: gate open PRs, squash-merge the CLEAN ones, advance
+cckit watch --loop         # self-pace gate/merge passes until steady state
+```
+
 ## Driven by agents
 
 cckit is meant to be operated by an agent loop, not only a human. See [`AGENTS.md`](AGENTS.md) for
-the contract. Every verb accepts `--llm` for structured, parseable output:
+the contract. Every verb accepts `--llm` for structured output — uniform payloads come back as
+**TOON** (token-efficient), so the plan, board, and fan-out cost the model far fewer tokens:
 
 ```bash
-cckit sync --llm           # JSON board state for an agent to reason over
-cckit effort plan --llm    # the session-fit work plan as data
+cckit sync --llm           # board state for an agent to reason over
+cckit plan --llm           # the wave plan as TOON rows
+cckit copilot --llm        # the fan-out (one subagent prompt per issue) as TOON
 ```
+
+Human output renders as markdown — rich via `glow` in a terminal, native in the Claude Code
+transcript, pipe-safe everywhere (`cckit render` exposes the seam for any script).
 
 ## Documentation
 

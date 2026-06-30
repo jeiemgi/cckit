@@ -1,0 +1,72 @@
+---
+title: Skills cckit ships
+description: The skills cckit installs — what each one does and when to reach for it.
+---
+
+import { CardGrid, LinkCard, Aside } from '@astrojs/starlight/components';
+
+The skills cckit installs, grouped by what you're trying to do.
+
+A **skill** is a packaged instruction set Claude Code can run on request. cckit ships skills for the
+whole GitHub lifecycle, so you drive the work by asking for it (`/kit-task-start 42`) instead of
+remembering each step. You can run every skill's underlying command directly too — the skills just
+wrap them.
+
+## Everyday loop
+
+| Skill | What it does |
+| ----- | ------------ |
+| `kit-next` | Find the next unblocked issue and pick it up, or fan the whole wave out. |
+| `kit-ship` | Take one request from code to merged: start → PR → CI → merge → close. |
+| `kit-autopilot` | Run a planned effort hands-off — the captain merges each wave and continues. |
+| `kit-task-sync` | Print the board grouped by role; flag blocked items. |
+
+## Task lifecycle (one issue)
+
+| Skill | What it does |
+| ----- | ------------ |
+| `kit-task-new` | Create an issue with labels, milestone, and board fields in one flow. |
+| `kit-task-start` | Branch (optionally an isolated worktree) and mark the issue in progress. |
+| `kit-task-pr` | Commit, push, and open a pull request linked to the issue. |
+| `kit-task-pr-merge` | Squash-merge the open PR, switch to the base branch, pull. |
+| `kit-task-pr-auto` | Open the PR and merge it in one command. |
+| `kit-task-close` | Close the issue and set the board to Done after its PR merges. |
+
+## Effort lifecycle (many issues, one goal)
+
+| Skill | What it does |
+| ----- | ------------ |
+| `kit-effort-new` | Create an effort: a parent issue plus linked sub-issues on the board. |
+| `kit-effort-start` | Begin building — open the single effort branch the subs merge into. |
+| `kit-effort-pr` | Open the one pull request for the whole effort. |
+| `kit-effort-close` | Snapshot each sub's diff, squash-merge, close parent + subs, garbage-collect. |
+
+## Maintenance & delivery
+
+| Skill | What it does |
+| ----- | ------------ |
+| `kit-gc` | Prune merged branches and worktrees; surface orphans and stale stashes. |
+| `kit-security-sweep` | Audit the apps for injection, auth, CORS/CSP, and dependency issues. |
+| `kit-digest` | Pre-digest long inputs with a local model to save tokens. |
+
+## Authoring & contributing
+
+| Skill | What it does |
+| ----- | ------------ |
+| `docs-writer` | Write docs in the house voice — kind but robust, scannable, no analogies. |
+| `kit-customize` | Add or edit agents and skills in a scaffolded project. |
+| `kit-contribute` | Open a pull request to contribute your additions back to cckit. |
+| `kit-onboard` | First-contact setup on a new machine or project. |
+| `kit-annotate` | Wire click-to-annotate visual UI feedback for a React app. |
+
+<Aside type="note" title="Running a skill">
+In Claude Code, type `/` and the skill name (for example `/kit-next`). Each skill's page explains
+what it asks for and what it does.
+</Aside>
+
+---
+
+<CardGrid>
+  <LinkCard title="The copilot loop" href="/copilot/" description="The loop the everyday skills drive." />
+  <LinkCard title="CLI reference" href="/cli-reference/" description="The commands the skills wrap." />
+</CardGrid>
