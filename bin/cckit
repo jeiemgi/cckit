@@ -13,6 +13,7 @@
 #   cckit close <issue> <summary>   close issue + mark done
 #   cckit contribute "<summary>"    open a contribution PR to cckit, gated on scripts/check.sh
 #   cckit sync [--llm]              board state / what's unblocked
+#   cckit plan [--llm] [--effort N] wave plan: deps-ordered, file-disjoint, session-fit (TOON --llm)
 #   cckit effort <new|start|pr|close|plan>   the effort lifecycle
 #   cckit orchestrate <a> <b> …     run N flows in parallel worktrees (--dry-run/--cap/--agent)
 #   cckit autopilot [<a> …]         unattended multi-flow: drive (or auto-pick) issues under a cap
@@ -149,6 +150,14 @@ case "$cmd" in
     esac
     ;;
   sync)        exec "$ROOT/scripts/task-sync.sh" "$@" ;;
+  plan)
+    # Wave plan over the board (deps-ordered, file-disjoint, session-fit). Runs in the invoking
+    # project; needs config so KIT_REPO is set before plan-machine reads it.
+    # shellcheck source=/dev/null
+    source "$LIB/kit-config.sh" && load_kit_config
+    # shellcheck source=/dev/null
+    source "$LIB/plan-machine.sh"; plan_machine "$@"
+    ;;
   gc)
     # shellcheck source=/dev/null
     source "$LIB/kit-config.sh" && load_kit_config
