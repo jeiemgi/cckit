@@ -1,0 +1,9 @@
+---
+// Starlight Footer override — renders the default footer, plus the dev-only Agentation annotation
+// toolbar on every page. `client:only="react"` keeps agentation out of the SSR/production build;
+// the `import.meta.env.DEV` gate keeps it out of `astro build` output entirely.
+import Default from '@astrojs/starlight/components/Footer.astro';
+import AnnotateToolbar from './AnnotateToolbar';
+---
+<Default />
+{import.meta.env.DEV && <AnnotateToolbar client:only="react" />}

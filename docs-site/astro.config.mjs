@@ -10,6 +10,11 @@ import react from '@astrojs/react';
 // repo root isn't uploaded on a CLI deploy.
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
 
+// Dev-only annotation toolbar: register the Footer override ONLY outside production, so the
+// `agentation` island is never collected into `astro build` output (a runtime DEV gate still ships
+// the chunk; gating at config time keeps it out entirely).
+const DEV = process.env.NODE_ENV !== 'production';
+
 // https://astro.build/config
 export default defineConfig({
   // Live domain. cckit.dev is the future canonical home (DNS coming soon); until it
@@ -23,7 +28,12 @@ export default defineConfig({
       // Wrap long code lines instead of a horizontal scrollbar (the long copilot prompts especially).
       expressiveCode: { defaultProps: { wrap: true } },
       // Header version badge — prepended to the social icons (see src/components/SocialIcons.astro).
-      components: { SocialIcons: './src/components/SocialIcons.astro' },
+      // Footer override mounts the dev-only annotation toolbar (stripped from production).
+      components: {
+        SocialIcons: './src/components/SocialIcons.astro',
+        // Footer override only in dev → the agentation toolbar island is never built for production.
+        ...(DEV ? { Footer: './src/components/Footer.astro' } : {}),
+      },
       description: 'A project operating system for coding agents — the full GitHub work lifecycle as a CLI, drivable by Claude Code and any agent.',
       social: { github: 'https://github.com/jeiemgi/cckit' },
       favicon: '/favicon.svg',
