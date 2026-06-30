@@ -11,7 +11,7 @@ description: Install cckit and run your first lifecycle commands.
 curl -fsSL https://raw.githubusercontent.com/jeiemgi/cckit/main/scripts/web-install.sh | bash
 ```
 
-**Homebrew** (once the tap is published):
+**Homebrew:**
 
 ```bash
 brew tap jeiemgi/cckit && brew install cckit
