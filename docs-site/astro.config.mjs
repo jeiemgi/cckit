@@ -39,40 +39,35 @@ export default defineConfig({
       // The Designer owns the visual theme — this file is the single hook (elegant + sober,
       // never Claude/Anthropic colors). Placeholder until the Designer's spec lands.
       customCss: ['./src/styles/theme.css'],
+      // Ordered as a journey: orient + set up, then WHERE cckit enters your git workflow, then WHEN
+      // you reach for it day to day, then everything to look up. Each group is a stage, not a bucket.
       sidebar: [
-        { label: 'Installation', items: [
-          { label: 'Introduction', slug: 'index' },
-          { label: 'Installing cckit', slug: 'install' },
-        ]},
-        { label: 'Getting started', items: [
-          // Starred entry point — the place to begin.
-          { label: 'Getting started', slug: 'getting-started', badge: { text: 'Start here', variant: 'success' } },
+        { label: '1 · Start here', items: [
+          { label: 'What cckit is', slug: 'index' },
           { label: 'How to read this guide', slug: 'how-to-read' },
+          { label: 'Installing cckit', slug: 'install' },
+          { label: 'Your first run', slug: 'getting-started', badge: { text: 'Start here', variant: 'success' } },
           { label: 'Showcase', slug: 'showcase' },
         ]},
-        { label: 'Learning', items: [
-          { label: 'CLI reference', slug: 'cli-reference' },
-          { label: 'Cookbook', slug: 'cookbook' },
-          { label: 'Adopting cckit', slug: 'adoption' },
-          { label: 'Config & permissions', slug: 'config-and-permissions' },
-        ]},
-        { label: 'Agents', items: [
-          { label: 'Driving cckit from agents', slug: 'agents' },
-          { label: 'The copilot loop', slug: 'copilot' },
-          { label: 'Adapters', slug: 'adapters' },
-          { label: 'Browser debug', slug: 'debug' },
-        ]},
-        { label: 'Git mechanisms', items: [
+        { label: '2 · How the work flows', items: [
           { label: 'The GitHub cycle', slug: 'github-cycle' },
           { label: 'Efforts, waves & worktrees', slug: 'efforts-and-waves' },
-          { label: 'Hooks', slug: 'hooks' },
+          { label: 'Hooks — when cckit acts for you', slug: 'hooks' },
+        ]},
+        { label: '3 · Using cckit day to day', items: [
+          { label: 'The copilot loop', slug: 'copilot' },
+          { label: 'Driving cckit from agents', slug: 'agents' },
+          { label: 'Cookbook', slug: 'cookbook' },
+          { label: 'Adopting cckit on a repo', slug: 'adoption' },
+        ]},
+        { label: '4 · Reference', items: [
+          { label: 'CLI reference', slug: 'cli-reference' },
+          { label: 'Skills cckit ships', slug: 'skills' },
+          { label: 'Config & permissions', slug: 'config-and-permissions' },
+          { label: 'Adapters', slug: 'adapters' },
           { label: 'Releasing', slug: 'releasing' },
-        ]},
-        { label: 'Skills cckit ships', items: [
-          { label: 'Skills catalog', slug: 'skills' },
-        ]},
-        { label: 'Reference', items: [
           { label: 'Security & secret guard', slug: 'security' },
+          { label: 'Browser debug', slug: 'debug' },
           { label: '"Built with cckit" badge', slug: 'badge' },
         ]},
       ],
