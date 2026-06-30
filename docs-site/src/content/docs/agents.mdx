@@ -1,0 +1,106 @@
+---
+title: Driving cckit from agents
+description: cckit is agent-agnostic — any agent that can run a shell can drive the full lifecycle.
+---
+
+import { CardGrid, LinkCard, Steps, Aside } from '@astrojs/starlight/components';
+import Tag from '../../components/Tag.astro';
+import TagRow from '../../components/TagRow.astro';
+
+<TagRow kinds={["agent"]} />
+
+Drive the whole GitHub work lifecycle from any agent that can run a shell — read the board, start an issue, open a pull request — all in machine-readable output.
+
+cckit is agent-agnostic. Claude Code is first-class (skills and slash commands), but the contract is a plain CLI. Any agent that can run a shell and parse text can run it. The full contract lives in `AGENTS.md` at the repo root.
+
+## The one rule that makes it agent-friendly
+
+Every verb takes `--llm`. Append it to any command and the verb switches from pretty human output to machine-readable output an agent can parse.
+
+- **Uniform results come back as TOON.** TOON is a compact text format for uniform lists — the board, the wave plan, the next-issue set. It is smaller than JSON, so it costs fewer tokens in an agent's context.
+- **Single-result verbs come back as one JSON object** on stdout (the pretty text goes to stderr).
+- **Human output is markdown**, rendered through the `cckit render` seam — `glow` on a terminal, verbatim text when piped. So the same verb reads well to a person and parses cleanly to a machine.
+
+<Aside type="note" title="New here? What an agent is">
+An agent is a program that runs commands on your behalf — Claude Code is one. cckit does not contain a model. It hands the agent commands to run, and the agent runs them. That is why cckit works with any agent: it only ever speaks shell.
+</Aside>
+
+## Ground rules
+
+These five rules keep an agent's work safe and repeatable.
+
+- **Read state before acting.** `cckit sync --llm` returns the board. Decide from the data, never guess.
+- **One issue = one branch = one worktree = one PR.** `cckit start <issue>` creates the isolated worktree; do all the work there; `cckit pr <issue>` opens the pull request. Never commit to the base branch.
+- **Structured output.** Append `--llm` to any verb for machine-readable output.
+- **Idempotent and safe.** Re-running a verb on an already-done step is a no-op, not an error.
+- **Never invent paths or config.** Everything resolves from `cckit.config.json`.
+
+## The agent loop
+
+<Steps>
+
+1. **Read the board** — `cckit sync --llm` returns the board; pick an unblocked issue.
+
+2. **Start the issue** — `cckit start <issue>` prints a worktree path; `cd` into it.
+
+3. **Implement** — do the work in that worktree; commit early and often.
+
+4. **Open the PR** — `cckit pr <issue> "<summary>"` opens the pull request; report the URL.
+
+5. **Stop** — merging is a human decision unless an approved plan says otherwise.
+
+</Steps>
+
+## The verbs an agent uses most
+
+Lead with the **read** verbs — they return **TOON**, so most of an agent's context spend stays
+token-cheap. The board, the next-issue set, the wave plan, and the fan-out brief are all uniform
+lists, so they encode as TOON. The single-result *action* verbs (start / pr / close) return one JSON
+object — there's nothing to tabulate.
+
+| Do this | Command | `--llm` output |
+| --- | --- | --- |
+| Read the board | `cckit sync --llm` | **TOON** |
+| Find the next unblocked issue | `cckit next --llm` | **TOON** |
+| Get the wave plan | `cckit plan --llm` | **TOON** |
+| Get the fan-out brief | `cckit wave --llm` | **TOON** |
+| Start an issue | `cckit start <issue>` | JSON (one object) |
+| Open the PR | `cckit pr <issue> "<summary>"` | JSON (one object) |
+| Close the issue | `cckit close <issue> "<summary>"` | JSON (one object) |
+| Render markdown to a terminal | `cckit render` | — |
+
+So the loop is **read in TOON, act in JSON**: pull state cheaply as TOON, then fire the one-shot
+action verbs. An agent that stays on the `--llm` reads spends a fraction of the tokens that scraping
+human output or re-fetching JSON would cost.
+
+
+## Model endpoint
+
+cckit shells out to whatever agent invokes it; it does not embed a model. For the few verbs that synthesize text (digests, ingest), the model endpoint is set through environment variables.
+
+## Paste-ready agent prompt
+
+Drop this verbatim into your agent's system prompt (or the first message of a session). It is self-contained and not repo-specific, so it works for any project that has run `cckit init`.
+
+<div class="cckit-prompt">
+
+```text frame="terminal" title="Prompt to paste"
+You operate this repository through cckit, a CLI that runs the full GitHub work lifecycle.
+
+Operating rules:
+1. Read state before acting. Run `cckit sync --llm` and decide from the TOON board it returns
+   (TOON is a compact table format — parse it, don't guess the board).
+2. One issue = one branch = one worktree = one PR. Begin every task with `cckit start <issue>`,
+   then cd into the worktree path it prints. Never commit on main or develop.
+3. Append `--llm` to any verb for machine-readable output — TOON for lists (board, plan, next,
+   wave), one JSON object for single-result action verbs (start, pr, close).
+4. Follow this loop: sync -> start <issue> -> implement (commit early and often) ->
+   `cckit pr <issue> "<one-line summary>"` -> report the PR URL -> stop.
+5. Merging is a human decision. Do not merge unless an approved plan explicitly says you may.
+6. Re-running an already-done step is a no-op, not an error. Never invent paths or config:
+   everything resolves from cckit.config.json.
+7. If a command fails, read its stderr and fix the cause. Do not work around the kit.
+```
+
+</div>
+

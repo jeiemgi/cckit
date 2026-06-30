@@ -1,0 +1,91 @@
+---
+title: CLI reference
+description: The cckit verbs.
+---
+
+import { CardGrid, LinkCard, Steps, Aside } from '@astrojs/starlight/components';
+import Tag from '../../components/Tag.astro';
+import TagRow from '../../components/TagRow.astro';
+
+<TagRow kinds={["command", "agent"]} />
+
+Every cckit verb, grouped by job, with the one-liner version of what it does.
+
+cckit is a thin bash dispatcher over a git-mechanics bundle. Every verb reads from `cckit.config.json` — no org or repo is hardcoded. Append `--llm` to any verb for machine-readable output an agent can parse.
+
+<Aside type="tip" title="How to read this page">
+The tables are grouped by job: setup, the daily lifecycle, planning a wave, running flows in parallel, and housekeeping. Copy any command straight from the table. Run `cckit <verb> --help` for the details of one verb.
+</Aside>
+
+## Set up and install
+
+| Verb | Purpose |
+| --- | --- |
+| `cckit install [bin-dir]` | Symlink `cckit` onto your PATH. |
+| `cckit init --profile <p>` | Scaffold `cckit.config.json` + `.claude/` for this repo. |
+| `cckit scan` | Detect this repo's stack + kit state (JSON). |
+| `cckit doctor` | Onboarding preflight: deps present, `gh` authenticated. Asks before installing; `--fix` installs without the prompt. |
+| `cckit adopt` | Record kit-shaped files a repo already has. |
+| `cckit migrate` | Reshuffle an old kit layout to the current one. |
+
+## The daily lifecycle
+
+One issue becomes one branch, one worktree, one PR. These verbs walk that path.
+
+| Verb | Purpose |
+| --- | --- |
+| `cckit next [--effort N]` | The unblocked set + how to start the top issue. |
+| `cckit start <issue> [slug]` | Create an isolated worktree + branch for an issue. |
+| `cckit pr <issue> <summary>` | Commit, push, and open the PR. |
+| `cckit close <issue> <summary>` | Close the issue and mark it done. |
+| `cckit sync` | Board state / what's unblocked. |
+| `cckit status` | Dashboard: board + worktrees + resume handoff. |
+| `cckit handoff "<note>"` | Save a resume-here note for the next session. |
+
+
+## Plan and drive a wave
+
+A **wave** is a set of issues with no blockers between them, so they can run at once. These verbs plan a wave and drive the agents through it.
+
+| Verb | Purpose |
+| --- | --- |
+| `cckit plan [--effort N]` | Wave plan: deps-ordered, file-disjoint, session-fit. |
+| `cckit wave [--effort N]` | Read open efforts, propose incoming waves: subagent fan-out + captain drive. |
+| `cckit watch [--merge] [--loop]` | Captain: gate open PRs, squash-merge clean ones, advance. |
+| `cckit effort <new\|start\|pr\|close\|plan>` | The effort lifecycle (a parent issue + sub-issues). |
+
+
+## Run flows in parallel
+
+| Verb | Purpose |
+| --- | --- |
+| `cckit orchestrate <a> <b> …` | Run N flows in parallel worktrees (`--dry-run` / `--cap` / `--agent`). |
+| `cckit autopilot [<a> …]` | Unattended multi-flow: drive (or auto-pick) issues under a cap. |
+
+Both are launch verbs with no JSON result — use `--dry-run` to inspect the plan before anything starts.
+
+## Housekeeping and output
+
+| Verb | Purpose |
+| --- | --- |
+| `cckit gc [--prune [--yes]]` | Report (default) or prune merged branches + worktrees. |
+| `cckit render` | stdin markdown → rich output (glow on a TTY, verbatim when piped). |
+| `cckit encode-context` | stdin JSON → compact TOON (token-saving for subagents). |
+| `cckit digest <path\|url>` | Summarize a file or URL with the local model. |
+| `cckit version` | The installed cckit version. |
+| `cckit commands` | List every verb (the command catalog). |
+| `cckit update` | Report whether this project is behind the installed cckit. |
+| `cckit release <ver> [--publish]` | Cut a release (dry-run by default). |
+
+## Structured output for agents
+
+Append `--llm` (or `--output=json`) to any verb for parseable output, so an agent reasons over the result instead of scraping human text:
+
+```bash
+cckit sync --llm
+cckit plan --llm
+cckit effort plan --llm
+```
+
+Human (pretty) output is the default; agents should prefer `--llm`. See [Driving cckit from agents](/agents/) for the full contract.
+

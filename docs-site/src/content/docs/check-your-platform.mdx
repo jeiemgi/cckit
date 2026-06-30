@@ -1,0 +1,54 @@
+---
+title: Check your platform
+description: Confirm cckit runs on your system, install its dependencies, and sign in to GitHub.
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+import Tag from '../../components/Tag.astro';
+import TagRow from '../../components/TagRow.astro';
+
+<TagRow kinds={["command"]} />
+
+Before your first lifecycle, make sure cckit can run here: a supported platform, its dependencies,
+and GitHub signed in.
+
+<Steps>
+
+1. **Confirm your platform is supported.**
+
+   | Platform | Supported |
+   | -------- | --------- |
+   | macOS    | Yes — native |
+   | Linux    | Yes — native |
+   | Windows  | Yes — via WSL or Git Bash (not native cmd/PowerShell) |
+
+2. **Check — and install — dependencies.** You need `bash` 4+, `git`, and
+   [`gh`](https://cli.github.com/) (the GitHub command-line tool); `jq` (a JSON reader) is
+   recommended. `cckit doctor` finds what's missing and, **when you run it in a terminal, asks before
+   installing anything**:
+
+   ```bash title="Check what's missing — and offer to fix it"
+   cckit doctor
+   ```
+
+   Say yes and it installs each piece for you (Homebrew, `gh`, `jq`, …); say no and it just prints
+   the exact commands to run yourself. To skip the question, use `--fix`:
+
+   ```bash title="Install the missing pieces without the prompt"
+   cckit doctor --fix
+   ```
+
+3. **Sign in to GitHub.** Once `gh` is installed, authenticate once — then re-run `cckit doctor` to
+   confirm everything is in place.
+
+   ```bash
+   gh auth login
+   ```
+
+</Steps>
+
+<Aside type="tip" title="New to the terminal? Start here">
+The terminal is the text window where you type commands. [`gh`](https://cli.github.com/) is GitHub's
+official command-line tool. Run `cckit doctor`, approve the prompt, and it installs `gh` (and anything
+else missing) for you; then `gh auth login` signs you in.
+</Aside>

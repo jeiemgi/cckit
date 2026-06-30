@@ -1,0 +1,11 @@
+---
+// TagRow — the activation-tag row directly under a page title. Renders a real wrapper element (so its
+// spacing actually applies — a bare `<Tag/> <Tag/>` line compiles to loose <a> siblings that no
+// selector can reliably target), then the tag pills.
+// Usage:  <TagRow kinds={['flow', 'command']} />
+import Tag from './Tag.astro';
+const { kinds = [] } = Astro.props;
+---
+<div class="cckit-tag-row">
+  {kinds.map((kind) => <Tag kind={kind} />)}
+</div>

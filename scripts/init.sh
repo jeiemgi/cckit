@@ -230,8 +230,9 @@ _INIT_SKIP_PREFLIGHT=0
 for _ia in "$@"; do [[ "$_ia" == "--upgrade" || "$_ia" == "--dry-run" ]] && _INIT_SKIP_PREFLIGHT=1; done
 
 if [[ $_INIT_SKIP_PREFLIGHT -eq 0 && -x "$_DOCTOR" ]]; then
-  # Pass --no-install if init itself was called with --no-install equivalent
-  bash "$_DOCTOR" || {
+  # --yes: init's preflight installs Tier-1 deps non-interactively (no approval prompt here; the
+  # user already opted into setup by running init). A human running `cckit doctor` directly is asked.
+  bash "$_DOCTOR" --yes || {
     echo "" >&2
     echo "x kit-doctor reported unresolved issues — fix them and re-run /kit-init." >&2
     exit 1

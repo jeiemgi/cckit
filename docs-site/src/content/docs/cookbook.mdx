@@ -1,0 +1,254 @@
+---
+title: Cookbook
+description: An AI-agent playbook for cckit — the correct flow for each job, how to configure it, and copy-paste prompts you hand to Claude Code or any coding agent.
+---
+
+import { CardGrid, LinkCard, Steps, Aside } from '@astrojs/starlight/components';
+import Tag from '../../components/Tag.astro';
+import TagRow from '../../components/TagRow.astro';
+
+<TagRow kinds={["flow", "conversational"]} />
+
+<Aside type="tip" title="cckit stays out of your way">
+You trigger cckit by **describing intent**, not by reciting commands — the agent already knows the verbs from `AGENTS.md`. cckit is quiet by design: it prints little and just does each step. So when a verb **errors**, take it seriously — it usually means something is genuinely off. That's also the best moment to [report it or contribute a fix](https://github.com/jeiemgi/cckit).
+</Aside>
+
+This cookbook is written for **AI agents** (Claude Code and any coding agent) driving cckit — and for the humans steering them. Each recipe gives you three things:
+
+- **The prompt** — plain-intent text you hand the agent. You describe the goal in your own words; the agent triggers cckit for you. You don't name the commands — that's the point.
+- **What cckit does** — the commands cckit runs under the hood, shown so you can see what happened. You rarely type these yourself.
+- **Configure** — any one-time setup the recipe assumes.
+
+cckit is built to be agent-operable: every verb has a machine-readable mode (`cckit <verb> --llm`) and the repo ships an [`AGENTS.md`](/agents/) contract, so an agent reasons over structured data instead of scraping human output. Point your agent at `AGENTS.md` once and it knows the grammar.
+
+**Prime your agent once (copy-paste):**
+
+<div class="cckit-prompt">
+
+```text frame="terminal" title="Prompt to paste"
+Read AGENTS.md and cckit.config.json in this repo.
+
+From now on, drive the whole work lifecycle through cckit — read the board and repo state as data,
+act one step at a time, and resolve everything from cckit.config.json.
+
+You don't need me to name the commands; follow the AGENTS.md contract.
+```
+
+</div>
+
+## Configure cckit in a repo (one-time)
+
+**Configure.** cckit needs `git`, `gh` (authenticated), and `jq`. It reads everything from `cckit.config.json`, which `init` scaffolds.
+
+**Prompt:**
+
+<div class="cckit-prompt">
+
+```text frame="terminal" title="Prompt to paste"
+Set up cckit in this repository and confirm it's ready to use.
+
+Scaffold its config and project setup, and check that my GitHub access is working.
+
+Then show me what it detected about the stack so I can verify it looks right.
+```
+
+</div>
+
+**What cckit does:**
+
+```bash
+cckit init        # scaffold cckit.config.json + .claude/
+cckit doctor      # preflight: deps + gh auth
+cckit scan --llm  # verify detected stack + kit state (JSON)
+```
+
+## Ship one issue end-to-end
+
+The core lifecycle: isolated worktree → PR → close → clean up. Each step is one verb, correct by construction — the agent runs them in order and does not improvise branch or PR plumbing.
+
+**Prompt:**
+
+<div class="cckit-prompt">
+
+```text frame="terminal" title="Prompt to paste"
+Check the board and pick the next issue that's ready.
+
+Take it all the way to a merged PR — work it on its own isolated branch, keep the change focused on
+that issue, and open the pull request.
+
+When it's merged, clean up and tell me the PR link.
+```
+
+</div>
+
+**What cckit does:**
+
+```bash
+cckit next                       # find the next unblocked issue + its start command
+cckit start <issue>              # worktree + branch, board → In Progress
+# …agent makes the change in the new worktree…
+cckit pr <issue> "<summary>"     # commit, push, open the PR, board → In Review
+cckit close <issue> "<summary>"  # close the issue, board → Done
+cckit gc --prune --yes           # remove the merged branch + worktree
+```
+
+`cckit sync --llm` at any point gives the agent the board state and what's unblocked.
+
+
+## Plan and run a multi-part effort
+
+An **effort** is a parent issue plus native sub-issues — use it when one goal decomposes into several tasks. The parent issue *is* the plan, so the agent reads it instead of a separate doc.
+
+**Prompt:**
+
+<div class="cckit-prompt">
+
+```text frame="terminal" title="Prompt to paste"
+This work is too big for one PR — turn it into a tracked effort.
+
+Break it into a sub-task for each independent piece, and size the work for me first.
+
+Then build the pieces (in parallel where they don't touch the same files), and open a single PR for
+the whole effort once they're all done.
+```
+
+</div>
+
+**What cckit does:**
+
+```bash
+cckit effort plan --llm        # session-fit plan over open efforts (data)
+cckit effort new "Auth rework" # parent issue + native sub-issues, all on the board
+cckit effort start <N>         # integration branch effort/<N> + worktree
+# …build sub-issues on the effort branch (sequential) or in worktrees (parallel)…
+cckit effort pr <N>            # ONE PR: effort/<N> → base branch
+cckit effort close <N>         # squash-merge, close parent + all subs, garbage-collect
+```
+
+See [Efforts, waves & worktrees](/efforts-and-waves/) for how an effort breaks into waves.
+
+## Fan out a wave with `cckit wave`
+
+For a whole wave of unblocked issues at once, **`cckit wave`** writes the brief and the agent fans it out into one subagent per issue. The **captain** (`cckit watch`) gates the resulting PRs and merges the clean ones.
+
+**Prompt:**
+
+<div class="cckit-prompt">
+
+```text frame="terminal" title="Prompt to paste"
+Clear the next wave of ready work.
+
+Fan the unblocked issues out so they're worked in parallel, then gate the resulting PRs and merge the
+ones that pass.
+
+Advance to the next wave and keep going until the board is drained.
+```
+
+</div>
+
+**What cckit does:**
+
+```bash
+cckit wave             # emit the wave-0 subagent fan-out brief
+# …the agent spawns one subagent per issue, each opens a PR…
+cckit watch --merge    # gate open PRs, squash-merge the clean ones, advance the wave
+```
+
+
+## Fan out flows in parallel / run unattended
+
+For several independent issues at once, the agent orchestrates parallel worktrees — **always dry-run first** so it (and you) can see the launch plan before anything is created.
+
+**Prompt (parallel):**
+
+<div class="cckit-prompt">
+
+```text frame="terminal" title="Prompt to paste"
+Work the next few unblocked issues at the same time.
+
+Show me the launch plan first; if it looks right, run them with at most three going at once.
+
+Then summarize how each one turned out.
+```
+
+</div>
+
+**Prompt (unattended / overnight):**
+
+<div class="cckit-prompt">
+
+```text frame="terminal" title="Prompt to paste"
+Clear the unblocked backlog unattended, a few at a time.
+
+Auto-pick ready issues and drive them through to merged.
+
+Only stop and ping me on a genuine blocker — otherwise give me a summary of what merged.
+```
+
+</div>
+
+**What cckit does:**
+
+```bash
+cckit orchestrate --dry-run 46 47 48  # resolve + print the plan; create nothing
+cckit orchestrate --cap 3 46 47 48    # launch, at most 3 concurrent; the rest queue
+cckit autopilot --cap 3               # auto-pick unblocked issues and drive them
+```
+
+## Adopt an existing repo
+
+Bring cckit to a project that already has its own structure — nothing above the kit is restructured.
+
+**Prompt:**
+
+<div class="cckit-prompt">
+
+```text frame="terminal" title="Prompt to paste"
+Bring cckit into this existing project without disturbing its layout.
+
+Look at what's already here, add its config, and record the kit-shaped files the repo already has.
+
+Then confirm everything's wired up.
+```
+
+</div>
+
+**What cckit does:**
+
+```bash
+cckit scan      # detect the repo's stack + current kit state
+cckit init      # scaffold cckit.config.json + .claude/
+cckit adopt     # record kit-shaped files the repo already has
+cckit status    # confirm the board + worktrees + handoff view
+```
+
+The full adoption sequence is on the [adoption page](/adoption/).
+
+## Drive cckit as pure data (headless agents)
+
+For a non-interactive agent (CI bot, scheduled run), skip human output entirely and consume JSON. Every verb that reports state takes `--llm`.
+
+**Prompt:**
+
+<div class="cckit-prompt">
+
+```text frame="terminal" title="Prompt to paste"
+You're running headless — no human watching.
+
+Work the board through to merged on your own: read state as structured data, pick the
+highest-priority unblocked issue, and drive it start to finish.
+
+Keep token use lean when you hand context to sub-agents.
+```
+
+</div>
+
+**What cckit does:**
+
+```bash
+cckit sync --llm          # board state + what's unblocked, as TOON
+cckit scan --llm          # repo stack + kit state, as JSON
+cckit plan --llm          # the session-fit wave plan, as TOON
+echo "$json" | cckit encode-context   # compact uniform arrays into TOON for sub-agents
+```
+

@@ -18,9 +18,23 @@ done
 ISSUES=$(gh issue list --repo "$KIT_REPO" --state open --limit 200 \
   --json number,title,labels,milestone,assignees,updatedAt,body)
 
-# Structured output for agents: emit the open board as a JSON array and stop (--llm / CCKIT_OUTPUT).
+# Structured output for agents: emit the open board and stop (--llm / CCKIT_OUTPUT). The board is a
+# uniform list, so it goes out as TOON — far cheaper in tokens than JSON — via the shared encoder,
+# which falls back to JSON for a non-uniform/empty result. labels + assignees are flattened to
+# space-joined strings (and priority is lifted out) so every row is scalar-only and TOON-eligible.
 if [ "${CCKIT_OUTPUT:-human}" = "json" ]; then
-  echo "$ISSUES" | jq -c '[.[] | {number, title, labels: [.labels[].name], milestone: (.milestone.title // null), blocked: ((.body // "") | test("Blocked by"))}]'
+  board="$(echo "$ISSUES" | jq -c '[.[] | {
+      number,
+      title,
+      priority: ([.labels[].name | select(startswith("priority:")) | sub("priority:";"")][0] // ""),
+      labels: ([.labels[].name] | join(" ")),
+      milestone: (.milestone.title // ""),
+      assignees: ([.assignees[].login] | join(" ")),
+      blocked: ((.body // "") | test("Blocked by"))
+    }]')"
+  # shellcheck source=/dev/null
+  . "$(dirname "$0")/lib/toon.sh"
+  printf '%s' "$board" | toon_encode
   exit 0
 fi
 

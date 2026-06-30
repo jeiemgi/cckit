@@ -1,0 +1,28 @@
+---
+title: Getting started
+description: The three steps to go from zero to shipping your first issue with cckit.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import Tag from '../../components/Tag.astro';
+import TagRow from '../../components/TagRow.astro';
+
+<TagRow kinds={["flow"]} />
+
+Three steps take you from zero to shipping your first issue. Do them in order.
+
+<Steps>
+
+1. ### [Install cckit](/install/)
+
+   One script puts the `cckit` command on your PATH — one-liner, Homebrew, npm, or from source.
+
+2. ### [Check your platform](/check-your-platform/)
+
+   Confirm cckit runs on your system, install its dependencies with `cckit doctor`, and sign in to GitHub.
+
+3. ### [Initialize cckit](/initialize/)
+
+   Run `cckit init` in your repo — then let Claude surface your first real task and run it end to end.
+
+</Steps>
