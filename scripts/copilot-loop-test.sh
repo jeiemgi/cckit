@@ -126,6 +126,13 @@ ok "$w101" "0" "plan: #101 root in wave 0"
 ok "$w103" "0" "plan: #103 root in wave 0"
 ok "$w102" "1" "plan: #102 dependent in wave 1"
 
+echo "== next: surfaces the unblocked set + the top issue's start command =="
+NEXT="$(CCKIT_OUTPUT=human cckit next 2>&1)"
+has "$NEXT" "#101" "next: lists unblocked #101"
+has "$NEXT" "#103" "next: lists unblocked #103"
+no  "$NEXT" "#102 |" "next: hides blocked #102 from the unblocked table"
+has "$NEXT" "cckit start 101" "next: gives the top issue's start command"
+
 echo "== merge: captain merges the CLEAN PR, skips the failing one =="
 PASS1="$(cckit watch --merge 2>&1)"
 has "$PASS1" "PR #201" "captain: gated PR #201"
