@@ -2,9 +2,12 @@ name: release
 
 # Auto-release on merge to main, driven by Conventional Commits + SemVer (scripts/lib/version-bump.sh
 # is the single source of the bump rules, shared with `cckit release`). Computes the next version
-# from the commits since the last tag; if release-worthy, bumps the manifests, tags, and cuts a
-# GitHub Release with generated notes. npm/Homebrew publishing stays manual (`cckit release <v>
-# --publish`, which needs tokens) until the secrets are wired.
+# from the commits since the last tag; if release-worthy, bumps the manifests, tags, cuts a GitHub
+# Release, then publishes to npm and bumps the Homebrew tap.
+#
+# Publishing is gated on secrets — releases still succeed without them, they just skip that channel:
+#   NPM_TOKEN            npm *Automation* token (bypasses 2FA). npmjs.com → Access Tokens → Automation.
+#   HOMEBREW_TAP_TOKEN   PAT with push access to jeiemgi/homebrew-cckit (repo/contents:write).
 on:
   push:
     branches: [main]
@@ -22,10 +25,17 @@ jobs:
     # Never react to our own release commit (no loop).
     if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') }}
     runs-on: ubuntu-latest
+    env:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0      # full history + tags for the version computation
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
 
       - name: Compute next version (Conventional Commits)
         id: ver
@@ -45,3 +55,27 @@ jobs:
           git tag -a "v$v" -m "v$v"
           git push origin HEAD:main --follow-tags
           gh release create "v$v" --title "v$v" --generate-notes
+
+      - name: Publish to npm
+        if: ${{ steps.ver.outputs.bump != 'none' && env.NPM_TOKEN != '' }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
+
+      - name: Bump the Homebrew tap
+        if: ${{ steps.ver.outputs.bump != 'none' && env.HOMEBREW_TAP_TOKEN != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          set -euo pipefail
+          v="${{ steps.ver.outputs.next }}"
+          url="https://github.com/${{ github.repository }}/archive/refs/tags/v$v.tar.gz"
+          # The tag tarball is generated on demand right after the push — retry until it's ready.
+          sha="$(curl -fsSL --retry 6 --retry-delay 5 "$url" | sha256sum | cut -d' ' -f1)"
+          git clone --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/jeiemgi/homebrew-cckit" tap
+          cd tap
+          perl -0pi -e "s{url \"[^\"]*\"}{url \"$url\"}; s{sha256 \"[^\"]*\"}{sha256 \"$sha\"}" Formula/cckit.rb
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -am "cckit $v"
+          git push
