@@ -243,7 +243,14 @@ body {
 	font-size: var(--sl-text-xs);
 	font-weight: 600;
 	line-height: 1.6;
+	/* Always one line — never wrap, break a word, or truncate to an ellipsis. */
 	white-space: nowrap;
+	word-break: keep-all;
+	overflow-wrap: normal;
+	text-overflow: clip;
+	overflow: visible;
+	flex: none;
+	max-width: none;
 	color: var(--tag, var(--sl-color-text-accent));
 	background: color-mix(in srgb, var(--tag, #888) 14%, transparent);
 	border: 1px solid color-mix(in srgb, var(--tag, #888) 45%, transparent);
@@ -260,18 +267,37 @@ body {
 }
 h1 .cckit-tag, h2 .cckit-tag, h3 .cckit-tag { font-size: 0.6em; }
 
-/* The legend — the key to the tags. */
-.cckit-legend { display: grid; gap: 0.5rem 1rem; margin: 1rem 0 1.5rem; }
+/* The legend — the key to the tags, grouped by what kind of thing a tag marks. */
+.cckit-legend { display: grid; gap: 1.25rem; margin: 1rem 0 1.5rem; }
+.cckit-legend__grouptitle {
+	margin: 0 0 0.5rem;
+	font-size: var(--sl-text-xs);
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: var(--sl-color-gray-3);
+}
+.cckit-legend__list { display: grid; gap: 0.5rem; margin: 0; }
 .cckit-legend__row {
 	display: grid;
-	grid-template-columns: 9rem 1fr;
+	/* size the tag column to its content so the widest tag never clips or wraps */
+	grid-template-columns: max-content 1fr;
 	align-items: center;
 	gap: 0.75rem;
 }
+.cckit-legend__row dt { min-width: 0; }
 .cckit-legend__row dd { margin: 0; color: var(--sl-color-gray-3); font-size: var(--sl-text-sm); }
 @media (max-width: 30rem) {
 	.cckit-legend__row { grid-template-columns: 1fr; gap: 0.15rem; }
 }
+
+/* ── Markdown wraps; nothing scrolls sideways ─────────────────────────── */
+/* Tables wrap their cells instead of forcing a horizontal scrollbar. The activation tags inside a
+   cell keep their own white-space:nowrap, so only the prose wraps — the pills never break. */
+.sl-markdown-content table { width: 100%; table-layout: auto; }
+.sl-markdown-content :where(td, th) { overflow-wrap: anywhere; word-break: normal; hyphens: none; }
+/* Long inline code in a cell (a command name) wraps rather than overflowing. */
+.sl-markdown-content :where(td, th) code { white-space: normal; overflow-wrap: anywhere; }
 
 /* ── React Flow diagrams — make the library chrome theme-aware ─────────── */
 /* @xyflow/react ships light defaults (white controls, light attribution). Repaint its chrome with

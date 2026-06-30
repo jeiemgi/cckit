@@ -1,14 +1,25 @@
 ---
-// TagLegend — the key to the activation tags. Drop it once on a "how to read" page so readers learn
-// what each coloured tag means; every tag elsewhere then reads at a glance.
+// TagLegend — the key to the activation tags, GROUPED by what kind of thing the tag marks: how you
+// trigger it, what runs on its own, and the concepts. Drop it once on a "how to read" page.
 import Tag, { TAGS } from './Tag.astro';
-const order = ['conversational', 'command', 'skill', 'flow', 'hook', 'agent', 'concept'];
+const groups = [
+  { title: 'You trigger it', kinds: ['conversational', 'command', 'skill'] },
+  { title: 'It runs on its own', kinds: ['hook'] },
+  { title: 'Concepts', kinds: ['flow', 'agent', 'concept'] },
+];
 ---
-<dl class="cckit-legend not-content">
-  {order.map((kind) => (
-    <div class="cckit-legend__row">
-      <dt><Tag kind={kind} /></dt>
-      <dd>{TAGS[kind].desc}</dd>
-    </div>
+<div class="cckit-legend not-content">
+  {groups.map((g) => (
+    <section class="cckit-legend__group">
+      <h4 class="cckit-legend__grouptitle">{g.title}</h4>
+      <dl class="cckit-legend__list">
+        {g.kinds.map((kind) => (
+          <div class="cckit-legend__row">
+            <dt><Tag kind={kind} /></dt>
+            <dd>{TAGS[kind].desc}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
   ))}
-</dl>
+</div>

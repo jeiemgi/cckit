@@ -20,6 +20,8 @@ export default defineConfig({
     react(),
     starlight({
       title: 'cckit',
+      // Wrap long code lines instead of a horizontal scrollbar (the long copilot prompts especially).
+      expressiveCode: { defaultProps: { wrap: true } },
       // Header version badge — prepended to the social icons (see src/components/SocialIcons.astro).
       components: { SocialIcons: './src/components/SocialIcons.astro' },
       description: 'A project operating system for coding agents — the full GitHub work lifecycle as a CLI, drivable by Claude Code and any agent.',
