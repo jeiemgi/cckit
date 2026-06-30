@@ -37,12 +37,12 @@ if [[ -z "${KIT_REPO:-}" ]]; then
 fi
 
 kto_repo() {
-  printf '%s' "${KIT_TASK_REPO:-${KIT_REPO:-jeiemgi/cckit}}"
+  printf '%s' "${KIT_TASK_REPO:-${KIT_REPO:-}}"
 }
 
 # The base branch a PR targets / pr-merge returns to (portable: KIT_BASE_BRANCH, default develop).
 kto_base_branch() {
-  printf '%s' "${KIT_BASE_BRANCH:-develop}"
+  printf '%s' "${KIT_BASE_BRANCH:-main}"
 }
 
 # True (rc 0) iff board updates should run. Off when KIT_PROJECTS_V2 is explicitly "false" — keeps

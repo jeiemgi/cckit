@@ -60,8 +60,10 @@ case "$CAP" in ''|*[!0-9]*) echo "orchestrate: --cap needs a number (got '$CAP')
 
 # Resolve the main worktree root + load config (repo + base branch drive everything).
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-ROOT="$(git -C "$SCRIPT_DIR" worktree list --porcelain | awk '/^worktree /{print $2; exit}')"
-[ -n "$ROOT" ] || { echo "orchestrate: not in a git repo" >&2; exit 1; }
+ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"   # cckit INSTALL root — for sourcing libs (works on brew/npm installs)
+# The git-repo guard validates the INVOKING project ($PWD), not cckit's install dir; wt_start and
+# load_kit_config below resolve the project + its config from the invoking directory.
+git -C "$PWD" rev-parse --show-toplevel >/dev/null 2>&1 || { echo "orchestrate: not in a git repo" >&2; exit 1; }
 # shellcheck source=/dev/null
 source "$ROOT/scripts/lib/kit-config.sh" && load_kit_config
 REPO="$KIT_REPO"

@@ -7,7 +7,12 @@
 # project config, nearest-wins (like .editorconfig). Projects with no .claudekit/ behave unchanged.
 
 load_kit_config() {
-  local cfg="${KIT_CONFIG:-.claude/kit.config.json}"
+  # Resolve the project config like the dispatcher (bin/cckit _cckit_find_config): an explicit
+  # KIT_CONFIG wins, else a root cckit.config.json, else .claude/kit.config.json.
+  local cfg="${KIT_CONFIG:-}"
+  if [[ -z "$cfg" ]]; then
+    if [[ -f cckit.config.json ]]; then cfg="cckit.config.json"; else cfg=".claude/kit.config.json"; fi
+  fi
   if [[ ! -f "$cfg" ]]; then
     echo "✗ $cfg not found. Run /kit-init (or scripts/init.sh) first." >&2
     return 1

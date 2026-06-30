@@ -15,7 +15,7 @@ ok()  { echo "ok $1"; }
 
 # ---- config (tolerant: defaults if config/lib absent) ----------------------
 KNOWLEDGE_DIR="knowledge"; PLANS_DIR=""; PLANS_FORMAT=""
-if [[ -f scripts/lib/kit-config.sh && -f .claude/kit.config.json ]]; then
+if [[ -f scripts/lib/kit-config.sh && ( -f .claude/kit.config.json || -f cckit.config.json ) ]]; then
   source scripts/lib/kit-config.sh
   load_kit_config >/dev/null 2>&1 || true
   KNOWLEDGE_DIR="${KIT_KNOWLEDGE_DIR:-knowledge}"
