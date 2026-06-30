@@ -5,71 +5,86 @@ description: The skills cckit installs — what each one does, and how it's trig
 
 import { CardGrid, LinkCard, Aside } from '@astrojs/starlight/components';
 import Tag from '../../components/Tag.astro';
+import TagRow from '../../components/TagRow.astro';
 
-<Tag kind="skill" /> <Tag kind="conversational" />
+<TagRow kinds={["skill", "conversational"]} />
 
 The skills cckit installs, grouped by what you're trying to do.
 
 A **skill** is a packaged instruction set Claude Code can run. Every skill here you can run with a
-`/` (for example `/kit-next`) — that's the <Tag kind="skill" /> tag. Some also trigger when you just
-**describe the task in plain words** — that's the <Tag kind="conversational" /> tag. New to the
-tags? See [How to read this guide](/how-to-read/).
+`/` (for example `/kit-next`) — that's the <Tag kind="skill" text>Skill</Tag> tag. Some also trigger
+when you just **describe the task in plain words** — that's the
+<Tag kind="conversational" text>Conversational</Tag> tag. New to the tags? See
+[How to read this guide](/how-to-read/).
 
 ## Everyday loop
 
+<div class="cckit-nowrap-2">
+
 | Skill | Activates | What it does |
 | ----- | --------- | ------------ |
-| `kit-next` | <Tag kind="skill" /> | Find the next unblocked issue and pick it up, or fan the whole wave out. |
-| `kit-ship` | <Tag kind="skill" /> | Take one request from code to merged: start → PR → CI → merge → close. |
-| `kit-autopilot` | <Tag kind="skill" /> | Run a planned effort hands-off — the captain merges each wave and continues. |
-| `kit-task-sync` | <Tag kind="skill" /> | Print the board grouped by role; flag blocked items. |
+| `kit-next` | <Tag kind="skill" /> | Pick up the next unblocked issue, or fan the wave out. |
+| `kit-ship` | <Tag kind="skill" /> | One request, code to merged. |
+| `kit-autopilot` | <Tag kind="skill" /> | Run a planned effort hands-off. |
+| `kit-task-sync` | <Tag kind="skill" /> | Print the board by role; flag blockers. |
+
+</div>
 
 ## Task lifecycle (one issue)
 
+<div class="cckit-nowrap-2">
+
 | Skill | Activates | What it does |
 | ----- | --------- | ------------ |
-| `kit-task-new` | <Tag kind="skill" /> | Create an issue with labels, milestone, and board fields in one flow. |
-| `kit-task-start` | <Tag kind="skill" /> | Branch (optionally an isolated worktree) and mark the issue in progress. |
-| `kit-task-pr` | <Tag kind="skill" /> | Commit, push, and open a pull request linked to the issue. |
-| `kit-task-pr-merge` | <Tag kind="skill" /> | Squash-merge the open PR, switch to the base branch, pull. |
-| `kit-task-pr-auto` | <Tag kind="skill" /> | Open the PR and merge it in one command. |
-| `kit-task-close` | <Tag kind="skill" /> | Close the issue and set the board to Done after its PR merges. |
+| `kit-task-new` | <Tag kind="skill" /> | Create an issue with labels and board fields. |
+| `kit-task-start` | <Tag kind="skill" /> | Branch (optional worktree); mark it in progress. |
+| `kit-task-pr` | <Tag kind="skill" /> | Commit, push, open a PR linked to the issue. |
+| `kit-task-pr-merge` | <Tag kind="skill" /> | Squash-merge the PR, switch to base, pull. |
+| `kit-task-pr-auto` | <Tag kind="skill" /> | Open the PR and merge it in one step. |
+| `kit-task-close` | <Tag kind="skill" /> | Close the issue; set the board to Done. |
+
+</div>
 
 ## Effort lifecycle (many issues, one goal)
 
+<div class="cckit-nowrap-2">
+
 | Skill | Activates | What it does |
 | ----- | --------- | ------------ |
-| `kit-effort-new` | <Tag kind="skill" /> | Create an effort: a parent issue plus linked sub-issues on the board. |
-| `kit-effort-start` | <Tag kind="skill" /> | Begin building — open the single effort branch the subs merge into. |
-| `kit-effort-pr` | <Tag kind="skill" /> | Open the one pull request for the whole effort. |
-| `kit-effort-close` | <Tag kind="skill" /> | Snapshot each sub's diff, squash-merge, close parent + subs, garbage-collect. |
+| `kit-effort-new` | <Tag kind="skill" /> | Create an effort: a parent plus sub-issues. |
+| `kit-effort-start` | <Tag kind="skill" /> | Open the effort branch the subs merge into. |
+| `kit-effort-pr` | <Tag kind="skill" /> | Open the one PR for the whole effort. |
+| `kit-effort-close` | <Tag kind="skill" /> | Squash-merge subs, close parent + subs, clean up. |
+
+</div>
 
 ## Maintenance & delivery
 
+<div class="cckit-nowrap-2">
+
 | Skill | Activates | What it does |
 | ----- | --------- | ------------ |
-| `kit-gc` | <Tag kind="skill" /> | Prune merged branches and worktrees; surface orphans and stale stashes. |
-| `kit-security-sweep` | <Tag kind="skill" /> | Audit the apps for injection, auth, CORS/CSP, and dependency issues. |
-| `kit-digest` | <Tag kind="skill" /> | Pre-digest long inputs with a local model to save tokens. |
+| `kit-gc` | <Tag kind="skill" /> | Prune merged branches and worktrees. |
+| `kit-security-sweep` | <Tag kind="skill" /> | Audit for injection, auth, CORS/CSP, deps. |
+| `kit-digest` | <Tag kind="skill" /> | Pre-digest long inputs with a local model. |
+
+</div>
 
 ## Authoring & contributing
 
+<div class="cckit-nowrap-2">
+
 | Skill | Activates | What it does |
 | ----- | --------- | ------------ |
-| `docs-writer` | <Tag kind="conversational" /> | Write docs in the house voice — kind but robust, scannable, no analogies. |
-| `kit-customize` | <Tag kind="conversational" /> | Add or edit agents and skills in a scaffolded project. |
-| `kit-contribute` | <Tag kind="conversational" /> | Open a pull request to contribute your additions back to cckit. |
-| `kit-onboard` | <Tag kind="skill" /> | First-contact setup on a new machine or project. |
+| `docs-writer` | <Tag kind="conversational" /> | Write docs in the house voice. |
+| `kit-customize` | <Tag kind="conversational" /> | Add or edit agents and skills in a project. |
+| `kit-contribute` | <Tag kind="conversational" /> | Open a PR to contribute your additions upstream. |
+| `kit-onboard` | <Tag kind="skill" /> | First-contact setup on a new machine. |
+
+</div>
 
 <Aside type="note" title="Running a skill">
-In Claude Code, type `/` and the skill name (for example `/kit-next`). A <Tag kind="conversational" />
-skill also triggers when you describe the task — for instance, asking to "contribute this upstream"
-starts `kit-contribute`.
+In Claude Code, type `/` and the skill name (for example `/kit-next`). A
+<Tag kind="conversational" text>conversational</Tag> skill also triggers when you describe the task —
+for instance, asking to "contribute this upstream" starts `kit-contribute`.
 </Aside>
-
----
-
-<CardGrid>
-  <LinkCard title="The copilot loop" href="/copilot/" description="The loop the everyday skills drive." />
-  <LinkCard title="CLI reference" href="/cli-reference/" description="The commands the skills wrap." />
-</CardGrid>

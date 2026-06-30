@@ -5,24 +5,29 @@ description: The agnostic core and the per-agent adapters (Claude Code is adapte
 
 import { CardGrid, LinkCard, Steps, Aside } from '@astrojs/starlight/components';
 import Tag from '../../components/Tag.astro';
-import Combo from '../../components/Combo.astro';
+import TagRow from '../../components/TagRow.astro';
 
-<Tag kind="concept" />
+<TagRow kinds={["concept"]} />
 
 cckit is split in two: an agnostic core that does every operation, and per-agent adapters that route a specific agent to it — so any agent can drive cckit while Claude Code gets a native feel.
 
+<Aside type="tip" title="You don't do this by hand">
+This is how cckit is built, not something you set up. Read it to understand how any agent can drive
+cckit — there's nothing here for you to run.
+</Aside>
+
 ## The two layers
+
+<div class="cckit-nowrap-2">
 
 | Layer | What it is | Depends on an agent? |
 | --- | --- | --- |
 | **Core** | Pure bash that owns every operation | No |
 | **Adapter** | The thin layer a specific agent uses to discover and call the core | Yes — one per agent |
 
-Understanding this split is the key to extending cckit to a new agent.
+</div>
 
-<Aside type="note" title="New here? What 'agnostic' means">
-"Agnostic" means the core does not care which agent is calling it. It exposes plain shell commands. Anything that can run a shell — an agent, a CI job, you at a terminal — can call them the same way.
-</Aside>
+Understanding this split is the key to extending cckit to a new agent.
 
 ## The agnostic core
 
@@ -62,12 +67,4 @@ No adapter re-implements an operation; they all target the one core contract. De
 - **Portable.** The core has no agent dependency, so cckit runs in CI, a cron job, or a bare terminal — not only inside an agent.
 - **Open to any agent.** Adding an agent is writing an adapter, not forking the kit.
 
-<Combo>[Driving cckit from agents](/agents/) is the core contract · [Skills](/skills/) are the Claude adapter's teaching layer.</Combo>
 
----
-
-<CardGrid>
-  <LinkCard title="Driving cckit from agents" href="/agents/" description="The agnostic contract every adapter targets." />
-  <LinkCard title="Skills cckit ships" href="/skills/" description="The skills that wrap the core verbs for Claude." />
-  <LinkCard title="Config & permissions" href="/config-and-permissions/" description="The config the core reads from." />
-</CardGrid>

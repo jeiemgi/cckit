@@ -5,9 +5,9 @@ description: SemVer + Conventional Commits versioning, with auto-release on merg
 
 import { CardGrid, LinkCard, Steps, Aside } from '@astrojs/starlight/components';
 import Tag from '../../components/Tag.astro';
-import Combo from '../../components/Combo.astro';
+import TagRow from '../../components/TagRow.astro';
 
-<Tag kind="command" label="cckit release" /> <Tag kind="flow" />
+<TagRow kinds={["command", "flow"]} />
 
 Cut a release with no "what number is this" step — your commit messages decide the version, and a merge to `main` ships it.
 
@@ -71,11 +71,4 @@ Wiring npm and brew publishing into the workflow (behind repo secrets) is a foll
 - **Breaking changes** use `!` after the type/scope **or** a `BREAKING CHANGE:` footer — never a silent major.
 - **One logical change per commit** so the generated release notes read cleanly.
 
-<Combo>[`cckit release --next`](/releasing/) previews the version · [The GitHub cycle](/github-cycle/) is where the commits come from.</Combo>
 
----
-
-<CardGrid>
-  <LinkCard title="The GitHub cycle" href="/github-cycle/" description="Where the commits that drive a release come from." />
-  <LinkCard title="Security & secret guard" href="/security/" description="The guard that runs before any publish." />
-</CardGrid>

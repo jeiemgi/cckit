@@ -1,9 +1,27 @@
 ---
-// Starlight Footer override — renders the default footer, plus the dev-only Agentation annotation
-// toolbar on every page. `client:only="react"` keeps agentation out of the SSR/production build;
-// the `import.meta.env.DEV` gate keeps it out of `astro build` output entirely.
+// Starlight Footer override — renders the default footer plus a standing legal/trademark disclaimer
+// on every page (production included). This override carries NO client islands, so it is always
+// registered; the dev-only Agentation toolbar lives in DevAnnotate.astro instead.
 import Default from '@astrojs/starlight/components/Footer.astro';
-import AnnotateToolbar from './AnnotateToolbar';
 ---
 <Default />
-{import.meta.env.DEV && <AnnotateToolbar client:only="react" />}
+<p class="cckit-disclaimer">
+  Independent, educational project — <strong>not affiliated with or endorsed by Anthropic</strong>.
+  Claude and Claude Code are trademarks of Anthropic PBC.
+  <a href="/disclaimer/">Disclaimer &amp; trademarks</a>
+</p>
+
+<script is:inline>
+  // Click-to-copy for commands in tables. Fenced code blocks already get Expressive Code's copy
+  // button, but inline `code` inside a table cell does not — so make those copyable on click, with a
+  // brief "Copied" flash. One delegated listener on document covers every table and survives page
+  // swaps (the document element persists), so it's wired exactly once.
+  document.addEventListener('click', function (e) {
+    var code = e.target && e.target.closest('.sl-markdown-content td code, .sl-markdown-content th code');
+    if (!code || !navigator.clipboard) return;
+    navigator.clipboard.writeText(code.textContent || '').then(function () {
+      code.setAttribute('data-copied', '');
+      setTimeout(function () { code.removeAttribute('data-copied'); }, 1200);
+    }).catch(function () {});
+  });
+</script>

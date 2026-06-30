@@ -5,13 +5,17 @@ description: Optional, auto-detected browser debugging via chrome-devtools-axi.
 
 import { CardGrid, LinkCard, Steps, Aside } from '@astrojs/starlight/components';
 import Tag from '../../components/Tag.astro';
-import Combo from '../../components/Combo.astro';
+import TagRow from '../../components/TagRow.astro';
 
-<Tag kind="command" label="cckit debug" />
+<TagRow kinds={["command"]} />
 
-Give an agent a token-efficient, scriptable way to debug a web page — screenshots, accessibility snapshots, console and network logs, Lighthouse — without bloating its context.
+Give an agent a token-efficient, scriptable way to debug a web page — screenshots, accessibility snapshots, console and network logs, [Lighthouse](https://developer.chrome.com/docs/lighthouse/overview) — without bloating its context.
 
-`cckit debug` drives [chrome-devtools-axi](https://github.com/kunchenguid/chrome-devtools-axi) (Kun Chen), which runs a self-contained Chrome bridge and emits TOON-encoded output. TOON is a compact text format, so results stay small in an agent's context.
+`cckit debug` drives [chrome-devtools-axi](https://github.com/kunchenguid/chrome-devtools-axi) (Kun Chen), which runs a self-contained [Chrome DevTools](https://developer.chrome.com/docs/devtools/) bridge and emits [TOON](/agents/#the-verbs-an-agent-uses-most)-encoded output. TOON is a compact text format, so results stay small in an agent's context.
+
+<Aside type="tip" title="Built on chrome-devtools-axi">
+The browser layer is **[chrome-devtools-axi](https://github.com/kunchenguid/chrome-devtools-axi)** by Kun Chen — a self-contained Chrome bridge for agents. cckit only wraps and auto-detects it; all credit for the browser tooling goes there. If it helps you, ⭐ the repo.
+</Aside>
 
 <Aside type="note" title="New here? Why this exists">
 Debugging a web page normally means a person clicking around a browser. An agent cannot do that. `cckit debug` exposes the same browser tools as plain commands an agent can run and read, so the agent can see what is on the page.
@@ -50,11 +54,4 @@ Everything after `cckit debug` is forwarded verbatim to axi, so cckit never has 
 cckit debug <axi-args...>         # passed straight through — see the axi docs for subcommands
 ```
 
-<Combo>[`cckit debug`](/debug/) inspects the page · [Driving cckit from agents](/agents/) is the surface that calls it.</Combo>
 
----
-
-<CardGrid>
-  <LinkCard title="Driving cckit from agents" href="/agents/" description="The agent-facing commands that pair with debug." />
-  <LinkCard title="Config & permissions" href="/config-and-permissions/" description="How optional tools are detected and gated." />
-</CardGrid>

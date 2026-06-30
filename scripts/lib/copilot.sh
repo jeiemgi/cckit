@@ -7,10 +7,10 @@
 # Task-subagent prompt per issue (worktree-isolated, background), and the between-waves drive (gate +
 # merge with the captain, then re-run for the next wave). The agent reads the brief and acts.
 #
-#   cckit copilot                 brief for the open board: wave 0 fan-out + the loop
-#   cckit copilot --effort <N>    brief scoped to effort #N's sub-issues
-#   cckit copilot --cap <K>       session ctx budget per wave (passed to the plan machine)
-#   cckit copilot --llm           the fan-out as TOON rows (wave,number,ctx,prompt) for an agent
+#   cckit wave                    brief for the open board: wave 0 fan-out + the loop
+#   cckit wave --effort <N>       brief scoped to effort #N's sub-issues
+#   cckit wave --cap <K>          session ctx budget per wave (passed to the plan machine)
+#   cckit wave --llm              the fan-out as TOON rows (wave,number,ctx,prompt) for an agent
 #
 # Requires: gh, jq (via the plan machine). bash 3.2 / zsh compatible.
 
@@ -19,7 +19,7 @@ COPILOT_REPO="${COPILOT_REPO:-${KIT_REPO:-}}"
 # _copilot_seed <num> <title> — the headless subagent prompt for one issue (worktree already isolated).
 _copilot_seed() {
   local num="$1" title="$2"
-  printf 'You are a Task subagent in a cckit copilot run — NO human is present, so never ask: decide autonomously and apply effort proportional to the task. Your worktree and branch for issue #%s are already isolated. Do: `gh issue view %s`, implement "%s", run `bash scripts/check.sh` until green, then open the PR with `cckit pr %s "<summary>"`. If it is a no-op, run `cckit close %s "<reason>"` with why. Return a one-line result.' \
+  printf 'You are a Task subagent in a cckit wave run — NO human is present, so never ask: decide autonomously and apply effort proportional to the task. Your worktree and branch for issue #%s are already isolated. Do: `gh issue view %s`, implement "%s", run `bash scripts/check.sh` until green, then open the PR with `cckit pr %s "<summary>"`. If it is a no-op, run `cckit close %s "<reason>"` with why. Return a one-line result.' \
     "$num" "$num" "$title" "$num" "$num"
 }
 
@@ -46,7 +46,7 @@ copilot_brief() {
   local rows
   rows="$(CCKIT_OUTPUT=tsv plan_machine "${planargs[@]+"${planargs[@]}"}" 2>/dev/null)"
   if [ -z "$rows" ]; then
-    [ "$out" = "json" ] && echo "[]" || echo "copilot: nothing to drive (no open issues in scope)"
+    [ "$out" = "json" ] && echo "[]" || echo "wave: nothing to drive (no open issues in scope)"
     return 0
   fi
 
@@ -78,7 +78,7 @@ copilot_brief() {
   local n0 esfx; n0="$(printf '%s\n' "$wave0" | grep -c .)"
   esfx="$([ -n "$effort" ] && echo " --effort $effort")"
   {
-    printf '# cckit copilot — %s%s\n' "$repo" "$([ -n "$effort" ] && echo " · effort #$effort")"
+    printf '# cckit wave — %s%s\n' "$repo" "$([ -n "$effort" ] && echo " · effort #$effort")"
     printf '\nThe plan machine laid out %s wave(s). You are the orchestrator: fan wave 0 out as parallel\nTask subagents, gate + merge with the captain, then re-run this brief for the next wave.\n' "$((waves_total + 1))"
 
     printf '\n## Wave 0 — spawn %s parallel Task subagent(s)\n\n' "$n0"
@@ -95,7 +95,7 @@ copilot_brief() {
     printf '1. When the wave-0 subagents have opened their PRs, gate + merge them:\n'
     printf '   ```\n   cckit watch --merge%s\n   ```\n' "$esfx"
     printf '2. Merging unblocks the next wave. Re-run this brief to get it:\n'
-    printf '   ```\n   cckit copilot%s\n   ```\n' "$esfx"
-    printf '3. Repeat until `cckit copilot` reports nothing to drive. To let the captain self-pace the\n   gate/merge passes, use `cckit watch --loop` (or drive this brief under `/loop`).\n\n'
+    printf '   ```\n   cckit wave%s\n   ```\n' "$esfx"
+    printf '3. Repeat until `cckit wave` reports nothing to drive. To let the captain self-pace the\n   gate/merge passes, use `cckit watch --loop` (or drive this brief under `/loop`).\n\n'
   } | cckit_render
 }

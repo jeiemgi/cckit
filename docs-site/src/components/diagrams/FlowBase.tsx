@@ -31,9 +31,9 @@ function nodeStyleFor(kind: Kind): React.CSSProperties {
     border: `1.5px solid ${c}`,
     background: `color-mix(in srgb, ${c} 16%, var(--sl-color-gray-6))`,
     color: 'var(--sl-color-white)',
-    padding: '8px 12px',
-    fontSize: 13,
-    width: 156,
+    padding: '10px 12px',
+    fontSize: 15,
+    width: 150,
     textAlign: 'center',
     lineHeight: 1.3,
   };
@@ -52,16 +52,17 @@ export default function FlowBase({
       style={{
         width: '100%',
         aspectRatio: '2 / 1',
-        minHeight: 280,
-        maxHeight: 460,
-        margin: '1.25rem 0',
+        minHeight: 340,
+        maxHeight: 540,
       }}
     >
       <ReactFlow
         nodes={nodes}
         edges={edges}
         fitView
-        fitViewOptions={{ padding: 0.16 }}
+        fitViewOptions={{ padding: 0.08 }}
+        minZoom={0.2}
+        maxZoom={1.4}
         nodesDraggable={false}
         nodesConnectable={false}
         elementsSelectable={false}
@@ -88,7 +89,7 @@ export function node(
 ): FlowNode {
   return {
     id,
-    position: { x: col * 215, y: row * 116 },
+    position: { x: col * 190, y: row * 124 },
     sourcePosition: Position.Right,
     targetPosition: Position.Left,
     style: nodeStyleFor(kind),
@@ -96,7 +97,7 @@ export function node(
       label: (
         <span>
           <strong>{title}</strong>
-          {desc ? <><br /><span style={{ fontSize: 11, opacity: 0.85 }}>{desc}</span></> : null}
+          {desc ? <><br /><span style={{ fontSize: 12.5, opacity: 0.85 }}>{desc}</span></> : null}
         </span>
       ),
     },

@@ -5,9 +5,9 @@ description: The cckit verbs.
 
 import { CardGrid, LinkCard, Steps, Aside } from '@astrojs/starlight/components';
 import Tag from '../../components/Tag.astro';
-import Combo from '../../components/Combo.astro';
+import TagRow from '../../components/TagRow.astro';
 
-<Tag kind="command" label="cckit …" /> <Tag kind="agent" label="--llm" />
+<TagRow kinds={["command", "agent"]} />
 
 Every cckit verb, grouped by job, with the one-liner version of what it does.
 
@@ -24,7 +24,7 @@ The tables are grouped by job: setup, the daily lifecycle, planning a wave, runn
 | `cckit install [bin-dir]` | Symlink `cckit` onto your PATH. |
 | `cckit init --profile <p>` | Scaffold `cckit.config.json` + `.claude/` for this repo. |
 | `cckit scan` | Detect this repo's stack + kit state (JSON). |
-| `cckit doctor` | Onboarding preflight: deps present, `gh` authenticated. |
+| `cckit doctor` | Onboarding preflight: deps present, `gh` authenticated. Asks before installing; `--fix` installs without the prompt. |
 | `cckit adopt` | Record kit-shaped files a repo already has. |
 | `cckit migrate` | Reshuffle an old kit layout to the current one. |
 
@@ -42,7 +42,6 @@ One issue becomes one branch, one worktree, one PR. These verbs walk that path.
 | `cckit status` | Dashboard: board + worktrees + resume handoff. |
 | `cckit handoff "<note>"` | Save a resume-here note for the next session. |
 
-<Combo>[`cckit next`](/cli-reference/) finds the issue · [`cckit start`](/github-cycle/) opens the worktree · [`cckit pr`](/github-cycle/) opens the PR.</Combo>
 
 ## Plan and drive a wave
 
@@ -51,11 +50,10 @@ A **wave** is a set of issues with no blockers between them, so they can run at 
 | Verb | Purpose |
 | --- | --- |
 | `cckit plan [--effort N]` | Wave plan: deps-ordered, file-disjoint, session-fit. |
-| `cckit copilot [--effort N]` | Prompt machine: emit the subagent fan-out + captain drive. |
+| `cckit wave [--effort N]` | Read open efforts, propose incoming waves: subagent fan-out + captain drive. |
 | `cckit watch [--merge] [--loop]` | Captain: gate open PRs, squash-merge clean ones, advance. |
 | `cckit effort <new\|start\|pr\|close\|plan>` | The effort lifecycle (a parent issue + sub-issues). |
 
-<Combo>[`cckit plan`](/efforts-and-waves/) builds the wave → [`cckit copilot`](/copilot/) fans it out → [`cckit watch`](/copilot/) gates and merges it.</Combo>
 
 ## Run flows in parallel
 
@@ -91,10 +89,3 @@ cckit effort plan --llm
 
 Human (pretty) output is the default; agents should prefer `--llm`. See [Driving cckit from agents](/agents/) for the full contract.
 
----
-
-<CardGrid>
-  <LinkCard title="The copilot loop" href="/copilot/" description="How plan → copilot → watch fans a wave out and merges it." />
-  <LinkCard title="The GitHub work cycle" href="/github-cycle/" description="One issue, one branch, one worktree, one PR." />
-  <LinkCard title="Recipes & copy-paste prompts" href="/cookbook/" description="The correct flow for each job, ready to hand an agent." />
-</CardGrid>

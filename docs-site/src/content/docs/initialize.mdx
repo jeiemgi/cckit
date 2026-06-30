@@ -1,0 +1,116 @@
+---
+title: Initialize cckit
+description: Set cckit up in a project with one command — then let Claude surface your first real task and run it end to end.
+---
+
+import { Steps, Tabs, TabItem, Aside, FileTree } from '@astrojs/starlight/components';
+import Tag from '../../components/Tag.astro';
+import TagRow from '../../components/TagRow.astro';
+
+<TagRow kinds={["command", "conversational"]} />
+
+You've installed cckit. Now set it up in a project — and, even if that project has no issues or notes
+yet, give yourself a real first task to run through the kit.
+
+## 1 · Initialize the kit on a project
+
+From the root of the repo you want to work in:
+
+```bash
+cckit init
+```
+
+That's the whole setup. `cckit init` writes two things:
+
+- **`cckit.config.json`** — your repo, owner, and base branch. Nothing is hardcoded; every verb reads from here.
+- **`.claude/`** — agents, hooks, rules, and settings, so Claude Code and cckit know how to drive *this* project.
+
+Afterwards your repo looks roughly like this — your own files are untouched, cckit just adds its own:
+
+<FileTree>
+- your-repo/
+  - cckit.config.json    your repo, owner, base branch
+  - .claude/
+    - kit.config.json    profile + enabled features
+    - settings.local.json    hook registrations
+    - hooks/
+      - repo-hygiene.sh    SessionStart: stale branches/worktrees
+      - guard-base-branch-commit.sh    block commits to the base branch
+      - kit_version_check.sh    notice when you're behind
+    - agents/    role agents the kit ships
+    - skills/    the /kit-\* skills
+    - rules/    house rules for Claude Code
+    - lib/    shared helpers (kit-sigil.sh, …)
+  - … your existing files, unchanged
+</FileTree>
+
+<Aside type="tip" title="Want to see what's already there first?">
+Run `cckit scan` before `init` — it reports the repo's stack and whether any kit-shaped files already exist.
+</Aside>
+
+## 2 · No issues yet? Have Claude find your first one
+
+A fresh board is empty. Instead of inventing a task, point Claude at the code and let it surface
+**real** work — then open a cckit issue for each finding, so you have something concrete to run.
+
+Pick an angle and paste the prompt into Claude Code:
+
+<Tabs syncKey="first-task">
+  <TabItem label="Security review">
+    <div class="cckit-prompt">
+
+    ```text frame="terminal" title="Prompt to paste"
+    Analyze this repository for security threats — injection, auth gaps, secret handling, and
+    unsafe dependencies.
+
+    For each real finding, open a cckit issue (use the task-new skill) with a clear title, the
+    file, and a concrete fix. Skip anything speculative.
+    ```
+
+    </div>
+  </TabItem>
+  <TabItem label="Best-practice audit">
+    <div class="cckit-prompt">
+
+    ```text frame="terminal" title="Prompt to paste"
+    Review this repository for code-quality and best-practice gaps — dead code, missing tests,
+    inconsistent error handling, risky patterns.
+
+    For each actionable item, open a cckit issue with a clear title and the fix you'd make.
+    ```
+
+    </div>
+  </TabItem>
+</Tabs>
+
+Claude reads the repo and the **task-new** skill files one issue per finding — that's a
+<Tag kind="conversational" text>conversational</Tag> trigger, you just described the job. Your board
+now has real, scoped work to practice on.
+
+## 3 · Run one, end to end
+
+With issues on the board, the everyday loop is short. Run it on one finding to learn the ergonomics:
+
+<Steps>
+
+1. **See what's unblocked** — `cckit next` picks the issue to start and prints its start command.
+
+2. **Start it** — `cckit start <issue>` makes an isolated worktree and branch, so the change stays separate from `main`.
+
+3. **Make the change** — implement the fix; run your checks until they pass.
+
+4. **Open the pull request** — `cckit pr <issue> "what changed"` commits, pushes, and opens the PR.
+
+5. **Merge and clean up** — merge the PR, then `cckit gc` prunes the merged branch and worktree.
+
+</Steps>
+
+```bash
+cckit next                 # the next issue + how to start it
+cckit start 1              # isolated worktree + branch for issue #1
+cckit pr 1 "fix the thing" # commit, push, open the PR
+cckit gc                   # prune merged branches + worktrees
+```
+
+That's the ergonomics — one command per step, the same every time. When you've got many issues at
+once, [Wave](/wave/) fans a whole batch out to parallel agents and merges them for you.

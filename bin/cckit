@@ -19,7 +19,7 @@
 #   cckit autopilot [<a> …]         unattended multi-flow: drive (or auto-pick) issues under a cap
 #   cckit watch [--merge] [--loop]  captain: gate open PRs, squash-merge CLEAN, advance the wave
 #   cckit next [--effort N]         everyday helper: the unblocked set + how to start the top issue
-#   cckit copilot [--effort N]      prompt machine: emit the wave-0 subagent fan-out + captain drive
+#   cckit wave [--effort N]         read open efforts, propose incoming waves: fan-out + captain drive
 #   cckit gc [--prune [--yes]]      report (default) or prune merged branches + worktrees
 #   cckit status                    thin dashboard: board + worktrees + resume handoff
 #   cckit scan [--llm]              detect this repo's stack + kit state (JSON)
@@ -194,9 +194,10 @@ case "$cmd" in
     # shellcheck source=/dev/null
     source "$LIB/next.sh"; next_issue "$@"
     ;;
-  copilot)
-    # The prompt machine: emit the wave-0 Task-subagent fan-out + the between-waves captain drive.
-    # Runs in the invoking project; needs config so KIT_REPO is set before copilot reads it.
+  wave|copilot)
+    # Read the open efforts and propose the incoming waves of work: emit the wave-0 Task-subagent
+    # fan-out + the between-waves captain drive. (`copilot` is a hidden back-compat alias for `wave`.)
+    # Runs in the invoking project; needs config so KIT_REPO is set before it reads it.
     # shellcheck source=/dev/null
     source "$LIB/kit-config.sh" && load_kit_config
     # shellcheck source=/dev/null

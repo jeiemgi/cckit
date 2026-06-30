@@ -239,10 +239,10 @@ body {
 	display: inline-flex;
 	align-items: center;
 	gap: 0.4em;
-	padding: 0.1rem 0.55rem;
-	font-size: var(--sl-text-xs);
+	padding: 0.25rem 0.7rem;
+	font-size: var(--sl-text-sm);
 	font-weight: 600;
-	line-height: 1.6;
+	line-height: 1.4;
 	/* Always one line — never wrap, break a word, or truncate to an ellipsis. */
 	white-space: nowrap;
 	word-break: keep-all;
@@ -256,39 +256,130 @@ body {
 	border: 1px solid color-mix(in srgb, var(--tag, #888) 45%, transparent);
 	border-radius: 999px;
 	vertical-align: middle;
+	/* Clickable: jumps to the legend. Keep the pill look — no underline, quiet hover lift. */
+	text-decoration: none;
+	cursor: pointer;
+	transition: background-color 0.15s ease, border-color 0.15s ease;
 }
-.cckit-tag::before {
-	content: '';
-	width: 0.5em;
-	height: 0.5em;
-	border-radius: 50%;
-	background: var(--tag, #888);
-	flex: none;
+.cckit-tag:hover {
+	background: color-mix(in srgb, var(--tag, #888) 24%, transparent);
+	border-color: var(--tag, #888);
 }
-h1 .cckit-tag, h2 .cckit-tag, h3 .cckit-tag { font-size: 0.6em; }
+/* The tag is an <a>, so Starlight's `.sl-markdown-content a` (link accent + underline) out-specifies
+   the base rule above. Re-assert the tag's OWN colour with a higher-specificity selector (double
+   class) so a tag never wears the link colour, in any state. */
+.cckit-tag.cckit-tag,
+.sl-markdown-content a.cckit-tag {
+	color: var(--tag, var(--sl-color-text-accent));
+	text-decoration: none;
+}
+.cckit-tag.cckit-tag:hover,
+.cckit-tag.cckit-tag:focus,
+.sl-markdown-content a.cckit-tag:hover {
+	color: var(--tag, var(--sl-color-text-accent));
+	text-decoration: none;
+}
+h1 .cckit-tag, h2 .cckit-tag, h3 .cckit-tag { font-size: 0.65em; }
 
-/* The legend — the key to the tags, grouped by what kind of thing a tag marks. */
-.cckit-legend { display: grid; gap: 1.25rem; margin: 1rem 0 1.5rem; }
-.cckit-legend__grouptitle {
-	margin: 0 0 0.5rem;
+/* Inline TEXT variant — a kind word in flowing prose: just the kind's colour + underline, no pill.
+   Double-class / scoped selectors out-specify Starlight's `.sl-markdown-content a` link colour. */
+.cckit-tag-ref.cckit-tag-ref,
+.sl-markdown-content a.cckit-tag-ref {
+	color: var(--tag, var(--sl-color-text-accent));
+	font-weight: 600;
+	text-decoration: underline;
+	text-decoration-color: color-mix(in srgb, var(--tag, #888) 55%, transparent);
+	text-underline-offset: 0.2em;
+}
+.cckit-tag-ref.cckit-tag-ref:hover,
+.sl-markdown-content a.cckit-tag-ref:hover {
+	color: var(--tag, var(--sl-color-text-accent));
+	text-decoration-color: var(--tag, #888);
+}
+
+/* Top-of-page tag row (the <TagRow> component directly below the title): a "Tags:" label (with a tag
+   icon) precedes the pills, on one flex line, with breathing room before the lead paragraph. Rendered
+   as a real wrapper element so the spacing reliably applies. */
+.sl-markdown-content .cckit-tag-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.45rem;
+	margin-bottom: 1.75rem;
+}
+/* Two heavy callout boxes back-to-back (e.g. showcase, debug) merge visually at the default 1rem gap —
+   give consecutive Asides room to read as two. Asides also separate from prose as distinct callouts. */
+.sl-markdown-content .starlight-aside { margin-block: 1.5rem; }
+.sl-markdown-content .starlight-aside + .starlight-aside { margin-top: 1.5rem; }
+
+/* Tags directory: each section title and its tag pill share ONE line, pushed to opposite ends
+   (title left, tag right). The section spacing lives on the CONTAINER (not the heading), so the
+   heading and the pill align on a true centre line. Wraps the pill below on a narrow screen. */
+.tags-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem 1rem;
+	flex-wrap: wrap;
+	margin-top: 1.75rem;
+}
+.tags-row > :where(h2, h3) { margin: 0; }
+.tags-row > a.cckit-tag { flex: none; }
+
+/* ── Standing legal disclaimer (every page footer) ────────────────────── */
+.cckit-disclaimer {
+	margin-top: 2.5rem;
+	padding-top: 1rem;
+	border-top: 1px solid var(--sl-color-hairline);
+	font-size: var(--sl-text-xs);
+	line-height: 1.5;
+	color: var(--sl-color-gray-3);
+	text-align: center;
+	text-wrap: balance;
+}
+.cckit-disclaimer a { color: var(--sl-color-gray-2); }
+
+/* ── Shared spacing rhythm (design-review consolidation) ──────────────── */
+/* One block-gap token for the heavy visual objects (prompt frames, diagrams) so they share a rhythm
+   instead of three accidental values. Scoped under .sl-markdown-content so it actually beats
+   Starlight's flow rule (which silently clobbered the authored prompt margin). */
+:root { --cckit-block-gap: 1.25rem; }
+/* Bond a bold mini-label paragraph ("Prompt:", "What cckit does:") to the block it introduces. */
+.sl-markdown-content p:has(> strong:only-child) + * { margin-top: 0.4rem; }
+/* Multi-line list items get a touch more separation than the stock 0.25rem (ADHD-scannable). */
+.sl-markdown-content li + li { margin-top: 0.5rem; }
+/* Heavy structural blocks breathe more than prose. */
+.sl-markdown-content starlight-file-tree { margin-block: 1.5rem; }
+
+/* ── Cookbook prompts ─────────────────────────────────────────────────── */
+/* The copy-paste prompts you hand an agent. Framed in the conversational accent (these ARE the
+   conversational trigger) and given roomy line-height so the blank-line paragraph breaks read as
+   real spacing. The code block keeps its native copy button. */
+.cckit-prompt { --cckit-prompt: #e0863c; }
+.sl-markdown-content .cckit-prompt { margin-block: var(--cckit-block-gap); }
+:root[data-theme='light'] .cckit-prompt { --cckit-prompt: #b9701f; }
+/* No custom border or background — the terminal "command window" frame is the whole visual. We only
+   tint its title bar with the conversational accent so a prompt reads apart from a plain command block. */
+.cckit-prompt :where(.expressive-code) .ec-line { line-height: 1.7; }
+.cckit-prompt :where(.expressive-code) figcaption .title,
+.cckit-prompt :where(.expressive-code) .frame .title {
+	color: var(--cckit-prompt);
+	font-weight: 700;
+}
+
+/* The legend — the key to the tags, as a table so pills + meanings line up in columns. Grouped by
+   what kind of thing a tag marks via full-width sub-header rows. */
+.cckit-legend-table { width: 100%; margin: 1rem 0 1.5rem; }
+/* Tag column shrinks to its content so the pills align flush-left and never wrap. */
+.cckit-legend-table :where(td, th):first-child { width: 1%; white-space: nowrap; vertical-align: middle; }
+.cckit-legend-table td:last-child { color: var(--sl-color-gray-3); vertical-align: middle; }
+.cckit-legend-table__group th {
 	font-size: var(--sl-text-xs);
 	font-weight: 700;
 	text-transform: uppercase;
 	letter-spacing: 0.05em;
 	color: var(--sl-color-gray-3);
-}
-.cckit-legend__list { display: grid; gap: 0.5rem; margin: 0; }
-.cckit-legend__row {
-	display: grid;
-	/* size the tag column to its content so the widest tag never clips or wraps */
-	grid-template-columns: max-content 1fr;
-	align-items: center;
-	gap: 0.75rem;
-}
-.cckit-legend__row dt { min-width: 0; }
-.cckit-legend__row dd { margin: 0; color: var(--sl-color-gray-3); font-size: var(--sl-text-sm); }
-@media (max-width: 30rem) {
-	.cckit-legend__row { grid-template-columns: 1fr; gap: 0.15rem; }
+	background: var(--sl-color-gray-6);
 }
 
 /* ── Markdown wraps; nothing scrolls sideways ─────────────────────────── */
@@ -296,8 +387,58 @@ h1 .cckit-tag, h2 .cckit-tag, h3 .cckit-tag { font-size: 0.6em; }
    cell keep their own white-space:nowrap, so only the prose wraps — the pills never break. */
 .sl-markdown-content table { width: 100%; table-layout: auto; }
 .sl-markdown-content :where(td, th) { overflow-wrap: anywhere; word-break: normal; hyphens: none; }
+/* Calmer row rhythm — the stock 0.5rem block padding is too tight for the table-heavy reference pages
+   (design review: "table-heavy reference pages must stay readable, not dense"). */
+.sl-markdown-content :where(td, th) { padding-block: 0.6rem; }
 /* Long inline code in a cell (a command name) wraps rather than overflowing. */
 .sl-markdown-content :where(td, th) code { white-space: normal; overflow-wrap: anywhere; }
+
+/* Opt-in: keep the FIRST TWO columns on one line (no wrap) for tables wrapped in .cckit-nowrap-2.
+   The remaining columns still wrap. Higher specificity than the wrap rule above, and it also pins the
+   inline code in those cells to nowrap. */
+.cckit-nowrap-2 :where(td, th):nth-child(-n+2),
+.cckit-nowrap-2 :where(td, th):nth-child(-n+2) code {
+	white-space: nowrap;
+	overflow-wrap: normal;
+	word-break: keep-all;
+}
+/* Graceful degradation: if the nowrap columns + the wrapping description don't fit, the wrapper
+   scrolls horizontally instead of forcing a broken layout. The table grows to its content width. */
+.cckit-nowrap-2 {
+	overflow-x: auto;
+	max-width: 100%;
+}
+/* The description column keeps a sensible minimum so it isn't crushed to one word per line; when the
+   nowrap columns plus this minimum exceed the width, the wrapper scrolls rather than breaking. */
+.cckit-nowrap-2 :where(td, th):nth-child(n+3) { min-width: 14rem; }
+
+/* Commands in table cells are click-to-copy (wired in Footer.astro). Show the affordance: pointer +
+   a quiet hover, and a "Copied" flash via the data-copied attribute the script toggles. */
+.sl-markdown-content :where(td, th) code {
+	position: relative;
+	cursor: pointer;
+	transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+.sl-markdown-content :where(td, th) code:hover {
+	background: color-mix(in srgb, var(--sl-color-accent) 16%, var(--sl-color-gray-6));
+	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sl-color-accent) 45%, transparent);
+}
+.sl-markdown-content :where(td, th) code[data-copied]::after {
+	content: 'Copied';
+	position: absolute;
+	bottom: calc(100% + 4px);
+	left: 50%;
+	transform: translateX(-50%);
+	padding: 0.1rem 0.4rem;
+	font-size: var(--sl-text-xs);
+	font-family: var(--sl-font);
+	white-space: nowrap;
+	color: var(--sl-color-white);
+	background: var(--sl-color-accent);
+	border-radius: 0.3rem;
+	pointer-events: none;
+	z-index: 2;
+}
 
 /* ── React Flow diagrams — make the library chrome theme-aware ─────────── */
 /* @xyflow/react ships light defaults (white controls, light attribution). Repaint its chrome with
@@ -314,30 +455,82 @@ h1 .cckit-tag, h2 .cckit-tag, h3 .cckit-tag { font-size: 0.6em; }
 .cckit-flow .react-flow__attribution { background: transparent; color: var(--sl-color-gray-4); }
 .cckit-flow .react-flow__attribution a { color: var(--sl-color-gray-3); }
 .cckit-flow .react-flow__edge-text { fill: var(--sl-color-white); }
+/* Hero diagrams are the heaviest objects on a page — give them the most vertical air (more than the
+   block token), set here in theme.css rather than inline in FlowBase.tsx so all block rhythm lives
+   in one file. */
+.cckit-flow { margin-block: 2.25rem; }
+/* Readability: the diagrams are wide (left→right flows), but the prose column is narrow, so fitView
+   shrinks the node text. On wide screens let the diagram break out past the prose measure (centered,
+   symmetric negative margins) so the graph renders larger. Lowered the gate to ~1248px so typical
+   laptops actually get the breakout (it was clamped at 1400px, which most screens never hit), while
+   still clearing the right-hand table of contents. */
+@media (min-width: 78rem) {
+	.cckit-flow {
+		width: min(58rem, 92vw);
+		max-width: none;
+		margin-inline: calc((100% - min(58rem, 92vw)) / 2);
+	}
+}
 
-/* ── Combo notes ──────────────────────────────────────────────────────── */
-/* An outlined "pairs well with" line — teaches the next useful command/skill/flow. Quiet accent
-   border so it reads as a helper, not a warning. */
-.cckit-combo {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: baseline;
-	gap: 0.5rem;
-	margin: 1.25rem 0;
-	padding: 0.6rem 0.85rem;
-	font-size: var(--sl-text-sm);
-	border: 1px solid var(--sl-color-hairline);
-	border-left: 3px solid var(--sl-color-accent);
-	border-radius: 0.5rem;
-	background: color-mix(in srgb, var(--sl-color-accent) 6%, transparent);
+/* ── "Next" suggestion cards ──────────────────────────────────────────── */
+/* The cards at the foot of a page that point onward. Set apart from the body with the propose-violet
+   accent (not the steel-cyan brand) and made fully clickable: the lone link inside each card stretches
+   to cover it, so the whole card is the target while the icon + title stay visible. */
+.next-cards :where(.card) {
+	position: relative;
+	border-color: color-mix(in srgb, var(--cckit-next) 45%, var(--sl-color-hairline));
+	background: color-mix(in srgb, var(--cckit-next) 6%, transparent);
+	transition: border-color 0.15s ease, background-color 0.15s ease;
+	--cckit-next: #8b7cf6;
 }
-.cckit-combo__label {
-	font-weight: 700;
-	color: var(--sl-color-accent);
-	text-transform: uppercase;
-	letter-spacing: 0.03em;
-	font-size: var(--sl-text-xs);
+:root[data-theme='light'] .next-cards :where(.card) { --cckit-next: #6d5bd6; }
+.next-cards :where(.card):hover {
+	border-color: var(--cckit-next);
+	background: color-mix(in srgb, var(--cckit-next) 11%, transparent);
 }
-.cckit-combo__label::before { content: '⊕ '; }
-.cckit-combo__body { color: var(--sl-color-gray-2); }
-.cckit-combo__body :where(p) { margin: 0; display: inline; }
+/* Recolour the card icon from the global steel-cyan to the propose-violet (overrides the !important
+   unify rule above for these cards only). */
+.next-cards :where(.card) .icon {
+	color: var(--cckit-next) !important;
+	background-color: color-mix(in srgb, var(--cckit-next) 14%, transparent) !important;
+}
+/* Stretch the single body link across the card → whole card is clickable. */
+.next-cards :where(.card) a { color: var(--cckit-next); font-weight: 600; }
+.next-cards :where(.card) a::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+}
+
+/* ── Sidebar group icons ──────────────────────────────────────────────── */
+/* Starlight sidebar entries don't take an icon, so we paint one before each top-level GROUP label
+   (Get started / Concepts / Guides / Reference) via a CSS mask — a line icon tinted with the accent.
+   Matched by group order (the sidebar config order is stable). */
+.top-level > li > details > summary .group-label { display: flex; align-items: center; }
+.top-level > li > details > summary .group-label::before {
+	content: '';
+	width: 1.1em;
+	height: 1.1em;
+	flex: none;
+	margin-inline-end: 0.5rem;
+	background-color: var(--sl-color-text-accent);
+	-webkit-mask: var(--cckit-nav-icon) center / contain no-repeat;
+	mask: var(--cckit-nav-icon) center / contain no-repeat;
+}
+/* 1 · Get started — rocket */
+.top-level > li:nth-child(1) > details > summary .group-label {
+	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z'/%3E%3Cpath d='M12 15l-3-3a22 22 0 0 1 8-10c3 0 5 2 5 5a22 22 0 0 1-10 8z'/%3E%3Cpath d='M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0'/%3E%3Cpath d='M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5'/%3E%3C/svg%3E");
+}
+/* 2 · Concepts — layers */
+.top-level > li:nth-child(2) > details > summary .group-label {
+	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 2 2 7l10 5 10-5-10-5z'/%3E%3Cpath d='M2 17l10 5 10-5'/%3E%3Cpath d='M2 12l10 5 10-5'/%3E%3C/svg%3E");
+}
+/* 3 · Guides — open book */
+.top-level > li:nth-child(3) > details > summary .group-label {
+	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 7v14'/%3E%3Cpath d='M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z'/%3E%3C/svg%3E");
+}
+/* 4 · Reference — list */
+.top-level > li:nth-child(4) > details > summary .group-label {
+	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 6h13'/%3E%3Cpath d='M8 12h13'/%3E%3Cpath d='M8 18h13'/%3E%3Cpath d='M3 6h.01'/%3E%3Cpath d='M3 12h.01'/%3E%3Cpath d='M3 18h.01'/%3E%3C/svg%3E");
+}

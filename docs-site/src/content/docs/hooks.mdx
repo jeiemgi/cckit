@@ -5,9 +5,9 @@ description: The hooks cckit sets up — which event each one runs on, and what 
 
 import { CardGrid, LinkCard, Aside } from '@astrojs/starlight/components';
 import Tag from '../../components/Tag.astro';
-import Combo from '../../components/Combo.astro';
+import TagRow from '../../components/TagRow.astro';
 
-<Tag kind="hook" />
+<TagRow kinds={["hook"]} />
 
 The hooks cckit installs, what fires each one, and what it does.
 
@@ -15,16 +15,16 @@ A **hook** is a script Claude Code runs automatically when something happens —
 command is about to run, a session ends. cckit scaffolds a few during `cckit init`, so the right
 check runs at the right moment without you remembering to run it.
 
-<Aside type="note" title="New to hooks?">
-You don't call a hook. Claude Code does, on an **event**. `SessionStart` fires when a session opens,
-`PreToolUse` fires just before a tool (like a shell command) runs, `Stop`/`SessionEnd` fire when a
-session ends, and `PreCompact` fires before the conversation is compressed. A hook reads what's
-happening and can print a note or block the action.
+<Aside type="tip" title="You don't do this by hand">
+Hooks run on their own — Claude Code fires them on an **event**, you never call one. Read this to
+know what runs and when; there's nothing here for you to trigger.
 </Aside>
 
 ## Always set up
 
 These three are scaffolded for every project.
+
+<div class="cckit-nowrap-2">
 
 | Event | Hook | What it does |
 | ----- | ---- | ------------ |
@@ -32,11 +32,13 @@ These three are scaffolded for every project.
 | `SessionStart` | `kit_version_check.sh` | A quiet notice if this project is behind the installed cckit — the prompt to run `cckit update`. |
 | `PreToolUse` (Bash) | `guard-base-branch-commit.sh` | Blocks a commit made straight to the base branch, so work always goes through a branch and a PR. |
 
-<Combo>These guard the [GitHub cycle](/github-cycle/): the base-branch guard keeps you on a branch, and the hygiene report feeds [`cckit gc`](/cli-reference/).</Combo>
+</div>
 
 ## Set up when you enable a feature
 
 `cckit init` adds these when you turn the matching option on.
+
+<div class="cckit-nowrap-2">
 
 | Event | Hook | Enabled by | What it does |
 | ----- | ---- | ---------- | ------------ |
@@ -46,6 +48,8 @@ These three are scaffolded for every project.
 | `Stop` | `mempal_save.sh` | memory (MemPalace) | Files the finished session into MemPalace. |
 | `PreCompact` | `mempal_precompact.sh` | memory (MemPalace) | A safety-net sweep to memory before the conversation is compressed. |
 | `SessionEnd` | `mempal_followup.sh` | memory (MemPalace) | Captures any unsynced work if a session closes abruptly. |
+
+</div>
 
 ## Where they live
 
@@ -60,9 +64,3 @@ tool isn't installed, so nothing breaks if a dependency is missing.
 | Check the repo health a hook reports | `cckit gc` |
 | Act on the update notice | `cckit update` |
 
----
-
-<CardGrid>
-  <LinkCard title="Config & permissions" href="/config-and-permissions/" description="What cckit reads and what it's allowed to do." />
-  <LinkCard title="The GitHub cycle" href="/github-cycle/" description="The lifecycle the guard hooks protect." />
-</CardGrid>

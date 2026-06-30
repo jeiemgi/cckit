@@ -1,6 +1,7 @@
 ---
 // TagLegend — the key to the activation tags, GROUPED by what kind of thing the tag marks: how you
-// trigger it, what runs on its own, and the concepts. Drop it once on a "how to read" page.
+// trigger it, what runs on its own, and the concepts. Rendered as a TABLE so the pills and their
+// meanings line up in columns. Drop it once on a "how to read" page.
 import Tag, { TAGS } from './Tag.astro';
 const groups = [
   { title: 'You trigger it', kinds: ['conversational', 'command', 'skill'] },
@@ -8,18 +9,19 @@ const groups = [
   { title: 'Concepts', kinds: ['flow', 'agent', 'concept'] },
 ];
 ---
-<div class="cckit-legend not-content">
+<table class="cckit-legend-table">
+  <thead>
+    <tr><th>Tag</th><th>What it means</th></tr>
+  </thead>
   {groups.map((g) => (
-    <section class="cckit-legend__group">
-      <h4 class="cckit-legend__grouptitle">{g.title}</h4>
-      <dl class="cckit-legend__list">
-        {g.kinds.map((kind) => (
-          <div class="cckit-legend__row">
-            <dt><Tag kind={kind} /></dt>
-            <dd>{TAGS[kind].desc}</dd>
-          </div>
-        ))}
-      </dl>
-    </section>
+    <tbody>
+      <tr class="cckit-legend-table__group"><th colspan="2" scope="colgroup">{g.title}</th></tr>
+      {g.kinds.map((kind) => (
+        <tr>
+          <td><Tag kind={kind} /></td>
+          <td>{TAGS[kind].desc}</td>
+        </tr>
+      ))}
+    </tbody>
   ))}
-</div>
+</table>

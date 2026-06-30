@@ -5,9 +5,9 @@ description: Issue-driven, incremental adoption of cckit in any repo.
 
 import { CardGrid, LinkCard, Steps, Aside } from '@astrojs/starlight/components';
 import Tag from '../../components/Tag.astro';
-import Combo from '../../components/Combo.astro';
+import TagRow from '../../components/TagRow.astro';
 
-<Tag kind="flow" /> <Tag kind="command" label="cckit adopt" />
+<TagRow kinds={["flow", "command"]} />
 
 Bring cckit to any repo, one issue at a time, without restructuring what's already there.
 
@@ -50,20 +50,17 @@ The manifest is cckit's list of which files in your repo it owns and manages. Fi
 
 ## Why issue-driven
 
-Adoption changes a repo's tracked files, so it goes through the normal lifecycle: one issue → one branch → one PR (`cckit start` / `cckit pr`).
+Every change starts as an issue — **because that's how real software is built**. The issue says *what*
+and *why* before any code exists; the branch, the PR, and the review all hang off it, so the work is
+traceable, reviewable, and reversible. (Adoption itself follows this path: one issue → one branch →
+one PR via `cckit start` / `cckit pr`, with the issue recording which steps applied to this repo.)
 
-That keeps the adoption reviewable and reversible, and the issue is the place to record which steps applied to this repo.
+You don't have to know that theory to get it. cckit makes the issue-first path the path of least
+resistance, so you pick up the discipline of professional software delivery just by using the kit —
+no process to study, no habits to force. The good practice is simply the default.
 
 ## Idempotent and safe
 
 Every step is a no-op when there is nothing to do. The file-touching ones (`init`, `adopt`, `migrate`) are dry-run-previewable and never overwrite content they don't own. Re-running the whole flow is safe.
 
-<Combo>[`cckit scan`](/cli-reference/) reads the state · [`cckit start`](/github-cycle/) opens the adoption issue's branch · [`cckit pr`](/github-cycle/) ships it for review.</Combo>
 
----
-
-<CardGrid>
-  <LinkCard title="The GitHub work cycle" href="/github-cycle/" description="One issue, one branch, one worktree, one PR." />
-  <LinkCard title="Install in depth" href="/install/" description="Install paths, dependencies, and the safety gate." />
-  <LinkCard title="The full CLI reference" href="/cli-reference/" description="Every cckit verb and its --llm mode." />
-</CardGrid>

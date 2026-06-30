@@ -5,9 +5,9 @@ description: cckit's built-in, agnostic guard against publishing secrets, keys, 
 
 import { CardGrid, LinkCard, Steps, Aside } from '@astrojs/starlight/components';
 import Tag from '../../components/Tag.astro';
-import Combo from '../../components/Combo.astro';
+import TagRow from '../../components/TagRow.astro';
 
-<Tag kind="concept" /> <Tag kind="hook" />
+<TagRow kinds={["concept", "hook"]} />
 
 A built-in guard that stops secrets, keys, env files, and your own private data from ever being committed or published — across all content, every time.
 
@@ -54,11 +54,4 @@ A finding blocks the commit. The guard is not optional and is not bypassed by th
 
 Open a private security advisory on the repository (Security → Advisories), or a regular issue if it is low-risk. Do not include secrets or exploit details in a public issue.
 
-<Combo>[Config & permissions](/config-and-permissions/) is the consent gate · this guard always runs on top of it, before any commit or publish.</Combo>
 
----
-
-<CardGrid>
-  <LinkCard title="Config & permissions" href="/config-and-permissions/" description="The consent gate this guard sits on top of." />
-  <LinkCard title="Releasing" href="/releasing/" description="The publish step the guard runs before." />
-</CardGrid>

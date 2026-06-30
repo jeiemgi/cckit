@@ -1,0 +1,84 @@
+---
+title: Wave
+description: cckit wave reads your open efforts and proposes the incoming waves of work — parallel agent tasks that gate and merge themselves.
+---
+
+import { Card, CardGrid, Steps, Aside } from '@astrojs/starlight/components';
+import CopilotFanout from '../../components/diagrams/CopilotFanout';
+import Tag from '../../components/Tag.astro';
+import TagRow from '../../components/TagRow.astro';
+
+<TagRow kinds={["flow", "command"]} />
+
+`cckit wave` reads your open efforts and proposes the incoming waves of work.
+
+<CopilotFanout client:only="react" />
+
+## What a wave is
+
+An **effort** is a goal broken into many issues. Some issues block others, so they can't all start
+at once. A **wave** is the set of issues that are unblocked *right now* — everything ready to be
+worked in parallel.
+
+`cckit wave` looks at your open efforts, works out that set, and writes a **brief**: one task per
+issue, each scoped to its own isolated worktree so the parallel work can't collide. It doesn't run
+anything itself — it hands the brief to the agent, and the agent does the work.
+
+Here's the whole shape, then the steps below walk each part:
+
+- **One wave → many agents.** The brief lists each unblocked issue as a self-contained task. The
+  agent (Claude Code) spawns one subagent per task. They run **at the same time**, in **separate
+  worktrees**, each implementing its issue and opening a pull request.
+- **The captain gates and merges.** `cckit watch` checks every open pull request. The clean ones —
+  tests passing, no conflicts — get merged; the rest are reported with exactly what to fix.
+- **Merging unblocks the next wave.** Closing this wave's issues frees the ones that depended on
+  them. Re-run `cckit wave` and it proposes the next set. The board drains itself, wave by wave.
+
+## One turn of the loop
+
+<Steps>
+
+1. **Propose the wave** — `cckit wave` reads the board, finds the issues unblocked right now, and
+   writes the brief: one subagent task per issue, each in its own worktree.
+
+   ```sh
+   cckit wave
+   ```
+
+2. **Fan out** — the agent spawns one subagent per issue from that brief. They run in parallel, each
+   implementing its issue and opening a pull request.
+
+3. **Gate + merge** — the captain checks every open pull request. The clean ones are merged; the
+   rest are reported with what to fix.
+
+   ```sh
+   cckit watch --merge
+   ```
+
+4. **Advance** — merging unblocks the next wave. Re-run `cckit wave` and the loop repeats until
+   there's nothing left to propose.
+
+</Steps>
+
+<Aside type="note" title="Why a brief, not a launcher">
+cckit emits the plan as instructions and the agent enacts it. That keeps the work inside Claude
+Code's own tools — Task subagents, worktrees, background runs — instead of a separate process you
+can't see.
+</Aside>
+
+## The commands
+
+| Do this | Command |
+| ------- | ------- |
+| Propose the wave (fan-out brief) | `cckit wave` |
+| Scope to one effort | `cckit wave --effort <N>` |
+| Gate + merge the wave | `cckit watch --merge` |
+| Let the captain self-pace | `cckit watch --loop` |
+| Machine-readable plan | `cckit plan --llm` |
+
+
+## Links to learn more
+
+- [Efforts, waves & worktrees](/efforts-and-waves/) — where the waves come from.
+- [Driving cckit from agents](/agents/) — the full agent-facing surface.
+

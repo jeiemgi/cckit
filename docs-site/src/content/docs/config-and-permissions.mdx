@@ -5,9 +5,9 @@ description: How cckit discovers config, scans a project, and asks permission be
 
 import { CardGrid, LinkCard, Steps, Aside } from '@astrojs/starlight/components';
 import Tag from '../../components/Tag.astro';
-import Combo from '../../components/Combo.astro';
+import TagRow from '../../components/TagRow.astro';
 
-<Tag kind="concept" />
+<TagRow kinds={["concept"]} />
 
 How cckit finds its config, reads what kind of project it is pointed at, and asks before it changes anything — all without a single hardcoded org, repo, or path.
 
@@ -54,12 +54,4 @@ cckit asks before it changes anything in a repo it has not worked in before.
 
 cckit asks your name on first run and stores it in `.cckit/identity` (gitignored). Nothing personal is hardcoded; commits use your local git identity.
 
-<Combo>[`cckit init`](/github-cycle/) writes the config · [`cckit scan`](/how-to-read/) reads the project · [Security](/security/) is the guard that always runs.</Combo>
 
----
-
-<CardGrid>
-  <LinkCard title="Security & secret guard" href="/security/" description="The guard that runs before any commit or publish." />
-  <LinkCard title="Adapters" href="/adapters/" description="The agnostic core that reads this config." />
-  <LinkCard title="Driving cckit from agents" href="/agents/" description="How an agent reads state and acts." />
-</CardGrid>

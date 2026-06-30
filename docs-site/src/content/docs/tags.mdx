@@ -1,0 +1,129 @@
+---
+title: Tags
+description: Every activation tag, how you trigger it, and where it appears — a directory of the things cckit triggers, grouped by how you trigger them.
+---
+
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+import Tag from '../../components/Tag.astro';
+
+Every coloured tag in these docs says **how a thing is triggered**. This is the directory: each tag
+explains **how you use it**, then lists everything of that kind. New to the colours? The
+[how-to-read guide](/how-to-read/#the-tags) introduces them.
+
+<div class="tags-row">
+
+## Conversational
+
+<Tag kind="conversational" />
+
+</div>
+
+**How you use it:** just say what you want to Claude Code in plain words — no command, no slash.
+Asking to "contribute this upstream" starts the `kit-contribute` skill; "write docs for this" starts
+`docs-writer`. Claude matches your intent to the right skill.
+
+<CardGrid>
+  <LinkCard title="Skills cckit ships" href="/skills/" description="The conversational skills — docs-writer, kit-customize, kit-contribute." />
+  <LinkCard title="Driving cckit from agents" href="/agents/" description="How plain-language requests map to cckit verbs." />
+</CardGrid>
+
+<div class="tags-row">
+
+## Command
+
+<Tag kind="command" />
+
+</div>
+
+**How you use it:** type it in your terminal — `cckit <verb>` (for example `cckit start 42`). Run
+`cckit help` for the full list, or `cckit <verb> --help` for one. Add `--llm` to any verb for
+machine-readable output.
+
+<CardGrid>
+  <LinkCard title="CLI reference" href="/cli-reference/" description="Every cckit verb, flag, and --llm mode." />
+  <LinkCard title="Quickstart" href="/getting-started/" description="cckit init, start, pr, sync, gc — the first lifecycle." />
+  <LinkCard title="The GitHub cycle" href="/github-cycle/" description="The command for each step of one issue." />
+  <LinkCard title="Wave" href="/wave/" description="cckit wave + cckit watch — the parallel loop." />
+</CardGrid>
+
+<div class="tags-row">
+
+## Skill
+
+<Tag kind="skill" />
+
+</div>
+
+**How you use it:** in Claude Code, type `/` then the skill name — `/kit-next`, `/kit-ship`. The
+editor lists them as you type. Many skills *also* trigger conversationally (see above), so you can
+either run `/kit-contribute` or just ask to "contribute this upstream".
+
+<CardGrid>
+  <LinkCard title="Skills cckit ships" href="/skills/" description="The full list, grouped by what you're trying to do." />
+</CardGrid>
+
+<div class="tags-row">
+
+## Flow
+
+<Tag kind="flow" />
+
+</div>
+
+**How you use it:** you don't trigger a flow directly — it's the end-to-end **process** the commands
+and skills carry out. You "use" it by running its steps in order (each step has its own command). The
+diagrams on these pages draw each flow left to right.
+
+<CardGrid>
+  <LinkCard title="The GitHub cycle" href="/github-cycle/" description="Issue → branch → PR → review → merge." />
+  <LinkCard title="Efforts, waves & worktrees" href="/efforts-and-waves/" description="Many issues at once, sorted into waves." />
+  <LinkCard title="Wave" href="/wave/" description="A wave of issues fanned out to parallel agents." />
+</CardGrid>
+
+<div class="tags-row">
+
+## Hook
+
+<Tag kind="hook" />
+
+</div>
+
+**How you use it:** you don't — a hook runs **automatically** when an event happens (before a commit,
+on session start, and so on). cckit wires them when you set up a repo; you just see the result. The
+Hooks page lists each one and the command it guards.
+
+<CardGrid>
+  <LinkCard title="Hooks" href="/hooks/" description="Every hook cckit wires, the event it fires on, and the command it guards." />
+</CardGrid>
+
+<div class="tags-row">
+
+## Agent
+
+<Tag kind="agent" />
+
+</div>
+
+**How you use it:** add `--llm` to any cckit verb to get machine-readable output (uniform data as
+TOON, JSON otherwise) — this is the surface an agent reads instead of scraping human text. The
+`AGENTS.md` contract documents it.
+
+<CardGrid>
+  <LinkCard title="Driving cckit from agents" href="/agents/" description="The --llm surface and the AGENTS.md contract." />
+</CardGrid>
+
+<div class="tags-row">
+
+## Concept
+
+<Tag kind="concept" />
+
+</div>
+
+**How you use it:** nothing to trigger — a concept is a **term worth knowing** before you go further
+(an effort, a wave, a worktree). Click through to where it's defined.
+
+<CardGrid>
+  <LinkCard title="Efforts, waves & worktrees" href="/efforts-and-waves/" description="Efforts, sub-issues, waves, worktrees — defined." />
+  <LinkCard title="How to read this guide" href="/how-to-read/" description="The tags and diagrams, explained once." />
+</CardGrid>

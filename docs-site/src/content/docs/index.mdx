@@ -5,7 +5,7 @@ template: splash
 ---
 
 import { Image } from 'astro:assets';
-import { Card, CardGrid, LinkButton } from '@astrojs/starlight/components';
+import { Card, CardGrid, LinkCard, LinkButton, Icon } from '@astrojs/starlight/components';
 import banner from '../../assets/hero-banner.png';
 
 <div class="hero-banner">
@@ -23,14 +23,39 @@ import banner from '../../assets/hero-banner.png';
   <span class="coming-soon" aria-disabled="true" title="cckit.dev — coming soon">cckit.dev · coming soon</span>
 </div>
 
-## Why cckit
+## Start here
 
-<CardGrid stagger>
+<CardGrid>
+  <LinkCard title="How to read this guide" href="/how-to-read/" description="The tags and diagrams, explained once. Read this first." />
+  <LinkCard title="Install cckit" href="/install/" description="One script. Adds the CLI and the Claude Code plugin." />
+  <LinkCard title="Quickstart" href="/getting-started/" description="Run your first command and ship one issue end to end." />
+</CardGrid>
+
+## Explore by topic
+
+<CardGrid>
+  <Card title="Get started" icon="rocket">
+    Orient yourself and set up. [How to read](/how-to-read/) · [Install](/install/) · [Quickstart](/getting-started/) · [Showcase](/showcase/)
+  </Card>
+  <Card title="Concepts" icon="puzzle">
+    How it works under the hood. [The GitHub cycle](/github-cycle/) · [Efforts, waves & worktrees](/efforts-and-waves/) · [Hooks](/hooks/) · [Adapters](/adapters/)
+  </Card>
+  <Card title="Guides" icon="open-book">
+    Do a job end to end. [All guides](/guides/) · [Wave](/wave/) · [From agents](/agents/) · [Adoption](/adoption/) · [Cookbook](/cookbook/)
+  </Card>
+  <Card title="Reference" icon="list-format">
+    Look things up. [CLI reference](/cli-reference/) · [Skills](/skills/) · [Config & permissions](/config-and-permissions/) · [Security](/security/)
+  </Card>
+</CardGrid>
+
+## What makes cckit different
+
+<CardGrid>
   <Card title="One lifecycle" icon="seti:todo">
     Start an issue, get an isolated worktree and branch, open a PR, merge, clean up — each step is one command, correct by construction.
   </Card>
-  <Card title="A copilot loop" icon="rocket">
-    `cckit copilot` turns the board into a wave of parallel agent work; `cckit watch` gates and merges the PRs, then advances to the next wave.
+  <Card title="A parallel loop" icon="random">
+    `cckit wave` turns the board into a wave of parallel agent work; `cckit watch` gates and merges the PRs, then advances to the next wave.
   </Card>
   <Card title="Agent-operable" icon="puzzle">
     Every verb has a machine-readable mode (`cckit <verb> --llm`, uniform data as TOON) and an `AGENTS.md` contract, so agents drive the kit without scraping human output.
@@ -40,6 +65,11 @@ import banner from '../../assets/hero-banner.png';
   </Card>
 </CardGrid>
 
-## Learn it as a visual guide
+## Popular
 
-These docs are a learning book: coloured **tags** tell you how each thing is triggered (a command you type, a skill you run, something that happens just by talking to Claude), and **interactive diagrams** show each flow left to right. Start with [how to read this guide](/how-to-read/), then the [GitHub cycle](/github-cycle/).
+<CardGrid>
+  <LinkCard title="Wave" href="/wave/" description="A wave of issues becomes parallel agent work that merges itself." />
+  <LinkCard title="The GitHub cycle" href="/github-cycle/" description="The lifecycle every command builds on, drawn left to right." />
+  <LinkCard title="CLI reference" href="/cli-reference/" description="Every verb, every flag, in one place." />
+  <LinkCard title="Skills cckit ships" href="/skills/" description="What each skill does and how it's triggered." />
+</CardGrid>

@@ -1,0 +1,48 @@
+---
+title: Guides
+description: Task-oriented walkthroughs — how to do things with cckit, start to finish.
+---
+
+import { CardGrid, LinkCard, Icon } from '@astrojs/starlight/components';
+
+Each guide walks one job end to end. Skim the cards, jump to the one you need.
+
+<CardGrid>
+  <LinkCard
+    title="Wave"
+    href="/wave/"
+    description="Turn a wave of issues into parallel agent work that gates and merges itself."
+  />
+  <LinkCard
+    title="Driving cckit from agents"
+    href="/agents/"
+    description="The machine-readable surface — every verb's --llm mode and the AGENTS.md contract."
+  />
+  <LinkCard
+    title="Adopting cckit on a repo"
+    href="/adoption/"
+    description="Bring cckit to an existing project: install, configure, and wire the board."
+  />
+  <LinkCard
+    title="Cookbook"
+    href="/cookbook/"
+    description="Short, copy-paste recipes for the things you'll do again and again."
+  />
+  <LinkCard
+    title="Browser debug"
+    href="/debug/"
+    description="Annotate a running app and let Claude read the notes to fix the UI."
+  />
+</CardGrid>
+
+---
+
+## Before the guides
+
+New here? These orient you first.
+
+<CardGrid>
+  <LinkCard title="How to read this guide" href="/how-to-read/" description="The tags and diagrams, explained once." />
+  <LinkCard title="Quickstart" href="/getting-started/" description="Install and run your first command." />
+  <LinkCard title="The GitHub cycle" href="/github-cycle/" description="The lifecycle every guide builds on." />
+</CardGrid>

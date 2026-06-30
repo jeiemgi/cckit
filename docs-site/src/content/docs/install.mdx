@@ -3,11 +3,11 @@ title: Installing cckit
 description: "Put cckit on your PATH: install paths, dependencies, IDE config, and the safety gate."
 ---
 
-import { CardGrid, LinkCard, Steps, Aside } from '@astrojs/starlight/components';
+import { CardGrid, LinkCard, Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 import Tag from '../../components/Tag.astro';
-import Combo from '../../components/Combo.astro';
+import TagRow from '../../components/TagRow.astro';
 
-<Tag kind="flow" /> <Tag kind="command" label="cckit install" />
+<TagRow kinds={["flow", "command"]} />
 
 Put the `cckit` command on your PATH, confirm it works, and adopt it in a repo.
 
@@ -15,27 +15,46 @@ cckit is pure bash over `git`, `gh`, and `jq`. There is no build step — instal
 
 ## Install globally
 
-```sh
-# From a clone:
-./scripts/install.sh            # or: cckit install  (symlinks bin/cckit into a PATH dir)
+<Steps>
 
-# One-liner (no clone):
-curl -fsSL https://cckit.dev/install.sh | bash      # scripts/web-install.sh
+1. **Pick an install method.** Each tab is one route — pick the one that fits, and copy the box.
 
-# Homebrew:
-brew install jeiemgi/cckit/cckit                    # Formula/cckit.rb
-```
+   <Tabs syncKey="install-method">
+     <TabItem label="One-liner">
+       ```sh title="macOS · Linux · WSL — no npm or brew"
+       curl -fsSL https://cckit.dev/install.sh | bash
+       ```
+     </TabItem>
+     <TabItem label="Homebrew">
+       ```sh title="Formula/cckit.rb"
+       brew install jeiemgi/cckit/cckit
+       ```
+     </TabItem>
+     <TabItem label="npm">
+       ```sh title="the bare name is taken, so cckit is scoped"
+       npm install -g @jeiemgi/cckit
+       ```
+     </TabItem>
+     <TabItem label="From source">
+       ```sh title="symlinks bin/cckit onto your PATH"
+       git clone https://github.com/jeiemgi/cckit.git
+       cd cckit && ./scripts/install.sh
+       ```
+     </TabItem>
+   </Tabs>
+
+2. **Verify it's on your PATH.**
+
+   ```sh
+   cckit version       # prints the installed version
+   cckit doctor        # preflight: git/gh/jq present, gh authenticated
+   ```
+
+</Steps>
 
 `cckit install [bin-dir]` symlinks `bin/cckit` into the first writable PATH folder (`~/.local/bin`, then `/usr/local/bin`, then `~/bin`), or a folder you pass.
 
 It is a **symlink, not a copy** — the dispatcher resolves the link back to the repo, so `git pull` upgrades your install with no reinstall.
-
-## Verify the install
-
-```sh
-cckit version       # prints the installed version
-cckit doctor        # preflight: git/gh/jq present, gh authenticated
-```
 
 ## Dependencies
 
@@ -86,12 +105,4 @@ Every contribution and release runs the local gate first:
 
 Nothing publishable leaves without passing the gate. The git hook in `githooks/pre-commit` wires the same guard at commit time.
 
-<Combo>[`cckit doctor`](/cli-reference/) checks deps + auth · [`cckit init`](/getting-started/) sets up the repo after install.</Combo>
 
----
-
-<CardGrid>
-  <LinkCard title="Next: Run your first lifecycle" href="/getting-started/" description="Init a repo and ship your first issue end to end." />
-  <LinkCard title="Adopt an existing repo" href="/adoption/" description="Bring cckit to a project that already has its own structure." />
-  <LinkCard title="The full CLI reference" href="/cli-reference/" description="Every cckit verb and its --llm mode." />
-</CardGrid>

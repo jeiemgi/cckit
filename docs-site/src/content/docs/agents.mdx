@@ -5,9 +5,9 @@ description: cckit is agent-agnostic — any agent that can run a shell can driv
 
 import { CardGrid, LinkCard, Steps, Aside } from '@astrojs/starlight/components';
 import Tag from '../../components/Tag.astro';
-import Combo from '../../components/Combo.astro';
+import TagRow from '../../components/TagRow.astro';
 
-<Tag kind="agent" />
+<TagRow kinds={["agent"]} />
 
 Drive the whole GitHub work lifecycle from any agent that can run a shell — read the board, start an issue, open a pull request — all in machine-readable output.
 
@@ -53,18 +53,26 @@ These five rules keep an agent's work safe and repeatable.
 
 ## The verbs an agent uses most
 
+Lead with the **read** verbs — they return **TOON**, so most of an agent's context spend stays
+token-cheap. The board, the next-issue set, the wave plan, and the fan-out brief are all uniform
+lists, so they encode as TOON. The single-result *action* verbs (start / pr / close) return one JSON
+object — there's nothing to tabulate.
+
 | Do this | Command | `--llm` output |
 | --- | --- | --- |
-| Read the board | `cckit sync --llm` | JSON |
-| Find the next unblocked issue | `cckit next --llm` | TOON |
-| Get the wave plan | `cckit plan --llm` | TOON |
-| Get the fan-out brief | `cckit copilot --llm` | TOON |
-| Start an issue | `cckit start <issue>` | JSON |
-| Open the PR | `cckit pr <issue> "<summary>"` | JSON |
-| Close the issue | `cckit close <issue> "<summary>"` | JSON |
+| Read the board | `cckit sync --llm` | **TOON** |
+| Find the next unblocked issue | `cckit next --llm` | **TOON** |
+| Get the wave plan | `cckit plan --llm` | **TOON** |
+| Get the fan-out brief | `cckit wave --llm` | **TOON** |
+| Start an issue | `cckit start <issue>` | JSON (one object) |
+| Open the PR | `cckit pr <issue> "<summary>"` | JSON (one object) |
+| Close the issue | `cckit close <issue> "<summary>"` | JSON (one object) |
 | Render markdown to a terminal | `cckit render` | — |
 
-<Combo>[`cckit copilot`](/copilot/) fans a wave out · [`cckit watch`](/copilot/) gates and merges it · [`cckit next`](/github-cycle/) is the by-hand version for one issue.</Combo>
+So the loop is **read in TOON, act in JSON**: pull state cheaply as TOON, then fire the one-shot
+action verbs. An agent that stays on the `--llm` reads spends a fraction of the tokens that scraping
+human output or re-fetching JSON would cost.
+
 
 ## Model endpoint
 
@@ -74,15 +82,18 @@ cckit shells out to whatever agent invokes it; it does not embed a model. For th
 
 Drop this verbatim into your agent's system prompt (or the first message of a session). It is self-contained and not repo-specific, so it works for any project that has run `cckit init`.
 
-```text
+<div class="cckit-prompt">
+
+```text frame="terminal" title="Prompt to paste"
 You operate this repository through cckit, a CLI that runs the full GitHub work lifecycle.
 
 Operating rules:
-1. Read state before acting. Run `cckit sync --llm` and decide from the JSON it returns. Never
-   guess the board.
+1. Read state before acting. Run `cckit sync --llm` and decide from the TOON board it returns
+   (TOON is a compact table format — parse it, don't guess the board).
 2. One issue = one branch = one worktree = one PR. Begin every task with `cckit start <issue>`,
    then cd into the worktree path it prints. Never commit on main or develop.
-3. Append `--llm` to any verb for machine-readable JSON output.
+3. Append `--llm` to any verb for machine-readable output — TOON for lists (board, plan, next,
+   wave), one JSON object for single-result action verbs (start, pr, close).
 4. Follow this loop: sync -> start <issue> -> implement (commit early and often) ->
    `cckit pr <issue> "<one-line summary>"` -> report the PR URL -> stop.
 5. Merging is a human decision. Do not merge unless an approved plan explicitly says you may.
@@ -91,10 +102,5 @@ Operating rules:
 7. If a command fails, read its stderr and fix the cause. Do not work around the kit.
 ```
 
----
+</div>
 
-<CardGrid>
-  <LinkCard title="The copilot loop" href="/copilot/" description="Fan a wave of issues out to parallel agents." />
-  <LinkCard title="Adapters" href="/adapters/" description="The agnostic core and the per-agent adapters." />
-  <LinkCard title="Config & permissions" href="/config-and-permissions/" description="How cckit finds config and asks before it mutates." />
-</CardGrid>

@@ -2,7 +2,8 @@
 # kit-doctor — onboarding preflight: deps + brew bootstrap + gh auth/scopes + SSH guided
 #
 # Usage:
-#   scripts/kit-doctor.sh                 # detect + auto-install + report
+#   scripts/kit-doctor.sh                 # detect + report; in a terminal, ASK before installing
+#   scripts/kit-doctor.sh --fix           # install missing deps without asking (alias: --yes, -y)
 #   scripts/kit-doctor.sh --dry-run       # report only — no installs, no auth changes
 #   scripts/kit-doctor.sh --no-install    # check and auth only — skip package installs
 #   scripts/kit-doctor.sh --dismiss-local # silence the "local layer down" session notice
@@ -21,14 +22,15 @@ set -euo pipefail
 _export_dir_doctor="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
 
 # ---- flags ------------------------------------------------------------------
-DRY_RUN=0; NO_INSTALL=0; DISMISS_LOCAL=0
+DRY_RUN=0; NO_INSTALL=0; DISMISS_LOCAL=0; ASSUME_YES=0
 for _a in "$@"; do
   case "$_a" in
     --dry-run)       DRY_RUN=1 ;;
     --no-install)    NO_INSTALL=1 ;;
+    --fix|--yes|-y)  ASSUME_YES=1 ;;
     --dismiss-local) DISMISS_LOCAL=1 ;;
     -h|--help)
-      sed -n '2,12p' "$0" | grep '^#' | sed 's/^# \?//'
+      sed -n '2,13p' "$0" | grep '^#' | sed 's/^# \?//'
       exit 0 ;;
   esac
 done
@@ -80,6 +82,24 @@ if [ "$KIT_UNICODE" = 1 ]; then
   MARK_SEED="${C_AZAFRAN}⡶${C_RESET}"
 else
   MARK_OK="ok"; MARK_FAIL="FAIL"; MARK_WARN="warn"; MARK_SKIP="-"; MARK_SEED="o"
+fi
+
+# ---- install consent --------------------------------------------------------
+# The doctor can install missing dependencies for you (Homebrew, gh, jq, node, …). When a HUMAN runs
+# it in a terminal, ASK first — install only if approved. Non-interactive callers (init.sh preflight,
+# hooks) pass --fix/--yes or simply have no TTY, so automation keeps its current auto-install behavior
+# and never blocks on a prompt. --dry-run / --no-install already skip installs entirely.
+if [[ $DRY_RUN -eq 0 && $NO_INSTALL -eq 0 && $ASSUME_YES -eq 0 && -t 0 ]]; then
+  printf '\n  %s%scckit doctor can install anything missing for you%s (via Homebrew, corepack, etc.).\n' "$C_BOLD" "" "$C_RESET"
+  printf '  It will show each thing as it goes. Nothing is installed if you decline.\n\n'
+  printf '  Install missing dependencies? [Y/n] '
+  read -r _reply || _reply=""
+  case "$_reply" in
+    [nN]|[nN][oO])
+      NO_INSTALL=1
+      printf '\n  %s report-only — listing what is missing and how to install it (no changes made).\n' "$MARK_SKIP" ;;
+    *) : ;;  # default (Enter / y) → proceed with installs
+  esac
 fi
 
 # ---- report accumulators ----------------------------------------------------
