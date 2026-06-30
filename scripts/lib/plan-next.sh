@@ -29,24 +29,21 @@ plan_next_skills_dir() { _pn_first_dir "$1/skills" "$1/.claude/skills" 2>/dev/nu
 plan_next_rules_dir()  { _pn_first_dir "$1/rules" "$1/templates/rules" "$1/.claude/rules" 2>/dev/null; }
 plan_next_docs_dir()   { _pn_first_dir "$1/docs-site/src/content/docs" "$1/docs" "$1/.claude/docs" 2>/dev/null; }
 
+# All scanners use `find` (not shell globs): an unmatched glob errors under zsh's nomatch and stays
+# literal under bash — `find` handles "no matches" cleanly in both, so the lib is shell-portable.
+
 # plan_next_skills <root> — one skill name per line (the SKILL.md parent dir basename), sorted.
 plan_next_skills() {
   local dir; dir="$(plan_next_skills_dir "$1")" || return 0
-  local f
-  for f in "$dir"/*/SKILL.md; do
-    [ -f "$f" ] || continue
-    basename "$(dirname "$f")"
-  done | sort -u
+  find "$dir" -mindepth 2 -maxdepth 2 -name SKILL.md -type f 2>/dev/null \
+    | while IFS= read -r f; do basename "$(dirname "$f")"; done | sort -u
 }
 
 # plan_next_rules <root> — one rule name per line (the .md basename without extension), sorted.
 plan_next_rules() {
   local dir; dir="$(plan_next_rules_dir "$1")" || return 0
-  local f b
-  for f in "$dir"/*.md; do
-    [ -f "$f" ] || continue
-    b="$(basename "$f")"; printf '%s\n' "${b%.md}"
-  done | sort -u
+  find "$dir" -maxdepth 1 -name '*.md' -type f 2>/dev/null \
+    | while IFS= read -r f; do b="$(basename "$f")"; printf '%s\n' "${b%.md}"; done | sort -u
 }
 
 # plan_next_verbs <root> — one verb per line. Prefer the cckit dispatcher's own case labels (the
@@ -60,27 +57,22 @@ plan_next_verbs() {
     return 0
   fi
   local dir; dir="$(_pn_first_dir "$root/commands" "$root/.claude/commands" 2>/dev/null)" || return 0
-  local f b
-  for f in "$dir"/*.md; do
-    [ -f "$f" ] || continue
-    b="$(basename "$f")"; printf '%s\n' "${b%.md}"
-  done | sort -u
+  find "$dir" -maxdepth 1 -name '*.md' -type f 2>/dev/null \
+    | while IFS= read -r f; do b="$(basename "$f")"; printf '%s\n' "${b%.md}"; done | sort -u
 }
 
 # plan_next_docs <root> — one doc name per line (the .md/.mdx basename without extension), sorted.
 plan_next_docs() {
   local dir; dir="$(plan_next_docs_dir "$1")" || return 0
-  local f b
-  for f in "$dir"/*.md "$dir"/*.mdx; do
-    [ -f "$f" ] || continue
-    b="$(basename "$f")"; b="${b%.mdx}"; printf '%s\n' "${b%.md}"
-  done | sort -u
+  find "$dir" -maxdepth 1 \( -name '*.md' -o -name '*.mdx' \) -type f 2>/dev/null \
+    | while IFS= read -r f; do b="$(basename "$f")"; b="${b%.mdx}"; printf '%s\n' "${b%.md}"; done | sort -u
 }
 
 # _pn_docs_blob <root> — all doc text concatenated + lowercased, for coverage-gap detection.
 _pn_docs_blob() {
   local dir; dir="$(plan_next_docs_dir "$1")" || return 0
-  cat "$dir"/*.md "$dir"/*.mdx 2>/dev/null | tr '[:upper:]' '[:lower:]'
+  find "$dir" -maxdepth 1 \( -name '*.md' -o -name '*.mdx' \) -type f -exec cat {} + 2>/dev/null \
+    | tr '[:upper:]' '[:lower:]'
 }
 
 # _pn_root — the directory to scan. PLAN_NEXT_ROOT wins (tests / explicit), else the project root
