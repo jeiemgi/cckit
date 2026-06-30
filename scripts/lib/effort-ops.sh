@@ -43,21 +43,40 @@ _eff_parent_body() {
 EOF
 }
 
-# effort_new "<name>" [<sub title> …] — create the parent (template) + native sub-issues, linked.
+# effort_new "<name>" [--slug <s>] [<sub title> …] — parent (template) + native sub-issues, linked.
+# An optional --slug sets the explicit human handle, stored as a slug:<slug> label; without it the
+# handle falls back to the title-derived slug (still stored as a label so the resolver can find it).
 effort_new() {
   _eff_need gh || return 1; _eff_need jq || return 1
-  local repo name; repo="$(_eff_repo)"; name="${1:-}"; shift || true
+  local repo name explicit_slug=""; repo="$(_eff_repo)"
+  # Peel optional leading flags (--slug) before the positional <name>.
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --slug)   explicit_slug="${2:-}"; shift 2 || true ;;
+      --slug=*) explicit_slug="${1#*=}"; shift ;;
+      *) break ;;
+    esac
+  done
+  name="${1:-}"; shift || true
   [ -n "$repo" ] || { echo "effort_new: no repo (KIT_REPO/EFFORT_REPO unset — run in a kit project)" >&2; return 1; }
-  [ -n "$name" ] || { echo 'effort_new: usage: effort_new "<name>" [<sub title> …]' >&2; return 1; }
+  [ -n "$name" ] || { echo 'effort_new: usage: effort_new "<name>" [--slug <s>] [<sub title> …]' >&2; return 1; }
   # Validate the name against the title rule BEFORE creating anything (synthetic prefix for the lint).
   effort_title_lint "[Effort] 0 · $name" || { echo "effort_new: fix the name and retry" >&2; return 1; }
 
-  local url num
+  local url num slug
   url="$(gh issue create --repo "$repo" --title "[Effort] · $name" --body "$(_eff_parent_body)")" \
     || { echo "effort_new: failed to create the parent issue" >&2; return 1; }
   num="${url##*/}"
   gh issue edit "$num" --repo "$repo" --title "[Effort] $num · $name" >/dev/null 2>&1
-  echo "  ✓ effort #$num · $name" >&2
+  # The human handle: explicit --slug if given, else derived from the title (number/flow peeled).
+  if [ -n "$explicit_slug" ]; then slug="$(_eff_slug "$explicit_slug")"
+  else slug="$(_eff_title_slug "[Effort] $num · $name")"; fi
+  if [ -n "$slug" ]; then
+    gh label create "slug:$slug" --repo "$repo" --color ededed \
+      --description "effort slug handle" >/dev/null 2>&1 || true   # idempotent: ok if it exists
+    gh issue edit "$num" --repo "$repo" --add-label "slug:$slug" >/dev/null 2>&1 || true
+  fi
+  echo "  ✓ effort $(effort_display "$num" "$slug") · $name" >&2
 
   local i=0 sub child
   for sub in "$@"; do
