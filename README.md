@@ -80,6 +80,10 @@ cckit gc                   # prune merged branches + worktrees
 
 Run `cckit help` for the full verb list, or `cckit <verb> --help` for any one.
 
+For a goal too big for one PR, `cckit effort new "<name>" "sub :: desc" …` creates the parent issue
+(the four-section plan body), applies the `ctx/kind/priority/role/flow` labels, and lints every
+sub-issue title — the same effort `/kit-effort-new` produces, since both call one shared core.
+
 ## The copilot loop
 
 cckit turns the board into parallel agent work that gates and merges itself:
