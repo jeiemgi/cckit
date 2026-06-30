@@ -1,0 +1,97 @@
+---
+title: Installing cckit
+description: "Put cckit on your PATH: install paths, dependencies, IDE config, and the safety gate."
+---
+
+import { CardGrid, LinkCard, Steps, Aside } from '@astrojs/starlight/components';
+import Tag from '../../components/Tag.astro';
+import Combo from '../../components/Combo.astro';
+
+<Tag kind="flow" /> <Tag kind="command" label="cckit install" />
+
+Put the `cckit` command on your PATH, confirm it works, and adopt it in a repo.
+
+cckit is pure bash over `git`, `gh`, and `jq`. There is no build step — installing it puts the `cckit` dispatcher on your PATH, the list of folders your terminal searches when you type a command. Pick whichever route fits.
+
+## Install globally
+
+```sh
+# From a clone:
+./scripts/install.sh            # or: cckit install  (symlinks bin/cckit into a PATH dir)
+
+# One-liner (no clone):
+curl -fsSL https://cckit.dev/install.sh | bash      # scripts/web-install.sh
+
+# Homebrew:
+brew install jeiemgi/cckit/cckit                    # Formula/cckit.rb
+```
+
+`cckit install [bin-dir]` symlinks `bin/cckit` into the first writable PATH folder (`~/.local/bin`, then `/usr/local/bin`, then `~/bin`), or a folder you pass.
+
+It is a **symlink, not a copy** — the dispatcher resolves the link back to the repo, so `git pull` upgrades your install with no reinstall.
+
+## Verify the install
+
+```sh
+cckit version       # prints the installed version
+cckit doctor        # preflight: git/gh/jq present, gh authenticated
+```
+
+## Dependencies
+
+| Required | Why |
+| --- | --- |
+| `git`, `gh`, `jq` | the lifecycle (worktrees, GitHub, JSON) |
+| `bash` 3.2+ | the dispatcher + lib |
+
+Optional, auto-detected, never required:
+
+| Optional | Enables |
+| --- | --- |
+| `tmux` | `cckit orchestrate` (parallel panes) |
+| `glow` / `fzf` / `gum` | nicer terminal output and pickers |
+| Node + Chrome | `cckit debug` (browser debugging via chrome-devtools-axi) |
+
+`cckit doctor` reports what's missing.
+
+<Aside type="tip" title="What is a symlink? (skip if you know)">
+A symlink is a pointer file: it stands in one folder but redirects to a file somewhere else. cckit installs as a symlink into a PATH folder that points back to the cloned repo, so updating the repo updates your installed command automatically.
+</Aside>
+
+## Set up in a repo
+
+Installing puts `cckit` on PATH globally. **Adopting it in a repo** is a separate, per-repo step:
+
+```sh
+cckit scan          # what's here already
+cckit init          # scaffold cckit.config.json + .claude/ (greenfield)
+```
+
+For a repo that already has kit-shaped files, see the [adoption flow](/adoption/).
+
+## Claude Code (IDE) config
+
+cckit ships as a Claude Code plugin (`.claude-plugin/plugin.json` + `commands/` + `skills/`). With the repo present, Claude Code discovers the `/kit-*` slash commands and skills.
+
+`cckit init` scaffolds a project's `.claude/` folder — agents, hooks, rules, settings — from a profile, so the editor picks up the kit's conventions.
+
+Other agents drive the same CLI through [AGENTS.md](https://github.com/jeiemgi/cckit/blob/main/AGENTS.md) — no IDE required.
+
+## Safety and permission gate
+
+Every contribution and release runs the local gate first:
+
+- **`scripts/check.sh`** — shell syntax, valid manifests, no stray branding.
+- **The secret + privacy guard** (`scripts/lib/secret-guard.sh`) — blocks env files, keys, tokens, and a user-declared `.cckit/privacy-denylist`.
+
+Nothing publishable leaves without passing the gate. The git hook in `githooks/pre-commit` wires the same guard at commit time.
+
+<Combo>[`cckit doctor`](/cli-reference/) checks deps + auth · [`cckit init`](/getting-started/) sets up the repo after install.</Combo>
+
+---
+
+<CardGrid>
+  <LinkCard title="Next: Run your first lifecycle" href="/getting-started/" description="Init a repo and ship your first issue end to end." />
+  <LinkCard title="Adopt an existing repo" href="/adoption/" description="Bring cckit to a project that already has its own structure." />
+  <LinkCard title="The full CLI reference" href="/cli-reference/" description="Every cckit verb and its --llm mode." />
+</CardGrid>

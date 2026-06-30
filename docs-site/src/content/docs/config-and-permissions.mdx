@@ -1,0 +1,65 @@
+---
+title: Config & permissions
+description: How cckit discovers config, scans a project, and asks permission before it mutates anything.
+---
+
+import { CardGrid, LinkCard, Steps, Aside } from '@astrojs/starlight/components';
+import Tag from '../../components/Tag.astro';
+import Combo from '../../components/Combo.astro';
+
+<Tag kind="concept" />
+
+How cckit finds its config, reads what kind of project it is pointed at, and asks before it changes anything — all without a single hardcoded org, repo, or path.
+
+## Config resolution (nearest wins)
+
+cckit runs in the directory you invoke it from. It finds the config for that project by walking upward from the current folder and taking the first match.
+
+| Order | Source | What it is |
+| --- | --- | --- |
+| 1 | `$KIT_CONFIG` | An explicit path in the environment. Always wins. |
+| 2 | `cckit.config.json` | The project config at (or above) the repo root. |
+| 3 | `.claude/kit.config.json` | The config a kit-scaffolded project keeps under `.claude/`. |
+| 4 | cckit's own config | The fallback when you run outside any project. |
+
+No org, repo, or path is hardcoded — every value comes from this file. A repo with no config is invited to run `cckit init`.
+
+<Aside type="note" title="New here? Why 'nearest wins'">
+"Nearest wins" means cckit uses the config closest to where you are standing in the folder tree. If you run a command three folders deep, cckit walks up until it finds the first config file and uses that one. This is the same idea many tools use so a sub-project can override its parent.
+</Aside>
+
+## Project scanning
+
+cckit detects the project it is pointed at from the filesystem, not from baked-in knowledge. Run it yourself to see what cckit sees:
+
+```bash
+cckit scan --llm
+```
+
+It reads three things:
+
+- **The repo root** — `git rev-parse --show-toplevel`.
+- **Stack hints** — `package.json`, `pyproject.toml`, `go.mod`, `Cargo.toml`.
+- **Kit state** — `cckit.config.json`, `.claude/`, `.cckit/`.
+
+## The permission gate (ask before operating)
+
+cckit asks before it changes anything in a repo it has not worked in before.
+
+- **Read-only by default in an unknown repo.** Before the first *mutating* operation, cckit records your consent in `.cckit/consent` (gitignored).
+- **The secret and privacy guard always runs** before anything is committed or published. It is not optional and consent does not bypass it — see [Security](/security/).
+- **Destructive or irreversible operations** (force-push, repo create, history rewrite) always require a separate, explicit confirmation.
+
+## Identity
+
+cckit asks your name on first run and stores it in `.cckit/identity` (gitignored). Nothing personal is hardcoded; commits use your local git identity.
+
+<Combo>[`cckit init`](/github-cycle/) writes the config · [`cckit scan`](/how-to-read/) reads the project · [Security](/security/) is the guard that always runs.</Combo>
+
+---
+
+<CardGrid>
+  <LinkCard title="Security & secret guard" href="/security/" description="The guard that runs before any commit or publish." />
+  <LinkCard title="Adapters" href="/adapters/" description="The agnostic core that reads this config." />
+  <LinkCard title="Driving cckit from agents" href="/agents/" description="How an agent reads state and acts." />
+</CardGrid>

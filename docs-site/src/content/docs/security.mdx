@@ -1,0 +1,64 @@
+---
+title: Security & secret guard
+description: cckit's built-in, agnostic guard against publishing secrets, keys, env files, or your private data.
+---
+
+import { CardGrid, LinkCard, Steps, Aside } from '@astrojs/starlight/components';
+import Tag from '../../components/Tag.astro';
+import Combo from '../../components/Combo.astro';
+
+<Tag kind="concept" /> <Tag kind="hook" />
+
+A built-in guard that stops secrets, keys, env files, and your own private data from ever being committed or published — across all content, every time.
+
+cckit's guard checks code, docs, the cookbook, examples, and templates. It runs in the local gate and as a pre-commit hook, so a leak is caught before it leaves your machine.
+
+<Aside type="note" title="New here? What a pre-commit hook is">
+A pre-commit hook is a script git runs the moment you try to commit. If the script fails, the commit is blocked. cckit uses one so a secret is caught at commit time, before it ever reaches a remote.
+</Aside>
+
+## What it blocks
+
+- **Forbidden files** — `.env*` (including `.env.example`), `*.pem` / `*.key` / keystores, `id_rsa`, `.netrc`, `*.tfvars`, project id dumps.
+- **Secret content** — provider key prefixes, private-key blocks, JWTs, and secret-looking assignments. Placeholders like `<...>`, `${...}`, and `YOUR_…` are allowed.
+- **Your private terms** — a denylist you control (below).
+
+## Your private denylist (agnostic)
+
+Nothing project-specific is hardcoded in cckit. You declare what is private to you.
+
+<Steps>
+
+1. **Copy the example** — `cp privacy-denylist.example .cckit/privacy-denylist` (the target is gitignored).
+
+2. **List your terms** — org names, hosts, emails, anything private to you, one per line.
+
+3. **Commit something** — the guard fails if any term appears in a tracked file.
+
+</Steps>
+
+cckit ships the list **empty** — it never guesses what is yours.
+
+## Enforcement
+
+The guard runs in two places:
+
+| Where | What it is | How to enable |
+| --- | --- | --- |
+| Local gate | `scripts/check.sh` | Runs as part of the check suite |
+| Pre-commit hook | `githooks/pre-commit` | `git config core.hooksPath githooks` |
+
+A finding blocks the commit. The guard is not optional and is not bypassed by the permission consent described in [Config & permissions](/config-and-permissions/).
+
+## Reporting a vulnerability
+
+Open a private security advisory on the repository (Security → Advisories), or a regular issue if it is low-risk. Do not include secrets or exploit details in a public issue.
+
+<Combo>[Config & permissions](/config-and-permissions/) is the consent gate · this guard always runs on top of it, before any commit or publish.</Combo>
+
+---
+
+<CardGrid>
+  <LinkCard title="Config & permissions" href="/config-and-permissions/" description="The consent gate this guard sits on top of." />
+  <LinkCard title="Releasing" href="/releasing/" description="The publish step the guard runs before." />
+</CardGrid>

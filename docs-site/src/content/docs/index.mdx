@@ -18,7 +18,8 @@ import banner from '../../assets/hero-banner.png';
 
 <div class="hero-actions">
   <LinkButton href="/getting-started/" icon="right-arrow" iconPlacement="end">Get started</LinkButton>
-  <LinkButton href="https://github.com/jeiemgi/cckit" variant="secondary" icon="external">GitHub</LinkButton>
+  <LinkButton href="/how-to-read/" variant="secondary">How to read this guide</LinkButton>
+  <LinkButton href="https://github.com/jeiemgi/cckit" variant="minimal" icon="external">GitHub</LinkButton>
   <span class="coming-soon" aria-disabled="true" title="cckit.dev — coming soon">cckit.dev · coming soon</span>
 </div>
 
@@ -28,13 +29,17 @@ import banner from '../../assets/hero-banner.png';
   <Card title="One lifecycle" icon="seti:todo">
     Start an issue, get an isolated worktree and branch, open a PR, merge, clean up — each step is one command, correct by construction.
   </Card>
+  <Card title="A copilot loop" icon="rocket">
+    `cckit copilot` turns the board into a wave of parallel agent work; `cckit watch` gates and merges the PRs, then advances to the next wave.
+  </Card>
   <Card title="Agent-operable" icon="puzzle">
-    Every verb has a machine-readable mode (`cckit <verb> --llm`) and an `AGENTS.md` contract, so agents drive the kit without scraping human output.
+    Every verb has a machine-readable mode (`cckit <verb> --llm`, uniform data as TOON) and an `AGENTS.md` contract, so agents drive the kit without scraping human output.
   </Card>
   <Card title="Zero hard dependencies" icon="approve-check">
     Pure bash with graceful fallbacks; it auto-detects optional tools and degrades instead of failing.
   </Card>
-  <Card title="Portable" icon="setting">
-    No company, framework, or repo is baked in — everything is driven from `cckit.config.json`.
-  </Card>
 </CardGrid>
+
+## Learn it as a visual guide
+
+These docs are a learning book: coloured **tags** tell you how each thing is triggered (a command you type, a skill you run, something that happens just by talking to Claude), and **interactive diagrams** show each flow left to right. Start with [how to read this guide](/how-to-read/), then the [GitHub cycle](/github-cycle/).

@@ -1,0 +1,43 @@
+---
+title: Built with cckit badge
+description: Add a badge to your README if you build with cckit.
+---
+
+import { CardGrid, LinkCard, Steps, Aside } from '@astrojs/starlight/components';
+import Tag from '../../components/Tag.astro';
+import Combo from '../../components/Combo.astro';
+
+<Tag kind="concept" />
+
+Add a "Built with cckit" badge to your README — optional, never required, and a nod is always appreciated.
+
+[![Built with cckit](https://img.shields.io/badge/built%20with-cckit-0A7E8C.svg)](https://github.com/jeiemgi/cckit)
+
+## Markdown
+
+```markdown
+[![Built with cckit](https://img.shields.io/badge/built%20with-cckit-0A7E8C.svg)](https://github.com/jeiemgi/cckit)
+```
+
+## HTML
+
+```html
+<a href="https://github.com/jeiemgi/cckit"><img src="https://img.shields.io/badge/built%20with-cckit-0A7E8C.svg" alt="Built with cckit"></a>
+```
+
+## Flat-square variant
+
+Append `?style=flat-square` to the badge URL for a flat look:
+
+```text
+https://img.shields.io/badge/built%20with-cckit-0A7E8C.svg?style=flat-square
+```
+
+<Combo>Building on cckit? [The GitHub cycle](/github-cycle/) and [Skills](/skills/) are the next things to learn.</Combo>
+
+---
+
+<CardGrid>
+  <LinkCard title="The GitHub cycle" href="/github-cycle/" description="The lifecycle the badge says you build on." />
+  <LinkCard title="Skills cckit ships" href="/skills/" description="The skills that wrap the cckit flows." />
+</CardGrid>

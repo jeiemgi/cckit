@@ -1,0 +1,60 @@
+---
+title: Browser debug
+description: Optional, auto-detected browser debugging via chrome-devtools-axi.
+---
+
+import { CardGrid, LinkCard, Steps, Aside } from '@astrojs/starlight/components';
+import Tag from '../../components/Tag.astro';
+import Combo from '../../components/Combo.astro';
+
+<Tag kind="command" label="cckit debug" />
+
+Give an agent a token-efficient, scriptable way to debug a web page — screenshots, accessibility snapshots, console and network logs, Lighthouse — without bloating its context.
+
+`cckit debug` drives [chrome-devtools-axi](https://github.com/kunchenguid/chrome-devtools-axi) (Kun Chen), which runs a self-contained Chrome bridge and emits TOON-encoded output. TOON is a compact text format, so results stay small in an agent's context.
+
+<Aside type="note" title="New here? Why this exists">
+Debugging a web page normally means a person clicking around a browser. An agent cannot do that. `cckit debug` exposes the same browser tools as plain commands an agent can run and read, so the agent can see what is on the page.
+</Aside>
+
+## Optional + auto-detected
+
+cckit is pure bash; axi needs Node and Chrome. So this is **not a hard dependency** — cckit detects it at call time and degrades cleanly:
+
+- **Node/npx and Chrome present** → `cckit debug` drives axi.
+- **Otherwise** → it prints how to enable the capability and exits `0`. An unattended run is never hard-failed by a missing optional tool.
+
+Check availability without running anything:
+
+```bash
+cckit debug --check
+```
+
+## Enabling it
+
+```bash
+npm i -g chrome-devtools-axi      # or rely on `npx -y chrome-devtools-axi` (Node present)
+```
+
+Override the command cckit invokes with an environment variable — useful for a pinned version or a wrapper:
+
+```bash
+export CCKIT_AXI=<command>
+```
+
+## Usage
+
+Everything after `cckit debug` is forwarded verbatim to axi, so cckit never has to track axi's evolving subcommand surface:
+
+```bash
+cckit debug <axi-args...>         # passed straight through — see the axi docs for subcommands
+```
+
+<Combo>[`cckit debug`](/debug/) inspects the page · [Driving cckit from agents](/agents/) is the surface that calls it.</Combo>
+
+---
+
+<CardGrid>
+  <LinkCard title="Driving cckit from agents" href="/agents/" description="The agent-facing commands that pair with debug." />
+  <LinkCard title="Config & permissions" href="/config-and-permissions/" description="How optional tools are detected and gated." />
+</CardGrid>

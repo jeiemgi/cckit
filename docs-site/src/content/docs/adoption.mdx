@@ -1,0 +1,69 @@
+---
+title: Adopting cckit
+description: Issue-driven, incremental adoption of cckit in any repo.
+---
+
+import { CardGrid, LinkCard, Steps, Aside } from '@astrojs/starlight/components';
+import Tag from '../../components/Tag.astro';
+import Combo from '../../components/Combo.astro';
+
+<Tag kind="flow" /> <Tag kind="command" label="cckit adopt" />
+
+Bring cckit to any repo, one issue at a time, without restructuring what's already there.
+
+Adoption is **issue-driven** and incremental: file an issue for it, then walk the steps below. Every step is a single cckit verb, so an agent can perform the whole adoption unattended and report back.
+
+## The flow
+
+Run these in order from inside the repo.
+
+```sh
+cckit scan      # 1. detect the repo's stack + kit state
+cckit init      # 2. scaffold cckit.config.json + .claude/  (greenfield only)
+cckit adopt     # 3. record kit-shaped files the repo ALREADY has
+cckit migrate   # 4. reshuffle any old kit layout to the current one
+cckit update    # 5. report whether the project is behind the installed cckit
+cckit doctor    # 6. preflight: deps + gh auth are in place
+```
+
+## What each step does
+
+<Steps>
+
+1. **`scan` — where you stand.** It reports the kit state: `configured` (cckit already runs here), `partial` or `claude-only` (some kit-shaped files exist but aren't owned), or `none` (greenfield).
+
+2. **`init` — greenfield only.** For a `none` repo, it writes the config and a `.claude/` folder from a profile. Skip it if `scan` says `configured`.
+
+3. **`adopt` — take ownership of files already there.** This is the bridge for a repo that imported the kit by hand (copied a `.claude/`, ran an old init, a teammate pasted skills). The files are present but the **manifest** — cckit's record of which files it owns — doesn't know them, so `update` and `remove` won't touch them. `adopt` records each at its current hash. It writes no content; it only takes ownership. Dry-run first; it never claims your `knowledge/`, plans, or app code.
+
+4. **`migrate` — fix layout drift.** It reshuffles an old kit layout to the current one, and survives repeated runs unchanged.
+
+5. **`update` — check your version.** It reports whether the project trails the installed cckit version.
+
+6. **`doctor` — confirm the basics.** It checks deps and `gh` auth are in place.
+
+</Steps>
+
+<Aside type="note" title="What is the manifest?">
+The manifest is cckit's list of which files in your repo it owns and manages. Files outside it — your app code, your `knowledge/`, your plans — are never touched by `update` or `remove`. `adopt` is how you add already-present kit files to that list.
+</Aside>
+
+## Why issue-driven
+
+Adoption changes a repo's tracked files, so it goes through the normal lifecycle: one issue → one branch → one PR (`cckit start` / `cckit pr`).
+
+That keeps the adoption reviewable and reversible, and the issue is the place to record which steps applied to this repo.
+
+## Idempotent and safe
+
+Every step is a no-op when there is nothing to do. The file-touching ones (`init`, `adopt`, `migrate`) are dry-run-previewable and never overwrite content they don't own. Re-running the whole flow is safe.
+
+<Combo>[`cckit scan`](/cli-reference/) reads the state · [`cckit start`](/github-cycle/) opens the adoption issue's branch · [`cckit pr`](/github-cycle/) ships it for review.</Combo>
+
+---
+
+<CardGrid>
+  <LinkCard title="The GitHub work cycle" href="/github-cycle/" description="One issue, one branch, one worktree, one PR." />
+  <LinkCard title="Install in depth" href="/install/" description="Install paths, dependencies, and the safety gate." />
+  <LinkCard title="The full CLI reference" href="/cli-reference/" description="Every cckit verb and its --llm mode." />
+</CardGrid>

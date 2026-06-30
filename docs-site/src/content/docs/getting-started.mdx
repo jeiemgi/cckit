@@ -1,0 +1,85 @@
+---
+title: Getting started
+description: Install cckit and run your first lifecycle commands.
+---
+
+import { CardGrid, LinkCard, Steps, Aside } from '@astrojs/starlight/components';
+import Tag from '../../components/Tag.astro';
+import Combo from '../../components/Combo.astro';
+
+<Tag kind="flow" /> <Tag kind="command" label="cckit init" />
+
+Install cckit, set it up in a repo, and ship your first issue end to end.
+
+## Install cckit
+
+Pick one. Each puts the `cckit` command on your PATH — the list of folders your terminal searches when you type a command.
+
+```bash
+# One-liner (macOS · Linux · WSL — no npm or brew needed):
+curl -fsSL https://raw.githubusercontent.com/jeiemgi/cckit/main/scripts/web-install.sh | bash
+
+# Homebrew:
+brew tap jeiemgi/cckit && brew install cckit
+
+# npm (the bare cckit name is taken, so cckit is scoped):
+npm install -g @jeiemgi/cckit
+
+# From source:
+git clone https://github.com/jeiemgi/cckit.git
+cd cckit && ./scripts/install.sh    # symlinks bin/cckit onto your PATH
+```
+
+The full breakdown of install paths, the symlink behavior, and IDE config lives on the [install page](/install/).
+
+## Check your platform
+
+| Platform | Supported |
+| -------- | --------- |
+| macOS    | Yes — native |
+| Linux    | Yes — native |
+| Windows  | Yes — via WSL or Git Bash (not native cmd/PowerShell) |
+
+You need `bash` 4+, `git`, and `gh` (the GitHub command-line tool) signed in. `jq` (a JSON reader) is recommended. Run `cckit doctor` and it tells you what's missing.
+
+<Aside type="tip" title="New to the terminal? Start here">
+The terminal is the text window where you type commands. `gh` is GitHub's official command-line tool — install it, then run `gh auth login` once to sign in. After that, `cckit doctor` confirms everything cckit needs is in place.
+</Aside>
+
+## Run your first lifecycle
+
+Each command below is one step of the work lifecycle. Run them in order from inside your repo.
+
+<Steps>
+
+1. **Set up the repo** — `cckit init` writes `cckit.config.json` and a `.claude/` folder so cckit knows how to drive this project.
+
+2. **Start an issue** — `cckit start 42` makes an isolated worktree and branch for issue #42, so your change stays separate from the main branch.
+
+3. **Open the pull request** — `cckit pr 42 "what changed"` commits, pushes, and opens the PR.
+
+4. **Read the board** — `cckit sync` shows what's done, in progress, and unblocked.
+
+5. **Clean up** — `cckit gc` removes branches and worktrees whose PR already merged.
+
+</Steps>
+
+```bash
+cckit init                 # scaffold cckit.config.json + .claude/ for this repo
+cckit start 42             # isolated worktree + branch for issue #42
+cckit pr 42 "what changed" # commit, push, open the PR
+cckit sync                 # board state, what's unblocked
+cckit gc                   # prune merged branches + worktrees
+```
+
+Run `cckit help` for the full verb list, or `cckit <verb> --help` for any one.
+
+<Combo>[`cckit next`](/cli-reference/) shows the unblocked issue to pick · [`cckit copilot`](/copilot/) fans a whole wave out at once.</Combo>
+
+---
+
+<CardGrid>
+  <LinkCard title="Next: Install in depth" href="/install/" description="Install paths, dependencies, IDE config, and the safety gate." />
+  <LinkCard title="The full CLI reference" href="/cli-reference/" description="Every cckit verb, what it does, and its --llm mode." />
+  <LinkCard title="The GitHub work cycle" href="/github-cycle/" description="How one issue becomes one branch, one worktree, one PR." />
+</CardGrid>
