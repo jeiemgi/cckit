@@ -33,3 +33,5 @@ privacy-denylist
 # os / editor
 .DS_Store
 *.swp
+.vercel
+.env*
