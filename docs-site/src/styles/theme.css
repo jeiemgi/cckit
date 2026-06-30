@@ -288,3 +288,30 @@ h1 .cckit-tag, h2 .cckit-tag, h3 .cckit-tag { font-size: 0.6em; }
 .cckit-flow .react-flow__attribution { background: transparent; color: var(--sl-color-gray-4); }
 .cckit-flow .react-flow__attribution a { color: var(--sl-color-gray-3); }
 .cckit-flow .react-flow__edge-text { fill: var(--sl-color-white); }
+
+/* ── Combo notes ──────────────────────────────────────────────────────── */
+/* An outlined "pairs well with" line — teaches the next useful command/skill/flow. Quiet accent
+   border so it reads as a helper, not a warning. */
+.cckit-combo {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 0.5rem;
+	margin: 1.25rem 0;
+	padding: 0.6rem 0.85rem;
+	font-size: var(--sl-text-sm);
+	border: 1px solid var(--sl-color-hairline);
+	border-left: 3px solid var(--sl-color-accent);
+	border-radius: 0.5rem;
+	background: color-mix(in srgb, var(--sl-color-accent) 6%, transparent);
+}
+.cckit-combo__label {
+	font-weight: 700;
+	color: var(--sl-color-accent);
+	text-transform: uppercase;
+	letter-spacing: 0.03em;
+	font-size: var(--sl-text-xs);
+}
+.cckit-combo__label::before { content: '⊕ '; }
+.cckit-combo__body { color: var(--sl-color-gray-2); }
+.cckit-combo__body :where(p) { margin: 0; display: inline; }

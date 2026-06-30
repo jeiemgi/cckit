@@ -6,6 +6,7 @@ description: How one piece of work travels from an issue to merged code, step by
 import { CardGrid, LinkCard, Steps, Aside } from '@astrojs/starlight/components';
 import GitHubCycle from '../../components/diagrams/GitHubCycle';
 import Tag from '../../components/Tag.astro';
+import Combo from '../../components/Combo.astro';
 
 <Tag kind="flow" />
 
@@ -55,6 +56,8 @@ to memorize the terms — the commands above do each step for you.
 | What's next | `cckit next` |
 
 Each command is explained in the [CLI reference](/cli-reference/).
+
+<Combo>[`cckit next`](/copilot/) finds the next issue to start · [`cckit copilot`](/copilot/) runs this whole cycle for a wave of issues at once.</Combo>
 
 ## Links to learn more
 

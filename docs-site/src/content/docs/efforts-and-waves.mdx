@@ -7,6 +7,7 @@ import { CardGrid, LinkCard, Steps, Aside } from '@astrojs/starlight/components'
 import EffortWaves from '../../components/diagrams/EffortWaves';
 import WorktreeIsolation from '../../components/diagrams/WorktreeIsolation';
 import Tag from '../../components/Tag.astro';
+import Combo from '../../components/Combo.astro';
 
 <Tag kind="flow" /> <Tag kind="concept" />
 
@@ -38,6 +39,8 @@ Some sub-issues depend on others: sub #4 can't start until sub #1 is merged. cck
 </Steps>
 
 `cckit plan` shows the waves. Each wave is exactly "what can run in parallel right now".
+
+<Combo>[`cckit plan`](/copilot/) lays out the waves · [`cckit copilot`](/copilot/) runs a whole wave at once · [`cckit start`](/github-cycle/) opens one issue's worktree.</Combo>
 
 ## Worktrees keep parallel work apart
 
