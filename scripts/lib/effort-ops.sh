@@ -68,19 +68,20 @@ effort_new() {
   printf '%s\n' "$num"
 }
 
-# effort_start <N> [<slug>] — create the effort/<N> integration branch + its worktree from the base.
+# effort_start <slug|N> [<slug>] — create the effort/<N> integration branch + its worktree from base.
 effort_start() {
   _eff_need git || return 1
-  local num="${1:-}" slug_override="${2:-}" repo base root title slug branch wt
-  [ -n "$num" ] || { echo "effort_start: <effort issue #> required" >&2; return 1; }
+  local raw="${1:-}" slug_override="${2:-}" num repo base root title slug branch wt
+  [ -n "$raw" ] || { echo "effort_start: <slug|effort issue #> required" >&2; return 1; }
+  num="$(effort_slug_resolve "$raw")" || { echo "effort_start: could not resolve '$raw' to an effort" >&2; return 1; }
   repo="$(_eff_repo)"; base="$(_eff_base)"
   root="$(git worktree list --porcelain 2>/dev/null | awk '/^worktree /{print $2; exit}')"
   [ -n "$root" ] || { echo "effort_start: not in a git repo" >&2; return 1; }
 
-  if [ -n "$slug_override" ]; then slug="$slug_override"
+  if [ -n "$slug_override" ]; then slug="$(_eff_slug "$slug_override")"
   else
     title="$(gh issue view "$num" --repo "$repo" --json title -q .title 2>/dev/null)"
-    slug="$(_eff_slug "${title:-effort}")"; [ -n "$slug" ] || slug="effort"
+    slug="$(_eff_title_slug "${title:-effort}")"; [ -n "$slug" ] || slug="effort"
   fi
   branch="effort/$num-$slug"; wt="$root/.claude/worktrees/effort-$num"
 
@@ -92,18 +93,22 @@ effort_start() {
     git -C "$root" worktree add -b "$branch" "$wt" "$from" >/dev/null 2>&1 \
       || { echo "effort_start: failed to create worktree for $branch" >&2; return 1; }
   fi
-  echo "  ✓ effort #$num → $branch  (worktree: $wt)" >&2
+  echo "  ✓ effort $(effort_display "$num" "$slug") → $branch  (worktree: $wt)" >&2
   printf '%s|%s|%s\n' "$wt" "$branch" "$num"
 }
 
-# effort_pr [<N>] — open the single PR effort/<N> → base. N defaults to the current effort branch.
+# effort_pr [<slug|N>] — open the single PR effort/<N> → base. Defaults to the current effort branch.
 effort_pr() {
   _eff_need gh || return 1
-  local num="${1:-}" repo base branch title name
+  local raw="${1:-}" num repo base branch title name
   repo="$(_eff_repo)"; base="$(_eff_base)"
   branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)"
-  [ -n "$num" ] || num="$(effort_branch_num "$branch")"
-  [ -n "$num" ] || { echo "effort_pr: not on an effort/<N>-… branch and no <N> given" >&2; return 1; }
+  if [ -n "$raw" ]; then
+    num="$(effort_slug_resolve "$raw")" || { echo "effort_pr: could not resolve '$raw' to an effort" >&2; return 1; }
+  else
+    num="$(effort_branch_num "$branch")"
+  fi
+  [ -n "$num" ] || { echo "effort_pr: not on an effort/<N>-… branch and no <slug|N> given" >&2; return 1; }
   case "$branch" in effort/"$num"-*) : ;; *) echo "effort_pr: current branch ($branch) is not effort/$num-…" >&2; return 1 ;; esac
 
   git push -u origin "$branch" >/dev/null 2>&1 || true
@@ -118,8 +123,9 @@ effort_pr() {
 # Destructive: it merges and closes. Snapshots first so the per-sub work record survives the squash.
 effort_close() {
   _eff_need gh || return 1; _eff_need jq || return 1
-  local num="${1:-}" repo base branch
-  [ -n "$num" ] || { echo "effort_close: <effort issue #> required" >&2; return 1; }
+  local raw="${1:-}" num repo base branch
+  [ -n "$raw" ] || { echo "effort_close: <slug|effort issue #> required" >&2; return 1; }
+  num="$(effort_slug_resolve "$raw")" || { echo "effort_close: could not resolve '$raw' to an effort" >&2; return 1; }
   repo="$(_eff_repo)"; base="$(_eff_base)"
   branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)"
   case "$branch" in effort/"$num"-*) : ;; *) echo "effort_close: run from the effort/$num-… branch" >&2; return 1 ;; esac
