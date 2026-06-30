@@ -28,10 +28,11 @@ export CCKIT_FORCE_COLOR=1
 export CCKIT_NO_GLOW=1
 mkdir -p "$IMG_DIR"
 
-# Normalized capture preset — EVERY screenshot uses the same width, wrap, font, and line height so
-# the gallery reads as one coherent series (same zoom, fits the docs content column). Height is the
-# only thing that varies, with the command's output. Keep this in lockstep across the whole set.
-FREEZE_PRESET=(--window --padding 20 --width 920 --wrap 90 --font.size 14 --line-height 1.25)
+# Normalized capture preset — EVERY screenshot is the SAME fixed size (920×400) with the same wrap,
+# font, and line height, so the gallery is one coherent series that fits the docs column. The
+# showcase is a small VISUAL teaser; the full command list lives on the CLI reference page as
+# copyable text. Only include short, visual commands here so nothing clips at height 400.
+FREEZE_PRESET=(--window --padding 20 --width 920 --height 400 --wrap 90 --font.size 14 --line-height 1.25)
 
 # Gallery header.
 {
@@ -40,9 +41,9 @@ FREEZE_PRESET=(--window --padding 20 --width 920 --wrap 90 --font.size 14 --line
   echo 'description: Every cckit capability at a glance — real command output captured as screenshots.'
   echo '---'
   echo
-  echo 'A live tour of cckit, generated from a dataset (`docs-site/showcase/showcase.json`) by'
-  echo '`scripts/showcase.sh`: each command is run for real and its output captured as a screenshot.'
-  echo 'Every command here is read-only or a dry-run — safe to run yourself.'
+  echo 'A short visual tour of cckit — each shot is a real command run for real, captured at the same'
+  echo 'size. For the **full command list** (copyable), see the [CLI reference](/cli-reference/); to'
+  echo 'see how the verbs fit together, start with [the GitHub cycle](/github-cycle/).'
   echo
 } > "$GALLERY"
 

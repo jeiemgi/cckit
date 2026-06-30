@@ -1,0 +1,68 @@
+---
+title: Hooks
+description: The hooks cckit sets up — which event each one runs on, and what it does.
+---
+
+import { CardGrid, LinkCard, Aside } from '@astrojs/starlight/components';
+import Tag from '../../components/Tag.astro';
+import Combo from '../../components/Combo.astro';
+
+<Tag kind="hook" />
+
+The hooks cckit installs, what fires each one, and what it does.
+
+A **hook** is a script Claude Code runs automatically when something happens — a session starts, a
+command is about to run, a session ends. cckit scaffolds a few during `cckit init`, so the right
+check runs at the right moment without you remembering to run it.
+
+<Aside type="note" title="New to hooks?">
+You don't call a hook. Claude Code does, on an **event**. `SessionStart` fires when a session opens,
+`PreToolUse` fires just before a tool (like a shell command) runs, `Stop`/`SessionEnd` fire when a
+session ends, and `PreCompact` fires before the conversation is compressed. A hook reads what's
+happening and can print a note or block the action.
+</Aside>
+
+## Always set up
+
+These three are scaffolded for every project.
+
+| Event | Hook | What it does |
+| ----- | ---- | ------------ |
+| `SessionStart` | `repo-hygiene.sh` | A read-only report at the start of each session: stale branches, leftover worktrees, and stashes — the same things `cckit gc` cleans up. |
+| `SessionStart` | `kit_version_check.sh` | A quiet notice if this project is behind the installed cckit — the prompt to run `cckit update`. |
+| `PreToolUse` (Bash) | `guard-base-branch-commit.sh` | Blocks a commit made straight to the base branch, so work always goes through a branch and a PR. |
+
+<Combo>These guard the [GitHub cycle](/github-cycle/): the base-branch guard keeps you on a branch, and the hygiene report feeds [`cckit gc`](/cli-reference/).</Combo>
+
+## Set up when you enable a feature
+
+`cckit init` adds these when you turn the matching option on.
+
+| Event | Hook | Enabled by | What it does |
+| ----- | ---- | ---------- | ------------ |
+| `PreToolUse` (Bash) | `prepush_gate.sh` | pre-push gate | Runs your project's check (tests, lint) before a `git push`, so a red branch never reaches the remote. |
+| `SessionStart` | `kit-local-status.sh` | local model layer | Announces the local model (`mlx_lm.server`) when it's enabled and alive. |
+| `SessionStart` | `mempal_session_start.sh` | memory (MemPalace) | Loads this project's saved context at the start of a session. |
+| `Stop` | `mempal_save.sh` | memory (MemPalace) | Files the finished session into MemPalace. |
+| `PreCompact` | `mempal_precompact.sh` | memory (MemPalace) | A safety-net sweep to memory before the conversation is compressed. |
+| `SessionEnd` | `mempal_followup.sh` | memory (MemPalace) | Captures any unsynced work if a session closes abruptly. |
+
+## Where they live
+
+Hooks are plain scripts under `.claude/hooks/` in your project, registered in
+`.claude/settings.local.json`. They are yours to read and edit — every one is a safe no-op when its
+tool isn't installed, so nothing breaks if a dependency is missing.
+
+| Do this | Command |
+| ------- | ------- |
+| Scaffold the hooks | `cckit init` |
+| Check setup is healthy | `cckit doctor` |
+| Check the repo health a hook reports | `cckit gc` |
+| Act on the update notice | `cckit update` |
+
+---
+
+<CardGrid>
+  <LinkCard title="Config & permissions" href="/config-and-permissions/" description="What cckit reads and what it's allowed to do." />
+  <LinkCard title="The GitHub cycle" href="/github-cycle/" description="The lifecycle the guard hooks protect." />
+</CardGrid>

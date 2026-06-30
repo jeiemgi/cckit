@@ -63,6 +63,7 @@ export default defineConfig({
         { label: 'Git mechanisms', items: [
           { label: 'The GitHub cycle', slug: 'github-cycle' },
           { label: 'Efforts, waves & worktrees', slug: 'efforts-and-waves' },
+          { label: 'Hooks', slug: 'hooks' },
           { label: 'Releasing', slug: 'releasing' },
         ]},
         { label: 'Skills cckit ships', items: [
