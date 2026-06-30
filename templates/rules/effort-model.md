@@ -56,6 +56,14 @@ The parent ref is mandatory; `N` is a plain number so subs sort and read predict
 applies both formats when it creates the parent + native sub-issues, so a sub is identifiable by
 name alone in any flat list.
 
+**One creation core (no drift).** Both ways to create an effort — the `cckit effort new` verb and
+the `/kit-effort-new` skill — call the **same** shared function `effort_new` (`scripts/lib/effort-ops.sh`).
+That single core fills the four body sections, applies the `ctx/kind/priority/role/flow` label set
+(`ctx:*` via `effort_ctx_bucket`), lints the parent **and every sub** title up front, links the
+native sub-issues, and adds everything to the board. Change the core and both move together; there
+is no second implementation. `scripts/setup-labels.sh` provisions every label family the core
+applies (`ctx:* flow:* kind:* priority:* role:*`) so creation never fails on a missing label.
+
 ### Title rule, flow tags, relations, session-fit
 
 The board should be **legible at a glance** — a title says *what* an effort delivers and *which
@@ -68,8 +76,9 @@ plain-language **outcome** with an optional leading `[Flow]` tag:
 - **Banned in the name:** glyphs (`— ▾ ▸ → ✓ ✗ … •`), parentheses, ` — ` / ` · ` / ` / ` sub-clauses,
   code identifiers (file names, paths, `snake_case`), internal jargon (`chrome`, `seam`, `contract`,
   `rescue stash`, `refactor`, `wiring`, …), and **> 6 words**. Detail goes in the body.
-- **`effort_title_lint`** (`scripts/lib/effort.sh`) is the check; `effort-new` refuses a failing
-  title. Bad→good: `operator chrome — Settings ▾ dropdown + fixes` → **`[UI] operator navigation`**.
+- **`effort_title_lint`** (`scripts/lib/effort.sh`) is the check; `effort-new` lints the parent **and
+  every sub** title up front and refuses to create anything if one fails. Bad→good:
+  `operator chrome — Settings ▾ dropdown + fixes` → **`[UI] operator navigation`**.
 
 **Flow tag (`[Flow]` + `flow:<flow>` label).** A **flow** is a named thread of efforts toward one
 outcome. Controlled vocabulary (`EFFORT_FLOWS` in `effort.sh`; a project overrides it). The title
@@ -99,7 +108,7 @@ The parent carries the rich narrative; the **PR** carries the human-facing revie
 
 | Step | What |
 |------|------|
-| `effort-new` | parent issue (template) + native sub-issues; optional `--slug` sets the handle |
+| `effort-new` | parent issue (4-section body **filled** + `ctx/kind/priority/role/flow` labels) + native sub-issues, every title linted; optional `--slug` sets the handle |
 | `effort-start <slug\|N>` | `effort/<N>` branch + worktree; board → In Progress |
 | orchestrate | sub-issues in own worktrees (file-disjoint) → merge into `effort/<N>`; each closes + board Done as it lands |
 | `effort-pr <slug\|N>` | ONE PR `effort/<N>` → main (rich body + `## For agents`) |

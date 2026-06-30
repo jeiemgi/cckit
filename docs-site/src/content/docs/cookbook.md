@@ -92,7 +92,7 @@ several tasks. The parent issue *is* the plan, so the agent reads it instead of 
 **Flow:**
 ```bash
 cckit effort plan --llm        # session-fit plan over open efforts (data)
-cckit effort new "Auth rework" # parent issue + native sub-issues, all on the board
+cckit effort new "Auth rework" # parent (4-section body + ctx/kind/priority/role/flow labels) + linted subs
 cckit effort start <N>         # integration branch effort/<N> + worktree
 # …build sub-issues on the effort branch (sequential) or in worktrees (parallel)…
 cckit effort pr <N>            # ONE PR: effort/<N> → base branch

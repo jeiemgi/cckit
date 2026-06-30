@@ -7,10 +7,11 @@ when_to_use: When starting a new unit of work (a "plan"/effort) that decomposes 
 # kit-effort-new
 
 Plugin-direct skill — runs straight from `${CLAUDE_PLUGIN_ROOT}` (no per-project `scripts/` checkout
-needed). Helpers are sourced from the plugin; the verb logic lives in `scripts/lib/effort.sh`
-(`effort_link_sub`), never re-authored inline (kit-engine-boundary #1/#2). Repo + board config come
-from `load_kit_config` (`$KIT_REPO`, `KIT_PROJECTS_V2`). Reads `.claude/kit.config.json` from the
-working directory.
+needed). It is a **thin caller** of the shared creation core `effort_new` (`scripts/lib/effort-ops.sh`)
+— the exact function `cckit effort new` runs — so the skill and the verb produce structurally
+identical efforts (effort #98). No creation logic is re-authored inline (kit-engine-boundary #1/#2).
+Repo + board config come from `load_kit_config` (`$KIT_REPO`, `KIT_PROJECTS_V2`). Reads
+`.claude/kit.config.json` from the working directory.
 
 Creates the **parent issue** (the plan) + **N native sub-issues** for one effort. See
 `rules/effort-model.md` for the model and the parent-issue template. GitHub is the single source of
@@ -34,119 +35,46 @@ truth — the parent issue IS the plan (no separate plan file).
 
 ## Execution
 
+This skill is a **thin caller** of the shared creation core `effort_new`
+(`scripts/lib/effort-ops.sh`) — the SAME function `cckit effort new` runs (effort #98). The core owns
+body composition, the `ctx/kind/priority/role/flow` label set, per-sub title lint, native sub-issue
+links, `blocked_by` edges, and the board add. There is no second implementation here.
+
 ```bash
 source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/kit-config.sh" && load_kit_config
-[[ "$KIT_PROJECTS_V2" == "true" ]] && { source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/gh-project.sh"; load_project_ids; }
-source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/role-identity.sh" 2>/dev/null || true
+# Board + role helpers must be loaded BEFORE effort_new so its (guarded) board add can run.
+if [[ "$KIT_PROJECTS_V2" == "true" ]]; then
+  source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/gh-project.sh"; load_project_ids
+  source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/role-identity.sh" 2>/dev/null || true
+fi
 source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/effort.sh"
 source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/effort-metrics.sh"   # effort_ctx_bucket
+source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/effort-ops.sh"       # effort_new — the shared creation core
 
-# TITLE = the human NAME only; the board title is composed as "[Effort] <N> · [<FLOW>] <TITLE>"
-# (N is injected after creation — it's the issue's own number). FLOW is an optional controlled-vocab tag.
-FLOW_TAG=""; [[ -n "${FLOW:-}" ]] && FLOW_TAG="[$FLOW] "
+# TITLE = the human NAME only (no "[Effort]"/number prefix). The core composes the board title
+# "[Effort] <N> · [<FLOW>] <TITLE>", fills the four sections, applies labels, and lints the parent +
+# every sub title up front (a bad name aborts before anything is created — no half-effort).
 
-# 0. Guard the title content BEFORE creating anything: concise, no jargon, valid flow tag.
-#    Lint with a placeholder number — the rule is about the NAME, not the (not-yet-assigned) N.
-effort_title_lint "[Effort] 0 · ${FLOW_TAG}${TITLE}" \
-  || { echo "✗ fix the effort title (above) before creating — concise / no-jargon / valid flow" >&2; return 1; }
+# SUBS is a newline-delimited list of "name :: one-line description"; pass each line as a positional
+# sub spec. The core numbers them 1..k and composes the "[Effort <parent>] <M> · <name>" title.
+SUB_ARGS=()
+while IFS= read -r line; do [[ -n "$line" ]] && SUB_ARGS+=("$line"); done <<< "$SUBS"
 
-# 1. Compose the parent body (the 4 sections) + an optional ## Relations chain.
-RELATIONS=""
-if [[ -n "${DEPENDS_ON:-}" ]]; then
-  RELATIONS=$'\n\n## Relations\n'
-  for d in ${DEPENDS_ON//,/ }; do d="${d#\#}"; RELATIONS+="- Depends on #$d"$'\n'; done
-fi
-PARENT_BODY=$(cat <<EOF
-## Goal
-
-$GOAL
-
-## Scope
-
-$SCOPE
-
-## For agents
-
-$FOR_AGENTS
-
-## Verification
-
-$VERIFICATION$RELATIONS
-EOF
-)
-
-# 2. Create the parent issue (the plan). kind:task is the effort default unless overridden. Labels
-#    add `ctx:*` (session weight, first-pass from the sub count; refined at kit-effort-start) + an
-#    optional `flow:<flow>` tag.
-SUBCOUNT=$(printf '%s\n' "$SUBS" | grep -c . 2>/dev/null || echo 1); [[ "$SUBCOUNT" -ge 1 ]] || SUBCOUNT=1
-CTX="$(effort_ctx_bucket 1 "$SUBCOUNT")"
-FLOW_LABEL=""; [[ -n "${FLOW:-}" ]] && FLOW_LABEL=",flow:$(printf '%s' "$FLOW" | tr '[:upper:]' '[:lower:]')"
-PARENT_URL=$(gh issue create --repo "$KIT_REPO" \
-  --title "[Effort] PLACEHOLDER · ${FLOW_TAG}${TITLE}" \
-  --body "$PARENT_BODY" \
-  --label "$CTX,kind:task,priority:${PRIORITY:-p1},role:$ROLE$FLOW_LABEL" \
-  ${MILESTONE:+--milestone "$MILESTONE"})
-PARENT_NUM=$(basename "$PARENT_URL")
-# Inject the real effort id (== the issue number) into the title now that we have it.
-gh issue edit "$PARENT_NUM" --repo "$KIT_REPO" --title "[Effort] $PARENT_NUM · ${FLOW_TAG}${TITLE}" >/dev/null
-echo "✓ parent #$PARENT_NUM — $PARENT_URL"
-
-# 2b. Native dependency edges from DEPENDS_ON — the visible board chain.
-if [[ -n "${DEPENDS_ON:-}" ]]; then
-  for d in ${DEPENDS_ON//,/ }; do d="${d#\#}"; effort_set_blocked_by "$PARENT_NUM" "$d"; done
-fi
-
-# 3. Add the parent to the board, set Status=Todo + Role (if Projects v2 is enabled).
-if [[ "$KIT_PROJECTS_V2" == "true" ]]; then
-  PARENT_NODE=$(gh api "repos/$KIT_REPO/issues/$PARENT_NUM" --jq .node_id)
-  PARENT_ITEM=$(project_add_item "$PARENT_NODE" 2>/dev/null || echo "")
-  if [[ -n "$PARENT_ITEM" ]]; then
-    project_set_single_select "$PARENT_ITEM" "$STATUS_FIELD_ID" "$STATUS_OPT_TODO"
-    ROLE_OPT=$(role_option_id "$ROLE" 2>/dev/null || echo "")
-    [[ -n "$ROLE_OPT" ]] && project_set_single_select "$PARENT_ITEM" "$ROLE_FIELD_ID" "$ROLE_OPT"
-  fi
-fi
-
-# 4. Create each sub-issue, link it natively under the parent, add it to the board.
-#    SUBS is a newline-delimited list of "name :: one-line description". The skill numbers them
-#    1..k and composes the "[Effort <parent>] <M> · <name>" title (effort-model.md), linting each.
-#    Sub-issue bodies are intentionally short: the parent carries the narrative.
-SUB_M=0
-printf '%s\n' "$SUBS" | while IFS= read -r line; do
-  [[ -z "$line" ]] && continue
-  SUB_M=$((SUB_M + 1))
-  SUB_NAME="${line%% :: *}"
-  SUB_DESC="${line#* :: }"; [[ "$SUB_DESC" == "$line" ]] && SUB_DESC=""
-  SUB_TITLE="[Effort $PARENT_NUM] $SUB_M · $SUB_NAME"
-  effort_title_lint "$SUB_TITLE" \
-    || { echo "  ✗ sub title fails the rule (above) — rename and re-run: $SUB_TITLE" >&2; continue; }
-  SUB_URL=$(gh issue create --repo "$KIT_REPO" \
-    --title "$SUB_TITLE" \
-    --body "$SUB_DESC
-
-Sub-issue of #$PARENT_NUM (effort)." \
-    --label "kind:task,priority:${PRIORITY:-p1},role:$ROLE" \
-    ${MILESTONE:+--milestone "$MILESTONE"})
-  SUB_NUM=$(basename "$SUB_URL")
-  echo "  ✓ sub #$SUB_NUM — $SUB_TITLE"
-
-  # Native parent/child link via the sub-issues REST API (child DB id, not number).
-  effort_link_sub "$PARENT_NUM" "$SUB_NUM"
-
-  # Board: add sub, Status=Todo + Role.
-  if [[ "$KIT_PROJECTS_V2" == "true" ]]; then
-    SUB_NODE=$(gh api "repos/$KIT_REPO/issues/$SUB_NUM" --jq .node_id)
-    SUB_ITEM=$(project_add_item "$SUB_NODE" 2>/dev/null || echo "")
-    if [[ -n "$SUB_ITEM" ]]; then
-      project_set_single_select "$SUB_ITEM" "$STATUS_FIELD_ID" "$STATUS_OPT_TODO"
-      ROLE_OPT=$(role_option_id "$ROLE" 2>/dev/null || echo "")
-      [[ -n "$ROLE_OPT" ]] && project_set_single_select "$SUB_ITEM" "$ROLE_FIELD_ID" "$ROLE_OPT"
-    fi
-  fi
-done
-
+# effort_new echoes the parent number on stdout (progress goes to stderr) — capture it for the hint.
+PARENT_NUM=$(effort_new \
+  ${FLOW:+--flow "$FLOW"} \
+  --role "$ROLE" \
+  --priority "${PRIORITY:-p1}" \
+  --goal "$GOAL" --scope "$SCOPE" --for-agents "$FOR_AGENTS" --verification "$VERIFICATION" \
+  ${DEPENDS_ON:+--depends-on "$DEPENDS_ON"} \
+  ${MILESTONE:+--milestone "$MILESTONE"} \
+  "$TITLE" "${SUB_ARGS[@]}")
 echo "✓ effort #$PARENT_NUM created — next: /kit-effort-start $PARENT_NUM"
 ```
+
+> The block above is intentionally short: all creation logic lives in `effort_new`. If you need to
+> change what an effort looks like (body, labels, lint, board), change the core — both the skill and
+> the verb move together.
 
 ## Output
 

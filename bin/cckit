@@ -15,6 +15,9 @@
 #   cckit sync [--llm]              board state / what's unblocked
 #   cckit plan [--llm] [--effort N] wave plan: deps-ordered, file-disjoint, session-fit (TOON --llm)
 #   cckit effort <new|start|pr|close|plan>   the effort lifecycle
+#     effort new [--flow F --role R --priority p1 --goal G --scope S --for-agents A
+#       --verification V --depends-on "#1,#2" --milestone M] "<name>" ["sub :: desc" …]
+#         parent (4-section body + ctx/kind/priority/role/flow labels) + linted native sub-issues
 #   cckit orchestrate <a> <b> …     run N flows in parallel worktrees (--dry-run/--cap/--agent)
 #   cckit autopilot [<a> …]         unattended multi-flow: drive (or auto-pick) issues under a cap
 #   cckit watch [--merge] [--loop]  captain: gate open PRs, squash-merge CLEAN, advance the wave
@@ -108,9 +111,21 @@ case "$cmd" in
     source "$LIB/effort.sh"
     # shellcheck source=/dev/null
     source "$LIB/effort-ops.sh"   # the new|start|pr|close lifecycle ops (compose effort.sh helpers)
+    # shellcheck source=/dev/null
+    source "$LIB/effort-metrics.sh"   # effort_ctx_bucket — sizes the ctx:* label on `effort new`
     sub="${1:-}"; shift || true
     case "$sub" in
-      new)   effort_new   "$@" ;;
+      new)
+        # Full parity with /kit-effort-new: load the board + role helpers so an effort created via
+        # the verb lands on the board exactly as the skill does. Board ops are guarded inside
+        # effort_new, so this is a safe no-op when Projects v2 is off or the IDs aren't captured.
+        if [ "${KIT_PROJECTS_V2:-}" = "true" ]; then
+          # shellcheck source=/dev/null
+          source "$LIB/gh-project.sh"; load_project_ids >/dev/null 2>&1 || true
+          # shellcheck source=/dev/null
+          source "$LIB/role-identity.sh" 2>/dev/null || true
+        fi
+        effort_new "$@" ;;
       start) effort_start "$@" ;;
       pr)    effort_pr    "$@" ;;
       close) effort_close "$@" ;;
