@@ -26,9 +26,9 @@ if [ -n "${KTO_TEST_INNER:-}" ]; then
   eq "branch effort/851-z" "$(kto_branch_issue_number 'effort/851-tail')"      "851"
 
   # kto_base_branch / kto_board_enabled (portability toggles)
-  eq "base default"        "$(kto_base_branch)"                             "develop"
+  eq "base default"        "$(unset KIT_BASE_BRANCH; kto_base_branch)"      "main"
   eq "base override"       "$(KIT_BASE_BRANCH=main; kto_base_branch)"       "main"
-  if kto_board_enabled; then eq "board default on" "on" "on"; else eq "board default on" "off" "on"; fi
+  if ( unset KIT_PROJECTS_V2; kto_board_enabled ); then eq "board default on" "on" "on"; else eq "board default on" "off" "on"; fi
   ( KIT_PROJECTS_V2=false; if kto_board_enabled; then exit 0; else exit 1; fi ) \
     && eq "board off" "on" "off" || eq "board off" "off" "off"
 

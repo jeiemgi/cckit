@@ -48,7 +48,7 @@ kit_gc_analyze() {
 
   echo "# branches"
   for b in $(git branch --format='%(refname:short)' 2>/dev/null); do
-    case "$b" in develop|main) echo "  $b -> ACTIVE (base branch)"; continue;; esac
+    case "$b" in "${KIT_BASE_BRANCH:-main}"|develop|main) echo "  $b -> ACTIVE (base branch)"; continue;; esac
     pr="$(gh pr list --repo "$repo" --head "$b" --state all --json number,state --jq '.[0]|"PR#\(.number) \(.state)"' 2>/dev/null || true)"
     prot="$(wt_protected_reason "$b" "$repo" 2>/dev/null || true)"
     if [ -n "$prot" ]; then
@@ -86,7 +86,7 @@ kit_gc_prune() {
     | awk '/^worktree /{w=$2} /^branch /{print w" "$2}' \
     | while read -r path ref; do
         b="${ref#refs/heads/}"
-        case "$b" in develop|main|"") continue ;; esac
+        case "$b" in "${KIT_BASE_BRANCH:-main}"|develop|main|"") continue ;; esac
         [ -n "$(wt_protected_reason "$b" "$repo" 2>/dev/null || true)" ] && continue
         pr="$(gh pr list --repo "$repo" --head "$b" --state all --json state --jq '.[0].state' 2>/dev/null || true)"
         [ "$pr" = "MERGED" ] || continue
@@ -103,7 +103,7 @@ kit_gc_prune() {
 
   # Then local branches whose PR merged (worktree now gone).
   for b in $(git branch --format='%(refname:short)' 2>/dev/null); do
-    case "$b" in develop|main) continue ;; esac
+    case "$b" in "${KIT_BASE_BRANCH:-main}"|develop|main) continue ;; esac
     [ -n "$(wt_protected_reason "$b" "$repo" 2>/dev/null || true)" ] && continue
     pr="$(gh pr list --repo "$repo" --head "$b" --state all --json state --jq '.[0].state' 2>/dev/null || true)"
     [ "$pr" = "MERGED" ] || continue

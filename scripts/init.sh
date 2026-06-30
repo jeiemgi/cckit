@@ -353,6 +353,9 @@ BASENAME="$(basename "$TARGET")"
 [[ -z "$SLUG" ]] && SLUG="$(echo "$BASENAME" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed -E 's/^-|-$//g')"
 if [[ -z "$GH_OWNER" ]]; then GH_OWNER="$(gh api user --jq .login 2>/dev/null || echo "")"; fi
 [[ -z "$OWNER_NAME" ]] && OWNER_NAME="${GH_OWNER:-owner}"
+# Prefer the project's ACTUAL GitHub remote over an <owner>/<dir-basename> guess — the local
+# directory name often differs from the repo name (would target a non-existent repo otherwise).
+[[ -z "$REPO" ]] && REPO="$(cd "$TARGET" 2>/dev/null && gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || true)"
 [[ -z "$REPO" && -n "$GH_OWNER" ]] && REPO="$GH_OWNER/$SLUG"
 [[ -z "$REPO" ]] && REPO="$SLUG"
 

@@ -17,7 +17,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 command -v jq >/dev/null 2>&1 || exit 0
-cfg="$TARGET/.claude/kit.config.json"
+cfg="$TARGET/cckit.config.json"; [[ -f "$cfg" ]] || cfg="$TARGET/.claude/kit.config.json"
 [[ -f "$cfg" ]] || exit 0
 
 # Locate the installed plugin's plugin.json: explicit root → env → best-effort glob.

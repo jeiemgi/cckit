@@ -8,7 +8,7 @@ project_scan() {
   [ -f "$root/pyproject.toml" ] && stack+=("python")
   [ -f "$root/go.mod" ]         && stack+=("go")
   [ -f "$root/Cargo.toml" ]     && stack+=("rust")
-  if   [ -f "$root/cckit.config.json" ]; then kit="configured"
+  if   [ -f "$root/cckit.config.json" ] || [ -f "$root/.claude/kit.config.json" ]; then kit="configured"
   elif [ -d "$root/.cckit" ];            then kit="partial"
   elif [ -d "$root/.claude" ];           then kit="claude-only"; fi
   printf '{"root":"%s","stack":[%s],"kit":"%s"}\n' \

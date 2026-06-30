@@ -41,7 +41,7 @@ estimate_effort() {
   est="$d/estimator.json"; [[ -f "$est" ]] || return 0
   command -v jq >/dev/null 2>&1 || return 0
 
-  repo="${EFFORT_REPO:-jeiemgi/cckit}"
+  repo="${EFFORT_REPO:-${KIT_REPO:-}}"
   subs="$(gh api graphql -f query='query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){issue(number:$n){subIssues(first:50){totalCount}}}}' \
         -F o="${repo%/*}" -F r="${repo#*/}" -F n="$num" --jq '.data.repository.issue.subIssues.totalCount' 2>/dev/null)"
   [[ "$subs" =~ ^[0-9]+$ ]] || subs=1; [[ "$subs" -lt 1 ]] && subs=1
@@ -126,7 +126,7 @@ _em_token_sum() {
 }
 
 capture_effort_metrics() {
-  local num="$1" base="${2:-origin/develop}" d start now build_s shortstat files added removed commits churn diff_auto branch
+  local num="$1" base="${2:-origin/${KIT_BASE_BRANCH:-main}}" d start now build_s shortstat files added removed commits churn diff_auto branch
   local toks tin tout tcr tcw tokens_real cost_real cost_source tokens_est cost_est rec
   local IFS=' '   # force space-split for `set --` below (ambient IFS may carry a NUL)
   [[ -n "$num" ]] || return 0
@@ -213,7 +213,7 @@ _EM_JUDGE_MAX_CHARS="${EM_JUDGE_MAX_CHARS:-12000}"
 # (<git-common-dir>/traces/effort-<N>/*.diff, written pre-squash by effort_snapshot_subs) and falls
 # back to `git diff <base>...HEAD`. Echoes the (untruncated) diff; truncation happens in the caller.
 _em_judge_diff() {
-  local num="$1" base="${2:-origin/develop}" common tdir
+  local num="$1" base="${2:-origin/${KIT_BASE_BRANCH:-main}}" common tdir
   common="$(git rev-parse --git-common-dir 2>/dev/null)" || true
   if [[ -n "$common" ]]; then
     case "$common" in /*) : ;; *) common="$PWD/$common" ;; esac
@@ -231,7 +231,7 @@ _em_judge_diff() {
 _em_judge_goal() {
   local num="$1" repo body
   command -v gh >/dev/null 2>&1 || { printf ''; return 0; }
-  repo="${EFFORT_REPO:-jeiemgi/cckit}"
+  repo="${EFFORT_REPO:-${KIT_REPO:-}}"
   body="$(gh issue view "$num" --repo "$repo" --json body --jq '.body' 2>/dev/null)" || { printf ''; return 0; }
   [[ -n "$body" ]] || { printf ''; return 0; }
   # Extract the lines after "## Goal" up to the next "## " heading.
@@ -282,7 +282,7 @@ _em_judge_call() {
 }
 
 judge_effort_metrics() {
-  local num="$1" base="${2:-origin/develop}" d f goal diff truncated_note system user out model reply json dj sj
+  local num="$1" base="${2:-origin/${KIT_BASE_BRANCH:-main}}" d f goal diff truncated_note system user out model reply json dj sj
   [[ -n "$num" ]] || return 0
   command -v jq >/dev/null 2>&1 || return 0
   d="$(_em_dir)" || return 0; f="$d/records.jsonl"

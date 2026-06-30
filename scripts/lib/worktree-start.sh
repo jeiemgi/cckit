@@ -11,7 +11,7 @@
 #
 # Requires: gh, jq, git, scripts/lib/gh-project.sh (board update). bash 3.2 compatible.
 
-WT_START_REPO="${WT_START_REPO:-jeiemgi/cckit}"
+WT_START_REPO="${WT_START_REPO:-${KIT_REPO:-}}"
 
 # _wt_set_port <app-env-file> <port> <issue-num> — append a per-worktree dev PORT to an app's
 # .env.local, but only where one exists (i.e. the app is locally runnable). Idempotent: an existing
