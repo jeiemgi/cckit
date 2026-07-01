@@ -1,8 +1,42 @@
 #!/usr/bin/env bash
 # SessionStart hook — load MemPalace wake-up context for this project (wing={{WING}}).
-# Scaffolded by claude-kit. stdout is injected into the session context by Claude Code.
+# Scaffolded by cckit. stdout is injected into the session context by Claude Code.
 # Safe no-op if the `mempalace` CLI is not installed.
+#
 # NOTE: uses `wake-up --wing` on purpose, NOT `mempalace hook run --hook session-start` —
 # `hook run` derives the wing implicitly and can file into the wrong wing; `--wing` is explicit.
+#
+# HEADER SCOPING: `mempalace wake-up` scopes the L1 *body* to --wing, but its L0 identity
+# *header* is read from the single global ~/.mempalace/identity.txt and ignores the wing
+# (see mempalace layers.py Layer0). To give this wing its own header, drop a per-wing
+# identity file next to this hook:
+#     .claude/mempal-identity.{{WING}}.txt   (preferred)  or  .claude/mempal-identity.txt
+# When present it replaces the global L0 block; absent → mempalace output is passed through
+# unchanged (no regression).
 command -v mempalace >/dev/null 2>&1 || exit 0
-mempalace wake-up --wing {{WING}} 2>/dev/null || true
+
+_wake="$(mempalace wake-up --wing {{WING}} 2>/dev/null)" || exit 0
+
+# Locate an optional per-wing identity header (relative to this hook's own dir).
+_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+_id=""
+for _cand in "$_dir/../mempal-identity.{{WING}}.txt" "$_dir/../mempal-identity.txt"; do
+  [ -s "$_cand" ] && { _id="$_cand"; break; }
+done
+
+# No per-wing identity, or output not in the expected L0/L1 shape → pass through verbatim.
+if [ -z "$_id" ] || ! printf '%s\n' "$_wake" | grep -q '^## L1'; then
+  printf '%s\n' "$_wake"
+  exit 0
+fi
+
+# Replace the global L0 block (between the "====" rule and the first "## L1") with our header.
+awk -v idfile="$_id" '
+  BEGIN { while ((getline line < idfile) > 0) id = id line "\n" }
+  !sep && /^=+$/ { print; sep=1; printf "%s\n", id; inl0=1; next }
+  inl0 && /^## L1/ { inl0=0 }
+  inl0 { next }
+  { print }
+' <<EOF
+$_wake
+EOF

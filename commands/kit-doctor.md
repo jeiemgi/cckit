@@ -16,6 +16,7 @@ Run the kit-doctor script to check all dependencies and authentication required 
 | Tier 1 | `git`, `gh` (≥2.29 for Projects v2), `jq`, `perl` — auto-installs via brew |
 | Tier 2 | `node`, `pnpm`, `vercel` (if .vercel/ exists), `turbo`/`playwright` (dev deps only) |
 | Local | Only when `.local.enabled` — installs `mlx-lm` via `uv tool install` (fallback `pipx`, never plain `pip`) + starts `mlx_lm.server` in background with a port health check (first run downloads ~4.5 GB) |
+| Memory | Only when `.memory.enabled` — checks the `mempalace` CLI, the per-wing wake-up header (`.claude/mempal-identity.<wing>.txt`), and whether the session-start hook is current (older hooks can't apply the header). `--fix` seeds the header from `kit.config.json` and re-emits a stale hook; `--dry-run`/`--no-install` only report |
 | Auth | `gh auth status`, scope `project`, `git config user.name/email` |
 | SSH | Optional: detect existing key; `KIT_DOCTOR_SSH=1` triggers guided ed25519 setup |
 
@@ -42,7 +43,7 @@ Run the kit-doctor script to check all dependencies and authentication required 
 
 4. If all Tier 1 checks pass:
    - Report success
-   - Remind the user the onboarding guide is at `http://localhost:3001/onboarding` (or `$CCKIT_ADMIN_URL/onboarding`)
+   - Point the user at the pointer the doctor prints on its last line: the local onboarding app at `$CCKIT_ADMIN_URL/onboarding` **only when it is actually reachable**, otherwise the public docs at `https://cckit.vercel.app`. Do not hardcode `localhost:3001` — nothing serves it by default.
 
 ## Rules
 

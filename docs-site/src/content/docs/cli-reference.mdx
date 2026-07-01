@@ -24,7 +24,7 @@ The tables are grouped by job: setup, the daily lifecycle, planning a wave, runn
 | `cckit install [bin-dir]` | Symlink `cckit` onto your PATH. |
 | `cckit init --profile <p>` | Scaffold `cckit.config.json` + `.claude/` for this repo. |
 | `cckit scan` | Detect this repo's stack + kit state (JSON). |
-| `cckit doctor` | Onboarding preflight: deps present, `gh` authenticated. Asks before installing; `--fix` installs without the prompt. |
+| `cckit doctor` | Onboarding preflight: deps present, `gh` authenticated, and (when enabled) the MemPalace CLI + per-wing wake-up header. Asks before installing; `--fix` installs and seeds without the prompt. |
 | `cckit adopt` | Record kit-shaped files a repo already has. |
 | `cckit migrate` | Reshuffle an old kit layout to the current one. |
 
