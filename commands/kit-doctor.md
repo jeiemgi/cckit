@@ -16,7 +16,7 @@ Run the kit-doctor script to check all dependencies and authentication required 
 | Tier 1 | `git`, `gh` (≥2.29 for Projects v2), `jq`, `perl` — auto-installs via brew |
 | Tier 2 | `node`, `pnpm`, `vercel` (if .vercel/ exists), `turbo`/`playwright` (dev deps only) |
 | Local | Only when `.local.enabled` — installs `mlx-lm` via `uv tool install` (fallback `pipx`, never plain `pip`) + starts `mlx_lm.server` in background with a port health check (first run downloads ~4.5 GB) |
-| Memory | Only when `.memory.enabled` — checks the `mempalace` CLI, the per-wing wake-up header (`.claude/mempal-identity.<wing>.txt`), and whether the session-start hook is current (older hooks can't apply the header). `--fix` seeds the header from `kit.config.json` and re-emits a stale hook; `--dry-run`/`--no-install` only report |
+| Memory | Only when `.memory.enabled` — installs the [MemPalace](https://github.com/MemPalace/mempalace) CLI if missing (pipx, fallback uv), seeds the per-wing wake-up header (`.claude/mempal-identity.<wing>.txt`), and refreshes a stale session-start hook. Install + seed + refresh obey the consent guard: `--fix` applies them, `--dry-run`/`--no-install` only report |
 | Auth | `gh auth status`, scope `project`, `git config user.name/email` |
 | Repo | `github.baseBranch` vs the repo's GitHub default branch — a mismatch means `Closes #N` won't auto-close issues on GitHub-UI merges (report-only; `cckit pr-merge` already closes them explicitly) |
 | SSH | Optional: detect existing key; `KIT_DOCTOR_SSH=1` triggers guided ed25519 setup |

@@ -1,28 +1,27 @@
 ---
 title: Getting started
-description: The three steps to go from zero to shipping your first issue with cckit.
+description: The steps to go from zero to shipping your first issue with cckit — plus an optional memory layer.
 ---
 
-import { Steps } from '@astrojs/starlight/components';
+import { Card, CardGrid } from '@astrojs/starlight/components';
 import Tag from '../../components/Tag.astro';
 import TagRow from '../../components/TagRow.astro';
 
 <TagRow kinds={["flow"]} />
 
-Three steps take you from zero to shipping your first issue. Do them in order.
+Three steps take you from zero to shipping your first issue — then an optional memory layer. Work through the cards in order.
 
-<Steps>
-
-1. ### [Install cckit](/install/)
-
-   One script puts the `cckit` command on your PATH — one-liner, Homebrew, npm, or from source.
-
-2. ### [Check your platform](/check-your-platform/)
-
-   Confirm cckit runs on your system, install its dependencies with `cckit doctor`, and sign in to GitHub.
-
-3. ### [Initialize cckit](/initialize/)
-
-   Run `cckit init` in your repo — then let Claude surface your first real task and run it end to end.
-
-</Steps>
+<CardGrid>
+  <Card title="<a href='/install/'>1 · Install cckit</a>" icon="cloud-download">
+    One script puts the `cckit` command on your PATH — one-liner, Homebrew, npm, or from source.
+  </Card>
+  <Card title="<a href='/check-your-platform/'>2 · Check your platform</a>" icon="approve-check-circle">
+    Confirm cckit runs on your system, install its dependencies with `cckit doctor`, and sign in to GitHub.
+  </Card>
+  <Card title="<a href='/initialize/'>3 · Initialize cckit</a>" icon="rocket">
+    Run `cckit init` in your repo — then let Claude surface your first real task and run it end to end.
+  </Card>
+  <Card title="<a href='/memory/'>Set up memory</a>" icon="open-book">
+    Optional — give your agent persistent, per-project memory with [MemPalace](/memory/). Why it helps and how to turn it on.
+  </Card>
+</CardGrid>

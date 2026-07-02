@@ -101,6 +101,7 @@ export default defineConfig({
           { label: 'Install cckit', slug: 'install' },
           { label: 'Check your platform', slug: 'check-your-platform' },
           { label: 'Initialize cckit', slug: 'initialize' },
+          { label: 'Set up memory', slug: 'memory', badge: { text: 'Optional', variant: 'note' } },
           { label: 'Adopting cckit on a repo', slug: 'adoption' },
           { label: 'Showcase', slug: 'showcase' },
         ]},

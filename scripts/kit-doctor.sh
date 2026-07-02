@@ -521,15 +521,51 @@ if [[ "$_mem_on" == "true" ]]; then
   _mwing="$(jq -r '.memory.wing // .project.slug // ""' "$_kitcfg" 2>/dev/null || echo "")"
   [[ -z "$_mwing" || "$_mwing" == "null" ]] && _mwing="$(basename "${TARGET:-$PWD}")"
 
-  # 1. mempalace CLI present?
-  if has_cmd mempalace; then
-    _mv="$(mempalace --version 2>/dev/null | head -1)"; [[ -n "$_mv" ]] || _mv="installed"
+  # 1. mempalace CLI — install it (guarded) when memory is on but the CLI is missing; the
+  #    SessionStart/Stop/… hooks are silent no-ops without it. MemPalace is a Python CLI
+  #    (github.com/MemPalace/mempalace); install into an isolated tool venv via pipx (fallback uv).
+  #    Installs obey the same consent guard as every other dep: skipped under --dry-run/--no-install
+  #    or when the operator declined the install prompt.
+  _mp_find() {  # pipx/uv drop the bin in ~/.local/bin, which may not be on PATH yet this session
+    if has_cmd mempalace; then command -v mempalace
+    elif [[ -x "$HOME/.local/bin/mempalace" ]]; then echo "$HOME/.local/bin/mempalace"
+    fi
+    return 0
+  }
+  _mp_bin="$(_mp_find)"
+  if [[ -n "$_mp_bin" ]]; then
+    _mv="$("$_mp_bin" --version 2>/dev/null | head -1)"; [[ -n "$_mv" ]] || _mv="installed"
     row "$MARK_OK" "mempalace CLI" "$_mv"
     CHECKS_OK=$((CHECKS_OK + 1))
-  else
-    row "$MARK_WARN" "mempalace CLI" "not installed — the memory hooks are silent no-ops"
-    CHECKS_WARN=$((CHECKS_WARN + 1))
+  elif [[ $DRY_RUN -eq 1 || $NO_INSTALL -eq 1 ]]; then
+    row "$MARK_FAIL" "mempalace CLI" "missing — pipx install mempalace"
+    CHECKS_FAIL=$((CHECKS_FAIL + 1))
     ACTIONS_NEEDED+=("Install MemPalace: pipx install mempalace  (then: mempalace mcp)")
+  else
+    # ensure an installer: pipx preferred (brew-installable), uv as fallback. NEVER plain pip.
+    if ! has_cmd pipx && ! has_cmd uv; then
+      brew_install pipx pipx && ACTIONS_TAKEN+=("Installed pipx via brew") || true
+    fi
+    if has_cmd pipx; then
+      printf '  %s mempalace missing — installing via pipx (isolated venv)...\n' "$MARK_WARN"
+      pipx install mempalace >/dev/null 2>&1 || true
+      _mp_installer="pipx"
+    elif has_cmd uv; then
+      printf '  %s mempalace missing — installing via uv tool install (isolated venv)...\n' "$MARK_WARN"
+      uv tool install mempalace >/dev/null 2>&1 || true
+      _mp_installer="uv tool install"
+    fi
+    _mp_bin="$(_mp_find)"
+    if [[ -n "$_mp_bin" ]]; then
+      _mv="$("$_mp_bin" --version 2>/dev/null | head -1)"; [[ -n "$_mv" ]] || _mv="installed"
+      row "$MARK_OK" "mempalace CLI" "$_mv (via ${_mp_installer:-pipx})"
+      CHECKS_OK=$((CHECKS_OK + 1))
+      ACTIONS_TAKEN+=("Installed MemPalace via ${_mp_installer:-pipx} — run 'mempalace mcp' to wire the MCP server")
+    else
+      row "$MARK_FAIL" "mempalace CLI" "install failed — install pipx, then: pipx install mempalace"
+      CHECKS_FAIL=$((CHECKS_FAIL + 1))
+      ACTIONS_NEEDED+=("Install MemPalace: pipx install mempalace  (then: mempalace mcp)")
+    fi
   fi
 
   # 2. per-wing identity header — the fix for the global-header bug
