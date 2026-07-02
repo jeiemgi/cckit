@@ -3,7 +3,7 @@ title: Getting started
 description: The three steps to go from zero to shipping your first issue with cckit.
 ---
 
-import { Steps } from '@astrojs/starlight/components';
+import { Steps, Aside } from '@astrojs/starlight/components';
 import Tag from '../../components/Tag.astro';
 import TagRow from '../../components/TagRow.astro';
 
@@ -26,3 +26,32 @@ Three steps take you from zero to shipping your first issue. Do them in order.
    Run `cckit init` in your repo — then let Claude surface your first real task and run it end to end.
 
 </Steps>
+
+## Set up memory with MemPalace <Tag kind="flow" />
+
+Persistent memory is an **optional** add-on, powered by [**MemPalace**](https://github.com/MemPalace/mempalace) — a local, no-API-key engine that mines your projects and conversations into a searchable "palace," scoped per project (a *wing*). Turn it on and cckit wires four hooks (SessionStart / Stop / PreCompact / SessionEnd) so each session wakes up with the right context and files its work back on its own.
+
+<Steps>
+
+1. **Enable memory when you initialize** — say *yes* to memory at `cckit init`, or pass it explicitly:
+
+   ```bash
+   cckit init --profile software --memory on
+   ```
+
+2. **Install the MemPalace CLI** — `cckit doctor` sees that memory is on and installs it for you into an isolated venv (pipx, falling back to uv), then points you at the MCP wiring:
+
+   ```bash
+   cckit doctor     # installs mempalace + seeds this project's wake-up header
+   mempalace mcp    # print the MCP-server setup line for Claude Code
+   ```
+
+   Rather do it by hand? `pipx install mempalace`.
+
+3. **That's it** — every session now loads a wing-scoped wake-up header (`.claude/mempal-identity.<wing>.txt`, seeded by `init`/`doctor`) plus your project's recent decisions. The full read/write protocol lives in the scaffolded `.claude/rules/mempalace.md`.
+
+</Steps>
+
+<Aside type="tip" title="Built on MemPalace — credit where it's due">
+The memory engine, palace format, and MCP server are all the work of the open-source **[MemPalace](https://github.com/MemPalace/mempalace)** project (maintainer [@milla-jovovich](https://github.com/MemPalace)) — *"give your AI a memory: mine projects and conversations into a searchable palace. No API key required."* cckit only scaffolds the hooks and the per-wing header; MemPalace does the remembering. If it's useful, **star the repo, file issues, and follow along** at [github.com/MemPalace/mempalace](https://github.com/MemPalace/mempalace).
+</Aside>
