@@ -3,5 +3,5 @@
   "framework": "astro",
   "buildCommand": "astro build",
   "outputDirectory": "dist",
-  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- ."
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- docs-site"
 }
