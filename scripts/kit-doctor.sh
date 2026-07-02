@@ -676,6 +676,29 @@ else
   CHECKS_FAIL=$((CHECKS_FAIL + 1))
   ACTIONS_NEEDED+=("Set git email: git config --global user.email \"you@example.com\"")
 fi
+
+# ---- base branch vs GitHub default -----------------------------------------
+# `Closes #N` auto-close only fires when a PR merges into the repo's DEFAULT branch. If this
+# project integrates on a non-default branch (github.baseBranch, e.g. develop) that mismatch
+# silently leaves issues open on native/UI merges. cckit's own `pr-merge` closes them explicitly,
+# but the misalignment still bites anyone who merges from the GitHub UI — so surface it.
+if [[ $GH_AUTHED -eq 1 ]] && has_cmd gh && [[ -f "$_kitcfg" ]]; then
+  _cfg_repo="$(jq -r '.github.repo // empty' "$_kitcfg" 2>/dev/null || true)"
+  _cfg_base="$(jq -r '.github.baseBranch // "main"' "$_kitcfg" 2>/dev/null || echo main)"
+  if [[ -n "$_cfg_repo" ]]; then
+    _gh_default="$(gh repo view "$_cfg_repo" --json defaultBranchRef --jq '.defaultBranchRef.name' 2>/dev/null || true)"
+    if [[ -z "$_gh_default" ]]; then
+      row "$MARK_SKIP" "base branch" "couldn't read GitHub default for $_cfg_repo — skipped"
+    elif [[ "$_cfg_base" == "$_gh_default" ]]; then
+      row "$MARK_OK" "base branch" "$_cfg_base = GitHub default"
+      CHECKS_OK=$((CHECKS_OK + 1))
+    else
+      row "$MARK_WARN" "base branch" "baseBranch '$_cfg_base' ≠ GitHub default '$_gh_default' — 'Closes #N' won't auto-close on GitHub-UI merges"
+      CHECKS_WARN=$((CHECKS_WARN + 1))
+      ACTIONS_NEEDED+=("Align base branch: 'gh repo edit $_cfg_repo --default-branch $_cfg_base' (or set github.baseBranch to '$_gh_default'). Note: 'cckit pr-merge' already closes linked issues explicitly.")
+    fi
+  fi
+fi
 printf '\n'
 
 # ============================================================================
