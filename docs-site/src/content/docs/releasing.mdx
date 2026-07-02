@@ -1,6 +1,6 @@
 ---
 title: Releasing
-description: SemVer + Conventional Commits versioning, with auto-release on merge.
+description: SemVer + Conventional Commits versioning, cut by an explicit, manual release.
 ---
 
 import { CardGrid, LinkCard, Steps, Aside } from '@astrojs/starlight/components';
@@ -9,9 +9,9 @@ import TagRow from '../../components/TagRow.astro';
 
 <TagRow kinds={["command", "flow"]} />
 
-Cut a release with no "what number is this" step — your commit messages decide the version, and a merge to `main` ships it.
+Cut a release with no "what number is this" step — your commit messages decide the version. Merges to `main` **don't** ship anything; you release deliberately, when a batch of merged work is ready.
 
-cckit follows [Semantic Versioning](https://semver.org/) driven by [Conventional Commits](https://www.conventionalcommits.org/). Versioning is automatic: the commit messages on `main` pick the next version.
+cckit follows [Semantic Versioning](https://semver.org/) driven by [Conventional Commits](https://www.conventionalcommits.org/). The version *number* is automatic — the commit messages since the last tag pick it — but cutting the release is a deliberate, manual step.
 
 <Aside type="note" title="New here? The two terms">
 **Semantic Versioning** is the `MAJOR.MINOR.PATCH` number on a release (like `1.4.2`). **Conventional Commits** is a small rule for writing commit messages so a tool can read them — each subject starts with a `type:` such as `feat:` or `fix:`. Together they let cckit pick the next version from the commits alone.
@@ -34,9 +34,14 @@ Check what the next version would be at any time:
 cckit release --next        # or: scripts/lib/version-bump.sh --next
 ```
 
-## Auto-release on merge
+## Cutting a release (manual)
 
-`.github/workflows/release.yml` runs on every merge to `main`:
+`.github/workflows/release.yml` is triggered **on demand**, never by a merge — so you can merge, merge, merge, then release once when the batch is ready. Start it from **Actions ▸ release ▸ Run workflow**, or:
+
+```bash
+gh workflow run release.yml                 # cut the release
+gh workflow run release.yml -f dry_run=true # preview the version, ship nothing
+```
 
 <Steps>
 
@@ -48,7 +53,7 @@ cckit release --next        # or: scripts/lib/version-bump.sh --next
 
 </Steps>
 
-The workflow ignores its own `chore(release):` commit, so it never loops. A merge with only `chore` or `docs` noise still patches; a merge with no new commits releases nothing.
+A run with only `chore`/`docs` noise still patches; a run with no release-worthy commits since the last tag releases nothing (`bump=none`). Because releases are manual, two PRs merging at once can no longer race each other into a corrupted tag.
 
 <Aside type="caution" title="Workflow edits are human-reviewed">
 Changes to the release workflow are always reviewed by a person — the CI token has a wide blast radius. This repo ships the workflow; a maintainer merges the PR that adds or edits it.
