@@ -1,79 +1,27 @@
 ---
 title: Getting started
-description: The three steps to go from zero to shipping your first issue with cckit.
+description: The steps to go from zero to shipping your first issue with cckit — plus an optional memory layer.
 ---
 
-import { Steps, Aside } from '@astrojs/starlight/components';
+import { Card, CardGrid } from '@astrojs/starlight/components';
 import Tag from '../../components/Tag.astro';
 import TagRow from '../../components/TagRow.astro';
 
 <TagRow kinds={["flow"]} />
 
-Three steps take you from zero to shipping your first issue. Do them in order.
+Three steps take you from zero to shipping your first issue — then an optional memory layer. Work through the cards in order.
 
-<Steps>
-
-1. ### [Install cckit](/install/)
-
-   One script puts the `cckit` command on your PATH — one-liner, Homebrew, npm, or from source.
-
-2. ### [Check your platform](/check-your-platform/)
-
-   Confirm cckit runs on your system, install its dependencies with `cckit doctor`, and sign in to GitHub.
-
-3. ### [Initialize cckit](/initialize/)
-
-   Run `cckit init` in your repo — then let Claude surface your first real task and run it end to end.
-
-</Steps>
-
-## Set up memory with MemPalace <Tag kind="flow" />
-
-Persistent memory is an **optional** add-on, powered by [**MemPalace**](https://github.com/MemPalace/mempalace) — a local, no-API-key engine that mines your projects and conversations into a searchable "palace," scoped per project (a *wing*). Turn it on and cckit wires four hooks (SessionStart / Stop / PreCompact / SessionEnd) so each session wakes up with the right context and files its work back on its own.
-
-### Why it's worth turning on
-
-Coding agents are **stateless** — every session starts from zero. Without memory, you re-explain the same architecture, re-derive decisions you already made, and watch the *why* behind past choices evaporate the moment the context window compacts. You become the agent's memory, and that gets expensive fast.
-
-With memory on, the agent **wakes up already knowing your project** — so it stops asking what it should already know. Concretely:
-
-- **Continuity across sessions.** Pick up where you (or another agent) left off, instead of rebuilding context each time.
-- **Decisions that stick.** ADRs, trade-offs, and "we tried that, it didn't work" persist — so settled choices don't get re-litigated a week later.
-- **Cheaper and faster.** Fewer tokens burned re-establishing context every session; the wake-up is ~600–900 tokens, leaving 95%+ of the window for actual work.
-- **A searchable record.** Everything mined is queryable by you and by future agents — a project brain that outlives any one conversation.
-
-### How cckit embraces it
-
-Memory isn't a bolt-on — cckit treats it as **first-class in the lifecycle**. Flip it on and the kit does the remembering for you; you never have to say "remember this":
-
-- **Four hooks wire it into every session automatically** — `SessionStart` loads a wing-scoped wake-up (identity header + recent decisions), `Stop` files the finished session, `PreCompact` sweeps to memory before the window compresses, and `SessionEnd` catches any unsynced work if a session ends abruptly.
-- **One wing per project.** Memories never bleed across repos, and each specialist agent gets its own diary wing for its notes.
-- **A scaffolded protocol.** `.claude/rules/mempalace.md` teaches Claude to *recall before it answers* and *record after it decides* — so it checks the palace instead of guessing, and writes decisions back when the work is done.
-- **Kept healthy by `cckit doctor`.** It installs the CLI, seeds this project's wake-up header, and refreshes stale hooks — so the layer keeps working as the kit evolves.
-
-<Steps>
-
-1. **Enable memory when you initialize** — say *yes* to memory at `cckit init`, or pass it explicitly:
-
-   ```bash
-   cckit init --profile software --memory on
-   ```
-
-2. **Install the MemPalace CLI** — `cckit doctor` sees that memory is on and installs it for you into an isolated venv (pipx, falling back to uv), then points you at the MCP wiring:
-
-   ```bash
-   cckit doctor     # installs mempalace + seeds this project's wake-up header
-   mempalace mcp    # print the MCP-server setup line for Claude Code
-   ```
-
-   Rather do it by hand? `pipx install mempalace`.
-
-3. **That's it** — every session now loads a wing-scoped wake-up header (`.claude/mempal-identity.<wing>.txt`, seeded by `init`/`doctor`) plus your project's recent decisions. The full read/write protocol lives in the scaffolded `.claude/rules/mempalace.md`.
-
-</Steps>
-
-<Aside type="tip" title="Built on MemPalace — credit where it's due">
-The memory engine, palace format, and MCP server are all the work of the open-source **[MemPalace](https://github.com/MemPalace/mempalace)** project (maintainer [@milla-jovovich](https://github.com/MemPalace)) — *"give your AI a memory: mine projects and conversations into a searchable palace. No API key required."* cckit only scaffolds the hooks and the per-wing header; MemPalace does the remembering. If it's useful, **star the repo, file issues, and follow along** at [github.com/MemPalace/mempalace](https://github.com/MemPalace/mempalace).
-
-**Not affiliated.** cckit is not a maintainer of MemPalace and has no affiliation with or endorsement from the project or its authors — we're simply users who find it excellent. MemPalace is independent software under its own license; install and use it at your own discretion. Please direct MemPalace bugs and questions to [its own issue tracker](https://github.com/MemPalace/mempalace/issues), not to cckit.
-</Aside>
+<CardGrid>
+  <Card title="<a href='/install/'>1 · Install cckit</a>" icon="cloud-download">
+    One script puts the `cckit` command on your PATH — one-liner, Homebrew, npm, or from source.
+  </Card>
+  <Card title="<a href='/check-your-platform/'>2 · Check your platform</a>" icon="approve-check-circle">
+    Confirm cckit runs on your system, install its dependencies with `cckit doctor`, and sign in to GitHub.
+  </Card>
+  <Card title="<a href='/initialize/'>3 · Initialize cckit</a>" icon="rocket">
+    Run `cckit init` in your repo — then let Claude surface your first real task and run it end to end.
+  </Card>
+  <Card title="<a href='/memory/'>Set up memory</a>" icon="open-book">
+    Optional — give your agent persistent, per-project memory with [MemPalace](/memory/). Why it helps and how to turn it on.
+  </Card>
+</CardGrid>
