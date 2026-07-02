@@ -44,7 +44,7 @@ These three are scaffolded for every project.
 | ----- | ---- | ---------- | ------------ |
 | `PreToolUse` (Bash) | `prepush_gate.sh` | pre-push gate | Runs your project's check (tests, lint) before a `git push`, so a red branch never reaches the remote. |
 | `SessionStart` | `kit-local-status.sh` | local model layer | Announces the local model (`mlx_lm.server`) when it's enabled and alive. |
-| `SessionStart` | `mempal_session_start.sh` | memory (MemPalace) | Loads this project's saved context at the start of a session. |
+| `SessionStart` | `mempal_session_start.sh` | memory (MemPalace) | Loads this project's saved context (`wake-up --wing`) at the start of a session. The body is wing-scoped; for a wing-scoped identity header, drop in `.claude/mempal-identity.<wing>.txt`. |
 | `Stop` | `mempal_save.sh` | memory (MemPalace) | Files the finished session into MemPalace. |
 | `PreCompact` | `mempal_precompact.sh` | memory (MemPalace) | A safety-net sweep to memory before the conversation is compressed. |
 | `SessionEnd` | `mempal_followup.sh` | memory (MemPalace) | Captures any unsynced work if a session closes abruptly. |
