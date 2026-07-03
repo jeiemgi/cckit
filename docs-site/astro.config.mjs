@@ -77,7 +77,7 @@ export default defineConfig({
         Head: './src/components/Head.astro',
         ...(DEV ? { PageSidebar: './src/components/DevAnnotate.astro' } : {}),
       },
-      description: 'A project operating system for coding agents — the full GitHub work lifecycle as a CLI, drivable by Claude Code and any agent.',
+      description: 'Be the architect — cckit runs the mechanics. The full GitHub work lifecycle as a CLI that turns your Git into retrievable, efficient context, drivable by Claude Code and any agent.',
       social: { github: 'https://github.com/jeiemgi/cckit' },
       favicon: '/favicon.svg',
       // SEO / social share. Starlight emits canonical, description, sitemap, and title/OG tags from
