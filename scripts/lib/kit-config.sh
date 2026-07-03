@@ -76,6 +76,10 @@ load_kit_config() {
   KIT_MILESTONES="$(jq -r '.milestones[]? // empty' "$cfg")"
   export KIT_ROLES KIT_MILESTONES
 
+  # Effort flow vocabulary (effort.flows[]) — space-joined so effort.sh can resolve EFFORT_FLOWS
+  # from the project config (#150). Empty when unconfigured (effort.sh keeps its built-in default).
+  export KIT_EFFORT_FLOWS="$(jq -r '[.effort.flows[]? | tostring] | join(" ")' "$cfg")"
+
   # Apply per-folder .claudekit/ overrides (no-op when none exist).
   _kit_apply_claudekit_overlays "$cfg"
 }
@@ -109,5 +113,6 @@ _kit_apply_claudekit_overlays() {
   export KIT_ANNOTATE_ENABLED="$(_kit_cfg_get '.annotate.enabled // false')"
   export KIT_ANNOTATE_BACKEND="$(_kit_cfg_get '.annotate.backend // ""')"
   export KIT_ANNOTATE_FRAMEWORK="$(_kit_cfg_get '.annotate.framework // ""')"
+  export KIT_EFFORT_FLOWS="$(_kit_cfg_get '[.effort.flows[]? | tostring] | join(" ")')"
   export KIT_EFFECTIVE_CONFIG="$merged"
 }

@@ -68,6 +68,7 @@
       "type": "object",
       "additionalProperties": true,
       "properties": {
+        "flows": { "type": "array", "items": { "type": "string" }, "description": "Controlled flow vocabulary for effort titles — the values accepted by the leading [Flow] title tag and `--flow` (also the flow:<flow> labels). Replaces the built-in default (Core UI API Docs Infra Auth Data Web App); an explicit EFFORT_FLOWS env var still wins per invocation." },
         "knowledgeIngestHook": { "type": "string", "description": "Optional path to an executable run after `cckit effort close`, invoked as `<hook> <effort-number> <trace-dir>` to fold the closed effort's work record into a knowledge base. No-op when unset or not executable; the kit ships no default." }
       }
     },

@@ -146,7 +146,26 @@ effort_pr_title_check() {
 # controlled vocabulary — never internal jargon, glyphs, code identifiers, parentheticals, em-dash
 # sub-clauses, or >6 words (detail goes in the body). See rules/effort-model.md § Titles.
 
-# Controlled flow vocabulary for the optional leading [Flow] title tag. Projects override via EFFORT_FLOWS.
+# Controlled flow vocabulary for the optional leading [Flow] title tag. Resolution order (#150):
+#   1. an explicit EFFORT_FLOWS env var always wins (per-invocation override)
+#   2. the project config `effort.flows[]` — via KIT_EFFORT_FLOWS (exported by load_kit_config) or
+#      read straight from the config file, so a configured vocabulary works even for callers that
+#      never loaded the config
+#   3. the built-in default.
+_effort_flows_from_config() {
+  if [[ -n "${KIT_EFFORT_FLOWS:-}" ]]; then printf '%s' "$KIT_EFFORT_FLOWS"; return 0; fi
+  command -v jq >/dev/null 2>&1 || return 1
+  # Locate the project config through the ONE shared resolver (config-path.sh sits next to this lib).
+  if ! command -v kit_config_path >/dev/null 2>&1; then
+    local _ef_dir; _ef_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)"
+    # shellcheck source=/dev/null
+    [[ -n "$_ef_dir" && -f "$_ef_dir/config-path.sh" ]] && . "$_ef_dir/config-path.sh"
+  fi
+  command -v kit_config_path >/dev/null 2>&1 || return 1
+  local _ef_cfg; _ef_cfg="$(kit_config_path 2>/dev/null)" && [[ -f "$_ef_cfg" ]] || return 1
+  jq -r '[.effort.flows[]? | tostring] | join(" ")' "$_ef_cfg" 2>/dev/null
+}
+if [[ -z "${EFFORT_FLOWS:-}" ]]; then EFFORT_FLOWS="$(_effort_flows_from_config 2>/dev/null || true)"; fi
 EFFORT_FLOWS="${EFFORT_FLOWS:-Core UI API Docs Infra Auth Data Web App}"
 # Jargon denylist — internal terms that read as noise on the board. Override via EFFORT_TITLE_JARGON.
 EFFORT_TITLE_JARGON="${EFFORT_TITLE_JARGON:-chrome seam contract claim rescue stash teardown scaffolding shim boilerplate refactor wiring}"
