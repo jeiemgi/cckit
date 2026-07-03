@@ -11,7 +11,7 @@
 [![Docs](https://img.shields.io/badge/docs-cckit.vercel.app-0A7E8C.svg)](https://cckit.vercel.app)
 [![Platforms: macOS · Linux · WSL](https://img.shields.io/badge/platforms-macOS%20%C2%B7%20Linux%20%C2%B7%20WSL-555.svg)](#platforms--requirements)
 
-**[📖 Documentation](https://cckit.vercel.app)** · [Quick start](#quick-start) · [Contributing](CONTRIBUTING.md) · [Code of Conduct](CODE_OF_CONDUCT.md)
+**[📖 Documentation](https://cckit.vercel.app)** · [Tutorials](https://cckit.vercel.app/tutorials/) · [Quick start](#quick-start) · [Contributing](CONTRIBUTING.md) · [Code of Conduct](CODE_OF_CONDUCT.md)
 
 cckit turns a Git repository into a structured, agent-operable workspace. It ships the entire
 GitHub lifecycle — issues, branches, isolated worktrees, PRs, the merge flow, garbage collection,
@@ -130,7 +130,7 @@ transcript, pipe-safe everywhere (`cckit render` exposes the seam for any script
 
 ## Documentation
 
-Full docs, the [cookbook](https://cckit.vercel.app/cookbook/) of lifecycle recipes, and the [CLI reference](https://cckit.vercel.app/cli-reference/) live at **[cckit.vercel.app](https://cckit.vercel.app)**.
+Full docs, the [tutorials](https://cckit.vercel.app/tutorials/) (step-by-step "How to X with Claude Code" guides), the [cookbook](https://cckit.vercel.app/cookbook/) of lifecycle recipes, and the [CLI reference](https://cckit.vercel.app/cli-reference/) live at **[cckit.vercel.app](https://cckit.vercel.app)**.
 
 ## Project layout
 
