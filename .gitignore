@@ -27,6 +27,8 @@ id_ed25519.*
 
 # cckit runtime + the user's private denylist (the .example is committed, the real one is not)
 .cckit/
+# effort/task worktrees live here — never commit them (they are separate checkouts)
+.claude/worktrees/
 privacy-denylist
 !privacy-denylist.example
 
