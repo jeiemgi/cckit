@@ -47,8 +47,10 @@ fi
 run bash "$root/scripts/lib/version-bump.sh" --write "$VERSION"
 run git -C "$root" add -A
 run git -C "$root" commit -m "release: $tag"
-run git -C "$root" tag "$tag"
-run git -C "$root" push origin main --tags
+# -m makes the tag annotated, which also satisfies tag.gpgsign=true configs — a bare `git tag`
+# aborts there with "fatal: no tag message?" and kills the publish mid-run (#167).
+run git -C "$root" tag -m "$tag" "$tag"
+run git -C "$root" push origin main "$tag"
 run gh release create "$tag" --repo "$repo" --title "$tag" --generate-notes
 
 # 2. Compute the tarball sha256 for the stable Homebrew formula.
