@@ -6,6 +6,14 @@ All notable changes to cckit are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- `cckit release` now stamps the version on all four version surfaces through the one shared
+  bumper (`version-bump.sh --write`) instead of an inline jq that wrote only
+  `cckit.config.json.kitVersion` (#173). v0.4.0 had shipped with `.claude-plugin/plugin.json` and
+  `docs-site/package.json` still at 0.3.0, making `cckit update` report "ahead of plugin" on a
+  fully current install; the drifted files are realigned and a new `version-bump-test.sh` guards
+  that the four surfaces agree and that publish.sh keeps delegating to the shared bumper.
+
 ### Changed
 - README rewritten in the philosophy-page voice — architect framing, the retrievable-context
   one-liner, a "cckit builds cckit" receipts section — with the quick start corrected
