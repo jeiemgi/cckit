@@ -17,8 +17,11 @@ while [[ $# -gt 0 ]]; do
 done
 
 command -v jq >/dev/null 2>&1 || exit 0
-cfg="$TARGET/cckit.config.json"; [[ -f "$cfg" ]] || cfg="$TARGET/.claude/kit.config.json"
-[[ -f "$cfg" ]] || exit 0
+# Resolve the target project's config via the ONE shared resolver (config-path.sh, #69).
+# shellcheck source=/dev/null
+. "$(dirname "$0")/lib/config-path.sh"
+cfg="$(kit_config_find "$TARGET" 2>/dev/null || true)"
+[[ -n "$cfg" && -f "$cfg" ]] || exit 0
 
 # Locate the installed cckit's plugin.json. Order (first hit wins):
 #   1. explicit --plugin-root / CLAUDE_PLUGIN_ROOT

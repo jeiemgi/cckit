@@ -6,13 +6,24 @@
 # Per-folder overrides: any .claudekit/config.json in an ancestor directory is deep-merged over the
 # project config, nearest-wins (like .editorconfig). Projects with no .claudekit/ behave unchanged.
 
+# Source the ONE shared config-path resolver (config-path.sh, #69). Self-locate portably: BASH_SOURCE
+# is bash-only (empty under zsh, where dirname "" -> CWD and the lib is sought in the wrong dir), so
+# use zsh's %x prompt escape there. eval keeps bash from parsing the zsh-only syntax.
+if ! command -v kit_config_path >/dev/null 2>&1; then
+  if [ -n "${BASH_SOURCE:-}" ]; then _kc_self="${BASH_SOURCE[0]}"
+  elif [ -n "${ZSH_VERSION:-}" ]; then eval '_kc_self="${(%):-%x}"'
+  else _kc_self="$0"; fi
+  _kc_dir="$(cd "$(dirname "$_kc_self")" && pwd)"
+  # shellcheck source=/dev/null
+  [ -f "$_kc_dir/config-path.sh" ] && . "$_kc_dir/config-path.sh"
+  unset _kc_self _kc_dir
+fi
+
 load_kit_config() {
-  # Resolve the project config like the dispatcher (bin/cckit _cckit_find_config): an explicit
-  # KIT_CONFIG wins, else a root cckit.config.json, else .claude/kit.config.json.
-  local cfg="${KIT_CONFIG:-}"
-  if [[ -z "$cfg" ]]; then
-    if [[ -f cckit.config.json ]]; then cfg="cckit.config.json"; else cfg=".claude/kit.config.json"; fi
-  fi
+  # Resolve the project config through the ONE shared resolver: an explicit KIT_CONFIG wins, else
+  # walk up for a root cckit.config.json or a .claude/kit.config.json.
+  local cfg; cfg="$(kit_config_path 2>/dev/null || true)"
+  [[ -n "$cfg" ]] || cfg=".claude/kit.config.json"
   if [[ ! -f "$cfg" ]]; then
     echo "✗ $cfg not found. Run /kit-init (or scripts/init.sh) first." >&2
     return 1

@@ -7,6 +7,11 @@ All notable changes to cckit are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- Project-config discovery is now a single shared resolver (`config-path.sh`): an explicit
+  `KIT_CONFIG` always wins, else it walks up for a root `cckit.config.json` or a
+  `.claude/kit.config.json`. `kit-doctor`, `kit-local`, `cckit update`, `cckit scan`, and
+  `knowledge-lint` all discover config the same way instead of re-deriving it inline — so a
+  root-config or an explicit `KIT_CONFIG` is honored everywhere, not just by the dispatcher (#69).
 - Ported a batch of host-project lib fixes (#124): `cckit gc` classifies branches from a single
   `gh pr list` call indexed locally (no per-branch N+1) and iterates branches with `while read` so it
   survives a NUL-polluted `IFS`; effort token actuals attribute by branch **union** the effort's
