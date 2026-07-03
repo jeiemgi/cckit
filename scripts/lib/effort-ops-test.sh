@@ -46,11 +46,16 @@ source "$LIB/effort-ops.sh"
 
 # ── effort_new ────────────────────────────────────────────────────────────────────────────────
 : > "$GH_LOG"
-parent="$(effort_new "[Core] demo effort" "first sub" "second sub" 2>/dev/null)"
+parent="$(effort_new --flow Core "demo effort" "first sub" "second sub" 2>/dev/null)"
 t  "effort_new returns the parent number"          "$parent" "1"
 t  "effort_new creates parent + 2 subs (3 issues)" "$(grep -c 'issue create' "$GH_LOG")" "3"
 t  "effort_new links 2 native sub-issues"          "$(grep -c 'method POST .*sub_issues' "$GH_LOG")" "2"
 tc "$GH_LOG" 'issue create .*--title \[Effort\] · \[Core\] demo effort' "effort_new titles the parent"
+# every kit-defined label is ensured (created idempotently) BEFORE the issue create uses it (#153)
+tc "$GH_LOG" 'label create ctx:'        "effort_new ensures the ctx:* label exists"
+tc "$GH_LOG" 'label create kind:task'   "effort_new ensures the kind label exists"
+tc "$GH_LOG" 'label create priority:p1' "effort_new ensures the priority label exists"
+tc "$GH_LOG" 'label create flow:core'   "effort_new ensures the flow label exists"
 # a jargon/long name is rejected before any issue is created
 : > "$GH_LOG"
 effort_new "refactor the whole scripts/kit wiring layer" >/dev/null 2>&1 && rc=0 || rc=1

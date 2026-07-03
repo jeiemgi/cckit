@@ -50,6 +50,14 @@ ${verification:-<!-- how we know it is done: commands, checks, acceptance -->}${
 EOF
 }
 
+# _eff_ensure_label <name> <color> <description> — make sure a kit-defined label exists in the repo
+# before `gh issue create --label` uses it (which fails hard on a missing label, #153). Idempotent:
+# creating an existing label is a silent no-op.
+_eff_ensure_label() {
+  gh label create "$1" --repo "$(_eff_repo)" --color "$2" \
+    --description "$3" >/dev/null 2>&1 || true
+}
+
 # Add an issue (by number) to the project board + set Status=Todo and the Role field. Guarded: a
 # no-op unless Projects v2 is on AND the project helpers (gh-project.sh) are already sourced, so the
 # verb can run from any shell with no board config. Mirrors the skill's old inline board block.
@@ -158,13 +166,23 @@ effort_new() {
   local subcount=$#; [ "$subcount" -ge 1 ] || subcount=1
   local ctx="ctx:S"
   command -v effort_ctx_bucket >/dev/null 2>&1 && ctx="$(effort_ctx_bucket 1 "$subcount")"
+  # Every kit-defined label is ensured before use — `gh issue create --label` fails hard on a
+  # missing label, which aborted the whole parent create on repos without the ctx:* set (#153).
+  _eff_ensure_label "$ctx" bfd4f2 "effort session weight"
+  _eff_ensure_label "kind:task" d4c5f9 "kit issue kind"
+  _eff_ensure_label "priority:$priority" e99695 "kit priority"
   local labels="$ctx,kind:task,priority:$priority"
-  [ -n "$role" ] && labels="$labels,role:$role"
-  [ -n "$flow" ] && labels="$labels,flow:$(printf '%s' "$flow" | tr '[:upper:]' '[:lower:]')"
+  if [ -n "$role" ]; then
+    _eff_ensure_label "role:$role" 0e8a16 "kit role lane"
+    labels="$labels,role:$role"
+  fi
+  if [ -n "$flow" ]; then
+    local flow_lc; flow_lc="$(printf '%s' "$flow" | tr '[:upper:]' '[:lower:]')"
+    _eff_ensure_label "flow:$flow_lc" 1d76db "kit flow lane"
+    labels="$labels,flow:$flow_lc"
+  fi
   if [ -n "$par" ]; then
-    # par:* is a kit-defined label; ensure it exists so `gh issue create --label` doesn't fail.
-    gh label create "par:$par" --repo "$repo" --color c5def5 \
-      --description "effort parallelism hint" >/dev/null 2>&1 || true
+    _eff_ensure_label "par:$par" c5def5 "effort parallelism hint"
     labels="$labels,par:$par"
   fi
 
