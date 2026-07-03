@@ -190,7 +190,20 @@ effort_new() {
   printf '%s\n' "$num"
 }
 
-# effort_start <slug|N> [<slug>] — create the effort/<N> integration branch + its worktree from base.
+# _eo_source_wt — lazily source the worktree mechanic (worktree-start.sh) so effort_start gets the
+# SAME full worktree setup as `cckit start`: wt_bootstrap (env-file copy + per-worktree dev port +
+# dependency install) and the _wt_session_owns collision guard. bin/cckit's `effort` verb does not
+# load it, so effort-ops brings it in on demand (#119). No-op if already loaded.
+_eo_source_wt() {
+  command -v wt_bootstrap >/dev/null 2>&1 && return 0
+  local d; d="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+  # shellcheck source=/dev/null
+  [ -f "$d/worktree-start.sh" ] && . "$d/worktree-start.sh"
+}
+
+# effort_start <slug|N> [<slug>] — create the effort/<N> integration branch + its worktree from base,
+# with the full `cckit start` worktree setup (env copy, per-worktree dev port, dependency install —
+# opt out with KIT_WT_INSTALL=0) and a live-session collision guard.
 effort_start() {
   _eff_need git || return 1
   local raw="${1:-}" slug_override="${2:-}" num repo base root title slug branch wt
@@ -205,7 +218,17 @@ effort_start() {
     title="$(gh issue view "$num" --repo "$repo" --json title -q .title 2>/dev/null)"
     slug="$(_eff_title_slug "${title:-effort}")"; [ -n "$slug" ] || slug="effort"
   fi
-  branch="effort/$num-$slug"; wt="$root/.claude/worktrees/effort-$num"
+  # Worktree dir follows the kind+N-slug convention (branch-naming.md) so kit-gc's issue-open
+  # protection recognizes it by DIRECTORY name too — matching the kit-effort-start skill (#119).
+  branch="effort/$num-$slug"; wt="$root/.claude/worktrees/effort+$num-$slug"
+
+  _eo_source_wt
+
+  # Session-collision precheck: never disturb a worktree a LIVE session is sitting in (its work may
+  # be uncommitted). Guarded on the helper being available.
+  if [ -d "$wt" ] && command -v _wt_session_owns >/dev/null 2>&1 && _wt_session_owns "$root" "$wt"; then
+    echo "effort_start: a live session owns $wt — refusing to disturb it" >&2; return 1
+  fi
 
   git -C "$root" fetch origin "$base" --quiet 2>/dev/null || true
   if git -C "$root" show-ref --verify --quiet "refs/heads/$branch"; then
@@ -215,6 +238,11 @@ effort_start() {
     git -C "$root" worktree add -b "$branch" "$wt" "$from" >/dev/null 2>&1 \
       || { echo "effort_start: failed to create worktree for $branch" >&2; return 1; }
   fi
+
+  # Bootstrap the worktree for local dev: copy gitignored env, assign a per-worktree dev port, and
+  # install deps (KIT_WT_INSTALL=0 opts out). Best-effort — a hiccup never fails the start.
+  command -v wt_bootstrap >/dev/null 2>&1 && wt_bootstrap "$root" "$wt" "$num" || true
+
   echo "  ✓ effort $(effort_display "$num" "$slug") → $branch  (worktree: $wt)" >&2
   printf '%s|%s|%s\n' "$wt" "$branch" "$num"
 }

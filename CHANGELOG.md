@@ -7,6 +7,10 @@ All notable changes to cckit are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- `cckit effort start` now gives its worktree the full `cckit start` setup — gitignored env-file
+  copy, per-worktree dev port, and dependency install (opt out with `KIT_WT_INSTALL=0`) — plus a
+  live-session collision guard. Its worktree dir now follows the `effort+<N>-<slug>` convention
+  (matching the skill) so kit-gc's issue-open protection recognizes it by directory name (#119).
 - Projects v2 board capture now honors `github.projectOwnerType` (`user` | `organization`, default
   `user`). An organization-owned board previously returned null from the user-only GraphQL root, so
   field/option IDs never captured; `capture-project-ids.sh` now selects `organization(login:)` vs

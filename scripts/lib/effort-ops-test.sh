@@ -38,6 +38,7 @@ SH
 chmod +x "$stub/gh"
 export PATH="$stub:$PATH"
 export KIT_REPO="o/r" EFFORT_REPO="o/r" KIT_BASE_BRANCH="main"
+export KIT_WT_INSTALL=0   # #119: skip the dependency install during the hermetic worktree bootstrap
 # shellcheck source=/dev/null
 source "$LIB/effort.sh" 2>/dev/null
 # shellcheck source=/dev/null
@@ -63,12 +64,22 @@ t  "effort_new creates nothing on a bad title"     "$(grep -c 'issue create' "$G
   && git push -q origin HEAD:main )
 cd "$tmp/work"
 
+# #119: a gitignored local env in the root must be copied into the fresh worktree by wt_bootstrap.
+printf 'SECRET=from-root\n' > "$tmp/work/.env.local"
+
 start_out="$(effort_start 99 demo 2>/dev/null)"
 t  "effort_start echoes wt|branch|num" "${start_out##*|}" "99"
 t  "effort_start created the branch"   "$(git show-ref --verify --quiet refs/heads/effort/99-demo && echo yes)" "yes"
+# #119: worktree dir follows the kind+N-slug convention (gc-recognizable), not the old effort-N form.
+# (compare the trailing path segments — mktemp's /var may resolve to /private/var on macOS)
+t  "effort_start worktree dir is effort+N-slug" \
+   "$(printf '%s' "${start_out%%|*}" | sed -E 's#^.*/(\.claude/worktrees/.*)$#\1#')" \
+   ".claude/worktrees/effort+99-demo"
+t  "effort_start bootstrapped the worktree (.env.local copied)" \
+   "$(cat "$tmp/work/.claude/worktrees/effort+99-demo/.env.local" 2>/dev/null)" "SECRET=from-root"
 
 # move onto the effort branch (its worktree) for pr/close
-cd "$tmp/work/.claude/worktrees/effort-99"
+cd "$tmp/work/.claude/worktrees/effort+99-demo"
 : > "$GH_LOG"
 effort_pr 99 >/dev/null 2>&1
 tc "$GH_LOG" 'pr create .*--base main --head effort/99-demo' "effort_pr opens effort/99 → main"
