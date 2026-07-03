@@ -13,6 +13,7 @@
     "@astrojs/sitemap": "^3.7.3",
     "@astrojs/starlight": "^0.40.0",
     "@astrojs/starlight-docsearch": "^0.7.0",
+    "@vercel/speed-insights": "^1.2.0",
     "@xyflow/react": "^12.11.1",
     "astro": "^6.4.8",
     "astro-og-canvas": "^0.13.0",

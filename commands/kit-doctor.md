@@ -44,7 +44,7 @@ Run the kit-doctor script to check all dependencies and authentication required 
 
 4. If all Tier 1 checks pass:
    - Report success
-   - Point the user at the pointer the doctor prints on its last line: the local onboarding app at `$CCKIT_ADMIN_URL/onboarding` **only when it is actually reachable**, otherwise the public docs at `https://cckit.vercel.app`. Do not hardcode `localhost:3001` — nothing serves it by default.
+   - Point the user at the pointer the doctor prints on its last line: the local onboarding app at `$CCKIT_ADMIN_URL/onboarding` **only when it is actually reachable**, otherwise the public docs at `https://cckit.dev`. Do not hardcode `localhost:3001` — nothing serves it by default.
 
 ## Rules
 

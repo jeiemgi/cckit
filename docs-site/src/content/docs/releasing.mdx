@@ -9,9 +9,9 @@ import TagRow from '../../components/TagRow.astro';
 
 <TagRow kinds={["command", "flow"]} />
 
-Cut a release with no "what number is this" step — your commit messages decide the version. Merges to `main` **don't** ship anything; you release deliberately, when a batch of merged work is ready.
+Cut a release with no "what number is this" step — your commit messages decide the version. Ongoing merges **don't** ship anything; you release deliberately, by merging one pull request when a batch of work is ready.
 
-cckit follows [Semantic Versioning](https://semver.org/) driven by [Conventional Commits](https://www.conventionalcommits.org/). The version *number* is automatic — the commit messages since the last tag pick it — but cutting the release is a deliberate, manual step.
+cckit follows [Semantic Versioning](https://semver.org/) driven by [Conventional Commits](https://www.conventionalcommits.org/). The version *number* is automatic — the commit messages since the last tag pick it — and the release is cut by [release-please](https://github.com/googleapis/release-please), which keeps a single **Release PR** open and up to date. Merging that PR is the release.
 
 <Aside type="note" title="New here? The two terms">
 **Semantic Versioning** is the `MAJOR.MINOR.PATCH` number on a release (like `1.4.2`). **Conventional Commits** is a small rule for writing commit messages so a tool can read them — each subject starts with a `type:` such as `feat:` or `fix:`. Together they let cckit pick the next version from the commits alone.
@@ -19,7 +19,7 @@ cckit follows [Semantic Versioning](https://semver.org/) driven by [Conventional
 
 ## How the version is decided
 
-`scripts/lib/version-bump.sh` is the single source of the bump rules (shared by `cckit release` and the release workflow). It reads every commit since the last tag and picks the highest bump:
+release-please reads every Conventional Commit since the last tag and picks the highest bump (the local `cckit release` fallback applies the same rules via `scripts/lib/version-bump.sh`):
 
 | Commit | Bump | Example |
 | --- | --- | --- |
@@ -34,26 +34,21 @@ Check what the next version would be at any time:
 cckit release --next        # or: scripts/lib/version-bump.sh --next
 ```
 
-## Cutting a release (manual)
+## Cutting a release (merge the Release PR)
 
-`.github/workflows/release.yml` is triggered **on demand**, never by a merge — so you can merge, merge, merge, then release once when the batch is ready. Start it from **Actions ▸ release ▸ Run workflow**, or:
-
-```bash
-gh workflow run release.yml                 # cut the release
-gh workflow run release.yml -f dry_run=true # preview the version, ship nothing
-```
+`.github/workflows/release-please.yml` runs on every push to `main`. It doesn't ship anything on its own — it keeps a single **Release PR** open (titled `chore(main): release X.Y.Z`) and rewrites it as more work lands. So you can merge, merge, merge, then release once by merging that PR when the batch is ready.
 
 <Steps>
 
-1. **Compute the bump** from the commits since the last tag.
+1. **Work reaches `main`.** Feature branches merge into `develop`; when you're ready, `develop` merges into `main` via PR. (`main` is protected — releases only.)
 
-2. **Bump the version** in `cckit.config.json`, `.claude-plugin/plugin.json`, and `package.json` (if release-worthy).
+2. **release-please opens/updates the Release PR** — it computes the bump from the commits since the last tag, bumps all four version surfaces (`package.json`, `docs-site/package.json`, `.claude-plugin/plugin.json`, `cckit.config.json`) plus `Formula/cckit.rb`, and regenerates `CHANGELOG.md`. Review it whenever; nothing ships yet.
 
-3. **Commit, tag, and release** — commit `chore(release): vX.Y.Z`, tag `vX.Y.Z`, push, and cut a GitHub Release with generated notes.
+3. **Merge the Release PR.** That merge is the release: release-please tags `vX.Y.Z` and cuts the GitHub Release, then the `publish` job pushes to npm and bumps the Homebrew tap automatically.
 
 </Steps>
 
-A run with only `chore`/`docs` noise still patches; a run with no release-worthy commits since the last tag releases nothing (`bump=none`). Because releases are manual, two PRs merging at once can no longer race each other into a corrupted tag.
+A batch with only `chore`/`docs` noise produces no Release PR (`bump=none` → nothing to release). Because the release is a single PR merge, two feature PRs merging at once can no longer race each other into a corrupted tag.
 
 <Aside type="caution" title="Workflow edits are human-reviewed">
 Changes to the release workflow are always reviewed by a person — the CI token has a wide blast radius. This repo ships the workflow; a maintainer merges the PR that adds or edits it.
@@ -61,14 +56,19 @@ Changes to the release workflow are always reviewed by a person — the CI token
 
 ## Publishing to npm + Homebrew
 
-The GitHub Release is automatic; pushing the package is a deliberate, credentialed step. It is dry-run by default — nothing changes until you add `--publish`.
+Publishing is automatic once the Release PR is merged — the `publish` job in `release-please.yml` runs `npm publish` and bumps the [jeiemgi/homebrew-cckit](https://github.com/jeiemgi/homebrew-cckit) tap (recomputing the formula `sha256`). Each channel is gated on a repo secret and simply skipped if the secret is absent:
+
+- `NPM_TOKEN` — npm **Automation** token (npmjs.com → Access Tokens → Automation).
+- `HOMEBREW_TAP_TOKEN` — a PAT with push access to the tap repo (`contents:write`).
+
+### Local fallback
+
+`scripts/publish.sh` (aliased as `cckit release`) still cuts a release from your machine if you ever need to bypass CI. It is dry-run by default — nothing changes until you add `--publish`.
 
 ```bash
 cckit release X.Y.Z              # DRY RUN — prints the full plan, changes nothing
 cckit release X.Y.Z --publish    # tag + GitHub release + Homebrew formula + npm (needs tokens)
 ```
-
-Wiring npm and brew publishing into the workflow (behind repo secrets) is a follow-up; until then it is the one manual step, safe by default.
 
 ## Commit message rules (the contract)
 

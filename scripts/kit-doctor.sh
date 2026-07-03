@@ -833,7 +833,7 @@ _admin_url="${CCKIT_ADMIN_URL:-http://localhost:3001}"
 if has_cmd curl && curl -fsS --max-time 1 "$_admin_url/onboarding" >/dev/null 2>&1; then
   printf '  %sOnboarding guide (web): %s/onboarding%s\n' "$C_DIM" "$_admin_url" "$C_RESET"
 else
-  printf '  %sDocs & quick start: %shttps://cckit.vercel.app%s\n' "$C_DIM" "" "$C_RESET"
+  printf '  %sDocs & quick start: %shttps://cckit.dev%s\n' "$C_DIM" "" "$C_RESET"
 fi
 printf '\n'
 
