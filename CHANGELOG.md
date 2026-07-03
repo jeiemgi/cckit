@@ -7,6 +7,14 @@ All notable changes to cckit are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- Ported a batch of host-project lib fixes (#124): `cckit gc` classifies branches from a single
+  `gh pr list` call indexed locally (no per-branch N+1) and iterates branches with `while read` so it
+  survives a NUL-polluted `IFS`; effort token actuals attribute by branch **union** the effort's
+  build time-window (recovering sessions the branch field alone missed); the `project_issue_status`
+  board helper is restored and wired into a `cckit start` claim precheck (warns when an issue is
+  already In Progress); and `cckit update` resolves the running install's version from the script's
+  own directory (the old glob only matched `claude-kit*` and never a cckit install, so it silently
+  no-op'd).
 - `cckit watch --merge` now enforces auto-merge policy floors (default on): the captain never
   auto-merges a PR touching `.github/workflows/**`, lockfile/graph files (`pnpm-lock.yaml`,
   `package.json`, `*-workspace.yaml`, `turbo.json`, …), or security-sensitive paths (`*.pem`,

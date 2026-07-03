@@ -61,5 +61,28 @@ t "recovered file content is intact" "$(git show "$TIP_AFTER:keep.txt")" "precio
 git worktree prune 2>/dev/null || true
 [ -d "$(git rev-parse --git-common-dir)/worktrees/wt" ] && { echo "FAIL: admin dir survived prune"; fail=1; } || echo "ok: admin dir pruned after the work was recovered"
 
+# ── #124: single-call PR index + local lookup ───────────────────────────────────────────────────
+IDX="$(printf 'feat/1-a\tPR#11 MERGED\nfeat/2-b\tPR#22 OPEN')"
+t "pr index lookup finds a branch"        "$(_kit_gc_pr_for "$IDX" feat/1-a)" "PR#11 MERGED"
+t "pr index lookup finds another branch"  "$(_kit_gc_pr_for "$IDX" feat/2-b)" "PR#22 OPEN"
+t "pr index lookup misses an absent branch" "$(_kit_gc_pr_for "$IDX" feat/9-z)" ""
+
+# kit_gc_analyze must issue exactly ONE `gh pr list` regardless of branch count (no per-branch N+1).
+git branch feat/30-x >/dev/null 2>&1; git branch feat/31-y >/dev/null 2>&1; git branch feat/32-z >/dev/null 2>&1
+stub="$tmp/ghbin"; mkdir -p "$stub"
+cat > "$stub/gh" <<'SH'
+#!/usr/bin/env bash
+echo "$*" >> "$GH_CALLS"
+case "$1 $2" in
+  "pr list") printf 'feat/30-x\tPR#30 MERGED\n' ;;
+  "issue view") echo "open" ;;
+  *) : ;;
+esac
+SH
+chmod +x "$stub/gh"
+export GH_CALLS="$tmp/ghcalls"; : > "$GH_CALLS"
+PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_analyze >/dev/null 2>&1
+t "kit_gc_analyze makes exactly ONE gh pr list call" "$(grep -c '^pr list' "$GH_CALLS")" "1"
+
 [ "$fail" -eq 0 ] && echo "ALL OK (kit-gc)" || echo "kit-gc: FAILURES"
 exit "$fail"

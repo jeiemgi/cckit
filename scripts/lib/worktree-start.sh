@@ -266,6 +266,13 @@ wt_start() {
   # lookup on the org board, not a full-board scan. Best-effort — a board hiccup never fails the start.
   if source "$root/scripts/lib/gh-project.sh" 2>/dev/null; then
     [[ -n "${STATUS_FIELD_ID:-}" ]] || load_project_ids >/dev/null 2>&1 || true
+    # Claim precheck (#124): if the issue is ALREADY In Progress on the board, another session may
+    # already own it — warn (never block; the start still proceeds) so two agents don't collide.
+    if command -v project_issue_status >/dev/null 2>&1; then
+      local _prev_status; _prev_status="$(project_issue_status "$num" 2>/dev/null || true)"
+      [[ "$_prev_status" == "In Progress" ]] \
+        && echo "[#$num] ⚠ already In Progress on the board — another session may own this issue; continuing." >&2
+    fi
     item="$(project_find_item_by_issue "$num" 2>/dev/null)"
     if [[ -z "$item" ]]; then
       local content_id

@@ -209,3 +209,19 @@ project_find_item_by_issue() {
     '.data.repository.issue.projectItems.nodes[] | select(.project.number==$n) | .id' 2>/dev/null | head -1)
   echo "$item_id"
 }
+
+# project_issue_status <issue_number> [<project_number>] — echo an issue's Project Status field value
+# on OUR board ("Todo" / "In Progress" / "Done" / …), or empty when the issue isn't on the board.
+# The cheap issue.projectItems lookup, same as project_find_item_by_issue. A claim precheck reads this
+# before starting an issue so it can warn on a collision (another session already In Progress). #124.
+project_issue_status() {
+  local issue_num="$1" pnum="${2:-$(_ghp_resolve_pnum)}" repo owner name resp
+  repo="$(_ghp_resolve_repo)"; owner="${repo%%/*}"; name="${repo##*/}"
+  [ -n "$owner" ] && [ -n "$name" ] && [ -n "$pnum" ] || return 1
+  resp="$(gh api graphql \
+    -f query='query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){issue(number:$n){projectItems(first:20){nodes{project{number} fieldValueByName(name:"Status"){...on ProjectV2ItemFieldSingleSelectValue{name}}}}}}}' \
+    -F o="$owner" -F r="$name" -F n="$issue_num" 2>/dev/null)" || return 1
+  printf '%s' "$resp" | jq -r --argjson n "$pnum" \
+    '.data.repository.issue.projectItems.nodes[]? | select(.project.number==$n) | .fieldValueByName.name // empty' \
+    2>/dev/null | head -1
+}

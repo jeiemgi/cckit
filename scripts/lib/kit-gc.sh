@@ -29,6 +29,20 @@ _kit_gc_load_deps() {
   [ -f "$d/worktree-issue.sh" ] && . "$d/worktree-issue.sh"
 }
 
+# _kit_gc_pr_index [repo] — echo one "<headRefName>\tPR#<num> <STATE>" line per PR in ONE gh call, so
+# branch classification is a local lookup instead of a per-branch `gh pr list --head` — an N+1 that
+# scaled badly exactly when gc matters most (many stale branches). #124.
+_kit_gc_pr_index() {
+  local repo="${1:-$KIT_GC_REPO}"
+  gh pr list --repo "$repo" --state all --limit 200 --json number,state,headRefName \
+    --jq '.[] | "\(.headRefName)\tPR#\(.number) \(.state)"' 2>/dev/null || true
+}
+
+# _kit_gc_pr_for <index> <branch> — first PR line matching <branch> as head (mirrors the old `.[0]`).
+_kit_gc_pr_for() {
+  printf '%s\n' "$1" | awk -F'\t' -v want="$2" '$1==want{print $2; exit}'
+}
+
 # kit_gc_analyze — read-only classification of worktrees, branches, and stashes. Writes NOTHING.
 # Each row is tagged PROTECTED / SAFE / ACTIVE / ORPHAN so a human or UI can decide what to prune.
 kit_gc_analyze() {
@@ -49,9 +63,13 @@ kit_gc_analyze() {
       done
 
   echo "# branches"
-  for b in $(git branch --format='%(refname:short)' 2>/dev/null); do
+  # All PRs in ONE call, indexed locally by head branch (#124). while-read (NOT `for b in $(...)`) so
+  # branch iteration survives a NUL-polluted IFS.
+  local pr_index; pr_index="$(_kit_gc_pr_index "$repo")"
+  git branch --format='%(refname:short)' 2>/dev/null | while IFS= read -r b; do
+    [ -n "$b" ] || continue
     case "$b" in "${KIT_BASE_BRANCH:-main}"|develop|main) echo "  $b -> ACTIVE (base branch)"; continue;; esac
-    pr="$(gh pr list --repo "$repo" --head "$b" --state all --json number,state --jq '.[0]|"PR#\(.number) \(.state)"' 2>/dev/null || true)"
+    pr="$(_kit_gc_pr_for "$pr_index" "$b")"
     prot="$(wt_protected_reason "$b" "$repo" 2>/dev/null || true)"
     if [ -n "$prot" ]; then
       echo "  $b -> PROTECTED: $prot"
@@ -164,8 +182,12 @@ kit_gc_prune() {
   _kit_gc_load_deps
   # `wtpath`, not `path`: under zsh `path` is tied to PATH (special array), so assigning to a bare
   # `path` local would clobber the command search path. A namespaced name is inert.
-  local repo="$KIT_GC_REPO" yes=0 a wtpath ref b pr
+  local repo="$KIT_GC_REPO" yes=0 a wtpath ref b pr pr_index
   for a in "$@"; do case "$a" in --yes|-y) yes=1 ;; esac; done
+
+  # All PRs in ONE call, indexed by head branch (#124) — shared by both loops below instead of a
+  # per-branch `gh pr list --head` (the N+1 that scaled badly with many stale branches).
+  pr_index="$(_kit_gc_pr_index "$repo")"
 
   # Worktrees first - a branch's worktree must be removed before the branch can be deleted.
   git worktree list --porcelain 2>/dev/null \
@@ -174,8 +196,8 @@ kit_gc_prune() {
         b="${ref#refs/heads/}"
         case "$b" in "${KIT_BASE_BRANCH:-main}"|develop|main|"") continue ;; esac
         [ -n "$(wt_protected_reason "$b" "$repo" 2>/dev/null || true)" ] && continue
-        pr="$(gh pr list --repo "$repo" --head "$b" --state all --json state --jq '.[0].state' 2>/dev/null || true)"
-        [ "$pr" = "MERGED" ] || continue
+        pr="$(_kit_gc_pr_for "$pr_index" "$b")"
+        printf '%s' "$pr" | grep -q 'MERGED' || continue
         if [ -n "$(git -C "$wtpath" status --porcelain 2>/dev/null)" ]; then
           echo "  SKIP dirty worktree $wtpath [$b] - commit/recover before pruning" >&2; continue
         fi
@@ -194,12 +216,14 @@ kit_gc_prune() {
   kit_gc_recover_zombies "$yes"
   [ "$yes" -eq 1 ] && { git worktree prune 2>/dev/null || true; }
 
-  # Then local branches whose PR merged (worktree now gone).
-  for b in $(git branch --format='%(refname:short)' 2>/dev/null); do
+  # Then local branches whose PR merged (worktree now gone). while-read (NOT `for b in $(...)`) so
+  # branch iteration survives a NUL-polluted IFS (#124).
+  git branch --format='%(refname:short)' 2>/dev/null | while IFS= read -r b; do
+    [ -n "$b" ] || continue
     case "$b" in "${KIT_BASE_BRANCH:-main}"|develop|main) continue ;; esac
     [ -n "$(wt_protected_reason "$b" "$repo" 2>/dev/null || true)" ] && continue
-    pr="$(gh pr list --repo "$repo" --head "$b" --state all --json state --jq '.[0].state' 2>/dev/null || true)"
-    [ "$pr" = "MERGED" ] || continue
+    pr="$(_kit_gc_pr_for "$pr_index" "$b")"
+    printf '%s' "$pr" | grep -q 'MERGED' || continue
     if [ "$yes" -eq 1 ]; then
       git branch -D "$b" >/dev/null 2>&1 && echo "  deleted local branch $b (PR MERGED)"
     else

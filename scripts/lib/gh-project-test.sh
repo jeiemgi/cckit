@@ -72,5 +72,24 @@ rm -f "$tmp/scripts/.project-ids.env"
 run_capture user
 has "capture uses user root for a user board" "$(cat "$tmp/qlog")" "user(login"
 
+# ── project_issue_status: read an issue's board Status via the cheap issue.projectItems query (#124) ─
+mkdir -p "$tmp/bin2"
+cat > "$tmp/bin2/gh" <<'SH'
+#!/usr/bin/env bash
+# The issue.projectItems Status query: issue is "In Progress" on project #3 (and Todo on some other).
+cat <<'JSON'
+{"data":{"repository":{"issue":{"projectItems":{"nodes":[
+  {"project":{"number":7},"fieldValueByName":{"name":"Todo"}},
+  {"project":{"number":3},"fieldValueByName":{"name":"In Progress"}}
+]}}}}}
+JSON
+SH
+chmod +x "$tmp/bin2/gh"
+st="$(PATH="$tmp/bin2:$PATH" KIT_REPO="acme/app" KIT_PROJECT_NUMBER=3 bash -c "source '$LIB/gh-project.sh'; project_issue_status 42")"
+t "project_issue_status returns the board Status for our project" "$st" "In Progress"
+# unresolved repo/number -> non-zero, no guess.
+PATH="$tmp/bin2:$PATH" KIT_REPO="" KIT_PROJECT_NUMBER="" bash -c "source '$LIB/gh-project.sh'; project_issue_status 42" >/dev/null 2>&1
+t "project_issue_status fails (rc 1) with unresolved repo/number" "$?" "1"
+
 [ "$fail" -eq 0 ] && echo "ALL OK (gh-project)" || echo "gh-project: FAILURES"
 exit "$fail"
