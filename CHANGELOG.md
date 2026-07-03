@@ -5,6 +5,23 @@ All notable changes to cckit are documented here. New entries below are generate
 [Conventional Commits](https://www.conventionalcommits.org/) and land when the Release PR is
 merged to `main`. Earlier entries follow [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.4.1](https://github.com/jeiemgi/cckit/compare/v0.4.0...v0.4.1) (2026-07-03)
+
+
+### Bug Fixes
+
+* point release-please at the main release branch ([#191](https://github.com/jeiemgi/cckit/issues/191)) ([bdf158d](https://github.com/jeiemgi/cckit/commit/bdf158d3f04071dfa1d710ca6684781fc05386ad))
+
+
+### Documentation
+
+* add release setup checklist ([903cabb](https://github.com/jeiemgi/cckit/commit/903cabbda9c1154af1224a2cc17f1253cb3a448c))
+
+
+### Miscellaneous Chores
+
+* release 0.4.1 ([a8c65e0](https://github.com/jeiemgi/cckit/commit/a8c65e01e45c14dbe2511e0991748def1ab5d42c))
+
 ## [Unreleased]
 
 ### Security
