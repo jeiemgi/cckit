@@ -3,8 +3,13 @@ title: Built with cckit badge
 description: Add a badge to your README if you build with cckit.
 ---
 
-Built your project's workflow on cckit? Add a badge to your README. **Optional, not required** — a
-nod is always appreciated.
+import { CardGrid, LinkCard, Steps, Aside } from '@astrojs/starlight/components';
+import Tag from '../../components/Tag.astro';
+import TagRow from '../../components/TagRow.astro';
+
+<TagRow kinds={["concept"]} />
+
+Add a "Built with cckit" badge to your README — optional, never required, and a nod is always appreciated.
 
 [![Built with cckit](https://img.shields.io/badge/built%20with-cckit-0A7E8C.svg)](https://github.com/jeiemgi/cckit)
 
@@ -20,4 +25,12 @@ nod is always appreciated.
 <a href="https://github.com/jeiemgi/cckit"><img src="https://img.shields.io/badge/built%20with-cckit-0A7E8C.svg" alt="Built with cckit"></a>
 ```
 
-Flat-square variant: append `?style=flat-square` to the badge URL.
+## Flat-square variant
+
+Append `?style=flat-square` to the badge URL for a flat look:
+
+```text
+https://img.shields.io/badge/built%20with-cckit-0A7E8C.svg?style=flat-square
+```
+
+

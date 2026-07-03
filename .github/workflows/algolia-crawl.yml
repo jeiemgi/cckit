@@ -1,0 +1,33 @@
+name: Algolia crawl on production deploy
+
+# Reindex the DocSearch index after the docs ship. Fires when Vercel reports a successful
+# Production deployment (so it crawls the freshly-live site), and can be run on demand.
+on:
+  deployment_status:
+  workflow_dispatch:
+
+jobs:
+  reindex:
+    # Only on a SUCCESSFUL PRODUCTION deployment (skip preview deploys + non-success states).
+    # workflow_dispatch has no deployment_status payload, so allow it through too.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.deployment_status.state == 'success' &&
+       github.event.deployment_status.environment == 'Production')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Algolia Crawler reindex
+        env:
+          CRAWLER_ID: ${{ secrets.ALGOLIA_CRAWLER_ID }}
+          CRAWLER_USER_ID: ${{ secrets.ALGOLIA_CRAWLER_USER_ID }}
+          CRAWLER_API_KEY: ${{ secrets.ALGOLIA_CRAWLER_API_KEY }}
+        run: |
+          if [ -z "$CRAWLER_ID" ] || [ -z "$CRAWLER_USER_ID" ] || [ -z "$CRAWLER_API_KEY" ]; then
+            echo "::error::Missing Algolia Crawler secrets (ALGOLIA_CRAWLER_ID / ALGOLIA_CRAWLER_USER_ID / ALGOLIA_CRAWLER_API_KEY)."
+            exit 1
+          fi
+          echo "Triggering reindex for crawler $CRAWLER_ID …"
+          curl -sS -f -X POST \
+            "https://crawler.algolia.com/api/1/crawlers/${CRAWLER_ID}/reindex" \
+            --user "${CRAWLER_USER_ID}:${CRAWLER_API_KEY}"
+          echo "Reindex requested."

@@ -1,0 +1,67 @@
+---
+title: Showcase
+description: Every cckit capability at a glance — real command output captured as screenshots.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+A short visual tour of cckit — each shot is a real command run for real, captured at the same
+size. For the **full command list** (copyable), see the [CLI reference](/cli-reference/); to
+see how the verbs fit together, start with [the GitHub cycle](/github-cycle/).
+
+<Aside type="note" title="Where do I run these — and do they do the work?">
+These are **plain terminal commands you type in your own shell** (Terminal, iTerm, the VS Code
+terminal — anywhere). Typing `cckit <verb>` **runs it and does the job itself**: deterministic bash,
+no AI in the loop. They are *not* prompts that ask Claude to act.
+
+cckit *can* also be driven by Claude Code and other agents — but that's a separate surface. Every
+screenshot below is the **CLI executing for real** in a terminal.
+</Aside>
+
+<Aside type="tip" title="Run it and you'll see human output — agents get something leaner">
+Run any of these yourself and you'll see friendly, **human-readable** output. For agents, cckit keeps
+that output small on purpose: it borrows **[axi](https://axi.md)**'s idea of *protecting the context
+window* — encoding results as [TOON](/agents/#the-verbs-an-agent-uses-most) with a thin layer on top,
+so machine output costs a fraction of the tokens. A dedicated **`gh-axi`** integration is on the
+[roadmap](https://github.com/jeiemgi/cckit).
+</Aside>
+
+## The installed version
+
+```bash
+cckit version
+```
+
+![The installed version](/showcase/version.png)
+
+## Detect this repo's stack + kit state
+
+```bash
+cckit scan
+```
+
+![Detect this repo's stack + kit state](/showcase/scan.png)
+
+## Thin dashboard — board, worktrees, handoff
+
+```bash
+cckit status
+```
+
+![Thin dashboard — board, worktrees, handoff](/showcase/status.png)
+
+## Plan N parallel flows (dry-run)
+
+```bash
+cckit orchestrate --dry-run 46 47 48
+```
+
+![Plan N parallel flows (dry-run)](/showcase/orchestrate.png)
+
+## Compact uniform JSON into TOON
+
+```bash
+echo '[…uniform array…]' | cckit encode-context
+```
+
+![Compact uniform JSON into TOON](/showcase/encode-context.png)

@@ -1,16 +1,25 @@
 name: release
 
-# Auto-release on merge to main, driven by Conventional Commits + SemVer (scripts/lib/version-bump.sh
-# is the single source of the bump rules, shared with `cckit release`). Computes the next version
-# from the commits since the last tag; if release-worthy, bumps the manifests, tags, cuts a GitHub
-# Release, then publishes to npm and bumps the Homebrew tap.
+# EXPLICIT, MANUAL release — NOT triggered by merges. Merge PRs freely; nothing ships until you
+# ask for it. When you're ready to cut a release, run this workflow:
+#   • GitHub UI:  Actions ▸ release ▸ Run workflow
+#   • CLI:        gh workflow run release.yml            (add -f dry_run=true to preview)
 #
-# Publishing is gated on secrets — releases still succeed without them, they just skip that channel:
+# It computes the next version from Conventional Commits since the last tag
+# (scripts/lib/version-bump.sh — the same rules as `cckit release --next`), bumps the manifests,
+# tags, cuts a GitHub Release, then publishes to npm + the Homebrew tap. `dry_run` prints the
+# computed version and stops before tagging/publishing.
+#
+# Publishing is gated on secrets — a release still succeeds without them, it just skips that channel:
 #   NPM_TOKEN            npm *Automation* token (bypasses 2FA). npmjs.com → Access Tokens → Automation.
 #   HOMEBREW_TAP_TOKEN   PAT with push access to jeiemgi/homebrew-cckit (repo/contents:write).
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Preview the computed version without tagging or publishing"
+        type: boolean
+        default: false
 
 # The version-bump commit + tag are pushed back to main, so it needs write access.
 permissions:
@@ -22,8 +31,6 @@ concurrency:
 
 jobs:
   release:
-    # Never react to our own release commit (no loop).
-    if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') }}
     runs-on: ubuntu-latest
     env:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -41,8 +48,16 @@ jobs:
         id: ver
         run: bash scripts/lib/version-bump.sh --emit >> "$GITHUB_OUTPUT"
 
+      - name: Plan
+        run: |
+          echo "Bump: ${{ steps.ver.outputs.bump }}  →  v${{ steps.ver.outputs.next }}"
+          echo "Dry run: ${{ inputs.dry_run }}"
+          if [ "${{ steps.ver.outputs.bump }}" = "none" ]; then
+            echo "::notice::No release-worthy commits since the last tag — nothing to release."
+          fi
+
       - name: Tag + GitHub Release
-        if: ${{ steps.ver.outputs.bump != 'none' }}
+        if: ${{ steps.ver.outputs.bump != 'none' && inputs.dry_run != true }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -57,13 +72,13 @@ jobs:
           gh release create "v$v" --title "v$v" --generate-notes
 
       - name: Publish to npm
-        if: ${{ steps.ver.outputs.bump != 'none' && env.NPM_TOKEN != '' }}
+        if: ${{ steps.ver.outputs.bump != 'none' && inputs.dry_run != true && env.NPM_TOKEN != '' }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish --access public
 
       - name: Bump the Homebrew tap
-        if: ${{ steps.ver.outputs.bump != 'none' && env.HOMEBREW_TAP_TOKEN != '' }}
+        if: ${{ steps.ver.outputs.bump != 'none' && inputs.dry_run != true && env.HOMEBREW_TAP_TOKEN != '' }}
         env:
           GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |

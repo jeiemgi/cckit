@@ -1,0 +1,10 @@
+---
+// Dev-only PageSidebar override — renders Starlight's default right-hand table of contents, then
+// mounts the Agentation annotation toolbar (a fixed-position floating UI, so its mount point doesn't
+// matter visually). This component is registered as the `PageSidebar` override ONLY in dev (see
+// astro.config.mjs), so the `agentation` client island is never collected into `astro build` output.
+import Default from '@astrojs/starlight/components/PageSidebar.astro';
+import AnnotateToolbar from './AnnotateToolbar';
+---
+<Default />
+<AnnotateToolbar client:only="react" />

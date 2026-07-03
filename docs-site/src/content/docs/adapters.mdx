@@ -1,0 +1,70 @@
+---
+title: Adapters
+description: The agnostic core and the per-agent adapters (Claude Code is adapter one).
+---
+
+import { CardGrid, LinkCard, Steps, Aside } from '@astrojs/starlight/components';
+import Tag from '../../components/Tag.astro';
+import TagRow from '../../components/TagRow.astro';
+
+<TagRow kinds={["concept"]} />
+
+cckit is split in two: an agnostic core that does every operation, and per-agent adapters that route a specific agent to it — so any agent can drive cckit while Claude Code gets a native feel.
+
+<Aside type="tip" title="You don't do this by hand">
+This is how cckit is built, not something you set up. Read it to understand how any agent can drive
+cckit — there's nothing here for you to run.
+</Aside>
+
+## The two layers
+
+<div class="cckit-nowrap-2">
+
+| Layer | What it is | Depends on an agent? |
+| --- | --- | --- |
+| **Core** | Pure bash that owns every operation | No |
+| **Adapter** | The thin layer a specific agent uses to discover and call the core | Yes — one per agent |
+
+</div>
+
+Understanding this split is the key to extending cckit to a new agent.
+
+## The agnostic core
+
+The core is pure bash plus the standard toolchain (`git`, `gh`, `jq`, `tmux`). It owns every operation — the GitHub work lifecycle, efforts, worktrees, orchestration, garbage collection — and nothing in it is specific to any agent.
+
+| Path | Role |
+| --- | --- |
+| `bin/cckit` | The CLI dispatcher — one entrypoint for every verb |
+| `scripts/lib/*.sh` | The operations (start/pr/close, effort, worktree, gc, orchestrate, ...) |
+| `scripts/*.sh` | The runnable ops (publish, migrate, doctor, digest, ...) |
+| `cckit.config.json` | The only source of repo / owner / base-branch — nothing is hardcoded |
+
+The contract the core exposes to agents lives in [`AGENTS.md`](https://github.com/jeiemgi/cckit/blob/main/AGENTS.md): every verb, its arguments, and its `--llm` output. An agent that can run a shell and parse the output can drive the whole lifecycle through this contract alone.
+
+## Adapter one — Claude Code
+
+The Claude adapter is the native layer that makes cckit feel built-in inside Claude Code. It is a thin shell over the core — it adds discovery and ergonomics, never a second copy of an operation.
+
+| Path | Role |
+| --- | --- |
+| `.claude-plugin/plugin.json` | The Claude Code plugin manifest (install entrypoint) |
+| `commands/*.md` | Slash commands (`/kit-*`) that front the core verbs |
+| `skills/*` | Skills that teach Claude how and when to run each operation |
+| `templates/{agents,hooks,rules,skills,settings}` | What `cckit init` scaffolds into a project's `.claude/` |
+
+Every command and skill ultimately calls a core verb or a `scripts/lib` function. There is one implementation of each operation (in the core); the adapter only routes Claude to it. This is why a fix in the core is a fix for every agent at once.
+
+## Future adapters
+
+Any other agent (Codex, Copilot, Antigravity, a custom model) is a future adapter over the same core. An adapter is whatever that agent needs to discover and call the verbs — at minimum, the agent reads `AGENTS.md` and shells out with `--llm`.
+
+No adapter re-implements an operation; they all target the one core contract. Deeper per-agent adapters (native command palettes, richer prompts) are follow-ups. The agnostic CLI contract is the floor every agent already stands on.
+
+## Why the split
+
+- **One source of truth.** An operation lives once, in the core. No drift between "the Claude way" and "the CLI way".
+- **Portable.** The core has no agent dependency, so cckit runs in CI, a cron job, or a bare terminal — not only inside an agent.
+- **Open to any agent.** Adding an agent is writing an adapter, not forking the kit.
+
+

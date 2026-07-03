@@ -1,5 +1,5 @@
 ---
-name: docs-writer
+name: kit-docs-writer
 description: >
   Write and edit end-user documentation in the house voice: kind but robust, ADHD-oriented and
   scannable, ZERO analogies, beginner-inclusive but expert-skippable. Encodes the page template
@@ -15,7 +15,7 @@ metadata:
   version: 1.0.0
 ---
 
-# docs-writer — the house voice for human documentation
+# kit-docs-writer — the house voice for human documentation
 
 Documentation here is read by people with low software knowledge. It must still be correct and
 complete for experts. The whole skill is one promise: **a beginner can follow the flow, and an

@@ -6,6 +6,10 @@ description: How cckit runs many issues at once without the changes colliding.
 import { CardGrid, LinkCard, Steps, Aside } from '@astrojs/starlight/components';
 import EffortWaves from '../../components/diagrams/EffortWaves';
 import WorktreeIsolation from '../../components/diagrams/WorktreeIsolation';
+import Tag from '../../components/Tag.astro';
+import TagRow from '../../components/TagRow.astro';
+
+<TagRow kinds={["flow", "concept"]} />
 
 How cckit runs many issues at once without the changes colliding.
 
@@ -14,6 +18,11 @@ How cckit runs many issues at once without the changes colliding.
 A big piece of work is an **effort**. cckit breaks it into **sub-issues**, then sorts them into
 **waves** so the ones that don't depend on each other run together, and the ones that do wait their
 turn.
+
+<Aside type="tip" title="You don't do this by hand">
+cckit plans the waves and isolates the worktrees for you. Read this to understand how parallel work
+stays safe — you don't set any of it up manually.
+</Aside>
 
 ## Efforts and sub-issues
 
@@ -64,6 +73,7 @@ Some sub-issues depend on others: sub #4 can't start until sub #1 is merged. cck
 
 `cckit plan` shows the waves. Each wave is exactly "what can run in parallel right now".
 
+
 ## Worktrees keep parallel work apart
 
 Running several issues at once raises one question: how do the changes not overwrite each other?
@@ -79,14 +89,3 @@ different files, they merge cleanly.
 `cckit start <issue>` makes the branch and the worktree for you. You don't manage worktrees by hand.
 </Aside>
 
-## Links to learn more
-
-- [The GitHub cycle](/github-cycle/) — the path one issue takes from start to merge.
-- [The copilot loop](/copilot/) — fan a whole wave out to agents and merge them automatically.
-
----
-
-<CardGrid>
-  <LinkCard title="Next: The copilot loop" href="/copilot/" description="Let agents run a whole wave." />
-  <LinkCard title="The GitHub cycle" href="/github-cycle/" description="The path of a single issue." />
-</CardGrid>

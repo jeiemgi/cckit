@@ -100,6 +100,7 @@ Correct-option notes:
 ## Hooks (scaffolded into `.claude/settings.local.json`)
 
 - **SessionStart** → `mempalace wake-up --wing {{WING}}` — injects palace context at session start. Uses `wake-up --wing` (explicit) rather than `mempalace hook run --hook session-start`, which derives the wing implicitly and could file into the wrong wing.
+  - **Per-wing header:** `wake-up` scopes the L1 *body* to `{{WING}}`, but its L0 identity *header* comes from the single global `~/.mempalace/identity.txt` and ignores the wing. So this project has its own, `cckit init` seeded **`.claude/mempal-identity.{{WING}}.txt`** (and `cckit doctor` re-seeds it if it goes missing); the hook swaps it in for the global L0 block. **Edit its `Stack:` line** to describe this project — it shows on every session wake-up. Delete the file to fall back to the global identity unchanged.
 - **Stop** → files the finished session into `wing={{WING}}` (`mempalace mine … --mode convos`).
 - **PreCompact** → safety-net sweep before context compression.
 - **SessionEnd** → `mempal_followup.sh`: if the current branch has **unsynced work** (dirty tree or
