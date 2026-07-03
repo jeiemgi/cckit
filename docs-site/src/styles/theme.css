@@ -152,6 +152,33 @@ body {
 	box-shadow: var(--sl-shadow-md);
 }
 
+/* Philosophy tagline under the banner — the one line that reveals the "you're the architect,
+   cckit runs the mechanics" idea, linking to the human-written /philosophy/ page. */
+.hero-tagline {
+	max-width: 44rem;
+	margin: 1.5rem auto 0;
+	text-align: center;
+	font-size: var(--sl-text-lg);
+	line-height: 1.55;
+	color: var(--sl-color-gray-2);
+	text-wrap: balance;
+}
+.hero-tagline strong { color: var(--sl-color-white); font-weight: 600; }
+
+/* "Human-written" subtagline at the top of the philosophy page — a small, honest badge line. */
+.human-note {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5em;
+	margin: 0 0 1.5rem;
+	padding: 0.35rem 0.8rem;
+	font-size: var(--sl-text-sm);
+	color: var(--sl-color-text-accent);
+	background: var(--sl-color-bg-sidebar);
+	border: 1px solid var(--sl-color-accent-low);
+	border-radius: 999px;
+}
+
 /* Action links below the banner: one centered row, the accent lives on the
    primary "Get started" button only (≤10% accent budget). */
 .hero-actions {

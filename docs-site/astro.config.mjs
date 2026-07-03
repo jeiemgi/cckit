@@ -96,6 +96,7 @@ export default defineConfig({
       //   Reference — look things up. Each group is one kind of content, not a stage.
       sidebar: [
         { label: 'Get started', items: [
+          { label: 'The idea', slug: 'philosophy', badge: { text: 'Human-written', variant: 'tip' } },
           { label: 'Overview', slug: 'index' },
           { label: 'How to read this guide', slug: 'how-to-read' },
           { label: 'Quickstart', slug: 'getting-started', badge: { text: 'Start here', variant: 'success' } },
