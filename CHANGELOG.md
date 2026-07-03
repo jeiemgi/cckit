@@ -5,7 +5,38 @@ All notable changes to cckit are documented here. New entries below are generate
 [Conventional Commits](https://www.conventionalcommits.org/) and land when the Release PR is
 merged to `main`. Earlier entries follow [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased]
+## [0.4.1](https://github.com/jeiemgi/cckit/compare/v0.4.0...v0.4.1) (2026-07-03)
+
+### Added
+- **Automated releases via release-please.** A single Release PR now bumps every version surface —
+  `package.json`, `docs-site/package.json`, `.claude-plugin/plugin.json`, `cckit.config.json`, and
+  the Homebrew formula — and regenerates this changelog from Conventional Commits; merging it tags
+  the release and publishes to npm + the Homebrew tap. Replaces the manual `release.yml` (#181).
+- **Site-level SEO and analytics on the docs site.** `SiteSchema.astro` (WebSite +
+  SoftwareApplication JSON-LD), Google Analytics 4 + Search Console wiring, and Vercel Speed
+  Insights — all inert until their env vars are set — plus a growth plan and a release setup
+  checklist in the releasing guide.
+
+### Changed
+- **Production domain is now `cckit.dev`.** All canonical, sitemap, and social/OG references point to
+  the new domain; `cckit.vercel.app` remains only as the preview URL for non-production deploys.
+
+### Security
+- Cleared the open Dependabot alerts living in the docs-site dependencies (#177, addressing #169).
+
+### Fixed
+- release-please now targets the `main` release branch instead of the repo default branch (#191).
+- Session mail no longer goes silent when the PATH `cckit` is stale — the hook prefers the project's
+  own `bin/cckit` (#180) — and sessions can send steer messages to each other (#176).
+- `cckit release` now gives the release tag an annotated message so the tag push survives
+  `tag.gpgsign` (#178), and stamps the version on all four surfaces instead of one (#174); the
+  Homebrew formula ships a stable `url`/`sha256` block.
+
+## [0.4.0] and earlier
+
+<!-- The entries below accumulated under a single "Unreleased" heading before release-please was
+     adopted; they all shipped in v0.4.0 or earlier. Kept as historical record — release-please
+     manages versioned sections from 0.4.1 onward. -->
 
 ### Security
 - Cleared all 11 open Dependabot alerts (4 high) — every one lived in docs-site dependencies.

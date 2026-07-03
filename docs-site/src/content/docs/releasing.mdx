@@ -61,6 +61,12 @@ Publishing is automatic once the Release PR is merged — the `publish` job in `
 - `NPM_TOKEN` — npm **Automation** token (npmjs.com → Access Tokens → Automation).
 - `HOMEBREW_TAP_TOKEN` — a PAT with push access to the tap repo (`contents:write`).
 
+<Aside type="tip" title="One-time setup checklist">
+- Both secrets set under **Settings → Secrets and variables → Actions**.
+- `develop` is the default branch; `main` is protected (PR required, no force-push or deletion) so it only advances through a merged PR.
+- On the **first** Release PR, reconcile the hand-written `## [Unreleased]` block in `CHANGELOG.md` — release-please owns changelog entries from then on.
+</Aside>
+
 ### Local fallback
 
 `scripts/publish.sh` (aliased as `cckit release`) still cuts a release from your machine if you ever need to bypass CI. It is dry-run by default — nothing changes until you add `--publish`.
