@@ -14,8 +14,11 @@ name: release-please
 # patch, feat!/BREAKING CHANGE -> major) — the same rules as scripts/lib/version-bump.sh.
 #
 # Publishing is gated on secrets — a release still succeeds without them, it just skips that channel:
-#   NPM_TOKEN            npm *Automation* token (bypasses 2FA). npmjs.com -> Access Tokens -> Automation.
-#   HOMEBREW_TAP_TOKEN   PAT with push access to jeiemgi/homebrew-cckit (contents:write).
+#   NPM_TOKEN                  npm *Automation* token (bypasses 2FA). npmjs.com -> Access Tokens -> Automation.
+#   Homebrew tap auth (either — the GitHub App is preferred, the PAT is the fallback):
+#     HOMEBREW_APP_ID          + HOMEBREW_APP_PRIVATE_KEY — a GitHub App (Contents: write) installed on
+#                              homebrew-cckit; the workflow mints a short-lived, tap-scoped token per run.
+#     HOMEBREW_TAP_TOKEN       legacy PAT with push access to jeiemgi/homebrew-cckit (contents:write).
 on:
   push:
     branches: [main]
@@ -55,6 +58,7 @@ jobs:
     env:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
       HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+      HOMEBREW_APP_ID: ${{ secrets.HOMEBREW_APP_ID }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -71,10 +75,26 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish --access public
 
+      # Preferred tap auth: mint a short-lived, tap-scoped token from the cckit-release GitHub App
+      # (set HOMEBREW_APP_ID + HOMEBREW_APP_PRIVATE_KEY secrets, install the app on homebrew-cckit
+      # with Contents: write). Skipped until the app secrets exist — then the step below falls back
+      # to the legacy HOMEBREW_TAP_TOKEN PAT.
+      - name: Mint a tap token from the GitHub App
+        id: tap_app_token
+        if: ${{ env.HOMEBREW_APP_ID != '' }}
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.HOMEBREW_APP_ID }}
+          private-key: ${{ secrets.HOMEBREW_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: homebrew-cckit
+
       - name: Bump the Homebrew tap
-        if: ${{ env.HOMEBREW_TAP_TOKEN != '' }}
+        # Run if either auth path is available: the GitHub App (preferred) or the legacy PAT.
+        if: ${{ env.HOMEBREW_APP_ID != '' || env.HOMEBREW_TAP_TOKEN != '' }}
         env:
-          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          # App token when present, else the PAT — the first non-empty wins.
+          GH_TOKEN: ${{ steps.tap_app_token.outputs.token || secrets.HOMEBREW_TAP_TOKEN }}
           VERSION: ${{ needs.release-please.outputs.version }}
         run: |
           set -euo pipefail
