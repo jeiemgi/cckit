@@ -3,7 +3,7 @@ title: Config & permissions
 description: How cckit discovers config, scans a project, and asks permission before it mutates anything.
 ---
 
-import { CardGrid, LinkCard, Steps, Aside } from '@astrojs/starlight/components';
+import { CardGrid, LinkCard, Steps, Aside, FileTree } from '@astrojs/starlight/components';
 import Tag from '../../components/Tag.astro';
 import TagRow from '../../components/TagRow.astro';
 
@@ -27,6 +27,25 @@ No org, repo, or path is hardcoded — every value comes from this file. A repo 
 <Aside type="note" title="New here? Why 'nearest wins'">
 "Nearest wins" means cckit uses the config closest to where you are standing in the folder tree. If you run a command three folders deep, cckit walks up until it finds the first config file and uses that one. This is the same idea many tools use so a sub-project can override its parent.
 </Aside>
+
+### Where these live on disk
+
+Sources 2–4 are files; source 1 (`$KIT_CONFIG`) is an environment variable, so it isn't in the
+tree. Everything cckit writes about *you* — consent, identity — lands in `.cckit/`, which is
+gitignored, so it never leaves your machine.
+
+<FileTree>
+- your-repo/
+  - cckit.config.json    **source 2** · repo, owner, base branch — nothing hardcoded
+  - .claude/
+    - kit.config.json    **source 3** · a kit-scaffolded project's config
+    - …    agents, hooks, rules, skills
+  - .cckit/    gitignored — cckit's local state, never committed
+    - consent    your recorded yes to mutate this repo
+    - identity    your name, asked once on first run
+    - privacy-denylist    extra paths the secret guard must block
+  - … your existing files, untouched
+</FileTree>
 
 ## Project scanning
 
