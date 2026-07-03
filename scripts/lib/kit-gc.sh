@@ -33,17 +33,19 @@ _kit_gc_load_deps() {
 # Each row is tagged PROTECTED / SAFE / ACTIVE / ORPHAN so a human or UI can decide what to prune.
 kit_gc_analyze() {
   _kit_gc_load_deps
-  local repo="$KIT_GC_REPO" b ref path reason pr prot
+  # `wtpath`, not `path`: under zsh `path` is tied to PATH (special array), so a bare `path` local
+  # here would clobber the command search path on assignment. A namespaced name is inert.
+  local repo="$KIT_GC_REPO" b ref wtpath reason pr prot
   git fetch origin --prune --quiet 2>/dev/null || true
 
   echo "# worktrees"
   git worktree list --porcelain 2>/dev/null \
     | awk '/^worktree /{w=$2} /^branch /{print w" "$2}' \
-    | while read -r path ref; do
+    | while read -r wtpath ref; do
         b="${ref#refs/heads/}"
         reason="$(wt_protected_reason "$b" "$repo" 2>/dev/null || true)"
-        if [ -n "$reason" ]; then echo "  $path [$b] -> PROTECTED: $reason"
-        else echo "  $path [$b] -> prunable if PR merged"; fi
+        if [ -n "$reason" ]; then echo "  $wtpath [$b] -> PROTECTED: $reason"
+        else echo "  $wtpath [$b] -> prunable if PR merged"; fi
       done
 
   echo "# branches"
@@ -78,25 +80,27 @@ kit_gc_has_prunable() {
 # already deleted at merge time (gh pr merge --delete-branch); this cleans up the local side.
 kit_gc_prune() {
   _kit_gc_load_deps
-  local repo="$KIT_GC_REPO" yes=0 a path ref b pr
+  # `wtpath`, not `path`: under zsh `path` is tied to PATH (special array), so assigning to a bare
+  # `path` local would clobber the command search path. A namespaced name is inert.
+  local repo="$KIT_GC_REPO" yes=0 a wtpath ref b pr
   for a in "$@"; do case "$a" in --yes|-y) yes=1 ;; esac; done
 
   # Worktrees first - a branch's worktree must be removed before the branch can be deleted.
   git worktree list --porcelain 2>/dev/null \
     | awk '/^worktree /{w=$2} /^branch /{print w" "$2}' \
-    | while read -r path ref; do
+    | while read -r wtpath ref; do
         b="${ref#refs/heads/}"
         case "$b" in "${KIT_BASE_BRANCH:-main}"|develop|main|"") continue ;; esac
         [ -n "$(wt_protected_reason "$b" "$repo" 2>/dev/null || true)" ] && continue
         pr="$(gh pr list --repo "$repo" --head "$b" --state all --json state --jq '.[0].state' 2>/dev/null || true)"
         [ "$pr" = "MERGED" ] || continue
-        if [ -n "$(git -C "$path" status --porcelain 2>/dev/null)" ]; then
-          echo "  SKIP dirty worktree $path [$b] - commit/recover before pruning" >&2; continue
+        if [ -n "$(git -C "$wtpath" status --porcelain 2>/dev/null)" ]; then
+          echo "  SKIP dirty worktree $wtpath [$b] - commit/recover before pruning" >&2; continue
         fi
         if [ "$yes" -eq 1 ]; then
-          git worktree remove --force "$path" 2>/dev/null && echo "  removed worktree $path [$b]"
+          git worktree remove --force "$wtpath" 2>/dev/null && echo "  removed worktree $wtpath [$b]"
         else
-          echo "  would remove worktree $path [$b] (PR MERGED)"
+          echo "  would remove worktree $wtpath [$b] (PR MERGED)"
         fi
       done
   git worktree prune 2>/dev/null || true

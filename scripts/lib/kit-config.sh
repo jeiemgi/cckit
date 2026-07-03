@@ -83,11 +83,14 @@ _kit_apply_claudekit_overlays() {
     merged="$(jq -s '.[0] * .[1]' <(printf '%s' "$merged") "$o" 2>/dev/null || printf '%s' "$merged")"
   done
 
-  local g; g() { printf '%s' "$merged" | jq -r "$1" 2>/dev/null; }
-  export KIT_LANG="$(g '.project.language // env.KIT_LANG')"
-  export KIT_PLANS_FORMAT="$(g '.plans.format // env.KIT_PLANS_FORMAT')"
-  export KIT_ANNOTATE_ENABLED="$(g '.annotate.enabled // false')"
-  export KIT_ANNOTATE_BACKEND="$(g '.annotate.backend // ""')"
-  export KIT_ANNOTATE_FRAMEWORK="$(g '.annotate.framework // ""')"
+  # Named `_kit_cfg_get`, not `g`: a one-letter `g` collides with a universal `alias g=git` when
+  # this file is sourced under zsh (interactive shells) -> "defining function based on alias" parse
+  # error. A namespaced name can never be an alias.
+  _kit_cfg_get() { printf '%s' "$merged" | jq -r "$1" 2>/dev/null; }
+  export KIT_LANG="$(_kit_cfg_get '.project.language // env.KIT_LANG')"
+  export KIT_PLANS_FORMAT="$(_kit_cfg_get '.plans.format // env.KIT_PLANS_FORMAT')"
+  export KIT_ANNOTATE_ENABLED="$(_kit_cfg_get '.annotate.enabled // false')"
+  export KIT_ANNOTATE_BACKEND="$(_kit_cfg_get '.annotate.backend // ""')"
+  export KIT_ANNOTATE_FRAMEWORK="$(_kit_cfg_get '.annotate.framework // ""')"
   export KIT_EFFECTIVE_CONFIG="$merged"
 }

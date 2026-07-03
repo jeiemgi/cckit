@@ -6,6 +6,12 @@ All notable changes to cckit are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- Adoption hardening (#115): sourcing kit libs from an interactive zsh no longer breaks. The
+  config accessor is namespaced (`_kit_cfg_get`, never a bare `g` that collides with `alias g=git`),
+  and worktree/gc/events locals no longer shadow zsh's PATH-tied `path` array (#116). A new
+  `zsh-safety-test.sh` asserts every affected lib sources and runs clean under `zsh -ic`.
+
 ### Added
 - Initial standalone scaffold of cckit, extracted from the in-tree claude-kit (ADR-014).
 - Agnostic secret + privacy guard (secret-guard.sh) wired into the gate and a pre-commit hook —
