@@ -5,7 +5,7 @@ description: Autonomous GitHub coding agent. Triggered in CI when a maintainer l
 when_to_use: Not summoned interactively — runs in CI (a GitHub Actions workflow) on `issues: labeled` with `agent:auto`. Documented here so the workflow prompt and humans share one source of truth for its charter.
 tools: [Bash, Read, Edit, Write, Glob, Grep]
 skills:
-  - kit-task-start # Branch <kind>/<N>-<slug> from the integration branch
+  - kit-task-start # Isolated worktree + branch <kind>/<N>-<slug> from the integration branch (via `cckit start`)
   - kit-task-pr # Commit + push + open PR with labels/milestone
   - agent-skills:github-navigator # gh CLI operations
 ---

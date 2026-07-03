@@ -27,7 +27,7 @@ The role determines which agent owns the work. Spawn that agent for the actual e
 ## The loop
 
 1. `/kit-task-sync` — see the board, pick an unblocked issue
-2. `/kit-task-start <N>` — branch from main, mark In Progress
+2. `/kit-task-start <N>` — isolated worktree + branch from the base, mark In Progress
 3. Do the work (spawn the owning agent)
 4. `/kit-task-pr <N>` — commit, push, open PR
 5. `/kit-task-pr-merge` — squash-merge, back to main
