@@ -205,10 +205,13 @@ body {
 /* Starlight rotates card-icon backgrounds through a multicolor palette (amber/
    lavender/green/pink) that clashes with the sober identity and washes out on
    light paper. Force one calm accent treatment, consistent in both themes. */
+/* All three properties need !important: in the production bundle Starlight's per-card palette
+   out-specifies plain rules (both the background AND the foreground color), which showed up as
+   multicolor boxed icons in prod while dev looked fine. Force the whole calm treatment. */
 .card .icon {
-	background-color: var(--sl-color-accent-low);
-	color: var(--sl-color-accent);
-	border: 1px solid var(--sl-color-hairline);
+	background-color: var(--sl-color-accent-low) !important;
+	color: var(--sl-color-accent) !important;
+	border: 1px solid var(--sl-color-hairline) !important;
 }
 
 /* ── Home splash: banner is the visual hero ───────────────────────────── */
@@ -226,10 +229,6 @@ body {
 	white-space: nowrap;
 	border: 0;
 }
-
-/* Starlight's per-card icon background palette out-specifies the rule above in the production
-   build (the color won, the background did not). Force one calm steel-cyan tint, both themes. */
-.card .icon { background-color: var(--sl-color-accent-low) !important; }
 
 /* ── Activation tags ──────────────────────────────────────────────────── */
 /* Small coloured pills that teach HOW a thing is used (Conversational / Command / Skill / Flow /
