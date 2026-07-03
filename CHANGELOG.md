@@ -6,6 +6,12 @@ All notable changes to cckit are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- README rewritten in the philosophy-page voice — architect framing, the retrievable-context
+  one-liner, a "cckit builds cckit" receipts section — with the quick start corrected
+  (`cckit init --profile`), the resume/handoff, adoption, and autopilot/orchestrate stories added,
+  and the banner regenerated to match (#160).
+
 ### Fixed
 - `cckit effort close <N>` now closes **wave-driven** efforts (#164). A wave run ships each sub as
   its own task PR squash-merged straight to base, so no `effort/<N>` integration branch ever
