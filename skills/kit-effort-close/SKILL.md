@@ -50,6 +50,11 @@ function `cckit effort close` runs. The core owns the pre-squash snapshot + trac
 telemetry capture/judge/sync, the squash-merge, issue closes, board Done, GC, the
 knowledge-ingest hook, and the kit-sync drift check. There is no second implementation here.
 
+The core handles both effort styles (#164): run from the `effort/<N>-…` branch it squash-merges
+the integration PR; run from anywhere else with an explicit `#N`, and if no `effort/<N>` branch
+exists anywhere (a **wave-driven** effort — subs merged as individual task PRs), it verifies every
+sub is closed with a merged PR, traces from the merged PR diffs, and runs the same close tail.
+
 ```bash
 source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/kit-config.sh" && load_kit_config
 source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/effort.sh"

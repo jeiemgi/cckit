@@ -106,6 +106,43 @@ effort_snapshot_subs() {
   printf '%s' "$dir"
 }
 
+# effort_snapshot_merged_subs <parent> <rows> — the WAVE-style trace (#164): the subs were delivered
+# as individual task PRs squash-merged to base, so there is no effort branch whose commits
+# effort_snapshot_subs could walk. Snapshot each sub's merged PR diff instead. <rows> is the wave
+# close's per-sub read, one "sub|state|pr|merge-oid|title" line each. Same layout as
+# effort_snapshot_subs — $traces/effort-<N>/<seq>-<key>.{diff,meta} + index.jsonl — so exporters
+# and the judge read both styles identically.
+effort_snapshot_merged_subs() {
+  local parent="$1" rows="$2" dir seq=0
+  [[ -n "$parent" && -n "$rows" ]] || { echo "effort_snapshot_merged_subs: parent + sub rows required" >&2; return 1; }
+  dir="$(effort_trace_dir "$parent")" || { echo "effort_snapshot_merged_subs: could not create trace dir" >&2; return 1; }
+
+  local index="$dir/index.jsonl"
+  : > "$index"
+
+  local sub state pr oid title stub short
+  while IFS='|' read -r sub state pr oid title; do
+    [[ -n "$pr" ]] || continue
+    seq=$((seq + 1))
+    short="$(printf '%.7s' "$oid")"; [[ -n "$short" ]] || short="pr$pr"
+    stub="$(printf '%02d-%s' "$seq" "$short")"
+    gh pr diff "$pr" --repo "$EFFORT_REPO" > "$dir/$stub.diff" 2>/dev/null || rm -f "$dir/$stub.diff"
+    [[ -s "$dir/$stub.diff" ]] || { rm -f "$dir/$stub.diff"; seq=$((seq - 1)); continue; }
+    jq -n --arg parent "$parent" --arg sub "${sub:-}" --arg sha "${oid:-}" \
+          --arg subject "$title" --arg pr "$pr" --arg file "$stub.diff" \
+      '{parent:($parent|tonumber), sub_issue:(if $sub=="" then null else ($sub|tonumber) end),
+        commit:(if $sha=="" then null else $sha end), pr:($pr|tonumber), subject:$subject,
+        branch:null, diff_file:$file, outcome:"merged"}' \
+      > "$dir/$stub.meta"
+    cat "$dir/$stub.meta" >> "$index"
+  done <<EOF_ROWS
+$rows
+EOF_ROWS
+
+  echo "  ✓ snapshotted $seq merged sub PR diff(s) to $dir (index.jsonl)" >&2
+  printf '%s' "$dir"
+}
+
 # ── Effort PR title — ONE composer shared by the verb + the skill (#121) ────────────────────────
 # `cckit effort pr` (the verb) and /kit-effort-pr (the skill) previously composed different PR
 # titles; they now both call effort_pr_title so an effort PR is titled identically no matter who

@@ -25,10 +25,15 @@ case "$1 $2" in
   "issue edit"|"issue close"|"pr merge") exit 0 ;;
   "issue view")    echo "[Effort] 99 · demo effort" ;;          # --json title -q .title
   "pr create")     echo "https://github.com/o/r/pull/7" ;;
+  "pr diff")       # a merged sub PR's diff (wave-style close, #164): one kit-managed + one app file
+    printf 'diff --git a/.claude/skills/demo.md b/.claude/skills/demo.md\n+kit\ndiff --git a/src/app.ts b/src/app.ts\n+app\n' ;;
   "api "*|"api")
     case "$*" in
       *"--method POST"*"/sub_issues"*) exit 0 ;;                # link a sub
       *"/sub_issues"*".[].number"*)    printf '101\n102\n' ;;   # list subs (for close)
+      # wave-style close (#164): per-sub "sub|state|pr|merge-oid|title" rows by parent number
+      *closedByPullRequestsReferences*n=77*) printf '301|CLOSED|501|abc1234def|first sub\n302|CLOSED|502|bcd2345eab|second sub\n' ;;
+      *closedByPullRequestsReferences*n=78*) printf '201|CLOSED|401|abc1234def|done sub\n202|OPEN|||still open sub\n' ;;
       *".id"*)                         echo "55501" ;;          # issue db id
       *) exit 0 ;;
     esac ;;
@@ -152,6 +157,34 @@ tc "$GH_LOG" 'pr merge effort/88-forced .*--squash' "KIT_FORCE=1 close merges de
 t  "knowledge-ingest hook ran with the effort number" "$(cat "$tmp/khook.out" 2>/dev/null)" "ingested 88"
 # #148: no kit-managed file touched → the drift check stays silent
 case "$forced_out" in *"kit-sync"*) echo "FAIL: kit-sync warning fired with no kit-managed change"; fail=1 ;; *) echo "ok: drift check silent when no kit-managed file changed" ;; esac
+
+# ── effort_close #164: WAVE-style close — subs merged as individual task PRs, no effort branch ──
+# Run from the main checkout on a non-effort branch with NO effort/<N>-* branch anywhere: the close
+# must dispatch to the wave path instead of demanding the integration branch.
+
+# refuse: a sub still open / lacking a merged PR → list the stragglers, close nothing
+: > "$GH_LOG"
+close_out="$(effort_close 78 2>&1)"; rc=$?
+t  "wave close refuses while a sub is open (rc 1)" "$rc" "1"
+case "$close_out" in *"not done"*"#202"*) echo "ok: wave refuse lists the straggler sub" ;; *) echo "FAIL: wave refuse output: $close_out"; fail=1 ;; esac
+t  "wave refuse closes nothing" "$(grep -c 'issue close' "$GH_LOG")" "0"
+
+# happy: every sub CLOSED with a merged PR → trace from the PR diffs → parent closed, board Done
+# for parent + subs, drift check fires off the union of the merged PR diffs
+: > "$BOARD_LOG"
+export KIT_PROJECTS_V2="true"
+: > "$GH_LOG"
+close_out="$(effort_close 77 2>&1)"; rc=$?
+export KIT_PROJECTS_V2="false"
+t  "wave close succeeds when all subs merged (rc 0)" "$rc" "0"
+tc "$GH_LOG" 'pr diff 501' "wave close snapshots the merged sub PR diffs"
+tc "$GH_LOG" 'issue close 77 ' "wave close closes the parent"
+t  "wave close closes ONLY the parent (subs already closed)" "$(grep -c 'issue close' "$GH_LOG")" "1"
+t  "wave close never squash-merges anything" "$(grep -c 'pr merge' "$GH_LOG")" "0"
+tc "$BOARD_LOG" 'ITEM-77 SF1 OPT_DONE'  "wave close sets board Done for the parent"
+tc "$BOARD_LOG" 'ITEM-301 SF1 OPT_DONE' "wave close sets board Done for sub #301"
+tc "$BOARD_LOG" 'ITEM-302 SF1 OPT_DONE' "wave close sets board Done for sub #302"
+case "$close_out" in *"kit-sync"*".claude/skills/demo.md"*) echo "ok: wave drift check reads the merged PR diffs" ;; *) echo "FAIL: no kit-sync warning in wave close output"; fail=1 ;; esac
 
 [ "$fail" -eq 0 ] && echo "ALL OK (effort-ops)" || echo "effort-ops: FAILURES"
 exit "$fail"

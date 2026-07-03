@@ -396,7 +396,19 @@ effort_close() {
   num="$(effort_slug_resolve "$raw")" || { echo "effort_close: could not resolve '$raw' to an effort" >&2; return 1; }
   repo="$(_eff_repo)"; base="$(_eff_base)"
   branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)"
-  case "$branch" in effort/"$num"-*) : ;; *) echo "effort_close: run from the effort/$num-… branch" >&2; return 1 ;; esac
+  case "$branch" in
+    effort/"$num"-*) : ;;
+    *)
+      # Not on the integration branch. If effort/<num>-… exists (locally or on origin), this is
+      # just the wrong cwd — keep the instruction. If it exists NOWHERE, this is a WAVE-style
+      # effort (#164): the subs shipped as individual task PRs squash-merged straight to base, so
+      # there is no branch to run from — close via the merged sub PRs instead.
+      if git branch --list "effort/$num-*" 2>/dev/null | grep -q . \
+         || git ls-remote --heads origin "effort/$num-*" 2>/dev/null | grep -q .; then
+        echo "effort_close: run from the effort/$num-… branch" >&2; return 1
+      fi
+      _eo_close_wave "$num" "$repo" "$base"; return $? ;;
+  esac
   root="$(git worktree list --porcelain 2>/dev/null | awk '/^worktree /{print $2; exit}')"
   self_wt="$(git rev-parse --show-toplevel 2>/dev/null)"
   _eo_source_metrics
@@ -462,15 +474,89 @@ effort_close() {
   # (g) optional, config-gated knowledge-ingest hook (no-op when absent).
   _eo_knowledge_ingest "$num" "${trace_dir:-}" "$root"
 
-  # (h) kit-sync drift check — kit ⇄ project stay in sync (#148, moved here from the skill). If the
-  # effort changed kit-managed files they likely belong upstream (/kit-contribute); an un-upstreamed
-  # change is a latent regression the next /kit-update can clobber. Advisory: never blocks the close.
-  if [ -n "$kit_touched" ]; then
-    {
-      echo ""
-      echo "  ⚠ kit-sync: this effort changed kit-managed files — review for upstream (/kit-contribute):"
-      printf '%s\n' "$kit_touched" | sed 's/^/     /'
-      echo "     kit ⇄ project must stay in sync; an un-upstreamed change can be clobbered by /kit-update."
-    } >&2
+  # (h) kit-sync drift check — kit ⇄ project stay in sync (#148, moved here from the skill).
+  _eo_kit_sync_warn "$kit_touched"
+}
+
+# _eo_kit_sync_warn <files> — the advisory kit-sync drift warning, shared by both close styles
+# (#148/#164). If an effort changed kit-managed files they likely belong upstream (/kit-contribute);
+# an un-upstreamed change is a latent regression the next /kit-update can clobber. Never blocks.
+_eo_kit_sync_warn() {
+  [ -n "${1:-}" ] || return 0
+  {
+    echo ""
+    echo "  ⚠ kit-sync: this effort changed kit-managed files — review for upstream (/kit-contribute):"
+    printf '%s\n' "$1" | sed 's/^/     /'
+    echo "     kit ⇄ project must stay in sync; an un-upstreamed change can be clobbered by /kit-update."
+  } >&2
+}
+
+# _eo_close_wave <num> <repo> <base> — close a WAVE-style effort (#164): every sub was delivered as
+# its own task PR squash-merged straight to base (`cckit wave` → fan-out → `cckit watch --merge`),
+# so no effort/<N> integration branch ever existed. Verifies every sub is CLOSED with a merged
+# closing PR (refuses and lists the stragglers otherwise), snapshots the work trace from the merged
+# sub PR diffs, then runs the SAME close tail as the branch path: judge + sync metrics, close the
+# parent, board Status=Done for parent + subs, knowledge-ingest hook, kit-sync drift check.
+# capture_effort_metrics is intentionally skipped — there is no live branch diff to measure; the
+# merged PR diffs in the trace are the work record.
+_eo_close_wave() {
+  local num="$1" repo="$2" base="$3" root rows bad trace_dir kit_touched sub
+  root="$(git worktree list --porcelain 2>/dev/null | awk '/^worktree /{print $2; exit}')"
+  _eo_source_metrics
+
+  # (a) read every sub + the merged PR that closed it, one "sub|state|pr|merge-oid|title" line each
+  # (title LAST so a stray "|" in it can't shift the fields awk/read split on).
+  rows="$(gh api graphql -f query='
+    query($o:String!,$r:String!,$n:Int!){ repository(owner:$o,name:$r){ issue(number:$n){
+      subIssues(first:50){ nodes { number state
+        closedByPullRequestsReferences(first:10){ nodes { number merged mergeCommit{oid} title } } } } } } }' \
+    -F o="${repo%/*}" -F r="${repo#*/}" -F n="$num" --jq '
+      .data.repository.issue.subIssues.nodes[]
+      | (((.closedByPullRequestsReferences.nodes // []) | map(select(.merged)) | .[0]) // null) as $pr
+      | "\(.number)|\(.state)|\($pr.number // "")|\($pr.mergeCommit.oid // "")|\($pr.title // "")"' 2>/dev/null)"
+  [ -n "$rows" ] || { echo "effort_close: no effort/$num-… branch and no readable sub-issues — nothing to close (wave-style needs merged subs, #164)" >&2; return 1; }
+
+  # (b) every sub must be CLOSED with a merged closing PR — otherwise the effort is not done.
+  bad="$(printf '%s\n' "$rows" | awk -F'|' '$2 != "CLOSED" || $3 == "" {
+    printf "  #%s (%s%s)\n", $1, tolower($2), ($3 == "" ? ", no merged PR" : "") }')"
+  if [ -n "$bad" ]; then
+    echo "effort_close: #$num is not done — these subs are still open or lack a merged PR:" >&2
+    printf '%s\n' "$bad" >&2
+    return 1
   fi
+
+  # (c) the work trace, from the merged sub PR diffs (the record the per-sub squashes left behind).
+  # Same refuse-without-trace backstop as the branch path (#120) — KIT_FORCE=1 overrides.
+  trace_dir="$(effort_snapshot_merged_subs "$num" "$rows" 2>/dev/null)"
+  if [ -z "$trace_dir" ] || ! ls "$trace_dir"/*.diff >/dev/null 2>&1; then
+    if [ "${KIT_FORCE:-0}" = "1" ]; then
+      echo "effort_close: no per-sub work trace captured — proceeding anyway (KIT_FORCE=1)" >&2
+    else
+      echo "effort_close: refusing to close #$num — could not capture the work trace from the merged sub PRs. Set KIT_FORCE=1 to override." >&2
+      return 1
+    fi
+  fi
+
+  # (d) judge + sync the metrics off the trace (guarded, best-effort — same as the branch path).
+  command -v judge_effort_metrics >/dev/null 2>&1 && judge_effort_metrics "$num" "origin/$base" || true
+  command -v sync_effort_metrics  >/dev/null 2>&1 && sync_effort_metrics  "$num" || true
+
+  # (e) kit-sync drift source: the union of files across the merged sub PR diffs.
+  kit_touched="$(awk '/^diff --git /{print $3}' "$trace_dir"/*.diff 2>/dev/null | sed 's#^a/##' \
+    | grep -E "$_EO_KIT_MANAGED_RE" | sort -u || true)"
+
+  # (f) close the parent + board Status=Done for parent and every sub (subs are already closed).
+  _eo_source_board
+  for sub in $(printf '%s\n' "$rows" | cut -d'|' -f1); do
+    _eo_board_done "$sub"
+  done
+  gh issue close "$num" --repo "$repo" --reason completed >/dev/null 2>&1 && echo "  ✓ closed effort #$num" >&2
+  _eo_board_done "$num"
+
+  # (g) GC: the sub branches/worktrees were GC'd by their own merges — just prune stragglers.
+  [ -n "$root" ] && git -C "$root" worktree prune >/dev/null 2>&1 || true
+
+  # (h) same optional hook + advisory drift check as the branch path.
+  _eo_knowledge_ingest "$num" "${trace_dir:-}" "$root"
+  _eo_kit_sync_warn "$kit_touched"
 }

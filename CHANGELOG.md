@@ -7,6 +7,15 @@ All notable changes to cckit are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- `cckit effort close <N>` now closes **wave-driven** efforts (#164). A wave run ships each sub as
+  its own task PR squash-merged straight to base, so no `effort/<N>` integration branch ever
+  exists — the close verb used to refuse with "run from the effort/<N>-… branch" and the parent
+  had to be closed by hand (the exact divergent-close drift #148 eliminated, reintroduced for the
+  wave style). When the integration branch exists nowhere, the close now verifies every sub is
+  CLOSED with a merged PR (refusing and listing the stragglers otherwise), snapshots the work
+  trace from the merged sub PR diffs (`effort_snapshot_merged_subs`, same trace layout), and runs
+  the same close tail: metrics judge/sync, parent close, board Status=Done for parent + subs,
+  knowledge-ingest hook, kit-sync drift check. The integration-branch path is unchanged.
 - The `/kit-effort-close` skill is now a **thin caller** of `effort_close` — the exact function
   `cckit effort close` runs — so exactly ONE close implementation exists (the #121
   single-implementation precedent, applied to the close). The two skill-only steps moved into the
