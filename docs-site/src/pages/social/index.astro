@@ -1,0 +1,49 @@
+---
+// Index for the Instagram / Stories card templates — one link per tutorial. The 1200×630 link cards
+// for LinkedIn / X / Facebook are automatic (/og/…); this page is only the manual-post IG kit.
+import { getCollection } from 'astro:content';
+
+const entries = await getCollection('docs');
+const tutorials = entries
+  .filter((e) => e.id.startsWith('tutorials/') && e.data.tutorial)
+  .map((e) => ({ slug: e.id.replace(/^tutorials\//, ''), title: e.data.title, tag: e.data.tutorial.ogTag }))
+  .sort((a, b) => a.title.localeCompare(b.title));
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Social card kit — cckit tutorials</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { background: #0b0f14; color: #c3ced4; font-family: -apple-system, system-ui, sans-serif;
+        line-height: 1.6; padding: 56px 24px 96px; }
+      main { max-width: 760px; margin: 0 auto; }
+      h1 { color: #eef3f4; font-size: 30px; letter-spacing: -0.02em; margin-bottom: 8px; }
+      p.lead { color: #8195a0; margin-bottom: 32px; }
+      a { color: #2ab3a6; text-decoration: none; }
+      ul { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+      li a { display: flex; align-items: center; justify-content: space-between; gap: 16px;
+        background: #10151b; border: 1px solid #223039; border-radius: 12px; padding: 16px 18px;
+        color: #e9edef; }
+      li a:hover { border-color: #2ab3a6; }
+      .tag { font-family: ui-monospace, Menlo, monospace; font-size: 11px; letter-spacing: .08em;
+        text-transform: uppercase; color: #8fa6ad; border: 1px solid #223039; border-radius: 999px;
+        padding: 3px 10px; white-space: nowrap; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Social card kit</h1>
+      <p class="lead">Instagram feed (1080×1080) and Story (1080×1920) graphics for each tutorial —
+        export to PNG and post manually. Link cards for LinkedIn / X / Facebook are generated
+        automatically from each page's frontmatter.</p>
+      <ul>
+        {tutorials.map((t) => (
+          <li><a href={`/social/${t.slug}/`}><span>{t.title}</span><span class="tag">{t.tag}</span></a></li>
+        ))}
+      </ul>
+    </main>
+  </body>
+</html>
