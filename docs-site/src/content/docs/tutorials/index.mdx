@@ -1,52 +1,29 @@
 ---
-title: cckit — a project OS for coding agents
-description: Be the architect — cckit runs the mechanics. The full GitHub work lifecycle as a CLI that turns your Git into retrievable, efficient context, drivable by Claude Code and any agent.
-template: splash
+title: Tutorials
+description: Step-by-step guides for doing real jobs with Claude Code and cckit — set up, ship, run in parallel, go headless, and stay secure, each one start to finish.
 ---
 
-import { Image } from 'astro:assets';
-import { CardGrid, LinkCard, LinkButton } from '@astrojs/starlight/components';
-import banner from '../../assets/hero-banner.png';
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-<div class="hero-banner">
-  <Image
-    src={banner}
-    alt="cckit — the full GitHub work lifecycle as a CLI, drivable by Claude Code and any agent"
-    loading="eager"
-  />
-</div>
+Task-first walkthroughs — each one titled the way you'd search for it, answered in the first screen,
+then taken start to finish with the exact prompts and commands. New tutorials land here as the
+library grows.
 
-<p class="hero-tagline">
-  <strong>You bring the ideas and the architecture. cckit runs the mechanics.</strong><br />
-  Old-school issue tracking, carried into the age of agentic development — your Git becomes retrievable, efficient context. <a href="/philosophy/">Why I built this →</a>
-</p>
-
-<div class="hero-actions">
-  <LinkButton href="/getting-started/" icon="right-arrow" iconPlacement="end">Get started</LinkButton>
-  <LinkButton href="/how-to-read/" variant="secondary">How to read this guide</LinkButton>
-  <LinkButton href="https://github.com/jeiemgi/cckit" variant="minimal" icon="external">GitHub</LinkButton>
-  <span class="coming-soon" aria-disabled="true" title="cckit.dev — coming soon">cckit.dev · coming soon</span>
-</div>
-
-## Tutorials
-
-Step-by-step **“How to X with Claude Code”** guides — each one titled the way you'd search for it, answered in the first screen, then taken start to finish. [Browse all tutorials →](/tutorials/)
-
-### Get started
+## Get started
 
 <CardGrid>
   <LinkCard title="Set up cckit in a Git repo" href="/tutorials/set-up-cckit-in-a-repo/" description="Scaffold config, check GitHub access, confirm the stack. · Beginner · 4 min" />
   <LinkCard title="Add cckit to an existing repo" href="/tutorials/adopt-cckit-in-an-existing-repo/" description="Bring cckit to a project that already has structure. · Beginner · 5 min" />
 </CardGrid>
 
-### Ship work
+## Ship work
 
 <CardGrid>
   <LinkCard title="Take a GitHub issue to a merged PR" href="/tutorials/take-a-github-issue-to-a-merged-pr/" description="One issue, end to end: worktree → PR → close → cleanup. · Beginner · 6 min" />
   <LinkCard title="Break a big feature into an effort" href="/tutorials/break-a-feature-into-an-effort/" description="A parent issue plus sub-issues, shipped as one PR. · Intermediate · 7 min" />
 </CardGrid>
 
-### Run in parallel
+## Run in parallel
 
 <CardGrid>
   <LinkCard title="Run a wave of issues in parallel" href="/tutorials/run-issues-in-parallel-with-a-wave/" description="Fan unblocked issues out, then gate and merge the clean PRs. · Intermediate · 7 min" />
@@ -54,7 +31,7 @@ Step-by-step **“How to X with Claude Code”** guides — each one titled the 
   <LinkCard title="Drive Claude Code headless in CI" href="/tutorials/drive-claude-code-headless-in-ci/" description="Consume every verb as JSON/TOON from a bot. · Advanced · 6 min" />
 </CardGrid>
 
-### Security
+## Security
 
 <CardGrid>
   <LinkCard title="Stop Claude Code from committing secrets" href="/tutorials/stop-claude-committing-secrets/" description="Wire cckit's secret guard as a pre-commit hook. · Beginner · 5 min" />
@@ -62,7 +39,7 @@ Step-by-step **“How to X with Claude Code”** guides — each one titled the 
   <LinkCard title="Control what Claude Code is allowed to do" href="/tutorials/control-what-claude-code-can-do/" description="The permission gate: read-only by default, explicit consent to mutate. · Intermediate · 5 min" />
 </CardGrid>
 
-### Concepts & extending
+## Concepts & extending
 
 <CardGrid>
   <LinkCard title="Give Claude Code persistent project memory" href="/tutorials/give-claude-code-persistent-memory/" description="Wake up already knowing the project — decisions persist across sessions. · Intermediate · 6 min" />

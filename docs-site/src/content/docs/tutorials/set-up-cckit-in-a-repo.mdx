@@ -1,0 +1,97 @@
+---
+title: How to set up cckit in a Git repo with Claude Code
+description: Scaffold cckit's config in any Git repository, verify your GitHub access, and confirm the detected stack — three commands, driven by Claude Code.
+tutorial:
+  job: set up cckit in a Git repo
+  difficulty: beginner
+  time: "4 min"
+  prerequisites: [git, "gh (authenticated)", jq]
+  ogTag: Setup
+  keywords: [set up cckit, cckit init, configure claude code project]
+  related: [take-a-github-issue-to-a-merged-pr, adopt-cckit-in-an-existing-repo, drive-claude-code-headless-in-ci]
+---
+
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import TagRow from '../../../components/TagRow.astro';
+import TutorialMeta from '../../../components/TutorialMeta.astro';
+import TutorialSchema from '../../../components/TutorialSchema.astro';
+
+<TagRow kinds={["flow", "conversational"]} />
+
+<TutorialMeta />
+
+**What you'll set up:** cckit reads everything from a single `cckit.config.json`. In three commands
+it scaffolds that config and a `.claude/` folder, preflights your dependencies and GitHub auth, and
+shows you the stack it detected — so you know it's ready before you run any real work. You describe
+the goal; Claude Code triggers the commands.
+
+## Steps
+
+<Steps>
+
+1. **Ask Claude to set it up.** You don't name the commands — describe the intent.
+
+   <div class="cckit-prompt">
+
+   ```text frame="terminal" title="Prompt to paste"
+   Set up cckit in this repository and confirm it's ready to use. Scaffold its config,
+   check my GitHub access, and show me what it detected about the stack.
+   ```
+
+   </div>
+
+2. **cckit scaffolds the config.** Under the hood it runs:
+
+   ```bash frame="terminal"
+   cckit init     # scaffold cckit.config.json + .claude/
+   cckit doctor   # preflight: deps + gh auth
+   cckit scan     # show the detected stack + kit state
+   ```
+
+3. **Verify it's ready.** `doctor` prints a green check for `git`, `gh` (authenticated), and `jq`;
+   `scan` prints the detected language and framework. If both look right, cckit is live in the repo.
+
+</Steps>
+
+## How it works
+
+cckit is portable by design — no company, framework, or repo is baked in. Everything it needs comes
+from `cckit.config.json`, which `init` scaffolds and every other verb reads. That's why setup is just
+"scaffold, preflight, confirm": once the config exists and your tools are present, every later
+command resolves against it.
+
+<Aside type="tip" title="Nothing above the kit is touched">
+`init` only adds cckit's own files. Your existing project layout is left exactly as it is.
+</Aside>
+
+## Troubleshooting
+
+**`doctor` says `gh` isn't authenticated.** Run `gh auth login` once, then re-run the setup prompt.
+cckit uses your existing GitHub CLI session; it never stores a token of its own.
+
+**`scan` detected the wrong stack.** The detection is a starting point you can correct — open
+`cckit.config.json` and adjust the project fields; every verb will pick up the change.
+
+**`jq` is missing.** cckit degrades gracefully without optional tools, but `jq` is required for the
+JSON paths. Install it (`brew install jq` / your package manager) and re-run `doctor`.
+
+## Related tutorials
+
+<CardGrid>
+  <LinkCard title="Take a GitHub issue to a merged PR" href="/tutorials/take-a-github-issue-to-a-merged-pr/" description="The core lifecycle, one issue end to end." />
+  <LinkCard title="Add cckit to an existing repo" href="/tutorials/adopt-cckit-in-an-existing-repo/" description="Bring cckit to a project that already has structure." />
+  <LinkCard title="Drive Claude Code headless in CI" href="/tutorials/drive-claude-code-headless-in-ci/" description="Consume cckit as pure JSON from a bot." />
+</CardGrid>
+
+<TutorialSchema
+  steps={[
+    { name: 'Ask Claude to set it up', text: 'Describe the intent — set up cckit, scaffold config, check GitHub access, show the detected stack. Claude Code triggers the commands for you.' },
+    { name: 'cckit scaffolds the config', text: 'cckit init scaffolds cckit.config.json and .claude/; cckit doctor preflights deps and gh auth; cckit scan shows the detected stack.' },
+    { name: 'Verify it is ready', text: 'doctor prints green checks for git, gh, and jq; scan prints the detected language and framework. If both look right, cckit is live in the repo.' },
+  ]}
+  faqs={[
+    { q: "doctor says gh isn't authenticated", a: 'Run gh auth login once, then re-run setup. cckit uses your existing GitHub CLI session and never stores its own token.' },
+    { q: 'scan detected the wrong stack', a: 'Detection is a starting point. Edit the project fields in cckit.config.json and every verb picks up the change.' },
+    { q: 'jq is missing', a: 'jq is required for the JSON paths. Install it and re-run cckit doctor.' },
+  ]}
+/>

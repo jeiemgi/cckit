@@ -1,0 +1,99 @@
+---
+title: How to run a wave of GitHub issues in parallel with Claude Code
+description: Use cckit wave to fan a whole wave of unblocked issues out into parallel agent work, then gate and merge the clean PRs with the captain — the board drains itself.
+tutorial:
+  job: run a wave of GitHub issues in parallel
+  difficulty: intermediate
+  time: "7 min"
+  prerequisites: ["cckit installed and initialized", "several unblocked issues"]
+  ogTag: Parallel work
+  keywords: [run claude code in parallel, parallel ai agents github, cckit wave]
+  related: [break-a-feature-into-an-effort, run-claude-code-unattended, take-a-github-issue-to-a-merged-pr]
+---
+
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import TagRow from '../../../components/TagRow.astro';
+import TutorialMeta from '../../../components/TutorialMeta.astro';
+import TutorialSchema from '../../../components/TutorialSchema.astro';
+
+<TagRow kinds={["flow", "conversational"]} />
+
+<TutorialMeta />
+
+**What you'll do:** clear a whole wave of ready work at once. `cckit wave` writes the fan-out brief
+and the agent spawns one subagent per unblocked issue, each opening its own PR. The **captain**
+(`cckit watch`) then gates the resulting PRs and merges the ones that pass — so the board advances
+wave by wave until it's drained.
+
+## Steps
+
+<Steps>
+
+1. **Ask Claude to clear the next wave.**
+
+   <div class="cckit-prompt">
+
+   ```text frame="terminal" title="Prompt to paste"
+   Clear the next wave of ready work. Fan the unblocked issues out so they're worked in parallel,
+   then gate the resulting PRs and merge the ones that pass. Advance to the next wave and keep going
+   until the board is drained.
+   ```
+
+   </div>
+
+2. **cckit fans out the wave and gates the PRs.**
+
+   ```bash frame="terminal"
+   cckit wave             # emit the wave-0 subagent fan-out brief
+   # …the agent spawns one subagent per issue, each opens a PR…
+   cckit watch --merge    # gate open PRs, squash-merge the clean ones, advance the wave
+   ```
+
+3. **Let it advance.** `watch --merge` merges every PR that passes its gate and moves on to the next
+   wave. It stops when there's nothing left unblocked.
+
+</Steps>
+
+## How it works
+
+A **wave** is exactly "what can run in parallel right now" — every issue that nothing is blocking.
+Because the issues in a wave touch different files and each runs in its own worktree, their PRs merge
+cleanly. `cckit watch` is the captain: it doesn't write code, it reviews the fan-out's PRs against
+the gate and merges only the clean ones, then advances to the wave those merges just unblocked.
+
+<Aside type="tip" title="Waves come from the dependency graph">
+You don't assign waves by hand. cckit reads the *blocked-by* links and computes them — see
+[Efforts, waves & worktrees](/efforts-and-waves/).
+</Aside>
+
+## Troubleshooting
+
+**A PR didn't merge.** The captain merges only PRs that pass the gate. Read the gate output on that
+PR, fix the finding, and re-run `cckit watch --merge` — the rest of the wave isn't held up.
+
+**Two subagents edited the same file.** Those issues shouldn't be in the same wave. Add a *blocked-by*
+link so the dependent one lands in a later wave, then re-run.
+
+**The wave brief is empty.** Nothing is unblocked. Run `cckit sync` to see what's blocking the
+remaining issues, or start an [effort](/tutorials/break-a-feature-into-an-effort/) to create some.
+
+## Related tutorials
+
+<CardGrid>
+  <LinkCard title="Break a big feature into an effort" href="/tutorials/break-a-feature-into-an-effort/" description="Where the waves of sub-issues come from." />
+  <LinkCard title="Run Claude Code unattended" href="/tutorials/run-claude-code-unattended/" description="Drive waves with no one watching." />
+  <LinkCard title="Take a GitHub issue to a merged PR" href="/tutorials/take-a-github-issue-to-a-merged-pr/" description="The single-issue lifecycle each subagent runs." />
+</CardGrid>
+
+<TutorialSchema
+  steps={[
+    { name: 'Ask Claude to clear the next wave', text: 'Ask to fan the unblocked issues out in parallel, gate the resulting PRs, merge the ones that pass, and keep advancing until the board is drained.' },
+    { name: 'cckit fans out the wave and gates the PRs', text: 'cckit wave emits the subagent fan-out brief; the agent spawns one subagent per issue, each opening a PR; cckit watch --merge gates open PRs and squash-merges the clean ones.' },
+    { name: 'Let it advance', text: 'watch --merge merges every PR that passes its gate and moves to the next wave, stopping when nothing is left unblocked.' },
+  ]}
+  faqs={[
+    { q: "A PR didn't merge", a: 'The captain merges only PRs that pass the gate. Read the gate output on that PR, fix the finding, and re-run cckit watch --merge; the rest of the wave is not held up.' },
+    { q: 'Two subagents edited the same file', a: 'Those issues should not share a wave. Add a blocked-by link so the dependent one lands in a later wave, then re-run.' },
+    { q: 'The wave brief is empty', a: 'Nothing is unblocked. Run cckit sync to see what is blocking the remaining issues, or start an effort to create some.' },
+  ]}
+/>

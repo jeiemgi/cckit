@@ -1,0 +1,124 @@
+---
+title: How to run Claude Code unattended overnight
+description: Use cckit orchestrate and autopilot to clear an unblocked backlog with no one watching — dry-run the plan first, cap concurrency, and only get pinged on a real blocker.
+tutorial:
+  job: run Claude Code unattended overnight
+  difficulty: advanced
+  time: "8 min"
+  prerequisites: ["cckit installed and initialized", "an unblocked backlog"]
+  ogTag: Parallel work
+  keywords: [claude code unattended, ai agent overnight autopilot, cckit orchestrate]
+  related: [run-issues-in-parallel-with-a-wave, break-a-feature-into-an-effort, drive-claude-code-headless-in-ci]
+---
+
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import TagRow from '../../../components/TagRow.astro';
+import TutorialMeta from '../../../components/TutorialMeta.astro';
+import TutorialSchema from '../../../components/TutorialSchema.astro';
+
+<TagRow kinds={["flow", "conversational"]} />
+
+<TutorialMeta />
+
+**What you'll do:** clear an unblocked backlog unattended, a few issues at a time. cckit orchestrates
+parallel worktrees and drives each issue through to merged. You **always dry-run first** so you can
+see the launch plan before anything is created, then let it run and only get pinged on a genuine
+blocker.
+
+## Steps
+
+<Steps>
+
+1. **Read the board, then pick the work.** Have Claude sync the board first and show you what's
+   ready — you choose which issues run, rather than naming numbers up front.
+
+   <div class="cckit-prompt">
+
+   ```text frame="terminal" title="Prompt to paste"
+   Read the board and show me what's unblocked right now. I'll tell you which of those to run in
+   parallel. Show me the launch plan before anything is created, then run them a few at a time.
+   ```
+
+   </div>
+
+   ```bash frame="terminal"
+   cckit sync --llm                        # read the board; decide from what's actually ready
+   ```
+
+2. **Dry-run, then launch with a cap.** Pass the issues *you* picked (a dry-run creates nothing):
+
+   ```bash frame="terminal"
+   cckit orchestrate --dry-run <issues…>   # resolve + print the launch plan; create nothing
+   cckit orchestrate --cap 3 <issues…>     # launch, at most 3 concurrent; the rest queue
+   ```
+
+3. **Or let autopilot pick the work.** For a fully unattended run, autopilot auto-selects ready
+   issues itself — no numbers to name:
+
+   ```bash frame="terminal"
+   cckit autopilot --cap 3                 # auto-pick unblocked issues and drive them through
+   ```
+
+   <div class="cckit-prompt">
+
+   ```text frame="terminal" title="Prompt to paste"
+   Clear the unblocked backlog unattended, a few at a time. Sync the board, auto-pick what's ready,
+   and drive each to merged. Only stop and ping me on a genuine blocker — otherwise summarize what
+   merged.
+   ```
+
+   </div>
+
+</Steps>
+
+<Aside type="tip" title="Which verb for which case">
+Same board, three routes — let what's ready decide: one issue → the
+[single-issue lifecycle](/tutorials/take-a-github-issue-to-a-merged-pr/); a set of related sub-issues
+→ an [effort](/tutorials/break-a-feature-into-an-effort/) or a [wave](/tutorials/run-issues-in-parallel-with-a-wave/);
+a whole backlog with nobody watching → `cckit autopilot`.
+</Aside>
+
+## How it works
+
+`orchestrate` takes a specific set of issue numbers and runs them in isolated worktrees, capped so
+only N run at once and the rest queue. `autopilot` is the hands-off version: it picks the next
+unblocked issues itself and keeps going. The **dry-run** is the safety rail — it resolves the plan and
+prints exactly what *would* launch without creating a single branch, so you approve the shape before
+committing to it.
+
+<Aside type="caution" title="Always dry-run first">
+Unattended runs create real branches, worktrees, and PRs. Seeing the plan first is how you (and the
+agent) catch a wrong issue or a bad cap before it fans out.
+</Aside>
+
+## Troubleshooting
+
+**It stopped on a blocker.** That's by design — unattended runs ping you only on a genuine blocker
+rather than guessing. Resolve it, then re-run; the merged work isn't repeated.
+
+**Too many worktrees at once.** Lower `--cap`. A smaller cap trades wall-clock for less load and
+fewer merge conflicts on a busy repo.
+
+**A queued issue never started.** It was blocked by one still in flight. `cckit sync` shows what's
+gating it; it starts automatically once its blocker merges.
+
+## Related tutorials
+
+<CardGrid>
+  <LinkCard title="Run issues in parallel with a wave" href="/tutorials/run-issues-in-parallel-with-a-wave/" description="The attended version — fan out and gate a single wave." />
+  <LinkCard title="Break a big feature into an effort" href="/tutorials/break-a-feature-into-an-effort/" description="Create the backlog of sub-issues to clear." />
+  <LinkCard title="Drive Claude Code headless in CI" href="/tutorials/drive-claude-code-headless-in-ci/" description="Run with no human at all, consuming JSON." />
+</CardGrid>
+
+<TutorialSchema
+  steps={[
+    { name: 'Dry-run the launch plan', text: 'Ask to see the launch plan before anything runs. cckit orchestrate --dry-run resolves and prints the plan without creating anything.' },
+    { name: 'Launch with a concurrency cap', text: 'Once the plan looks right, run cckit orchestrate --cap 3 with the issue numbers to launch at most three concurrent worktrees; the rest queue.' },
+    { name: 'Or let autopilot pick the work', text: 'For a fully unattended run, cckit autopilot --cap 3 auto-selects ready issues and drives each to merged, pinging you only on a genuine blocker.' },
+  ]}
+  faqs={[
+    { q: 'It stopped on a blocker', a: 'By design, unattended runs ping you only on a genuine blocker rather than guessing. Resolve it and re-run; merged work is not repeated.' },
+    { q: 'Too many worktrees at once', a: 'Lower --cap. A smaller cap trades wall-clock for less load and fewer merge conflicts on a busy repo.' },
+    { q: 'A queued issue never started', a: 'It was blocked by one still in flight. cckit sync shows what is gating it; it starts automatically once its blocker merges.' },
+  ]}
+/>

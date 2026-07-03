@@ -1,0 +1,99 @@
+---
+title: How to add cckit to an existing repo without disrupting it
+description: Bring cckit to a project that already has its own structure — scan the repo, scaffold config, record the kit-shaped files it already has, and confirm the board, all without restructuring anything.
+tutorial:
+  job: add cckit to an existing repo without disrupting it
+  difficulty: beginner
+  time: "5 min"
+  prerequisites: ["an existing Git repo", "gh (authenticated)"]
+  ogTag: Adoption
+  keywords: [adopt cckit existing project, add cckit to repo, claude code existing codebase]
+  related: [set-up-cckit-in-a-repo, take-a-github-issue-to-a-merged-pr, drive-claude-code-headless-in-ci]
+---
+
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import TagRow from '../../../components/TagRow.astro';
+import TutorialMeta from '../../../components/TutorialMeta.astro';
+import TutorialSchema from '../../../components/TutorialSchema.astro';
+
+<TagRow kinds={["flow", "conversational"]} />
+
+<TutorialMeta />
+
+**What you'll do:** bring cckit into a project that already has its own layout — nothing above the kit
+is restructured. cckit looks at what's already there, adds its config, and records the kit-shaped
+files the repo already has, then confirms everything's wired up.
+
+## Steps
+
+<Steps>
+
+1. **Ask Claude to adopt the repo.**
+
+   <div class="cckit-prompt">
+
+   ```text frame="terminal" title="Prompt to paste"
+   Bring cckit into this existing project without disturbing its layout. Look at what's already here,
+   add its config, and record the kit-shaped files the repo already has. Then confirm everything's
+   wired up.
+   ```
+
+   </div>
+
+2. **cckit scans, scaffolds, and adopts.**
+
+   ```bash frame="terminal"
+   cckit scan      # detect the repo's stack + current kit state
+   cckit init      # scaffold cckit.config.json + .claude/
+   cckit adopt     # record kit-shaped files the repo already has
+   cckit status    # confirm the board + worktrees + handoff view
+   ```
+
+3. **Confirm nothing else moved.** `status` shows the board, any worktrees, and the handoff view.
+   Your existing files and structure are untouched — only cckit's own config was added.
+
+</Steps>
+
+## How it works
+
+Adoption is deliberately additive. `scan` reads your stack and current state so cckit knows what it's
+joining; `init` writes only its own `cckit.config.json` and `.claude/`; `adopt` records the
+kit-shaped files you already have so cckit manages them in place instead of duplicating them. Because
+everything resolves from the config, cckit adapts to your repo — your repo never adapts to cckit.
+
+<Aside type="tip" title="Additive, not a rewrite">
+No company, framework, or repo layout is baked into cckit. Adoption adds a config and records what
+exists; it never reshapes your project.
+</Aside>
+
+## Troubleshooting
+
+**`adopt` didn't pick up a file I expected.** It records the kit-shaped files it recognizes. If one
+was missed, add it to `cckit.config.json` and re-run `status` to confirm it's tracked.
+
+**I already ran `init` elsewhere.** `init` is idempotent — running it on an already-configured repo
+leaves your existing config in place rather than overwriting it.
+
+**The board looks empty.** That's expected on a fresh adoption — there are no issues in flight yet.
+Start one with the [single-issue lifecycle](/tutorials/take-a-github-issue-to-a-merged-pr/).
+
+## Related tutorials
+
+<CardGrid>
+  <LinkCard title="Set up cckit in a repo" href="/tutorials/set-up-cckit-in-a-repo/" description="The from-scratch version for a new repo." />
+  <LinkCard title="Take a GitHub issue to a merged PR" href="/tutorials/take-a-github-issue-to-a-merged-pr/" description="Run your first lifecycle after adopting." />
+  <LinkCard title="Drive Claude Code headless in CI" href="/tutorials/drive-claude-code-headless-in-ci/" description="Wire the adopted repo into a bot." />
+</CardGrid>
+
+<TutorialSchema
+  steps={[
+    { name: 'Ask Claude to adopt the repo', text: 'Describe the intent — bring cckit into the existing project without disturbing its layout, add config, and record the kit-shaped files it already has.' },
+    { name: 'cckit scans, scaffolds, and adopts', text: 'cckit scan detects the stack and kit state; init scaffolds cckit.config.json and .claude/; adopt records existing kit-shaped files; status confirms the board and worktrees.' },
+    { name: 'Confirm nothing else moved', text: 'status shows the board, worktrees, and handoff view. Existing files and structure are untouched — only cckit config was added.' },
+  ]}
+  faqs={[
+    { q: "adopt didn't pick up a file I expected", a: 'It records the kit-shaped files it recognizes. Add the missed file to cckit.config.json and re-run status to confirm it is tracked.' },
+    { q: 'I already ran init elsewhere', a: 'init is idempotent — on an already-configured repo it leaves your existing config in place rather than overwriting it.' },
+    { q: 'The board looks empty', a: 'Expected on a fresh adoption — nothing is in flight yet. Start one with the single-issue lifecycle.' },
+  ]}
+/>

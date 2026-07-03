@@ -1,0 +1,105 @@
+---
+title: How to break a big feature into a tracked effort with Claude Code
+description: Turn a feature that's too big for one PR into a cckit effort — a parent issue plus native sub-issues — sized, built in parallel where safe, and shipped as a single pull request.
+tutorial:
+  job: break a big feature into a tracked effort
+  difficulty: intermediate
+  time: "7 min"
+  prerequisites: ["cckit installed and initialized"]
+  ogTag: Planning
+  keywords: [plan a large feature with ai, break down feature github sub-issues, claude code effort]
+  related: [take-a-github-issue-to-a-merged-pr, run-issues-in-parallel-with-a-wave, run-claude-code-unattended]
+---
+
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import TagRow from '../../../components/TagRow.astro';
+import TutorialMeta from '../../../components/TutorialMeta.astro';
+import TutorialSchema from '../../../components/TutorialSchema.astro';
+
+<TagRow kinds={["flow", "concept"]} />
+
+<TutorialMeta />
+
+**What you'll do:** turn one goal that's too big for a single PR into a tracked **effort** — a parent
+issue with a sub-issue for each independent piece. The parent issue *is* the plan, so the agent reads
+it instead of a separate doc. You build the pieces in parallel where they don't touch the same files,
+then ship the whole thing as one pull request.
+
+## Steps
+
+<Steps>
+
+1. **Ask Claude to make it an effort.** Describe the goal and that it's too big for one PR.
+
+   <div class="cckit-prompt">
+
+   ```text frame="terminal" title="Prompt to paste"
+   This work is too big for one PR — turn it into a tracked effort. Break it into a sub-task for each
+   independent piece, size the work first, then build the pieces (in parallel where they don't touch
+   the same files) and open a single PR for the whole effort once they're done.
+   ```
+
+   </div>
+
+2. **cckit creates and runs the effort.**
+
+   ```bash frame="terminal"
+   cckit effort plan              # session-fit plan over open efforts
+   cckit effort new "Auth rework" # parent issue + native sub-issues, all on the board
+   cckit effort start <N>         # integration branch effort/<N> + worktree
+   # …build sub-issues on the effort branch (sequential) or in worktrees (parallel)…
+   cckit effort pr <N>            # ONE PR: effort/<N> → base branch
+   cckit effort close <N>         # squash-merge, close parent + all subs, garbage-collect
+   ```
+
+3. **Ship it as one PR.** `effort pr` opens a single pull request for the whole effort; `effort close`
+   squash-merges it and closes the parent and every sub-issue together.
+
+</Steps>
+
+## How it works
+
+`cckit effort new` fills the parent's four-section body (Goal / Scope / For agents / Verification),
+applies the `ctx/kind/priority/role/flow` labels, and lints every title up front — so a bad sub name
+fails before anything is created. cckit reads the sub-issues' *blocked-by* links and sorts them into
+**waves**: everything unblocked runs together, dependents wait their turn. Each effort also gets a
+memorable **slug** handle (`effort/<N>-<slug>`), so `start`, `pr`, and `close` accept the slug or the
+number interchangeably.
+
+<Aside type="note" title="The number stays canonical">
+The slug is a convenience; the GitHub issue number is still what the sub-issues, PRs, and labels all
+point at. Pass a pure-digits argument and it's always treated as the number.
+</Aside>
+
+## Troubleshooting
+
+**A sub title was rejected.** cckit lints every title up front (≤ 6 words, no jargon) and aborts the
+whole operation before creating a half-effort. Shorten the failing sub name and re-run — the detail
+belongs in the body, not the title.
+
+**Two sub-issues keep colliding.** They touch the same files, so they belong in different waves. Add
+a *blocked-by* link between them; cckit will schedule the dependent one in a later wave.
+
+**Flags were treated as sub-issues.** Pass `--flow`, `--role`, and `--priority` **before** the effort
+name, not after the sub list — the parser reads flags first, then everything else as sub-specs.
+
+## Related tutorials
+
+<CardGrid>
+  <LinkCard title="Take a GitHub issue to a merged PR" href="/tutorials/take-a-github-issue-to-a-merged-pr/" description="The single-issue lifecycle an effort is built from." />
+  <LinkCard title="Run issues in parallel with a wave" href="/tutorials/run-issues-in-parallel-with-a-wave/" description="Fan a wave of sub-issues out into parallel work." />
+  <LinkCard title="Run Claude Code unattended" href="/tutorials/run-claude-code-unattended/" description="Drive the effort's waves overnight." />
+</CardGrid>
+
+<TutorialSchema
+  steps={[
+    { name: 'Ask Claude to make it an effort', text: 'Describe the goal and that it is too big for one PR. Ask to break it into a sub-task per independent piece and size the work first.' },
+    { name: 'cckit creates and runs the effort', text: 'cckit effort new creates the parent issue and native sub-issues; effort start makes the integration branch and worktree; build the subs on the branch or in worktrees.' },
+    { name: 'Ship it as one PR', text: 'cckit effort pr opens a single pull request for the whole effort; effort close squash-merges it and closes the parent and every sub-issue together.' },
+  ]}
+  faqs={[
+    { q: 'A sub title was rejected', a: 'cckit lints every title up front (<= 6 words, no jargon) and aborts before creating a half-effort. Shorten the failing sub name; detail belongs in the body.' },
+    { q: 'Two sub-issues keep colliding', a: 'They touch the same files, so they belong in different waves. Add a blocked-by link and cckit schedules the dependent one later.' },
+    { q: 'Flags were treated as sub-issues', a: 'Pass --flow, --role and --priority before the effort name, not after the sub list — the parser reads flags first, then everything else as sub-specs.' },
+  ]}
+/>

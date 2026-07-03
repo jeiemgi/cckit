@@ -1,0 +1,91 @@
+---
+title: How to control what Claude Code is allowed to do
+description: Understand cckit's permission gate — read-only by default in an unknown repo, explicit consent recorded before the first mutation, and a separate confirmation for destructive operations.
+tutorial:
+  job: control what Claude Code is allowed to do
+  difficulty: intermediate
+  time: "5 min"
+  prerequisites: ["cckit installed and initialized"]
+  ogTag: Security
+  keywords: [claude code permissions, ai agent permissions, control what ai can do repo]
+  related: [stop-claude-committing-secrets, keep-private-data-out-of-ai-commits, run-checks-with-cckit-hooks]
+---
+
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import TagRow from '../../../components/TagRow.astro';
+import TutorialMeta from '../../../components/TutorialMeta.astro';
+import TutorialSchema from '../../../components/TutorialSchema.astro';
+
+<TagRow kinds={["concept"]} />
+
+<TutorialMeta />
+
+**What you'll understand:** cckit asks before it changes anything in a repo it hasn't worked in
+before. This tutorial walks the permission gate — how consent is recorded, what always runs
+regardless, and what needs a separate confirmation — so you know exactly what an agent driving cckit
+can and can't do on your behalf.
+
+## Steps
+
+<Steps>
+
+1. **Start read-only.** In an unknown repo, cckit is read-only by default. Point it at the project and
+   inspect state without granting anything:
+
+   ```bash frame="terminal"
+   cckit scan --llm    # detect repo root, stack hints, and kit state — reads only
+   ```
+
+2. **Consent is recorded before the first mutation.** The first time cckit is about to *change*
+   something, it records your yes in `.cckit/consent` (gitignored) — so consent is explicit, local,
+   and never committed.
+
+3. **Destructive operations still ask every time.** Force-push, repo creation, and history rewrites
+   always require a separate, explicit confirmation — consent to mutate does not cover them.
+
+</Steps>
+
+## How it works
+
+cckit resolves its config by walking up from where you invoke it (nearest wins: `$KIT_CONFIG`, then
+`cckit.config.json`, then `.claude/kit.config.json`, then its own fallback) — no org, repo, or path is
+hardcoded. Everything it writes about *you* — consent, identity, your privacy denylist — lands in
+`.cckit/`, which is gitignored, so it never leaves your machine. Two things are **not** negotiable:
+the secret and privacy guard always runs before anything is committed, and consent never bypasses it.
+
+<Aside type="note" title="Consent is per-repo and local">
+The recorded yes in `.cckit/consent` applies to that repo only and stays on your machine. A new repo
+starts read-only again.
+</Aside>
+
+## Troubleshooting
+
+**cckit won't mutate the repo.** It hasn't recorded consent yet. The first mutating operation prompts
+for it; approve once and it's stored in `.cckit/consent`.
+
+**A destructive op keeps asking.** By design — force-push, repo create, and history rewrite always
+require explicit confirmation, even after you've consented to ordinary mutations.
+
+**The guard blocked a commit even though I consented.** Consent doesn't bypass the secret/privacy
+guard — that always runs. See [stop Claude committing secrets](/tutorials/stop-claude-committing-secrets/).
+
+## Related tutorials
+
+<CardGrid>
+  <LinkCard title="Stop Claude Code from committing secrets" href="/tutorials/stop-claude-committing-secrets/" description="The guard that runs regardless of consent." />
+  <LinkCard title="Keep private & company data out of AI commits" href="/tutorials/keep-private-data-out-of-ai-commits/" description="Your local denylist, stored in .cckit/." />
+  <LinkCard title="Run checks automatically with cckit hooks" href="/tutorials/run-checks-with-cckit-hooks/" description="The guards that fire before a command runs." />
+</CardGrid>
+
+<TutorialSchema
+  steps={[
+    { name: 'Start read-only', text: 'In an unknown repo cckit is read-only by default. cckit scan --llm detects repo root, stack hints, and kit state without granting anything.' },
+    { name: 'Consent is recorded before the first mutation', text: 'The first time cckit is about to change something it records your yes in .cckit/consent (gitignored) — explicit, local, and never committed.' },
+    { name: 'Destructive operations still ask every time', text: 'Force-push, repo creation, and history rewrites always require a separate explicit confirmation; consent to mutate does not cover them.' },
+  ]}
+  faqs={[
+    { q: "cckit won't mutate the repo", a: 'It has not recorded consent yet. The first mutating operation prompts for it; approve once and it is stored in .cckit/consent.' },
+    { q: 'A destructive op keeps asking', a: 'By design — force-push, repo create, and history rewrite always require explicit confirmation, even after you consent to ordinary mutations.' },
+    { q: 'The guard blocked a commit even though I consented', a: 'Consent does not bypass the secret/privacy guard — that always runs before anything is committed.' },
+  ]}
+/>

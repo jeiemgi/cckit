@@ -1,0 +1,97 @@
+---
+title: How to extend Claude Code with cckit skills
+description: Run cckit's packaged skills from Claude Code — /kit-next, /kit-ship, /kit-effort-new and more — trigger them by slash command or plain description, and add your own with kit-customize.
+tutorial:
+  job: extend Claude Code with cckit skills
+  difficulty: beginner
+  time: "5 min"
+  prerequisites: ["cckit installed and initialized", "Claude Code"]
+  ogTag: Skills
+  keywords: [claude code skills, slash commands claude code, extend claude code]
+  related: [debug-a-web-page-with-claude-code, take-a-github-issue-to-a-merged-pr, break-a-feature-into-an-effort]
+---
+
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import TagRow from '../../../components/TagRow.astro';
+import TutorialMeta from '../../../components/TutorialMeta.astro';
+import TutorialSchema from '../../../components/TutorialSchema.astro';
+
+<TagRow kinds={["skill", "conversational"]} />
+
+<TutorialMeta />
+
+**What you'll do:** a skill is a packaged instruction set Claude Code can run. cckit installs a set
+covering the whole lifecycle — the everyday loop, one-issue tasks, efforts, maintenance, and
+authoring. You run each with a `/` slash command, and many also trigger when you just describe the
+task in plain words.
+
+## Steps
+
+<Steps>
+
+1. **See what's installed.** `cckit init` scaffolds the skills into the project. In Claude Code, type
+   `/` to list them — they're prefixed `kit-` (for example `/kit-next`, `/kit-ship`,
+   `/kit-effort-new`).
+
+2. **Run one by slash command or by description.** Type the skill directly, or just say what you want
+   — a conversational skill triggers from plain intent:
+
+   <div class="cckit-prompt">
+
+   ```text frame="terminal" title="Two ways to trigger the same skill"
+   /kit-ship
+   — or —
+   Take this request all the way to a merged PR.
+   ```
+
+   </div>
+
+3. **Add your own.** Use `kit-customize` to add or edit agents and skills in a project, and
+   `kit-contribute` to open a PR that sends your additions upstream.
+
+</Steps>
+
+## How it works
+
+Every skill maps to a job in the lifecycle: `kit-next` picks up the next unblocked issue, `kit-ship`
+goes from one request to merged, `kit-effort-new` creates a parent plus sub-issues, `kit-gc` prunes
+merged branches, `kit-security-sweep` audits for injection/auth/CORS issues. Skills marked
+*conversational* also fire from plain description — asking to "contribute this upstream" starts
+`kit-contribute` without you typing the slash command.
+
+<Aside type="note" title="Running a skill">
+In Claude Code, type `/` and the skill name (for example `/kit-next`). See the full list on the
+[Skills cckit ships](/skills/) reference page.
+</Aside>
+
+## Troubleshooting
+
+**The `/kit-` skills don't show up.** They're scaffolded by `cckit init`. Run it in the repo, then
+reload Claude Code so it picks up the new skills.
+
+**A conversational skill didn't trigger.** Be explicit — name the job clearly, or just run the slash
+command directly (`/kit-contribute`) instead of relying on phrasing.
+
+**I want a project-specific skill.** Use `kit-customize` to add one in the project; it lives alongside
+the shipped skills and you can send it upstream with `kit-contribute`.
+
+## Related tutorials
+
+<CardGrid>
+  <LinkCard title="Let Claude Code debug a web page" href="/tutorials/debug-a-web-page-with-claude-code/" description="A command-driven capability skills build on." />
+  <LinkCard title="Take a GitHub issue to a merged PR" href="/tutorials/take-a-github-issue-to-a-merged-pr/" description="What /kit-ship runs end to end." />
+  <LinkCard title="Break a big feature into an effort" href="/tutorials/break-a-feature-into-an-effort/" description="What /kit-effort-new sets up." />
+</CardGrid>
+
+<TutorialSchema
+  steps={[
+    { name: "See what's installed", text: 'cckit init scaffolds the skills into the project. In Claude Code, type / to list them — they are prefixed kit- (for example /kit-next, /kit-ship, /kit-effort-new).' },
+    { name: 'Run one by slash command or by description', text: 'Type the skill directly, or just describe the task — a conversational skill triggers from plain intent.' },
+    { name: 'Add your own', text: 'Use kit-customize to add or edit agents and skills in a project, and kit-contribute to open a PR that sends your additions upstream.' },
+  ]}
+  faqs={[
+    { q: "The /kit- skills don't show up", a: 'They are scaffolded by cckit init. Run it in the repo, then reload Claude Code so it picks up the new skills.' },
+    { q: "A conversational skill didn't trigger", a: 'Be explicit — name the job clearly, or run the slash command directly instead of relying on phrasing.' },
+    { q: 'I want a project-specific skill', a: 'Use kit-customize to add one in the project; it lives alongside the shipped skills and you can send it upstream with kit-contribute.' },
+  ]}
+/>

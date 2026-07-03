@@ -3,6 +3,8 @@ import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 import starlightDocSearch from '@astrojs/starlight-docsearch';
 import react from '@astrojs/react';
+import sitemap from '@astrojs/sitemap';
+import rehypeExternalLinks from 'rehype-external-links';
 
 // .env files are NOT injected into process.env inside astro.config.mjs. Vercel DOES populate
 // process.env from the project's env vars at build, so prefer that; locally, fall back to parsing
@@ -53,6 +55,11 @@ export default defineConfig({
     '/run-your-first-lifecycle': '/initialize/', // lifecycle page reframed as the init tutorial
   },
   vite: { define: { __CCKIT_VERSION__: JSON.stringify(pkg.version) } },
+  // External links open in a new tab (safely) and get an "opens externally" icon via CSS
+  // (a[target="_blank"] in theme.css). Relative in-site links are untouched.
+  markdown: {
+    rehypePlugins: [[rehypeExternalLinks, { target: '_blank', rel: ['noopener', 'noreferrer'] }]],
+  },
   integrations: [
     react(),
     starlight({
@@ -71,21 +78,21 @@ export default defineConfig({
         // Agentation toolbar lives in a SEPARATE override (PageSidebar) that's registered only in
         // dev, so its island is never collected into the production build.
         Footer: './src/components/Footer.astro',
+        // Head override swaps the single global og.png for a per-page generated card
+        // (/og/<id>.png). Its per-page og:image/twitter:image replace the global ones below.
+        Head: './src/components/Head.astro',
         ...(DEV ? { PageSidebar: './src/components/DevAnnotate.astro' } : {}),
       },
-      description: 'A project operating system for coding agents — the full GitHub work lifecycle as a CLI, drivable by Claude Code and any agent.',
+      description: 'Be the architect — cckit runs the mechanics. The full GitHub work lifecycle as a CLI that turns your Git into retrievable, efficient context, drivable by Claude Code and any agent.',
       social: { github: 'https://github.com/jeiemgi/cckit' },
       favicon: '/favicon.svg',
-      // SEO / social share. Starlight already emits canonical, description, sitemap, and
-      // title/OG tags from `site` + page frontmatter; this adds the social image + card type.
+      // SEO / social share. Starlight emits canonical, description, sitemap, and title/OG tags from
+      // `site` + page frontmatter; the per-page og:image/twitter:image are emitted by the Head
+      // override (src/components/Head.astro) so each page gets its own generated card.
       head: [
         // Algolia site verification — lets the Algolia Crawler confirm ownership of the site.
         { tag: 'meta', attrs: { name: 'algolia-site-verification', content: '9E796471F3020A1F' } },
-        { tag: 'meta', attrs: { property: 'og:image', content: 'https://cckit.vercel.app/og.png' } },
-        { tag: 'meta', attrs: { property: 'og:image:alt', content: 'cckit — the full GitHub work lifecycle as a CLI' } },
         { tag: 'meta', attrs: { property: 'og:type', content: 'website' } },
-        { tag: 'meta', attrs: { name: 'twitter:card', content: 'summary_large_image' } },
-        { tag: 'meta', attrs: { name: 'twitter:image', content: 'https://cckit.vercel.app/og.png' } },
       ],
       // The Designer owns the visual theme — this file is the single hook (elegant + sober,
       // never Claude/Anthropic colors). Placeholder until the Designer's spec lands.
@@ -95,6 +102,7 @@ export default defineConfig({
       //   Reference — look things up. Each group is one kind of content, not a stage.
       sidebar: [
         { label: 'Get started', items: [
+          { label: 'The idea', slug: 'philosophy', badge: { text: 'Human-written', variant: 'tip' } },
           { label: 'Overview', slug: 'index' },
           { label: 'How to read this guide', slug: 'how-to-read' },
           { label: 'Quickstart', slug: 'getting-started', badge: { text: 'Start here', variant: 'success' } },
@@ -104,6 +112,23 @@ export default defineConfig({
           { label: 'Set up memory', slug: 'memory', badge: { text: 'Optional', variant: 'note' } },
           { label: 'Adopting cckit on a repo', slug: 'adoption' },
           { label: 'Showcase', slug: 'showcase' },
+        ]},
+        { label: 'Tutorials', items: [
+          { label: 'All tutorials', slug: 'tutorials' },
+          { label: 'Set up cckit in a repo', slug: 'tutorials/set-up-cckit-in-a-repo' },
+          { label: 'Add cckit to an existing repo', slug: 'tutorials/adopt-cckit-in-an-existing-repo' },
+          { label: 'Issue → merged PR', slug: 'tutorials/take-a-github-issue-to-a-merged-pr' },
+          { label: 'Break a feature into an effort', slug: 'tutorials/break-a-feature-into-an-effort' },
+          { label: 'Run a wave in parallel', slug: 'tutorials/run-issues-in-parallel-with-a-wave' },
+          { label: 'Run Claude Code unattended', slug: 'tutorials/run-claude-code-unattended' },
+          { label: 'Drive Claude Code headless in CI', slug: 'tutorials/drive-claude-code-headless-in-ci' },
+          { label: 'Stop Claude committing secrets', slug: 'tutorials/stop-claude-committing-secrets' },
+          { label: 'Keep private data out of AI commits', slug: 'tutorials/keep-private-data-out-of-ai-commits' },
+          { label: 'Control what Claude Code can do', slug: 'tutorials/control-what-claude-code-can-do' },
+          { label: 'Give Claude Code persistent memory', slug: 'tutorials/give-claude-code-persistent-memory' },
+          { label: 'Run checks with cckit hooks', slug: 'tutorials/run-checks-with-cckit-hooks' },
+          { label: 'Debug a web page with Claude Code', slug: 'tutorials/debug-a-web-page-with-claude-code' },
+          { label: 'Extend Claude Code with skills', slug: 'tutorials/extend-claude-code-with-skills' },
         ]},
         { label: 'Concepts', items: [
           { label: 'The GitHub cycle', slug: 'github-cycle' },
@@ -130,5 +155,9 @@ export default defineConfig({
         ]},
       ],
     }),
+    // Starlight uses this sitemap integration instead of its default when one is present. Keep the
+    // /social/ export templates (IG feed + story cards) out of the sitemap — they're internal
+    // manual-post assets, not pages we want crawled or indexed.
+    sitemap({ filter: (page) => !page.includes('/social/') }),
   ],
 });

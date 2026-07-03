@@ -1,0 +1,101 @@
+---
+title: How to give Claude Code persistent project memory
+description: Turn on cckit's optional memory layer so Claude Code wakes up already knowing your project — decisions, context, and history persist across sessions instead of being re-explained every time.
+tutorial:
+  job: give Claude Code persistent project memory
+  difficulty: intermediate
+  time: "6 min"
+  prerequisites: ["cckit installed and initialized", "pipx or uv"]
+  ogTag: Memory
+  keywords: [claude code memory, persistent ai memory, claude code context across sessions]
+  related: [run-checks-with-cckit-hooks, set-up-cckit-in-a-repo, drive-claude-code-headless-in-ci]
+---
+
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import TagRow from '../../../components/TagRow.astro';
+import TutorialMeta from '../../../components/TutorialMeta.astro';
+import TutorialSchema from '../../../components/TutorialSchema.astro';
+
+<TagRow kinds={["flow"]} />
+
+<TutorialMeta />
+
+**What you'll set up:** coding agents are stateless — every session starts from zero, so you keep
+re-explaining the same architecture and re-deriving decisions you already made. cckit's optional
+memory layer (powered by the open-source **MemPalace**) wires four hooks so each session wakes up
+already knowing your project and files its work back on its own. The wake-up costs ~600–900 tokens,
+leaving 95%+ of the window for real work.
+
+## Steps
+
+<Steps>
+
+1. **Enable memory when you initialize.** Say *yes* to memory at `cckit init`, or pass it explicitly:
+
+   ```bash frame="terminal"
+   cckit init --profile software --memory on
+   ```
+
+2. **Let doctor install the engine.** `cckit doctor` sees memory is on and installs the MemPalace CLI
+   into an isolated environment, then points you at the MCP wiring:
+
+   ```bash frame="terminal"
+   cckit doctor     # installs mempalace + seeds this project's wake-up header
+   mempalace mcp    # print the MCP-server setup line for Claude Code
+   ```
+
+   Prefer to do it by hand? `pipx install mempalace`.
+
+3. **That's it.** Every session now loads a wing-scoped wake-up header plus your project's recent
+   decisions. The full recall/record protocol lives in the scaffolded `.claude/rules/mempalace.md` —
+   you never have to say "remember this".
+
+</Steps>
+
+## How it works
+
+Memory is first-class in the lifecycle, not a bolt-on. Four hooks wire it into every session:
+`SessionStart` loads a wing-scoped wake-up, `Stop` files the finished session, `PreCompact` sweeps to
+memory before the window compresses, and `SessionEnd` catches unsynced work if a session ends
+abruptly. Each project gets **one wing**, so memories never bleed across repos, and `cckit doctor`
+keeps the layer healthy as the kit evolves.
+
+<Aside type="tip" title="Built on MemPalace — credit where it's due">
+The memory engine, palace format, and MCP server are the work of the open-source
+[MemPalace](https://github.com/MemPalace/mempalace) project. cckit only scaffolds the hooks and the
+per-wing header — MemPalace does the remembering. cckit is not affiliated with the project; direct
+MemPalace bugs to its own issue tracker.
+</Aside>
+
+## Troubleshooting
+
+**`doctor` didn't install MemPalace.** It only installs it when memory is on. Re-run `cckit init` with
+`--memory on` (or answer yes), then `cckit doctor`.
+
+**Claude isn't recalling anything.** Confirm the MCP server line from `mempalace mcp` is wired into
+Claude Code, and that `.claude/rules/mempalace.md` exists — it's what teaches Claude to recall before
+answering.
+
+**Memories from another repo showed up.** They shouldn't — memory is scoped per wing (one per
+project). Check you're in the right repo and that its wing name in the config is unique.
+
+## Related tutorials
+
+<CardGrid>
+  <LinkCard title="Run checks automatically with cckit hooks" href="/tutorials/run-checks-with-cckit-hooks/" description="The hook system memory plugs into." />
+  <LinkCard title="Set up cckit in a repo" href="/tutorials/set-up-cckit-in-a-repo/" description="Initialize the repo where you turn memory on." />
+  <LinkCard title="Drive Claude Code headless in CI" href="/tutorials/drive-claude-code-headless-in-ci/" description="Keep hand-offs token-lean, memory included." />
+</CardGrid>
+
+<TutorialSchema
+  steps={[
+    { name: 'Enable memory when you initialize', text: 'Say yes to memory at cckit init, or pass it explicitly with cckit init --profile software --memory on.' },
+    { name: 'Let doctor install the engine', text: 'cckit doctor installs the MemPalace CLI into an isolated environment and seeds the wake-up header; mempalace mcp prints the MCP-server setup line for Claude Code.' },
+    { name: 'Confirm the wake-up loads', text: 'Every session now loads a wing-scoped wake-up header plus recent decisions. The recall/record protocol lives in .claude/rules/mempalace.md.' },
+  ]}
+  faqs={[
+    { q: "doctor didn't install MemPalace", a: 'It only installs when memory is on. Re-run cckit init with --memory on (or answer yes), then cckit doctor.' },
+    { q: "Claude isn't recalling anything", a: 'Confirm the MCP server line from mempalace mcp is wired into Claude Code and that .claude/rules/mempalace.md exists — it teaches Claude to recall before answering.' },
+    { q: 'Memories from another repo showed up', a: 'Memory is scoped per wing (one per project). Check you are in the right repo and its wing name is unique.' },
+  ]}
+/>

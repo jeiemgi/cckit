@@ -1,0 +1,104 @@
+---
+title: How to take a GitHub issue to a merged PR with Claude Code
+description: Drive one GitHub issue through its whole lifecycle with cckit — isolated worktree, focused change, pull request, close, and cleanup — each step one command.
+tutorial:
+  job: take a GitHub issue to a merged PR
+  difficulty: beginner
+  time: "6 min"
+  prerequisites: ["cckit installed and initialized", "an open issue"]
+  ogTag: Lifecycle
+  keywords: [ai agent github issue to pr, claude code pull request, automate github workflow]
+  related: [set-up-cckit-in-a-repo, break-a-feature-into-an-effort, run-issues-in-parallel-with-a-wave]
+---
+
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import TagRow from '../../../components/TagRow.astro';
+import TutorialMeta from '../../../components/TutorialMeta.astro';
+import TutorialSchema from '../../../components/TutorialSchema.astro';
+
+<TagRow kinds={["flow", "conversational"]} />
+
+<TutorialMeta />
+
+**What you'll do:** take a single issue from the board all the way to a merged pull request — on its
+own isolated branch and worktree, with the change kept focused on that one issue. Each step is one
+cckit verb, correct by construction: the agent runs them in order and never improvises branch or PR
+plumbing.
+
+## Steps
+
+<Steps>
+
+1. **Pick the next ready issue.** Ask Claude to read the board and take the top unblocked issue all
+   the way to merged.
+
+   <div class="cckit-prompt">
+
+   ```text frame="terminal" title="Prompt to paste"
+   Check the board and pick the next issue that's ready. Take it all the way to a merged PR —
+   work it on its own isolated branch, keep the change focused, and open the pull request.
+   When it's merged, clean up and tell me the PR link.
+   ```
+
+   </div>
+
+2. **cckit runs the lifecycle.** Each verb moves the board and the git state together:
+
+   ```bash frame="terminal"
+   cckit next                       # find the next unblocked issue + its start command
+   cckit start <issue>              # worktree + branch, board → In Progress
+   # …agent makes the focused change in the new worktree…
+   cckit pr <issue> "<summary>"     # commit, push, open the PR, board → In Review
+   cckit close <issue> "<summary>"  # close the issue, board → Done
+   cckit gc --prune --yes           # remove the merged branch + worktree
+   ```
+
+3. **Confirm and clean up.** When the PR merges, `gc` prunes the branch and worktree so nothing is
+   left behind. `cckit sync` at any point shows the current board and what's unblocked next.
+
+</Steps>
+
+## How it works
+
+The lifecycle is one source of truth: starting an issue creates an isolated worktree and branch, so
+the change can't collide with anything else you're running. The PR, the board columns, and the branch
+all reference the same issue number — you never wire them up by hand, which is what "correct by
+construction" means here.
+
+<Aside type="tip" title="One issue, one worktree">
+`cckit start` makes the branch and the worktree in one step. The change lives in its own copy of the
+repo until the PR merges — see [Efforts, waves & worktrees](/efforts-and-waves/).
+</Aside>
+
+## Troubleshooting
+
+**A verb errored.** cckit is quiet by design — it prints little and just does each step. So when a
+verb errors, take it seriously; it usually means something is genuinely off (a missing dependency,
+a dirty tree, an auth gap). Read the message before retrying.
+
+**The change touched more than the issue.** Keep the worktree focused on the one issue. If scope
+grew, split it into an [effort](/tutorials/break-a-feature-into-an-effort/) with sub-issues instead.
+
+**`gc` didn't remove the branch.** `gc --prune` only removes branches whose PR has merged. If the PR
+is still open, finish the merge first, then run cleanup.
+
+## Related tutorials
+
+<CardGrid>
+  <LinkCard title="Set up cckit in a repo" href="/tutorials/set-up-cckit-in-a-repo/" description="Get the board and config ready first." />
+  <LinkCard title="Break a big feature into an effort" href="/tutorials/break-a-feature-into-an-effort/" description="When one issue is too big for a single PR." />
+  <LinkCard title="Run issues in parallel with a wave" href="/tutorials/run-issues-in-parallel-with-a-wave/" description="Clear a whole wave of ready work at once." />
+</CardGrid>
+
+<TutorialSchema
+  steps={[
+    { name: 'Pick the next ready issue', text: 'Ask Claude to read the board and take the top unblocked issue to merged on its own isolated branch, keeping the change focused.' },
+    { name: 'cckit runs the lifecycle', text: 'cckit next finds the issue; start makes the worktree and branch; pr commits, pushes and opens the PR; close closes the issue; gc --prune removes the merged branch and worktree.' },
+    { name: 'Confirm and clean up', text: 'When the PR merges, gc prunes the branch and worktree. cckit sync shows the current board and what is unblocked next.' },
+  ]}
+  faqs={[
+    { q: 'A cckit verb errored', a: 'cckit is quiet by design, so an error usually means something is genuinely off — a missing dependency, a dirty tree, or an auth gap. Read the message before retrying.' },
+    { q: 'The change touched more than the issue', a: 'Keep the worktree focused on one issue. If scope grew, split it into an effort with sub-issues.' },
+    { q: "gc didn't remove the branch", a: 'gc --prune only removes branches whose PR has merged. Finish the merge first, then run cleanup.' },
+  ]}
+/>
