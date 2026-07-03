@@ -1,0 +1,127 @@
+---
+// GDPR consent banner for GA4 (Google Consent Mode v2). Mounted from Footer.astro so it's on every
+// page, but rendered ONLY when GA is enabled (PUBLIC_GA_MEASUREMENT_ID set) — no GA, nothing to
+// consent to. The gtag `consent default` is already 'denied' (set in astro.config's head script)
+// before GA loads, so no cookies/identifiers are stored until the visitor clicks Accept here. The
+// choice persists in localStorage under 'cckit-consent' ('granted' | 'denied'); returning visitors
+// aren't re-prompted, and a stored 'granted' is re-applied early in the head script.
+//
+// PUBLIC_ vars are exposed to components via import.meta.env — this mirrors the head-array gate in
+// astro.config.mjs (which reads the same value through its own env helper), so banner and GA turn on
+// together. Undefined locally (var deliberately unset in dev) → no banner in `pnpm dev`, matching GA.
+const GA_ENABLED = Boolean(import.meta.env.PUBLIC_GA_MEASUREMENT_ID);
+---
+{GA_ENABLED && (
+  <div id="cckit-consent" class="cckit-consent" hidden role="dialog" aria-label="Cookie consent" aria-modal="false">
+    <p class="cckit-consent__text">
+      We use <strong>Google Analytics</strong> to see which docs help — nothing else. No cookies or
+      identifiers are set until you accept. More in our <a href="/disclaimer/">disclaimer</a>.
+    </p>
+    <div class="cckit-consent__actions">
+      <button type="button" class="cckit-consent__btn cckit-consent__btn--ghost" data-consent="denied">Reject</button>
+      <button type="button" class="cckit-consent__btn cckit-consent__btn--solid" data-consent="granted">Accept</button>
+    </div>
+  </div>
+
+  <style>
+    .cckit-consent {
+      position: fixed;
+      z-index: 100;
+      inset-inline: 0;
+      inset-block-end: 0;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem 1.5rem;
+      padding: 0.9rem 1.25rem calc(0.9rem + env(safe-area-inset-bottom));
+      background: var(--sl-color-bg-nav);
+      border-block-start: 1px solid var(--sl-color-gray-5);
+      box-shadow: var(--sl-shadow-lg);
+    }
+    .cckit-consent__text {
+      margin: 0;
+      max-width: 60ch;
+      font-size: var(--sl-text-sm);
+      line-height: 1.5;
+      color: var(--sl-color-gray-2);
+    }
+    .cckit-consent__text a { color: var(--sl-color-text-accent); }
+    .cckit-consent__actions {
+      display: flex;
+      gap: 0.6rem;
+      flex-shrink: 0;
+    }
+    .cckit-consent__btn {
+      cursor: pointer;
+      border-radius: 0.4rem;
+      padding: 0.4rem 1.1rem;
+      font: inherit;
+      font-size: var(--sl-text-sm);
+      font-weight: 600;
+      line-height: 1.4;
+      border: 1px solid transparent;
+      transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+    }
+    .cckit-consent__btn--solid {
+      background: var(--sl-color-accent);
+      color: var(--sl-color-text-invert);
+    }
+    .cckit-consent__btn--solid:hover { background: var(--sl-color-accent-high); }
+    .cckit-consent__btn--ghost {
+      background: transparent;
+      color: var(--sl-color-gray-2);
+      border-color: var(--sl-color-gray-4);
+    }
+    .cckit-consent__btn--ghost:hover {
+      color: var(--sl-color-white);
+      border-color: var(--sl-color-gray-3);
+    }
+    .cckit-consent__btn:focus-visible {
+      outline: 2px solid var(--sl-color-text-accent);
+      outline-offset: 2px;
+    }
+    @media (max-width: 30rem) {
+      .cckit-consent { justify-content: stretch; }
+      .cckit-consent__actions { width: 100%; }
+      .cckit-consent__btn { flex: 1; }
+    }
+  </style>
+
+  <script is:inline>
+    (function () {
+      var KEY = 'cckit-consent';
+      var el = document.getElementById('cckit-consent');
+      if (!el) return;
+
+      function hide() { el.hidden = true; }
+      function show() { el.hidden = false; }
+
+      function apply(choice) {
+        try { localStorage.setItem(KEY, choice); } catch (e) {}
+        // Reflect the choice to GA both ways: a mid-session switch to Reject must revoke, not just
+        // grant. The head script already defaulted analytics_storage to 'denied'.
+        if (typeof gtag === 'function') {
+          gtag('consent', 'update', { analytics_storage: choice === 'granted' ? 'granted' : 'denied' });
+        }
+      }
+
+      // First visit (no stored choice) → prompt. A stored 'granted' was already re-applied in the
+      // head script, so returning visitors stay tracked without seeing the banner again.
+      var stored;
+      try { stored = localStorage.getItem(KEY); } catch (e) {}
+      if (!stored) show();
+
+      // Delegated on document so the footer's "Cookie settings" trigger works no matter where it
+      // sits, and the handler is resilient to DOM re-render.
+      document.addEventListener('click', function (e) {
+        var opener = e.target.closest('[data-consent-open]');
+        if (opener) { e.preventDefault(); show(); return; }
+        var btn = e.target.closest('#cckit-consent [data-consent]');
+        if (!btn) return;
+        apply(btn.getAttribute('data-consent'));
+        hide();
+      });
+    })();
+  </script>
+)}
