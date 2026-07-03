@@ -73,11 +73,14 @@ The slug is a *derived* convenience, not a second source of truth. `--slug` only
   name `cckit gc` recognizes so it is never pruned while the effort issue is open.
 - **`cckit effort pr`** and the `/kit-effort-pr` skill compose the PR title from **one shared
   composer**, and both refuse to open a PR whose title lacks the mandatory `[#N]` effort id.
-- **`cckit effort close`** is the single close op: it snapshots each sub-issue's diff and captures
-  effort metrics **before** the squash, **refuses to squash-merge when no work trace was captured**
-  (the squash is irreversible — override with `KIT_FORCE=1`), squash-merges, closes the parent and
-  every sub, garbage-collects the worktree/branch, and runs an optional, config-gated
-  knowledge-ingest hook (`effort.knowledgeIngestHook`).
+- **`cckit effort close`** is the single close implementation — the `/kit-effort-close` skill is a
+  thin caller of the same function, so the two can never drift apart. It snapshots each sub-issue's
+  diff and captures effort metrics **before** the squash, **refuses to squash-merge when no work
+  trace was captured** (the squash is irreversible — override with `KIT_FORCE=1`), squash-merges,
+  closes the parent and every sub and sets the board **Status=Done** for each, garbage-collects the
+  worktree/branch, runs an optional, config-gated knowledge-ingest hook
+  (`effort.knowledgeIngestHook`), and finishes with an advisory **kit-sync drift check** that flags
+  any kit-managed files the effort touched (they belong upstream via `/kit-contribute`).
 
 ## Waves
 

@@ -7,6 +7,15 @@ All notable changes to cckit are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- The `/kit-effort-close` skill is now a **thin caller** of `effort_close` — the exact function
+  `cckit effort close` runs — so exactly ONE close implementation exists (the #121
+  single-implementation precedent, applied to the close). The two skill-only steps moved into the
+  verb: `effort_close` now sets the board **Status=Done** for the parent + every sub (guarded — a
+  no-op when Projects v2 is off or the board helpers aren't captured) and finishes with the
+  advisory **kit-sync drift check** flagging kit-managed files the effort touched (computed from
+  the pre-squash branch diff, so it survives the close's own branch GC). Previously the skill and
+  the verb each ran a divergent subset — the skill never captured the trace/telemetry and the verb
+  never updated the board (#148).
 - `init.sh --upgrade` (the `/kit-update` engine) now preserves existing project files it cannot
   prove it owns intact: the statusline wire step no longer replaces a customized (or
   manifest-untracked) `.claude/statusline.sh` shim with the template — the conffiles guard in

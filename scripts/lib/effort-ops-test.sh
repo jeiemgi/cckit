@@ -100,18 +100,36 @@ t  "effort_close did NOT merge without a trace" "$(grep -c 'pr merge' "$GH_LOG")
 
 # ── effort_close #120: happy path — commit present → trace captured → full close ────────────────
 # A real commit on the effort branch gives snapshot something to trace; close then proceeds through
-# capture (pre-squash) → merge → judge/sync → close subs+parent → worktree GC.
+# capture (pre-squash) → merge → judge/sync → close subs+parent → board Done → worktree GC →
+# kit-sync drift check (#148: board Done + drift check moved into the verb from the skill).
 echo "work" > file.txt
-git -c user.email=t@t -c user.name=t add file.txt
+mkdir -p .claude/skills
+echo "kit-managed" > .claude/skills/demo.md   # a kit-managed path → the drift check must fire (#148)
+git -c user.email=t@t -c user.name=t add file.txt .claude/skills/demo.md
 git -c user.email=t@t -c user.name=t commit -q -m "feat: do the thing (#101)"
+
+# #148: the VERB sets board Status=Done (guarded). Stub the board helpers + captured ids in-shell —
+# _eo_source_board must see them and skip sourcing the real gh-project.sh.
+BOARD_LOG="$tmp/board.log"; : > "$BOARD_LOG"
+project_find_item_by_issue() { echo "ITEM-$1"; }
+project_set_single_select()  { echo "$*" >> "$BOARD_LOG"; }
+export KIT_PROJECTS_V2="true" STATUS_FIELD_ID="SF1" STATUS_OPT_DONE="OPT_DONE"
+
 : > "$GH_LOG"
 close_out="$(effort_close 99 2>&1)"; rc=$?
+export KIT_PROJECTS_V2="false"
 cd "$tmp/work"   # our cwd (the effort worktree) is GC'd by the close — step to the main checkout
 t  "effort_close succeeds with a trace (rc 0)" "$rc" "0"
 tc "$GH_LOG" 'pr merge effort/99-demo .*--squash' "effort_close squash-merges the PR"
 tc "$GH_LOG" 'issue close 101'  "effort_close closes sub #101"
 tc "$GH_LOG" 'issue close 99 '  "effort_close closes the parent"
 case "$close_out" in *"metrics:"*) echo "ok: capture_effort_metrics composed into close" ;; *) echo "FAIL: no metrics capture in close"; fail=1 ;; esac
+# #148: board Status=Done for the parent + EVERY sub, set by the verb (was skill-only before)
+tc "$BOARD_LOG" 'ITEM-99 SF1 OPT_DONE'  "effort_close sets board Done for the parent"
+tc "$BOARD_LOG" 'ITEM-101 SF1 OPT_DONE' "effort_close sets board Done for sub #101"
+tc "$BOARD_LOG" 'ITEM-102 SF1 OPT_DONE' "effort_close sets board Done for sub #102"
+# #148: kit-sync drift check moved into the verb — a kit-managed path in the diff → advisory warning
+case "$close_out" in *"kit-sync"*".claude/skills/demo.md"*) echo "ok: kit-sync drift check warns on kit-managed files" ;; *) echo "FAIL: no kit-sync warning in close output"; fail=1 ;; esac
 t  "effort_close GC removed the effort worktree" \
    "$(git -C "$tmp/work" worktree list --porcelain | grep -c 'effort+99-demo')" "0"
 t  "effort_close GC deleted the local branch" \
@@ -128,10 +146,12 @@ chmod +x "$stub/khook"
 start_out="$(effort_start 88 forced 2>/dev/null)"
 cd "$tmp/work/.claude/worktrees/effort+88-forced"
 : > "$GH_LOG"
-KHOOK_MARKER="$tmp/khook.out" KIT_EFFORT_KNOWLEDGE_HOOK="$stub/khook" KIT_FORCE=1 effort_close 88 >/dev/null 2>&1
+forced_out="$(KHOOK_MARKER="$tmp/khook.out" KIT_EFFORT_KNOWLEDGE_HOOK="$stub/khook" KIT_FORCE=1 effort_close 88 2>&1)"
 cd "$tmp/work"
 tc "$GH_LOG" 'pr merge effort/88-forced .*--squash' "KIT_FORCE=1 close merges despite no trace"
 t  "knowledge-ingest hook ran with the effort number" "$(cat "$tmp/khook.out" 2>/dev/null)" "ingested 88"
+# #148: no kit-managed file touched → the drift check stays silent
+case "$forced_out" in *"kit-sync"*) echo "FAIL: kit-sync warning fired with no kit-managed change"; fail=1 ;; *) echo "ok: drift check silent when no kit-managed file changed" ;; esac
 
 [ "$fail" -eq 0 ] && echo "ALL OK (effort-ops)" || echo "effort-ops: FAILURES"
 exit "$fail"
