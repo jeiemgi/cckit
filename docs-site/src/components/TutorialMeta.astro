@@ -1,32 +1,143 @@
 ---
-// TutorialMeta — the strip under a tutorial's title: difficulty · read-time · prerequisites.
-// Reads straight off the page's `tutorial:` frontmatter (via Starlight's route data), so an author
-// fills the frontmatter once and drops <TutorialMeta /> in — no repeated props. Renders nothing on
-// a page that isn't a tutorial.
+// TutorialMeta — the header block under a tutorial's title. Three jobs, all read from the page's
+// `tutorial:` frontmatter (via Starlight route data) so an author drops <TutorialMeta /> in with no
+// props and every tutorial gets the same treatment:
+//   1. a "New to cckit?" line for cold traffic that may not know what Claude Code / cckit is,
+//   2. a "Copy as Markdown" button that copies a ready-to-paste Claude Code prompt,
+//   3. the difficulty · read-time · prerequisites strip.
+// The copied prompt links the docs (agent contract, CLI reference, install) and this page's URL, so
+// Claude reads them and learns the cckit CLI before running the steps.
 const route = Astro.locals.starlightRoute;
-const t = route?.entry?.data?.tutorial;
+const data = route?.entry?.data ?? {};
+const t = data.tutorial;
 const diffLabel = { beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced' };
+
+const DOCS = 'https://cckit.vercel.app';
+const pageUrl = new URL(Astro.url.pathname, Astro.site ?? DOCS).href;
+
+const copyMarkdown = t
+  ? `I want to: ${t.job}.
+
+Follow this cckit tutorial and do it in my repo, step by step:
+${pageUrl}
+
+cckit is a CLI that drives the whole GitHub work lifecycle from Claude Code. If you don't already
+know its commands, read these first, then follow the tutorial above:
+- Agent contract (the command grammar): ${DOCS}/agents/
+- CLI reference: ${DOCS}/cli-reference/
+- Install cckit: ${DOCS}/install/
+
+Run the commands as we go and tell me what each one did.
+`
+  : '';
 ---
 {t && (
-  <div class="tut-meta" data-difficulty={t.difficulty}>
-    <span class="tut-badge tut-diff">{diffLabel[t.difficulty] ?? t.difficulty}</span>
-    <span class="tut-badge tut-time">{t.time} read</span>
-    {t.prerequisites.length > 0 && (
-      <span class="tut-pre">
-        <span class="tut-pre-label">Needs</span>
-        {t.prerequisites.map((p) => <code class="tut-chip">{p}</code>)}
+  <div class="tut-header">
+    <div class="tut-actionbar">
+      <button type="button" class="tut-copy" data-copy-md={copyMarkdown} aria-label="Copy this tutorial as a Claude Code prompt">
+        <svg class="tut-copy-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+        </svg>
+        <span class="tut-copy-label">Copy as Markdown</span>
+      </button>
+      <span class="tut-new">
+        New to cckit? It's a CLI for Claude Code — <a href="/install/">install it</a> · <a href="/getting-started/">quickstart</a>
       </span>
-    )}
+    </div>
+
+    <div class="tut-meta" data-difficulty={t.difficulty}>
+      <span class="tut-badge tut-diff">{diffLabel[t.difficulty] ?? t.difficulty}</span>
+      <span class="tut-badge tut-time">{t.time} read</span>
+      {t.prerequisites.length > 0 && (
+        <span class="tut-pre">
+          <span class="tut-pre-label">Needs</span>
+          {t.prerequisites.map((p) => <code class="tut-chip">{p}</code>)}
+        </span>
+      )}
+    </div>
   </div>
 )}
 
+<script is:inline>
+  document.addEventListener('click', (event) => {
+    const btn = event.target.closest('[data-copy-md]');
+    if (!btn) return;
+    const md = btn.getAttribute('data-copy-md') || '';
+    const label = btn.querySelector('.tut-copy-label');
+    const done = () => {
+      if (!label) return;
+      const prev = label.textContent;
+      label.textContent = 'Copied ✓';
+      btn.classList.add('is-copied');
+      setTimeout(() => {
+        label.textContent = prev;
+        btn.classList.remove('is-copied');
+      }, 1600);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(md).then(done).catch(() => {});
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); done(); } catch (e) {}
+      document.body.removeChild(ta);
+    }
+  });
+</script>
+
 <style>
+  .tut-header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    margin: 0.5rem 0 1.75rem;
+  }
+  .tut-actionbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem 1rem;
+  }
+  .tut-copy {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font: inherit;
+    font-size: var(--sl-text-sm);
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0.4rem 0.8rem;
+    border-radius: 8px;
+    border: 1px solid var(--sl-color-accent-low);
+    color: var(--sl-color-white);
+    background: var(--sl-color-accent-low);
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+  .tut-copy:hover {
+    background: var(--sl-color-accent);
+    border-color: var(--sl-color-accent);
+  }
+  .tut-copy.is-copied {
+    background: var(--sl-color-accent);
+    border-color: var(--sl-color-accent);
+  }
+  .tut-copy-icon { flex: none; }
+  .tut-new {
+    font-size: var(--sl-text-sm);
+    color: var(--sl-color-gray-3);
+  }
+  .tut-new a { white-space: nowrap; }
+
   .tut-meta {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 0.5rem 0.75rem;
-    margin: 0.25rem 0 1.5rem;
     font-size: var(--sl-text-sm);
   }
   .tut-badge {
