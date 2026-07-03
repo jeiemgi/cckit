@@ -308,7 +308,9 @@ if [[ $UPGRADE -eq 1 ]]; then
   [[ -z "$MEMORY" ]]       && MEMORY="$(jq -r 'if .memory.enabled then "on" else "off" end' "$UP_CFG")"
   [[ -z "$SPECKIT" ]]      && SPECKIT="$(jq -r 'if (.specKit.enabled // false) then "on" else "off" end' "$UP_CFG")"
   [[ -z "$LOCAL_LAYER" ]]  && LOCAL_LAYER="$(jq -r 'if (.local.enabled // false) then "on" else "off" end' "$UP_CFG")"
-  [[ -z "$PLANS_FORMAT" ]] && PLANS_FORMAT="$(jq -r '.plans.format // ""' "$UP_CFG")"
+  # A config with NO plans key at all deliberately runs without plan files — upgrade must not
+  # resurrect the profile default (and with it the plans rule + config block) (#149).
+  [[ -z "$PLANS_FORMAT" ]] && PLANS_FORMAT="$(jq -r 'if has("plans") then (.plans.format // "") else "none" end' "$UP_CFG")"
   [[ "$LANG_PREF" == "English" ]] && LANG_PREF="$(jq -r '.project.language // "English"' "$UP_CFG")"
   # Skill-name prefix: projects that namespace their kit skills (e.g. "kit-task-close") set
   # `skillPrefix` so upgrade scaffolds namespaced templates to the matching name instead of
@@ -621,8 +623,16 @@ jq -n \
     memory:{enabled:$mem,provider:"mempalace",wing:$wing,claudeProjectSlug:$cps}}' \
   > "$KITCFG.kit-new"
 if [[ $UPGRADE -eq 1 && -f "$KITCFG" ]]; then
-  # deep-merge: existing values win (preserve user choices), new keys added, version bumped.
-  jq -s --arg kitver "$PLUGIN_VERSION" '.[0] * .[1] | .kitVersion = $kitver' "$KITCFG.kit-new" "$KITCFG" \
+  # deep-merge: existing values win (preserve user choices), new REQUIRED keys added, version
+  # bumped. FEATURE blocks (plans/specKit/prePush/local/memory) are additive only when the
+  # project's config ALREADY has them — a missing feature key is a deliberate absence, and an
+  # upgrade must never inject profile defaults over it (#149).
+  jq -s --arg kitver "$PLUGIN_VERSION" '
+    .[1] as $have
+    | (.[0] | with_entries(.key as $k | select(
+        (["plans","specKit","prePush","local","memory"] | index($k)) == null
+        or ($have | has($k))))) as $tmpl
+    | $tmpl * $have | .kitVersion = $kitver' "$KITCFG.kit-new" "$KITCFG" \
     > "$KITCFG.merged" && mv "$KITCFG.merged" "$KITCFG"
   rm -f "$KITCFG.kit-new"
   # Existing values win in the merge — but an EXPLICIT --local flag is a user decision now,
@@ -815,8 +825,16 @@ echo "  + .claude/settings.local.json${HOOK_NOTE:+ (}${HOOK_NOTE# + }${HOOK_NOTE
 # Runs on BOTH scaffold and --upgrade so every update re-wires (fixes the class of bug where
 # /kit-update refreshed files but never re-ran the wiring → statusline/settings drifted). #369
 if [[ -f "$KIT_ROOT/scripts/kit-wire.sh" ]]; then
+  # On --upgrade an EXISTING .claude/statusline.sh follows the same contract as safe_write: the
+  # conffiles guard in kit-operate keeps a customized (or untracked) shim; only a shim the kit
+  # provably owns intact is refreshed (#149).
+  _SHIM="$TARGET/.claude/statusline.sh"
+  _shim_before=""; [[ -f "$_SHIM" ]] && _shim_before="$(cat "$_SHIM" 2>/dev/null)"
   if ( cd "$TARGET" && CLAUDE_PLUGIN_ROOT="$KIT_ROOT" KIT_ASSUME_YES=1 bash "$KIT_ROOT/scripts/kit-wire.sh" >/dev/null 2>&1 ); then
     echo "  + wired: statusline shim + settings.statusLine (kit-wire)"
+  fi
+  if [[ $UPGRADE -eq 1 && -n "$_shim_before" && "$_shim_before" == "$(cat "$_SHIM" 2>/dev/null)" ]]; then
+    UPGRADE_PRESERVED+=(".claude/statusline.sh")
   fi
 fi
 

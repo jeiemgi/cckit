@@ -7,6 +7,14 @@ All notable changes to cckit are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- `init.sh --upgrade` (the `/kit-update` engine) now preserves existing project files it cannot
+  prove it owns intact: the statusline wire step no longer replaces a customized (or
+  manifest-untracked) `.claude/statusline.sh` shim with the template — the conffiles guard in
+  `kit-operate` refuses to auto-overwrite an edited/unowned file even under `KIT_ASSUME_YES`,
+  mirroring `kit_op_remove`. The `kit.config.json` upgrade merge is additive only for keys the
+  template requires: feature blocks a project's config deliberately lacks (`plans`, `specKit`,
+  `prePush`, `local`, `memory`) are never injected from profile defaults, and a config with no
+  `plans` key no longer resurrects the profile's plan format (or its rules) on upgrade (#149).
 - `cckit status` board counters no longer break. Status fed `task-sync --llm` output (TOON, not
   JSON) into `jq 'length'`, so the leading `[N]` header mis-parsed and the `|| echo 0` fallback
   concatenated onto jq's partial output (e.g. `1\n0`), throwing `integer expression expected` at

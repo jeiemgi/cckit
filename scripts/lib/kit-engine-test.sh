@@ -80,6 +80,15 @@ if [ -n "${KIT_ENGINE_TEST_INNER:-}" ]; then
   printf 'USER EDIT\n' > dst.txt
   KIT_ASSUME_YES= kit_op_write src.txt dst.txt A wire </dev/null >/dev/null 2>&1
   t "conffiles keeps edit" "$(cat dst.txt)" "USER EDIT"
+  # conffiles hard rule (#149): KIT_ASSUME_YES never consents to clobbering an edited file
+  KIT_ASSUME_YES=1 kit_op_write src.txt dst.txt A wire >/dev/null 2>&1
+  t "assume-yes keeps edit (rc)" "$?" "10"
+  t "assume-yes keeps edit"      "$(cat dst.txt)" "USER EDIT"
+  # ...nor an UNTRACKED pre-existing file with different content (never touch what we don't own)
+  printf 'PRE-EXISTING\n' > pre.txt
+  KIT_ASSUME_YES=1 kit_op_write src.txt pre.txt A wire >/dev/null 2>&1
+  t "untracked existing kept (rc)" "$?" "10"
+  t "untracked existing kept"      "$(cat pre.txt)" "PRE-EXISTING"
   # remove untracked refuses
   printf 'z\n' > untracked2.txt
   KIT_ASSUME_YES=1 kit_op_remove untracked2.txt >/dev/null 2>&1
