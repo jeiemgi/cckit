@@ -71,21 +71,21 @@ export default defineConfig({
         // Agentation toolbar lives in a SEPARATE override (PageSidebar) that's registered only in
         // dev, so its island is never collected into the production build.
         Footer: './src/components/Footer.astro',
+        // Head override swaps the single global og.png for a per-page generated card
+        // (/og/<id>.png). Its per-page og:image/twitter:image replace the global ones below.
+        Head: './src/components/Head.astro',
         ...(DEV ? { PageSidebar: './src/components/DevAnnotate.astro' } : {}),
       },
       description: 'A project operating system for coding agents — the full GitHub work lifecycle as a CLI, drivable by Claude Code and any agent.',
       social: { github: 'https://github.com/jeiemgi/cckit' },
       favicon: '/favicon.svg',
-      // SEO / social share. Starlight already emits canonical, description, sitemap, and
-      // title/OG tags from `site` + page frontmatter; this adds the social image + card type.
+      // SEO / social share. Starlight emits canonical, description, sitemap, and title/OG tags from
+      // `site` + page frontmatter; the per-page og:image/twitter:image are emitted by the Head
+      // override (src/components/Head.astro) so each page gets its own generated card.
       head: [
         // Algolia site verification — lets the Algolia Crawler confirm ownership of the site.
         { tag: 'meta', attrs: { name: 'algolia-site-verification', content: '9E796471F3020A1F' } },
-        { tag: 'meta', attrs: { property: 'og:image', content: 'https://cckit.vercel.app/og.png' } },
-        { tag: 'meta', attrs: { property: 'og:image:alt', content: 'cckit — the full GitHub work lifecycle as a CLI' } },
         { tag: 'meta', attrs: { property: 'og:type', content: 'website' } },
-        { tag: 'meta', attrs: { name: 'twitter:card', content: 'summary_large_image' } },
-        { tag: 'meta', attrs: { name: 'twitter:image', content: 'https://cckit.vercel.app/og.png' } },
       ],
       // The Designer owns the visual theme — this file is the single hook (elegant + sober,
       // never Claude/Anthropic colors). Placeholder until the Designer's spec lands.

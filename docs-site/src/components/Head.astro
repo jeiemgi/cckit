@@ -1,0 +1,21 @@
+---
+// Head override — keeps Starlight's default <head>, then swaps the social image from the one global
+// og.png to this page's generated card at /og/<id>.png (see src/pages/og/[...slug].ts). The
+// per-page og:image/twitter:image tags are emitted here and removed from the global `head` array in
+// astro.config so there's exactly one of each.
+import Default from '@astrojs/starlight/components/Head.astro';
+
+const route = Astro.locals.starlightRoute;
+// The site root has an empty entry id in Starlight route data, but its generated card is /og/index.png
+// (the docs collection entry id is `index`) — normalise so the homepage gets its card too.
+const id = route?.entry?.id || 'index';
+const ogImage = new URL(`/og/${id}.png`, Astro.site).href;
+const alt = route?.entry?.data?.title ? `${route.entry.data.title} — cckit` : 'cckit';
+---
+<Default><slot /></Default>
+<meta property="og:image" content={ogImage} />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content={alt} />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:image" content={ogImage} />
