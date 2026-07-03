@@ -84,7 +84,13 @@ effort_new() {
   local repo; repo="$(_eff_repo)"
   [ -n "$repo" ] || { echo "effort_new: no repo (KIT_REPO/EFFORT_REPO unset — run in a kit project)" >&2; return 1; }
 
-  local flow="" role="" priority="p1" goal="" scope="" for_agents="" verification="" depends_on="" milestone="" explicit_slug=""
+  local flow="" role="" priority="p1" goal="" scope="" for_agents="" verification="" depends_on="" milestone="" explicit_slug="" par=""
+  # Flags are position-INDEPENDENT: recognized --flag [value] pairs are consumed wherever they occur
+  # (before the title, between subs, or after them) and the remaining positionals are collected as the
+  # title (first) + sub specs (rest). Previously the parser broke at the first positional, so any flag
+  # placed after the title was mis-read as a sub-issue spec — creating junk sub-issues. `--` forces
+  # everything after it to be treated as positional (for a sub name that starts with a dash).
+  local pos=()
   while [ $# -gt 0 ]; do
     case "$1" in
       --flow)         flow="${2:-}"; shift 2 ;;
@@ -98,11 +104,24 @@ effort_new() {
       --milestone)    milestone="${2:-}"; shift 2 ;;
       --slug)         explicit_slug="${2:-}"; shift 2 ;;
       --slug=*)       explicit_slug="${1#*=}"; shift ;;
-      --)             shift; break ;;
+      --par)          par="${2:-}"; shift 2 ;;
+      --par=*)        par="${1#*=}"; shift ;;
+      --)             shift; while [ $# -gt 0 ]; do pos+=("$1"); shift; done ;;
       --*)            echo "effort_new: unknown flag $1" >&2; return 1 ;;
-      *)              break ;;
+      *)              pos+=("$1"); shift ;;
     esac
   done
+  set -- "${pos[@]+"${pos[@]}"}"
+
+  # Parallelism hint label (#121): --par seq | wide | <positive-int> → a par:<value> label on the
+  # parent (how the effort's subs are meant to run). Validated before anything is created.
+  if [ -n "$par" ]; then
+    case "$par" in
+      seq|wide) : ;;
+      ''|*[!0-9]*) echo "effort_new: --par must be 'seq', 'wide', or a positive integer (got '$par')" >&2; return 1 ;;
+      *) : ;;
+    esac
+  fi
 
   local name="${1:-}"; shift || true
   [ -n "$name" ] || { echo 'effort_new: usage: effort_new [flags] "<name>" [<sub spec> …]' >&2; return 1; }
@@ -142,6 +161,12 @@ effort_new() {
   local labels="$ctx,kind:task,priority:$priority"
   [ -n "$role" ] && labels="$labels,role:$role"
   [ -n "$flow" ] && labels="$labels,flow:$(printf '%s' "$flow" | tr '[:upper:]' '[:lower:]')"
+  if [ -n "$par" ]; then
+    # par:* is a kit-defined label; ensure it exists so `gh issue create --label` doesn't fail.
+    gh label create "par:$par" --repo "$repo" --color c5def5 \
+      --description "effort parallelism hint" >/dev/null 2>&1 || true
+    labels="$labels,par:$par"
+  fi
 
   local url num slug
   url="$(gh issue create --repo "$repo" --title "[Effort] · ${flow_tag}${name}" --body "$body" \
@@ -264,8 +289,12 @@ effort_pr() {
   git push -u origin "$branch" >/dev/null 2>&1 || true
   title="$(gh issue view "$num" --repo "$repo" --json title -q .title 2>/dev/null)"
   name="$(printf '%s' "$title" | sed -E 's/^\[Effort\] [0-9]+ · ?//')"
+  # ONE shared composer (effort.sh) so the verb + the kit-effort-pr skill title identically, then the
+  # mandatory-[#N] check before we ever call gh — refuse rather than open an id-less PR (#121).
+  local pr_title; pr_title="$(effort_pr_title "$num" "${name:-effort}")"
+  effort_pr_title_check "$pr_title" "$num" || { echo "effort_pr: refusing to open a PR without the [#$num] effort id" >&2; return 1; }
   gh pr create --repo "$repo" --base "$base" --head "$branch" \
-    --title "[Effort] $num · ${name:-effort}" \
+    --title "$pr_title" \
     --body "$(printf 'Closes the #%s effort.\n\n## For agents\nSee #%s for the goal, scope, and entry points.\n' "$num" "$num")"
 }
 

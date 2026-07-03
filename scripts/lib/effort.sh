@@ -106,6 +106,40 @@ effort_snapshot_subs() {
   printf '%s' "$dir"
 }
 
+# ── Effort PR title — ONE composer shared by the verb + the skill (#121) ────────────────────────
+# `cckit effort pr` (the verb) and /kit-effort-pr (the skill) previously composed different PR
+# titles; they now both call effort_pr_title so an effort PR is titled identically no matter who
+# opens it. The MANDATORY element is the [#N] effort id — a PR title without it is a review blocker
+# (effort-model.md), enforced by effort_pr_title_check.
+#
+# effort_pr_title <num> <name> [role_display] — compose the canonical title:
+#   effort_pr_title 115 "adoption hardening"             -> "[#115] adoption hardening"
+#   effort_pr_title 115 "adoption hardening" "Tech Lead" -> "[Tech Lead] [#115] adoption hardening"
+# A full parent title ("[Effort] 115 · [Core] adoption hardening") is accepted too — the
+# "[Effort] N · " prefix is peeled so the id is never duplicated.
+effort_pr_title() {
+  local num="${1:-}" name="${2:-}" role="${3:-}"
+  num="${num#\#}"
+  name="$(printf '%s' "$name" | sed -E 's/^\[Effort\] [0-9]+ · ?//')"
+  [ -n "$name" ] || name="effort"
+  if [ -n "$role" ]; then printf '[%s] [#%s] %s' "$role" "$num" "$name"
+  else printf '[#%s] %s' "$num" "$name"; fi
+}
+
+# effort_pr_title_check <title> [num] — rc 0 iff <title> carries the effort id token [#N] (the exact
+# [#num] when given, else any [#digits]). Prints the reason + rc 1 when it doesn't, so both the verb
+# and the skill can refuse to open a PR whose title lacks the effort id.
+effort_pr_title_check() {
+  local title="${1:-}" num="${2:-}"
+  if [ -n "$num" ]; then
+    num="${num#\#}"
+    case "$title" in *"[#$num]"*) return 0 ;; esac
+    echo "effort_pr_title_check: PR title lacks the [#$num] effort id: '$title'" >&2; return 1
+  fi
+  printf '%s' "$title" | grep -qE '\[#[0-9]+\]' && return 0
+  echo "effort_pr_title_check: PR title lacks a [#N] effort id: '$title'" >&2; return 1
+}
+
 # ── Effort-title rule — concise, jargon-free, flow-tagged ──────────────────────────────────────────
 # The board must say what an effort delivers and which FLOW it belongs to. So the `<Name>` part of an
 # effort/sub title is a short plain-language outcome with an optional leading `[Flow]` tag from a

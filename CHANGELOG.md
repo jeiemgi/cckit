@@ -7,6 +7,12 @@ All notable changes to cckit are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- Effort PRs are now titled by ONE shared composer used by both `cckit effort pr` and the
+  kit-effort-pr skill, so a PR is titled identically no matter who opens it — and both refuse to
+  open a PR whose title lacks the mandatory `[#N]` effort id. `cckit effort new` gained a `--par`
+  option (`seq` | `wide` | `<int>` → a `par:` label) and now parses flags in ANY position: a
+  `--flow`/`--role` placed after the title is honored instead of being mis-read as a sub-issue spec
+  (which previously created junk sub-issues) (#121).
 - `cckit effort close` now runs the whole close in one op: it captures effort metrics before the
   squash and judges + syncs them after, refuses to squash-merge when no per-sub work trace was
   captured (the squash is irreversible; override with `KIT_FORCE=1`), garbage-collects the effort
