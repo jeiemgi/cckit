@@ -117,6 +117,23 @@ The parent carries the rich narrative; the **PR** carries the human-facing revie
 Board + record state are correct **by construction** — the close op owns them. Never rely on a
 separate, skippable "mark done" step.
 
+## Wave close — the final sub of every effort
+
+When efforts are planned as an **arc** (a chain of `blocked_by` efforts toward one outcome), the
+downstream efforts start as **thin placeholders** — a parent with a Goal + a one-line scope, *not*
+yet decomposed. Every effort's **last sub-issue is a wave-close task** that keeps the arc moving:
+
+1. **Fill the next effort's sub-issues** — decompose the next placeholder into its real deliverables
+   on the now-clean base, so each plan is scoped **just-in-time** with an accurate `## For agents`
+   retrieval context, never guessed up front. (Speculative sub-issues rot; stale sub-issues hide
+   unfinished work.)
+2. **Compact the wave** — write a compact summary of what shipped (to the knowledge base + a memory
+   drawer) and run `/compact`, so the next wave starts on clean context.
+
+This makes the arc **self-propelling**: finishing wave N produces wave N+1's issues. The final effort
+in an arc has nothing to fill next — its wave-close task is compact-and-close only. A single,
+standalone effort needs no wave-close sub.
+
 ## Slug handles (number stays canonical)
 
 The issue **number** is the single source of truth — sub-issue links, PRs, labels, and `blocked_by`
