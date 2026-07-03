@@ -3,6 +3,7 @@ import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 import starlightDocSearch from '@astrojs/starlight-docsearch';
 import react from '@astrojs/react';
+import sitemap from '@astrojs/sitemap';
 
 // .env files are NOT injected into process.env inside astro.config.mjs. Vercel DOES populate
 // process.env from the project's env vars at build, so prefer that; locally, fall back to parsing
@@ -147,5 +148,9 @@ export default defineConfig({
         ]},
       ],
     }),
+    // Starlight uses this sitemap integration instead of its default when one is present. Keep the
+    // /social/ export templates (IG feed + story cards) out of the sitemap — they're internal
+    // manual-post assets, not pages we want crawled or indexed.
+    sitemap({ filter: (page) => !page.includes('/social/') }),
   ],
 });
