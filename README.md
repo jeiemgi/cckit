@@ -110,6 +110,7 @@ that gate and merge themselves:
 cckit plan                 # the wave plan: deps-ordered, file-disjoint, session-fit
 cckit wave                 # a Task-subagent fan-out brief Claude Code enacts (proposes the next wave)
 cckit watch --merge        # the captain: gate open PRs, squash-merge the CLEAN ones, advance
+                           #   (policy floors hold PRs touching CI, lockfiles, or secrets for review)
 cckit watch --loop         # self-pace gate/merge passes until steady state
 ```
 
