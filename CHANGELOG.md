@@ -7,22 +7,36 @@ merged to `main`. Earlier entries follow [Keep a Changelog](https://keepachangel
 
 ## [0.4.1](https://github.com/jeiemgi/cckit/compare/v0.4.0...v0.4.1) (2026-07-03)
 
+### Added
+- **Automated releases via release-please.** A single Release PR now bumps every version surface —
+  `package.json`, `docs-site/package.json`, `.claude-plugin/plugin.json`, `cckit.config.json`, and
+  the Homebrew formula — and regenerates this changelog from Conventional Commits; merging it tags
+  the release and publishes to npm + the Homebrew tap. Replaces the manual `release.yml` (#181).
+- **Site-level SEO and analytics on the docs site.** `SiteSchema.astro` (WebSite +
+  SoftwareApplication JSON-LD), Google Analytics 4 + Search Console wiring, and Vercel Speed
+  Insights — all inert until their env vars are set — plus a growth plan and a release setup
+  checklist in the releasing guide.
 
-### Bug Fixes
+### Changed
+- **Production domain is now `cckit.dev`.** All canonical, sitemap, and social/OG references point to
+  the new domain; `cckit.vercel.app` remains only as the preview URL for non-production deploys.
 
-* point release-please at the main release branch ([#191](https://github.com/jeiemgi/cckit/issues/191)) ([bdf158d](https://github.com/jeiemgi/cckit/commit/bdf158d3f04071dfa1d710ca6684781fc05386ad))
+### Security
+- Cleared the open Dependabot alerts living in the docs-site dependencies (#177, addressing #169).
 
+### Fixed
+- release-please now targets the `main` release branch instead of the repo default branch (#191).
+- Session mail no longer goes silent when the PATH `cckit` is stale — the hook prefers the project's
+  own `bin/cckit` (#180) — and sessions can send steer messages to each other (#176).
+- `cckit release` now gives the release tag an annotated message so the tag push survives
+  `tag.gpgsign` (#178), and stamps the version on all four surfaces instead of one (#174); the
+  Homebrew formula ships a stable `url`/`sha256` block.
 
-### Documentation
+## [0.4.0] and earlier
 
-* add release setup checklist ([903cabb](https://github.com/jeiemgi/cckit/commit/903cabbda9c1154af1224a2cc17f1253cb3a448c))
-
-
-### Miscellaneous Chores
-
-* release 0.4.1 ([a8c65e0](https://github.com/jeiemgi/cckit/commit/a8c65e01e45c14dbe2511e0991748def1ab5d42c))
-
-## [Unreleased]
+<!-- The entries below accumulated under a single "Unreleased" heading before release-please was
+     adopted; they all shipped in v0.4.0 or earlier. Kept as historical record — release-please
+     manages versioned sections from 0.4.1 onward. -->
 
 ### Security
 - Cleared all 11 open Dependabot alerts (4 high) — every one lived in docs-site dependencies.
