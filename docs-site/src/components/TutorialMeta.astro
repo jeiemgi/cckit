@@ -15,7 +15,7 @@ const data = route?.entry?.data ?? {};
 const t = data.tutorial;
 const diffLabel = { beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced' };
 
-const DOCS = 'https://cckit.vercel.app';
+const DOCS = 'https://cckit.dev';
 const pageUrl = new URL(Astro.url.pathname, Astro.site ?? DOCS).href;
 
 const copyMarkdown = t

@@ -9,10 +9,10 @@
 
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
 [![Built for Claude Code](https://img.shields.io/badge/built%20for-Claude%20Code-8A63D2.svg)](https://docs.claude.com/claude-code)
-[![Docs](https://img.shields.io/badge/docs-cckit.vercel.app-0A7E8C.svg)](https://cckit.vercel.app)
+[![Docs](https://img.shields.io/badge/docs-cckit.dev-0A7E8C.svg)](https://cckit.dev)
 [![Platforms: macOS · Linux · WSL](https://img.shields.io/badge/platforms-macOS%20%C2%B7%20Linux%20%C2%B7%20WSL-555.svg)](#platforms--requirements)
 
-**[📖 Documentation](https://cckit.vercel.app)** · [The idea](https://cckit.vercel.app/philosophy/) · [Tutorials](https://cckit.vercel.app/tutorials/) · [Quick start](#quick-start) · [Contributing](CONTRIBUTING.md) · [Code of Conduct](CODE_OF_CONDUCT.md)
+**[📖 Documentation](https://cckit.dev)** · [The idea](https://cckit.dev/philosophy/) · [Tutorials](https://cckit.dev/tutorials/) · [Quick start](#quick-start) · [Contributing](CONTRIBUTING.md) · [Code of Conduct](CODE_OF_CONDUCT.md)
 
 The whole idea in one line:
 
@@ -164,13 +164,13 @@ The board is both the plan and the proof.
 
 ## Documentation
 
-Full docs live at **[cckit.vercel.app](https://cckit.vercel.app)** — start with
-[the idea](https://cckit.vercel.app/philosophy/) if you want the why. The
-[tutorials](https://cckit.vercel.app/tutorials/) are step-by-step "How to X with Claude Code"
+Full docs live at **[cckit.dev](https://cckit.dev)** — start with
+[the idea](https://cckit.dev/philosophy/) if you want the why. The
+[tutorials](https://cckit.dev/tutorials/) are step-by-step "How to X with Claude Code"
 guides, each labelled **Beginner / Intermediate / Advanced** and carrying a **"Copy as Markdown"
 prompt** you can paste straight into Claude Code — start exactly where you are. The
-[cookbook](https://cckit.vercel.app/cookbook/) holds lifecycle recipes, and the
-[CLI reference](https://cckit.vercel.app/cli-reference/) covers every verb.
+[cookbook](https://cckit.dev/cookbook/) holds lifecycle recipes, and the
+[CLI reference](https://cckit.dev/cli-reference/) covers every verb.
 
 ## Project layout
 
@@ -182,7 +182,7 @@ cckit/
   skills/ commands/      # Claude Code skills + slash commands
   profiles/ templates/   # init profiles + scaffold templates
   routines/ modules/     # scheduled routines + optional modules
-  docs-site/             # documentation source — Astro/Starlight (deployed to cckit.vercel.app)
+  docs-site/             # documentation source — Astro/Starlight (deployed to cckit.dev)
   cckit.config.json      # project configuration (no hardcoded org/repo)
 ```
 

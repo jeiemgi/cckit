@@ -4,7 +4,7 @@
   "private": false,
   "license": "MIT OR Apache-2.0",
   "description": "cckit — a project operating system for coding agents (CLI + Claude Code plugin).",
-  "homepage": "https://cckit.vercel.app",
+  "homepage": "https://cckit.dev",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/jeiemgi/cckit.git"

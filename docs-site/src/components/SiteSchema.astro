@@ -1,0 +1,37 @@
+---
+// SiteSchema — site-level JSON-LD, dropped once on the homepage only (mirrors how TutorialSchema
+// is dropped on tutorial pages). TutorialSchema covers per-tutorial HowTo/FAQ rich results; this
+// covers the two things that describe cckit itself as a *thing* — a WebSite (so Google can build a
+// sitelinks searchbox) and a SoftwareApplication (name/description/category/price/repo), which is
+// also what AI answer engines lean on to describe a tool correctly instead of guessing.
+const site = Astro.site?.href ?? 'https://cckit.dev/';
+
+const webSite = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: 'cckit',
+  url: site,
+  description:
+    'Be the architect — cckit runs the mechanics. The full GitHub work lifecycle as a CLI that turns your Git into retrievable, efficient context, drivable by Claude Code and any agent.',
+  // No SearchAction: site search is an in-page modal (Pagefind/Algolia), not a URL query param, so a
+  // SearchAction here would describe an endpoint that doesn't exist — inaccurate structured data.
+};
+
+const softwareApplication = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: 'cckit',
+  applicationCategory: 'DeveloperApplication',
+  operatingSystem: 'macOS, Linux, Windows (WSL)',
+  description:
+    'A project OS for coding agents: the full GitHub work lifecycle (issues, worktrees, PRs, merges, multi-agent waves) as one CLI, drivable by Claude Code and any agent.',
+  url: site,
+  codeRepository: 'https://github.com/jeiemgi/cckit',
+  license: 'https://github.com/jeiemgi/cckit/blob/main/LICENSE-MIT',
+  offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+  author: { '@type': 'Person', name: 'josegtz', url: 'https://josegtz.com' },
+};
+---
+
+<script type="application/ld+json" set:html={JSON.stringify(webSite)} />
+<script type="application/ld+json" set:html={JSON.stringify(softwareApplication)} />
