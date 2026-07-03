@@ -7,6 +7,11 @@ All notable changes to cckit are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- The foreign-repo acceptance harness (`scripts/portable-test.sh`) now enforces invoking-project
+  resolution **by construction**: it iterates `cckit commands`, exercises every read-only verb
+  against a foreign fixture (distinct repo, non-default base branch, org-owned board) with a stubbed
+  gh, asserts no verb ever resolves cckit's own repo, and fails if any new verb is left unclassified
+  — so coverage can't silently rot (#74).
 - `cckit init` and the annotate setup now derive the project name / slug / wing from the git remote
   (the actual `owner/repo`) before falling back to the local directory basename — the directory is
   often cloned or renamed to something other than the repo name. Host-agnostic parsing (ssh, https,
