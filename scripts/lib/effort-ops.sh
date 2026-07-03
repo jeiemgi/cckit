@@ -326,6 +326,43 @@ _eo_source_metrics() {
   [ -f "$d/effort-metrics.sh" ] && . "$d/effort-metrics.sh"
 }
 
+# _eo_source_board — lazily source the board helpers (gh-project.sh) + captured field ids so
+# effort_close can set Status=Done from any shell, with no caller wiring (bin/cckit sources the
+# board helpers only for `effort new`). Guarded: a no-op unless Projects v2 is on; a missing
+# gh-project.sh or ids file degrades to a no-op (the board steps below are themselves guarded).
+_eo_source_board() {
+  [ "${KIT_PROJECTS_V2:-}" = "true" ] || return 0
+  if ! command -v project_find_item_by_issue >/dev/null 2>&1; then
+    local d; d="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+    # shellcheck source=/dev/null
+    [ -f "$d/gh-project.sh" ] && . "$d/gh-project.sh"
+  fi
+  if [ -z "${STATUS_FIELD_ID:-}" ] && command -v load_project_ids >/dev/null 2>&1; then
+    load_project_ids >/dev/null 2>&1 || true
+  fi
+  return 0
+}
+
+# _eo_board_done <issue #> — set the board Status=Done for one issue. Guarded like _eff_board_add:
+# a no-op unless Projects v2 is on AND the board helpers + field ids are loaded. Best-effort — a
+# board hiccup never fails the close (the merge already landed).
+_eo_board_done() {
+  local n="$1" item
+  [ "${KIT_PROJECTS_V2:-}" = "true" ] || return 0
+  command -v project_find_item_by_issue >/dev/null 2>&1 || return 0
+  [ -n "${STATUS_FIELD_ID:-}" ] && [ -n "${STATUS_OPT_DONE:-}" ] || return 0
+  item="$(project_find_item_by_issue "$n" 2>/dev/null)" || return 0
+  [ -n "$item" ] || { echo "  ⚠ #$n not on board — skipped" >&2; return 0; }
+  project_set_single_select "$item" "$STATUS_FIELD_ID" "$STATUS_OPT_DONE" 2>/dev/null \
+    && echo "  ✓ board Done: #$n" >&2 || true
+  return 0
+}
+
+# Kit-managed paths (the kit ⇄ project sync surface): a change here that is not contributed
+# upstream (/kit-contribute) is a latent regression the next /kit-update can clobber. One place —
+# effort_close's drift check greps against this (was inlined in the kit-effort-close skill, #148).
+_EO_KIT_MANAGED_RE='^(scripts/(lib/|kit$|kit-)|\.claude/(skills|rules|hooks|lib|agents)/)'
+
 # _eo_knowledge_ingest <num> <trace_dir> <root> — optional post-close knowledge-ingest hook. Runs a
 # project-configured command (github/effort.knowledgeIngestHook, or KIT_EFFORT_KNOWLEDGE_HOOK) with
 # the effort number + trace dir, so a project can fold the closed effort's work record into its
@@ -346,13 +383,15 @@ _eo_knowledge_ingest() {
   "$hook" "$num" "$trace" >/dev/null 2>&1 || echo "effort_close: knowledge-ingest hook failed (non-fatal)" >&2
 }
 
-# effort_close <N> — the single close op. Snapshot per-sub diffs + capture metrics BEFORE the squash
-# (the squash erases the per-sub history), REFUSE to squash if no work trace was captured (KIT_FORCE=1
-# overrides), squash-merge, judge + sync the metrics, close parent + subs, GC the worktree/branch, and
-# run the optional knowledge-ingest hook. Destructive: it merges, closes, and prunes.
+# effort_close <N> — the SINGLE close implementation (#148): the /kit-effort-close skill is a thin
+# caller of this function, never a second close. Snapshot per-sub diffs + capture metrics BEFORE the
+# squash (the squash erases the per-sub history), REFUSE to squash if no work trace was captured
+# (KIT_FORCE=1 overrides), squash-merge, judge + sync the metrics, close parent + subs, set the board
+# Status=Done for each (guarded), GC the worktree/branch, run the optional knowledge-ingest hook,
+# and finish with the advisory kit-sync drift check. Destructive: it merges, closes, and prunes.
 effort_close() {
   _eff_need gh || return 1; _eff_need jq || return 1
-  local raw="${1:-}" num repo base branch root self_wt trace_dir
+  local raw="${1:-}" num repo base branch root self_wt trace_dir kit_touched
   [ -n "$raw" ] || { echo "effort_close: <slug|effort issue #> required" >&2; return 1; }
   num="$(effort_slug_resolve "$raw")" || { echo "effort_close: could not resolve '$raw' to an effort" >&2; return 1; }
   repo="$(_eff_repo)"; base="$(_eff_base)"
@@ -379,6 +418,11 @@ effort_close() {
   # (b) capture effort metrics PRE-squash (needs the live-branch diff + commit signals).
   command -v capture_effort_metrics >/dev/null 2>&1 && capture_effort_metrics "$num" "origin/$base" || true
 
+  # (b2) record which kit-managed files this effort touched, PRE-squash (the branch is GC'd below,
+  # so the live-branch diff is the reliable source). The warning itself is emitted last (step h).
+  kit_touched="$(git diff --name-only "origin/$base"...HEAD 2>/dev/null \
+    | grep -E "$_EO_KIT_MANAGED_RE" | sort -u || true)"
+
   # (c) squash-merge the effort PR.
   gh pr merge "$branch" --repo "$repo" --squash --delete-branch >/dev/null 2>&1 \
     || { echo "effort_close: could not squash-merge the PR for $branch (open? mergeable?)" >&2; return 1; }
@@ -388,12 +432,17 @@ effort_close() {
   command -v judge_effort_metrics >/dev/null 2>&1 && judge_effort_metrics "$num" "origin/$base" || true
   command -v sync_effort_metrics  >/dev/null 2>&1 && sync_effort_metrics  "$num" || true
 
-  # (e) close every native sub-issue, then the parent.
+  # (e) close every native sub-issue, then the parent — and set the board Status=Done for each
+  # (guarded: a no-op when Projects v2 is off or the board helpers/ids are unavailable). Board +
+  # issue + record state are owned by this ONE op (effort-model.md) — never a separate "mark done".
+  _eo_source_board
   local sub
   for sub in $(gh api "repos/$repo/issues/$num/sub_issues" --jq '.[].number' 2>/dev/null); do
     gh issue close "$sub" --repo "$repo" --reason completed >/dev/null 2>&1 && echo "  ✓ closed sub #$sub" >&2
+    _eo_board_done "$sub"
   done
   gh issue close "$num" --repo "$repo" --reason completed >/dev/null 2>&1 && echo "  ✓ closed effort #$num" >&2
+  _eo_board_done "$num"
 
   # (f) GC: switch the main checkout to base, remove the effort worktree, delete the local branch,
   # prune. The remote branch was deleted by --delete-branch above. All via `git -C "$root"` so the
@@ -412,4 +461,16 @@ effort_close() {
 
   # (g) optional, config-gated knowledge-ingest hook (no-op when absent).
   _eo_knowledge_ingest "$num" "${trace_dir:-}" "$root"
+
+  # (h) kit-sync drift check — kit ⇄ project stay in sync (#148, moved here from the skill). If the
+  # effort changed kit-managed files they likely belong upstream (/kit-contribute); an un-upstreamed
+  # change is a latent regression the next /kit-update can clobber. Advisory: never blocks the close.
+  if [ -n "$kit_touched" ]; then
+    {
+      echo ""
+      echo "  ⚠ kit-sync: this effort changed kit-managed files — review for upstream (/kit-contribute):"
+      printf '%s\n' "$kit_touched" | sed 's/^/     /'
+      echo "     kit ⇄ project must stay in sync; an un-upstreamed change can be clobbered by /kit-update."
+    } >&2
+  fi
 }
