@@ -37,7 +37,25 @@ if [ -n "${CAP_TEST_INNER:-}" ]; then
   eq "act failing"       "$(cap_action CHECKS_FAILING)" "fix"
   eq "act pending"       "$(cap_action CHECKS_PENDING)" "wait"
   eq "act draft"         "$(cap_action DRAFT)"          "wait"
+  eq "act held"          "$(cap_action HELD)"           "hold"
   eq "act blocked"       "$(cap_action BLOCKED)"        "skip"
+
+  # cap_policy_floor — floors that block an unattended auto-merge (default ON). Non-empty = held.
+  nl="$(printf '\n')"
+  eq "floor: clean PR merges"       "$(KIT_CAPTAIN_FLOORS= KIT_CAPTAIN_EXTRA_GLOBS= cap_policy_floor "src/app.ts${nl}README.md" "")" ""
+  neq() { if [ -z "$2" ]; then echo "FAIL($CAP_TEST_INNER): $1 -> empty, want non-empty"; fail=1; fi; }
+  neq "floor: workflow file held"   "$(KIT_CAPTAIN_FLOORS= cap_policy_floor ".github/workflows/ci.yml" "")"
+  neq "floor: pnpm-lock held"       "$(KIT_CAPTAIN_FLOORS= cap_policy_floor "pnpm-lock.yaml" "")"
+  neq "floor: package.json held"    "$(KIT_CAPTAIN_FLOORS= cap_policy_floor "apps/web/package.json" "")"
+  neq "floor: workspace yaml held"  "$(KIT_CAPTAIN_FLOORS= cap_policy_floor "pnpm-workspace.yaml" "")"
+  neq "floor: turbo.json held"      "$(KIT_CAPTAIN_FLOORS= cap_policy_floor "turbo.json" "")"
+  neq "floor: pem held"             "$(KIT_CAPTAIN_FLOORS= cap_policy_floor "certs/server.pem" "")"
+  neq "floor: dotenv held"          "$(KIT_CAPTAIN_FLOORS= cap_policy_floor ".env.production" "")"
+  neq "floor: secrets path held"    "$(KIT_CAPTAIN_FLOORS= cap_policy_floor "config/secrets/db.yml" "")"
+  neq "floor: hold label held"      "$(KIT_CAPTAIN_FLOORS= cap_policy_floor "src/app.ts" "priority:p1 hold")"
+  neq "floor: extra glob held"      "$(KIT_CAPTAIN_FLOORS= KIT_CAPTAIN_EXTRA_GLOBS='migrations/*' cap_policy_floor "migrations/001.sql" "")"
+  # a disabling override lets even a workflow file through (config/CLI can opt out).
+  eq "floor: KIT_CAPTAIN_FLOORS=0 disables" "$(KIT_CAPTAIN_FLOORS=0 cap_policy_floor ".github/workflows/ci.yml" "hold")" ""
 
   # _cap_issue_of_branch — pull the issue number out of a flow branch.
   eq "branch task"       "$(_cap_issue_of_branch 'task/47-admin-clerk')" "47"

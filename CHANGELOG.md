@@ -7,6 +7,12 @@ All notable changes to cckit are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- `cckit watch --merge` now enforces auto-merge policy floors (default on): the captain never
+  auto-merges a PR touching `.github/workflows/**`, lockfile/graph files (`pnpm-lock.yaml`,
+  `package.json`, `*-workspace.yaml`, `turbo.json`, …), or security-sensitive paths (`*.pem`,
+  `*.key`, `.env*`, secret paths), and always holds a `hold`-labelled or draft PR — surfacing them
+  for human review instead. Configurable via `captain.mergePolicy` (`floors`, `protectedGlobs`) or
+  `KIT_CAPTAIN_FLOORS` / `KIT_CAPTAIN_EXTRA_GLOBS` (#123).
 - `cckit gc` now honors recover-before-prune. A zombie worktree (its working dir gone but its admin
   metadata lingering) can hold staged-but-uncommitted work in its admin index — the only blob→path
   map — which `git worktree prune` would orphan. gc now detects zombies (and staged-without-commit)
