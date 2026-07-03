@@ -81,6 +81,14 @@ The slug is a *derived* convenience, not a second source of truth. `--slug` only
   worktree/branch, runs an optional, config-gated knowledge-ingest hook
   (`effort.knowledgeIngestHook`), and finishes with an advisory **kit-sync drift check** that flags
   any kit-managed files the effort touched (they belong upstream via `/kit-contribute`).
+- **Wave-driven efforts close too.** A wave run ships each sub as its own task PR squash-merged
+  straight to the base branch, so no `effort/<N>` integration branch ever exists. `cckit effort
+  close <N>` detects that (no such branch locally or on origin) and closes **wave-style**: it
+  verifies every sub is closed with a merged PR (refusing and listing the stragglers otherwise),
+  snapshots the work trace from the merged sub PR diffs instead of branch commits, and then runs
+  the same close tail — metrics judge/sync, parent close, board **Status=Done** for parent and
+  subs, the knowledge-ingest hook, and the kit-sync drift check. If the integration branch does
+  exist, the close still asks you to run from it.
 
 ## Waves
 
