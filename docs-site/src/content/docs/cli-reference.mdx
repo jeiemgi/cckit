@@ -50,6 +50,7 @@ A **wave** is a set of issues with no blockers between them, so they can run at 
 | Verb | Purpose |
 | --- | --- |
 | `cckit plan [--effort N]` | Wave plan: deps-ordered, file-disjoint, session-fit. |
+| `cckit plan-next` | Forward plan: inventory the kit's own skills/verbs/rules/docs, propose what to build next. |
 | `cckit wave [--effort N]` | Read open efforts, propose incoming waves: subagent fan-out + captain drive. |
 | `cckit watch [--merge] [--loop]` | Captain: gate open PRs, squash-merge clean ones, advance. |
 | `cckit effort <new\|start\|pr\|close\|plan>` | The effort lifecycle (a parent issue + sub-issues). `new` takes `--slug`; `start`/`pr`/`close` accept a `<slug>` or the effort `<N>`. |
@@ -84,6 +85,7 @@ Append `--llm` (or `--output=json`) to any verb for parseable output, so an agen
 ```bash
 cckit sync --llm
 cckit plan --llm
+cckit plan-next --llm   # the forward plan as TOON rows {rank,area,proposal,next}
 cckit effort plan --llm
 ```
 

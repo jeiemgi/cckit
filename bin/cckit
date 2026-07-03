@@ -14,6 +14,7 @@
 #   cckit contribute "<summary>"    open a contribution PR to cckit, gated on scripts/check.sh
 #   cckit sync [--llm]              board state / what's unblocked
 #   cckit plan [--llm] [--effort N] wave plan: deps-ordered, file-disjoint, session-fit (TOON --llm)
+#   cckit plan-next [--llm]         forward plan: current skills/verbs/rules/docs -> what to build next
 #   cckit effort <new|start|pr|close|plan>   the effort lifecycle
 #     effort new [--flow F --role R --priority p1 --goal G --scope S --for-agents A
 #       --verification V --depends-on "#1,#2" --milestone M] "<name>" ["sub :: desc" …]
@@ -176,6 +177,16 @@ case "$cmd" in
     source "$LIB/kit-config.sh" && load_kit_config
     # shellcheck source=/dev/null
     source "$LIB/plan-machine.sh"; plan_machine "$@"
+    ;;
+  plan-next)
+    # Forward planner: introspect the CURRENT capability surface (skills/verbs/rules/docs) and
+    # propose what to build next, grounded in what the kit can already do. Filesystem-only — config
+    # is loaded for the project-root inference (KIT_CONFIG), then plan-next scans that root. Output
+    # is HUMAN / orchestrator-facing only — never wired into a monitored model's context (#86).
+    # shellcheck source=/dev/null
+    source "$LIB/kit-config.sh" && load_kit_config 2>/dev/null || true
+    # shellcheck source=/dev/null
+    source "$LIB/plan-next.sh"; plan_next "$@"
     ;;
   gc)
     # shellcheck source=/dev/null

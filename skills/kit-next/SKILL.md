@@ -16,6 +16,10 @@ metadata:
 
 Answer one question fast: **what should I work on right now, and how do I start it?**
 
+> Planning the work that doesn't exist yet is a different question. For "given where we are, what
+> should we build next?" use `/kit-plan-next` (`cckit plan-next`) — it inventories the kit's current
+> capabilities and proposes next efforts. `kit-next` orders the issues that already exist.
+
 ## Pick up the next issue
 
 ```

@@ -71,6 +71,7 @@ Requirements: `bash` 4+, `git`, and `gh` (GitHub CLI) authenticated. `jq` recomm
 
 ```bash
 cckit init                 # scaffold cckit.config.json + .claude/ for this repo
+cckit plan-next            # propose what to build next, grounded in current capabilities
 cckit next                 # the next unblocked issue + how to start it
 cckit start 42             # isolated worktree + branch for issue #42
 cckit pr 42 "what changed" # commit, push, open the PR
