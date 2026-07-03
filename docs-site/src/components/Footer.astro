@@ -3,8 +3,12 @@
 // on every page (production included). This override carries NO client islands, so it is always
 // registered; the dev-only Agentation toolbar lives in DevAnnotate.astro instead.
 import Default from '@astrojs/starlight/components/Footer.astro';
+import SpeedInsights from '@vercel/speed-insights/astro';
 ---
 <Default />
+{/* Core Web Vitals sampling — zero-config on Vercel, free on Hobby; a ranking-relevant signal
+    Google's tools otherwise give no visibility into. */}
+<SpeedInsights />
 <p class="cckit-disclaimer">
   Independent, educational project — <strong>not affiliated with or endorsed by Anthropic</strong>.
   Claude and Claude Code are trademarks of Anthropic PBC.

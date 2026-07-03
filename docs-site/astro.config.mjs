@@ -44,6 +44,14 @@ const ALGOLIA = {
 };
 const HAS_DOCSEARCH = Boolean(ALGOLIA.appId && ALGOLIA.apiKey && ALGOLIA.indexName);
 
+// Analytics + Search Console — same optional-env pattern as Algolia above: both are no-ops until
+// set, so the build never breaks for a fresh clone. GA4 is free with no event cap (unlike Vercel's
+// own Web Analytics, which pauses collection once the Hobby plan's monthly cap is hit), which is
+// why it's the traffic layer here; Vercel Speed Insights (added below, near-zero setup since the
+// site is already on Vercel) covers Core Web Vitals instead.
+const GA_MEASUREMENT_ID = envVar('PUBLIC_GA_MEASUREMENT_ID');
+const GSC_VERIFICATION = envVar('PUBLIC_GSC_VERIFICATION');
+
 // https://astro.build/config
 export default defineConfig({
   // Live domain. cckit.dev is the future canonical home (DNS coming soon); until it
@@ -93,6 +101,21 @@ export default defineConfig({
         // Algolia site verification — lets the Algolia Crawler confirm ownership of the site.
         { tag: 'meta', attrs: { name: 'algolia-site-verification', content: '9E796471F3020A1F' } },
         { tag: 'meta', attrs: { property: 'og:type', content: 'website' } },
+        // Google Search Console ownership verification (meta-tag method) — set PUBLIC_GSC_VERIFICATION
+        // to the content value Search Console gives you when adding cckit.vercel.app as a property.
+        ...(GSC_VERIFICATION
+          ? [{ tag: 'meta', attrs: { name: 'google-site-verification', content: GSC_VERIFICATION } }]
+          : []),
+        // GA4 — set PUBLIC_GA_MEASUREMENT_ID (a "G-XXXXXXX" id) in Vercel project env vars to enable.
+        ...(GA_MEASUREMENT_ID
+          ? [
+              { tag: 'script', attrs: { async: true, src: `https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}` } },
+              {
+                tag: 'script',
+                content: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${GA_MEASUREMENT_ID}');`,
+              },
+            ]
+          : []),
       ],
       // The Designer owns the visual theme — this file is the single hook (elegant + sober,
       // never Claude/Anthropic colors). Placeholder until the Designer's spec lands.
