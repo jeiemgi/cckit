@@ -7,6 +7,12 @@ All notable changes to cckit are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- `cckit gc` now honors recover-before-prune. A zombie worktree (its working dir gone but its admin
+  metadata lingering) can hold staged-but-uncommitted work in its admin index — the only blob→path
+  map — which `git worktree prune` would orphan. gc now detects zombies (and staged-without-commit)
+  as their own analysis bucket, recovers any staged delta to its branch as a commit via
+  `write-tree`/`commit-tree`/`update-ref` before pruning, and no longer runs `git worktree prune`
+  in a dry-run (#111).
 - Effort PRs are now titled by ONE shared composer used by both `cckit effort pr` and the
   kit-effort-pr skill, so a PR is titled identically no matter who opens it — and both refuse to
   open a PR whose title lacks the mandatory `[#N]` effort id. `cckit effort new` gained a `--par`

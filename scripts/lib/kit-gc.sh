@@ -66,11 +66,93 @@ kit_gc_analyze() {
 
   echo "# stashes"
   git stash list 2>/dev/null | sed 's/^/  /' || true
+
+  echo "# zombies (worktree dir gone, admin metadata lingers)"
+  local zname zbranch zstaged found=0
+  while IFS="$(printf '\t')" read -r zname zbranch zstaged; do
+    [ -n "$zname" ] || continue
+    found=1
+    if [ "$zstaged" = yes ]; then
+      echo "  $zname [$zbranch] -> ZOMBIE with STAGED work — recover-before-prune (gc --prune --yes recovers it to a commit)"
+    else
+      echo "  $zname [$zbranch] -> ZOMBIE (no staged delta) — prunable"
+    fi
+  done <<EOF
+$(_kit_gc_zombies)
+EOF
+  [ "$found" -eq 1 ] || echo "  (none)"
 }
 
 # kit_gc_has_prunable — rc 0 if at least one branch is SAFE to delete (a merged, unprotected branch).
 kit_gc_has_prunable() {
   kit_gc_analyze 2>/dev/null | grep -q '> SAFE '
+}
+
+# _kit_gc_zombies — echo "<name>\t<branch>\t<staged:yes|no>" for each ZOMBIE worktree: its working
+# dir is gone but its admin metadata (<git-common-dir>/worktrees/<name>/) lingers. staged=yes when
+# the admin index holds a tree that differs from the branch tip (staged-but-uncommitted work that
+# `git worktree prune` would orphan). Writes NOTHING. bash 3.2.
+_kit_gc_zombies() {
+  local common wdir name gitdir wtpath branch tree tip tiptree staged
+  common="$(git rev-parse --git-common-dir 2>/dev/null)" || return 0
+  case "$common" in /*) : ;; *) common="$(cd "$common" 2>/dev/null && pwd)" || return 0 ;; esac
+  [ -d "$common/worktrees" ] || return 0
+  for wdir in "$common"/worktrees/*/; do
+    [ -d "$wdir" ] || continue
+    gitdir="$(cat "$wdir/gitdir" 2>/dev/null)"; wtpath="${gitdir%/.git}"
+    # A zombie: the recorded working-tree path is set but no longer exists on disk.
+    [ -n "$wtpath" ] && [ ! -e "$wtpath" ] || continue
+    name="$(basename "$wdir")"
+    branch="$(sed -n 's#^ref: refs/heads/##p' "$wdir/HEAD" 2>/dev/null)"
+    tree=""; [ -f "$wdir/index" ] && tree="$(GIT_INDEX_FILE="$wdir/index" git write-tree 2>/dev/null)"
+    tip="$(git rev-parse --verify --quiet "refs/heads/${branch}" 2>/dev/null)"
+    tiptree=""; [ -n "$tip" ] && tiptree="$(git rev-parse --verify --quiet "${tip}^{tree}" 2>/dev/null)"
+    if [ -n "$tree" ] && [ "$tree" != "$tiptree" ]; then staged=yes; else staged=no; fi
+    printf '%s\t%s\t%s\n' "$name" "${branch:-?}" "$staged"
+  done
+}
+
+# kit_gc_recover_zombies <yes> — the recover-before-prune mechanic (#111). For each ZOMBIE worktree
+# holding staged-but-uncommitted work, recover that delta to its branch via plumbing BEFORE any
+# prune: GIT_INDEX_FILE=<admin>/index git write-tree -> git commit-tree -p <tip> -> update-ref. With
+# <yes>=1 it performs the recovery + sweeps that zombie's stale locks; otherwise it reports what it
+# WOULD recover (dry-run). Never prunes; that stays with the caller (gated on --yes). bash 3.2.
+kit_gc_recover_zombies() {
+  local yes="${1:-0}" common wdir name gitdir wtpath branch tree tip tiptree newc msg
+  common="$(git rev-parse --git-common-dir 2>/dev/null)" || return 0
+  case "$common" in /*) : ;; *) common="$(cd "$common" 2>/dev/null && pwd)" || return 0 ;; esac
+  [ -d "$common/worktrees" ] || return 0
+  for wdir in "$common"/worktrees/*/; do
+    [ -d "$wdir" ] || continue
+    gitdir="$(cat "$wdir/gitdir" 2>/dev/null)"; wtpath="${gitdir%/.git}"
+    [ -n "$wtpath" ] && [ ! -e "$wtpath" ] || continue    # only dead worktrees
+    name="$(basename "$wdir")"
+    branch="$(sed -n 's#^ref: refs/heads/##p' "$wdir/HEAD" 2>/dev/null)"
+    [ -f "$wdir/index" ] || continue
+    tree="$(GIT_INDEX_FILE="$wdir/index" git write-tree 2>/dev/null)" || continue
+    [ -n "$tree" ] || continue
+    tip="$(git rev-parse --verify --quiet "refs/heads/${branch}" 2>/dev/null)"
+    tiptree=""; [ -n "$tip" ] && tiptree="$(git rev-parse --verify --quiet "${tip}^{tree}" 2>/dev/null)"
+    # No staged delta beyond the tip → nothing to recover; the zombie is safe to prune as-is.
+    [ "$tree" = "$tiptree" ] && continue
+    [ -n "$branch" ] || { echo "  gc: zombie $name is detached with staged work — leaving it for manual recovery" >&2; continue; }
+    if [ "$yes" -ne 1 ]; then
+      echo "  would RECOVER staged work from zombie worktree $name -> a commit on $branch (staged tree $tree)" >&2
+      continue
+    fi
+    msg="kit gc: recovered staged work from zombie worktree $name (recover-before-prune)"
+    newc="$(printf '%s\n' "$msg" | GIT_AUTHOR_NAME="${GIT_AUTHOR_NAME:-kit-gc}" GIT_AUTHOR_EMAIL="${GIT_AUTHOR_EMAIL:-kit-gc@localhost}" GIT_COMMITTER_NAME="${GIT_COMMITTER_NAME:-kit-gc}" GIT_COMMITTER_EMAIL="${GIT_COMMITTER_EMAIL:-kit-gc@localhost}" git commit-tree "$tree" ${tip:+-p "$tip"} 2>/dev/null)"
+    if [ -n "$newc" ]; then
+      # Compare-and-swap on the tip so a concurrent update is never clobbered.
+      if git update-ref "refs/heads/$branch" "$newc" ${tip:+"$tip"} 2>/dev/null; then
+        echo "  RECOVERED staged work from zombie $name -> commit ${newc%% *} on $branch" >&2
+      else
+        echo "  gc: could not update refs/heads/$branch (moved concurrently?) — zombie $name left intact" >&2
+      fi
+    fi
+    # Stale-lock sweep — safe only because this worktree is provably dead.
+    rm -f "$wdir/index.lock" "$wdir/HEAD.lock" 2>/dev/null || true
+  done
 }
 
 # kit_gc_prune [--yes] - remove worktrees + local branches whose PR is MERGED (the SAFE rows).
@@ -103,7 +185,14 @@ kit_gc_prune() {
           echo "  would remove worktree $wtpath [$b] (PR MERGED)"
         fi
       done
-  git worktree prune 2>/dev/null || true
+
+  # recover-before-prune (#111): a zombie worktree (working dir gone, admin metadata lingers) may
+  # hold staged-but-uncommitted work in its admin index — the ONLY blob->path map. `git worktree
+  # prune` deletes that index, orphaning the blobs for a later `git gc` to reap — real data loss in a
+  # documented incident. Recover any staged delta to its branch FIRST, and gate the prune sweep
+  # behind --yes so it NEVER runs in a dry-run (the previous unconditional prune was the hazard).
+  kit_gc_recover_zombies "$yes"
+  [ "$yes" -eq 1 ] && { git worktree prune 2>/dev/null || true; }
 
   # Then local branches whose PR merged (worktree now gone).
   for b in $(git branch --format='%(refname:short)' 2>/dev/null); do
