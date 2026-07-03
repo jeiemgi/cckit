@@ -7,6 +7,11 @@ All notable changes to cckit are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- `cckit effort close` now runs the whole close in one op: it captures effort metrics before the
+  squash and judges + syncs them after, refuses to squash-merge when no per-sub work trace was
+  captured (the squash is irreversible; override with `KIT_FORCE=1`), garbage-collects the effort
+  worktree/branch, and runs an optional config-gated knowledge-ingest hook
+  (`effort.knowledgeIngestHook`, a no-op when absent). The pre-squash sub-diff snapshot is unchanged (#120).
 - `cckit effort start` now gives its worktree the full `cckit start` setup — gitignored env-file
   copy, per-worktree dev port, and dependency install (opt out with `KIT_WT_INSTALL=0`) — plus a
   live-session collision guard. Its worktree dir now follows the `effort+<N>-<slug>` convention

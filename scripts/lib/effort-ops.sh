@@ -269,27 +269,100 @@ effort_pr() {
     --body "$(printf 'Closes the #%s effort.\n\n## For agents\nSee #%s for the goal, scope, and entry points.\n' "$num" "$num")"
 }
 
-# effort_close <N> — snapshot per-sub diffs (before squash), squash-merge the PR, close parent + subs.
-# Destructive: it merges and closes. Snapshots first so the per-sub work record survives the squash.
+# _eo_source_metrics — lazily source effort-metrics.sh so effort_close can call the shipped
+# capture/judge/sync functions even when only effort-ops is loaded (bin/cckit sources it for the
+# effort verb; this makes the composition robust + testable). No-op if already loaded.
+_eo_source_metrics() {
+  command -v capture_effort_metrics >/dev/null 2>&1 && return 0
+  local d; d="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+  # shellcheck source=/dev/null
+  [ -f "$d/effort-metrics.sh" ] && . "$d/effort-metrics.sh"
+}
+
+# _eo_knowledge_ingest <num> <trace_dir> <root> — optional post-close knowledge-ingest hook. Runs a
+# project-configured command (github/effort.knowledgeIngestHook, or KIT_EFFORT_KNOWLEDGE_HOOK) with
+# the effort number + trace dir, so a project can fold the closed effort's work record into its
+# knowledge base. Config-gated: a NO-OP when unset or the hook file is missing/not executable — the
+# kit ships no default hook. Best-effort — a hook failure never fails the close.
+_eo_knowledge_ingest() {
+  local num="$1" trace="$2" root="$3" hook="" cfg
+  hook="${KIT_EFFORT_KNOWLEDGE_HOOK:-}"
+  if [ -z "$hook" ]; then
+    cfg="${KIT_CONFIG:-}"; [ -n "$cfg" ] || { [ -f "$root/cckit.config.json" ] && cfg="$root/cckit.config.json" || cfg="$root/.claude/kit.config.json"; }
+    [ -f "$cfg" ] && command -v jq >/dev/null 2>&1 \
+      && hook="$(jq -r '.effort.knowledgeIngestHook // empty' "$cfg" 2>/dev/null)"
+  fi
+  [ -n "$hook" ] || return 0
+  case "$hook" in /*) : ;; *) hook="$root/$hook" ;; esac   # resolve a relative hook against the root
+  [ -x "$hook" ] || { echo "effort_close: knowledge-ingest hook '$hook' not executable — skipping" >&2; return 0; }
+  echo "  → knowledge-ingest hook: $hook $num" >&2
+  "$hook" "$num" "$trace" >/dev/null 2>&1 || echo "effort_close: knowledge-ingest hook failed (non-fatal)" >&2
+}
+
+# effort_close <N> — the single close op. Snapshot per-sub diffs + capture metrics BEFORE the squash
+# (the squash erases the per-sub history), REFUSE to squash if no work trace was captured (KIT_FORCE=1
+# overrides), squash-merge, judge + sync the metrics, close parent + subs, GC the worktree/branch, and
+# run the optional knowledge-ingest hook. Destructive: it merges, closes, and prunes.
 effort_close() {
   _eff_need gh || return 1; _eff_need jq || return 1
-  local raw="${1:-}" num repo base branch
+  local raw="${1:-}" num repo base branch root self_wt trace_dir
   [ -n "$raw" ] || { echo "effort_close: <slug|effort issue #> required" >&2; return 1; }
   num="$(effort_slug_resolve "$raw")" || { echo "effort_close: could not resolve '$raw' to an effort" >&2; return 1; }
   repo="$(_eff_repo)"; base="$(_eff_base)"
   branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)"
   case "$branch" in effort/"$num"-*) : ;; *) echo "effort_close: run from the effort/$num-… branch" >&2; return 1 ;; esac
+  root="$(git worktree list --porcelain 2>/dev/null | awk '/^worktree /{print $2; exit}')"
+  self_wt="$(git rev-parse --show-toplevel 2>/dev/null)"
+  _eo_source_metrics
 
-  # (a) snapshot the per-sub-issue diffs while the unsquashed history still exists.
-  effort_snapshot_subs "$num" "origin/$base" || true
-  # (b) squash-merge the effort PR.
+  # (a) snapshot the per-sub-issue diffs while the unsquashed history still exists (echoes the trace dir).
+  trace_dir="$(effort_snapshot_subs "$num" "origin/$base" 2>/dev/null)"
+
+  # (a2) refuse-squash-without-trace backstop: the squash is irreversible and collapses the per-sub
+  # commits that ARE the work record. If nothing was snapshotted, refuse — unless KIT_FORCE=1.
+  if [ -z "$trace_dir" ] || ! ls "$trace_dir"/*.diff >/dev/null 2>&1; then
+    if [ "${KIT_FORCE:-0}" = "1" ]; then
+      echo "effort_close: no per-sub work trace captured — proceeding anyway (KIT_FORCE=1)" >&2
+    else
+      echo "effort_close: refusing to squash-merge #$num — no per-sub work trace was captured; the squash would erase the per-sub history irrecoverably. Run from the effort branch with its commits present, or set KIT_FORCE=1 to override." >&2
+      return 1
+    fi
+  fi
+
+  # (b) capture effort metrics PRE-squash (needs the live-branch diff + commit signals).
+  command -v capture_effort_metrics >/dev/null 2>&1 && capture_effort_metrics "$num" "origin/$base" || true
+
+  # (c) squash-merge the effort PR.
   gh pr merge "$branch" --repo "$repo" --squash --delete-branch >/dev/null 2>&1 \
     || { echo "effort_close: could not squash-merge the PR for $branch (open? mergeable?)" >&2; return 1; }
   echo "  ✓ merged $branch" >&2
-  # (c) close every native sub-issue, then the parent.
+
+  # (d) judge + sync the metrics (judge reads the durable trace dir; sync no-ops when the engine is off).
+  command -v judge_effort_metrics >/dev/null 2>&1 && judge_effort_metrics "$num" "origin/$base" || true
+  command -v sync_effort_metrics  >/dev/null 2>&1 && sync_effort_metrics  "$num" || true
+
+  # (e) close every native sub-issue, then the parent.
   local sub
   for sub in $(gh api "repos/$repo/issues/$num/sub_issues" --jq '.[].number' 2>/dev/null); do
     gh issue close "$sub" --repo "$repo" --reason completed >/dev/null 2>&1 && echo "  ✓ closed sub #$sub" >&2
   done
   gh issue close "$num" --repo "$repo" --reason completed >/dev/null 2>&1 && echo "  ✓ closed effort #$num" >&2
+
+  # (f) GC: switch the main checkout to base, remove the effort worktree, delete the local branch,
+  # prune. The remote branch was deleted by --delete-branch above. All via `git -C "$root"` so the
+  # caller's cwd is never moved. Best-effort — a GC hiccup never fails the (already-landed) close.
+  if [ -n "$root" ]; then
+    git -C "$root" checkout "$base" >/dev/null 2>&1 || true
+    git -C "$root" pull origin "$base" --quiet >/dev/null 2>&1 || true
+    if [ -n "$self_wt" ] && [ "$self_wt" != "$root" ]; then
+      case "$self_wt" in "$root"/.claude/worktrees/*)
+        git -C "$root" worktree remove "$self_wt" --force >/dev/null 2>&1 && echo "  ✓ removed worktree $self_wt" >&2 ;;
+      esac
+    fi
+    git -C "$root" branch -D "$branch" >/dev/null 2>&1 && echo "  ✓ deleted local branch $branch" >&2
+    git -C "$root" worktree prune >/dev/null 2>&1 || true
+  fi
+
+  # (g) optional, config-gated knowledge-ingest hook (no-op when absent).
+  _eo_knowledge_ingest "$num" "${trace_dir:-}" "$root"
 }

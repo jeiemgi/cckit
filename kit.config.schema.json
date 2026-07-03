@@ -64,6 +64,13 @@
       }
     },
     "milestones": { "type": "array", "items": { "type": "string" } },
+    "effort": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "knowledgeIngestHook": { "type": "string", "description": "Optional path to an executable run after `cckit effort close`, invoked as `<hook> <effort-number> <trace-dir>` to fold the closed effort's work record into a knowledge base. No-op when unset or not executable; the kit ships no default." }
+      }
+    },
     "plans": {
       "type": "object",
       "additionalProperties": true,
