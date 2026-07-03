@@ -144,7 +144,14 @@ for entry in "${ENTRIES[@]}"; do
     tmux select-layout -t "$SESSION:flows" tiled >/dev/null
   fi
   if [ "$SEED" -eq 1 ]; then
-    tmux send-keys -t "$pane" "$AGENT \"$(seed_for "$num" "$branch")\"" C-m
+    # Single-quote the prompt so its embedded quotes / redirection chars (e.g. the
+    # "<summary>" and "<reason>" placeholders) reach the agent literally instead of being
+    # parsed by the pane's shell. Double-quoting collided with the seed's own quotes and
+    # dumped `<summary>` onto zsh as a redirection ("no such file or directory: summary"),
+    # so the agent never launched. Escape any single quotes for safe single-quote wrapping.
+    seed="$(seed_for "$num" "$branch")"
+    esc=${seed//\'/\'\\\'\'}
+    tmux send-keys -t "$pane" "$AGENT '$esc'" C-m
   else
     tmux send-keys -t "$pane" "$AGENT" C-m
   fi
