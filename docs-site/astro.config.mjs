@@ -107,6 +107,13 @@ export default defineConfig({
         ]},
         { label: 'Tutorials', items: [
           { label: 'All tutorials', slug: 'tutorials' },
+          { label: 'Set up cckit in a repo', slug: 'tutorials/set-up-cckit-in-a-repo' },
+          { label: 'Add cckit to an existing repo', slug: 'tutorials/adopt-cckit-in-an-existing-repo' },
+          { label: 'Issue → merged PR', slug: 'tutorials/take-a-github-issue-to-a-merged-pr' },
+          { label: 'Break a feature into an effort', slug: 'tutorials/break-a-feature-into-an-effort' },
+          { label: 'Run a wave in parallel', slug: 'tutorials/run-issues-in-parallel-with-a-wave' },
+          { label: 'Run Claude Code unattended', slug: 'tutorials/run-claude-code-unattended' },
+          { label: 'Drive Claude Code headless in CI', slug: 'tutorials/drive-claude-code-headless-in-ci' },
           { label: 'Stop Claude committing secrets', slug: 'tutorials/stop-claude-committing-secrets' },
         ]},
         { label: 'Concepts', items: [

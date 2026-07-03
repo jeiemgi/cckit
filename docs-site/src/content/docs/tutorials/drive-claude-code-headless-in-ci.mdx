@@ -1,0 +1,103 @@
+---
+title: How to drive Claude Code headless in CI with structured JSON
+description: Run cckit non-interactively from a CI bot or scheduled job — skip human output entirely, consume every verb's --llm JSON, and hand compact context to sub-agents.
+tutorial:
+  job: drive Claude Code headless in CI with structured JSON
+  difficulty: advanced
+  time: "6 min"
+  prerequisites: ["a cckit repo", "a CI runner or scheduled job"]
+  ogTag: Headless
+  keywords: [claude code headless json ci, cckit --llm, ai agent ci automation]
+  related: [run-claude-code-unattended, set-up-cckit-in-a-repo, run-issues-in-parallel-with-a-wave]
+---
+
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import TagRow from '../../../components/TagRow.astro';
+import TutorialMeta from '../../../components/TutorialMeta.astro';
+import TutorialSchema from '../../../components/TutorialSchema.astro';
+
+<TagRow kinds={["flow", "agent"]} />
+
+<TutorialMeta />
+
+**What you'll do:** run cckit with no human watching — a CI bot or scheduled run that reads state as
+structured data instead of scraping human output. Every verb that reports state takes `--llm`, so the
+agent reasons over JSON (and TOON), picks the highest-priority unblocked issue, and drives it start to
+finish.
+
+## Steps
+
+<Steps>
+
+1. **Prime the headless agent.** Tell it there's no human and to consume data, not prose.
+
+   <div class="cckit-prompt">
+
+   ```text frame="terminal" title="Prompt to paste"
+   You're running headless — no human watching. Work the board through to merged on your own: read
+   state as structured data, pick the highest-priority unblocked issue, and drive it start to finish.
+   Keep token use lean when you hand context to sub-agents.
+   ```
+
+   </div>
+
+2. **Consume every verb as data.**
+
+   ```bash frame="terminal"
+   cckit sync --llm          # board state + what's unblocked, as TOON
+   cckit scan --llm          # repo stack + kit state, as JSON
+   cckit plan --llm          # the session-fit wave plan, as TOON
+   ```
+
+3. **Compact context for sub-agents.** Pipe uniform arrays through `encode-context` so hand-offs stay
+   token-lean:
+
+   ```bash frame="terminal"
+   echo "$json" | cckit encode-context   # compact uniform arrays into TOON for sub-agents
+   ```
+
+</Steps>
+
+## How it works
+
+cckit is agent-operable by design: every verb has a machine-readable mode and the repo ships an
+[`AGENTS.md`](/agents/) contract, so an agent reasons over structured data instead of scraping human
+output. Point the agent at `AGENTS.md` once and it knows the grammar; `--llm` then gives it the board,
+the stack, and the plan as JSON/TOON it can act on without a human in the loop.
+
+<Aside type="note" title="TOON keeps hand-offs cheap">
+`encode-context` compacts uniform arrays into TOON — a denser encoding than raw JSON — so passing
+context to sub-agents costs fewer tokens.
+</Aside>
+
+## Troubleshooting
+
+**A verb printed human output in CI.** Add `--llm`. Only the reporting verbs take it; if one still
+prints prose, you've hit a verb that doesn't report state (it just acts) — that's expected.
+
+**The agent doesn't know the verbs.** It hasn't read the contract. Have it read `AGENTS.md` and
+`cckit.config.json` once at the start of the run.
+
+**Hand-offs are burning tokens.** Pipe the JSON through `cckit encode-context` before handing it to a
+sub-agent; TOON is materially smaller than the equivalent JSON.
+
+## Related tutorials
+
+<CardGrid>
+  <LinkCard title="Run Claude Code unattended" href="/tutorials/run-claude-code-unattended/" description="The attended-but-hands-off sibling of a headless run." />
+  <LinkCard title="Set up cckit in a repo" href="/tutorials/set-up-cckit-in-a-repo/" description="Get the config the --llm verbs resolve against." />
+  <LinkCard title="Run issues in parallel with a wave" href="/tutorials/run-issues-in-parallel-with-a-wave/" description="Fan out work once the board is read as data." />
+</CardGrid>
+
+<TutorialSchema
+  steps={[
+    { name: 'Prime the headless agent', text: 'Tell the agent there is no human and to consume data, not prose — read state as structured data, pick the highest-priority unblocked issue, and drive it start to finish.' },
+    { name: 'Consume every verb as data', text: 'cckit sync --llm returns the board and what is unblocked as TOON; scan --llm returns the stack and kit state as JSON; plan --llm returns the wave plan as TOON.' },
+    { name: 'Compact context for sub-agents', text: 'Pipe uniform arrays through cckit encode-context to compact them into TOON so hand-offs to sub-agents stay token-lean.' },
+  ]}
+  faqs={[
+    { q: 'A verb printed human output in CI', a: 'Add --llm. Only reporting verbs take it; a verb that just acts (rather than reporting state) will still print prose, which is expected.' },
+    { q: "The agent doesn't know the verbs", a: 'It has not read the contract. Have it read AGENTS.md and cckit.config.json once at the start of the run.' },
+    { q: 'Hand-offs are burning tokens', a: 'Pipe the JSON through cckit encode-context before handing it to a sub-agent; TOON is materially smaller than the equivalent JSON.' },
+  ]}
+/>
