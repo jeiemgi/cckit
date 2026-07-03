@@ -60,9 +60,19 @@ msg_send() {
   local from_proj from_branch
   from_proj="$(_msg_proj)"; from_branch="$(_msg_branch)"; from_branch="${from_branch:-unknown}"
   local box="$(_msg_home)/$(_msg_encode "$_MSG_PROJ")/$(_msg_encode "$_MSG_BOX")/new"
+  # A typo'd target would silently create a dead mailbox (hcom hard-fails here; we warn) — flag a
+  # first-time mailbox so a misaddressed steer doesn't just vanish.
+  [ -d "$(dirname "$box")" ] || [ "$_MSG_BOX" = "all" ] \
+    || echo "  ⚠ new mailbox $_MSG_PROJ:$_MSG_BOX — no session has mail here yet; check the target if you expected one (cckit msg list)" >&2
   mkdir -p "$box" || return 1
   local kind="note"; [ "$steer" = 1 ] && kind="steer"
-  local f="$box/$(date +%s)-$$-$kind-from-$(_msg_encode "$from_proj")~$(_msg_encode "$from_branch").md"
+  # epoch-$$ alone collides for two sends in the same second from one shell — the second message
+  # would silently OVERWRITE the first. $RANDOM + an existence check makes the name unique.
+  local f
+  while :; do
+    f="$box/$(date +%s)-$$-${RANDOM}-$kind-from-$(_msg_encode "$from_proj")~$(_msg_encode "$from_branch").md"
+    [ -e "$f" ] || break
+  done
   {
     printf -- '---\nfrom: %s (%s)\nto: %s:%s\nkind: %s\nsent: %s\n---\n' \
       "$from_branch" "$from_proj" "$_MSG_PROJ" "$_MSG_BOX" "$kind" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -154,24 +164,44 @@ _msg_json_escape() {
 # the hook adds zero noise on the hot path. With mail, emits the event's JSON:
 #   PostToolUse | UserPromptSubmit | SessionStart | PreToolUse → hookSpecificOutput.additionalContext
 #   Stop → decision:block with the mail as reason — ONLY for steer-marked mail (a note never traps
-#          a finishing session), and the mail is consumed on delivery so it can never block twice.
+#          a finishing session). KIT_MAIL_STOP_POLL=<seconds> (default 0) makes the Stop pass WAIT
+#          that long for a steer to arrive before letting the session end — near-real-time steering
+#          of an idle session, no daemon (the hcom long-poll trick, opt-in).
+# Ordering: the JSON is emitted BEFORE the mail is consumed — a hook killed mid-run redelivers
+# instead of losing the message (at-least-once, like hcom's two-phase ack). Delivery is capped at
+# KIT_MAIL_MAX_PER_DELIVERY (default 20) messages per injection; the rest ride the next hook fire.
 msg_hook_check() {
-  local event="${1:-}" f body="" steer_only=0 delivered=0
+  local event="${1:-}" f body="" steer_only=0 count=0 max="${KIT_MAIL_MAX_PER_DELIVERY:-20}"
   [ -n "$event" ] || { echo "msg_hook_check: <event> required" >&2; return 1; }
   [ "$event" = "Stop" ] && steer_only=1
-  while IFS= read -r f; do
-    [ -n "$f" ] || continue
-    if [ "$steer_only" = 1 ]; then
-      case "$(basename "$f")" in *-steer-from-*) : ;; *) continue ;; esac
-    fi
-    body="$body$(cat "$f")
+
+  _msg_hook_pick() {  # fill _MSG_PICKED + body from current unread (respects steer filter + cap)
+    _MSG_PICKED=""
+    while IFS= read -r f; do
+      [ -n "$f" ] || continue
+      [ "$count" -lt "$max" ] || break
+      if [ "$steer_only" = 1 ]; then
+        case "$(basename "$f")" in *-steer-from-*) : ;; *) continue ;; esac
+      fi
+      body="$body$(cat "$f")
 "
-    _msg_consume "$f"
-    delivered=1
-  done <<EOF_UNREAD
+      _MSG_PICKED="$_MSG_PICKED$f
+"
+      count=$((count + 1))
+    done <<EOF_UNREAD
 $(_msg_unread)
 EOF_UNREAD
-  [ "$delivered" = 1 ] || return 0
+  }
+
+  _msg_hook_pick
+  # Opt-in Stop long-poll: no steer yet → wait up to KIT_MAIL_STOP_POLL seconds for one to land.
+  if [ "$count" -eq 0 ] && [ "$event" = "Stop" ] && [ "${KIT_MAIL_STOP_POLL:-0}" -gt 0 ] 2>/dev/null; then
+    local waited=0
+    while [ "$count" -eq 0 ] && [ "$waited" -lt "${KIT_MAIL_STOP_POLL}" ]; do
+      sleep 1; waited=$((waited + 1)); _msg_hook_pick
+    done
+  fi
+  [ "$count" -gt 0 ] || return 0
 
   local msg="SESSION MAIL (cckit msg): a parallel session sent you the message(s) below. If one is kind: steer, act on it BEFORE continuing your current plan.
 $body"
@@ -181,4 +211,10 @@ $body"
   else
     printf '{"hookSpecificOutput":{"hookEventName":"%s","additionalContext":%s}}\n' "$event" "$esc"
   fi
+  # consume AFTER emit (see header) — read the picked list back without a subshell.
+  while IFS= read -r f; do
+    [ -n "$f" ] && _msg_consume "$f"
+  done <<EOF_PICKED
+$_MSG_PICKED
+EOF_PICKED
 }

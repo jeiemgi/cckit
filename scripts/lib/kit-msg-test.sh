@@ -93,5 +93,39 @@ case "$(msg_hook_check UserPromptSubmit)" in
   *) echo "FAIL: note lost after Stop pass"; fail=1 ;;
 esac
 
+# ── hcom-informed hardening (#175): cap, typo warning, opt-in Stop long-poll ────────────────────
+# delivery cap: excess mail rides the NEXT hook fire, nothing is lost
+cd "$tmp/appA"
+msg_send "docs/site" "one" >/dev/null 2>&1
+msg_send "docs/site" "two" >/dev/null 2>&1
+cd "$tmp/appA-docs"
+# order within one second is filename-random — assert counts and the union, not sequence
+h1="$(KIT_MAIL_MAX_PER_DELIVERY=1 msg_hook_check PostToolUse | jq -r '.hookSpecificOutput.additionalContext')"
+h2="$(KIT_MAIL_MAX_PER_DELIVERY=1 msg_hook_check PostToolUse | jq -r '.hookSpecificOutput.additionalContext')"
+t "cap: first delivery carries exactly one message"  "$(printf '%s' "$h1" | grep -c '^kind: note')" "1"
+t "cap: second delivery carries exactly one message" "$(printf '%s' "$h2" | grep -c '^kind: note')" "1"
+case "$h1$h2" in
+  *one*two*|*two*one*) echo "ok: capped-out mail rides the next hook fire (nothing lost)" ;;
+  *) echo "FAIL: cap lost mail: [$h1] [$h2]"; fail=1 ;;
+esac
+
+# typo'd target → loud warning about a brand-new mailbox
+cd "$tmp/appA"
+warn="$(msg_send "task/9-fxi" "typo target" 2>&1 >/dev/null)"
+case "$warn" in *"new mailbox"*) echo "ok: unknown target warns instead of silently dropping" ;; *) echo "FAIL: no new-mailbox warning: $warn"; fail=1 ;; esac
+warn="$(msg_send "task/9-fix" "known target" 2>&1 >/dev/null)"
+case "$warn" in *"new mailbox"*) echo "FAIL: warned on an existing mailbox"; fail=1 ;; *) echo "ok: existing mailbox does not warn" ;; esac
+
+# opt-in Stop long-poll: steer sent DURING the wait is still delivered (near-real-time idle steer)
+cd "$tmp/appA-docs"
+( sleep 1; cd "$tmp/appA" && . "$LIB/kit-msg.sh" && msg_send "docs/site" --steer "late steer" >/dev/null 2>&1 ) &
+pj="$(KIT_MAIL_STOP_POLL=4 msg_hook_check Stop)"
+wait
+case "$(printf '%s' "$pj" | jq -r '.reason' 2>/dev/null)" in
+  *"late steer"*) echo "ok: Stop long-poll catches a steer that lands mid-wait" ;;
+  *) echo "FAIL: long-poll missed the steer: $pj"; fail=1 ;;
+esac
+t "long-poll consumed the steer (no double block)" "$(msg_hook_check Stop)" ""
+
 [ "$fail" -eq 0 ] && echo "ALL OK (kit-msg)"
 exit "$fail"
