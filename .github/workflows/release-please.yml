@@ -39,6 +39,10 @@ jobs:
       - uses: googleapis/release-please-action@v4
         id: rp
         with:
+          # Pin the release line to main. Without this, release-please defaults target-branch to
+          # the repo DEFAULT branch (develop in our gitflow) and would read the wrong history —
+          # so releases are cut from main even though development integrates on develop.
+          target-branch: main
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
