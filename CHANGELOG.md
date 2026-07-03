@@ -29,6 +29,9 @@ All notable changes to cckit are documented here. The format follows
   loud warning when a send targets a mailbox no session has used (typos don't vanish), and an
   opt-in Stop long-poll (`KIT_MAIL_STOP_POLL=<s>`) that waits for a steer before letting an idle
   session end — near-real-time steering with no daemon.
+- The mail hook prefers the project's own `bin/cckit` over the PATH install (#179): a stale
+  PATH cckit without the msg verb silently no-op'd delivery — found by the first live
+  end-to-end test of the channel.
 
 ### Fixed
 - `cckit release` now creates the release tag annotated (`git tag -m`) and pushes only that tag.

@@ -15,6 +15,10 @@ event="$(printf '%s' "$input" | jq -r '.hook_event_name // empty' 2>/dev/null ||
 # Run from the project the hook fired in (hooks provide cwd; fall back to where we are).
 cwd="$(printf '%s' "$input" | jq -r '.cwd // empty' 2>/dev/null || true)"
 [ -n "$cwd" ] && cd "$cwd" 2>/dev/null
-command -v cckit >/dev/null 2>&1 || exit 0
-cckit msg hook-check "$event" 2>/dev/null || true
+# Prefer the project's own bin/cckit (version-matched to this checkout — the dogfood case) over
+# the PATH install: a stale PATH cckit without the msg verb would silently no-op delivery (#179).
+kit="cckit"
+[ -x "./bin/cckit" ] && kit="./bin/cckit"
+command -v "$kit" >/dev/null 2>&1 || exit 0
+"$kit" msg hook-check "$event" 2>/dev/null || true
 exit 0

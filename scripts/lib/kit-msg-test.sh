@@ -127,5 +127,23 @@ case "$(printf '%s' "$pj" | jq -r '.reason' 2>/dev/null)" in
 esac
 t "long-poll consumed the steer (no double block)" "$(msg_hook_check Stop)" ""
 
+# ── hook script resolution (#179): the project's own bin/cckit beats a stale PATH cckit ─────────
+HOOK="$LIB/../../templates/hooks/kit-mail-check.sh.tmpl"
+mkdir -p "$tmp/appA/bin" "$tmp/stalebin"
+cat > "$tmp/appA/bin/cckit" <<'SH'
+#!/usr/bin/env bash
+[ "$1 $2" = "msg hook-check" ] && echo "PROJECT-BIN-DELIVERED $3"
+SH
+cat > "$tmp/stalebin/cckit" <<'SH'
+#!/usr/bin/env bash
+echo "cckit: unknown command '$1'" >&2; exit 2
+SH
+chmod +x "$tmp/appA/bin/cckit" "$tmp/stalebin/cckit"
+hout="$(printf '{"hook_event_name":"PostToolUse","cwd":"%s"}' "$tmp/appA" | PATH="$tmp/stalebin:$PATH" bash "$HOOK")"
+t "hook prefers the project's own bin/cckit over a stale PATH cckit" "$hout" "PROJECT-BIN-DELIVERED PostToolUse"
+rm -rf "$tmp/appA/bin"
+hout="$(printf '{"hook_event_name":"Stop","cwd":"%s"}' "$tmp/appA" | PATH="$tmp/stalebin:$PATH" bash "$HOOK"; echo "rc=$?")"
+t "hook stays a silent no-op when only a broken PATH cckit exists" "$hout" "rc=0"
+
 [ "$fail" -eq 0 ] && echo "ALL OK (kit-msg)"
 exit "$fail"
