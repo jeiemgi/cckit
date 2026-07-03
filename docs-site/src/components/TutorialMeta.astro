@@ -1,12 +1,12 @@
 ---
-// TutorialMeta — the header block under a tutorial's title. Three jobs, all read from the page's
-// `tutorial:` frontmatter (via Starlight route data) so an author drops <TutorialMeta /> in with no
-// props and every tutorial gets the same treatment:
-//   1. a "New to cckit?" line for cold traffic that may not know what Claude Code / cckit is,
-//   2. a "Copy as Markdown" button that copies a ready-to-paste Claude Code prompt,
-//   3. the difficulty · read-time · prerequisites strip.
-// The copied prompt links the docs (agent contract, CLI reference, install) and this page's URL, so
-// Claude reads them and learns the cckit CLI before running the steps.
+// TutorialMeta — the header block under a tutorial's title. Read entirely from the page's `tutorial:`
+// frontmatter (via Starlight route data) so an author drops <TutorialMeta /> in with no props:
+//   1. a "prompt bar" (Clerk-quickstart style) with a Copy-as-Markdown button,
+//   2. a "Before you start" card for cold traffic that may not know what cckit / Claude Code is,
+//   3. a "This tutorial" card: difficulty · read-time · prerequisites.
+// The copied prompt links the docs (agent contract, CLI reference, install) and this page's URL so
+// Claude reads them and learns the cckit CLI. It never hardcodes issue numbers — the flow tutorials
+// tell Claude to sync the board and let the reader pick the work.
 const route = Astro.locals.starlightRoute;
 const data = route?.entry?.data ?? {};
 const t = data.tutorial;
@@ -27,13 +27,21 @@ know its commands, read these first, then follow the tutorial above:
 - CLI reference: ${DOCS}/cli-reference/
 - Install cckit: ${DOCS}/install/
 
-Run the commands as we go and tell me what each one did.
+Read the board with \`cckit sync\` before acting, use the exact commands from the tutorial, and run
+them as we go — telling me what each one did.
 `
   : '';
 ---
 {t && (
   <div class="tut-header">
-    <div class="tut-actionbar">
+    <div class="tut-promptbar">
+      <div class="tut-promptbar-copy">
+        <span class="tut-promptbar-mark" aria-hidden="true">❯_</span>
+        <div class="tut-promptbar-text">
+          <strong>Do this with Claude&nbsp;Code</strong>
+          <span>Copy a prompt that links the cckit docs so Claude learns the CLI, then follows these steps.</span>
+        </div>
+      </div>
       <button type="button" class="tut-copy" data-copy-md={copyMarkdown} aria-label="Copy this tutorial as a Claude Code prompt">
         <svg class="tut-copy-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
@@ -41,20 +49,27 @@ Run the commands as we go and tell me what each one did.
         </svg>
         <span class="tut-copy-label">Copy as Markdown</span>
       </button>
-      <span class="tut-new">
-        New to cckit? It's a CLI for Claude Code — <a href="/install/">install it</a> · <a href="/getting-started/">quickstart</a>
-      </span>
     </div>
 
-    <div class="tut-meta" data-difficulty={t.difficulty}>
-      <span class="tut-badge tut-diff">{diffLabel[t.difficulty] ?? t.difficulty}</span>
-      <span class="tut-badge tut-time">{t.time} read</span>
-      {t.prerequisites.length > 0 && (
-        <span class="tut-pre">
-          <span class="tut-pre-label">Needs</span>
-          {t.prerequisites.map((p) => <code class="tut-chip">{p}</code>)}
-        </span>
-      )}
+    <div class="tut-cards">
+      <div class="tut-card">
+        <div class="tut-card-title">Before you start</div>
+        <a class="tut-card-link" href="/install/">Install cckit<span aria-hidden="true">→</span></a>
+        <a class="tut-card-link" href="/getting-started/">Quickstart: your first lifecycle<span aria-hidden="true">→</span></a>
+      </div>
+      <div class="tut-card">
+        <div class="tut-card-title">This tutorial</div>
+        <div class="tut-meta" data-difficulty={t.difficulty}>
+          <span class="tut-badge tut-diff">{diffLabel[t.difficulty] ?? t.difficulty}</span>
+          <span class="tut-badge tut-time">{t.time} read</span>
+          {t.prerequisites.length > 0 && (
+            <span class="tut-pre">
+              <span class="tut-pre-label">Needs</span>
+              {t.prerequisites.map((p) => <code class="tut-chip">{p}</code>)}
+            </span>
+          )}
+        </div>
+      </div>
     </div>
   </div>
 )}
@@ -70,20 +85,14 @@ Run the commands as we go and tell me what each one did.
       const prev = label.textContent;
       label.textContent = 'Copied ✓';
       btn.classList.add('is-copied');
-      setTimeout(() => {
-        label.textContent = prev;
-        btn.classList.remove('is-copied');
-      }, 1600);
+      setTimeout(() => { label.textContent = prev; btn.classList.remove('is-copied'); }, 1600);
     };
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(md).then(done).catch(() => {});
     } else {
       const ta = document.createElement('textarea');
-      ta.value = md;
-      ta.style.position = 'fixed';
-      ta.style.opacity = '0';
-      document.body.appendChild(ta);
-      ta.select();
+      ta.value = md; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
       try { document.execCommand('copy'); done(); } catch (e) {}
       document.body.removeChild(ta);
     }
@@ -91,88 +100,92 @@ Run the commands as we go and tell me what each one did.
 </script>
 
 <style>
-  .tut-header {
-    display: flex;
-    flex-direction: column;
-    gap: 0.9rem;
-    margin: 0.5rem 0 1.75rem;
-  }
-  .tut-actionbar {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.6rem 1rem;
-  }
-  .tut-copy {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.45rem;
-    font: inherit;
-    font-size: var(--sl-text-sm);
-    font-weight: 600;
-    cursor: pointer;
-    padding: 0.4rem 0.8rem;
-    border-radius: 8px;
-    border: 1px solid var(--sl-color-accent-low);
-    color: var(--sl-color-white);
-    background: var(--sl-color-accent-low);
-    transition: background 0.15s ease, border-color 0.15s ease;
-  }
-  .tut-copy:hover {
-    background: var(--sl-color-accent);
-    border-color: var(--sl-color-accent);
-  }
-  .tut-copy.is-copied {
-    background: var(--sl-color-accent);
-    border-color: var(--sl-color-accent);
-  }
-  .tut-copy-icon { flex: none; }
-  .tut-new {
-    font-size: var(--sl-text-sm);
-    color: var(--sl-color-gray-3);
-  }
-  .tut-new a { white-space: nowrap; }
+  .tut-header { display: flex; flex-direction: column; gap: 1rem; margin: 0.6rem 0 1.9rem; }
 
-  .tut-meta {
+  /* Prompt bar — full-width call to action, styled off the Starlight accent. */
+  .tut-promptbar {
+    position: relative;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.5rem 0.75rem;
-    font-size: var(--sl-text-sm);
+    justify-content: space-between;
+    gap: 0.85rem 1.25rem;
+    padding: 1rem 1.15rem;
+    border-radius: 12px;
+    border: 1px solid var(--sl-color-accent-low);
+    background:
+      linear-gradient(120deg, color-mix(in srgb, var(--sl-color-accent-low) 55%, transparent), transparent 70%),
+      var(--sl-color-bg-sidebar);
+    overflow: hidden;
   }
-  .tut-badge {
+  .tut-promptbar-copy { display: flex; align-items: center; gap: 0.85rem; min-width: 15rem; flex: 1 1 20rem; }
+  .tut-promptbar-mark {
     font-family: var(--sl-font-mono);
-    font-size: var(--sl-text-xs);
-    letter-spacing: 0.04em;
-    padding: 0.15rem 0.6rem;
-    border-radius: 999px;
-    border: 1px solid var(--sl-color-hairline);
-    color: var(--sl-color-gray-2);
-    white-space: nowrap;
-  }
-  .tut-diff {
+    font-size: 1.35rem;
+    line-height: 1;
     color: var(--sl-color-text-accent);
-    border-color: var(--sl-color-accent-low);
+    opacity: 0.85;
+    flex: none;
   }
-  .tut-meta[data-difficulty='advanced'] .tut-diff { color: #d9a441; border-color: #d9a44166; }
-  .tut-pre {
-    display: inline-flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.4rem;
+  .tut-promptbar-text { display: flex; flex-direction: column; gap: 0.15rem; }
+  .tut-promptbar-text strong { color: var(--sl-color-white); font-size: var(--sl-text-base); }
+  .tut-promptbar-text span { font-size: var(--sl-text-sm); color: var(--sl-color-gray-3); }
+
+  .tut-copy {
+    display: inline-flex; align-items: center; gap: 0.45rem; flex: none;
+    font: inherit; font-size: var(--sl-text-sm); font-weight: 600; cursor: pointer;
+    padding: 0.5rem 0.95rem; border-radius: 8px;
+    border: 1px solid var(--sl-color-accent);
+    color: var(--sl-color-text-invert);
+    background: var(--sl-color-accent);
+    transition: background 0.15s ease, filter 0.15s ease;
   }
-  .tut-pre-label {
+  .tut-copy:hover { filter: brightness(1.08); }
+  .tut-copy.is-copied { background: var(--sl-color-accent-high); border-color: var(--sl-color-accent-high); }
+  .tut-copy-icon { flex: none; }
+
+  /* Two info cards — "Before you start" + "This tutorial". */
+  .tut-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem; }
+  .tut-card {
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: 12px;
+    padding: 0.9rem 1rem;
+    background: var(--sl-color-bg-sidebar);
+    display: flex; flex-direction: column; gap: 0.5rem;
+  }
+  .tut-card-title {
     font-family: var(--sl-font-mono);
     font-size: var(--sl-text-xs);
-    text-transform: uppercase;
     letter-spacing: 0.12em;
+    text-transform: uppercase;
     color: var(--sl-color-gray-3);
+  }
+  .tut-card-link {
+    display: inline-flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+    font-size: var(--sl-text-sm); font-weight: 600;
+  }
+  .tut-card-link span { color: var(--sl-color-gray-4); transition: transform 0.15s ease; }
+  .tut-card-link:hover span { transform: translateX(2px); }
+
+  .tut-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.7rem; font-size: var(--sl-text-sm); }
+  .tut-badge {
+    font-family: var(--sl-font-mono); font-size: var(--sl-text-xs); letter-spacing: 0.04em;
+    padding: 0.15rem 0.6rem; border-radius: 999px;
+    border: 1px solid var(--sl-color-hairline); color: var(--sl-color-gray-2); white-space: nowrap;
+  }
+  .tut-diff { color: var(--sl-color-text-accent); border-color: var(--sl-color-accent-low); }
+  .tut-meta[data-difficulty='advanced'] .tut-diff { color: #d9a441; border-color: #d9a44166; }
+  .tut-pre { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+  .tut-pre-label {
+    font-family: var(--sl-font-mono); font-size: var(--sl-text-xs); text-transform: uppercase;
+    letter-spacing: 0.12em; color: var(--sl-color-gray-3);
   }
   .tut-chip {
-    font-size: var(--sl-text-xs);
-    background: var(--sl-color-bg-inline-code);
-    border: 1px solid var(--sl-color-hairline);
-    border-radius: 6px;
-    padding: 0.05rem 0.45rem;
+    font-size: var(--sl-text-xs); background: var(--sl-color-bg-inline-code);
+    border: 1px solid var(--sl-color-hairline); border-radius: 6px; padding: 0.05rem 0.45rem;
+  }
+
+  @media (max-width: 40rem) {
+    .tut-cards { grid-template-columns: 1fr; }
   }
 </style>

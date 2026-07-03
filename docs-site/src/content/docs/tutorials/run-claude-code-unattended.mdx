@@ -29,41 +29,54 @@ blocker.
 
 <Steps>
 
-1. **Dry-run the launch plan.** Ask to see the plan before anything runs.
+1. **Read the board, then pick the work.** Have Claude sync the board first and show you what's
+   ready — you choose which issues run, rather than naming numbers up front.
 
    <div class="cckit-prompt">
 
    ```text frame="terminal" title="Prompt to paste"
-   Work the next few unblocked issues at the same time. Show me the launch plan first; if it looks
-   right, run them with at most three going at once. Then summarize how each one turned out.
+   Read the board and show me what's unblocked right now. I'll tell you which of those to run in
+   parallel. Show me the launch plan before anything is created, then run them a few at a time.
    ```
 
    </div>
 
-2. **Launch with a concurrency cap.** Once the plan looks right:
+   ```bash frame="terminal"
+   cckit sync --llm                        # read the board; decide from what's actually ready
+   ```
+
+2. **Dry-run, then launch with a cap.** Pass the issues *you* picked (a dry-run creates nothing):
 
    ```bash frame="terminal"
-   cckit orchestrate --dry-run 46 47 48  # resolve + print the plan; create nothing
-   cckit orchestrate --cap 3 46 47 48    # launch, at most 3 concurrent; the rest queue
+   cckit orchestrate --dry-run <issues…>   # resolve + print the launch plan; create nothing
+   cckit orchestrate --cap 3 <issues…>     # launch, at most 3 concurrent; the rest queue
    ```
 
 3. **Or let autopilot pick the work.** For a fully unattended run, autopilot auto-selects ready
-   issues and drives them to merged:
+   issues itself — no numbers to name:
 
    ```bash frame="terminal"
-   cckit autopilot --cap 3   # auto-pick unblocked issues and drive them through
+   cckit autopilot --cap 3                 # auto-pick unblocked issues and drive them through
    ```
 
    <div class="cckit-prompt">
 
    ```text frame="terminal" title="Prompt to paste"
-   Clear the unblocked backlog unattended, a few at a time. Auto-pick ready issues and drive them to
-   merged. Only stop and ping me on a genuine blocker — otherwise summarize what merged.
+   Clear the unblocked backlog unattended, a few at a time. Sync the board, auto-pick what's ready,
+   and drive each to merged. Only stop and ping me on a genuine blocker — otherwise summarize what
+   merged.
    ```
 
    </div>
 
 </Steps>
+
+<Aside type="tip" title="Which verb for which case">
+Same board, three routes — let what's ready decide: one issue → the
+[single-issue lifecycle](/tutorials/take-a-github-issue-to-a-merged-pr/); a set of related sub-issues
+→ an [effort](/tutorials/break-a-feature-into-an-effort/) or a [wave](/tutorials/run-issues-in-parallel-with-a-wave/);
+a whole backlog with nobody watching → `cckit autopilot`.
+</Aside>
 
 ## How it works
 
