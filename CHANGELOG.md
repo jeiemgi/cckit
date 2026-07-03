@@ -7,6 +7,11 @@ All notable changes to cckit are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- `cckit status` board counters no longer break. Status fed `task-sync --llm` output (TOON, not
+  JSON) into `jq 'length'`, so the leading `[N]` header mis-parsed and the `|| echo 0` fallback
+  concatenated onto jq's partial output (e.g. `1\n0`), throwing `integer expression expected` at
+  the `[ "$open" -gt 8 ]` test and reporting a wrong count. It now fetches the board as a clean JSON
+  array and guards each counter to an integer (#142).
 - The foreign-repo acceptance harness (`scripts/portable-test.sh`) now enforces invoking-project
   resolution **by construction**: it iterates `cckit commands`, exercises every read-only verb
   against a foreign fixture (distinct repo, non-default base branch, org-owned board) with a stubbed
