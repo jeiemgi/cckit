@@ -40,8 +40,11 @@ if [ "$PUBLISH" = 1 ]; then
   command -v gh >/dev/null || { echo "x gh required" >&2; exit 1; }
 fi
 
-# 1. Stamp version, tag, and cut the GitHub release (creates the tarball).
-run bash -c "cd '$root' && command -v jq >/dev/null && jq '.kitVersion=\"$VERSION\"' cckit.config.json > .v.tmp && mv .v.tmp cckit.config.json || true"
+# 1. Stamp the version on ALL FOUR version surfaces via the ONE shared bumper (#173 — an inline jq
+# here used to write only cckit.config.json.kitVersion, shipping releases whose
+# .claude-plugin/plugin.json and package.json lagged behind and made `cckit update` report a
+# version drift on a fully current install), then tag and cut the GitHub release.
+run bash "$root/scripts/lib/version-bump.sh" --write "$VERSION"
 run git -C "$root" add -A
 run git -C "$root" commit -m "release: $tag"
 run git -C "$root" tag "$tag"
