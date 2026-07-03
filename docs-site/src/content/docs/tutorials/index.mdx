@@ -1,0 +1,26 @@
+---
+title: Tutorials
+description: Step-by-step guides for doing real jobs with Claude Code and cckit — set up, ship, secure, and scale, each one start to finish.
+---
+
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Task-first walkthroughs — each one titled the way you'd search for it, answered in the first screen,
+then taken start to finish with the exact prompts and commands. New tutorials land here as the
+library grows.
+
+## Security
+
+<CardGrid>
+  <LinkCard
+    title="Stop Claude Code from committing secrets"
+    href="/tutorials/stop-claude-committing-secrets/"
+    description="Wire cckit's secret guard as a pre-commit hook so keys and .env files can never be committed. · Beginner · 5 min"
+  />
+</CardGrid>
+
+## Coming next
+
+The rest of the library is being written from the [cookbook](/cookbook/), the
+[security guard](/security/), and the concept pages — set up cckit, take an issue to a merged PR,
+run a wave in parallel, run unattended overnight, give Claude persistent memory, and more.

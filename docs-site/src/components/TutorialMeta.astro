@@ -1,0 +1,67 @@
+---
+// TutorialMeta — the strip under a tutorial's title: difficulty · read-time · prerequisites.
+// Reads straight off the page's `tutorial:` frontmatter (via Starlight's route data), so an author
+// fills the frontmatter once and drops <TutorialMeta /> in — no repeated props. Renders nothing on
+// a page that isn't a tutorial.
+const route = Astro.locals.starlightRoute;
+const t = route?.entry?.data?.tutorial;
+const diffLabel = { beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced' };
+---
+{t && (
+  <div class="tut-meta" data-difficulty={t.difficulty}>
+    <span class="tut-badge tut-diff">{diffLabel[t.difficulty] ?? t.difficulty}</span>
+    <span class="tut-badge tut-time">{t.time} read</span>
+    {t.prerequisites.length > 0 && (
+      <span class="tut-pre">
+        <span class="tut-pre-label">Needs</span>
+        {t.prerequisites.map((p) => <code class="tut-chip">{p}</code>)}
+      </span>
+    )}
+  </div>
+)}
+
+<style>
+  .tut-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+    margin: 0.25rem 0 1.5rem;
+    font-size: var(--sl-text-sm);
+  }
+  .tut-badge {
+    font-family: var(--sl-font-mono);
+    font-size: var(--sl-text-xs);
+    letter-spacing: 0.04em;
+    padding: 0.15rem 0.6rem;
+    border-radius: 999px;
+    border: 1px solid var(--sl-color-hairline);
+    color: var(--sl-color-gray-2);
+    white-space: nowrap;
+  }
+  .tut-diff {
+    color: var(--sl-color-text-accent);
+    border-color: var(--sl-color-accent-low);
+  }
+  .tut-meta[data-difficulty='advanced'] .tut-diff { color: #d9a441; border-color: #d9a44166; }
+  .tut-pre {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .tut-pre-label {
+    font-family: var(--sl-font-mono);
+    font-size: var(--sl-text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--sl-color-gray-3);
+  }
+  .tut-chip {
+    font-size: var(--sl-text-xs);
+    background: var(--sl-color-bg-inline-code);
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: 6px;
+    padding: 0.05rem 0.45rem;
+  }
+</style>

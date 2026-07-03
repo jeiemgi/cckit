@@ -1,0 +1,44 @@
+---
+// TutorialSchema — emits HowTo + FAQPage JSON-LD for a tutorial, the structured data Google uses for
+// how-to and FAQ rich results. Name/description/URL come from the page (frontmatter + route); the
+// author passes the ordered `steps` and the `faqs` explicitly, since neither can be reliably scraped
+// from rendered MDX. Drop <TutorialSchema steps={[…]} faqs={[…]} /> once, anywhere on the page.
+interface Step { name: string; text: string }
+interface Faq { q: string; a: string }
+const { steps = [], faqs = [] } = Astro.props as { steps?: Step[]; faqs?: Faq[] };
+
+const data = Astro.locals.starlightRoute?.entry?.data ?? {};
+const pageUrl = new URL(Astro.url.pathname, Astro.site).href;
+
+const howTo =
+  steps.length > 0
+    ? {
+        '@context': 'https://schema.org',
+        '@type': 'HowTo',
+        name: data.title,
+        description: data.description,
+        step: steps.map((s, i) => ({
+          '@type': 'HowToStep',
+          position: i + 1,
+          name: s.name,
+          text: s.text,
+          url: `${pageUrl}#${i + 1}`,
+        })),
+      }
+    : null;
+
+const faqPage =
+  faqs.length > 0
+    ? {
+        '@context': 'https://schema.org',
+        '@type': 'FAQPage',
+        mainEntity: faqs.map((f) => ({
+          '@type': 'Question',
+          name: f.q,
+          acceptedAnswer: { '@type': 'Answer', text: f.a },
+        })),
+      }
+    : null;
+---
+{howTo && <script type="application/ld+json" set:html={JSON.stringify(howTo)} />}
+{faqPage && <script type="application/ld+json" set:html={JSON.stringify(faqPage)} />}

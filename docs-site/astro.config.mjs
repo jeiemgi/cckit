@@ -105,6 +105,10 @@ export default defineConfig({
           { label: 'Adopting cckit on a repo', slug: 'adoption' },
           { label: 'Showcase', slug: 'showcase' },
         ]},
+        { label: 'Tutorials', items: [
+          { label: 'All tutorials', slug: 'tutorials' },
+          { label: 'Stop Claude committing secrets', slug: 'tutorials/stop-claude-committing-secrets' },
+        ]},
         { label: 'Concepts', items: [
           { label: 'The GitHub cycle', slug: 'github-cycle' },
           { label: 'Efforts, waves & worktrees', slug: 'efforts-and-waves' },
