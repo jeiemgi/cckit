@@ -9,12 +9,12 @@
     "preview": "astro preview"
   },
   "dependencies": {
-    "@astrojs/react": "^4.4.2",
+    "@astrojs/react": "^5.0.7",
     "@astrojs/sitemap": "^3.7.3",
-    "@astrojs/starlight": "^0.32.0",
+    "@astrojs/starlight": "^0.40.0",
     "@astrojs/starlight-docsearch": "^0.7.0",
     "@xyflow/react": "^12.11.1",
-    "astro": "^5.6.0",
+    "astro": "^6.4.8",
     "astro-og-canvas": "^0.13.0",
     "canvaskit-wasm": "^0.41.1",
     "react": "^19.2.7",
@@ -26,11 +26,5 @@
     "@types/react-dom": "^19.2.3",
     "agentation": "^3.0.2",
     "rehype-external-links": "^3.0.0"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "sharp",
-      "esbuild"
-    ]
   }
 }

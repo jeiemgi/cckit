@@ -84,7 +84,7 @@ export default defineConfig({
         ...(DEV ? { PageSidebar: './src/components/DevAnnotate.astro' } : {}),
       },
       description: 'Be the architect — cckit runs the mechanics. The full GitHub work lifecycle as a CLI that turns your Git into retrievable, efficient context, drivable by Claude Code and any agent.',
-      social: { github: 'https://github.com/jeiemgi/cckit' },
+      social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/jeiemgi/cckit' }],
       favicon: '/favicon.svg',
       // SEO / social share. Starlight emits canonical, description, sitemap, and title/OG tags from
       // `site` + page frontmatter; the per-page og:image/twitter:image are emitted by the Head
