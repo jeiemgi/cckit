@@ -4,11 +4,17 @@ description: Every activation tag, how you trigger it, and where it appears — 
 ---
 
 import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+import TriggerSurfaces from '../../components/diagrams/TriggerSurfaces';
 import Tag from '../../components/Tag.astro';
 
 Every coloured tag in these docs says **how a thing is triggered**. This is the directory: each tag
 explains **how you use it**, then lists everything of that kind. New to the colours? The
 [how-to-read guide](/how-to-read/#the-tags) introduces them.
+
+<TriggerSurfaces client:only="react" />
+
+One question sorts every tag: **who pulls the trigger?** You act, the system fires on its own, an
+agent reads the machine surface — or nothing triggers it and it's simply a term worth knowing.
 
 <div class="tags-row">
 
@@ -20,10 +26,10 @@ explains **how you use it**, then lists everything of that kind. New to the colo
 
 **How you use it:** just say what you want to Claude Code in plain words — no command, no slash.
 Asking to "contribute this upstream" starts the `kit-contribute` skill; "write docs for this" starts
-`docs-writer`. Claude matches your intent to the right skill.
+`kit-docs-writer`. Claude matches your intent to the right skill.
 
 <CardGrid>
-  <LinkCard title="Skills cckit ships" href="/skills/" description="The conversational skills — docs-writer, kit-customize, kit-contribute." />
+  <LinkCard title="Skills cckit ships" href="/skills/" description="The conversational skills — kit-docs-writer, kit-customize, kit-contribute." />
   <LinkCard title="Driving cckit from agents" href="/agents/" description="How plain-language requests map to cckit verbs." />
 </CardGrid>
 
