@@ -107,12 +107,21 @@ export default defineConfig({
           ? [{ tag: 'meta', attrs: { name: 'google-site-verification', content: GSC_VERIFICATION } }]
           : []),
         // GA4 — set PUBLIC_GA_MEASUREMENT_ID (a "G-XXXXXXX" id) in Vercel project env vars to enable.
+        // Google Consent Mode v2: consent defaults to DENIED before gtag loads, so GA sends only
+        // cookieless "modeled" pings and sets no identifiers/cookies until the visitor accepts via
+        // the ConsentBanner (src/components/ConsentBanner.astro, mounted from Footer.astro). A stored
+        // 'granted' choice is re-applied here — early, before the first `config` ping — so returning
+        // opted-in visitors are tracked from the first hit without re-prompting.
         ...(GA_MEASUREMENT_ID
           ? [
               { tag: 'script', attrs: { async: true, src: `https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}` } },
               {
                 tag: 'script',
-                content: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${GA_MEASUREMENT_ID}');`,
+                content:
+                  `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}` +
+                  `gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied',wait_for_update:500});` +
+                  `try{if(localStorage.getItem('cckit-consent')==='granted'){gtag('consent','update',{analytics_storage:'granted'});}}catch(e){}` +
+                  `gtag('js',new Date());gtag('config','${GA_MEASUREMENT_ID}');`,
               },
             ]
           : []),
