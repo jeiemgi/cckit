@@ -4,6 +4,11 @@
 // registered; the dev-only Agentation toolbar lives in DevAnnotate.astro instead.
 import Default from '@astrojs/starlight/components/Footer.astro';
 import SpeedInsights from '@vercel/speed-insights/astro';
+import ConsentBanner from './ConsentBanner.astro';
+
+// PUBLIC_ var is exposed to components via import.meta.env — gate the "Cookie settings" re-open
+// trigger on the same signal as the banner so it only appears when GA (and thus consent) is live.
+const GA_ENABLED = Boolean(import.meta.env.PUBLIC_GA_MEASUREMENT_ID);
 ---
 <Default />
 {/* Core Web Vitals sampling — zero-config on Vercel, free on Hobby; a ranking-relevant signal
@@ -13,6 +18,12 @@ import SpeedInsights from '@vercel/speed-insights/astro';
   Independent, educational project — <strong>not affiliated with or endorsed by Anthropic</strong>.
   Claude and Claude Code are trademarks of Anthropic PBC.
   <a href="/disclaimer/">Disclaimer &amp; trademarks</a>
+  {GA_ENABLED && (
+    <>
+      {' · '}
+      <button type="button" class="cckit-cookie-settings" data-consent-open>Cookie settings</button>
+    </>
+  )}
 </p>
 <p class="cckit-madeby">
   From Mexico with
@@ -23,7 +34,22 @@ import SpeedInsights from '@vercel/speed-insights/astro';
   by <a href="https://josegtz.com" target="_blank" rel="noopener noreferrer">josegtz</a>
 </p>
 
+<ConsentBanner />
+
 <style>
+  /* "Cookie settings" trigger — a link-styled button so re-opening the banner reads as a text link,
+     not a chunky control, inside the disclaimer line. */
+  .cckit-cookie-settings {
+    background: none;
+    border: 0;
+    padding: 0;
+    font: inherit;
+    color: var(--sl-color-text-accent);
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  .cckit-cookie-settings:hover { text-decoration: none; }
+
   .cckit-madeby {
     margin-top: 0.4rem;
     text-align: center;

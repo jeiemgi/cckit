@@ -59,12 +59,21 @@ Changes to the release workflow are always reviewed by a person — the CI token
 Publishing is automatic once the Release PR is merged — the `publish` job in `release-please.yml` runs `npm publish` and bumps the [jeiemgi/homebrew-cckit](https://github.com/jeiemgi/homebrew-cckit) tap (recomputing the formula `sha256`). Each channel is gated on a repo secret and simply skipped if the secret is absent:
 
 - `NPM_TOKEN` — npm **Automation** token (npmjs.com → Access Tokens → Automation).
-- `HOMEBREW_TAP_TOKEN` — a PAT with push access to the tap repo (`contents:write`).
+- **Homebrew tap auth** — either of:
+  - **GitHub App (preferred)** — `HOMEBREW_APP_ID` + `HOMEBREW_APP_PRIVATE_KEY` for an app with **Contents: write** installed on `homebrew-cckit`. The workflow mints a short-lived, tap-scoped token per run — nothing to expire or rotate by hand.
+  - `HOMEBREW_TAP_TOKEN` — legacy fallback: a PAT with push access to the tap repo (`contents:write`). Used only when the app secrets are absent.
 
 <Aside type="tip" title="One-time setup checklist">
-- Both secrets set under **Settings → Secrets and variables → Actions**.
+- `NPM_TOKEN` and the Homebrew tap auth (the GitHub App, or the PAT) set under **Settings → Secrets and variables → Actions**.
 - `develop` is the default branch; `main` is protected (PR required, no force-push or deletion) so it only advances through a merged PR.
 - On the **first** Release PR, reconcile the hand-written `## [Unreleased]` block in `CHANGELOG.md` — release-please owns changelog entries from then on.
+</Aside>
+
+<Aside type="note" title="Setting up the Homebrew tap GitHub App">
+1. **Settings → Developer settings → GitHub Apps → New GitHub App.** Give it repo **Contents: Read and write**; no webhook, no other permissions.
+2. **Generate a private key** (downloads a `.pem`) and note the **App ID**.
+3. **Install** the app on `homebrew-cckit` only.
+4. Add repo secrets `HOMEBREW_APP_ID` (the App ID) and `HOMEBREW_APP_PRIVATE_KEY` (the full `.pem` contents). The workflow prefers these over `HOMEBREW_TAP_TOKEN` automatically.
 </Aside>
 
 ### Local fallback
