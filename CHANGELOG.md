@@ -13,6 +13,10 @@ All notable changes to cckit are documented here. The format follows
   override forces transitive esbuild ≥ 0.28.1 (dev-server file read on Windows). (#169)
 
 ### Fixed
+- `cckit release` now creates the release tag annotated (`git tag -m`) and pushes only that tag.
+  A bare `git tag` dies with `fatal: no tag message?` under `tag.gpgsign=true`, and `push --tags`
+  fails the whole publish when any stale local tag differs from the remote — both killed the
+  v0.4.0 publish mid-run (#167).
 - `cckit release` now stamps the version on all four version surfaces through the one shared
   bumper (`version-bump.sh --write`) instead of an inline jq that wrote only
   `cckit.config.json.kitVersion` (#173). v0.4.0 had shipped with `.claude-plugin/plugin.json` and
