@@ -43,8 +43,10 @@ emit_event() {
   [[ -n "$payload" ]] || payload='{}'
   command -v jq >/dev/null 2>&1 || return 0
 
-  local path ts line
-  path="$(kit_events_path)" || return 0
+  # `logpath`, not `path`: under zsh `path` is tied to PATH (special array); assigning to a bare
+  # `path` local would clobber the command search path. A namespaced name is inert.
+  local logpath ts line
+  logpath="$(kit_events_path)" || return 0
   ts="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
   # Build the line with jq so payload is validated + the record is well-formed.
@@ -58,5 +60,5 @@ emit_event() {
             '{ts:$ts, type:$type, op:$op, payload:{note:$raw}}' 2>/dev/null)" || return 0
 
   # Single-writer append; >> is atomic for short lines on local fs.
-  printf '%s\n' "$line" >> "$path" 2>/dev/null || return 0
+  printf '%s\n' "$line" >> "$logpath" 2>/dev/null || return 0
 }

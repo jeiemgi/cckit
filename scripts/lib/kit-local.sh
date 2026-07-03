@@ -16,7 +16,14 @@
 # KIT_LOCAL_TIMEOUT (default 90s; hooks should pass lower via env when latency matters).
 # Config: .claude/kit.config.json -> .local {enabled, port, model} (KIT_LOCAL_* env wins).
 
-KIT_LOCAL_CONFIG="${KIT_CONFIG:-.claude/kit.config.json}"
+# Resolve config through the ONE shared resolver (config-path.sh, #69): KIT_CONFIG wins, else a root
+# cckit.config.json or a .claude/kit.config.json (walk up). Falls back to the scaffolded path.
+if ! command -v kit_config_path >/dev/null 2>&1; then
+  _kl_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+  # shellcheck source=/dev/null
+  [ -f "$_kl_dir/config-path.sh" ] && . "$_kl_dir/config-path.sh"; unset _kl_dir
+fi
+KIT_LOCAL_CONFIG="$(kit_config_path 2>/dev/null || true)"; [ -n "$KIT_LOCAL_CONFIG" ] || KIT_LOCAL_CONFIG=".claude/kit.config.json"
 
 _kit_local_cfg() {  # _kit_local_cfg <jq-path> <default>
   local v=""

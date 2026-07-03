@@ -38,7 +38,7 @@ One issue becomes one branch, one worktree, one PR. These verbs walk that path.
 | `cckit start <issue> [slug]` | Create an isolated worktree + branch for an issue. |
 | `cckit pr <issue> <summary>` | Commit, push, and open the PR. |
 | `cckit close <issue> <summary>` | Close the issue and mark it done. |
-| `cckit sync` | Board state / what's unblocked. |
+| `cckit sync` | Board state: issues by role with Project Status, a merge-ordered open-PR queue, and blocked / not-on-board / stale (>14d) flags. |
 | `cckit status` | Dashboard: board + worktrees + resume handoff. |
 | `cckit handoff "<note>"` | Save a resume-here note for the next session. |
 
@@ -52,7 +52,7 @@ A **wave** is a set of issues with no blockers between them, so they can run at 
 | `cckit plan [--effort N]` | Wave plan: deps-ordered, file-disjoint, session-fit. |
 | `cckit plan-next` | Forward plan: inventory the kit's own skills/verbs/rules/docs, propose what to build next. |
 | `cckit wave [--effort N]` | Read open efforts, propose incoming waves: subagent fan-out + captain drive. |
-| `cckit watch [--merge] [--loop]` | Captain: gate open PRs, squash-merge clean ones, advance. |
+| `cckit watch [--merge] [--loop]` | Captain: gate open PRs, squash-merge clean ones, advance. Policy floors (default on) hold PRs touching CI workflows, lockfiles, or security paths — and any `hold`-labelled or draft PR — for human review. |
 | `cckit effort <new\|start\|pr\|close\|plan>` | The effort lifecycle (a parent issue + sub-issues). `new` takes `--slug`; `start`/`pr`/`close` accept a `<slug>` or the effort `<N>`. |
 
 

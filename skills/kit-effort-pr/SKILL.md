@@ -30,6 +30,7 @@ this PR is where humans review the result. The title carries `[#N]` (the effort 
 source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/kit-config.sh" && load_kit_config
 [[ "$KIT_PROJECTS_V2" == "true" ]] && { source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/gh-project.sh"; load_project_ids; }
 source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/role-identity.sh" 2>/dev/null || true
+source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/effort.sh"   # effort_pr_title + effort_pr_title_check (the shared composer)
 BASE="${KIT_BASE_BRANCH:-main}"
 
 # 1. Parse the parent effort number from the branch (effort/<N>-<slug>).
@@ -89,11 +90,14 @@ $(role_signature "$ROLE" 2>/dev/null || true)
 EOF
 )
 
-# 6. Create the PR. Title: [Role] [#N] <title> — the [#N] effort id is mandatory.
+# 6. Create the PR. Title composed by the ONE shared composer (same as `cckit effort pr`), then the
+#    mandatory-[#N] check — refuse rather than open an id-less PR.
+PR_TITLE=$(effort_pr_title "$NUM" "$TITLE" "$ROLE_DISPLAY")
+effort_pr_title_check "$PR_TITLE" "$NUM" || { echo "✗ PR title lacks the [#$NUM] effort id — aborting"; exit 1; }
 URL=$(gh pr create --repo "$KIT_REPO" \
   --base "$BASE" \
   --head "$BRANCH" \
-  --title "[$ROLE_DISPLAY] [#$NUM] $TITLE" \
+  --title "$PR_TITLE" \
   --body "$PR_BODY" \
   ${LABELS:+--label "$LABELS"} \
   ${MILESTONE:+--milestone "$MILESTONE"} \

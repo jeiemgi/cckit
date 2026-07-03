@@ -94,5 +94,35 @@ tc "$GH_LOG" '## Goal'         "bare call still emits ## Goal"
 tc "$GH_LOG" '## Verification' "bare call still emits ## Verification"
 tc "$GH_LOG" '<!--'            "bare call leaves the template placeholders (nothing to fill)"
 
+# ── #121: the ONE shared effort-PR title composer + the mandatory-[#N] check ─────────────────────
+t  "effort_pr_title composes [#N] name"        "$(effort_pr_title 115 'adoption hardening')"             "[#115] adoption hardening"
+t  "effort_pr_title with a role prefix"        "$(effort_pr_title 115 'adoption hardening' 'Tech Lead')" "[Tech Lead] [#115] adoption hardening"
+t  "effort_pr_title peels an [Effort] prefix"  "$(effort_pr_title 115 '[Effort] 115 · [Core] adoption hardening')" "[#115] [Core] adoption hardening"
+t  "effort_pr_title tolerates a #-prefixed num" "$(effort_pr_title '#42' 'x')"                           "[#42] x"
+effort_pr_title_check "[Tech Lead] [#115] adoption hardening" 115; t "check accepts a title carrying [#N]" "$?" "0"
+effort_pr_title_check "[Effort] 115 · adoption hardening" 115 2>/dev/null; t "check refuses a title lacking [#N]" "$?" "1"
+effort_pr_title_check "[#7] anything" 2>/dev/null; t "check accepts any [#N] when no num given" "$?" "0"
+
+# ── #121: --par applies a par:<value> label on the parent; bad values are rejected up front ───────
+: > "$GH_LOG"; printf '0' > "$GH_N"
+effort_new --flow Core --par wide "parallel wide effort" "a :: x" "b :: y" >/dev/null 2>&1
+tc "$GH_LOG" 'issue create .*--label [^ ]*,par:wide' "--par wide adds a par:wide label to the parent"
+tc "$GH_LOG" 'label create par:wide'                 "--par creates the par:wide label idempotently"
+: > "$GH_LOG"; printf '0' > "$GH_N"
+effort_new --par 3 "parallel three effort" >/dev/null 2>&1
+tc "$GH_LOG" 'issue create .*--label [^ ]*,par:3'    "--par 3 adds a par:3 label"
+: > "$GH_LOG"; printf '0' > "$GH_N"
+effort_new --par nonsense "bad par effort" >/dev/null 2>&1 && rc=0 || rc=1
+t  "--par rejects a non seq/wide/int value"          "$rc" "1"
+t  "--par creates nothing on a bad value"            "$(grep -c 'issue create' "$GH_LOG")" "0"
+
+# ── #121: flags are position-INDEPENDENT — trailing --flow/--role no longer become junk sub-issues ─
+: > "$GH_LOG"; printf '0' > "$GH_N"
+effort_new "flags after title effort" "real sub :: desc" --flow Docs --role docs >/dev/null 2>&1
+t  "trailing flags do NOT create junk subs (parent + 1 real sub)" "$(grep -c 'issue create' "$GH_LOG")" "2"
+tc "$GH_LOG" 'issue create .*--label [^ ]*,flow:docs'  "trailing --flow is honored (flow:docs label)"
+tc "$GH_LOG" 'issue create .*--title \[Effort 1\] 1 · real sub' "the one real sub is created from the positional"
+tn "$GH_LOG" 'issue create .*--title \[Effort 1\] [0-9]+ · --flow' "no '--flow' junk sub-issue created"
+
 [ "$fail" -eq 0 ] && echo "ALL OK (effort-parity)" || echo "effort-parity: FAILURES"
 exit "$fail"

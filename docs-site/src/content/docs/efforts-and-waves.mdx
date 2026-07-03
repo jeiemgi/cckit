@@ -58,6 +58,23 @@ The slug is a *derived* convenience, not a second source of truth. `--slug` only
 (stored as a `slug:<slug>` label); the issue number is still what everything else points at.
 </Aside>
 
+## The lifecycle: start → pr → close
+
+- **`cckit effort new`** — flags (`--flow`, `--role`, `--priority`, `--par`, …) may appear in **any
+  position**, before or after the name and sub specs. `--par seq | wide | <N>` records how the
+  effort's subs are meant to run as a `par:` label on the parent.
+- **`cckit effort start`** gives the effort's worktree the **same full setup as `cckit start`**:
+  it copies your gitignored env files, assigns a per-worktree dev port, and installs dependencies
+  (opt out with `KIT_WT_INSTALL=0`). The worktree lives at `.claude/worktrees/effort+<N>-<slug>`, a
+  name `cckit gc` recognizes so it is never pruned while the effort issue is open.
+- **`cckit effort pr`** and the `/kit-effort-pr` skill compose the PR title from **one shared
+  composer**, and both refuse to open a PR whose title lacks the mandatory `[#N]` effort id.
+- **`cckit effort close`** is the single close op: it snapshots each sub-issue's diff and captures
+  effort metrics **before** the squash, **refuses to squash-merge when no work trace was captured**
+  (the squash is irreversible — override with `KIT_FORCE=1`), squash-merges, closes the parent and
+  every sub, garbage-collects the worktree/branch, and runs an optional, config-gated
+  knowledge-ingest hook (`effort.knowledgeIngestHook`).
+
 ## Waves
 
 Some sub-issues depend on others: sub #4 can't start until sub #1 is merged. cckit reads those

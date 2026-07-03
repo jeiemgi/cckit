@@ -58,18 +58,12 @@ LIB="$ROOT/scripts/lib"
 # cckit.config.json, or .claude/kit.config.json), so board/lifecycle verbs act on the project you
 # ran cckit in — NOT cckit's own install dir. Running inside the cckit repo resolves to its own
 # cckit.config.json naturally (self-hosting); outside any project we fall back to cckit's config.
-# An explicit KIT_CONFIG in the environment always wins.
-_cckit_find_config() {
-  local d="$1"
-  while [ -n "$d" ] && [ "$d" != "/" ]; do
-    [ -f "$d/cckit.config.json" ]       && { printf '%s\n' "$d/cckit.config.json";       return 0; }
-    [ -f "$d/.claude/kit.config.json" ] && { printf '%s\n' "$d/.claude/kit.config.json"; return 0; }
-    d="$(dirname "$d")"
-  done
-  return 1
-}
+# An explicit KIT_CONFIG in the environment always wins. The walk lives in the ONE shared resolver
+# (config-path.sh, #69) that every kit entrypoint uses.
+# shellcheck source=/dev/null
+source "$LIB/config-path.sh"
 if [ -z "${KIT_CONFIG:-}" ]; then
-  KIT_CONFIG="$(_cckit_find_config "$PWD" || true)"
+  KIT_CONFIG="$(kit_config_find "$PWD" || true)"
   [ -n "$KIT_CONFIG" ] || KIT_CONFIG="$ROOT/cckit.config.json"
 fi
 export KIT_CONFIG

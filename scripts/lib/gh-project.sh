@@ -139,10 +139,10 @@ _ghp_resolve_pnum() {
 }
 
 # Resolve the project OWNER TYPE — "organization" or "user" (default "user").
-# The board moved from a user project (jeiemgi #2) to an org project
-# (tuempresadigital #3). An org-owned board is what lets a single issue see its
-# own card via the CHEAP issue.projectItems lookup (project_find_item_by_issue),
+# A board can live under a user login OR an organization login. An org-owned board is what lets a
+# single issue see its own card via the CHEAP issue.projectItems lookup (project_find_item_by_issue),
 # so every board GraphQL query must branch on this: organization(login:) vs user(login:).
+# Prefers the exported KIT_PROJECT_OWNER_TYPE (set by kit-config from github.projectOwnerType).
 _ghp_resolve_owner_type() {
   [[ -n "${KIT_PROJECT_OWNER_TYPE:-}" ]] && { printf '%s' "$KIT_PROJECT_OWNER_TYPE"; return 0; }
   local cfg="${KIT_CONFIG:-$SCRIPT_DIR/../.claude/kit.config.json}" t=""
@@ -176,10 +176,9 @@ _ghp_resolve_repo() {
 # Prints the item node ID on stdout, or nothing if the issue genuinely isn't on the board.
 #
 # Instead of paginating the WHOLE board (the old 330+-item loop), this asks the ISSUE for its
-# own project cards (issue.projectItems) and filters by project number. This works ONLY because
-# the board is now ORG-owned (tuempresadigital #3) — an org project surfaces issue.projectItems
-# cheaply; the move from the user board (#2) is the whole reason this finder no longer paginates.
-# An issue belongs to few projects, so first:20 covers it without a loop.
+# own project cards (issue.projectItems) and filters by project number. issue.projectItems surfaces
+# an issue's cards cheaply (O(1) per issue) whether the board is user- or org-owned, so this finder
+# never paginates. An issue belongs to few projects, so first:20 covers it without a loop.
 project_find_item_by_issue() {
   local issue_num="$1"
   local pnum="${2:-$(_ghp_resolve_pnum)}"
@@ -209,4 +208,20 @@ project_find_item_by_issue() {
   item_id=$(printf '%s' "$resp" | jq -r --argjson n "$pnum" \
     '.data.repository.issue.projectItems.nodes[] | select(.project.number==$n) | .id' 2>/dev/null | head -1)
   echo "$item_id"
+}
+
+# project_issue_status <issue_number> [<project_number>] — echo an issue's Project Status field value
+# on OUR board ("Todo" / "In Progress" / "Done" / …), or empty when the issue isn't on the board.
+# The cheap issue.projectItems lookup, same as project_find_item_by_issue. A claim precheck reads this
+# before starting an issue so it can warn on a collision (another session already In Progress). #124.
+project_issue_status() {
+  local issue_num="$1" pnum="${2:-$(_ghp_resolve_pnum)}" repo owner name resp
+  repo="$(_ghp_resolve_repo)"; owner="${repo%%/*}"; name="${repo##*/}"
+  [ -n "$owner" ] && [ -n "$name" ] && [ -n "$pnum" ] || return 1
+  resp="$(gh api graphql \
+    -f query='query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){issue(number:$n){projectItems(first:20){nodes{project{number} fieldValueByName(name:"Status"){...on ProjectV2ItemFieldSingleSelectValue{name}}}}}}}' \
+    -F o="$owner" -F r="$name" -F n="$issue_num" 2>/dev/null)" || return 1
+  printf '%s' "$resp" | jq -r --argjson n "$pnum" \
+    '.data.repository.issue.projectItems.nodes[]? | select(.project.number==$n) | .fieldValueByName.name // empty' \
+    2>/dev/null | head -1
 }

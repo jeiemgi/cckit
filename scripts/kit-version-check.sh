@@ -17,14 +17,29 @@ while [[ $# -gt 0 ]]; do
 done
 
 command -v jq >/dev/null 2>&1 || exit 0
-cfg="$TARGET/cckit.config.json"; [[ -f "$cfg" ]] || cfg="$TARGET/.claude/kit.config.json"
-[[ -f "$cfg" ]] || exit 0
+# Resolve the target project's config via the ONE shared resolver (config-path.sh, #69).
+# shellcheck source=/dev/null
+. "$(dirname "$0")/lib/config-path.sh"
+cfg="$(kit_config_find "$TARGET" 2>/dev/null || true)"
+[[ -n "$cfg" && -f "$cfg" ]] || exit 0
 
-# Locate the installed plugin's plugin.json: explicit root → env → best-effort glob.
+# Locate the installed cckit's plugin.json. Order (first hit wins):
+#   1. explicit --plugin-root / CLAUDE_PLUGIN_ROOT
+#   2. THIS script's own install root — kit-version-check.sh ships at <install>/scripts/, so
+#      <install>/.claude-plugin/plugin.json is the version of the cckit that is actually running.
+#      This is the reliable self-resolution for a Homebrew/symlink/`cckit update` install, which the
+#      plugin-dir glob below never matched (it only looked for claude-kit* under ~/.claude/plugins).
+#   3. best-effort glob over installed plugins — cckit* first, then legacy claude-kit*.
 pj=""
 [[ -n "$PLUGIN_ROOT" && -f "$PLUGIN_ROOT/.claude-plugin/plugin.json" ]] && pj="$PLUGIN_ROOT/.claude-plugin/plugin.json"
 if [[ -z "$pj" ]]; then
-  pj="$(ls -t "$HOME"/.claude/plugins/*/claude-kit*/.claude-plugin/plugin.json \
+  _self_dir="$(cd -- "$(dirname -- "$0")" >/dev/null 2>&1 && pwd)"
+  [[ -n "$_self_dir" && -f "$_self_dir/../.claude-plugin/plugin.json" ]] && pj="$_self_dir/../.claude-plugin/plugin.json"
+fi
+if [[ -z "$pj" ]]; then
+  pj="$(ls -t "$HOME"/.claude/plugins/*/cckit*/.claude-plugin/plugin.json \
+            "$HOME"/.claude/plugins/*/*/cckit*/.claude-plugin/plugin.json \
+            "$HOME"/.claude/plugins/*/claude-kit*/.claude-plugin/plugin.json \
             "$HOME"/.claude/plugins/*/*/claude-kit*/.claude-plugin/plugin.json \
             "$HOME"/.claude/plugins/*/*/claude-kit*/*/.claude-plugin/plugin.json \
             "$HOME"/.claude/plugins/*/*/*/claude-kit*/.claude-plugin/plugin.json 2>/dev/null | head -1 || true)"
