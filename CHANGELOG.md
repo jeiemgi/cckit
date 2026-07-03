@@ -5,6 +5,21 @@ All notable changes to cckit are documented here. New entries below are generate
 [Conventional Commits](https://www.conventionalcommits.org/) and land when the Release PR is
 merged to `main`. Earlier entries follow [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.5.0](https://github.com/jeiemgi/cckit/compare/v0.4.1...v0.5.0) (2026-07-03)
+
+
+### Features
+
+* authenticate the Homebrew tap push with a GitHub App ([#195](https://github.com/jeiemgi/cckit/issues/195)) ([f749489](https://github.com/jeiemgi/cckit/commit/f749489528e3e0d10163a397375f6590624e970c))
+
+
+### Bug Fixes
+
+* bump Homebrew formula version line on release (+ sync 0.4.1 to develop) ([ea022ef](https://github.com/jeiemgi/cckit/commit/ea022ef652091fe5e0ab53a990dee851a0b4c102))
+* bump the Homebrew formula version line on release ([8d723d2](https://github.com/jeiemgi/cckit/commit/8d723d2197e48e71402147ed9a15b51acb3e1128))
+* **docs-site:** sync pnpm-lock with package.json ([#198](https://github.com/jeiemgi/cckit/issues/198)) ([0487533](https://github.com/jeiemgi/cckit/commit/0487533e48cc9b8811332c1254a173b5879dea31))
+* sync docs-site lockfile to main ([39b42b9](https://github.com/jeiemgi/cckit/commit/39b42b9504c990487975838f0d6d04ec94b08a7a))
+
 ## [0.4.1](https://github.com/jeiemgi/cckit/compare/v0.4.0...v0.4.1) (2026-07-03)
 
 ### Added
