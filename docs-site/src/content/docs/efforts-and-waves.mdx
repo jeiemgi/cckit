@@ -62,7 +62,11 @@ The slug is a *derived* convenience, not a second source of truth. `--slug` only
 
 - **`cckit effort new`** — flags (`--flow`, `--role`, `--priority`, `--par`, …) may appear in **any
   position**, before or after the name and sub specs. `--par seq | wide | <N>` records how the
-  effort's subs are meant to run as a `par:` label on the parent.
+  effort's subs are meant to run as a `par:` label on the parent. The `--flow` values (the `[Flow]`
+  title tags) come from a controlled vocabulary your project sets once as `effort.flows` in
+  `cckit.config.json` / `.claude/kit.config.json` — e.g. `"effort": { "flows": ["Growth", "Checkout"] }`.
+  Unset, it defaults to `Core UI API Docs Infra Auth Data Web App`; an explicit `EFFORT_FLOWS` env
+  var still overrides both for one invocation.
 - **`cckit effort start`** gives the effort's worktree the **same full setup as `cckit start`**:
   it copies your gitignored env files, assigns a per-worktree dev port, and installs dependencies
   (opt out with `KIT_WT_INSTALL=0`). The worktree lives at `.claude/worktrees/effort+<N>-<slug>`, a

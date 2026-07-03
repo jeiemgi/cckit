@@ -23,7 +23,7 @@ truth — the parent issue IS the plan (no separate plan file).
 | ------------ | -------- | ------------------------------------------------------------------------------------------- |
 | Title        | ✓        | The human **name only** (no `[Effort]`/number prefix) — the skill composes the board title. Concise, no jargon (`effort_title_lint`) |
 | Role         | ✓        | `tech-lead` / `frontend` / … → `role:<role>` label + board Role field                       |
-| Flow         | optional | Controlled-vocab flow (`EFFORT_FLOWS`) → `[Flow]` title tag + `flow:<flow>` label            |
+| Flow         | optional | Controlled-vocab flow (`effort.flows` in the project config; `EFFORT_FLOWS` env overrides) → `[Flow]` title tag + `flow:<flow>` label |
 | Goal         | ✓        | 1–2 lines — `## Goal`                                                                       |
 | Scope        | ✓        | The sub-issue DAG — `## Scope` (mark each parallel \| sequential)                           |
 | For agents   | ✓        | Exact file paths / entry points — `## For agents`                                           |
