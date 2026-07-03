@@ -7,6 +7,10 @@ All notable changes to cckit are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- `cckit init` and the annotate setup now derive the project name / slug / wing from the git remote
+  (the actual `owner/repo`) before falling back to the local directory basename — the directory is
+  often cloned or renamed to something other than the repo name. Host-agnostic parsing (ssh, https,
+  GHE/GitLab) lives in the shared `git-remote.sh` (#73).
 - Project-config discovery is now a single shared resolver (`config-path.sh`): an explicit
   `KIT_CONFIG` always wins, else it walks up for a root `cckit.config.json` or a
   `.claude/kit.config.json`. `kit-doctor`, `kit-local`, `cckit update`, `cckit scan`, and

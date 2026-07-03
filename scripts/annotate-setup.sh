@@ -39,14 +39,19 @@ if [[ "$REACT_DETECTED" != "true" ]]; then
 fi
 
 CFG="$TARGET/.claude/kit.config.json"
-WING=""; MEMORY_BOOL="false"; PROJECT_NAME="$(basename "$TARGET")"; HTTP_PORT=4747
+# Repo name from the git remote is the identity fallback; the directory basename is the last resort (#73).
+# shellcheck source=/dev/null
+. "$KIT_ROOT/scripts/lib/git-remote.sh"
+REMOTE_NAME="$(git_remote_repo_name "$TARGET" 2>/dev/null || true)"; REMOTE_NAME="${REMOTE_NAME:-$(basename "$TARGET")}"
+WING=""; MEMORY_BOOL="false"; PROJECT_NAME="$REMOTE_NAME"; HTTP_PORT=4747
 if [[ -f "$CFG" ]]; then
   WING="$(jq -r '.memory.wing // .project.slug // ""' "$CFG" 2>/dev/null || echo "")"
   MEMORY_BOOL="$(jq -r '.memory.enabled // false'      "$CFG" 2>/dev/null || echo false)"
   PROJECT_NAME="$(jq -r '.project.name // ""'          "$CFG" 2>/dev/null || echo "$PROJECT_NAME")"
+  [[ -z "$PROJECT_NAME" || "$PROJECT_NAME" == "null" ]] && PROJECT_NAME="$REMOTE_NAME"
   HTTP_PORT="$(jq -r '.annotate.mcp.httpPort // 4747'  "$CFG" 2>/dev/null || echo 4747)"
 fi
-[[ -z "$WING" || "$WING" == "null" ]] && WING="$(basename "$TARGET" | tr '[:upper:]' '[:lower:]')"
+[[ -z "$WING" || "$WING" == "null" ]] && WING="$(printf '%s' "$REMOTE_NAME" | tr '[:upper:]' '[:lower:]')"
 [[ -z "$HTTP_PORT" || "$HTTP_PORT" == "null" ]] && HTTP_PORT=4747
 
 case "$REACT_PKG_MANAGER" in
