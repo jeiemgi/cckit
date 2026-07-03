@@ -1,0 +1,101 @@
+---
+title: How to let Claude Code debug a web page
+description: Give Claude Code a token-efficient, scriptable way to debug a web page — screenshots, accessibility snapshots, console and network logs, and Lighthouse — with cckit debug, driven by chrome-devtools-axi.
+tutorial:
+  job: let Claude Code debug a web page
+  difficulty: intermediate
+  time: "5 min"
+  prerequisites: [Node, Chrome]
+  ogTag: Browser
+  keywords: [claude code debug web page, ai browser debugging, cckit debug]
+  related: [extend-claude-code-with-skills, take-a-github-issue-to-a-merged-pr, set-up-cckit-in-a-repo]
+---
+
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import TagRow from '../../../components/TagRow.astro';
+import TutorialMeta from '../../../components/TutorialMeta.astro';
+import TutorialSchema from '../../../components/TutorialSchema.astro';
+
+<TagRow kinds={["command"]} />
+
+<TutorialMeta />
+
+**What you'll set up:** debugging a web page normally means a person clicking around a browser — an
+agent can't do that. `cckit debug` exposes the same browser tools (screenshots, accessibility
+snapshots, console and network logs, Lighthouse) as plain commands an agent can run and read. Output
+is [TOON](/agents/)-encoded, so results stay small in the agent's context.
+
+## Steps
+
+<Steps>
+
+1. **Check availability first.** cckit is pure bash; the browser bridge needs Node and Chrome. Check
+   without running anything:
+
+   ```bash frame="terminal"
+   cckit debug --check
+   ```
+
+   If Node/npx and Chrome are present, `cckit debug` drives the bridge. Otherwise it prints how to
+   enable it and exits `0` — an unattended run is never hard-failed by a missing optional tool.
+
+2. **Enable the bridge.** Install [chrome-devtools-axi](https://github.com/kunchenguid/chrome-devtools-axi),
+   or rely on `npx` if Node is present:
+
+   ```bash frame="terminal"
+   npm i -g chrome-devtools-axi      # or: npx -y chrome-devtools-axi
+   ```
+
+3. **Let the agent drive it.** Everything after `cckit debug` is forwarded verbatim to the bridge, so
+   the agent can take a screenshot, read the console, or run Lighthouse and act on the result:
+
+   ```bash frame="terminal"
+   cckit debug <axi-args...>         # passed straight through — see the axi docs
+   ```
+
+</Steps>
+
+## How it works
+
+`cckit debug` wraps chrome-devtools-axi (by Kun Chen), a self-contained Chrome DevTools bridge for
+agents. cckit only auto-detects and forwards to it — it never tracks the bridge's evolving subcommand
+surface, so args pass straight through. Because it's optional and auto-detected, a missing Node or
+Chrome degrades cleanly to a `0` exit with instructions rather than breaking a run.
+
+<Aside type="tip" title="Pin or wrap the command">
+Override what cckit invokes with `export CCKIT_AXI=<command>` — useful for a pinned version or a
+wrapper script.
+</Aside>
+
+## Troubleshooting
+
+**`cckit debug --check` says it's unavailable.** Node/npx or Chrome is missing. Install Node and
+Chrome, then re-check; cckit won't hard-fail without them.
+
+**The agent's context filled with output.** Results are TOON-encoded to stay compact, but a broad
+capture (full network log) is still large. Ask for the specific artifact — one screenshot, the
+console only — rather than everything.
+
+**A subcommand isn't recognized.** cckit forwards args verbatim to the bridge; the subcommand surface
+is the bridge's, not cckit's. Check the [axi docs](https://github.com/kunchenguid/chrome-devtools-axi).
+
+## Related tutorials
+
+<CardGrid>
+  <LinkCard title="Extend Claude Code with cckit skills" href="/tutorials/extend-claude-code-with-skills/" description="The skills that package repeatable jobs." />
+  <LinkCard title="Take a GitHub issue to a merged PR" href="/tutorials/take-a-github-issue-to-a-merged-pr/" description="Ship the fix once you've found the bug." />
+  <LinkCard title="Set up cckit in a repo" href="/tutorials/set-up-cckit-in-a-repo/" description="Get cckit running before you debug." />
+</CardGrid>
+
+<TutorialSchema
+  steps={[
+    { name: 'Check availability first', text: 'cckit debug --check reports whether Node/npx and Chrome are present. If they are, cckit debug drives the bridge; otherwise it prints how to enable it and exits 0.' },
+    { name: 'Enable the bridge', text: 'Install chrome-devtools-axi globally with npm i -g chrome-devtools-axi, or rely on npx -y chrome-devtools-axi if Node is present.' },
+    { name: 'Let the agent drive it', text: 'Everything after cckit debug is forwarded verbatim to the bridge, so the agent can take a screenshot, read the console, or run Lighthouse and act on the result.' },
+  ]}
+  faqs={[
+    { q: "cckit debug --check says it's unavailable", a: 'Node/npx or Chrome is missing. Install both and re-check; cckit will not hard-fail without them.' },
+    { q: "The agent's context filled with output", a: 'Results are TOON-encoded to stay compact, but a broad capture is still large. Ask for the specific artifact — one screenshot, the console only — rather than everything.' },
+    { q: "A subcommand isn't recognized", a: 'cckit forwards args verbatim; the subcommand surface belongs to chrome-devtools-axi, not cckit. Check the axi docs.' },
+  ]}
+/>

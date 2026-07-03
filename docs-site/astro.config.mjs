@@ -115,6 +115,12 @@ export default defineConfig({
           { label: 'Run Claude Code unattended', slug: 'tutorials/run-claude-code-unattended' },
           { label: 'Drive Claude Code headless in CI', slug: 'tutorials/drive-claude-code-headless-in-ci' },
           { label: 'Stop Claude committing secrets', slug: 'tutorials/stop-claude-committing-secrets' },
+          { label: 'Keep private data out of AI commits', slug: 'tutorials/keep-private-data-out-of-ai-commits' },
+          { label: 'Control what Claude Code can do', slug: 'tutorials/control-what-claude-code-can-do' },
+          { label: 'Give Claude Code persistent memory', slug: 'tutorials/give-claude-code-persistent-memory' },
+          { label: 'Run checks with cckit hooks', slug: 'tutorials/run-checks-with-cckit-hooks' },
+          { label: 'Debug a web page with Claude Code', slug: 'tutorials/debug-a-web-page-with-claude-code' },
+          { label: 'Extend Claude Code with skills', slug: 'tutorials/extend-claude-code-with-skills' },
         ]},
         { label: 'Concepts', items: [
           { label: 'The GitHub cycle', slug: 'github-cycle' },

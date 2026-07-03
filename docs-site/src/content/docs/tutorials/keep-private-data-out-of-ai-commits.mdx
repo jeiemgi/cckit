@@ -1,0 +1,99 @@
+---
+title: How to keep private and company data out of AI commits
+description: Declare a private denylist so cckit's secret guard blocks any commit containing your org names, internal hosts, or emails — nothing project-specific is ever hardcoded in the kit.
+tutorial:
+  job: keep private and company data out of AI commits
+  difficulty: beginner
+  time: "5 min"
+  prerequisites: [git, "a cckit repo"]
+  ogTag: Security
+  keywords: [ai commit private data, denylist secrets, keep company data out of git]
+  related: [stop-claude-committing-secrets, run-checks-with-cckit-hooks, control-what-claude-code-can-do]
+---
+
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import TagRow from '../../../components/TagRow.astro';
+import TutorialMeta from '../../../components/TutorialMeta.astro';
+import TutorialSchema from '../../../components/TutorialSchema.astro';
+
+<TagRow kinds={["concept", "hook"]} />
+
+<TutorialMeta />
+
+**What you'll set up:** cckit's secret guard already blocks keys and `.env` files. This adds *your*
+private terms — org names, internal hostnames, emails, anything specific to you — so the guard fails
+any commit that contains them. cckit ships the list **empty**: it never guesses what's yours, so
+nothing project-specific is baked into the kit.
+
+## Steps
+
+<Steps>
+
+1. **Copy the example denylist.** The target is gitignored, so your terms never get committed either.
+
+   ```bash frame="terminal"
+   cp privacy-denylist.example .cckit/privacy-denylist
+   ```
+
+2. **List your private terms.** One per line — org names, hosts, emails, anything private to you.
+
+   ```text frame="terminal" title=".cckit/privacy-denylist"
+   acme-internal
+   vpn.acme.example
+   jane@acme.example
+   ```
+
+3. **Prove it blocks them.** Stage a file that mentions a listed term and try to commit — the guard
+   fails the commit.
+
+   ```bash frame="terminal"
+   git add . && git commit -m "test"
+   # ✗ blocked: private term "acme-internal" found in a tracked file
+   ```
+
+</Steps>
+
+## How it works
+
+The guard checks code, docs, the cookbook, examples, and templates — every commit, every time — and
+your denylist is checked alongside the built-in rules for keys and env files. Because the list lives
+in `.cckit/privacy-denylist` (gitignored) and cckit ships it empty, the kit stays agnostic: you
+declare what's private to you, and nothing about your org is ever hardcoded upstream.
+
+<Aside type="tip" title="This pairs with the built-in guard">
+The denylist extends the same guard that already blocks keys, `.pem`/`.key` files, JWTs, and
+secret-looking assignments — see [Stop Claude from committing secrets](/tutorials/stop-claude-committing-secrets/).
+</Aside>
+
+## Troubleshooting
+
+**My denylist file got committed.** It shouldn't — `.cckit/privacy-denylist` is gitignored by
+default. If you copied it elsewhere, move it back to that path so it's ignored.
+
+**A term matches too broadly.** The guard matches the literal term. Choose specific strings (a full
+hostname rather than a common word) so it doesn't trip on unrelated text.
+
+**Nothing was blocked.** Confirm the file is at `.cckit/privacy-denylist`, the terms are one per line,
+and the [pre-commit hook is enabled](/tutorials/stop-claude-committing-secrets/) with
+`git config core.hooksPath githooks`.
+
+## Related tutorials
+
+<CardGrid>
+  <LinkCard title="Stop Claude Code from committing secrets" href="/tutorials/stop-claude-committing-secrets/" description="Turn on the guard that this denylist extends." />
+  <LinkCard title="Run checks automatically with cckit hooks" href="/tutorials/run-checks-with-cckit-hooks/" description="Where the guard runs at commit time." />
+  <LinkCard title="Control what Claude Code is allowed to do" href="/tutorials/control-what-claude-code-can-do/" description="The permission model around the guard." />
+</CardGrid>
+
+<TutorialSchema
+  steps={[
+    { name: 'Copy the example denylist', text: 'Copy privacy-denylist.example to .cckit/privacy-denylist. The target is gitignored so your terms are never committed.' },
+    { name: 'List your private terms', text: 'Add org names, internal hostnames, and emails — one per line — to .cckit/privacy-denylist.' },
+    { name: 'Prove it blocks them', text: 'Stage a file that mentions a listed term and attempt a commit; the guard fails the commit because the private term appears in a tracked file.' },
+  ]}
+  faqs={[
+    { q: 'My denylist file got committed', a: '.cckit/privacy-denylist is gitignored by default. If you copied it elsewhere, move it back to that path so it is ignored.' },
+    { q: 'A term matches too broadly', a: 'The guard matches the literal term. Choose specific strings — a full hostname rather than a common word — so it does not trip on unrelated text.' },
+    { q: 'Nothing was blocked', a: 'Confirm the file is at .cckit/privacy-denylist, terms are one per line, and the pre-commit hook is enabled with git config core.hooksPath githooks.' },
+  ]}
+/>

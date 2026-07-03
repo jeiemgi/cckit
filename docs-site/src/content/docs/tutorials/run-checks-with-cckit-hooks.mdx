@@ -1,0 +1,98 @@
+---
+title: How to run checks automatically with cckit hooks
+description: Scaffold cckit's hooks so the right check runs at the right moment — repo hygiene at session start, a base-branch commit guard, and an optional pre-push test gate — without you remembering to run anything.
+tutorial:
+  job: run checks automatically with cckit hooks
+  difficulty: beginner
+  time: "5 min"
+  prerequisites: ["a cckit repo"]
+  ogTag: Hooks
+  keywords: [claude code hooks, claude code pre-commit, automate checks ai agent]
+  related: [give-claude-code-persistent-memory, stop-claude-committing-secrets, control-what-claude-code-can-do]
+---
+
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import TagRow from '../../../components/TagRow.astro';
+import TutorialMeta from '../../../components/TutorialMeta.astro';
+import TutorialSchema from '../../../components/TutorialSchema.astro';
+
+<TagRow kinds={["hook"]} />
+
+<TutorialMeta />
+
+**What you'll set up:** a hook is a script Claude Code runs automatically when something happens — a
+session starts, a command is about to run, a session ends. cckit scaffolds a few at `init` so the
+right check fires at the right moment without you remembering to run it. You never call a hook; Claude
+Code fires it on an event.
+
+## Steps
+
+<Steps>
+
+1. **Scaffold the hooks.** `cckit init` installs the always-on set into `.claude/hooks/`.
+
+   ```bash frame="terminal"
+   cckit init
+   ```
+
+   You get three by default: a session-start **repo-hygiene** report (stale branches, worktrees,
+   stashes), a quiet **version check**, and a **base-branch commit guard** that blocks a commit made
+   straight to the base branch — so work always goes through a branch and a PR.
+
+2. **Confirm they're healthy.** `cckit doctor` checks the hooks are wired and refreshes any stale
+   ones.
+
+   ```bash frame="terminal"
+   cckit doctor
+   ```
+
+3. **Turn on feature hooks as you need them.** Enabling the pre-push gate at `init` adds a hook that
+   runs your project's tests/lint before a `git push`, so a red branch never reaches the remote.
+   Memory adds four more (see [persistent memory](/tutorials/give-claude-code-persistent-memory/)).
+
+</Steps>
+
+## How it works
+
+Hooks are plain scripts under `.claude/hooks/`, registered in `.claude/settings.local.json` — yours to
+read and edit. Every one is a **safe no-op** when its tool isn't installed, so nothing breaks if a
+dependency is missing (which is what makes unattended runs safe). Events map to moments:
+`SessionStart` for reports, `PreToolUse` (Bash) for guards before a command runs, `Stop`/`SessionEnd`
+for wrap-up.
+
+<Aside type="tip" title="You don't trigger these">
+Claude Code fires hooks on an event — you never call one. The commit guard, for example, runs the
+instant a commit is attempted.
+</Aside>
+
+## Troubleshooting
+
+**A hook didn't fire.** Run `cckit doctor` — it re-registers stale hooks. Confirm the entry exists in
+`.claude/settings.local.json`.
+
+**A hook I don't need is running.** They're plain scripts you own — edit or remove it from
+`.claude/hooks/` and its registration. Each is a safe no-op if you'd rather neutralize than delete.
+
+**The pre-push gate blocks a valid push.** It runs your project's check; a failing test or lint is the
+gate doing its job. Fix the finding, or adjust the check the gate runs.
+
+## Related tutorials
+
+<CardGrid>
+  <LinkCard title="Give Claude Code persistent memory" href="/tutorials/give-claude-code-persistent-memory/" description="The four hooks the memory layer adds." />
+  <LinkCard title="Stop Claude Code from committing secrets" href="/tutorials/stop-claude-committing-secrets/" description="The secret guard that runs as a pre-commit hook." />
+  <LinkCard title="Control what Claude Code is allowed to do" href="/tutorials/control-what-claude-code-can-do/" description="The permission gate around mutating operations." />
+</CardGrid>
+
+<TutorialSchema
+  steps={[
+    { name: 'Scaffold the hooks', text: 'cckit init installs the always-on hooks into .claude/hooks/: a session-start repo-hygiene report, a version check, and a base-branch commit guard.' },
+    { name: "Confirm they're healthy", text: 'cckit doctor checks the hooks are wired and refreshes any stale ones.' },
+    { name: 'Turn on feature hooks as you need them', text: 'Enabling the pre-push gate at init adds a hook that runs your project tests/lint before a git push; memory adds four more session hooks.' },
+  ]}
+  faqs={[
+    { q: "A hook didn't fire", a: 'Run cckit doctor to re-register stale hooks, and confirm the entry exists in .claude/settings.local.json.' },
+    { q: "A hook I don't need is running", a: 'Hooks are plain scripts you own. Edit or remove it from .claude/hooks/ and its registration; each is a safe no-op if you prefer to neutralize it.' },
+    { q: 'The pre-push gate blocks a valid push', a: 'It runs your project check; a failing test or lint is the gate doing its job. Fix the finding or adjust the check it runs.' },
+  ]}
+/>
