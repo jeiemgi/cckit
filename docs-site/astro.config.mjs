@@ -4,6 +4,7 @@ import starlight from '@astrojs/starlight';
 import starlightDocSearch from '@astrojs/starlight-docsearch';
 import react from '@astrojs/react';
 import sitemap from '@astrojs/sitemap';
+import rehypeExternalLinks from 'rehype-external-links';
 
 // .env files are NOT injected into process.env inside astro.config.mjs. Vercel DOES populate
 // process.env from the project's env vars at build, so prefer that; locally, fall back to parsing
@@ -54,6 +55,11 @@ export default defineConfig({
     '/run-your-first-lifecycle': '/initialize/', // lifecycle page reframed as the init tutorial
   },
   vite: { define: { __CCKIT_VERSION__: JSON.stringify(pkg.version) } },
+  // External links open in a new tab (safely) and get an "opens externally" icon via CSS
+  // (a[target="_blank"] in theme.css). Relative in-site links are untouched.
+  markdown: {
+    rehypePlugins: [[rehypeExternalLinks, { target: '_blank', rel: ['noopener', 'noreferrer'] }]],
+  },
   integrations: [
     react(),
     starlight({

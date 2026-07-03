@@ -531,6 +531,24 @@ h1 .cckit-tag, h2 .cckit-tag, h3 .cckit-tag { font-size: 0.65em; }
 	border-radius: inherit;
 }
 
+/* ── External-link icon ───────────────────────────────────────────────── */
+/* Links that open in a new tab (rehype-external-links sets target="_blank" on external URLs) get a
+   small "opens externally" arrow so the jump is signposted. Scoped to content + footer credits so it
+   doesn't decorate icon-only chrome links. */
+.sl-markdown-content a[target='_blank']::after,
+.cckit-madeby a[target='_blank']::after {
+	content: '';
+	display: inline-block;
+	width: 0.7em;
+	height: 0.7em;
+	margin-inline-start: 0.22em;
+	vertical-align: middle;
+	background-color: currentColor;
+	opacity: 0.7;
+	-webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 7h10v10'/%3E%3Cpath d='M7 17 17 7'/%3E%3C/svg%3E") center / contain no-repeat;
+	mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 7h10v10'/%3E%3Cpath d='M7 17 17 7'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
 /* ── Sidebar group icons ──────────────────────────────────────────────── */
 /* Starlight sidebar entries don't take an icon, so we paint one before each top-level GROUP label
    (Get started / Tutorials / Concepts / Guides / Reference) via a CSS mask — a line icon tinted with
