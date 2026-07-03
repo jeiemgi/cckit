@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 # Capture Projects v2 field + option IDs into scripts/.project-ids.env.
-# Reads owner + project number from .claude/kit.config.json. Run from project root.
+# Reads owner + project number + owner type from the kit config. Run from project root.
 # Handles "Status", "Role", and "Plan Link" fields by name (case-insensitive).
+#
+# The board can live under a USER login or an ORGANIZATION login. GraphQL selects a different root
+# for each (user(login:) vs organization(login:)), so this branches on github.projectOwnerType
+# ("user" | "organization", default "user") — a user-only query silently returned null for an
+# org-owned board (#118).
 set -euo pipefail
 source "$(dirname "$0")/lib/kit-config.sh" && load_kit_config
 
@@ -9,10 +14,18 @@ source "$(dirname "$0")/lib/kit-config.sh" && load_kit_config
 
 OUT="$(dirname "$0")/.project-ids.env"
 
-DATA=$(gh api graphql -f query='
-  query($login:String!, $number:Int!){
-    user(login:$login){
-      projectV2(number:$number){
+# Resolve the GraphQL root selector from the owner type (kit-config exports KIT_PROJECT_OWNER_TYPE).
+case "${KIT_PROJECT_OWNER_TYPE:-user}" in
+  org|organization) OWNER_ROOT="organization" ;;
+  *)                OWNER_ROOT="user" ;;
+esac
+
+# Build the query with the resolved root; the response is read under the SAME root below so the
+# selector and the jq path stay in lockstep regardless of user- vs org-owned board.
+DATA=$(gh api graphql -f query="
+  query(\$login:String!, \$number:Int!){
+    $OWNER_ROOT(login:\$login){
+      projectV2(number:\$number){
         id
         fields(first:50){ nodes{
           __typename
@@ -21,10 +34,10 @@ DATA=$(gh api graphql -f query='
         }}
       }
     }
-  }' -f login="$KIT_OWNER" -F number="$KIT_PROJECT_NUMBER")
+  }" -f login="$KIT_OWNER" -F number="$KIT_PROJECT_NUMBER")
 
-PROJECT_ID=$(echo "$DATA" | jq -r '.data.user.projectV2.id')
-[[ -z "$PROJECT_ID" || "$PROJECT_ID" == "null" ]] && { echo "✗ Could not resolve project #$KIT_PROJECT_NUMBER for $KIT_OWNER"; exit 1; }
+PROJECT_ID=$(echo "$DATA" | jq -r ".data.${OWNER_ROOT}.projectV2.id")
+[[ -z "$PROJECT_ID" || "$PROJECT_ID" == "null" ]] && { echo "✗ Could not resolve project #$KIT_PROJECT_NUMBER for $OWNER_ROOT '$KIT_OWNER' (check github.projectOwnerType)"; exit 1; }
 
 # jq filter: normalize an option/field label -> UPPER_SNAKE
 norm='def n: ascii_upcase | gsub("[ -]";"_");'
@@ -35,7 +48,7 @@ norm='def n: ascii_upcase | gsub("[ -]";"_");'
 
   # Single-select fields -> <FIELD>_FIELD_ID + <FIELD>_OPT_<OPTION>
   echo "$DATA" | jq -r "$norm"'
-    .data.user.projectV2.fields.nodes[]
+    .data.'"$OWNER_ROOT"'.projectV2.fields.nodes[]
     | select(.options != null)
     | (.name | n) as $f
     | ([ "\($f)_FIELD_ID=\(.id)" ]
@@ -43,7 +56,7 @@ norm='def n: ascii_upcase | gsub("[ -]";"_");'
 
   # Text/other fields -> <FIELD>_FIELD_ID
   echo "$DATA" | jq -r "$norm"'
-    .data.user.projectV2.fields.nodes[]
+    .data.'"$OWNER_ROOT"'.projectV2.fields.nodes[]
     | select(.options == null) | select(.name != null)
     | "\(.name | n)_FIELD_ID=\(.id)"'
 } > "$OUT"

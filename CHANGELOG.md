@@ -7,6 +7,10 @@ All notable changes to cckit are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- Projects v2 board capture now honors `github.projectOwnerType` (`user` | `organization`, default
+  `user`). An organization-owned board previously returned null from the user-only GraphQL root, so
+  field/option IDs never captured; `capture-project-ids.sh` now selects `organization(login:)` vs
+  `user(login:)` to match, and `kit-config` exports `KIT_PROJECT_OWNER_TYPE` (#118).
 - Integration branch now resolves through a fallback chain — `github.baseBranch` →
   `github.integrationBranch` → `github.flow` → `main` — so a host project that names its
   integration branch under an alternate key resolves correctly on adoption instead of silently

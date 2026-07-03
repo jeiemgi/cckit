@@ -37,6 +37,9 @@ load_kit_config() {
   export KIT_PROJECTS_V2="$(jq -r '.github.projectsV2' "$cfg")"
   export KIT_PROJECT_NUMBER="$(jq -r '.github.projectNumber' "$cfg")"
   export KIT_PROJECT_TITLE="$(jq -r '.github.projectTitle'   "$cfg")"
+  # Board owner type — "user" or "organization". A board can live under a user OR an org login, and
+  # every projectV2-by-number GraphQL query must select the matching root, so capture this once (#118).
+  export KIT_PROJECT_OWNER_TYPE="$(jq -r '.github.projectOwnerType // "user"' "$cfg")"
 
   export KIT_PLANS_FORMAT="$(jq -r '.plans.format'  "$cfg")"
   export KIT_PLANS_DIR="$(jq -r '.plans.dir'        "$cfg")"

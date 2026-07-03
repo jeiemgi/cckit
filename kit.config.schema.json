@@ -58,6 +58,7 @@
         "integrationBranch": { "type": "string", "description": "Alias for baseBranch, honored when baseBranch is unset (adoption fallback)." },
         "flow": { "type": "string", "description": "Last-resort alias for the integration branch, honored when baseBranch and integrationBranch are unset." },
         "projectsV2": { "type": "boolean" },
+        "projectOwnerType": { "type": "string", "enum": ["user", "organization"], "description": "Whether the Projects v2 board is owned by a user or an organization login (default: user). Selects the GraphQL root for board queries." },
         "projectNumber": { "type": ["integer", "null"] },
         "projectTitle": { "type": ["string", "null"] }
       }
