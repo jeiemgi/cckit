@@ -54,9 +54,9 @@ const GSC_VERIFICATION = envVar('PUBLIC_GSC_VERIFICATION');
 
 // https://astro.build/config
 export default defineConfig({
-  // Live domain. cckit.dev is the future canonical home (DNS coming soon); until it
-  // points here, the deployed site is cckit.vercel.app so canonical + OG resolve.
-  site: 'https://cckit.vercel.app',
+  // Live domain. cckit.dev is the production canonical home; canonical + OG resolve
+  // against it. cckit.vercel.app stays as the preview URL for non-production deploys.
+  site: 'https://cckit.dev',
   // Keep old docs URLs alive after renames.
   redirects: {
     '/copilot': '/wave/', // `cckit copilot` → `cckit wave`
@@ -102,7 +102,7 @@ export default defineConfig({
         { tag: 'meta', attrs: { name: 'algolia-site-verification', content: '9E796471F3020A1F' } },
         { tag: 'meta', attrs: { property: 'og:type', content: 'website' } },
         // Google Search Console ownership verification (meta-tag method) — set PUBLIC_GSC_VERIFICATION
-        // to the content value Search Console gives you when adding cckit.vercel.app as a property.
+        // to the content value Search Console gives you when adding cckit.dev as a property.
         ...(GSC_VERIFICATION
           ? [{ tag: 'meta', attrs: { name: 'google-site-verification', content: GSC_VERIFICATION } }]
           : []),

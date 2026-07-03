@@ -1,6 +1,6 @@
 # Growth — SEO, analytics, distribution
 
-Working notes for growing cckit.vercel.app. Not part of the published site. Last updated 2026-07-02.
+Working notes for growing cckit.dev. Not part of the published site. Last updated 2026-07-02.
 
 ## 1. Technical SEO — audit results
 
@@ -22,9 +22,10 @@ JSON-LD on every tutorial (`TutorialSchema.astro`). `/social/*` export pages are
 **Left as-is (already correct):** sitemap filtering, robots.txt, canonical tags, OG images,
 tutorial JSON-LD, redirect map for renamed pages. No action needed.
 
-**Not yet actionable:** when `cckit.dev` goes live, set up a permanent redirect from
+**Done:** `cckit.dev` is now the production domain. Keep a permanent redirect from
 `cckit.vercel.app` → `cckit.dev` (Vercel domain redirect, not a client-side one) so backlinks and
-any accumulated ranking carry over instead of starting from zero on the new domain.
+any accumulated ranking carry over instead of starting from zero on the new domain. `cckit.dev`
+stays as the preview URL for non-production deploys.
 
 ## 2. Analytics — zero-cost setup (you need to do this part)
 
@@ -39,12 +40,12 @@ keyword/impression data (which Vercel Analytics can't give you at all). Speed In
 free-tier and covers what GA4 doesn't: real-user Core Web Vitals.
 
 1. **GA4:** [analytics.google.com](https://analytics.google.com) → Admin → Create property →
-   "cckit" → Web data stream → `https://cckit.vercel.app`. Copy the Measurement ID (`G-XXXXXXX`).
+   "cckit" → Web data stream → `https://cckit.dev`. Copy the Measurement ID (`G-XXXXXXX`).
    Set `PUBLIC_GA_MEASUREMENT_ID` in Vercel.
 2. **Search Console:** [search.google.com/search-console](https://search.google.com/search-console)
-   → Add property → URL prefix → `https://cckit.vercel.app` → verify via "HTML tag" method → copy
+   → Add property → URL prefix → `https://cckit.dev` → verify via "HTML tag" method → copy
    the `content="..."` value. Set `PUBLIC_GSC_VERIFICATION` in Vercel. Submit
-   `https://cckit.vercel.app/sitemap-index.xml` in Search Console once verified — this is your main
+   `https://cckit.dev/sitemap-index.xml` in Search Console once verified — this is your main
    window into "what people actually search that lands on cckit," which should directly feed §3.
 3. **Speed Insights:** already wired (`@vercel/speed-insights`, `<SpeedInsights />` in the Footer
    override) — nothing to configure, it activates automatically once deployed on Vercel.
@@ -108,7 +109,7 @@ has very little to go on yet besides who links to you. In priority order:
    Settings. This is free discoverability on GitHub's own topic pages and search, and costs nothing.
 9. **The existing "Built with cckit" badge is already a backlink growth loop** — every adopter who
    adds it links back to the GitHub repo. Consider also linking the docs site
-   (`https://cckit.vercel.app`) from the badge, not just the repo, so adopters drive traffic to the
+   (`https://cckit.dev`) from the badge, not just the repo, so adopters drive traffic to the
    page that actually converts visitors (the tutorials), not just the source.
 
 ## What's implemented vs. what's on you
