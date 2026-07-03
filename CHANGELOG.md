@@ -6,6 +6,12 @@ All notable changes to cckit are documented here. The format follows
 
 ## [Unreleased]
 
+### Security
+- Cleared all 11 open Dependabot alerts (4 high) — every one lived in docs-site dependencies.
+  Astro upgraded 5.18 → 6.4.8 (reflected XSS ×3, host-header SSRF, server-island replay,
+  `define:vars` XSS, spread-props XSS) with Starlight 0.40 and `@astrojs/react` 5; a pnpm
+  override forces transitive esbuild ≥ 0.28.1 (dev-server file read on Windows). (#169)
+
 ### Fixed
 - `cckit release` now stamps the version on all four version surfaces through the one shared
   bumper (`version-bump.sh --write`) instead of an inline jq that wrote only
