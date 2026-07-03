@@ -5,7 +5,7 @@ template: splash
 ---
 
 import { Image } from 'astro:assets';
-import { Card, CardGrid, LinkCard, LinkButton, Icon } from '@astrojs/starlight/components';
+import { CardGrid, LinkCard, LinkButton } from '@astrojs/starlight/components';
 import banner from '../../assets/hero-banner.png';
 
 <div class="hero-banner">
@@ -23,53 +23,45 @@ import banner from '../../assets/hero-banner.png';
   <span class="coming-soon" aria-disabled="true" title="cckit.dev — coming soon">cckit.dev · coming soon</span>
 </div>
 
-## Start here
+## Tutorials
+
+Step-by-step **“How to X with Claude Code”** guides — each one titled the way you'd search for it, answered in the first screen, then taken start to finish. [Browse all tutorials →](/tutorials/)
+
+### Get started
 
 <CardGrid>
-  <LinkCard title="How to read this guide" href="/how-to-read/" description="The tags and diagrams, explained once. Read this first." />
-  <LinkCard title="Install cckit" href="/install/" description="One script. Adds the CLI and the Claude Code plugin." />
-  <LinkCard title="Quickstart" href="/getting-started/" description="Run your first command and ship one issue end to end." />
+  <LinkCard title="Set up cckit in a Git repo" href="/tutorials/set-up-cckit-in-a-repo/" description="Scaffold config, check GitHub access, confirm the stack. · Beginner · 4 min" />
+  <LinkCard title="Add cckit to an existing repo" href="/tutorials/adopt-cckit-in-an-existing-repo/" description="Bring cckit to a project that already has structure. · Beginner · 5 min" />
 </CardGrid>
 
-## Explore by topic
+### Ship work
 
 <CardGrid>
-  <Card title="Get started" icon="rocket">
-    Orient yourself and set up. [How to read](/how-to-read/) · [Install](/install/) · [Quickstart](/getting-started/) · [Showcase](/showcase/)
-  </Card>
-  <Card title="Concepts" icon="puzzle">
-    How it works under the hood. [The GitHub cycle](/github-cycle/) · [Efforts, waves & worktrees](/efforts-and-waves/) · [Hooks](/hooks/) · [Adapters](/adapters/)
-  </Card>
-  <Card title="Guides" icon="open-book">
-    Do a job end to end. [All guides](/guides/) · [Wave](/wave/) · [From agents](/agents/) · [Adoption](/adoption/) · [Cookbook](/cookbook/)
-  </Card>
-  <Card title="Reference" icon="list-format">
-    Look things up. [CLI reference](/cli-reference/) · [Skills](/skills/) · [Config & permissions](/config-and-permissions/) · [Security](/security/)
-  </Card>
+  <LinkCard title="Take a GitHub issue to a merged PR" href="/tutorials/take-a-github-issue-to-a-merged-pr/" description="One issue, end to end: worktree → PR → close → cleanup. · Beginner · 6 min" />
+  <LinkCard title="Break a big feature into an effort" href="/tutorials/break-a-feature-into-an-effort/" description="A parent issue plus sub-issues, shipped as one PR. · Intermediate · 7 min" />
 </CardGrid>
 
-## What makes cckit different
+### Run in parallel
 
 <CardGrid>
-  <Card title="One lifecycle" icon="seti:todo">
-    Start an issue, get an isolated worktree and branch, open a PR, merge, clean up — each step is one command, correct by construction.
-  </Card>
-  <Card title="A parallel loop" icon="random">
-    `cckit wave` turns the board into a wave of parallel agent work; `cckit watch` gates and merges the PRs, then advances to the next wave.
-  </Card>
-  <Card title="Agent-operable" icon="puzzle">
-    Every verb has a machine-readable mode (`cckit <verb> --llm`, uniform data as TOON) and an `AGENTS.md` contract, so agents drive the kit without scraping human output.
-  </Card>
-  <Card title="Zero hard dependencies" icon="approve-check">
-    Pure bash with graceful fallbacks; it auto-detects optional tools and degrades instead of failing.
-  </Card>
+  <LinkCard title="Run a wave of issues in parallel" href="/tutorials/run-issues-in-parallel-with-a-wave/" description="Fan unblocked issues out, then gate and merge the clean PRs. · Intermediate · 7 min" />
+  <LinkCard title="Run Claude Code unattended overnight" href="/tutorials/run-claude-code-unattended/" description="Clear a backlog hands-off, capped, pinged only on a blocker. · Advanced · 8 min" />
+  <LinkCard title="Drive Claude Code headless in CI" href="/tutorials/drive-claude-code-headless-in-ci/" description="Consume every verb as JSON/TOON from a bot. · Advanced · 6 min" />
 </CardGrid>
 
-## Popular
+### Security
 
 <CardGrid>
-  <LinkCard title="Wave" href="/wave/" description="A wave of issues becomes parallel agent work that merges itself." />
-  <LinkCard title="The GitHub cycle" href="/github-cycle/" description="The lifecycle every command builds on, drawn left to right." />
-  <LinkCard title="CLI reference" href="/cli-reference/" description="Every verb, every flag, in one place." />
-  <LinkCard title="Skills cckit ships" href="/skills/" description="What each skill does and how it's triggered." />
+  <LinkCard title="Stop Claude Code from committing secrets" href="/tutorials/stop-claude-committing-secrets/" description="Wire cckit's secret guard as a pre-commit hook. · Beginner · 5 min" />
+  <LinkCard title="Keep private & company data out of AI commits" href="/tutorials/keep-private-data-out-of-ai-commits/" description="Declare a denylist so your private terms are never committed. · Beginner · 5 min" />
+  <LinkCard title="Control what Claude Code is allowed to do" href="/tutorials/control-what-claude-code-can-do/" description="The permission gate: read-only by default, explicit consent to mutate. · Intermediate · 5 min" />
+</CardGrid>
+
+### Concepts & extending
+
+<CardGrid>
+  <LinkCard title="Give Claude Code persistent project memory" href="/tutorials/give-claude-code-persistent-memory/" description="Wake up already knowing the project — decisions persist across sessions. · Intermediate · 6 min" />
+  <LinkCard title="Run checks automatically with cckit hooks" href="/tutorials/run-checks-with-cckit-hooks/" description="The right check fires at the right moment, no reminders. · Beginner · 5 min" />
+  <LinkCard title="Let Claude Code debug a web page" href="/tutorials/debug-a-web-page-with-claude-code/" description="Screenshots, console, network, and Lighthouse as agent commands. · Intermediate · 5 min" />
+  <LinkCard title="Extend Claude Code with cckit skills" href="/tutorials/extend-claude-code-with-skills/" description="Run and author /kit- skills for the whole lifecycle. · Beginner · 5 min" />
 </CardGrid>
