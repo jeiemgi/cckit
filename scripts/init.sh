@@ -350,8 +350,13 @@ PROFILE_FILE="$KIT_ROOT/profiles/$PROFILE.json"
 mkdir -p "$TARGET"
 TARGET="$(cd "$TARGET" && pwd)"
 BASENAME="$(basename "$TARGET")"
-[[ -z "$NAME" ]] && NAME="$BASENAME"
-[[ -z "$SLUG" ]] && SLUG="$(echo "$BASENAME" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed -E 's/^-|-$//g')"
+# Prefer the ACTUAL repo name from the git remote — the local directory is often cloned/renamed to a
+# different name — and only fall back to the directory basename (#73).
+# shellcheck source=/dev/null
+. "$KIT_ROOT/scripts/lib/git-remote.sh"
+NAME_SRC="$(git_remote_repo_name "$TARGET" 2>/dev/null || true)"; NAME_SRC="${NAME_SRC:-$BASENAME}"
+[[ -z "$NAME" ]] && NAME="$NAME_SRC"
+[[ -z "$SLUG" ]] && SLUG="$(echo "$NAME_SRC" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed -E 's/^-|-$//g')"
 if [[ -z "$GH_OWNER" ]]; then GH_OWNER="$(gh api user --jq .login 2>/dev/null || echo "")"; fi
 [[ -z "$OWNER_NAME" ]] && OWNER_NAME="${GH_OWNER:-owner}"
 # Prefer the project's ACTUAL GitHub remote over an <owner>/<dir-basename> guess — the local

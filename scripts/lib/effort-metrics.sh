@@ -105,12 +105,26 @@ effort_ctx_bucket() {
 # ~/.claude/projects/*/. Echoes "in out cache_read cache_write" (0s when unmappable). Going-forward
 # only — the usage log is empty for the past (backtrace left tokens null, by design).
 _em_token_sum() {
-  local branch="$1" gcd ulog sids sid tx tin=0 tout=0 tcr=0 tcw=0 sums
+  # <branch> [start-epoch] [end-epoch] — attribute usage sessions to the effort by branch UNION a
+  # time window (#124). Branch alone misses sessions logged before the branch field was recorded or
+  # from a detached/worktree checkout; the [start,end] window (the effort's build span) recovers them.
+  local branch="$1" start="${2:-0}" end="${3:-0}" gcd ulog sids sid tx tin=0 tout=0 tcr=0 tcw=0 sums
   local IFS=' '   # force space-split for `set --` (ambient IFS may carry a NUL — see ifs landmine)
+  [[ "$start" =~ ^[0-9]+$ ]] || start=0; [[ "$end" =~ ^[0-9]+$ ]] || end=0
   gcd="$(git rev-parse --git-common-dir 2>/dev/null)" || { echo "0 0 0 0"; return 0; }
   ulog="$gcd/kit-usage.jsonl"
-  [[ -f "$ulog" && -n "$branch" ]] || { echo "0 0 0 0"; return 0; }
-  sids="$(jq -r --arg b "$branch" 'select(.branch==$b and .session!="")|.session' "$ulog" 2>/dev/null | sort -u)"
+  [[ -f "$ulog" ]] || { echo "0 0 0 0"; return 0; }
+  # A session counts when it matches the branch OR falls inside the [start,end] window (when given).
+  # `try … catch 0` keeps a malformed .ts row from aborting the whole filter.
+  sids="$(jq -r --arg b "$branch" --argjson s "$start" --argjson e "$end" '
+    select(.session != "")
+    | select(
+        ($b != "" and .branch == $b)
+        or ($s > 0 and $e > 0
+            and (try (.ts | fromdateiso8601) catch 0) >= $s
+            and (try (.ts | fromdateiso8601) catch 0) <= $e)
+      )
+    | .session' "$ulog" 2>/dev/null | sort -u)"
   [[ -n "$sids" ]] || { echo "0 0 0 0"; return 0; }
   while IFS= read -r sid; do
     [[ -n "$sid" ]] || continue
@@ -156,8 +170,8 @@ capture_effort_metrics() {
     echo "effort-metrics: WARN #$num — capture on '$branch' with an empty diff; run it PRE-close (the effort branch is gone). Recording zeros." >&2
   fi
 
-  # token/cost actuals (#807) — going-forward only.
-  toks="$(_em_token_sum "$branch")"; read -r tin tout tcr tcw <<< "$toks"
+  # token/cost actuals (#807) — attribute by branch UNION the effort's build window [start,now] (#124).
+  toks="$(_em_token_sum "$branch" "${start:-0}" "${now:-0}")"; read -r tin tout tcr tcw <<< "$toks"
   tin=${tin:-0}; tout=${tout:-0}; tcr=${tcr:-0}; tcw=${tcw:-0}
   if (( tin + tout + tcr + tcw > 0 )); then
     tokens_real=$(( tin + tout + tcr + tcw ))

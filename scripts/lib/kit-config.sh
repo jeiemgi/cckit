@@ -6,13 +6,24 @@
 # Per-folder overrides: any .claudekit/config.json in an ancestor directory is deep-merged over the
 # project config, nearest-wins (like .editorconfig). Projects with no .claudekit/ behave unchanged.
 
+# Source the ONE shared config-path resolver (config-path.sh, #69). Self-locate portably: BASH_SOURCE
+# is bash-only (empty under zsh, where dirname "" -> CWD and the lib is sought in the wrong dir), so
+# use zsh's %x prompt escape there. eval keeps bash from parsing the zsh-only syntax.
+if ! command -v kit_config_path >/dev/null 2>&1; then
+  if [ -n "${BASH_SOURCE:-}" ]; then _kc_self="${BASH_SOURCE[0]}"
+  elif [ -n "${ZSH_VERSION:-}" ]; then eval '_kc_self="${(%):-%x}"'
+  else _kc_self="$0"; fi
+  _kc_dir="$(cd "$(dirname "$_kc_self")" && pwd)"
+  # shellcheck source=/dev/null
+  [ -f "$_kc_dir/config-path.sh" ] && . "$_kc_dir/config-path.sh"
+  unset _kc_self _kc_dir
+fi
+
 load_kit_config() {
-  # Resolve the project config like the dispatcher (bin/cckit _cckit_find_config): an explicit
-  # KIT_CONFIG wins, else a root cckit.config.json, else .claude/kit.config.json.
-  local cfg="${KIT_CONFIG:-}"
-  if [[ -z "$cfg" ]]; then
-    if [[ -f cckit.config.json ]]; then cfg="cckit.config.json"; else cfg=".claude/kit.config.json"; fi
-  fi
+  # Resolve the project config through the ONE shared resolver: an explicit KIT_CONFIG wins, else
+  # walk up for a root cckit.config.json or a .claude/kit.config.json.
+  local cfg; cfg="$(kit_config_path 2>/dev/null || true)"
+  [[ -n "$cfg" ]] || cfg=".claude/kit.config.json"
   if [[ ! -f "$cfg" ]]; then
     echo "✗ $cfg not found. Run /kit-init (or scripts/init.sh) first." >&2
     return 1
@@ -30,10 +41,16 @@ load_kit_config() {
 
   export KIT_REPO="$(jq -r '.github.repo'           "$cfg")"
   export KIT_OWNER="$(jq -r '.github.owner'         "$cfg")"
-  export KIT_BASE_BRANCH="$(jq -r '.github.baseBranch // "main"' "$cfg")"  # integration branch (default main; e.g. develop)
+  # Integration branch, resolved through a fallback chain so a host project that names its
+  # integration branch under an older/alternate key still works on adoption: baseBranch (canonical)
+  # -> integrationBranch -> flow -> "main". First non-null wins (#117).
+  export KIT_BASE_BRANCH="$(jq -r '.github.baseBranch // .github.integrationBranch // .github.flow // "main"' "$cfg")"
   export KIT_PROJECTS_V2="$(jq -r '.github.projectsV2' "$cfg")"
   export KIT_PROJECT_NUMBER="$(jq -r '.github.projectNumber' "$cfg")"
   export KIT_PROJECT_TITLE="$(jq -r '.github.projectTitle'   "$cfg")"
+  # Board owner type — "user" or "organization". A board can live under a user OR an org login, and
+  # every projectV2-by-number GraphQL query must select the matching root, so capture this once (#118).
+  export KIT_PROJECT_OWNER_TYPE="$(jq -r '.github.projectOwnerType // "user"' "$cfg")"
 
   export KIT_PLANS_FORMAT="$(jq -r '.plans.format'  "$cfg")"
   export KIT_PLANS_DIR="$(jq -r '.plans.dir'        "$cfg")"
@@ -83,11 +100,14 @@ _kit_apply_claudekit_overlays() {
     merged="$(jq -s '.[0] * .[1]' <(printf '%s' "$merged") "$o" 2>/dev/null || printf '%s' "$merged")"
   done
 
-  local g; g() { printf '%s' "$merged" | jq -r "$1" 2>/dev/null; }
-  export KIT_LANG="$(g '.project.language // env.KIT_LANG')"
-  export KIT_PLANS_FORMAT="$(g '.plans.format // env.KIT_PLANS_FORMAT')"
-  export KIT_ANNOTATE_ENABLED="$(g '.annotate.enabled // false')"
-  export KIT_ANNOTATE_BACKEND="$(g '.annotate.backend // ""')"
-  export KIT_ANNOTATE_FRAMEWORK="$(g '.annotate.framework // ""')"
+  # Named `_kit_cfg_get`, not `g`: a one-letter `g` collides with a universal `alias g=git` when
+  # this file is sourced under zsh (interactive shells) -> "defining function based on alias" parse
+  # error. A namespaced name can never be an alias.
+  _kit_cfg_get() { printf '%s' "$merged" | jq -r "$1" 2>/dev/null; }
+  export KIT_LANG="$(_kit_cfg_get '.project.language // env.KIT_LANG')"
+  export KIT_PLANS_FORMAT="$(_kit_cfg_get '.plans.format // env.KIT_PLANS_FORMAT')"
+  export KIT_ANNOTATE_ENABLED="$(_kit_cfg_get '.annotate.enabled // false')"
+  export KIT_ANNOTATE_BACKEND="$(_kit_cfg_get '.annotate.backend // ""')"
+  export KIT_ANNOTATE_FRAMEWORK="$(_kit_cfg_get '.annotate.framework // ""')"
   export KIT_EFFECTIVE_CONFIG="$merged"
 }

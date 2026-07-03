@@ -55,12 +55,36 @@
         "repo": { "type": "string" },
         "owner": { "type": "string" },
         "baseBranch": { "type": "string", "description": "Integration branch the lifecycle skills branch from and merge into (default: main; e.g. develop)." },
+        "integrationBranch": { "type": "string", "description": "Alias for baseBranch, honored when baseBranch is unset (adoption fallback)." },
+        "flow": { "type": "string", "description": "Last-resort alias for the integration branch, honored when baseBranch and integrationBranch are unset." },
         "projectsV2": { "type": "boolean" },
+        "projectOwnerType": { "type": "string", "enum": ["user", "organization"], "description": "Whether the Projects v2 board is owned by a user or an organization login (default: user). Selects the GraphQL root for board queries." },
         "projectNumber": { "type": ["integer", "null"] },
         "projectTitle": { "type": ["string", "null"] }
       }
     },
     "milestones": { "type": "array", "items": { "type": "string" } },
+    "effort": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "knowledgeIngestHook": { "type": "string", "description": "Optional path to an executable run after `cckit effort close`, invoked as `<hook> <effort-number> <trace-dir>` to fold the closed effort's work record into a knowledge base. No-op when unset or not executable; the kit ships no default." }
+      }
+    },
+    "captain": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "mergePolicy": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "floors": { "type": "boolean", "description": "Auto-merge policy floors (default true). When on, `cckit watch --merge` never auto-merges a PR touching .github/workflows/**, lockfile/graph files, or security-sensitive paths, and always honors a `hold` label + draft state. Set false to disable (or KIT_CAPTAIN_FLOORS=0)." },
+            "protectedGlobs": { "type": "array", "items": { "type": "string" }, "description": "Extra path globs the captain must not auto-merge (added to the built-in floors). Also settable via KIT_CAPTAIN_EXTRA_GLOBS." }
+          }
+        }
+      }
+    },
     "plans": {
       "type": "object",
       "additionalProperties": true,

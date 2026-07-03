@@ -30,7 +30,9 @@ _wt_set_port() {
 # worktrees. Config-driven (no hardcoded app paths) so the kit stays portable: a project with no
 # `.worktree.devPorts` (or no kit.config.json) is a silent no-op. bash 3.2.
 wt_assign_ports() {
-  local wt="$1" num="$2" root="$3" cfg ports n offset i path base
+  # `apppath`, not `path`: under zsh `path` is tied to PATH (special array); a bare `path` local
+  # would clobber the command search path on assignment. A namespaced name is inert.
+  local wt="$1" num="$2" root="$3" cfg ports n offset i apppath base
   cfg="$root/.claude/kit.config.json"
   # jq is a stated requirement of this file (see header) — don't pre-check `command -v jq` here: the
   # `command -v … || return` idiom mis-fires under zsh, and the jq read below already no-ops on a
@@ -41,9 +43,9 @@ wt_assign_ports() {
   n="$(jq 'length' <<<"$ports" 2>/dev/null)"; [[ "$n" =~ ^[0-9]+$ && "$n" -gt 0 ]] || return 0
   offset=$(( num % 40 )); i=0
   while [[ "$i" -lt "$n" ]]; do
-    path="$(jq -r ".[$i].path // empty" <<<"$ports")"
+    apppath="$(jq -r ".[$i].path // empty" <<<"$ports")"
     base="$(jq -r ".[$i].base // empty" <<<"$ports")"
-    [[ -n "$path" && "$base" =~ ^[0-9]+$ ]] && _wt_set_port "$wt/$path" $(( base + offset * n )) "$num"
+    [[ -n "$apppath" && "$base" =~ ^[0-9]+$ ]] && _wt_set_port "$wt/$apppath" $(( base + offset * n )) "$num"
     i=$(( i + 1 ))
   done
 }
@@ -264,6 +266,13 @@ wt_start() {
   # lookup on the org board, not a full-board scan. Best-effort — a board hiccup never fails the start.
   if source "$root/scripts/lib/gh-project.sh" 2>/dev/null; then
     [[ -n "${STATUS_FIELD_ID:-}" ]] || load_project_ids >/dev/null 2>&1 || true
+    # Claim precheck (#124): if the issue is ALREADY In Progress on the board, another session may
+    # already own it — warn (never block; the start still proceeds) so two agents don't collide.
+    if command -v project_issue_status >/dev/null 2>&1; then
+      local _prev_status; _prev_status="$(project_issue_status "$num" 2>/dev/null || true)"
+      [[ "$_prev_status" == "In Progress" ]] \
+        && echo "[#$num] ⚠ already In Progress on the board — another session may own this issue; continuing." >&2
+    fi
     item="$(project_find_item_by_issue "$num" 2>/dev/null)"
     if [[ -z "$item" ]]; then
       local content_id

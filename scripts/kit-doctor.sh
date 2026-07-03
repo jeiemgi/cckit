@@ -39,7 +39,9 @@ done
 # Writes .local.dismissed = current kitVersion to kit.config.json; the SessionStart
 # notice stays silent until the kit's x.y core moves past it (issue #313).
 if [[ $DISMISS_LOCAL -eq 1 ]]; then
-  _kitcfg="${TARGET:-$PWD}/.claude/kit.config.json"
+  command -v kit_config_path >/dev/null 2>&1 || . "$(dirname "$0")/lib/config-path.sh"
+  _kitcfg="$(kit_config_path "${TARGET:-$PWD}" 2>/dev/null || true)"
+  [[ -n "$_kitcfg" ]] || _kitcfg="${TARGET:-$PWD}/.claude/kit.config.json"
   if ! command -v jq >/dev/null 2>&1 || [[ ! -f "$_kitcfg" ]]; then
     echo "kit-doctor: cannot dismiss — need jq + $_kitcfg" >&2
     exit 1
@@ -394,7 +396,9 @@ printf '\n'
 # pipx; NEVER suggest plain pip. When mlx-lm is present but the server is down,
 # the doctor starts it in background + health-checks the port. --dry-run stays
 # 100% read-only: it reports what it would do, installs and starts nothing.
-_kitcfg="${TARGET:-$PWD}/.claude/kit.config.json"
+command -v kit_config_path >/dev/null 2>&1 || . "$(dirname "$0")/lib/config-path.sh"
+_kitcfg="$(kit_config_path "${TARGET:-$PWD}" 2>/dev/null || true)"
+[[ -n "$_kitcfg" ]] || _kitcfg="${TARGET:-$PWD}/.claude/kit.config.json"
 _local_on="false"
 [[ -f "$_kitcfg" ]] && _local_on="$(jq -r '.local.enabled // false' "$_kitcfg" 2>/dev/null || echo false)"
 if [[ "$_local_on" == "true" ]]; then
@@ -720,7 +724,9 @@ fi
 # but the misalignment still bites anyone who merges from the GitHub UI — so surface it.
 if [[ $GH_AUTHED -eq 1 ]] && has_cmd gh && [[ -f "$_kitcfg" ]]; then
   _cfg_repo="$(jq -r '.github.repo // empty' "$_kitcfg" 2>/dev/null || true)"
-  _cfg_base="$(jq -r '.github.baseBranch // "main"' "$_kitcfg" 2>/dev/null || echo main)"
+  # Same fallback chain as load_kit_config (#117) so the warning judges the branch cckit actually
+  # integrates on: baseBranch -> integrationBranch -> flow -> "main".
+  _cfg_base="$(jq -r '.github.baseBranch // .github.integrationBranch // .github.flow // "main"' "$_kitcfg" 2>/dev/null || echo main)"
   if [[ -n "$_cfg_repo" ]]; then
     _gh_default="$(gh repo view "$_cfg_repo" --json defaultBranchRef --jq '.defaultBranchRef.name' 2>/dev/null || true)"
     if [[ -z "$_gh_default" ]]; then

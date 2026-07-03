@@ -61,8 +61,79 @@ cap_action() {
     CHECKS_FAILING) echo fix ;;
     CHECKS_PENDING) echo wait ;;
     DRAFT)          echo wait ;;
+    HELD)           echo hold ;;
     *)              echo skip ;;
   esac
+}
+
+# cap_policy_floor <files-newline> <labels-space> — echo a non-empty REASON when a PR must NOT be
+# auto-merged by the captain (a policy floor tripped), else empty. Floors are DEFAULT ON so an
+# unattended captain never lands a change a human must sign off on. They trip on:
+#   • a `hold` label (an explicit human stop)
+#   • any changed file under .github/workflows/**  (CI/CD — a supply-chain surface)
+#   • lockfile / dependency-graph files: pnpm-lock.yaml, package.json, package-lock.json, yarn.lock,
+#     turbo.json, *-workspace.yaml/.yml
+#   • security-sensitive paths: *.pem, *.key, .env / .env.*, any secret(s) path segment
+# Disable entirely with KIT_CAPTAIN_FLOORS=0 (or captain.mergePolicy.floors:false in config). Extend
+# the protected set with KIT_CAPTAIN_EXTRA_GLOBS (space-separated case-globs). Draft state is honored
+# separately by cap_classify (DRAFT -> wait). Pure — no gh; unit-tested. bash 3.2 / zsh safe.
+cap_policy_floor() {
+  local files="$1" labels="$2" f g extra hit
+  [ "${KIT_CAPTAIN_FLOORS:-1}" = "0" ] && return 0
+  case " $labels " in *" hold "*) printf 'hold label'; return 0 ;; esac
+  extra="${KIT_CAPTAIN_EXTRA_GLOBS:-}"
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    case "$f" in
+      .github/workflows/*) printf 'workflow file (%s)' "$f"; return 0 ;;
+    esac
+    case "${f##*/}" in
+      pnpm-lock.yaml|package.json|package-lock.json|yarn.lock|turbo.json)
+        printf 'lockfile/graph (%s)' "$f"; return 0 ;;
+      *-workspace.yaml|*-workspace.yml)
+        printf 'workspace graph (%s)' "$f"; return 0 ;;
+      *.pem|*.key) printf 'security-sensitive (%s)' "$f"; return 0 ;;
+      .env|.env.*) printf 'security-sensitive (%s)' "$f"; return 0 ;;
+    esac
+    case "/$f/" in */secret/*|*/secrets/*) printf 'security-sensitive (%s)' "$f"; return 0 ;; esac
+    # Extra protected globs from config (space-separated). Split on spaces via a here-string (no
+    # subshell, so `return` still exits the function), and inline each glob into an eval'd case so it
+    # is a LITERAL pattern — matching identically under bash and zsh (a variable in a case pattern is
+    # treated literally by zsh, so `case $f in $g` would silently never match there).
+    if [ -n "$extra" ]; then
+      hit=""
+      while IFS= read -r g; do
+        [ -n "$g" ] || continue
+        eval "case \"\$f\" in ($g) hit=1 ;; esac"
+        [ -n "$hit" ] && break
+      done <<EOF2
+$(printf '%s' "$extra" | tr ' ' '\n')
+EOF2
+      [ -n "$hit" ] && { printf 'protected by config (%s)' "$f"; return 0; }
+    fi
+  done <<EOF
+$files
+EOF
+  return 0
+}
+
+# _cap_load_policy_config — bridge captain.mergePolicy from the kit config into the env the pure
+# floor helper reads, so a project can override the floors declaratively. Env always wins (a value
+# already set is left untouched). Best-effort: no config / no jq -> defaults (floors ON).
+_cap_load_policy_config() {
+  command -v jq >/dev/null 2>&1 || return 0
+  local cfg="${KIT_CONFIG:-}"
+  [ -n "$cfg" ] || { [ -f cckit.config.json ] && cfg=cckit.config.json || cfg=.claude/kit.config.json; }
+  [ -f "$cfg" ] || return 0
+  if [ -z "${KIT_CAPTAIN_FLOORS:-}" ]; then
+    case "$(jq -r '.captain.mergePolicy.floors // empty' "$cfg" 2>/dev/null)" in
+      false) KIT_CAPTAIN_FLOORS=0 ;; true) KIT_CAPTAIN_FLOORS=1 ;;
+    esac
+  fi
+  if [ -z "${KIT_CAPTAIN_EXTRA_GLOBS:-}" ]; then
+    KIT_CAPTAIN_EXTRA_GLOBS="$(jq -r '(.captain.mergePolicy.protectedGlobs // []) | join(" ")' "$cfg" 2>/dev/null || echo "")"
+  fi
+  export KIT_CAPTAIN_FLOORS KIT_CAPTAIN_EXTRA_GLOBS
 }
 
 # _cap_issue_of_branch <branch> — issue number a flow branch encodes (task/47-x, fix/9-y, effort/12-z).
@@ -70,20 +141,31 @@ _cap_issue_of_branch() {
   printf '%s' "$1" | sed -nE 's#^[a-z]+/([0-9]+)-.*#\1#p'
 }
 
-# captain_gate <pr#> — fetch + classify one PR. Echoes "pr<TAB>issue<TAB>state<TAB>action<TAB>title".
+# captain_gate <pr#> — fetch + classify one PR. Echoes
+# "pr<TAB>issue<TAB>state<TAB>action<TAB>title<TAB>reason". A CLEAN PR that trips a policy floor
+# (cap_policy_floor) is downgraded to HELD/hold so the captain never auto-merges it; `reason` carries
+# the floor that tripped (empty otherwise).
 captain_gate() {
-  local repo="$CAPTAIN_REPO" pr="$1" j mergeable mss checks issue state action title branch
-  j="$(gh pr view "$pr" --repo "$repo" --json number,title,headRefName,mergeable,mergeStateStatus,statusCheckRollup 2>/dev/null)" \
+  local repo="$CAPTAIN_REPO" pr="$1" j mergeable mss checks issue state action title branch files labels reason
+  j="$(gh pr view "$pr" --repo "$repo" --json number,title,headRefName,mergeable,mergeStateStatus,statusCheckRollup,files,labels 2>/dev/null)" \
     || { echo "captain: cannot read PR #$pr" >&2; return 1; }
   mergeable="$(printf '%s' "$j" | jq -r '.mergeable // "UNKNOWN"')"
   mss="$(printf '%s' "$j" | jq -r '.mergeStateStatus // "UNKNOWN"')"
   checks="$(printf '%s' "$j" | jq -c '.statusCheckRollup // []' | cap_checks_summary)"
   branch="$(printf '%s' "$j" | jq -r '.headRefName // ""')"
   title="$(printf '%s' "$j" | jq -r '.title // ""')"
+  files="$(printf '%s' "$j" | jq -r '.files[]?.path // empty')"
+  labels="$(printf '%s' "$j" | jq -r '[.labels[]?.name] | join(" ")')"
   issue="$(_cap_issue_of_branch "$branch")"
   state="$(cap_classify "$mergeable" "$mss" "$checks")"
   action="$(cap_action "$state")"
-  printf '%s\t%s\t%s\t%s\t%s\n' "$pr" "${issue:-—}" "$state" "$action" "$title"
+  reason=""
+  # Policy floor: only a would-be merge is at risk, so gate only the CLEAN/merge verdict.
+  if [ "$action" = "merge" ]; then
+    reason="$(cap_policy_floor "$files" "$labels")"
+    [ -n "$reason" ] && { state="HELD"; action="hold"; }
+  fi
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$pr" "${issue:-—}" "$state" "$action" "$title" "$reason"
 }
 
 # _cap_open_prs [effort] — open PR numbers, optionally only those whose branch-issue is a sub of <effort>.
@@ -119,8 +201,9 @@ captain_pass() {
   done
   [ -n "$repo" ] || { echo "captain: no repo (set KIT_REPO / CAPTAIN_REPO)" >&2; return 1; }
   CAPTAIN_MERGED=0
+  _cap_load_policy_config   # bridge captain.mergePolicy from config into the floor env (env wins)
 
-  local prs pr row state action issue title merged_any=0
+  local prs pr row state action issue title reason merged_any=0
   prs="$(_cap_open_prs "$effort")"
   [ -n "$prs" ] || { echo "captain: no open PRs in scope"; return 0; }
 
@@ -132,6 +215,7 @@ captain_pass() {
     action="$(printf '%s' "$row" | cut -f4)"
     issue="$(printf '%s' "$row" | cut -f2)"
     title="$(printf '%s' "$row" | cut -f5)"
+    reason="$(printf '%s' "$row" | cut -f6)"
     printf '%s\t%s\n' "$pr" "$state" >> "$CAPTAIN_STATE" 2>/dev/null || true
     if [ "$action" = "merge" ] && [ "$do_merge" = "1" ] && [ "$dry" = "0" ]; then
       if gh pr merge "$pr" --repo "$repo" --squash --delete-branch >/dev/null 2>&1; then
@@ -140,6 +224,9 @@ captain_pass() {
       else
         printf '  PR #%-4s %-14s merge FAILED (re-check)   (#%s %s)\n' "$pr" "$state" "$issue" "$title"
       fi
+    elif [ "$action" = "hold" ]; then
+      printf '  PR #%-4s %-14s -> HELD    (#%s %s) — policy floor: %s [human review; C overrides]\n' \
+        "$pr" "$state" "$issue" "$title" "${reason:-protected}"
     else
       printf '  PR #%-4s %-14s -> %-7s (#%s %s)\n' "$pr" "$state" "$action" "$issue" "$title"
     fi
