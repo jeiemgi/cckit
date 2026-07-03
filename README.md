@@ -156,7 +156,9 @@ cckit wave --llm           # the fan-out (one subagent prompt per issue) as TOON
 ```
 
 Human output renders as markdown — rich via `glow` in a terminal, native in the Claude Code
-transcript, pipe-safe everywhere (`cckit render` exposes the seam for any script).
+transcript, pipe-safe everywhere. Every human-facing verb (`sync`, `plan`, `next`, `status`) shares
+one rendering seam, so board tables, wave plans, and the status dashboard read the same in every
+surface and never leak escape codes down a pipe (`cckit render` exposes the seam for any script).
 
 ## cckit builds cckit
 

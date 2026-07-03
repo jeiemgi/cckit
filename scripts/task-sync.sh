@@ -6,6 +6,10 @@ set -euo pipefail
 source "$(dirname "$0")/lib/kit-config.sh" && load_kit_config
 # Pure board-view render helpers (merge queue, stale flag, not-on-board flag, Project Status).
 source "$(dirname "$0")/lib/board-view.sh"
+# The rendering seam (#82): the human board is markdown, routed through cckit_render — rich via glow
+# in a TTY, verbatim markdown otherwise (renders natively in Claude Code, pipe-safe).
+source "$(dirname "$0")/lib/ui.sh" 2>/dev/null || true
+source "$(dirname "$0")/lib/render.sh" 2>/dev/null || true
 
 ROLE_FILTER=""; MS_FILTER=""
 while [[ $# -gt 0 ]]; do
@@ -64,6 +68,9 @@ fi
 PRS_JSON="$(gh pr list --repo "$KIT_REPO" --state open --limit 100 \
   --json number,title,labels,isDraft,headRefName,reviewDecision,mergeable 2>/dev/null || echo '[]')"
 
+# All human output is composed as markdown inside this function, then piped once through
+# cckit_render (below) so the whole board — tables, headings, flags — renders as one document.
+_board_human() {
 echo "## Board — $KIT_REPO"
 echo ""
 
@@ -126,3 +133,9 @@ if [ -f "$(dirname "$0")/lib/kit-local.sh" ]; then
       2>/dev/null || echo "_(local digest unavailable)_"
   fi
 fi
+}
+
+# Emit the composed markdown through the rendering seam. cckit_render is rich (glow) only on a TTY;
+# piped or in the Claude Code transcript it passes the markdown through verbatim (pipe-safe, no
+# escape codes). Fall back to a plain call if render.sh was unavailable.
+if command -v cckit_render >/dev/null 2>&1; then _board_human | cckit_render; else _board_human; fi
