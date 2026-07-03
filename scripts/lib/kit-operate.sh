@@ -48,6 +48,21 @@ kit_op_write() {
 
   # conffiles guard: tracked + user-modified => never silent overwrite
   local verdict; verdict="$(kit_manifest_verify "$dest" 2>/dev/null || true)"
+
+  # conffiles hard rule (#149): an EXISTING file with DIFFERENT content that the kit cannot
+  # prove it owns intact — user-edited (modified) or never recorded (untracked) — is only
+  # overwritten on an explicit interactive yes. KIT_ASSUME_YES does not consent on the user's
+  # behalf (mirrors kit_op_remove): non-interactive runs (init --upgrade, kit-update, CI)
+  # keep the user's version. Fixes the statusline-shim clobber on every /kit-update.
+  local guarded=0
+  if [ -f "$dest" ] && ! cmp -s "$src" "$dest" 2>/dev/null; then
+    case "$verdict" in modified|untracked) guarded=1;; esac
+  fi
+  if [ "$guarded" -eq 1 ] && { [ -n "${KIT_ASSUME_YES:-}" ] || _kit_op_dry; }; then
+    _kit_op_say "= kept your version ($verdict — never auto-overwritten): $dest"
+    return 10
+  fi
+
   _kit_op_say "propose: $dest  (tier $tier, $op, current=$verdict)"
   _kit_op_diff "$src" "$dest"
 
@@ -57,8 +72,8 @@ kit_op_write() {
     return 0
   fi
 
-  if [ "$verdict" = "modified" ]; then
-    if ! _kit_op_confirm "  $dest was edited by you — overwrite?"; then
+  if [ "$guarded" -eq 1 ]; then
+    if ! _kit_op_confirm "  $dest was edited by you (or is not kit-tracked) — overwrite?"; then
       _kit_op_say "  skip (kept your version): $dest"; return 10
     fi
   elif ! _kit_op_confirm "  apply?"; then

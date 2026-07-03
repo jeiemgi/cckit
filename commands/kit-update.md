@@ -105,8 +105,10 @@ _plug="$(jq -r '.version // "0.0.0"' "/Users/josegutierrezdelgado/.claude/plugin
    "${CLAUDE_PLUGIN_ROOT}/scripts/init.sh" --upgrade --target "$PWD" --dry-run
    ```
    Then run it for real to see the precise added/preserved report (step 4). Make clear: upgrade only
-   **adds** missing files and **merges** new config keys — your existing `.claude/` files and
-   `kit.config.json` values are never overwritten.
+   **adds** missing files and **merges** new required config keys — your existing `.claude/` files
+   (including a customized `.claude/statusline.sh` shim) and `kit.config.json` values are never
+   overwritten, and feature blocks your config deliberately lacks (`plans`, `specKit`, `prePush`,
+   `local`, `memory`) are never injected from profile defaults.
 
 4. **Confirm, then apply.** Ask with `AskUserQuestion`: **Apply update** · **Preview only** · **Skip**.
    Per the CLI-style preference, when the delta is purely additive (only new files, nothing preserved
@@ -122,8 +124,11 @@ _plug="$(jq -r '.version // "0.0.0"' "/Users/josegutierrezdelgado/.claude/plugin
 
 ## Rules
 
-- **Never clobber.** Upgrade only ADDS missing files and MERGES new `kit.config.json` keys; existing
-  files and config values are preserved. Always show the `--dry-run` preview before applying.
+- **Never clobber.** Upgrade only ADDS missing files and MERGES new required `kit.config.json` keys;
+  existing files and config values are preserved. A file the kit cannot prove it owns intact — edited
+  by the project or absent from the manifest (e.g. a repointed `.claude/statusline.sh`) — is kept, and
+  feature blocks the config deliberately lacks are never injected from profile defaults. Always show
+  the `--dry-run` preview before applying.
 - When reporting effective configuration, honor per-folder `.claudekit/config.json` overrides
   (nearest-wins) — see `scripts/lib/kit-config.sh`.
 - Don't fabricate changelog content — read `CHANGELOG.md`. If the project predates version tracking

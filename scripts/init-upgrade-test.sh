@@ -94,6 +94,40 @@ t "diff is only the kitVersion line"     "$only_kitver" "yes"
 t "kitVersion bumped to plugin version"  "$(jq -r '.kitVersion' .claude/kit.config.json)" "$PLUGIN_VERSION"
 t "upgrade block preserved through merge" "$(jq -r '.upgrade.removed | length' .claude/kit.config.json)" "2"
 
+# --- #149: upgrade preserves existing project files -------------------------------------
+# 4. feature keys deliberately absent from the config are NOT injected by the merge
+#    (the seed config never had plans/specKit/prePush/local/memory — profile defaults must
+#    not resurrect them), while REQUIRED structural keys still merge in.
+for k in plans specKit prePush local memory; do
+  t "feature key '$k' not injected"      "$(jq --arg k "$k" 'has($k)' .claude/kit.config.json)" "false"
+done
+t "required key 'knowledge' still added" "$(jq -r '.knowledge.dir // "absent"' .claude/kit.config.json)" "knowledge"
+
+# 5. a CUSTOMIZED statusline shim survives the next upgrade (the v0.3.0 clobber: kit-wire
+#    replaced a repointed shim with the template on every upgrade).
+git add -A && git commit -q -m "settle upgrade under test"
+t "statusline shim exists after wire"    "$([ -f .claude/statusline.sh ] && echo yes || echo no)" "yes"
+SL_MARKER="# LOCAL-STATUSLINE-EDIT-#149 (must survive upgrade)"
+printf '\n%s\n' "$SL_MARKER" >> .claude/statusline.sh
+jq '.kitVersion = "0.0.2"' .claude/kit.config.json > .claude/kit.config.json.tmp \
+  && mv .claude/kit.config.json.tmp .claude/kit.config.json
+git add -A && git commit -q -m "customize statusline + reset version"
+
+CLAUDE_PLUGIN_ROOT="$PLUGIN_DIR" bash "$INIT" --upgrade --target "$proj" >/dev/null 2>&1 \
+  || { echo "FAIL: statusline upgrade run exited non-zero"; exit 1; }
+t "customized statusline preserved (tracked: modified)" "$(grep -cF "$SL_MARKER" .claude/statusline.sh)" "1"
+
+# ...and also when the manifest is absent (fresh clone: shim exists but is UNTRACKED).
+git add -A && git commit -q -m "settle statusline upgrade"
+rm -f .claude/kit.manifest.json
+jq '.kitVersion = "0.0.3"' .claude/kit.config.json > .claude/kit.config.json.tmp \
+  && mv .claude/kit.config.json.tmp .claude/kit.config.json
+git add -A && git commit -q -m "reset version (manifest absent)"
+CLAUDE_PLUGIN_ROOT="$PLUGIN_DIR" bash "$INIT" --upgrade --target "$proj" >/dev/null 2>&1 \
+  || { echo "FAIL: manifest-absent upgrade run exited non-zero"; exit 1; }
+t "customized statusline preserved (untracked)" "$(grep -cF "$SL_MARKER" .claude/statusline.sh)" "1"
+t "feature keys still absent after repeat upgrades" "$(jq 'has("plans")' .claude/kit.config.json)" "false"
+
 echo ""
-[ "$fail" -eq 0 ] && echo "PASS: init.sh --upgrade honors the preserve/exclude contract (#334)" || echo "FAILED"
+[ "$fail" -eq 0 ] && echo "PASS: init.sh --upgrade honors the preserve/exclude contract (#334, #149)" || echo "FAILED"
 exit "$fail"

@@ -92,7 +92,10 @@ kit_wire() {
   _kit_op_say "kit-wire: plugin root = $proot"
   mkdir -p .claude
   # 1. statusline shim (tier B — CLI only). kit_op_write_content runs the conffiles machine.
-  _kit_shim_content | kit_op_write_content "$shim" B wire || return 1
+  # rc 10 = kept: a customized/untracked existing shim is PRESERVED (#149) — wiring continues;
+  # only a real error aborts. A project that repointed its shim keeps it across updates.
+  _kit_shim_content | kit_op_write_content "$shim" B wire
+  case $? in 0|10) ;; *) return 1;; esac
   [ -f "$shim" ] && [ -z "${KIT_DRY_RUN:-}" ] && chmod +x "$shim"
   # 2. settings statusLine -> shim
   _kit_wire_settings || true
