@@ -33,6 +33,31 @@ Verification), applies the `ctx/kind/priority/role/flow` labels, and lints every
 `/kit-effort-new` skill produces the identical effort — both call one shared core, so there is no
 drift between the verb and the skill.
 
+## Slug handles
+
+The GitHub issue **number** is the canonical key for an effort — the sub-issue links, PRs, labels,
+and dependencies all reference it. But a bare number is hard to remember, so every effort also has a
+memorable **slug** handle: the one that already lives in its `effort/<N>-<slug>` branch.
+
+`cckit effort start`, `pr`, and `close` accept the slug *or* the number interchangeably:
+
+```bash
+cckit effort new "Slug handles for efforts" --slug slug-handles   # optional explicit handle
+cckit effort start slug-handles                                   # identical to: cckit effort start 93
+cckit effort pr slug-handles
+cckit effort close slug-handles
+```
+
+A pure-digits argument is always treated as a number; anything else is resolved to the canonical
+number by matching the `effort/*` branches (local and remote), then the `slug:<slug>` label, then
+the titles of open efforts. An unknown or ambiguous slug fails with a clear error instead of guessing
+the wrong effort. Listings and titles render efforts as `slug #N`.
+
+<Aside type="note" title="The number stays canonical">
+The slug is a *derived* convenience, not a second source of truth. `--slug` only sets the handle
+(stored as a `slug:<slug>` label); the issue number is still what everything else points at.
+</Aside>
+
 ## Waves
 
 Some sub-issues depend on others: sub #4 can't start until sub #1 is merged. cckit reads those

@@ -52,7 +52,7 @@ A **wave** is a set of issues with no blockers between them, so they can run at 
 | `cckit plan [--effort N]` | Wave plan: deps-ordered, file-disjoint, session-fit. |
 | `cckit wave [--effort N]` | Read open efforts, propose incoming waves: subagent fan-out + captain drive. |
 | `cckit watch [--merge] [--loop]` | Captain: gate open PRs, squash-merge clean ones, advance. |
-| `cckit effort <new\|start\|pr\|close\|plan>` | The effort lifecycle (a parent issue + sub-issues). |
+| `cckit effort <new\|start\|pr\|close\|plan>` | The effort lifecycle (a parent issue + sub-issues). `new` takes `--slug`; `start`/`pr`/`close` accept a `<slug>` or the effort `<N>`. |
 
 
 ## Run flows in parallel

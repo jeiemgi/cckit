@@ -108,14 +108,25 @@ The parent carries the rich narrative; the **PR** carries the human-facing revie
 
 | Step | What |
 |------|------|
-| `effort-new` | parent issue (4-section body **filled** + `ctx/kind/priority/role/flow` labels) + native sub-issues, every title linted |
-| `effort-start <N>` | `effort/<N>` branch + worktree; board → In Progress |
+| `effort-new` | parent issue (4-section body **filled** + `ctx/kind/priority/role/flow` labels) + native sub-issues, every title linted; optional `--slug` sets the handle |
+| `effort-start <slug\|N>` | `effort/<N>` branch + worktree; board → In Progress |
 | orchestrate | sub-issues in own worktrees (file-disjoint) → merge into `effort/<N>`; each closes + board Done as it lands |
-| `effort-pr <N>` | ONE PR `effort/<N>` → main (rich body + `## For agents`) |
-| `effort-close <N>` | **snapshot sub-diffs pre-squash** → merge → close parent + subs → board Done(all) → GC prune → kit-sync drift check |
+| `effort-pr <slug\|N>` | ONE PR `effort/<N>` → main (rich body + `## For agents`) |
+| `effort-close <slug\|N>` | **snapshot sub-diffs pre-squash** → merge → close parent + subs → board Done(all) → GC prune → kit-sync drift check |
 
 Board + record state are correct **by construction** — the close op owns them. Never rely on a
 separate, skippable "mark done" step.
+
+## Slug handles (number stays canonical)
+
+The issue **number** is the single source of truth — sub-issue links, PRs, labels, and `blocked_by`
+all reference it. The **slug** is a *derived* human handle (the one in `effort/<N>-<slug>`), never a
+parallel ID space. `effort-start`/`pr`/`close` accept `<slug|N>`: a pure-digits arg is the number,
+anything else is resolved to the canonical number by matching `effort/*` branches (local + remote),
+then the `slug:<slug>` label, then open effort titles. Unknown/ambiguous → structured error, no
+guess. `effort-new --slug <s>` stores the handle as a `slug:<slug>` label; without it the slug is
+derived from the title (with the `[Effort] N ·` prefix and `[Flow]` tag peeled, so the number is not
+doubled into the slug). Efforts render as `slug #N`.
 
 ## Plans are issues, not files
 

@@ -4,23 +4,30 @@
 # any shell or agent (not only via the effort-* skills). Thin: composes the git-mechanics helpers in
 # effort.sh (linking, snapshots, title lint) plus gh + git. bash 3.2 compatible. Requires: gh, jq, git.
 #
-#   effort_new [flags] "<name>" [<sub spec> …]  parent (4-section body + labels) + native sub-issues
-#   effort_start <N> [<slug>]             effort/<N> branch + worktree from the base branch
-#   effort_pr [<N>]                       open the ONE PR effort/<N> → base branch
-#   effort_close <N>                      snapshot sub-diffs, squash-merge the PR, close parent + subs
+#   effort_new [flags] "<name>" [<sub spec> …]   parent (4-section body + labels) + native sub-issues
+#   effort_start <slug|N> [<slug>]        effort/<N> branch + worktree from the base branch
+#   effort_pr [<slug|N>]                  open the ONE PR effort/<N> → base branch
+#   effort_close <slug|N>                 snapshot sub-diffs, squash-merge the PR, close parent + subs
 #
 # effort_new is the SHARED creation core (effort #98): both `cckit effort new` (the verb) and
 # /kit-effort-new (the skill) call it, so they produce structurally identical efforts — one source of
 # truth for body composition + the ctx/kind/priority/role/flow label set + per-sub title lint.
 #
-# Repo + base branch come from kit.config.json (EFFORT_REPO / KIT_BASE_BRANCH), loaded by effort.sh.
+# Commands accept the human slug as well as the canonical number (#93): a pure-digits arg is a number,
+# anything else is resolved via effort_slug_resolve. Repo + base branch come from kit.config.json
+# (EFFORT_REPO / KIT_BASE_BRANCH), loaded by effort.sh.
+
+# Slug layer (#93): _eff_slug, _eff_title_slug, effort_display, effort_slug_resolve. One home in
+# effort-slug.sh; source it here so the lifecycle ops accept `<slug|N>` and render `slug #N`.
+if ! command -v effort_slug_resolve >/dev/null 2>&1; then
+  _eo_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+  # shellcheck source=/dev/null
+  [ -f "$_eo_dir/effort-slug.sh" ] && . "$_eo_dir/effort-slug.sh"
+  unset _eo_dir
+fi
 
 _eff_repo()  { printf '%s' "${EFFORT_REPO:-${KIT_REPO:-}}"; }
 _eff_base()  { printf '%s' "${KIT_BASE_BRANCH:-main}"; }
-_eff_slug()  { # <text> → a short branch-safe slug (mirrors wt_start)
-  printf '%s' "$1" | sed -E 's/^\[[^]]+\][[:space:]]*//' | tr '[:upper:]' '[:lower:]' \
-    | sed -E 's/[^a-z0-9]+/-/g; s/^-+|-+$//g' | cut -c1-40
-}
 _eff_need()  { command -v "$1" >/dev/null 2>&1 || { echo "effort: $1 is required" >&2; return 1; }; }
 
 # Compose the four-section parent body (rules/effort-model.md): the sections double as the work
@@ -66,17 +73,18 @@ _eff_board_add() {
 
 # effort_new [flags] "<name>" [<sub spec> …] — the shared creation core (effort #98).
 # Flags (all optional): --flow F --role R --priority p1 --goal G --scope S --for-agents A
-#   --verification V --depends-on "#1,#2" --milestone M.  A <sub spec> is "name :: one-line desc"
-#   (the desc is optional → just "name"). Fills the four body sections, applies the
+#   --verification V --depends-on "#1,#2" --milestone M --slug S.  A <sub spec> is "name :: one-line
+#   desc" (the desc is optional → just "name"). Fills the four body sections, applies the
 #   ctx/kind/priority/role/flow label set, lints the parent + EVERY sub title up front (so a bad sub
-#   name aborts before anything is created), links native sub-issues, sets blocked_by edges, and adds
-#   everything to the board (guarded). Echoes the parent number on stdout.
+#   name aborts before anything is created), links native sub-issues, sets blocked_by edges, adds
+#   everything to the board (guarded), and records the human slug handle (#93) as a slug:<slug> label.
+#   Echoes the parent number on stdout.
 effort_new() {
   _eff_need gh || return 1; _eff_need jq || return 1
   local repo; repo="$(_eff_repo)"
   [ -n "$repo" ] || { echo "effort_new: no repo (KIT_REPO/EFFORT_REPO unset — run in a kit project)" >&2; return 1; }
 
-  local flow="" role="" priority="p1" goal="" scope="" for_agents="" verification="" depends_on="" milestone=""
+  local flow="" role="" priority="p1" goal="" scope="" for_agents="" verification="" depends_on="" milestone="" explicit_slug=""
   while [ $# -gt 0 ]; do
     case "$1" in
       --flow)         flow="${2:-}"; shift 2 ;;
@@ -88,6 +96,8 @@ effort_new() {
       --verification) verification="${2:-}"; shift 2 ;;
       --depends-on)   depends_on="${2:-}"; shift 2 ;;
       --milestone)    milestone="${2:-}"; shift 2 ;;
+      --slug)         explicit_slug="${2:-}"; shift 2 ;;
+      --slug=*)       explicit_slug="${1#*=}"; shift ;;
       --)             shift; break ;;
       --*)            echo "effort_new: unknown flag $1" >&2; return 1 ;;
       *)              break ;;
@@ -133,13 +143,21 @@ effort_new() {
   [ -n "$role" ] && labels="$labels,role:$role"
   [ -n "$flow" ] && labels="$labels,flow:$(printf '%s' "$flow" | tr '[:upper:]' '[:lower:]')"
 
-  local url num
+  local url num slug
   url="$(gh issue create --repo "$repo" --title "[Effort] · ${flow_tag}${name}" --body "$body" \
         --label "$labels" ${milestone:+--milestone "$milestone"})" \
     || { echo "effort_new: failed to create the parent issue" >&2; return 1; }
   num="${url##*/}"
   gh issue edit "$num" --repo "$repo" --title "[Effort] $num · ${flow_tag}${name}" >/dev/null 2>&1
-  echo "  ✓ effort #$num · ${flow_tag}${name}" >&2
+  # The human handle (#93): explicit --slug if given, else derived from the title (number/flow peeled).
+  if [ -n "$explicit_slug" ]; then slug="$(_eff_slug "$explicit_slug")"
+  else slug="$(_eff_title_slug "[Effort] $num · ${flow_tag}${name}")"; fi
+  if [ -n "$slug" ]; then
+    gh label create "slug:$slug" --repo "$repo" --color ededed \
+      --description "effort slug handle" >/dev/null 2>&1 || true   # idempotent: ok if it exists
+    gh issue edit "$num" --repo "$repo" --add-label "slug:$slug" >/dev/null 2>&1 || true
+  fi
+  echo "  ✓ effort $(effort_display "$num" "$slug") · ${flow_tag}${name}" >&2
 
   # Native dependency edges (the visible board chain) — guarded on the helper being available.
   if [ -n "$depends_on" ] && command -v effort_set_blocked_by >/dev/null 2>&1; then
@@ -172,19 +190,20 @@ effort_new() {
   printf '%s\n' "$num"
 }
 
-# effort_start <N> [<slug>] — create the effort/<N> integration branch + its worktree from the base.
+# effort_start <slug|N> [<slug>] — create the effort/<N> integration branch + its worktree from base.
 effort_start() {
   _eff_need git || return 1
-  local num="${1:-}" slug_override="${2:-}" repo base root title slug branch wt
-  [ -n "$num" ] || { echo "effort_start: <effort issue #> required" >&2; return 1; }
+  local raw="${1:-}" slug_override="${2:-}" num repo base root title slug branch wt
+  [ -n "$raw" ] || { echo "effort_start: <slug|effort issue #> required" >&2; return 1; }
+  num="$(effort_slug_resolve "$raw")" || { echo "effort_start: could not resolve '$raw' to an effort" >&2; return 1; }
   repo="$(_eff_repo)"; base="$(_eff_base)"
   root="$(git worktree list --porcelain 2>/dev/null | awk '/^worktree /{print $2; exit}')"
   [ -n "$root" ] || { echo "effort_start: not in a git repo" >&2; return 1; }
 
-  if [ -n "$slug_override" ]; then slug="$slug_override"
+  if [ -n "$slug_override" ]; then slug="$(_eff_slug "$slug_override")"
   else
     title="$(gh issue view "$num" --repo "$repo" --json title -q .title 2>/dev/null)"
-    slug="$(_eff_slug "${title:-effort}")"; [ -n "$slug" ] || slug="effort"
+    slug="$(_eff_title_slug "${title:-effort}")"; [ -n "$slug" ] || slug="effort"
   fi
   branch="effort/$num-$slug"; wt="$root/.claude/worktrees/effort-$num"
 
@@ -196,18 +215,22 @@ effort_start() {
     git -C "$root" worktree add -b "$branch" "$wt" "$from" >/dev/null 2>&1 \
       || { echo "effort_start: failed to create worktree for $branch" >&2; return 1; }
   fi
-  echo "  ✓ effort #$num → $branch  (worktree: $wt)" >&2
+  echo "  ✓ effort $(effort_display "$num" "$slug") → $branch  (worktree: $wt)" >&2
   printf '%s|%s|%s\n' "$wt" "$branch" "$num"
 }
 
-# effort_pr [<N>] — open the single PR effort/<N> → base. N defaults to the current effort branch.
+# effort_pr [<slug|N>] — open the single PR effort/<N> → base. Defaults to the current effort branch.
 effort_pr() {
   _eff_need gh || return 1
-  local num="${1:-}" repo base branch title name
+  local raw="${1:-}" num repo base branch title name
   repo="$(_eff_repo)"; base="$(_eff_base)"
   branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)"
-  [ -n "$num" ] || num="$(effort_branch_num "$branch")"
-  [ -n "$num" ] || { echo "effort_pr: not on an effort/<N>-… branch and no <N> given" >&2; return 1; }
+  if [ -n "$raw" ]; then
+    num="$(effort_slug_resolve "$raw")" || { echo "effort_pr: could not resolve '$raw' to an effort" >&2; return 1; }
+  else
+    num="$(effort_branch_num "$branch")"
+  fi
+  [ -n "$num" ] || { echo "effort_pr: not on an effort/<N>-… branch and no <slug|N> given" >&2; return 1; }
   case "$branch" in effort/"$num"-*) : ;; *) echo "effort_pr: current branch ($branch) is not effort/$num-…" >&2; return 1 ;; esac
 
   git push -u origin "$branch" >/dev/null 2>&1 || true
@@ -222,8 +245,9 @@ effort_pr() {
 # Destructive: it merges and closes. Snapshots first so the per-sub work record survives the squash.
 effort_close() {
   _eff_need gh || return 1; _eff_need jq || return 1
-  local num="${1:-}" repo base branch
-  [ -n "$num" ] || { echo "effort_close: <effort issue #> required" >&2; return 1; }
+  local raw="${1:-}" num repo base branch
+  [ -n "$raw" ] || { echo "effort_close: <slug|effort issue #> required" >&2; return 1; }
+  num="$(effort_slug_resolve "$raw")" || { echo "effort_close: could not resolve '$raw' to an effort" >&2; return 1; }
   repo="$(_eff_repo)"; base="$(_eff_base)"
   branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)"
   case "$branch" in effort/"$num"-*) : ;; *) echo "effort_close: run from the effort/$num-… branch" >&2; return 1 ;; esac

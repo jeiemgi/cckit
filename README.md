@@ -80,9 +80,25 @@ cckit gc                   # prune merged branches + worktrees
 
 Run `cckit help` for the full verb list, or `cckit <verb> --help` for any one.
 
-For a goal too big for one PR, `cckit effort new "<name>" "sub :: desc" …` creates the parent issue
-(the four-section plan body), applies the `ctx/kind/priority/role/flow` labels, and lints every
-sub-issue title — the same effort `/kit-effort-new` produces, since both call one shared core.
+## Efforts and slug handles
+
+A big piece of work is an **effort** — a parent issue with sub-issues. `cckit effort new "<name>" "sub :: desc" …`
+creates the parent issue (the four-section plan body), applies the `ctx/kind/priority/role/flow` labels, and lints
+every sub-issue title — the same effort `/kit-effort-new` produces, since both call one shared core.
+
+The GitHub issue **number** stays the canonical key, but every effort also has a memorable **slug** handle (the one
+already in its `effort/<N>-<slug>` branch). Effort commands take the slug *or* the number interchangeably:
+
+```bash
+cckit effort new "Slug handles for efforts" --slug slug-handles   # optional explicit handle
+cckit effort start slug-handles                                   # same as: cckit effort start 93
+cckit effort pr slug-handles
+cckit effort close slug-handles
+```
+
+A pure-digits argument is always a number; anything else is resolved to the canonical number by
+matching `effort/*` branches, the `slug:<slug>` label, then open effort titles. An unknown or
+ambiguous slug fails with a clear error rather than guessing. Efforts render as `slug #N`.
 
 ## Wave
 
