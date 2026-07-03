@@ -80,7 +80,9 @@
 	/* Roles */
 	--sl-color-text: var(--sl-color-gray-2);
 	--sl-color-text-accent: #0a5666; /* link text — AA on the light page bg */
-	--sl-color-text-invert: var(--sl-color-white);
+	/* Text that sits ON the accent (active sidebar link, accent buttons). The light-mode accent is a
+	   deep teal, so this must be LIGHT — not the near-black ink `--sl-color-white` resolves to here. */
+	--sl-color-text-invert: #fbfdfd;
 	--sl-color-bg: var(--sl-color-black);
 	--sl-color-bg-nav: #f4f8f8;
 	--sl-color-bg-sidebar: #f4f8f8;
@@ -531,8 +533,9 @@ h1 .cckit-tag, h2 .cckit-tag, h3 .cckit-tag { font-size: 0.65em; }
 
 /* ── Sidebar group icons ──────────────────────────────────────────────── */
 /* Starlight sidebar entries don't take an icon, so we paint one before each top-level GROUP label
-   (Get started / Concepts / Guides / Reference) via a CSS mask — a line icon tinted with the accent.
-   Matched by group order (the sidebar config order is stable). */
+   (Get started / Tutorials / Concepts / Guides / Reference) via a CSS mask — a line icon tinted with
+   the accent. Matched by group order (the sidebar config order is stable); keep these in sync when a
+   group is added or reordered, or the last group renders as an empty square. */
 .top-level > li > details > summary .group-label { display: flex; align-items: center; }
 .top-level > li > details > summary .group-label::before {
 	content: '';
@@ -548,15 +551,19 @@ h1 .cckit-tag, h2 .cckit-tag, h3 .cckit-tag { font-size: 0.65em; }
 .top-level > li:nth-child(1) > details > summary .group-label {
 	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z'/%3E%3Cpath d='M12 15l-3-3a22 22 0 0 1 8-10c3 0 5 2 5 5a22 22 0 0 1-10 8z'/%3E%3Cpath d='M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0'/%3E%3Cpath d='M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5'/%3E%3C/svg%3E");
 }
-/* 2 · Concepts — layers */
+/* 2 · Tutorials — graduation cap */
 .top-level > li:nth-child(2) > details > summary .group-label {
+	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z'/%3E%3Cpath d='M22 10v6'/%3E%3Cpath d='M6 12.5V16a6 3 0 0 0 12 0v-3.5'/%3E%3C/svg%3E");
+}
+/* 3 · Concepts — layers */
+.top-level > li:nth-child(3) > details > summary .group-label {
 	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 2 2 7l10 5 10-5-10-5z'/%3E%3Cpath d='M2 17l10 5 10-5'/%3E%3Cpath d='M2 12l10 5 10-5'/%3E%3C/svg%3E");
 }
-/* 3 · Guides — open book */
-.top-level > li:nth-child(3) > details > summary .group-label {
+/* 4 · Guides — open book */
+.top-level > li:nth-child(4) > details > summary .group-label {
 	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 7v14'/%3E%3Cpath d='M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z'/%3E%3C/svg%3E");
 }
-/* 4 · Reference — list */
-.top-level > li:nth-child(4) > details > summary .group-label {
+/* 5 · Reference — list */
+.top-level > li:nth-child(5) > details > summary .group-label {
 	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 6h13'/%3E%3Cpath d='M8 12h13'/%3E%3Cpath d='M8 18h13'/%3E%3Cpath d='M3 6h.01'/%3E%3Cpath d='M3 12h.01'/%3E%3Cpath d='M3 18h.01'/%3E%3C/svg%3E");
 }
