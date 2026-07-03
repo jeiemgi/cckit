@@ -1,0 +1,87 @@
+name: release-please
+
+# Automated release pipeline (replaces the old manual release.yml).
+#
+# On every push to main, release-please maintains ONE open "Release PR" that:
+#   • bumps all four version surfaces — package.json (release-type: node),
+#     docs-site/package.json, .claude-plugin/plugin.json (extra-files),
+#     cckit.config.json (extra-files, .kitVersion) — plus Formula/cckit.rb, and
+#   • regenerates CHANGELOG.md from the Conventional Commits since the last tag.
+# NOTHING SHIPS until you merge that Release PR. Merging it creates the vX.Y.Z tag and the
+# GitHub Release, which then triggers the publish job below.
+#
+# The version number itself comes from the commits (feat -> minor, fix/perf/refactor/revert ->
+# patch, feat!/BREAKING CHANGE -> major) — the same rules as scripts/lib/version-bump.sh.
+#
+# Publishing is gated on secrets — a release still succeeds without them, it just skips that channel:
+#   NPM_TOKEN            npm *Automation* token (bypasses 2FA). npmjs.com -> Access Tokens -> Automation.
+#   HOMEBREW_TAP_TOKEN   PAT with push access to jeiemgi/homebrew-cckit (contents:write).
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write        # create the release branch/commit, the tag, and the GitHub Release
+  pull-requests: write   # open and update the Release PR
+
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.rp.outputs.release_created }}
+      tag_name: ${{ steps.rp.outputs.tag_name }}
+      version: ${{ steps.rp.outputs.version }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: rp
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  # Runs only on the push that MERGES the Release PR (release_created == true), i.e. right after
+  # the tag + GitHub Release are created. Same channels the old release.yml published to.
+  publish:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    runs-on: ubuntu-latest
+    env:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}   # publish exactly what was tagged
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+
+      - name: Publish to npm
+        if: ${{ env.NPM_TOKEN != '' }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
+
+      - name: Bump the Homebrew tap
+        if: ${{ env.HOMEBREW_TAP_TOKEN != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          VERSION: ${{ needs.release-please.outputs.version }}
+        run: |
+          set -euo pipefail
+          v="$VERSION"
+          url="https://github.com/${{ github.repository }}/archive/refs/tags/v$v.tar.gz"
+          # The tag tarball is generated on demand right after the tag is created — retry until it's ready.
+          sha="$(curl -fsSL --retry 6 --retry-delay 5 "$url" | sha256sum | cut -d' ' -f1)"
+          git clone --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/jeiemgi/homebrew-cckit" tap
+          cd tap
+          perl -0pi -e "s{url \"[^\"]*\"}{url \"$url\"}; s{sha256 \"[^\"]*\"}{sha256 \"$sha\"}" Formula/cckit.rb
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -am "cckit $v"
+          git push
