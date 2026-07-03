@@ -24,6 +24,7 @@
 #   cckit watch [--merge] [--loop]  captain: gate open PRs, squash-merge CLEAN, advance the wave
 #   cckit next [--effort N]         everyday helper: the unblocked set + how to start the top issue
 #   cckit wave [--effort N]         read open efforts, propose incoming waves: fan-out + captain drive
+#   cckit msg <send|read|list>      session mail across projects: steer a live session (--steer)
 #   cckit gc [--prune [--yes]]      report (default) or prune merged branches + worktrees
 #   cckit status                    thin dashboard: board + worktrees + resume handoff
 #   cckit scan [--llm]              detect this repo's stack + kit state (JSON)
@@ -266,6 +267,18 @@ case "$cmd" in
   status|ui)   exec "$ROOT/scripts/status.sh" "$@" ;;
   resume)      source "$LIB/handoff.sh"; handoff_read ;;
   handoff)     source "$LIB/handoff.sh"; handoff_write "$@" ;;
+  msg)
+    # Session mail (#175) — pure git-local state (.cckit/mail at the root worktree), no config.
+    source "$LIB/kit-msg.sh"
+    sub="${1:-}"; shift || true
+    case "$sub" in
+      send)       msg_send "$@" ;;
+      read)       msg_read "$@" ;;
+      list)       msg_list ;;
+      hook-check) msg_hook_check "$@" ;;
+      *) echo 'cckit msg <send|read|list|hook-check>' >&2; exit 2 ;;
+    esac
+    ;;
   install)     exec "$ROOT/scripts/install.sh" "$@" ;;
   init)        exec "$ROOT/scripts/init.sh" "$@" ;;
   commands)

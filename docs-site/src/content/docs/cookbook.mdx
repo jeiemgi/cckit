@@ -155,6 +155,28 @@ cckit watch --merge    # gate open PRs, squash-merge the clean ones, advance the
 ```
 
 
+## Steer a parallel session
+
+When several sessions work on the same machine — a captain and its wave agents in one repo, or a
+session in a *different project* — `cckit msg` gives them a mailbox. In a project with the kit's
+mail hook wired, delivery reaches a **live** session between its tool calls, not just at its next
+start. A session is addressed by what it's on: its branch (same project) or `project:branch`.
+
+```bash
+cckit msg send docs/site "main moved — rebase before continuing"    # same project, by branch
+cckit msg send acme/api:main "your schema change breaks our build"  # another project on this machine
+cckit msg send all "v0.4.0 released"                                # broadcast: every session here
+cckit msg send task/9-fix --steer "stop: wrong base branch"         # steer: also blocks its next
+                                                                    # stop and redirects it
+cckit msg read                                                      # read your own mail manually
+cckit msg list                                                      # machine-wide unread counts
+```
+
+Direct messages are read-once; broadcasts are project-scoped, reach each session exactly once,
+and expire after 7 days. Everything lives at `~/.cckit/mail` — machine-local by design, zero
+setup beyond the hook.
+
+
 ## Fan out flows in parallel / run unattended
 
 For several independent issues at once, the agent orchestrates parallel worktrees — **always dry-run first** so it (and you) can see the launch plan before anything is created.
