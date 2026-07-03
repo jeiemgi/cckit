@@ -1,0 +1,91 @@
+---
+title: Installing cckit
+description: "Put cckit on your PATH: install methods, dependencies, and keeping it updated."
+---
+
+import { CardGrid, LinkCard, Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+import Tag from '../../components/Tag.astro';
+import TagRow from '../../components/TagRow.astro';
+
+<TagRow kinds={["flow", "command"]} />
+
+Put the `cckit` command on your PATH and confirm it works. Setting it up in a repo comes next.
+
+cckit is pure bash over `git`, `gh`, and `jq`. There is no build step — installing it puts the `cckit` dispatcher on your PATH, the list of folders your terminal searches when you type a command. Pick whichever route fits.
+
+## Install globally
+
+<Steps>
+
+1. **Pick an install method.** Each tab is one route — pick the one that fits, and copy the box.
+
+   <Tabs syncKey="install-method">
+     <TabItem label="One-liner">
+       ```sh title="macOS · Linux · WSL — no npm or brew"
+       curl -fsSL https://cckit.dev/install.sh | bash
+       ```
+     </TabItem>
+     <TabItem label="Homebrew">
+       ```sh title="Formula/cckit.rb"
+       brew install jeiemgi/cckit/cckit
+       ```
+     </TabItem>
+     <TabItem label="npm">
+       ```sh title="the bare name is taken, so cckit is scoped"
+       npm install -g @jeiemgi/cckit
+       ```
+     </TabItem>
+     <TabItem label="From source">
+       ```sh title="symlinks bin/cckit onto your PATH"
+       git clone https://github.com/jeiemgi/cckit.git
+       cd cckit && ./scripts/install.sh
+       ```
+     </TabItem>
+   </Tabs>
+
+2. **Verify it's on your PATH.**
+
+   ```sh
+   cckit version       # prints the installed version
+   cckit doctor        # preflight: git/gh/jq present, gh authenticated
+   ```
+
+</Steps>
+
+`cckit install [bin-dir]` symlinks `bin/cckit` into the first writable PATH folder (`~/.local/bin`, then `/usr/local/bin`, then `~/bin`), or a folder you pass.
+
+It is a **symlink, not a copy** — the dispatcher resolves the link back to the repo, so `git pull` upgrades your install with no reinstall.
+
+## Dependencies
+
+| Required | Why |
+| --- | --- |
+| `git`, `gh`, `jq` | the lifecycle (worktrees, GitHub, JSON) |
+| `bash` 3.2+ | the dispatcher + lib |
+
+Optional, auto-detected, never required:
+
+| Optional | Enables |
+| --- | --- |
+| `tmux` | `cckit orchestrate` (parallel panes) |
+| `glow` / `fzf` / `gum` | nicer terminal output and pickers |
+| Node + Chrome | `cckit debug` (browser debugging via chrome-devtools-axi) |
+
+`cckit doctor` reports what's missing.
+
+<Aside type="tip" title="What is a symlink? (skip if you know)">
+A symlink is a pointer file: it stands in one folder but redirects to a file somewhere else. cckit installs as a symlink into a PATH folder that points back to the cloned repo, so updating the repo updates your installed command automatically.
+</Aside>
+
+## Next steps
+
+Installing only puts `cckit` on your PATH — nothing has touched a repo yet. Where to go from here:
+
+<CardGrid>
+  <LinkCard title="Initialize cckit" href="/initialize/" description="Set it up in a repo: cckit scan to see what's there, then cckit init to scaffold cckit.config.json + .claude/." />
+  <LinkCard title="Adopt an existing repo" href="/adoption/" description="Already have kit-shaped files? Record them instead of overwriting." />
+  <LinkCard title="Claude Code & other agents" href="/adapters/" description="How cckit ships as a Claude Code plugin, and how any agent drives the same CLI through AGENTS.md." />
+  <LinkCard title="Security & secret guard" href="/security/" description="The local gate and pre-commit hook that block secrets, keys, and your private data before they leave your machine." />
+</CardGrid>
+
+

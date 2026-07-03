@@ -1,0 +1,29 @@
+---
+// Tag — an activation/category badge. Teaches HOW a thing is used or triggered, at a glance.
+// Each kind has its own colour, used consistently everywhere that kind appears (a learning aid).
+// Usage in MDX:  <Tag kind="conversational" />   ·   <Tag kind="command" label="cckit plan" />
+// Inline TEXT variant (a kind word inside a sentence — just the colour + underline, no pill):
+//   the <Tag kind="skill" text>skill</Tag> tag   ·   <Tag kind="hook" text /> (falls back to label)
+export const TAGS = {
+  conversational: { label: 'Conversational', color: '#e0863c', desc: 'Triggers while you talk to Claude — just say what you want.' },
+  command:        { label: 'Command',        color: '#2c8fa6', desc: 'A CLI verb you type in a terminal (cckit …).' },
+  skill:          { label: 'Skill',          color: '#38b06a', desc: 'A /slash skill you run inside Claude Code.' },
+  flow:           { label: 'Flow',           color: '#8b7cf6', desc: 'A defined end-to-end process other things build on.' },
+  hook:           { label: 'Hook',           color: '#d86fb0', desc: 'Runs automatically when an event happens.' },
+  agent:          { label: 'Agent',          color: '#4f8cf0', desc: 'Agent-facing — machine output (--llm / TOON).' },
+  concept:        { label: 'Concept',        color: '#8090a0', desc: 'A term worth knowing before you go further.' },
+};
+
+const { kind = 'concept', label, text = false } = Astro.props;
+const t = TAGS[kind] ?? TAGS.concept;
+// Each tag links to its section in the /tags/ directory — a click lists everything of that kind.
+// The section ids match the capitalised label (e.g. kind "flow" → heading "Flow" → #flow).
+// The title carries the one-line description on hover.
+// `text`: render as inline prose — the kind's colour + underline only (no pill), for a word used
+// mid-sentence. Slot content sets the exact word; otherwise it falls back to the kind label.
+---
+{text ? (
+  <a class="cckit-tag-ref" href={`/tags/#${kind}`} style={`--tag:${t.color}`} title={t.desc}><slot>{label ?? t.label}</slot></a>
+) : (
+  <a class="cckit-tag" href={`/tags/#${kind}`} style={`--tag:${t.color}`} title={t.desc}>{label ?? t.label}</a>
+)}

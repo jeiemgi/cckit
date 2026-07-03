@@ -1,0 +1,79 @@
+---
+title: Releasing
+description: SemVer + Conventional Commits versioning, cut by an explicit, manual release.
+---
+
+import { CardGrid, LinkCard, Steps, Aside } from '@astrojs/starlight/components';
+import Tag from '../../components/Tag.astro';
+import TagRow from '../../components/TagRow.astro';
+
+<TagRow kinds={["command", "flow"]} />
+
+Cut a release with no "what number is this" step — your commit messages decide the version. Merges to `main` **don't** ship anything; you release deliberately, when a batch of merged work is ready.
+
+cckit follows [Semantic Versioning](https://semver.org/) driven by [Conventional Commits](https://www.conventionalcommits.org/). The version *number* is automatic — the commit messages since the last tag pick it — but cutting the release is a deliberate, manual step.
+
+<Aside type="note" title="New here? The two terms">
+**Semantic Versioning** is the `MAJOR.MINOR.PATCH` number on a release (like `1.4.2`). **Conventional Commits** is a small rule for writing commit messages so a tool can read them — each subject starts with a `type:` such as `feat:` or `fix:`. Together they let cckit pick the next version from the commits alone.
+</Aside>
+
+## How the version is decided
+
+`scripts/lib/version-bump.sh` is the single source of the bump rules (shared by `cckit release` and the release workflow). It reads every commit since the last tag and picks the highest bump:
+
+| Commit | Bump | Example |
+| --- | --- | --- |
+| `feat!:` / `type!:` / a `BREAKING CHANGE:` footer | **major** | `1.4.2 → 2.0.0` |
+| `feat:` | **minor** | `1.4.2 → 1.5.0` |
+| `fix:` / `perf:` / `refactor:` / `revert:` / anything else | **patch** | `1.4.2 → 1.4.3` |
+| no commits since the tag | **none** | no release |
+
+Check what the next version would be at any time:
+
+```bash
+cckit release --next        # or: scripts/lib/version-bump.sh --next
+```
+
+## Cutting a release (manual)
+
+`.github/workflows/release.yml` is triggered **on demand**, never by a merge — so you can merge, merge, merge, then release once when the batch is ready. Start it from **Actions ▸ release ▸ Run workflow**, or:
+
+```bash
+gh workflow run release.yml                 # cut the release
+gh workflow run release.yml -f dry_run=true # preview the version, ship nothing
+```
+
+<Steps>
+
+1. **Compute the bump** from the commits since the last tag.
+
+2. **Bump the version** in `cckit.config.json`, `.claude-plugin/plugin.json`, and `package.json` (if release-worthy).
+
+3. **Commit, tag, and release** — commit `chore(release): vX.Y.Z`, tag `vX.Y.Z`, push, and cut a GitHub Release with generated notes.
+
+</Steps>
+
+A run with only `chore`/`docs` noise still patches; a run with no release-worthy commits since the last tag releases nothing (`bump=none`). Because releases are manual, two PRs merging at once can no longer race each other into a corrupted tag.
+
+<Aside type="caution" title="Workflow edits are human-reviewed">
+Changes to the release workflow are always reviewed by a person — the CI token has a wide blast radius. This repo ships the workflow; a maintainer merges the PR that adds or edits it.
+</Aside>
+
+## Publishing to npm + Homebrew
+
+The GitHub Release is automatic; pushing the package is a deliberate, credentialed step. It is dry-run by default — nothing changes until you add `--publish`.
+
+```bash
+cckit release X.Y.Z              # DRY RUN — prints the full plan, changes nothing
+cckit release X.Y.Z --publish    # tag + GitHub release + Homebrew formula + npm (needs tokens)
+```
+
+Wiring npm and brew publishing into the workflow (behind repo secrets) is a follow-up; until then it is the one manual step, safe by default.
+
+## Commit message rules (the contract)
+
+- **Every commit on a PR** uses a Conventional Commit subject: `type(scope): summary`.
+- **Breaking changes** use `!` after the type/scope **or** a `BREAKING CHANGE:` footer — never a silent major.
+- **One logical change per commit** so the generated release notes read cleanly.
+
+

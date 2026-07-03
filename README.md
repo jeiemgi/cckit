@@ -81,13 +81,18 @@ cckit gc                   # prune merged branches + worktrees
 
 Run `cckit help` for the full verb list, or `cckit <verb> --help` for any one.
 
-## The copilot loop
+For a goal too big for one PR, `cckit effort new "<name>" "sub :: desc" …` creates the parent issue
+(the four-section plan body), applies the `ctx/kind/priority/role/flow` labels, and lints every
+sub-issue title — the same effort `/kit-effort-new` produces, since both call one shared core.
 
-cckit turns the board into parallel agent work that gates and merges itself:
+## Wave
+
+`cckit wave` reads your open efforts and proposes the incoming waves of work — parallel agent tasks
+that gate and merge themselves:
 
 ```bash
 cckit plan                 # the wave plan: deps-ordered, file-disjoint, session-fit
-cckit copilot              # a Task-subagent fan-out brief Claude Code enacts (the prompt machine)
+cckit wave                 # a Task-subagent fan-out brief Claude Code enacts (proposes the next wave)
 cckit watch --merge        # the captain: gate open PRs, squash-merge the CLEAN ones, advance
 cckit watch --loop         # self-pace gate/merge passes until steady state
 ```
@@ -101,7 +106,7 @@ the contract. Every verb accepts `--llm` for structured output — uniform paylo
 ```bash
 cckit sync --llm           # board state for an agent to reason over
 cckit plan --llm           # the wave plan as TOON rows
-cckit copilot --llm        # the fan-out (one subagent prompt per issue) as TOON
+cckit wave --llm           # the fan-out (one subagent prompt per issue) as TOON
 ```
 
 Human output renders as markdown — rich via `glow` in a terminal, native in the Claude Code
@@ -157,3 +162,21 @@ Licensed under either of
 at your option. Unless you explicitly state otherwise, any contribution intentionally submitted for
 inclusion in cckit by you, as defined in the Apache-2.0 license, shall be dual licensed as above,
 without any additional terms or conditions.
+
+## Disclaimer & trademarks
+
+cckit is an **independent, community-built project for educational purposes**. It is **not an
+official Anthropic product** and is **not affiliated with, endorsed, sponsored, or supported by
+Anthropic PBC** in any way.
+
+"Anthropic", "Claude", and "Claude Code", along with related names, logos, and marks, are
+trademarks of **Anthropic PBC**. All rights to Anthropic's products, services, names, and
+intellectual property belong to Anthropic. cckit uses these names only **nominatively** — to
+describe interoperability with Claude Code — and claims no ownership of or rights to them.
+
+cckit is provided **"as is", without warranty of any kind**, for learning and experimentation.
+Nothing here is legal advice. You are responsible for your own use of cckit and for complying with
+the terms of any third-party service it integrates with, including
+[Anthropic's Usage Policies and Terms](https://www.anthropic.com/legal). The cckit source code
+itself is licensed as stated above; this disclaimer does not extend cckit's license to any
+third-party trademark or product.

@@ -8,11 +8,12 @@ adapter one) — is described in [the Adapters page](docs-site/src/content/docs/
 
 ## Ground rules
 
-- **Read state before acting.** `cckit sync --llm` returns the board as JSON. Decide from data.
+- **Read state before acting.** `cckit sync --llm` returns the board as TOON. Decide from data.
 - **One issue = one branch = one worktree = one PR.** `cckit start <issue>` creates the isolated
   worktree; do all work there; `cckit pr <issue>` opens the PR. Never commit to the base branch.
-- **Structured output.** Append `--llm` to any verb for machine-readable (JSON) output. Human
-  (pretty) output is the default; agents should prefer `--llm`.
+- **Structured output, TOON-first.** Append `--llm` to any verb for machine-readable output. List
+  reads (sync, next, plan, wave) come back as **TOON** (token-cheap); single-result action verbs
+  (start, pr, close) return one JSON object. Human (pretty) output is the default; agents prefer `--llm`.
 - **Idempotent + safe.** Re-running a verb on an already-done step is a no-op, not an error.
 - **Never invent paths or config.** Everything resolves from `cckit.config.json`.
 - **Hand off when you stop with unfinished work.** `cckit handoff "<what's pending, next step, refs>"`
@@ -24,15 +25,16 @@ adapter one) — is described in [the Adapters page](docs-site/src/content/docs/
 | Verb | Purpose | LLM mode |
 | --- | --- | --- |
 | `cckit init` | scaffold config + `.claude/` | — |
-| `cckit sync` | board state / what's unblocked | `--llm` → JSON |
+| `cckit sync` | board state / what's unblocked | `--llm` → TOON |
 | `cckit next` | the next unblocked issue + how to start it | `--llm` → TOON |
 | `cckit plan` | wave plan: deps-ordered, file-disjoint, session-fit | `--llm` → TOON |
 | `cckit plan-next` | forward plan: inventory current skills/verbs/rules/docs → propose what to build next | `--llm` → TOON |
-| `cckit copilot` | Task-subagent fan-out brief + captain drive (the prompt machine) | `--llm` → TOON |
+| `cckit wave` | read open efforts, propose incoming waves: fan-out brief + captain drive | `--llm` → TOON |
 | `cckit watch [--merge] [--loop]` | captain: gate open PRs, squash-merge CLEAN, advance the wave | — |
 | `cckit start <issue> [slug]` | isolated worktree + branch | `--llm` |
 | `cckit pr <issue> <summary>` | commit + push + open PR | `--llm` |
 | `cckit close <issue> <summary>` | close issue + mark done | `--llm` |
+| `cckit effort new "<name>" ["sub :: desc" …]` | parent (4-section body + ctx/kind/priority/role/flow labels) + linted native sub-issues — identical to `/kit-effort-new` (one shared core) | flags: `--flow/--role/--priority/--goal/--scope/--for-agents/--verification/--depends-on/--milestone` |
 | `cckit effort plan` | session-fit effort plan | `--llm` → JSON |
 | `cckit orchestrate <a> <b> …` | run N flows in parallel worktrees | — (use `--dry-run`) |
 | `cckit autopilot [<a> …]` | unattended multi-flow: drive (or auto-pick) issues under a cap | — (use `--dry-run`) |
@@ -56,7 +58,7 @@ Every operation an unattended run needs is reachable through the one CLI:
 | Verb | Purpose |
 | --- | --- |
 | `cckit scan` | detect the repo's stack + kit state (emits JSON) |
-| `cckit doctor` | onboarding preflight (deps, gh auth) |
+| `cckit doctor [--fix]` | onboarding preflight (deps, gh auth); asks before installing on a TTY, `--fix` skips the prompt |
 | `cckit update` | report whether the project is behind the installed cckit |
 | `cckit migrate` | reshuffle an old kit layout to the current one |
 | `cckit digest` | summarize recent activity |
@@ -95,8 +97,8 @@ operate the repo through cckit. It is self-contained.
 You operate this repository through cckit, a CLI that runs the full GitHub work lifecycle.
 
 Operating rules:
-1. Read state before acting. Run `cckit sync --llm` and decide from the JSON it returns. Never
-   guess the board.
+1. Read state before acting. Run `cckit sync --llm` and decide from the TOON board it returns
+   (TOON is a compact table format — parse it, don't guess the board).
 2. One issue = one branch = one worktree = one PR. Begin every task with `cckit start <issue>`,
    then cd into the worktree path it prints. Never commit on main or develop.
 3. Append `--llm` to any verb for machine-readable JSON output.

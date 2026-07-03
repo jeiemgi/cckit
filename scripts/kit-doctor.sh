@@ -2,7 +2,8 @@
 # kit-doctor — onboarding preflight: deps + brew bootstrap + gh auth/scopes + SSH guided
 #
 # Usage:
-#   scripts/kit-doctor.sh                 # detect + auto-install + report
+#   scripts/kit-doctor.sh                 # detect + report; in a terminal, ASK before installing
+#   scripts/kit-doctor.sh --fix           # install missing deps without asking (alias: --yes, -y)
 #   scripts/kit-doctor.sh --dry-run       # report only — no installs, no auth changes
 #   scripts/kit-doctor.sh --no-install    # check and auth only — skip package installs
 #   scripts/kit-doctor.sh --dismiss-local # silence the "local layer down" session notice
@@ -21,14 +22,15 @@ set -euo pipefail
 _export_dir_doctor="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
 
 # ---- flags ------------------------------------------------------------------
-DRY_RUN=0; NO_INSTALL=0; DISMISS_LOCAL=0
+DRY_RUN=0; NO_INSTALL=0; DISMISS_LOCAL=0; ASSUME_YES=0
 for _a in "$@"; do
   case "$_a" in
     --dry-run)       DRY_RUN=1 ;;
     --no-install)    NO_INSTALL=1 ;;
+    --fix|--yes|-y)  ASSUME_YES=1 ;;
     --dismiss-local) DISMISS_LOCAL=1 ;;
     -h|--help)
-      sed -n '2,12p' "$0" | grep '^#' | sed 's/^# \?//'
+      sed -n '2,13p' "$0" | grep '^#' | sed 's/^# \?//'
       exit 0 ;;
   esac
 done
@@ -80,6 +82,24 @@ if [ "$KIT_UNICODE" = 1 ]; then
   MARK_SEED="${C_AZAFRAN}⡶${C_RESET}"
 else
   MARK_OK="ok"; MARK_FAIL="FAIL"; MARK_WARN="warn"; MARK_SKIP="-"; MARK_SEED="o"
+fi
+
+# ---- install consent --------------------------------------------------------
+# The doctor can install missing dependencies for you (Homebrew, gh, jq, node, …). When a HUMAN runs
+# it in a terminal, ASK first — install only if approved. Non-interactive callers (init.sh preflight,
+# hooks) pass --fix/--yes or simply have no TTY, so automation keeps its current auto-install behavior
+# and never blocks on a prompt. --dry-run / --no-install already skip installs entirely.
+if [[ $DRY_RUN -eq 0 && $NO_INSTALL -eq 0 && $ASSUME_YES -eq 0 && -t 0 ]]; then
+  printf '\n  %s%scckit doctor can install anything missing for you%s (via Homebrew, corepack, etc.).\n' "$C_BOLD" "" "$C_RESET"
+  printf '  It will show each thing as it goes. Nothing is installed if you decline.\n\n'
+  printf '  Install missing dependencies? [Y/n] '
+  read -r _reply || _reply=""
+  case "$_reply" in
+    [nN]|[nN][oO])
+      NO_INSTALL=1
+      printf '\n  %s report-only — listing what is missing and how to install it (no changes made).\n' "$MARK_SKIP" ;;
+    *) : ;;  # default (Enter / y) → proceed with installs
+  esac
 fi
 
 # ---- report accumulators ----------------------------------------------------
@@ -483,6 +503,128 @@ if [[ "$_local_on" == "true" ]]; then
 fi
 
 # ============================================================================
+# MEMORY LAYER (MemPalace) — opt-in — only checked when .memory.enabled is true
+# ============================================================================
+# Same gating principle as the local model layer: silent unless the project opted
+# into memory at init. Three things to verify:
+#   1. the `mempalace` CLI is installed — the SessionStart/Stop/… hooks no-op without it.
+#   2. a per-wing identity header exists. `mempalace wake-up` scopes the L1 *body* to the
+#      wing, but reads its L0 identity *header* from the single global ~/.mempalace/identity.txt
+#      (mempalace layers.py Layer0), so every wing shows the same — usually wrong — header
+#      unless .claude/mempal-identity.<wing>.txt is present. --fix seeds a starter from kit.config.
+#   3. the session-start hook is current — older hooks just ran `wake-up --wing` and could not
+#      apply the per-wing header from (2). --fix re-emits the hook from the kit template.
+_mem_on="false"
+[[ -f "$_kitcfg" ]] && _mem_on="$(jq -r '.memory.enabled // false' "$_kitcfg" 2>/dev/null || echo false)"
+if [[ "$_mem_on" == "true" ]]; then
+  printf '  %s%sMemory (MemPalace)%s\n' "$C_BOLD" "" "$C_RESET"
+  _mwing="$(jq -r '.memory.wing // .project.slug // ""' "$_kitcfg" 2>/dev/null || echo "")"
+  [[ -z "$_mwing" || "$_mwing" == "null" ]] && _mwing="$(basename "${TARGET:-$PWD}")"
+
+  # 1. mempalace CLI — install it (guarded) when memory is on but the CLI is missing; the
+  #    SessionStart/Stop/… hooks are silent no-ops without it. MemPalace is a Python CLI
+  #    (github.com/MemPalace/mempalace); install into an isolated tool venv via pipx (fallback uv).
+  #    Installs obey the same consent guard as every other dep: skipped under --dry-run/--no-install
+  #    or when the operator declined the install prompt.
+  _mp_find() {  # pipx/uv drop the bin in ~/.local/bin, which may not be on PATH yet this session
+    if has_cmd mempalace; then command -v mempalace
+    elif [[ -x "$HOME/.local/bin/mempalace" ]]; then echo "$HOME/.local/bin/mempalace"
+    fi
+    return 0
+  }
+  _mp_bin="$(_mp_find)"
+  if [[ -n "$_mp_bin" ]]; then
+    _mv="$("$_mp_bin" --version 2>/dev/null | head -1)"; [[ -n "$_mv" ]] || _mv="installed"
+    row "$MARK_OK" "mempalace CLI" "$_mv"
+    CHECKS_OK=$((CHECKS_OK + 1))
+  elif [[ $DRY_RUN -eq 1 || $NO_INSTALL -eq 1 ]]; then
+    row "$MARK_FAIL" "mempalace CLI" "missing — pipx install mempalace"
+    CHECKS_FAIL=$((CHECKS_FAIL + 1))
+    ACTIONS_NEEDED+=("Install MemPalace: pipx install mempalace  (then: mempalace mcp)")
+  else
+    # ensure an installer: pipx preferred (brew-installable), uv as fallback. NEVER plain pip.
+    if ! has_cmd pipx && ! has_cmd uv; then
+      brew_install pipx pipx && ACTIONS_TAKEN+=("Installed pipx via brew") || true
+    fi
+    if has_cmd pipx; then
+      printf '  %s mempalace missing — installing via pipx (isolated venv)...\n' "$MARK_WARN"
+      pipx install mempalace >/dev/null 2>&1 || true
+      _mp_installer="pipx"
+    elif has_cmd uv; then
+      printf '  %s mempalace missing — installing via uv tool install (isolated venv)...\n' "$MARK_WARN"
+      uv tool install mempalace >/dev/null 2>&1 || true
+      _mp_installer="uv tool install"
+    fi
+    _mp_bin="$(_mp_find)"
+    if [[ -n "$_mp_bin" ]]; then
+      _mv="$("$_mp_bin" --version 2>/dev/null | head -1)"; [[ -n "$_mv" ]] || _mv="installed"
+      row "$MARK_OK" "mempalace CLI" "$_mv (via ${_mp_installer:-pipx})"
+      CHECKS_OK=$((CHECKS_OK + 1))
+      ACTIONS_TAKEN+=("Installed MemPalace via ${_mp_installer:-pipx} — run 'mempalace mcp' to wire the MCP server")
+    else
+      row "$MARK_FAIL" "mempalace CLI" "install failed — install pipx, then: pipx install mempalace"
+      CHECKS_FAIL=$((CHECKS_FAIL + 1))
+      ACTIONS_NEEDED+=("Install MemPalace: pipx install mempalace  (then: mempalace mcp)")
+    fi
+  fi
+
+  # 2. per-wing identity header — the fix for the global-header bug
+  _idfile="${TARGET:-$PWD}/.claude/mempal-identity.${_mwing}.txt"
+  _idfile_generic="${TARGET:-$PWD}/.claude/mempal-identity.txt"
+  if [[ -s "$_idfile" ]] || [[ -s "$_idfile_generic" ]]; then
+    _present="$_idfile"; [[ -s "$_idfile" ]] || _present="$_idfile_generic"
+    row "$MARK_OK" "identity header" "wing-scoped (${_present#${TARGET:-$PWD}/})"
+    CHECKS_OK=$((CHECKS_OK + 1))
+  elif [[ $DRY_RUN -eq 0 && $NO_INSTALL -eq 0 ]]; then
+    # Seed a starter header from kit.config so this wing stops inheriting the global identity.
+    _owner="$(jq -r '.project.owner // ""' "$_kitcfg" 2>/dev/null || echo "")"
+    _pname="$(jq -r '.project.name // ""' "$_kitcfg" 2>/dev/null || echo "")"
+    [[ -z "$_pname" || "$_pname" == "null" ]] && _pname="$_mwing"
+    {
+      printf 'Project: %s (wing: %s)\n' "$_pname" "$_mwing"
+      [[ -n "$_owner" && "$_owner" != "null" ]] && printf 'Owner: %s\n' "$_owner"
+      printf 'Stack: (describe this project — this header shows on every session wake-up)\n'
+    } > "$_idfile"
+    row "$MARK_OK" "identity header" "seeded .claude/mempal-identity.${_mwing}.txt — edit the Stack line"
+    ACTIONS_TAKEN+=("Seeded per-wing MemPalace header .claude/mempal-identity.${_mwing}.txt (edit it to taste)")
+    CHECKS_OK=$((CHECKS_OK + 1))
+  else
+    row "$MARK_WARN" "identity header" "missing — wake-up shows the global ~/.mempalace/identity.txt for every wing"
+    CHECKS_WARN=$((CHECKS_WARN + 1))
+    ACTIONS_NEEDED+=("Create .claude/mempal-identity.${_mwing}.txt so this wing has its own wake-up header (or run: cckit doctor --fix)")
+  fi
+
+  # 3. session-start hook freshness — the `mempal-identity` marker means the hook
+  #    knows how to swap in the per-wing header (2). Older hooks lack it.
+  _hook="${TARGET:-$PWD}/.claude/hooks/mempal_session_start.sh"
+  _kit_root="$(dirname "$_export_dir_doctor")"
+  _hook_tmpl="$_kit_root/templates/hooks/mempal_session_start.sh.tmpl"
+  if [[ ! -f "$_hook" ]]; then
+    : # no hook installed — the CLI row already covers a non-functioning memory layer
+  elif grep -q 'mempal-identity' "$_hook" 2>/dev/null; then
+    row "$MARK_OK" "session-start hook" "current — applies the per-wing header"
+    CHECKS_OK=$((CHECKS_OK + 1))
+  elif [[ $DRY_RUN -eq 0 && $NO_INSTALL -eq 0 && -f "$_hook_tmpl" ]]; then
+    # Re-emit from the template (only {{WING}} to substitute; no IF blocks in this hook).
+    if sed "s|{{WING}}|${_mwing}|g" "$_hook_tmpl" > "$_hook"; then
+      chmod +x "$_hook"
+      row "$MARK_OK" "session-start hook" "refreshed — now applies the per-wing header"
+      ACTIONS_TAKEN+=("Refreshed .claude/hooks/mempal_session_start.sh (now swaps in the per-wing header)")
+      CHECKS_OK=$((CHECKS_OK + 1))
+    else
+      row "$MARK_WARN" "session-start hook" "stale — refresh failed; re-run: cckit init --upgrade"
+      CHECKS_WARN=$((CHECKS_WARN + 1))
+      ACTIONS_NEEDED+=("Refresh the session-start hook manually: cckit init --upgrade")
+    fi
+  else
+    row "$MARK_WARN" "session-start hook" "stale — ignores the per-wing header (runs wake-up --wing only)"
+    CHECKS_WARN=$((CHECKS_WARN + 1))
+    ACTIONS_NEEDED+=("Refresh the session-start hook: cckit doctor --fix (or cckit init --upgrade)")
+  fi
+  printf '\n'
+fi
+
+# ============================================================================
 # AUTH + CONFIG
 # ============================================================================
 printf '  %s%sAuth + config%s\n' "$C_BOLD" "" "$C_RESET"
@@ -570,6 +712,29 @@ else
   CHECKS_FAIL=$((CHECKS_FAIL + 1))
   ACTIONS_NEEDED+=("Set git email: git config --global user.email \"you@example.com\"")
 fi
+
+# ---- base branch vs GitHub default -----------------------------------------
+# `Closes #N` auto-close only fires when a PR merges into the repo's DEFAULT branch. If this
+# project integrates on a non-default branch (github.baseBranch, e.g. develop) that mismatch
+# silently leaves issues open on native/UI merges. cckit's own `pr-merge` closes them explicitly,
+# but the misalignment still bites anyone who merges from the GitHub UI — so surface it.
+if [[ $GH_AUTHED -eq 1 ]] && has_cmd gh && [[ -f "$_kitcfg" ]]; then
+  _cfg_repo="$(jq -r '.github.repo // empty' "$_kitcfg" 2>/dev/null || true)"
+  _cfg_base="$(jq -r '.github.baseBranch // "main"' "$_kitcfg" 2>/dev/null || echo main)"
+  if [[ -n "$_cfg_repo" ]]; then
+    _gh_default="$(gh repo view "$_cfg_repo" --json defaultBranchRef --jq '.defaultBranchRef.name' 2>/dev/null || true)"
+    if [[ -z "$_gh_default" ]]; then
+      row "$MARK_SKIP" "base branch" "couldn't read GitHub default for $_cfg_repo — skipped"
+    elif [[ "$_cfg_base" == "$_gh_default" ]]; then
+      row "$MARK_OK" "base branch" "$_cfg_base = GitHub default"
+      CHECKS_OK=$((CHECKS_OK + 1))
+    else
+      row "$MARK_WARN" "base branch" "baseBranch '$_cfg_base' ≠ GitHub default '$_gh_default' — 'Closes #N' won't auto-close on GitHub-UI merges"
+      CHECKS_WARN=$((CHECKS_WARN + 1))
+      ACTIONS_NEEDED+=("Align base branch: 'gh repo edit $_cfg_repo --default-branch $_cfg_base' (or set github.baseBranch to '$_gh_default'). Note: 'cckit pr-merge' already closes linked issues explicitly.")
+    fi
+  fi
+fi
 printf '\n'
 
 # ============================================================================
@@ -654,9 +819,16 @@ if [[ ${#ACTIONS_NEEDED[@]} -gt 0 ]]; then
 fi
 printf '\n'
 
-# ---- onboarding page -------------------------------------------------------
+# ---- onboarding / docs pointer ---------------------------------------------
+# Show the local onboarding app ONLY when something actually answers on it —
+# otherwise point at the public docs. (Previously this always printed
+# http://localhost:3001/onboarding even when nothing served that port.)
 _admin_url="${CCKIT_ADMIN_URL:-http://localhost:3001}"
-printf '  %sOnboarding guide (web): %s/onboarding%s\n' "$C_DIM" "$_admin_url" "$C_RESET"
+if has_cmd curl && curl -fsS --max-time 1 "$_admin_url/onboarding" >/dev/null 2>&1; then
+  printf '  %sOnboarding guide (web): %s/onboarding%s\n' "$C_DIM" "$_admin_url" "$C_RESET"
+else
+  printf '  %sDocs & quick start: %shttps://cckit.vercel.app%s\n' "$C_DIM" "" "$C_RESET"
+fi
 printf '\n'
 
 # Exit non-zero when critical checks failed

@@ -230,8 +230,9 @@ _INIT_SKIP_PREFLIGHT=0
 for _ia in "$@"; do [[ "$_ia" == "--upgrade" || "$_ia" == "--dry-run" ]] && _INIT_SKIP_PREFLIGHT=1; done
 
 if [[ $_INIT_SKIP_PREFLIGHT -eq 0 && -x "$_DOCTOR" ]]; then
-  # Pass --no-install if init itself was called with --no-install equivalent
-  bash "$_DOCTOR" || {
+  # --yes: init's preflight installs Tier-1 deps non-interactively (no approval prompt here; the
+  # user already opted into setup by running init). A human running `cckit doctor` directly is asked.
+  bash "$_DOCTOR" --yes || {
     echo "" >&2
     echo "x kit-doctor reported unresolved issues — fix them and re-run /kit-init." >&2
     exit 1
@@ -561,6 +562,7 @@ if [[ $DRY_RUN -eq 1 ]]; then
   echo "    knowledge/INDEX.md                        (knowledge-base manifest — rules/knowledge-base.md)"
   echo "    .claude/lib/kit-sigil.sh                  (claude-kit attribution sigil helper, sourced by task-* footers)"
   [[ "$MEMORY_BOOL"     == "true" ]] && echo "    .claude/hooks/mempal_session_start.sh + mempal_save.sh + mempal_precompact.sh + mempal_followup.sh   (SessionStart / Stop / PreCompact / SessionEnd)"
+  [[ "$MEMORY_BOOL"     == "true" ]] && echo "    .claude/mempal-identity.$SLUG.txt              (per-wing wake-up header — edit the Stack line)"
   [[ "$PREPUSH_ENABLED" == "true" ]] && echo "    .claude/hooks/prepush_gate.sh   (PreToolUse Bash gate: $PREPUSH_CMD)"
   [[ "$LOCAL_ON"        == "true" ]] && echo "    .claude/hooks/kit-local-status.sh   (SessionStart: announce local model layer when alive)"
   echo ""
@@ -732,6 +734,17 @@ if [[ "$MEMORY_BOOL" == "true" && $UPGRADE -eq 0 ]]; then
   emit "$KIT_ROOT/templates/hooks/mempal_precompact.sh.tmpl" "$TARGET/.claude/hooks/mempal_precompact.sh"
   emit "$KIT_ROOT/templates/hooks/mempal_followup.sh.tmpl"   "$TARGET/.claude/hooks/mempal_followup.sh"
   chmod +x "$TARGET/.claude/hooks/mempal_session_start.sh" "$TARGET/.claude/hooks/mempal_save.sh" "$TARGET/.claude/hooks/mempal_precompact.sh" "$TARGET/.claude/hooks/mempal_followup.sh"
+  # Per-wing wake-up header — without it, `mempalace wake-up` shows the single global
+  # ~/.mempalace/identity.txt for every wing (the session-start hook swaps this in). See
+  # templates/rules/mempalace.md; `cckit doctor` re-seeds it if it goes missing.
+  _mpid="$TARGET/.claude/mempal-identity.$SLUG.txt"
+  if [[ ! -e "$_mpid" ]]; then
+    {
+      printf 'Project: %s (wing: %s)\n' "$NAME" "$SLUG"
+      [[ -n "$OWNER_NAME" ]] && printf 'Owner: %s\n' "$OWNER_NAME"
+      printf 'Stack: (describe this project — this header shows on every session wake-up)\n'
+    } > "$_mpid"
+  fi
   merge_settings --arg start "$TARGET/.claude/hooks/mempal_session_start.sh" --arg save "$TARGET/.claude/hooks/mempal_save.sh" --arg pre "$TARGET/.claude/hooks/mempal_precompact.sh" --arg fup "$TARGET/.claude/hooks/mempal_followup.sh" \
     '.hooks.SessionStart = [{matcher:"",hooks:[{type:"command",command:$start,timeout:30}]}]
      | .hooks.Stop = [{matcher:"",hooks:[{type:"command",command:$save,timeout:30}]}]
