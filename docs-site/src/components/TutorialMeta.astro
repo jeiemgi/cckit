@@ -4,9 +4,12 @@
 //   1. a "prompt bar" (Clerk-quickstart style) with a Copy-as-Markdown button,
 //   2. a "Before you start" card for cold traffic that may not know what cckit / Claude Code is,
 //   3. a "This tutorial" card: difficulty · read-time · prerequisites.
-// The copied prompt links the docs (agent contract, CLI reference, install) and this page's URL so
-// Claude reads them and learns the cckit CLI. It never hardcodes issue numbers — the flow tutorials
-// tell Claude to sync the board and let the reader pick the work.
+// The two cards use Starlight's own <CardGrid>/<Card> so their layout, equal height, and content
+// spacing come from the design system (no hand-rolled grid). The copied prompt links the docs
+// (agent contract, CLI reference, install) and this page's URL so Claude reads them and learns the
+// cckit CLI; it never hardcodes issue numbers.
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
 const route = Astro.locals.starlightRoute;
 const data = route?.entry?.data ?? {};
 const t = data.tutorial;
@@ -51,26 +54,32 @@ them as we go — telling me what each one did.
       </button>
     </div>
 
-    <div class="tut-cards">
-      <div class="tut-card">
-        <div class="tut-card-title">Before you start</div>
-        <a class="tut-card-link" href="/install/">Install cckit<span aria-hidden="true">→</span></a>
-        <a class="tut-card-link" href="/getting-started/">Quickstart: your first lifecycle<span aria-hidden="true">→</span></a>
-      </div>
-      <div class="tut-card">
-        <div class="tut-card-title">This tutorial</div>
+    <CardGrid>
+      <Card title="Before you start" icon="rocket">
+        <div class="tut-links">
+          <a href="/install/">Install cckit</a>
+          <a href="/getting-started/">Quickstart: your first lifecycle</a>
+        </div>
+      </Card>
+      <Card title="This tutorial" icon="open-book">
         <div class="tut-meta" data-difficulty={t.difficulty}>
           <span class="tut-badge tut-diff">{diffLabel[t.difficulty] ?? t.difficulty}</span>
           <span class="tut-badge tut-time">{t.time} read</span>
           {t.prerequisites.length > 0 && (
             <span class="tut-pre">
               <span class="tut-pre-label">Needs</span>
-              {t.prerequisites.map((p) => <code class="tut-chip">{p}</code>)}
+              {t.prerequisites.map((p) =>
+                p === 'cckit installed and initialized' ? (
+                  <span class="tut-chip tut-chip-link">cckit <a href="/install/">installed</a> &amp; <a href="/initialize/">initialized</a></span>
+                ) : (
+                  <code class="tut-chip">{p}</code>
+                ),
+              )}
             </span>
           )}
         </div>
-      </div>
-    </div>
+      </Card>
+    </CardGrid>
   </div>
 )}
 
@@ -120,12 +129,8 @@ them as we go — telling me what each one did.
   }
   .tut-promptbar-copy { display: flex; align-items: center; gap: 0.85rem; min-width: 15rem; flex: 1 1 20rem; }
   .tut-promptbar-mark {
-    font-family: var(--sl-font-mono);
-    font-size: 1.35rem;
-    line-height: 1;
-    color: var(--sl-color-text-accent);
-    opacity: 0.85;
-    flex: none;
+    font-family: var(--sl-font-mono); font-size: 1.35rem; line-height: 1;
+    color: var(--sl-color-text-accent); opacity: 0.85; flex: none;
   }
   .tut-promptbar-text { display: flex; flex-direction: column; gap: 0.15rem; }
   .tut-promptbar-text strong { color: var(--sl-color-white); font-size: var(--sl-text-base); }
@@ -136,36 +141,17 @@ them as we go — telling me what each one did.
     font: inherit; font-size: var(--sl-text-sm); font-weight: 600; cursor: pointer;
     padding: 0.5rem 0.95rem; border-radius: 8px;
     border: 1px solid var(--sl-color-accent);
-    color: var(--sl-color-text-invert);
-    background: var(--sl-color-accent);
+    color: var(--sl-color-text-invert); background: var(--sl-color-accent);
     transition: background 0.15s ease, filter 0.15s ease;
   }
   .tut-copy:hover { filter: brightness(1.08); }
   .tut-copy.is-copied { background: var(--sl-color-accent-high); border-color: var(--sl-color-accent-high); }
   .tut-copy-icon { flex: none; }
 
-  /* Two info cards — "Before you start" + "This tutorial". */
-  .tut-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem; }
-  .tut-card {
-    border: 1px solid var(--sl-color-hairline);
-    border-radius: 12px;
-    padding: 0.9rem 1rem;
-    background: var(--sl-color-bg-sidebar);
-    display: flex; flex-direction: column; gap: 0.5rem;
-  }
-  .tut-card-title {
-    font-family: var(--sl-font-mono);
-    font-size: var(--sl-text-xs);
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--sl-color-gray-3);
-  }
-  .tut-card-link {
-    display: inline-flex; align-items: center; justify-content: space-between; gap: 0.5rem;
-    font-size: var(--sl-text-sm); font-weight: 600;
-  }
-  .tut-card-link span { color: var(--sl-color-gray-4); transition: transform 0.15s ease; }
-  .tut-card-link:hover span { transform: translateX(2px); }
+  /* Give both cards equal breathing room; the grid + equal height come from Starlight's CardGrid. */
+  .tut-header :global(.card) { height: 100%; }
+  .tut-links { display: flex; flex-direction: column; gap: 0.4rem; }
+  .tut-links a { font-weight: 600; }
 
   .tut-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.7rem; font-size: var(--sl-text-sm); }
   .tut-badge {
@@ -184,8 +170,9 @@ them as we go — telling me what each one did.
     font-size: var(--sl-text-xs); background: var(--sl-color-bg-inline-code);
     border: 1px solid var(--sl-color-hairline); border-radius: 6px; padding: 0.05rem 0.45rem;
   }
-
-  @media (max-width: 40rem) {
-    .tut-cards { grid-template-columns: 1fr; }
+  .tut-chip-link {
+    display: inline-flex; align-items: center; gap: 0.28rem;
+    font-family: var(--sl-font); color: var(--sl-color-gray-2); white-space: nowrap;
   }
+  .tut-chip-link a { font-weight: 600; }
 </style>
