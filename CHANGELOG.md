@@ -7,6 +7,10 @@ All notable changes to cckit are documented here. The format follows
 ## [Unreleased]
 
 ### Fixed
+- Integration branch now resolves through a fallback chain — `github.baseBranch` →
+  `github.integrationBranch` → `github.flow` → `main` — so a host project that names its
+  integration branch under an alternate key resolves correctly on adoption instead of silently
+  defaulting to `main`. Doctor's base-branch mismatch check uses the same chain (#117).
 - Adoption hardening (#115): sourcing kit libs from an interactive zsh no longer breaks. The
   config accessor is namespaced (`_kit_cfg_get`, never a bare `g` that collides with `alias g=git`),
   and worktree/gc/events locals no longer shadow zsh's PATH-tied `path` array (#116). A new

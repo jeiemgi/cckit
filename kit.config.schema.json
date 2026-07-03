@@ -55,6 +55,8 @@
         "repo": { "type": "string" },
         "owner": { "type": "string" },
         "baseBranch": { "type": "string", "description": "Integration branch the lifecycle skills branch from and merge into (default: main; e.g. develop)." },
+        "integrationBranch": { "type": "string", "description": "Alias for baseBranch, honored when baseBranch is unset (adoption fallback)." },
+        "flow": { "type": "string", "description": "Last-resort alias for the integration branch, honored when baseBranch and integrationBranch are unset." },
         "projectsV2": { "type": "boolean" },
         "projectNumber": { "type": ["integer", "null"] },
         "projectTitle": { "type": ["string", "null"] }

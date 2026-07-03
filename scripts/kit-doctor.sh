@@ -720,7 +720,9 @@ fi
 # but the misalignment still bites anyone who merges from the GitHub UI — so surface it.
 if [[ $GH_AUTHED -eq 1 ]] && has_cmd gh && [[ -f "$_kitcfg" ]]; then
   _cfg_repo="$(jq -r '.github.repo // empty' "$_kitcfg" 2>/dev/null || true)"
-  _cfg_base="$(jq -r '.github.baseBranch // "main"' "$_kitcfg" 2>/dev/null || echo main)"
+  # Same fallback chain as load_kit_config (#117) so the warning judges the branch cckit actually
+  # integrates on: baseBranch -> integrationBranch -> flow -> "main".
+  _cfg_base="$(jq -r '.github.baseBranch // .github.integrationBranch // .github.flow // "main"' "$_kitcfg" 2>/dev/null || echo main)"
   if [[ -n "$_cfg_repo" ]]; then
     _gh_default="$(gh repo view "$_cfg_repo" --json defaultBranchRef --jq '.defaultBranchRef.name' 2>/dev/null || true)"
     if [[ -z "$_gh_default" ]]; then

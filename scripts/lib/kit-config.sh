@@ -30,7 +30,10 @@ load_kit_config() {
 
   export KIT_REPO="$(jq -r '.github.repo'           "$cfg")"
   export KIT_OWNER="$(jq -r '.github.owner'         "$cfg")"
-  export KIT_BASE_BRANCH="$(jq -r '.github.baseBranch // "main"' "$cfg")"  # integration branch (default main; e.g. develop)
+  # Integration branch, resolved through a fallback chain so a host project that names its
+  # integration branch under an older/alternate key still works on adoption: baseBranch (canonical)
+  # -> integrationBranch -> flow -> "main". First non-null wins (#117).
+  export KIT_BASE_BRANCH="$(jq -r '.github.baseBranch // .github.integrationBranch // .github.flow // "main"' "$cfg")"
   export KIT_PROJECTS_V2="$(jq -r '.github.projectsV2' "$cfg")"
   export KIT_PROJECT_NUMBER="$(jq -r '.github.projectNumber' "$cfg")"
   export KIT_PROJECT_TITLE="$(jq -r '.github.projectTitle'   "$cfg")"
