@@ -84,7 +84,9 @@ jobs:
           sha="$(curl -fsSL --retry 6 --retry-delay 5 "$url" | sha256sum | cut -d' ' -f1)"
           git clone --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/jeiemgi/homebrew-cckit" tap
           cd tap
-          perl -0pi -e "s{url \"[^\"]*\"}{url \"$url\"}; s{sha256 \"[^\"]*\"}{sha256 \"$sha\"}" Formula/cckit.rb
+          # Update url, sha256 AND the explicit `version` line — a stale version line makes brew
+          # resolve the wrong version even when the url/sha are current.
+          perl -0pi -e "s{url \"[^\"]*\"}{url \"$url\"}; s{sha256 \"[^\"]*\"}{sha256 \"$sha\"}; s{version \"[^\"]*\"}{version \"$v\"}" Formula/cckit.rb
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git commit -am "cckit $v"
