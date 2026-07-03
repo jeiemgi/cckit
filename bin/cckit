@@ -102,6 +102,11 @@ case "$cmd" in
     if cckit_is_json; then cckit_json version "$v"; else echo "cckit $(ui_paint '1;36' "$v")"; fi
     ;;
   effort)
+    # Load the project config FIRST (like every sibling verb): KIT_REPO / KIT_BASE_BRANCH /
+    # KIT_PROJECTS_V2 drive repo resolution, the worktree base, and the board guard below —
+    # without this, effort start silently branches from origin/main on a non-main-based repo (#151).
+    # shellcheck source=/dev/null
+    source "$LIB/kit-config.sh" && load_kit_config
     # shellcheck source=/dev/null
     source "$LIB/effort.sh"
     # shellcheck source=/dev/null
