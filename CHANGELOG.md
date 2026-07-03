@@ -42,6 +42,12 @@ All notable changes to cckit are documented here. The format follows
   `zsh-safety-test.sh` asserts every affected lib sources and runs clean under `zsh -ic`.
 
 ### Added
+- `cckit sync` now renders a fuller board view: each issue row shows its **Project Status** (from
+  the Projects v2 board when enabled), a **Merge Queue** of open PRs ordered for top-down merging
+  (ready → draft → blocked; within a tier risk:low first, then smaller size, then number, with a
+  bot-branch flag), and **blocked / not-on-board / stale (>14d)** flags. An optional local-model
+  digest is appended only when the local endpoint is alive. Render logic lives in the unit-tested
+  `board-view.sh` (#122).
 - Initial standalone scaffold of cckit, extracted from the in-tree claude-kit (ADR-014).
 - Agnostic secret + privacy guard (secret-guard.sh) wired into the gate and a pre-commit hook —
   blocks secrets, keys, env files (incl. .env.example), and user-declared private terms across all
