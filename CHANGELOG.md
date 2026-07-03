@@ -12,6 +12,19 @@ All notable changes to cckit are documented here. The format follows
   `define:vars` XSS, spread-props XSS) with Starlight 0.40 and `@astrojs/react` 5; a pnpm
   override forces transitive esbuild ≥ 0.28.1 (dev-server file read on Windows). (#169)
 
+### Added
+- **Session mail** (#175): `cckit msg send <branch|project:branch|all> [--steer] "<text>"` /
+  `read` / `list` — a machine-global filesystem mailbox (`~/.cckit/mail/<project>/<branch>`,
+  project = the git-remote slug) so parallel sessions reach each other mid-flight, within one
+  project or across projects. Delivery is hook-driven via one event-aware script
+  (`kit-mail-check.sh`, shipped as a template and wired into cckit's own `.claude/settings.json`):
+  PostToolUse injects unread mail between a working session's tool calls, UserPromptSubmit and
+  SessionStart cover next-prompt and cold-start delivery, and Stop blocks-with-reason ONLY for
+  `--steer` messages so a finishing session gets redirected — consumed on delivery, so a steer can
+  never block twice. Direct mail is read-once; broadcasts hit each session exactly once via a
+  per-branch seen ledger and expire after 7 days.
+>>>>>>> e33a820 (task: sessions send steer messages to each other)
+
 ### Fixed
 - `cckit release` now creates the release tag annotated (`git tag -m`) and pushes only that tag.
   A bare `git tag` dies with `fatal: no tag message?` under `tag.gpgsign=true`, and `push --tags`

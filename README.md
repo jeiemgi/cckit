@@ -32,6 +32,10 @@ run a shell can drive every operation.
   the plan and the proof.
 - **Sessions that pick up where you left off.** `cckit handoff "<note>"` saves a resume-here note;
   bare `cckit` prints it at the start of the next session — context survives the context window.
+- **Sessions that talk to each other.** `cckit msg send <branch|project:branch|all> [--steer]
+  "<text>"` mails any parallel session on the machine — same project or another; the kit's mail
+  hook delivers it to a *live* session between tool calls, and a `--steer` message redirects a
+  session that is about to stop.
 - **Agent-operable.** Every verb has a machine-readable mode (`cckit <verb> --llm`) and an
   [`AGENTS.md`](AGENTS.md) contract, so agents drive the kit without scraping human output.
 - **Scales from one issue to a wave.** The same verbs that take one issue to a merged PR also plan
