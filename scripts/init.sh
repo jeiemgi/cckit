@@ -735,7 +735,7 @@ safe_copy "$KIT_ROOT/scripts/benchmark/lib/bench-common.sh" "$TARGET/scripts/ben
 echo "  + scripts/benchmark/ (doc-retrieval benchmark harness — see benchmarks/SCHEMA.md)"
 
 mkdir -p "$TARGET/benchmarks"
-for bf in SCHEMA.md benchmark.config.json retrieval.jsonl adversarial.jsonl abstain.jsonl quality.jsonl; do
+for bf in SCHEMA.md benchmark.config.json retrieval.jsonl adversarial.jsonl abstain.jsonl quality.jsonl .gitignore; do
   safe_write "$KIT_ROOT/templates/benchmarks/$bf" "$TARGET/benchmarks/$bf"
 done
 echo "  + benchmarks/ (example dataset + schema — grow your own; run: scripts/benchmark/report.sh)"
