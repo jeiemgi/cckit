@@ -735,6 +735,14 @@ safe_write "$KIT_ROOT/templates/lib/kit-sigil.sh.tmpl" "$TARGET/.claude/lib/kit-
 chmod +x "$TARGET/.claude/lib/kit-sigil.sh" 2>/dev/null || true
 echo "  + .claude/lib/kit-sigil.sh"
 
+# ---- settings.json (versioned — travels to worktrees + collaborators) ---
+# Unlike settings.local.json (gitignored, per-checkout), this one is CHECKED IN so the
+# captain's pre-authorized wave-merge (gh pr merge under an approved plan) works in every
+# worktree and for every collaborator without re-prompting. safe_write = preserve-if-exists.
+mkdir -p "$TARGET/.claude"
+safe_write "$KIT_ROOT/templates/settings/settings.json.tmpl" "$TARGET/.claude/settings.json"
+echo "  + .claude/settings.json (versioned captain merge permission)"
+
 # ---- settings.local.json (+ hooks, additive) ----------------------------
 mkdir -p "$TARGET/.claude"
 safe_write "$KIT_ROOT/templates/settings/settings.local.json.tmpl" "$TARGET/.claude/settings.local.json"

@@ -26,12 +26,17 @@ scripts; it never reimplements looping or orchestration.
 back to the human to confirm a planned step.** "Do these efforts with the new flow", an approved
 `kit effort plan`, or a green wave are an **established plan**: execute it end to end —
 build a wave → merge its PRs → close subs+parent → gc → launch the next wave — **without asking
-"merge or review?"**. A planned merge is _execution_, not a new decision. (José, "Error 1", 2026-06-28.)
+"merge or review?"**. A planned merge is _execution_, not a new decision (the canonical "Error 1" incident: stalling an approved plan to ask for a routine merge).
 
 - The human steers the **plan**, not each merge. Asking to confirm a routine planned merge is the error.
 - A `risk:med` change the plan already approved (a product feature in the agreed scope) is **not** a
   reason to stop — the plan blessed it. The risk-tiered review tiers
   (`risk-tiered-review.md`) govern **ad-hoc** PRs, **not** execution of an approved plan.
+- **The permission is shipped, not improvised.** `cckit init` scaffolds a **versioned**
+  `.claude/settings.json` (from `templates/settings/settings.json.tmpl`) whose explicit
+  `Bash(gh pr merge:*)` allow pre-authorizes the wave-merge — checked in, so it travels to every
+  worktree and collaborator (the gitignored `settings.local.json` does not). A captain merge that
+  still prompts means the project predates the template: re-run `cckit init --upgrade`.
 
 ### Ping the human ONLY on a genuine blocker
 
