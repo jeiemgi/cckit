@@ -177,6 +177,7 @@ export default defineConfig({
         ]},
         { label: 'Reference', items: [
           { label: 'CLI reference', slug: 'cli-reference' },
+          { label: 'Documentation benchmark', slug: 'benchmark' },
           { label: 'Skills cckit ships', slug: 'skills' },
           { label: 'Tags directory', slug: 'tags' },
           { label: 'Config & permissions', slug: 'config-and-permissions' },

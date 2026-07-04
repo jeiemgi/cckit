@@ -1,0 +1,97 @@
+---
+title: Documentation benchmark
+description: Score how well a kit-managed project finds and uses its own canonical docs — retrieval, adversarial, abstain, and quality tiers.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import Tag from '../../components/Tag.astro';
+import TagRow from '../../components/TagRow.astro';
+
+<TagRow kinds={["command"]} />
+
+A project's docs are only worth writing if they can be **found and used**. The documentation
+benchmark measures exactly that: it asks a cold agent your project's own questions and scores whether
+it points at the **right canonical document** — the same way a new teammate or an AI assistant would
+have to. Run it on a kit version bump (or any docs change) to catch regressions in retrieval,
+routing, and knowledge findability before they ship.
+
+cckit ships the **generic machinery** (`scripts/benchmark/`) plus an **example dataset + schema**
+(`benchmarks/`). The datasets are per-project fixtures — each project brings its own questions and
+expected paths and grows them over time.
+
+## The four tiers
+
+| Tier | What it tests | Scoring | Judge |
+| --- | --- | --- | --- |
+| **Retrieval** | a cold agent finds the canonical doc | objective top-hit path match | no |
+| **Adversarial** | paraphrased / no-keyword / split-canonical / trap | objective top-hit path match | no |
+| **Abstain** | unanswerable → the agent must abstain, not hallucinate | any path returned = fail | no |
+| **Quality** | claim-style answer correctness + completeness | model judge, 0..1 + mean | yes |
+
+The first three are **objective** — a returned path either matches the expected path or it doesn't,
+no judge. Quality uses a model judge, de-biased by a per-question `must` rubric so it scores coverage
+of required points, not tone.
+
+## Running it
+
+```bash
+cckit bench run          # retrieval + adversarial + abstain (objective)
+cckit bench quality      # the judged quality tier (0..1 mean)
+cckit bench report       # writes benchmarks/RESULTS.md a non-expert can read
+cckit bench run --dry    # offline shape check — validates every record, calls no model
+```
+
+`--dry` never touches a model: it validates that every record is well-formed and counts them. That
+makes it safe for CI and the per-round no-mistakes gate. A live run scores against the configured
+model backend and exits non-zero on any retrieval failure, so autopilot and CI notice a regression.
+
+<Aside type="tip" title="RESULTS.md">
+`cckit bench report` produces a plain, low-jargon `RESULTS.md`: what was tested, what passed, and one
+headline score. It's meant to be readable by someone who has never seen the harness.
+</Aside>
+
+## The dataset
+
+Datasets live in `benchmarks/` as one JSON object per line (`*.jsonl`). Blank lines and `#` comments
+are ignored, so you can annotate. See `benchmarks/SCHEMA.md` for the full schema; the shapes are:
+
+```json
+// retrieval / adversarial — expect a path, or an array of acceptable paths
+{"id": "ret-01", "q": "How do we cut a release?", "expect": "releasing.md"}
+
+// abstain — no documented answer; the agent must return NONE
+{"id": "abs-01", "q": "What is the DB admin password?", "expect": "NONE"}
+
+// quality — a claim plus the rubric that de-biases the judge
+{"id": "qual-01", "claim": "Summarize releasing.", "must": ["version bumped", "tag published"]}
+```
+
+Path matching is lenient about *where* a path is rooted (a leading `./` or knowledge-dir prefix is
+stripped) but strict about *which* document is named.
+
+## Pluggable model backend
+
+The backend has **no hard dependency on a provider**. Selection is by environment:
+
+| Env | Backend |
+| --- | --- |
+| _(default)_ | headless `claude -p` — the $0-API subscription path |
+| `BENCH_MODEL_ENDPOINT=<url>` (+ optional `BENCH_MODEL`, `BENCH_API_KEY`) | any OpenAI-compatible `/chat/completions` endpoint |
+| `BENCH_BACKEND=mock` | deterministic offline stand-in (`--dry` / tests) |
+
+`BENCH_TIMEOUT_SECS` (default 90) caps each call via a portable timeout that degrades from
+`timeout` → `gtimeout` → a perl watchdog.
+
+## Autopilot objective mode
+
+Two scripts wire the harness into unattended objective runs (see [autopilot](/efforts-and-waves/)):
+
+- **`scripts/benchmark/gate.sh`** — the per-round no-mistakes bundle: `bash -n` on every harness
+  script, `--dry` on every set, and the project's `knowledge-lint`. Nothing may be broken by an edit.
+- **`scripts/benchmark/stop-check.sh`** — the `Stop=Both` predicate for `/loop --until`: it exits 0
+  only when the suite has reached its record-count target **and** the gate has passed *N* rounds in
+  a row. A broken round resets the streak, so the loop can never stop on a round that grew the suite
+  but broke it.
+
+That lets an objective loop grow + harden the sets each round, fix any canonical-doc drift, re-verify,
+and never break anything — stopping only when it's both big enough and clean.

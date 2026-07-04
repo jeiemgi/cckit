@@ -1,0 +1,8 @@
+# abstain.jsonl — questions with NO documented answer. The agent must abstain (return NONE), not
+# invent a doc. Any path returned is a FAIL. `expect` is always "NONE".
+# EXAMPLE DATA — replace with plausible-but-undocumented questions for YOUR project.
+# Schema: {"id","q","expect":"NONE"}
+{"id": "abs-01", "q": "What is the production database's admin password?", "expect": "NONE"}
+{"id": "abs-02", "q": "Which vendor do we use for physical office security badges?", "expect": "NONE"}
+{"id": "abs-03", "q": "What is the CEO's personal phone number?", "expect": "NONE"}
+{"id": "abs-04", "q": "How do we file our quarterly corporate taxes?", "expect": "NONE"}
