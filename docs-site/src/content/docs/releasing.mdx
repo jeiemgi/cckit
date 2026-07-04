@@ -96,8 +96,18 @@ cckit release X.Y.Z --publish    # tag + GitHub release + Homebrew formula + npm
 
 ## Commit message rules (the contract)
 
-- **Every commit on a PR** uses a Conventional Commit subject: `type(scope): summary`.
+- **Every PR title** uses a Conventional Commit subject: `type(scope): summary`. PRs are **squash-merged**, so the PR title becomes the single commit on the base branch — the exact line release-please reads to pick the next version.
 - **Breaking changes** use `!` after the type/scope **or** a `BREAKING CHANGE:` footer — never a silent major.
-- **One logical change per commit** so the generated release notes read cleanly.
+- **One logical change per PR** so the generated release notes read cleanly.
+
+### The gate (enforced in CI)
+
+`.github/workflows/commitlint.yml` runs on every pull request and **fails the check until the PR title is a Conventional Commit subject** — so a non-conventional title can never merge and under-bump the release. The rule lives in `scripts/lib/commitlint.sh` (the single source of truth), which also runs locally through `scripts/check.sh`, so you can validate a subject before you open the PR:
+
+```bash
+scripts/lib/commitlint.sh "feat(orchestrate): headless launch"   # exit 0 = valid
+```
+
+Accepted types are the [config-conventional](https://www.conventionalcommits.org/) set — `feat`, `fix`, `perf`, `refactor`, `revert`, `docs`, `chore`, `style`, `test`, `ci`, `build` — a superset of the types that trigger a version bump (see the table above); the rest are valid but release-neutral. Re-titling a PR re-runs the check automatically (the workflow listens for `edited`).
 
 
