@@ -1,0 +1,8 @@
+# quality.jsonl — claim-style prompts graded 0..1 for answer completeness. Each carries a `must`
+# rubric (the required points) so the judge scores coverage, not tone. This de-biases the judge.
+# EXAMPLE DATA — replace with your project's real claims + rubrics.
+# Schema: {"id","claim","must":[ "point", "point", ... ]}
+{"id": "qual-01", "claim": "Summarize our release process end to end.", "must": ["version is bumped", "changelog is updated", "a tag/release is published", "who approves or triggers it"]}
+{"id": "qual-02", "claim": "Explain our branching model to a new contributor.", "must": ["the base/integration branch is named", "feature branches base off it", "how work merges back"]}
+{"id": "qual-03", "claim": "What are the first steps for onboarding a new engineer?", "must": ["access/accounts are provisioned", "the repo is set up locally", "which docs to read first"]}
+{"id": "qual-04", "claim": "Describe how and where we record architectural decisions.", "must": ["decisions are written as ADRs (or equivalent)", "where they live in the repo", "each states context and the decision"]}

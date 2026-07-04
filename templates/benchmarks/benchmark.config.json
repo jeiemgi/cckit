@@ -1,0 +1,14 @@
+{
+  "$comment": "Example benchmark config shipped by cckit. Datasets are PER-PROJECT: replace the records in the *.jsonl files with your own project's questions + expected canonical-doc paths, then grow them over time. cckit ships only this example + the schema (benchmarks/SCHEMA.md).",
+  "knowledgeDir": "knowledge",
+  "sets": [
+    { "name": "retrieval",   "file": "retrieval.jsonl",   "tier": "retrieval" },
+    { "name": "adversarial", "file": "adversarial.jsonl", "tier": "adversarial" },
+    { "name": "abstain",     "file": "abstain.jsonl",     "tier": "abstain" },
+    { "name": "quality",     "file": "quality.jsonl",     "tier": "quality" }
+  ],
+  "target": {
+    "minRecords": 12,
+    "cleanRounds": 2
+  }
+}

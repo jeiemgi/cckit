@@ -184,6 +184,7 @@ prompt** you can paste straight into Claude Code — start exactly where you are
 cckit/
   bin/cckit              # the CLI dispatcher
   scripts/lib/*.sh       # the git-mechanics bundle (effort, worktree, gh, gc, …)
+  scripts/benchmark/     # doc-retrieval benchmark harness (cckit bench)
   .claude-plugin/        # the Claude Code plugin manifest
   skills/ commands/      # Claude Code skills + slash commands
   profiles/ templates/   # init profiles + scaffold templates
@@ -191,6 +192,11 @@ cckit/
   docs-site/             # documentation source — Astro/Starlight (deployed to cckit.dev)
   cckit.config.json      # project configuration (no hardcoded org/repo)
 ```
+
+`cckit init` also scaffolds `benchmarks/` — a per-project **documentation benchmark** that scores how
+well an agent finds and uses your own canonical docs (retrieval / adversarial / abstain / quality
+tiers). Run `cckit bench report` after a docs or kit-version change to catch findability regressions;
+see the [benchmark guide](https://cckit.dev/benchmark/).
 
 ## Built with cckit
 

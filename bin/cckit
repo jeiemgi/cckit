@@ -36,6 +36,7 @@
 #   cckit migrate                   reshuffle an old kit layout to the current one
 #   cckit adopt                     record kit-shaped files a repo already has into the manifest
 #   cckit digest <path|url>         summarize a file or URL (local model)
+#   cckit bench [run|report|…]      doc-retrieval benchmark: score how well docs are found + used
 #   cckit release <ver> [--publish] cut a release (dry-run by default)
 #   cckit version [--llm]           the installed cckit version
 #   cckit commands [--llm]          list every verb (the command catalog)
@@ -259,6 +260,23 @@ case "$cmd" in
   adopt)       exec "$ROOT/scripts/kit-adopt.sh" "$@" ;;
   doctor)      exec "$ROOT/scripts/kit-doctor.sh" "$@" ;;
   digest)      exec "$ROOT/scripts/kit-digest.sh" "$@" ;;
+  bench)
+    # Documentation benchmark (#200) — score how well this project finds + uses its OWN canonical
+    # docs. Runs the PROJECT's scaffolded harness if present, else cckit's own copy. BENCH_KIT_ROOT
+    # lets the runner fall back to the shipped example set before a project grows its own data.
+    BENCH_ROOT="$PWD/scripts/benchmark"; [ -d "$BENCH_ROOT" ] || BENCH_ROOT="$ROOT/scripts/benchmark"
+    export BENCH_KIT_ROOT="$ROOT"
+    sub="${1:-report}"; shift || true
+    case "$sub" in
+      run)        exec bash "$BENCH_ROOT/run.sh" "$@" ;;
+      quality)    exec bash "$BENCH_ROOT/run-quality.sh" "$@" ;;
+      report)     exec bash "$BENCH_ROOT/report.sh" "$@" ;;
+      gate)       exec bash "$BENCH_ROOT/gate.sh" "$@" ;;
+      stop-check) exec bash "$BENCH_ROOT/stop-check.sh" "$@" ;;
+      -h|--help)  echo 'cckit bench <run|quality|report|gate|stop-check> [--dry] [--json]'; exit 0 ;;
+      *) echo 'cckit bench <run|quality|report|gate|stop-check> [--dry] [--json]' >&2; exit 2 ;;
+    esac
+    ;;
   scan)        source "$LIB/project-scan.sh"; project_scan "$@" ;;
   encode-context) source "$LIB/toon.sh"; toon_encode ;;
   render)      source "$LIB/render.sh"; cckit_render ;;
