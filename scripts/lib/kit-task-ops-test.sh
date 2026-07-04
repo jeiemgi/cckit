@@ -37,6 +37,27 @@ if [ -n "${KTO_TEST_INNER:-}" ]; then
   eq "kind from labels"  "$(kto_labels_kind 'kind:feat,priority:p2,role:tech-lead')" "feat"
   eq "role absent"       "$(kto_labels_role 'kind:chore,priority:p3')"               ""
 
+  # kto_pr_title — Conventional Commit PR titles (the squash-merge subject the commit gate reads)
+  . "$dir/commitlint.sh"   # the shared validator kto_pr_title reuses to honor a conventional summary
+  eq "task→feat + effort prefix stripped" \
+     "$(kto_pr_title '[Effort 182] 1 · Enforce Conventional Commits' '' 'kind:task,priority:p1')" \
+     "feat: Enforce Conventional Commits"
+  eq "double prefix [Effort] N · [Tag]" \
+     "$(kto_pr_title '[Effort] 86 · [Core] Plan future work' '' 'kind:task')" \
+     "feat: Plan future work"
+  eq "plain bug label → fix" \
+     "$(kto_pr_title 'mail hook goes silent' '' 'bug')" \
+     "fix: mail hook goes silent"
+  eq "kind:chore → chore" \
+     "$(kto_pr_title '[Effort 75] 7 · rich rendering' '' 'kind:chore')" \
+     "chore: rich rendering"
+  eq "conventional summary wins over derivation" \
+     "$(kto_pr_title '[Effort 182] 2 · Publish to npm' 'ci: publish via OIDC' 'kind:task')" \
+     "ci: publish via OIDC"
+  eq "non-conventional summary ignored → derive" \
+     "$(kto_pr_title 'Benchmark harness' 'ported a harness' 'kind:feat')" \
+     "feat: Benchmark harness"
+
   # kto_compose_pr_body must carry Closes #N and the Summary
   body="$(kto_compose_pr_body 42 'Did the thing.' 'tech-lead')"
   case "$body" in *"Closes #42"*) ;; *) echo "FAIL($KTO_TEST_INNER): pr body missing Closes #42"; fail=1 ;; esac

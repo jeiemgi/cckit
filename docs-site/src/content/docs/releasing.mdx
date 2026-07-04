@@ -97,6 +97,7 @@ cckit release X.Y.Z --publish    # tag + GitHub release + Homebrew formula + npm
 ## Commit message rules (the contract)
 
 - **Every PR title** uses a Conventional Commit subject: `type(scope): summary`. PRs are **squash-merged**, so the PR title becomes the single commit on the base branch — the exact line release-please reads to pick the next version.
+- **`cckit pr` generates a conventional title for you** — it derives the `type` from the issue's `kind:` label (`kind:task` → `feat`, a `bug` label → `fix`, `kind:chore` → `chore`, …) and strips the `[Effort N] M ·` / `[Tag]` prefix from the issue title. Pass a summary that is *already* a Conventional Commit subject (e.g. `cckit pr 42 "fix: guard the empty case"`) to override the derived type when you know the change's true nature. Either way the opened PR passes the gate below.
 - **Breaking changes** use `!` after the type/scope **or** a `BREAKING CHANGE:` footer — never a silent major.
 - **One logical change per PR** so the generated release notes read cleanly.
 

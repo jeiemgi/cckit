@@ -17,11 +17,14 @@ cckit start <issue>          # isolated worktree + branch
 cckit pr <issue> "<summary>" # open the PR
 ```
 
-- Branch from `main`; one issue = one branch = one PR.
+- Branch from `develop` (the integration branch); one issue = one branch = one PR. `main` is
+  releases-only. `cckit start` already branches from the configured base.
 - Use [Conventional Commits](https://www.conventionalcommits.org/) — releases are cut from them.
-  PRs are squash-merged, so **the PR title must be a Conventional Commit subject** (`type(scope): summary`);
-  CI (`commitlint`) fails the PR until it is. Check one locally with
-  `scripts/lib/commitlint.sh "feat: your summary"`.
+  PRs are squash-merged, so **the PR title must be a Conventional Commit subject** (`type(scope): summary`).
+  **`cckit pr` builds one for you** (derived from the issue's `kind:` label, `[Effort …]` prefix
+  stripped); pass an already-conventional summary — `cckit pr <issue> "fix: guard the empty case"` —
+  to set the type yourself. CI (`commitlint`) fails the PR until the title is valid; check one locally
+  with `scripts/lib/commitlint.sh "feat: your summary"`.
 - Run the local gate before opening a PR: `bash scripts/check.sh` (shell syntax, valid manifests,
   no stray branding, the commitlint rules). A green gate is the bar.
 
