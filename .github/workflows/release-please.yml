@@ -13,8 +13,13 @@ name: release-please
 # The version number itself comes from the commits (feat -> minor, fix/perf/refactor/revert ->
 # patch, feat!/BREAKING CHANGE -> major) — the same rules as scripts/lib/version-bump.sh.
 #
-# Publishing is gated on secrets — a release still succeeds without them, it just skips that channel:
-#   NPM_TOKEN                  npm *Automation* token (bypasses 2FA). npmjs.com -> Access Tokens -> Automation.
+# npm publishing uses OIDC "trusted publishing" (GA mid-2025) — NO long-lived token. GitHub Actions
+# mints a short-lived OIDC token per run that npm exchanges for publish rights, and the publish is
+# automatically signed with provenance. One-time setup on npmjs.com: the @jeiemgi/cckit package ->
+# Settings -> Trusted Publishing -> add this repo + workflow (.github/workflows/release-please.yml).
+# Requires npm >= 11.5.1 (setup-node's bundled npm is older, so the job upgrades it first).
+#
+# The Homebrew channel is still gated on secrets — a release succeeds without them, it just skips that channel:
 #   Homebrew tap auth (either — the GitHub App is preferred, the PAT is the fallback):
 #     HOMEBREW_APP_ID          + HOMEBREW_APP_PRIVATE_KEY — a GitHub App (Contents: write) installed on
 #                              homebrew-cckit; the workflow mints a short-lived, tap-scoped token per run.
@@ -55,8 +60,10 @@ jobs:
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read      # check out the tagged commit
+      id-token: write     # mint the OIDC token npm exchanges for publish rights (trusted publishing)
     env:
-      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
       HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
       HOMEBREW_APP_ID: ${{ secrets.HOMEBREW_APP_ID }}
     steps:
@@ -69,10 +76,14 @@ jobs:
           node-version: 20
           registry-url: https://registry.npmjs.org
 
-      - name: Publish to npm
-        if: ${{ env.NPM_TOKEN != '' }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # Trusted publishing needs npm >= 11.5.1; setup-node's bundled npm is older.
+      - name: Upgrade npm for trusted publishing
+        run: npm install -g npm@latest
+
+      # No token: npm detects the Actions OIDC (id-token: write above) and exchanges it for a
+      # short-lived publish credential, signing the tarball with provenance automatically. Requires
+      # the trusted publisher to be configured once on npmjs.com (see the header comment).
+      - name: Publish to npm (OIDC trusted publishing)
         run: npm publish --access public
 
       # Preferred tap auth: mint a short-lived, tap-scoped token from the cckit-release GitHub App
