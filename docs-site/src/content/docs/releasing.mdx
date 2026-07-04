@@ -56,17 +56,26 @@ Changes to the release workflow are always reviewed by a person — the CI token
 
 ## Publishing to npm + Homebrew
 
-Publishing is automatic once the Release PR is merged — the `publish` job in `release-please.yml` runs `npm publish` and bumps the [jeiemgi/homebrew-cckit](https://github.com/jeiemgi/homebrew-cckit) tap (recomputing the formula `sha256`). Each channel is gated on a repo secret and simply skipped if the secret is absent:
+Publishing is automatic once the Release PR is merged — the `publish` job in `release-please.yml` runs `npm publish` and bumps the [jeiemgi/homebrew-cckit](https://github.com/jeiemgi/homebrew-cckit) tap (recomputing the formula `sha256`).
 
-- `NPM_TOKEN` — npm **Automation** token (npmjs.com → Access Tokens → Automation).
-- **Homebrew tap auth** — either of:
+**npm uses OIDC trusted publishing** — no long-lived `NPM_TOKEN`. GitHub Actions mints a short-lived OIDC token per run (`id-token: write`) that npm exchanges for publish rights, and the tarball is signed with [provenance](https://docs.npmjs.com/generating-provenance-statements) automatically. Nothing to rotate or leak. It needs a **one-time setup** on npmjs.com (below) and npm ≥ 11.5.1 (the job upgrades npm before publishing).
+
+The **Homebrew** channel is still gated on a repo secret and simply skipped if it's absent — either of:
   - **GitHub App (preferred)** — `HOMEBREW_APP_ID` + `HOMEBREW_APP_PRIVATE_KEY` for an app with **Contents: write** installed on `homebrew-cckit`. The workflow mints a short-lived, tap-scoped token per run — nothing to expire or rotate by hand.
   - `HOMEBREW_TAP_TOKEN` — legacy fallback: a PAT with push access to the tap repo (`contents:write`). Used only when the app secrets are absent.
 
 <Aside type="tip" title="One-time setup checklist">
-- `NPM_TOKEN` and the Homebrew tap auth (the GitHub App, or the PAT) set under **Settings → Secrets and variables → Actions**.
+- **npm trusted publishing** — on npmjs.com, open the `@jeiemgi/cckit` package → **Settings → Trusted Publishing** and add a GitHub Actions publisher for this repo with workflow `.github/workflows/release-please.yml`. No secret to store.
+- The Homebrew tap auth (the GitHub App, or the PAT) set under **Settings → Secrets and variables → Actions**.
 - `develop` is the default branch; `main` is protected (PR required, no force-push or deletion) so it only advances through a merged PR.
 - On the **first** Release PR, reconcile the hand-written `## [Unreleased]` block in `CHANGELOG.md` — release-please owns changelog entries from then on.
+</Aside>
+
+<Aside type="note" title="Configuring npm trusted publishing">
+1. Publish `@jeiemgi/cckit` **once** the classic way if it doesn't exist yet (trusted publishing links to an existing package), e.g. `cckit release X.Y.Z --publish` from a logged-in machine.
+2. On npmjs.com go to the package → **Settings → Trusted Publishing → Add publisher** → **GitHub Actions**.
+3. Fill in owner `jeiemgi`, repository `cckit`, workflow filename `release-please.yml`. Leave the environment blank (the job runs without a named environment).
+4. Save. The next merged Release PR publishes with zero secrets and full provenance.
 </Aside>
 
 <Aside type="note" title="Setting up the Homebrew tap GitHub App">
