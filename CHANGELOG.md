@@ -5,6 +5,13 @@ All notable changes to cckit are documented here. New entries below are generate
 [Conventional Commits](https://www.conventionalcommits.org/) and land when the Release PR is
 merged to `main`. Earlier entries follow [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.6.1](https://github.com/jeiemgi/cckit/compare/v0.6.0...v0.6.1) (2026-09-02)
+
+
+### Bug Fixes
+
+* **ci:** pin npm@11 in the release publish job ([#213](https://github.com/jeiemgi/cckit/issues/213)) ([dd3e6a9](https://github.com/jeiemgi/cckit/commit/dd3e6a9c1c30925f93927070460c62db2ace627f))
+
 ## [0.6.0](https://github.com/jeiemgi/cckit/compare/v0.5.0...v0.6.0) (2026-09-02)
 
 
