@@ -69,6 +69,52 @@ kto_labels_kind() {
   printf '%s' "$1" | tr ',' '\n' | grep '^kind:' | head -1 | cut -d: -f2
 }
 
+# Compose the PR title as a Conventional Commit subject. Because PRs are squash-merged, this title
+# becomes the single commit release-please reads to pick the next version — a non-conventional title
+# under-bumps silently, and the commitlint gate (.github/workflows/commitlint.yml) now rejects it.
+# Args: <raw-issue-title> <summary> <labels-csv>
+#   1. An author <summary> that is ALREADY a conventional subject wins — the author knows the change's
+#      true type (e.g. a kind:task that is really a fix). Validated by the shared commitlint.sh.
+#   2. Otherwise derive the type from the kind:/bug label (kind:task, the default, → feat) and strip
+#      the "[Effort N] M · " / leading "[Tag] " noise from the issue title.
+# Network-free (covered by the self-test). Output always passes commitlint_check.
+kto_pr_title() {
+  local raw="${1:-}" summary="${2:-}" labels="${3:-}" kind ctype desc
+  # Reuse the ONE commit-lint implementation. bin/cckit sources it; if a bare caller hasn't, pull it
+  # from the repo (kto_task_pr always runs in-repo). Degrades gracefully if it can't be found.
+  if ! type commitlint_check >/dev/null 2>&1; then
+    local _cl; _cl="$(git rev-parse --show-toplevel 2>/dev/null)/scripts/lib/commitlint.sh"
+    [ -f "$_cl" ] && . "$_cl" 2>/dev/null || true
+  fi
+  # 1) Prefer an author-provided conventional summary.
+  if [ -n "$summary" ] && type commitlint_check >/dev/null 2>&1 && commitlint_check "$summary" >/dev/null 2>&1; then
+    printf '%s' "$summary"; return 0
+  fi
+  # 2) Derive the type from the kind:/bug label.
+  kind="$(kto_labels_kind "$labels")"
+  case "$kind" in
+    feat)     ctype=feat ;;
+    chore)    ctype=chore ;;
+    docs)     ctype=docs ;;
+    ci)       ctype=ci ;;
+    test)     ctype=test ;;
+    perf)     ctype=perf ;;
+    refactor) ctype=refactor ;;
+    fix|bug)  ctype=fix ;;
+    *)        ctype=feat ;;   # kind:task (the default) and anything unknown → feat
+  esac
+  case ",$labels," in *,bug,*) ctype=fix ;; esac   # a plain `bug` label → fix
+  # 3) Strip "[Effort N] M · " (the "· " consumed here as a literal — byte-wise match is portable
+  #    across BSD/GNU sed + locales; a negated class over the multibyte middot is not) and then a
+  #    leading "[Tag] " (e.g. [Core]). Order matters: eat the separator before the next tag's "[".
+  desc="$(printf '%s' "$raw" | sed -E \
+    -e 's/^\[Effort[^]]*\] +[0-9]+ +· +//' \
+    -e 's/^\[[^]]+\] +//' \
+    -e 's/^[[:space:]]+//')"
+  [ -n "$desc" ] || desc="$raw"
+  printf '%s: %s' "$ctype" "$desc"
+}
+
 # Compose a PR body from the kit-task-pr template. Args: <num> <summary> <role-slug>
 kto_compose_pr_body() {
   local num="$1" summary="$2" role="$3" sig=""
@@ -163,7 +209,9 @@ kto_task_pr() {
   labels=$(printf '%s' "$meta" | jq -r '[.labels[].name] | join(",")')
   milestone=$(printf '%s' "$meta" | jq -r '.milestone.title // ""')
   role="$(kto_labels_role "$labels")"
-  [[ -z "$commit_msg" ]] && commit_msg="${role:-task}: $title"
+  # Conventional Commit PR title (squash-merge commit release-please reads + the commitlint gate).
+  local pr_title; pr_title="$(kto_pr_title "$title" "$summary" "$labels")"
+  [[ -z "$commit_msg" ]] && commit_msg="$pr_title"
 
   if [[ -n "$(git status --porcelain)" ]]; then
     git add -A
@@ -179,7 +227,7 @@ kto_task_pr() {
 
   url=$(gh pr create --repo "$repo" \
     --base "$(kto_base_branch)" --head "$branch" \
-    --title "$title" \
+    --title "$pr_title" \
     --body "$(kto_compose_pr_body "$num" "$summary" "$role")" \
     --label "$labels" \
     ${milestone:+--milestone "$milestone"} \

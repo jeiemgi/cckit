@@ -1,0 +1,29 @@
+# Back-merge main into develop after every push to main (i.e. after each
+# release-please release lands). Keeps develop's version strings (package.json,
+# plugin.json, manifest) in sync with the released version, so symlink installs
+# tracking develop report the right version.
+# On a merge conflict the job FAILS (red) instead of guessing -- resolve by hand.
+name: backmerge
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  backmerge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: develop
+          fetch-depth: 0
+      - name: merge main into develop
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git merge --no-edit -m "chore: back-merge main into develop" origin/main; then
+            git push origin develop
+          else
+            echo "::error::back-merge conflict -- merge main into develop by hand"
+            exit 1
+          fi

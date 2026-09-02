@@ -1,0 +1,7 @@
+# retrieval.jsonl — direct questions. The agent should point at the ONE canonical doc that answers.
+# EXAMPLE DATA — replace `q` + `expect` with your project's real questions and canonical-doc paths.
+# Schema: {"id","q","expect"}  where expect = a knowledge-relative path, or an array of acceptable paths.
+{"id": "ret-01", "q": "How do we cut and publish a release?", "expect": "releasing.md"}
+{"id": "ret-02", "q": "What is our branching model and where do feature branches base off?", "expect": "branching.md"}
+{"id": "ret-03", "q": "How is the onboarding process for a new contributor documented?", "expect": "onboarding.md"}
+{"id": "ret-04", "q": "Where do we record architectural decisions?", "expect": ["adr/README.md", "architecture.md"]}

@@ -1,0 +1,31 @@
+name: commitlint
+
+# Enforce the commit contract release-please depends on. PRs are squash-merged, so the PR TITLE
+# becomes the single commit release-please reads to compute the next version — a non-conventional
+# title under-bumps the release silently. This gate fails the PR until the title is a Conventional
+# Commit subject. scripts/lib/commitlint.sh is the single source of truth (same rules run locally
+# in scripts/check.sh); CI just feeds it the PR title.
+#
+# `edited` is in the trigger list so re-titling a PR re-runs the check without a new push.
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: commitlint-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  pr-title:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate PR title (Conventional Commits)
+        # Pass the title through the environment, never interpolated into the script body — a PR
+        # title is attacker-controlled and must not reach the shell as code.
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: bash scripts/lib/commitlint.sh "$PR_TITLE"

@@ -722,6 +722,24 @@ for sc in setup-labels.sh setup-milestones.sh capture-project-ids.sh task-sync.s
 done
 echo "  + scripts/ (libs + setup + task-sync + version-check + knowledge-lint)"
 
+# ---- benchmark harness (generic machinery; kit-owned) + example dataset ----
+# The harness measures how well THIS project's own canonical docs can be found + used by a cold
+# agent (retrieval / adversarial / abstain / quality tiers). Machinery is kit-owned (refreshed on
+# upgrade); the datasets under benchmarks/ are the project's own — we scaffold an EXAMPLE set +
+# schema only, and safe_write preserves it on upgrade so growth is never clobbered.
+for bs in run.sh run-quality.sh report.sh gate.sh stop-check.sh benchmark-test.sh; do
+  safe_copy "$KIT_ROOT/scripts/benchmark/$bs" "$TARGET/scripts/benchmark/$bs" exec
+done
+safe_copy "$KIT_ROOT/scripts/benchmark/lib/model.sh"        "$TARGET/scripts/benchmark/lib/model.sh"
+safe_copy "$KIT_ROOT/scripts/benchmark/lib/bench-common.sh" "$TARGET/scripts/benchmark/lib/bench-common.sh"
+echo "  + scripts/benchmark/ (doc-retrieval benchmark harness — see benchmarks/SCHEMA.md)"
+
+mkdir -p "$TARGET/benchmarks"
+for bf in SCHEMA.md benchmark.config.json retrieval.jsonl adversarial.jsonl abstain.jsonl quality.jsonl .gitignore; do
+  safe_write "$KIT_ROOT/templates/benchmarks/$bf" "$TARGET/benchmarks/$bf"
+done
+echo "  + benchmarks/ (example dataset + schema — grow your own; run: scripts/benchmark/report.sh)"
+
 # ---- knowledge base (governed dir: INDEX manifest; upgrade-safe) ---------
 mkdir -p "$TARGET/knowledge"
 safe_write "$KIT_ROOT/templates/knowledge-INDEX.md.tmpl" "$TARGET/knowledge/INDEX.md"
@@ -734,6 +752,14 @@ mkdir -p "$TARGET/.claude/lib"
 safe_write "$KIT_ROOT/templates/lib/kit-sigil.sh.tmpl" "$TARGET/.claude/lib/kit-sigil.sh"
 chmod +x "$TARGET/.claude/lib/kit-sigil.sh" 2>/dev/null || true
 echo "  + .claude/lib/kit-sigil.sh"
+
+# ---- settings.json (versioned — travels to worktrees + collaborators) ---
+# Unlike settings.local.json (gitignored, per-checkout), this one is CHECKED IN so the
+# captain's pre-authorized wave-merge (gh pr merge under an approved plan) works in every
+# worktree and for every collaborator without re-prompting. safe_write = preserve-if-exists.
+mkdir -p "$TARGET/.claude"
+safe_write "$KIT_ROOT/templates/settings/settings.json.tmpl" "$TARGET/.claude/settings.json"
+echo "  + .claude/settings.json (versioned captain merge permission)"
 
 # ---- settings.local.json (+ hooks, additive) ----------------------------
 mkdir -p "$TARGET/.claude"

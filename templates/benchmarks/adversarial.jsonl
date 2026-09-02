@@ -1,0 +1,8 @@
+# adversarial.jsonl — the SAME canonical docs, reached through harder inputs: paraphrased, no shared
+# keyword, split-canonical (either doc is right), or a trap that sounds related but isn't.
+# EXAMPLE DATA — replace with your project's own hardened questions.
+# Schema: {"id","q","expect"}  (same as retrieval; expect may be an array for split-canonical).
+{"id": "adv-01", "q": "A teammate wants to ship a new version to users — where's the runbook?", "expect": "releasing.md"}
+{"id": "adv-02", "q": "Off which line should I start a new piece of work?", "expect": "branching.md"}
+{"id": "adv-03", "q": "New hire, day one — what should they read first?", "expect": "onboarding.md"}
+{"id": "adv-04", "q": "We disagreed on a design choice and want to write down the reasoning we settled on.", "expect": ["adr/README.md", "architecture.md"]}
