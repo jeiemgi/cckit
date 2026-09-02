@@ -76,9 +76,11 @@ jobs:
           node-version: 20
           registry-url: https://registry.npmjs.org
 
-      # Trusted publishing needs npm >= 11.5.1; setup-node's bundled npm is older.
+      # Trusted publishing needs npm >= 11.5.1; setup-node's bundled npm is older. Pin the major:
+      # `npm@latest` moved to 12.x, which requires node >= 22 and so EBADENGINE-fails on the node 20
+      # this job runs. npm 11 satisfies the trusted-publishing floor and runs on node 20.
       - name: Upgrade npm for trusted publishing
-        run: npm install -g npm@latest
+        run: npm install -g npm@11
 
       # No token: npm detects the Actions OIDC (id-token: write above) and exchanges it for a
       # short-lived publish credential, signing the tarball with provenance automatically. Requires
