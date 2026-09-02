@@ -5,6 +5,24 @@ All notable changes to cckit are documented here. New entries below are generate
 [Conventional Commits](https://www.conventionalcommits.org/) and land when the Release PR is
 merged to `main`. Earlier entries follow [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.6.0](https://github.com/jeiemgi/cckit/compare/v0.5.0...v0.6.0) (2026-09-02)
+
+
+### Features
+
+* doc-retrieval benchmark harness (cckit bench) ([#205](https://github.com/jeiemgi/cckit/issues/205)) ([b0ee8eb](https://github.com/jeiemgi/cckit/commit/b0ee8eb4154b034b3e56bba25d4d2690b1e76d43))
+* enforce Conventional Commits on every PR title ([#202](https://github.com/jeiemgi/cckit/issues/202)) ([c515695](https://github.com/jeiemgi/cckit/commit/c515695cacd30c7a47d23975d6827f58a56e9e1e))
+* **init:** ship a versioned settings.json with the captain merge permission ([#204](https://github.com/jeiemgi/cckit/issues/204)) ([c69abb4](https://github.com/jeiemgi/cckit/commit/c69abb4615c281f4b98b7062b92ee38b3d366265))
+* kit-ux-audit — graph-driven UX/UI audit skill ([#210](https://github.com/jeiemgi/cckit/issues/210)) ([d768c5c](https://github.com/jeiemgi/cckit/commit/d768c5c79f644f405022f9e1b7c86e3e78f29a64))
+* **pr:** cckit pr emits Conventional Commit titles ([02c7d18](https://github.com/jeiemgi/cckit/commit/02c7d18da827d2ae7220a6682dfe01ea74cb0b77))
+* **render:** route board + status through the rendering seam ([#82](https://github.com/jeiemgi/cckit/issues/82)) ([#201](https://github.com/jeiemgi/cckit/issues/201)) ([e317b45](https://github.com/jeiemgi/cckit/commit/e317b45c1287bb44dc0d9895018040dfa76e9b38))
+* self-update script + auto back-merge of releases into develop ([#206](https://github.com/jeiemgi/cckit/issues/206)) ([a6fba99](https://github.com/jeiemgi/cckit/commit/a6fba992a617f86e0f00f6871dbec2de53276dc7))
+
+
+### Bug Fixes
+
+* **orchestrate:** headless agent never launched — prompt quote collision ([bbf3453](https://github.com/jeiemgi/cckit/commit/bbf345383380220b20b8a3158a8e614f11768b94))
+
 ## [0.5.0](https://github.com/jeiemgi/cckit/compare/v0.4.1...v0.5.0) (2026-07-03)
 
 
