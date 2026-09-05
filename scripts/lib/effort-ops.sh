@@ -361,7 +361,13 @@ _eo_board_done() {
 # Kit-managed paths (the kit ⇄ project sync surface): a change here that is not contributed
 # upstream (/kit-contribute) is a latent regression the next /kit-update can clobber. One place —
 # effort_close's drift check greps against this (was inlined in the kit-effort-close skill, #148).
-_EO_KIT_MANAGED_RE='^(scripts/(lib/|kit$|kit-)|\.claude/(skills|rules|hooks|lib|agents)/)'
+#
+# `.claude/rules/` is NOT blanket kit-managed: `cckit init`/`--upgrade` only ever writes the named
+# files below (one per `templates/rules/*.md` — see init.sh's `$RULES` loop + `safe_write`), so a
+# project's OWN rule docs (design system conventions, product-specific policy, …) that merely live
+# in the same directory can never be touched by /kit-update and must not be flagged as drift. Keep
+# this list in sync with `templates/rules/` when a template rule is added/removed/renamed.
+_EO_KIT_MANAGED_RE='^(scripts/(lib/|kit$|kit-)|\.claude/(skills|hooks|lib|agents)/|\.claude/rules/(branch-naming|communication-style|delegation-brief|design-routing|effort-model|knowledge-base|mempalace|plan-next|plan-output-format|react-annotate|risk-tiered-review|skill-gaps|task-management)\.md$)'
 
 # _eo_knowledge_ingest <num> <trace_dir> <root> — optional post-close knowledge-ingest hook. Runs a
 # project-configured command (github/effort.knowledgeIngestHook, or KIT_EFFORT_KNOWLEDGE_HOOK) with

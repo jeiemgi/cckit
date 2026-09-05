@@ -108,9 +108,10 @@ t  "effort_close did NOT merge without a trace" "$(grep -c 'pr merge' "$GH_LOG")
 # capture (pre-squash) → merge → judge/sync → close subs+parent → board Done → worktree GC →
 # kit-sync drift check (#148: board Done + drift check moved into the verb from the skill).
 echo "work" > file.txt
-mkdir -p .claude/skills
+mkdir -p .claude/skills .claude/rules
 echo "kit-managed" > .claude/skills/demo.md   # a kit-managed path → the drift check must fire (#148)
-git -c user.email=t@t -c user.name=t add file.txt .claude/skills/demo.md
+echo "project-owned" > .claude/rules/project-specific.md  # NOT a kit template rule → must NOT fire
+git -c user.email=t@t -c user.name=t add file.txt .claude/skills/demo.md .claude/rules/project-specific.md
 git -c user.email=t@t -c user.name=t commit -q -m "feat: do the thing (#101)"
 
 # #148: the VERB sets board Status=Done (guarded). Stub the board helpers + captured ids in-shell —
@@ -135,6 +136,9 @@ tc "$BOARD_LOG" 'ITEM-101 SF1 OPT_DONE' "effort_close sets board Done for sub #1
 tc "$BOARD_LOG" 'ITEM-102 SF1 OPT_DONE' "effort_close sets board Done for sub #102"
 # #148: kit-sync drift check moved into the verb — a kit-managed path in the diff → advisory warning
 case "$close_out" in *"kit-sync"*".claude/skills/demo.md"*) echo "ok: kit-sync drift check warns on kit-managed files" ;; *) echo "FAIL: no kit-sync warning in close output"; fail=1 ;; esac
+# a project's OWN .claude/rules/*.md (not one of the kit's templates/rules/*.md names) must NOT be
+# flagged — cckit init/--upgrade never writes it, so it can't be clobbered by /kit-update (#1602)
+case "$close_out" in *".claude/rules/project-specific.md"*) echo "FAIL: project-owned rules/*.md flagged as kit-managed: $close_out"; fail=1 ;; *) echo "ok: drift check ignores a project-owned .claude/rules/*.md file" ;; esac
 t  "effort_close GC removed the effort worktree" \
    "$(git -C "$tmp/work" worktree list --porcelain | grep -c 'effort+99-demo')" "0"
 t  "effort_close GC deleted the local branch" \
