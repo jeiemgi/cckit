@@ -24,9 +24,29 @@ _kit_gc_root() { git worktree list --porcelain 2>/dev/null | awk '/^worktree /{p
 # Source worktree-issue.sh (wt_issue_number / wt_protected_reason) from whatever lib dir we live in.
 _kit_gc_load_deps() {
   command -v wt_protected_reason >/dev/null 2>&1 && return 0
-  local d; d="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
+  # Resolve this file's dir under bash (BASH_SOURCE) AND zsh (%x prompt escape). BASH_SOURCE is
+  # bash-only: under zsh it fell back to $0="zsh", so worktree-issue.sh was never sourced,
+  # wt_protected_reason stayed undefined, and every call site's `2>/dev/null || true` turned the
+  # resulting "command not found" into an empty reason — which classifies an open issue's branch
+  # as SAFE. `eval` keeps the zsh-only syntax out of bash's parser.
+  local src d
+  if [ -n "${BASH_SOURCE[0]:-}" ]; then src="${BASH_SOURCE[0]}"
+  elif [ -n "${ZSH_VERSION:-}" ]; then eval 'src=${(%):-%x}'
+  else src="$0"; fi
+  d="$(CDPATH='' cd -- "$(dirname -- "$src")" && pwd)"
   # shellcheck source=/dev/null
   [ -f "$d/worktree-issue.sh" ] && . "$d/worktree-issue.sh"
+}
+
+# Fail LOUD if the protection helper could not be loaded. Without it every issue-open check
+# silently returns empty and gc would offer to delete in-progress work — a wrong "safe" is far
+# worse than a refusal, so callers must not proceed on a degraded analysis.
+_kit_gc_require_deps() {
+  _kit_gc_load_deps
+  command -v wt_protected_reason >/dev/null 2>&1 && return 0
+  echo "kit-gc: FATAL — worktree-issue.sh not loaded; issue-open protection is unavailable." >&2
+  echo "kit-gc: refusing to classify branches: everything would look SAFE to delete." >&2
+  return 1
 }
 
 # _kit_gc_pr_index [repo] — echo one "<headRefName>\tPR#<num> <STATE>" line per PR in ONE gh call, so
@@ -46,7 +66,7 @@ _kit_gc_pr_for() {
 # kit_gc_analyze — read-only classification of worktrees, branches, and stashes. Writes NOTHING.
 # Each row is tagged PROTECTED / SAFE / ACTIVE / ORPHAN so a human or UI can decide what to prune.
 kit_gc_analyze() {
-  _kit_gc_load_deps
+  _kit_gc_require_deps || return 1
   # `wtpath`, not `path`: under zsh `path` is tied to PATH (special array), so a bare `path` local
   # here would clobber the command search path on assignment. A namespaced name is inert.
   local repo="$KIT_GC_REPO" b ref wtpath reason pr prot
@@ -179,7 +199,7 @@ kit_gc_recover_zombies() {
 # staged/unstaged/untracked changes is skipped with a warning, not destroyed. The remote branch is
 # already deleted at merge time (gh pr merge --delete-branch); this cleans up the local side.
 kit_gc_prune() {
-  _kit_gc_load_deps
+  _kit_gc_require_deps || return 1
   # `wtpath`, not `path`: under zsh `path` is tied to PATH (special array), so assigning to a bare
   # `path` local would clobber the command search path. A namespaced name is inert.
   local repo="$KIT_GC_REPO" yes=0 a wtpath ref b pr pr_index

@@ -14,6 +14,25 @@
 # Self-test: bash scripts/lib/worktree-issue-test.sh  (runs the cases under bash + zsh)
 
 # Echo the issue number a branch name / worktree path belongs to (empty if none, e.g. bot branches).
+# Normalize the numeric segment of a branch/dir name to an issue number.
+# Accepts "1602" and also the effort SUB form "1604a" — `sub/<N><letter>-<slug>` is the documented
+# sub-branch convention, and rejecting it meant every effort sub-branch parsed to "" and so got NO
+# issue-open protection at all (gc listed live subs of an open effort as SAFE to delete).
+# Exactly one trailing lowercase letter is stripped; anything else is not an issue number.
+_wt_normalize_issue_num() {
+  local n="$1" head tail
+  case "$n" in
+    ''|*[!0-9a-z]*) return 0 ;;
+  esac
+  case "$n" in
+    *[!0-9]) head="${n%?}"; tail="${n#"$head"}"
+             case "$tail" in [a-z]) : ;; *) return 0 ;; esac
+             case "$head" in ''|*[!0-9]*) return 0 ;; esac
+             printf '%s' "$head"; return 0 ;;
+    *)       printf '%s' "$n"; return 0 ;;
+  esac
+}
+
 wt_issue_number() {
   local ref="$1" base kind rest n
   # branch form: kind/N-slug  (kind = lowercase letters only, anchored at start)
@@ -24,10 +43,8 @@ wt_issue_number() {
       *)
         n="${rest%%-*}"
         if [ "$n" != "$rest" ]; then                 # a "-" follows the number
-          case "$n" in
-            ''|*[!0-9]*) : ;;
-            *) printf '%s' "$n"; return 0 ;;
-          esac
+          n="$(_wt_normalize_issue_num "$n")"
+          [ -n "$n" ] && { printf '%s' "$n"; return 0; }
         fi
         ;;
     esac
@@ -41,10 +58,8 @@ wt_issue_number() {
     esac
     n="${rest%%-*}"
     [ "$n" = "$rest" ] && return 0                   # no "-" after the number
-    case "$n" in
-      ''|*[!0-9]*) : ;;
-      *) printf '%s' "$n" ;;
-    esac
+    n="$(_wt_normalize_issue_num "$n")"
+    [ -n "$n" ] && printf '%s' "$n"
   fi
   return 0
 }
