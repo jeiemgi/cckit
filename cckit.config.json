@@ -30,5 +30,10 @@
   },
   "engine": {
     "mode": "off"
+  },
+  "captain": {
+    "mergePolicy": {
+      "requireChecks": true
+    }
   }
 }

@@ -69,6 +69,46 @@ cckit asks before it changes anything in a repo it has not worked in before.
 - **The secret and privacy guard always runs** before anything is committed or published. It is not optional and consent does not bypass it — see [Security](/security/).
 - **Destructive or irreversible operations** (force-push, repo create, history rewrite) always require a separate, explicit confirmation.
 
+## Captain merge policy
+
+`cckit watch --merge` is the one place cckit lands code without a human in the loop, so its policy is
+config, not code. Everything below lives under `captain.mergePolicy` in the config file resolved
+above, and every key has an environment override that **always wins** — so you can opt in or out for
+a single invocation without editing the file.
+
+| Key | Default | What it does | Env override |
+| --- | --- | --- | --- |
+| `floors` | `true` | Refuse to auto-merge a PR that touches `.github/workflows/**`, a lockfile or dependency-graph file, or a security-sensitive path — and always honour a `hold` label. Verdict becomes `HELD`. | `KIT_CAPTAIN_FLOORS=0` |
+| `protectedGlobs` | `[]` | Extra path globs added to the floors above. | `KIT_CAPTAIN_EXTRA_GLOBS` |
+| `requireChecks` | `false` | Treat a PR with **no checks at all** as unverified rather than green. Verdict becomes `CHECKS_MISSING`, action `verify`. | `KIT_CAPTAIN_REQUIRE_CHECKS=1` |
+
+### Why `requireChecks` exists
+
+The captain decides from three things GitHub reports about a PR: whether it merges cleanly, its merge
+state, and its **check rollup**. When that rollup is *empty* there is nothing to read — and an empty
+rollup is not a pass, it is the **absence of evidence**. Read as green, it means a repo with no CI is
+auto-mergeable by construction: "the gates are green" was never observed, only assumed.
+
+Turn `requireChecks` on and that case gets its own verdict, distinct from the two that already exist:
+
+| Verdict | Action | What actually happened |
+| --- | --- | --- |
+| `CHECKS_FAILING` | `fix` | Something ran and went red. |
+| `CHECKS_PENDING` | `wait` | Something is still running — come back. |
+| `CHECKS_MISSING` | `verify` | Nothing ran. There is no evidence to wait for. |
+
+It also closes a smaller race: a PR gated in the seconds before CI registers has an empty rollup too,
+so with `requireChecks` on the captain waits for the checks to appear instead of merging into the gap.
+
+<Aside type="caution" title="It is off by default — on purpose">
+A repo with no CI, reviewed by a human, is a legitimate setup. Requiring evidence everywhere would
+turn that into a captain that merges nothing and reports steady state with no explanation — a silent
+stall, harder to debug than the thing it prevents. So the default keeps existing behaviour, and
+instead `cckit watch` **says the assumption out loud**: any pass that would merge a PR with an empty
+rollup prints that green was assumed, not proved, and names this key. If your repo has CI, set it to
+`true` — cckit sets it on itself.
+</Aside>
+
 ## Identity
 
 cckit asks your name on first run and stores it in `.cckit/identity` (gitignored). Nothing personal is hardcoded; commits use your local git identity.
