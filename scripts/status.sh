@@ -71,8 +71,10 @@ for a in "$@"; do
   esac
 done
 if [ "${CCKIT_OUTPUT:-}" = "json" ]; then
+  # Propagate the rc: a report that could not read a bucket must not exit 0, or a caller that only
+  # checks the status code acts on a half-known state as if it were clean.
   status_buckets_json "$ROOT"
-  exit 0
+  exit $?
 fi
 
 if command -v cckit_render >/dev/null 2>&1; then _status_md | cckit_render; else _status_md; fi

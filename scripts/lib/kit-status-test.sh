@@ -62,6 +62,21 @@ if [ -n "${KS_TEST_INNER:-}" ]; then
     eq "no AI reviewer: the same PR asks for a human" \
        "$(verdict 12 "$unapproved" 0)" "review"
 
+    # ── #240 review: mergeability UNKNOWN and pipes in titles ─────────────────────────────────
+    # GitHub returns UNKNOWN while it is still computing mergeability. Reading that as "not
+    # conflicting" would report a PR as ready that may yet conflict, so it must read as wait.
+    unk='[{"number":13,"title":"still computing","draft":false,"mergeable":"UNKNOWN","checks":"PASS","approvals":1,"ai_review":true,"unresolved":0}]'
+    eq "UNKNOWN mergeability never reads ready" "$(verdict 13 "$unk" 1)" "wait"
+    has "the wait reason names mergeability" \
+        "$(printf '%s' "$unk" | status_prs_classify 1)" "computing mergeability"
+    # …and a later CONFLICTING on the same PR still classifies as a conflict.
+    conf='[{"number":13,"title":"resolved to conflict","draft":false,"mergeable":"CONFLICTING","checks":"PASS","approvals":1,"ai_review":true,"unresolved":0}]'
+    eq "a resolved CONFLICTING reads conflict" "$(verdict 13 "$conf" 1)" "conflict"
+
+    # A `|` in a PR title would split the markdown table cell it is rendered into.
+    pipe='[{"number":14,"title":"fix: a | in the title","draft":false,"mergeable":"MERGEABLE","checks":"PASS","approvals":1,"ai_review":true,"unresolved":0}]'
+    has "a pipe in the title is escaped" "$(printf '%s' "$pipe" | status_prs_classify 1)" '\\|'
+
     # The row carries the number, a trimmed title and a human reason for the verdict.
     row="$(printf '%s' "$fix" | status_prs_classify 1 | awk -F'\t' '$2==5')"
     has "row carries the unresolved count" "$row" "3 unresolved review thread(s)"
@@ -132,17 +147,33 @@ if [ -n "${KS_TEST_INNER:-}" ]; then
       && git checkout -q trunk ) >/dev/null 2>&1
     rows="$(cd "$eff" && status_local_rows trunk)"
     has "an unmerged sub is reported"    "$rows" "unmerged"
-    has "the unmerged row names the effort branch" "$rows" "not in effort/50-thing"
+    has "the unmerged row says it is in no effort branch" "$rows" "in no effort branch"
     # …and once merged, it stops being reported.
     ( cd "$eff" && git checkout -q effort/50-thing && git merge -q --no-ff -m merge sub/51-part \
       && git checkout -q trunk ) >/dev/null 2>&1
     rows="$(cd "$eff" && status_local_rows trunk)"
     no  "a merged sub is no longer reported" "$rows" "unmerged"
 
+    # A sub contained in ONE of several effort branches is not unmerged — `head -1` picked an
+    # arbitrary effort and reported a false positive (#240 review).
+    ( cd "$eff" && git checkout -q -b effort/60-other && git checkout -q trunk ) >/dev/null 2>&1
+    rows="$(cd "$eff" && status_local_rows trunk)"
+    no "a sub merged into one of several efforts is not unmerged" "$rows" "unmerged"
+
     # status_worktree_rows lists the checkout itself, with the branch it is on.
     wt="$(cd "$repo" && status_worktree_rows)"
     has "the worktree inventory names the branch" "$wt" "trunk"
     eq  "one row per checked-out worktree" "$(printf '%s\n' "$wt" | grep -c . | tr -d ' ')" "1"
+
+    # A worktree path containing a SPACE must survive: `awk $2` truncates it at the space and the
+    # row then names a directory that does not exist (#240 review).
+    spacey="$tmp/has space"; mkdir -p "$spacey"
+    ( cd "$repo" && git worktree add -q "$spacey/wt" -b feat/9-spacey ) >/dev/null 2>&1
+    wts="$(cd "$repo" && status_worktree_rows)"
+    has "a worktree path with a space is intact" "$wts" "has space/wt"
+    ( cd "$repo" && echo dirty > "$spacey/wt/x.txt" ) >/dev/null 2>&1
+    rows="$(cd "$repo" && status_local_rows trunk)"
+    has "a dirty worktree with a space in its path is intact" "$rows" "has space/wt"
 
     # status_cleanup_counts must return four integers even with no classifier loaded.
     counts="$(cd "$clean" && status_cleanup_counts)"
@@ -167,6 +198,16 @@ if [ -n "${KS_TEST_INNER:-}" ]; then
        "orphan,protected,remote_stale,safe"
     eq "an empty bucket is [] not null"   "$(printf '%s' "$js" | jq -r '.local_undone | length')" "0"
     eq "ai_review_expected is a boolean"  "$(printf '%s' "$js" | jq -r '.ai_review_expected | type')" "boolean"
+    # A PR bucket that could NOT be read must be distinguishable from an empty one, in the JSON and
+    # in the exit status — otherwise an agent treats "could not look" as "nothing to do".
+    eq "JSON reports whether the PRs were read" "$(printf '%s' "$js" | jq -r '.prs_read | type')" "boolean"
+    eq "JSON carries the dependency state"      "$(printf '%s' "$js" | jq -r '.deps | keys | join(",")')" "gh,git,jq"
+    stub="$tmp/nogh"; mkdir -p "$stub"
+    for c in git jq; do p_="$(command -v $c)"; [ -n "$p_" ] && ln -sf "$p_" "$stub/$c"; done
+    js2="$(cd "$clean" && PATH="$stub" KIT_BASE_BRANCH=trunk KIT_REPO="o/r" status_buckets_json "$clean" 2>/dev/null)"; jrc=$?
+    eq "no gh: prs_read is false"  "$(printf '%s' "$js2" | jq -r '.prs_read')" "false"
+    eq "no gh: deps.gh is false"   "$(printf '%s' "$js2" | jq -r '.deps.gh')" "false"
+    eq "no gh: the rc is non-zero" "$([ "$jrc" -ne 0 ] && echo yes || echo no)" "yes"
   fi
 
   rm -rf "$tmp"

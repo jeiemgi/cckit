@@ -51,7 +51,7 @@ One issue becomes one branch, one worktree, one PR. These verbs walk that path.
 | --- | --- | --- |
 | 1 | **Local undone work** | Worktrees with uncommitted changes; branches holding commits reachable from **no** remote ref; effort subs not yet merged into their effort branch. Plus the worktree inventory, because a clean worktree on an issue branch is still work in progress. |
 | 2 | **PRs waiting on a human** | Each open PR with the one thing it needs: `conflict` · `checks` · `draft` · `wait` · `threads` · `ai-review` · `review` · `ready`. |
-| 3 | **Cleanup available** | What can go, local **and** remote, plus what is deliberately kept (orphan work, open-issue branches). Acting on it is [`cckit cleanup`](#housekeeping-and-output). |
+| 3 | **Cleanup available** | What can go, local **and** remote, plus what is deliberately kept (orphan work, open-issue branches). `cckit gc` shows the same classification in full; acting on it is the `/kit-cleanup` skill. |
 
 Two details worth knowing, because both are places a naive reading gets it wrong:
 
