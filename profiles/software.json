@@ -8,7 +8,8 @@
     "speckit",
     "feature-build-refine",
     "supabase-patterns",
-    "karpathy-guidelines"
+    "karpathy-guidelines",
+    "concrete"
   ],
   "rules": [
     "branch-naming",
