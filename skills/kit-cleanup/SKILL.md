@@ -1,6 +1,6 @@
 ---
 name: kit-cleanup
-description: Run the ONE guided destructive sweep over the repo — present the gc plan (SAFE / ORPHAN / PROTECTED / stashes), then delete only the SAFE rows after the user confirms. Orphan branches, open-issue branches, and stashes are surfaced and left alone.
+description: Run the ONE guided destructive sweep over the repo — present the gc plan (SAFE / ZOMBIE / ORPHAN / PROTECTED / stashes), then delete only the SAFE rows and prune the listed ZOMBIE metadata after the user confirms. Orphan branches, open-issue branches, and stashes are surfaced and left alone.
 when_to_use: When `cckit gc` (or the SessionStart hygiene hook) reports merged branches and worktrees piling up and you want them gone in one pass. Use this instead of hand-rolling `git branch -D` + `git push origin --delete` loops. For the read-only report alone, use `/kit-gc`.
 ---
 
@@ -11,9 +11,12 @@ Plugin-direct skill — helpers resolve from `${CLAUDE_PLUGIN_ROOT}`.
 `/kit-gc` classifies; **this skill acts on that classification.** It is the only place in the kit
 that deletes a branch the user did not name, so the whole design is plan-first.
 
-**Safety contract:** the plan names **everything** `--yes` can touch — branches *and* worktrees, so
-no deletion escapes the user's veto. `--yes` is the only thing that deletes a **cleanup target** (a
-branch, a worktree, a remote ref), and three buckets are not deletable at all. A plan-only run still
+**Safety contract:** the plan names **everything** `--yes` can touch — branches, worktrees *and*
+ZOMBIE admin metadata, so no deletion escapes the user's veto. A zombie's staged work is committed
+to its branch **before** its metadata is pruned (recover-before-prune), and the plan says so per
+row. `--yes` is the only thing that deletes a **cleanup target** (a
+branch, a worktree, a remote ref, a listed zombie's metadata), and three buckets are not deletable
+at all. A plan-only run still
 prunes stale *remote-tracking metadata*, because it refreshes them to classify — see step 3. Table
 below. It reuses
 `kit_gc_analyze` as the single classifier rather than re-deriving verdicts, so `gc` and `cleanup`
@@ -41,6 +44,7 @@ veto per-bucket — if they want the orphans looked at first, do that before del
 | **SAFE** | PR `MERGED`, issue closed/absent, unprotected | **deletes** the worktree, the local branch, and the remote ref *if* the branch was level with it |
 | **PROTECTED** | associated issue **still OPEN** | **keeps** — close the issue first |
 | **ORPHAN** | local commits not on the base branch's remote, no merged PR | **keeps** — offer to recover into a PR (step 4) |
+| **ZOMBIE** | worktree dir gone, admin metadata lingers | **recovers** any staged delta to a commit on its branch, **then prunes** the metadata |
 | **stashes** | any stash entry | **keeps** — irreversible; drop only after showing each diff |
 
 ### 3. Execute

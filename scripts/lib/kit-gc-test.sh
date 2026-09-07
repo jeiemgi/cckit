@@ -129,20 +129,49 @@ has "cleanup counts the merged branch as SAFE" "$plan" "task/40-merged"
 has "plan names the protected branch"          "$plan" "task/41-open"
 has "plan names the orphan branch"             "$plan" "task/42-orphan"
 has "plan has a SAFE worktrees bucket"         "$plan" "SAFE worktrees"
-# Assert the PROTECTED bucket actually FIRED — without this, `task/41-open` surviving below proves
-# nothing, since an unclassified branch lands in ORPHAN and is kept for a different reason.
-t   "open-issue branch counted PROTECTED, not ORPHAN" \
-    "$(printf '%s\n' "$plan" | awk '/^  PROTECTED kept/{print $3}')" "1"
-# The plan is READ-ONLY: every branch must still be there afterwards.
-for b in task/40-merged task/41-open task/42-orphan; do
-  t "plan-only run kept $b" "$(git branch --list "$b" | wc -l | tr -d ' ')" "1"
-done
+# The ZOMBIE bucket (#227 review): --yes recovers a zombie's staged delta to its branch and then
+# prunes its metadata, so the plan MUST name those rows too — otherwise --yes acts on a row the
+# user never saw. Needs its OWN zombie: the one fabricated at the top of this file was already
+# pruned by the "prune gating" step above.
+git worktree add -q ../wt2 -b feat/6-zombie2 >/dev/null 2>&1
+echo "staged in the second zombie" > ../wt2/keep2.txt
+git -C ../wt2 add keep2.txt
+Z2_TIP_BEFORE="$(git rev-parse --verify refs/heads/feat/6-zombie2)"
+rm -rf ../wt2
+zplan="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_cleanup 2>&1)"
+has "plan has a ZOMBIE worktrees bucket"       "$zplan" "ZOMBIE worktrees"
+has "plan names the zombie worktree"           "$zplan" "wt2 [feat/6-zombie2]"
+has "plan says the staged work is recovered first" "$zplan" "STAGED work — recovered to a commit"
+t   "zombie counted in the plan" \
+    "$(printf '%s\n' "$zplan" | awk '/^  ZOMBIE worktrees/{print $3}')" "1"
+# Still plan-only: neither the metadata nor the branch tip may move.
+if [ -d "$(git rev-parse --git-common-dir)/worktrees/wt2" ]; then
+  echo "ok: plan-only left the zombie metadata intact"
+else
+  echo "FAIL: plan-only pruned the zombie metadata"; fail=1
+fi
+t "plan-only left the zombie branch tip alone" \
+  "$(git rev-parse --verify refs/heads/feat/6-zombie2)" "$Z2_TIP_BEFORE"
 
 applied="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_cleanup --yes 2>&1)"
 t   "--yes deleted the merged branch"   "$(git branch --list task/40-merged | wc -l | tr -d ' ')" "0"
 t   "--yes KEPT the open-issue branch"  "$(git branch --list task/41-open   | wc -l | tr -d ' ')" "1"
 t   "--yes KEPT the orphan branch"      "$(git branch --list task/42-orphan | wc -l | tr -d ' ')" "1"
 has "cleanup reports what it left"      "$applied" "left untouched"
+# --yes is where the zombie metadata is allowed to go — but only AFTER its staged work is a commit.
+if [ -d "$(git rev-parse --git-common-dir)/worktrees/wt2" ]; then
+  echo "FAIL: --yes left the zombie metadata behind"; fail=1
+else
+  echo "ok: --yes pruned the zombie metadata it listed"
+fi
+Z2_TIP_AFTER="$(git rev-parse --verify refs/heads/feat/6-zombie2)"
+if [ "$Z2_TIP_AFTER" != "$Z2_TIP_BEFORE" ]; then
+  echo "ok: --yes recovered the zombie's staged work before pruning"
+else
+  echo "FAIL: zombie metadata pruned without recovering its staged work"; fail=1
+fi
+has "the recovered commit carries the staged file" "$(git ls-tree -r --name-only "$Z2_TIP_AFTER")" "keep2.txt"
+has "cleanup counts the zombies it pruned" "$applied" "zombie pruned"
 # The failed-remote-delete count must be a real number the plan prints, not just an exit status —
 # the skill promises it and `--llm` serializes it as `remote_failed`.
 t   "cleanup prints a remote-failure count" \

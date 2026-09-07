@@ -317,7 +317,8 @@ _kit_gc_names() {
 kit_gc_cleanup() {
   _kit_gc_require_deps || return 1
   local repo="$KIT_GC_REPO" yes=0 a out b n_safe n_orphan n_prot n_stash n_wt rc=0 n_rfail=0
-  local safe_list orphan_list prot_list stash_list wt_list level_ok
+  local zname zbranch zstaged
+  local safe_list orphan_list prot_list stash_list wt_list zomb_list level_ok n_zomb
   for a in "$@"; do case "$a" in --yes|-y) yes=1 ;; esac; done
 
   out="$(kit_gc_analyze)" || return 1
@@ -340,17 +341,36 @@ kit_gc_cleanup() {
         fi
       done)"
 
+  # ZOMBIE worktrees (dir gone, admin metadata lingers). kit_gc_prune --yes acts on these two ways
+  # — kit_gc_recover_zombies commits any staged delta to the branch, then `git worktree prune`
+  # drops the metadata — so the plan MUST name them or --yes would touch a row nobody approved
+  # (#227 review). Same helper as the analyze report, so the two cannot diverge.
+  zomb_list="$(while IFS="$(printf '\t')" read -r zname zbranch zstaged; do
+        [ -n "$zname" ] || continue
+        if [ "$zstaged" = yes ]; then
+          echo "$zname [$zbranch] (STAGED work — recovered to a commit on $zbranch, then metadata pruned)"
+        else
+          echo "$zname [$zbranch] (no staged delta — metadata pruned)"
+        fi
+      done <<ZEOF
+$(_kit_gc_zombies)
+ZEOF
+)"
+
   n_safe="$(printf '%s' "$safe_list"   | grep -c . || true)"
   n_orphan="$(printf '%s' "$orphan_list" | grep -c . || true)"
   n_prot="$(printf '%s' "$prot_list"   | grep -c . || true)"
   n_stash="$(printf '%s' "$stash_list" | grep -c . || true)"
   n_wt="$(printf '%s' "$wt_list"       | grep -c . || true)"
+  n_zomb="$(printf '%s' "$zomb_list"   | grep -c . || true)"
 
   echo "# cleanup plan"
   printf '  SAFE branches     %3s  merged PR, issue closed/absent\n' "$n_safe"
   printf '%s\n' "$safe_list" | grep . | sed 's/^/      /' || true
   printf '  SAFE worktrees    %3s  removed with their branch\n' "$n_wt"
   printf '%s\n' "$wt_list" | grep . | sed 's/^/      /' || true
+  printf '  ZOMBIE worktrees  %3s  staged work recovered to its branch, then metadata pruned\n' "$n_zomb"
+  printf '%s\n' "$zomb_list" | grep . | sed 's/^/      /' || true
   printf '  ORPHAN kept       %3s  commits not on the base remote — never auto-deleted\n' "$n_orphan"
   printf '%s\n' "$orphan_list" | grep . | sed 's/^/      /' || true
   printf '  PROTECTED kept    %3s  issue still OPEN\n' "$n_prot"
@@ -359,10 +379,10 @@ kit_gc_cleanup() {
   printf '%s\n' "$stash_list" | grep . | sed 's/^/      /' || true
 
   if [ "$yes" -ne 1 ]; then
-    echo "cleanup: PLAN ONLY — nothing deleted. Pass --yes to delete the SAFE rows."
+    echo "cleanup: PLAN ONLY — nothing deleted. Pass --yes to delete the SAFE rows and prune the ZOMBIE rows."
     return 0
   fi
-  [ "$n_safe" -eq 0 ] && [ "$n_wt" -eq 0 ] && { echo "cleanup: nothing SAFE to delete."; return 0; }
+  [ "$n_safe" -eq 0 ] && [ "$n_wt" -eq 0 ] && [ "$n_zomb" -eq 0 ] && { echo "cleanup: nothing SAFE to delete."; return 0; }
 
   # Which SAFE branches may have their REMOTE deleted — decided BEFORE the local prune, because once
   # the local ref is gone there is nothing left to compare. Requires exact equality in BOTH
@@ -396,6 +416,6 @@ EOF
 $level_ok
 EOF
   printf '  remote deletes failed %3s\n' "$n_rfail"
-  echo "cleanup: done — $n_orphan orphan / $n_prot protected / $n_stash stash left untouched."
+  echo "cleanup: done — $n_zomb zombie pruned / $n_orphan orphan / $n_prot protected / $n_stash stash left untouched."
   return "$rc"
 }
