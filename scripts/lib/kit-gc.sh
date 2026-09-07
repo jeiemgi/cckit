@@ -259,3 +259,77 @@ kit_gc_prune() {
   done
   [ "$yes" -eq 1 ] && echo "gc prune: done" || echo "gc prune: DRY RUN - pass --yes to delete"
 }
+
+# _kit_gc_names <analysis> <section> <verdict-regex> — echo one bare name per matching row inside a
+# `# <section>` block of a kit_gc_analyze dump. The analysis is the SINGLE classifier (Family 1):
+# cleanup reads its verdicts rather than re-deriving them, so the two can never disagree about what
+# is safe to delete — the failure mode #219 was about.
+_kit_gc_names() {
+  printf '%s\n' "$1" | awk -v sect="$2" -v want="$3" '
+    /^# /     { in_s = ($0 == "# " sect); next }
+    !in_s     { next }
+    $0 ~ want { sub(/^  /, ""); sub(/ ->.*/, ""); print }
+  '
+}
+
+# kit_gc_cleanup [--yes] — the ONE guided destructive sweep over the gc analysis.
+#
+# PLAN FIRST, always: print every bucket with its counts and names, then execute only the SAFE rows,
+# and only with --yes. Without --yes nothing is written — the plan IS the output.
+#
+# What --yes deletes: merged worktrees, merged local branches (via kit_gc_prune, which also runs the
+# recover-before-prune zombie pass), and the REMOTE ref of a merged branch that still has one and is
+# level with it. What it NEVER deletes: an ORPHAN branch (local commits not on the base remote), a
+# PROTECTED branch (its issue is still open), or a stash. Those three are irreversible or hold the
+# only copy of work, so they are surfaced for a human and left exactly where they are.
+kit_gc_cleanup() {
+  _kit_gc_require_deps || return 1
+  local repo="$KIT_GC_REPO" yes=0 a out b n_safe n_orphan n_prot n_stash level_ok=""
+  local safe_list orphan_list prot_list stash_list
+  for a in "$@"; do case "$a" in --yes|-y) yes=1 ;; esac; done
+
+  out="$(kit_gc_analyze)" || return 1
+  safe_list="$(_kit_gc_names "$out" branches ' -> SAFE ')"
+  orphan_list="$(_kit_gc_names "$out" branches ' -> ORPHAN')"
+  prot_list="$(_kit_gc_names "$out" branches ' -> PROTECTED:')"
+  stash_list="$(printf '%s\n' "$out" | awk '/^# /{in_s=($0=="# stashes"); next} in_s && NF' | sed 's/^  //')"
+  n_safe="$(printf '%s' "$safe_list"   | grep -c . || true)"
+  n_orphan="$(printf '%s' "$orphan_list" | grep -c . || true)"
+  n_prot="$(printf '%s' "$prot_list"   | grep -c . || true)"
+  n_stash="$(printf '%s' "$stash_list" | grep -c . || true)"
+
+  echo "# cleanup plan"
+  printf '  SAFE to delete    %3s  merged PR, issue closed/absent\n' "$n_safe"
+  printf '%s\n' "$safe_list" | grep . | sed 's/^/      /' || true
+  printf '  ORPHAN kept       %3s  commits not on the base remote — never auto-deleted\n' "$n_orphan"
+  printf '%s\n' "$orphan_list" | grep . | sed 's/^/      /' || true
+  printf '  PROTECTED kept    %3s  issue still OPEN\n' "$n_prot"
+  printf '  stashes kept      %3s  irreversible — drop by hand after reading each diff\n' "$n_stash"
+
+  if [ "$yes" -ne 1 ]; then
+    echo "cleanup: PLAN ONLY — nothing deleted. Pass --yes to delete the SAFE rows."
+    return 0
+  fi
+  [ "$n_safe" -eq 0 ] && { echo "cleanup: nothing SAFE to delete."; return 0; }
+
+  # Record which SAFE branches are level with their remote BEFORE the local prune — once the local
+  # ref is gone there is nothing left to compare, and an "ahead" branch may hold unpushed work.
+  printf '%s\n' "$safe_list" | grep . | while IFS= read -r b; do
+    git show-ref --verify --quiet "refs/remotes/origin/$b" 2>/dev/null || continue
+    [ "$(git rev-list --count "origin/$b..$b" 2>/dev/null || echo 1)" = "0" ] && echo "$b"
+  done > "${TMPDIR:-/tmp}/kit-gc-level.$$"
+  level_ok="$(cat "${TMPDIR:-/tmp}/kit-gc-level.$$" 2>/dev/null || true)"
+  rm -f "${TMPDIR:-/tmp}/kit-gc-level.$$"
+
+  kit_gc_prune --yes
+
+  # Remote side last: only a branch that WAS level with its remote, so nothing unpushed is dropped.
+  printf '%s\n' "$level_ok" | grep . | while IFS= read -r b; do
+    if git push origin --delete "$b" >/dev/null 2>&1; then
+      echo "  deleted remote branch $b"
+    else
+      echo "  SKIP remote $b — delete failed (protected ref or already gone)" >&2
+    fi
+  done
+  echo "cleanup: done — $n_orphan orphan / $n_prot protected / $n_stash stash left untouched."
+}

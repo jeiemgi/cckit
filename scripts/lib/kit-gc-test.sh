@@ -100,5 +100,43 @@ t   "refusal emits no classification row"                   "$(printf '%s\n' "$o
 out="$(bash -c ". '$lone/kit-gc.sh'; kit_gc_prune" 2>&1)"; rc=$?
 t   "kit_gc_prune refuses without worktree-issue.sh (rc)"    "$rc" "1"
 
+# ── kit_gc_cleanup: plan first, and the three irreversible buckets survive --yes (#226) ─────────
+# A merged branch is SAFE; a branch whose issue is still OPEN is PROTECTED; a branch with local
+# commits and no PR is ORPHAN. Only the first may ever be deleted, and never without --yes.
+git branch task/40-merged  >/dev/null 2>&1
+git branch task/41-open    >/dev/null 2>&1
+git branch task/42-orphan  >/dev/null 2>&1
+cat > "$stub/gh" <<'SH'
+#!/usr/bin/env bash
+echo "$*" >> "$GH_CALLS"
+case "$1 $2" in
+  "pr list")   printf 'task/40-merged\tPR#40 MERGED\n' ;;
+  "issue view")
+    for a in "$@"; do case "$a" in 41) echo open; exit 0 ;; esac; done
+    echo closed ;;
+  *) : ;;
+esac
+SH
+chmod +x "$stub/gh"
+
+plan="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_cleanup 2>&1)"
+has "cleanup prints a plan"                    "$plan" "# cleanup plan"
+has "cleanup says it deleted nothing"          "$plan" "PLAN ONLY"
+has "cleanup counts the merged branch as SAFE" "$plan" "task/40-merged"
+# Assert the PROTECTED bucket actually FIRED — without this, `task/41-open` surviving below proves
+# nothing, since an unclassified branch lands in ORPHAN and is kept for a different reason.
+t   "open-issue branch counted PROTECTED, not ORPHAN" \
+    "$(printf '%s\n' "$plan" | awk '/^  PROTECTED kept/{print $3}')" "1"
+# The plan is READ-ONLY: every branch must still be there afterwards.
+for b in task/40-merged task/41-open task/42-orphan; do
+  t "plan-only run kept $b" "$(git branch --list "$b" | wc -l | tr -d ' ')" "1"
+done
+
+applied="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_cleanup --yes 2>&1)"
+t   "--yes deleted the merged branch"   "$(git branch --list task/40-merged | wc -l | tr -d ' ')" "0"
+t   "--yes KEPT the open-issue branch"  "$(git branch --list task/41-open   | wc -l | tr -d ' ')" "1"
+t   "--yes KEPT the orphan branch"      "$(git branch --list task/42-orphan | wc -l | tr -d ' ')" "1"
+has "cleanup reports what it left"      "$applied" "left untouched"
+
 [ "$fail" -eq 0 ] && echo "ALL OK (kit-gc)" || echo "kit-gc: FAILURES"
 exit "$fail"

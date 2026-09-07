@@ -189,6 +189,26 @@ case "$cmd" in
     # shellcheck source=/dev/null
     source "$LIB/plan-next.sh"; plan_next "$@"
     ;;
+  cleanup)
+    # ONE guided destructive sweep over the gc analysis: plan first, delete only the SAFE rows, and
+    # only with --yes. Orphans, protected branches and stashes are surfaced and left alone.
+    # shellcheck source=/dev/null
+    source "$LIB/kit-config.sh" && load_kit_config
+    # shellcheck source=/dev/null
+    source "$LIB/kit-gc.sh"
+    if cckit_is_json; then
+      out="$(kit_gc_cleanup "$@" 2>/dev/null || true)"
+      safe="$(printf '%s\n' "$out" | awk '/^  SAFE to delete/{print $4}')"
+      orphan="$(printf '%s\n' "$out" | awk '/^  ORPHAN kept/{print $3}')"
+      protected="$(printf '%s\n' "$out" | awk '/^  PROTECTED kept/{print $3}')"
+      stash="$(printf '%s\n' "$out" | awk '/^  stashes kept/{print $3}')"
+      applied=no; case " $* " in *" --yes "*|*" -y "*) applied=yes ;; esac
+      cckit_json verb cleanup safe "${safe:-0}" orphan "${orphan:-0}" \
+        protected "${protected:-0}" stash "${stash:-0}" applied "$applied"
+    else
+      kit_gc_cleanup "$@"
+    fi
+    ;;
   gc)
     # shellcheck source=/dev/null
     source "$LIB/kit-config.sh" && load_kit_config
