@@ -19,9 +19,10 @@ owns ALL of the mechanics:
 - the isolated worktree at `.claude/worktrees/effort+<N>-<slug>` (reused if the branch already
   exists; the dir name encodes #N so `kit-gc` won't wipe it while the issue is open)
 - **bootstrap** (`wt_bootstrap`): copies gitignored `.env.local*` + project ids, assigns a
-  per-worktree dev PORT, installs deps **only where there is something to install**, in this
-  precedence: `worktree.installPaths` if set (those dirs only; `[]` = nothing), else the root when
-  its manifest declares dependencies or it is a workspace root *with at least one member*, else
+  per-worktree dev PORT, installs deps **at the selected targets**, in this
+  precedence: `worktree.installPaths` if set (those dirs only, installed whether or not each one
+  declares dependencies; `[]` = nothing), else the root *only when* its manifest declares
+  dependencies or it is a workspace root *with at least one member*, else
   nothing — a dependency-free root never gets a stray empty `pnpm-lock.yaml`, and an `installPaths`
   entry that escapes the worktree is refused. `KIT_WT_INSTALL=0` opts out entirely
 - the live-session **collision guard**: refuses to disturb a worktree a live session is sitting in

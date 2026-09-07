@@ -93,9 +93,10 @@ cckit plan-next               # propose what to build next, grounded in current 
 cckit status                  # where are we: local undone work, PRs to attend, cleanup available
 cckit next                    # the next unblocked issue + how to start it
 cckit start 42                # isolated worktree + branch for issue #42, bootstrapped:
-                              #   env files copied, dev port assigned, deps installed only where
-                              #   there is something to install — worktree.installPaths if set,
-                              #   else a root with deps or a workspace root, else nothing
+                              #   env files copied, dev port assigned, deps installed at the
+                              #   selected targets — worktree.installPaths if set (those dirs
+                              #   regardless of their manifests), else a root that declares
+                              #   deps or is a workspace root with members, else nothing
                               #   (KIT_WT_INSTALL=0 skips the install entirely)
 cckit brief 42                # the delegation brief for #42, read out of the repo not memory
 cckit lib                     # every scripts/lib helper: functions, purpose, error contract

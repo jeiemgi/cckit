@@ -129,8 +129,10 @@ and the ones below it are never consulted:
 2. **Otherwise, the worktree root** — but only when its `package.json` declares at least one
    dependency (in `dependencies`, `devDependencies`, `optionalDependencies` or `peerDependencies`),
    **or** it is a workspace root **with at least one member** (`pnpm-workspace.yaml` whose
-   `packages:` lists a pattern, or a non-empty `workspaces` in `package.json`). A workspace root
-   holds its members' deps, so the install there is real work.
+   `packages:` lists a pattern, or — in `package.json` — a non-empty `workspaces` array or a
+   non-empty `workspaces.packages` array). A workspace root holds its members' deps, so the
+   install there is real work. A `workspaces` object whose `packages` list is empty counts as
+   memberless, however many other keys it carries.
 
 3. **Otherwise nothing** — the start prints `no dependencies declared — skipping pnpm install`.
 
