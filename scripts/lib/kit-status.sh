@@ -93,9 +93,16 @@ EOT
 status_worktree_rows() {
   command -v git >/dev/null 2>&1 || return 0
   # Same space-safe extraction as status_local_rows: take everything after the key, never `$2`.
+  # Emit per RECORD, not per `branch` line: a DETACHED worktree has a `HEAD` but no `branch`, so
+  # printing on `branch` alone silently drops it from the inventory — exactly the "in progress" work
+  # a session must not re-create. Flush on the next `worktree` and once more at EOF. ("branch " is
+  # 7 chars, "HEAD " is 5.)
   git worktree list --porcelain 2>/dev/null \
-    | awk '/^worktree /{w=substr($0, 10)}
-           /^branch /{b=substr($0, 8); sub(/^refs\/heads\//, "", b); print w"\t"b}'
+    | awk 'function emit() { if (seen) print w "\t" (b != "" ? b : "detached@" substr(head, 1, 12)) }
+           /^worktree /{ emit(); w=substr($0, 10); b=""; head=""; seen=1; next }
+           /^HEAD /    { head=substr($0, 6); next }
+           /^branch /  { b=substr($0, 8); sub(/^refs\/heads\//, "", b) }
+           END         { emit() }'
 }
 
 # ── bucket 2: open PRs waiting on a human ──────────────────────────────────────────────────────

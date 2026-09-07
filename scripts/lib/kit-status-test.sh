@@ -175,6 +175,16 @@ if [ -n "${KS_TEST_INNER:-}" ]; then
     rows="$(cd "$repo" && status_local_rows trunk)"
     has "a dirty worktree with a space in its path is intact" "$rows" "has space/wt"
 
+    # A DETACHED worktree emits `HEAD` but no `branch`: printing on `branch` alone dropped it from
+    # the inventory entirely, hiding in-progress work from both output paths (#240 review).
+    ( cd "$repo" && git worktree add -q --detach "$tmp/det" HEAD ) >/dev/null 2>&1
+    wts="$(cd "$repo" && status_worktree_rows)"
+    has "a detached worktree is still listed"     "$wts" "$tmp/det"
+    has "a detached worktree is labelled by HEAD" "$wts" "detached@"
+    has "attached worktrees keep their branch"    "$wts" "feat/9-spacey"
+    eq  "one row per worktree, detached included" \
+        "$(printf '%s\n' "$wts" | grep -c . | tr -d ' ')" "3"
+
     # status_cleanup_counts must return four integers even with no classifier loaded.
     counts="$(cd "$clean" && status_cleanup_counts)"
     eq "cleanup counts are four fields" \
