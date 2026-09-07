@@ -17,6 +17,7 @@ echo "→ Labels on $KIT_REPO"
 echo "kinds:"
 for k in task plan adr scaffold spike; do ensure_label "kind:$k" "5319e7" "Kind: $k"; done
 echo "priorities:"
+ensure_label "priority:p0" "8b0000" "Drop everything"
 ensure_label "priority:p1" "b60205" "Now / blocking"
 ensure_label "priority:p2" "fbca04" "Next"
 ensure_label "priority:p3" "0e8a16" "Later"

@@ -139,7 +139,7 @@ ambiguous slug fails with a clear error rather than guessing. Efforts render as 
 that gate and merge themselves. This is the part that turns one keyboard into a small team:
 
 ```bash
-cckit plan                 # the wave plan: deps-ordered, file-disjoint, session-fit
+cckit plan                 # the wave plan: deps-ordered, p0-first inside a wave, file-disjoint
 cckit wave                 # a Task-subagent fan-out brief Claude Code enacts (proposes the next wave)
 cckit orchestrate 12 14 17 # run N flows in parallel worktrees (--dry-run / --cap / --agent)
 cckit watch --merge        # the captain: gate open PRs, squash-merge the CLEAN ones, advance

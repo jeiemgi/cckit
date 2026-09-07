@@ -27,7 +27,7 @@ adapter one) — is described in [the Adapters page](docs-site/src/content/docs/
 | `cckit init` | scaffold config + `.claude/` | — |
 | `cckit sync` | board state / what's unblocked | `--llm` → TOON |
 | `cckit next` | the next unblocked issue + how to start it | `--llm` → TOON |
-| `cckit plan` | wave plan: deps-ordered, file-disjoint, session-fit | `--llm` → TOON |
+| `cckit plan` | wave plan: deps-ordered, priority-sorted within a wave, file-disjoint, session-fit | `--llm` → TOON |
 | `cckit plan-next` | forward plan: inventory current skills/verbs/rules/docs → propose what to build next | `--llm` → TOON |
 | `cckit status` | where are we: local undone work, open PRs waiting on a human, cleanup available (local + remote) | `--llm` → JSON |
 | `cckit brief <issue>` | the delegation brief for an issue, from real state: worktree, seed freshness, owned files, the helpers they sit on, standing gotchas | — |
