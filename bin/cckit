@@ -40,6 +40,7 @@
 #   cckit release <ver> [--publish] cut a release (dry-run by default)
 #   cckit version [--llm]           the installed cckit version
 #   cckit commands [--llm]          list every verb (the command catalog)
+#   cckit lib [--llm] [--all]       list every scripts/lib helper: functions, purpose, error contract
 #   cckit completions [bash|zsh]    print a shell-completion script to source
 #   cckit help
 set -eu
@@ -303,6 +304,16 @@ case "$cmd" in
     # The command catalog - verbs parsed from this dispatcher's own case labels (single source).
     verbs="$(grep -oE '^  [a-z][a-z|-]*\)' "$BIN/cckit" | sed 's/[) ]//g' | tr '|' '\n' | grep -vE '^(-|$)' | sort -u)"
     if cckit_is_json; then printf '%s\n' "$verbs" | jq -R . | jq -cs .; else printf '%s\n' "$verbs" | tr '\n' ' '; echo; fi
+    ;;
+  lib)
+    # The HELPER catalog — the companion to `commands` (#222). `commands` lists the verbs; this
+    # lists the library they are built from, so a helper like pr-evidence.sh is discoverable
+    # without an `ls`. Filesystem-only; config is loaded purely for the project-root inference
+    # (KIT_CONFIG), then it catalogs that project's scripts/lib, else cckit's own.
+    # shellcheck source=/dev/null
+    source "$LIB/kit-config.sh" && load_kit_config 2>/dev/null || true
+    # shellcheck source=/dev/null
+    source "$LIB/kit-lib.sh"; kit_lib "$@"
     ;;
   completions)
     case "${1:-bash}" in
