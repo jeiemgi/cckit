@@ -70,7 +70,10 @@ t "version is the install version, not the project's" "$got_ver" "$(jq -r '.kitV
 # ── BY CONSTRUCTION: exercise every read-only verb; none may resolve cckit's OWN repo ─────────────
 # Read-only board/config verbs that MUST act on the invoking project. Run each from the fixture and
 # assert the gh call log never mentions cckit's own repo (the leak this whole effort guards against).
-EXERCISE="sync status next plan plan-next wave gc scan doctor"
+# `lib` belongs here rather than in SKIP: it is read-only and calls no gh, so the assertion below
+# is the guard that keeps it that way — and running it from the fixture also proves the host-project
+# degradation (a project with no scripts/lib of its own falls back to the cckit install, no crash).
+EXERCISE="sync status next plan plan-next wave gc scan doctor lib"
 for v in $EXERCISE; do
   : > "$GH_REPO_LOG"
   ( cd "$fix" && PATH="$stub:$PATH" GH_REPO_LOG="$GH_REPO_LOG" "$CCKIT" "$v" --llm >/dev/null 2>&1 )

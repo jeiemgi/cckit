@@ -76,8 +76,33 @@ Both are launch verbs with no JSON result — use `--dry-run` to inspect the pla
 | `cckit bench [run\|report\|…]` | [Documentation benchmark](/benchmark/): score how well this project finds + uses its own canonical docs. |
 | `cckit version` | The installed cckit version. |
 | `cckit commands` | List every verb (the command catalog). |
+| `cckit lib [--all] [--reasons]` | List every `scripts/lib` helper: its public functions, its one-line purpose, and its declared error behaviour. The companion to `commands` — that lists the verbs, this lists the library they are built from. |
 | `cckit update` | Report whether this project is behind the installed cckit. |
 | `cckit release <ver> [--publish]` | Cut a release (dry-run by default). |
+
+### Finding a helper before you write one
+
+`cckit commands` answers "which verbs exist?". `cckit lib` answers the question underneath it — "which helper already does this?" — so an agent asked to, say, attach gate evidence to a PR finds `pr-evidence.sh` instead of writing that from scratch.
+
+Each row carries the four facts you need before sourcing a file:
+
+| Column | What it is |
+| --- | --- |
+| `file` | The basename to `source`. The footer prints the resolved absolute path. |
+| `errors` | The file's declared failure contract — `pure`, `strict`, `best-effort`, or `mixed` — read from its `# errors:` header (see [CONTRIBUTING](https://github.com/jeiemgi/cckit/blob/main/CONTRIBUTING.md)). A caller that composes a `strict` helper with a `best-effort` one silently inherits the weaker behaviour, so check this first. `mixed` rows also show their reason, because that is the only thing saying which half propagates; `--reasons` shows every file's reason. `unknown` means the file has no header yet — reported, never fatal. |
+| `public functions` | The functions meant for callers. `_`-prefixed names are private by convention and excluded, as are functions defined inside another function. Never elided. |
+| `purpose` | The first sentence of the file's own header comment — derived, never invented. |
+
+`*-test.sh` runners are excluded by default (they are test entry points, not a library); the footer always states how many, and `--all` includes them.
+
+Run from a project cckit is installed in, it catalogs that project's own `scripts/lib` when it has one and otherwise the cckit install itself — which is the library `cckit` on your PATH can actually source. `--root <dir>` points it somewhere else.
+
+```bash
+cckit lib                 # the markdown table
+cckit lib --llm           # TOON rows {file,errors,functions,purpose}
+cckit lib --all           # include the *-test.sh runners
+cckit lib --reasons       # every failure reason, not only the mixed ones
+```
 
 ## Structured output for agents
 
@@ -87,6 +112,7 @@ Append `--llm` (or `--output=json`) to any verb for parseable output, so an agen
 cckit sync --llm
 cckit plan --llm
 cckit plan-next --llm   # the forward plan as TOON rows {rank,area,proposal,next}
+cckit lib --llm         # the helper catalog as TOON rows {file,errors,functions,purpose}
 cckit effort plan --llm
 ```
 
