@@ -105,6 +105,19 @@ Some sub-issues depend on others: sub #4 can't start until sub #1 is merged. cck
 
 `cckit plan` shows the waves. Each wave is exactly "what can run in parallel right now".
 
+### Inside a wave, the most urgent work comes first
+
+A wave can hold a dozen issues, and they are not equally urgent. Within one wave `cckit plan` orders
+them by their `priority:pN` label — **p0 → p1 → p2 → p3**, with unlabeled issues last. Issues that
+share a priority keep the order they already had, and the batch packing follows that order, so the
+p0 work lands in the first batch rather than wherever it happened to fall.
+
+> **Dependencies still win.** Priority never overrides a blocked-by link. Two issues only share a
+> wave when there is *no* dependency between them — a blocker is always placed in a strictly earlier
+> wave than the issue it blocks. So a p3 issue that blocks a p0 issue still runs first: they are in
+> different waves, and the priority sort only ever reorders work that dependencies have already
+> declared startable at the same time.
+
 
 ## Worktrees keep parallel work apart
 

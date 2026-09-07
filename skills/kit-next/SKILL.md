@@ -29,6 +29,11 @@ cckit next
 Prints the unblocked set (wave 0 of the plan) and the single recommended next issue with its start
 command. `--effort <N>` scopes it to one effort's sub-issues.
 
+The unblocked set is ordered by the `priority:pN` label — **p0 → p1 → p2 → p3**, unlabeled last —
+so the recommended issue is the most urgent thing that is actually startable. Ties keep their
+existing order. Priority never jumps a dependency: an issue only reaches wave 0 once every blocker
+is closed, so a low-priority blocker is always offered before the high-priority issue it gates.
+
 Then start the top one in its own worktree + branch:
 
 ```

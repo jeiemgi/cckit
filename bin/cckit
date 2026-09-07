@@ -13,7 +13,7 @@
 #   cckit close <issue> <summary>   close issue + mark done
 #   cckit contribute "<summary>"    open a contribution PR to cckit, gated on scripts/check.sh
 #   cckit sync [--llm]              board state / what's unblocked
-#   cckit plan [--llm] [--effort N] wave plan: deps-ordered, file-disjoint, session-fit (TOON --llm)
+#   cckit plan [--llm] [--effort N] wave plan: deps-ordered, p0-first in a wave, file-disjoint (TOON --llm)
 #   cckit plan-next [--llm]         forward plan: current skills/verbs/rules/docs -> what to build next
 #   cckit effort <new|start|pr|close|plan>   the effort lifecycle
 #     effort new [--flow F --role R --priority p1 --goal G --scope S --for-agents A
