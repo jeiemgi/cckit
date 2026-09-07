@@ -90,6 +90,7 @@ cckit doctor                  # onboarding preflight: deps, gh auth
 cckit init --profile software # scaffold cckit.config.json + .claude/ for this repo
                               #   profiles: software · content · research · automation · minimal
 cckit plan-next               # propose what to build next, grounded in current capabilities
+cckit status                  # where are we: local undone work, PRs to attend, cleanup available
 cckit next                    # the next unblocked issue + how to start it
 cckit start 42                # isolated worktree + branch for issue #42
 cckit brief 42                # the delegation brief for #42, read out of the repo not memory
@@ -102,8 +103,9 @@ cckit cleanup [--yes]         # act on that report: delete the SAFE rows, prune 
 ```
 
 Adopting cckit in a repo that already has history? `cckit scan` detects the stack, `cckit adopt`
-records kit-shaped files the repo already has, and `cckit status` is the thin dashboard — board,
-worktrees, and the resume handoff in one screen. Run `cckit help` for the full verb list, or
+records kit-shaped files the repo already has, and `cckit status` answers "where are we" — local
+undone work, the open PRs waiting on a human, and the cleanup available, plus the board and the
+resume handoff in one screen. Run `cckit help` for the full verb list, or
 `cckit <verb> --help` for any one.
 
 ## Efforts and slug handles
