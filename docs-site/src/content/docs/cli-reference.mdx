@@ -39,9 +39,54 @@ One issue becomes one branch, one worktree, one PR. These verbs walk that path.
 | `cckit pr <issue> <summary>` | Commit, push, and open the PR. |
 | `cckit close <issue> <summary>` | Close the issue and mark it done. |
 | `cckit sync` | Board state: issues by role with Project Status, a merge-ordered open-PR queue, and blocked / not-on-board / stale (>14d) flags. |
-| `cckit status` | Dashboard: board + worktrees + resume handoff. |
+| `cckit status` | "Where are we?" in three buckets — local undone work, open PRs waiting on a human, cleanup available (local + remote) — plus the board and the resume handoff. Read-only. |
 | `cckit handoff "<note>"` | Save a resume-here note for the next session. |
 
+
+### Where are we?
+
+`cckit status` answers the question a session actually opens with, which is not what `git status` answers. Plain `git` output describes refs; it cannot see which PRs are waiting on a person, or which branches are safe to delete. The three buckets, in this order:
+
+| # | Bucket | What it reports |
+| --- | --- | --- |
+| 1 | **Local undone work** | Worktrees with uncommitted changes; branches holding commits reachable from **no** remote ref; effort subs not yet merged into their effort branch. Plus the worktree inventory, because a clean worktree on an issue branch is still work in progress. |
+| 2 | **PRs waiting on a human** | Each open PR with the one thing it needs: `conflict` · `checks` · `draft` · `wait` · `threads` · `ai-review` · `review` · `ready`. |
+| 3 | **Cleanup available** | What can go, local **and** remote, plus what is deliberately kept (orphan work, open-issue branches). Acting on it is [`cckit cleanup`](#housekeeping-and-output). |
+
+Two details worth knowing, because both are places a naive reading gets it wrong:
+
+- **"Unpushed" means on no remote at all**, not "ahead of its own upstream". An effort sub whose commits were merged into a pushed effort branch has no upstream of its own, yet its work is safely on the remote — reporting it as undone would send you to re-push work that is already there.
+- **A superseded check run never counts.** Re-running a check, or retitling a PR and re-firing a title gate, leaves the old run in GitHub's rollup. Counting every context there reports a PR as failing a check that has since passed, so only the latest run per check name is read.
+
+The `ai-review` verdict only appears when the repo evidently uses an AI reviewer — a reviewer config file, or an AI review already present on another open PR. In a repo with none, it never fires.
+
+```bash
+cckit status          # the three buckets
+cckit status --llm    # the same verdicts as JSON: local_undone, worktrees, prs, cleanup
+```
+
+## Verb ↔ skill map
+
+Every verb below is drivable from the CLI. The ones with a skill are also reachable as a slash command in Claude Code; the ones without are CLI-only, which means an agent that only reads the skills list cannot see them. Kept here so that gap stays visible rather than being rediscovered.
+
+| Verb | Skill | |
+| --- | --- | --- |
+| `status` | `kit-status` | |
+| `sync` | `kit-task-sync` | |
+| `next` | `kit-next` | |
+| `plan-next` | `kit-plan-next` | |
+| `start` · `pr` · `close` | `kit-task-start` · `kit-task-pr` · `kit-task-close` | |
+| `gc` | `kit-gc` | (`kit-cleanup` acts on its report) |
+| `autopilot` | `kit-autopilot` | |
+| `contribute` | `kit-contribute` | |
+| `digest` | `kit-digest` | |
+| `doctor` · `init` · `update` | `kit-doctor` · `kit-init` · `kit-update` | plugin commands |
+| `effort` | `kit-effort-new` · `-start` · `-pr` · `-close` | one skill per phase |
+| `brief` | — | CLI-only |
+| `plan` · `wave` · `watch` · `orchestrate` | — | CLI-only |
+| `msg` · `handoff` | — | CLI-only |
+| `adopt` · `migrate` · `scan` | — | CLI-only |
+| `lib` · `commands` · `version` · `render` · `encode-context` · `bench` · `release` · `install` · `completions` · `debug` | — | plumbing; no skill intended |
 
 ## Plan and drive a wave
 

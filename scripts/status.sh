@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# status.sh - a thin status viewer: the board, active worktrees/branches, and the resume handoff on
-# one screen. Output is MARKDOWN routed through the rendering seam (#82): rich via glow in a TTY,
+# status.sh - the "where are we?" dashboard: the board, then the THREE buckets a session actually
+# opens with (local undone work · PRs waiting on a human · cleanup available), then the resume
+# handoff. The bucket logic lives in scripts/lib/kit-status.sh (kit-engine-boundary: verb logic in a
+# sourceable lib, never inline in a script), so every verdict is unit-tested rather than eyeballed. Output is MARKDOWN routed through the rendering seam (#82): rich via glow in a TTY,
 # verbatim markdown otherwise (renders natively in Claude Code, always pipe-safe — no escape codes
 # leak into a redirect). This is the lightweight cockpit; the rich opentui TUI is an OPTIONAL
 # separate adapter — the core stays pure bash and dependency-light, so `cckit status` works anywhere.
@@ -12,6 +14,10 @@ source "$ROOT/scripts/lib/ui.sh" 2>/dev/null || true
 source "$ROOT/scripts/lib/render.sh" 2>/dev/null || true
 # shellcheck source=/dev/null
 source "$ROOT/scripts/lib/kit-config.sh" && load_kit_config
+# shellcheck source=/dev/null
+source "$ROOT/scripts/lib/kit-gc.sh" 2>/dev/null || true
+# shellcheck source=/dev/null
+source "$ROOT/scripts/lib/kit-status.sh"
 
 # _status_md — compose the whole dashboard as one markdown document on stdout.
 _status_md() {
@@ -43,14 +49,9 @@ _status_md() {
   fi
   echo ""
 
-  # Worktrees + branches: SAFE-to-prune vs active (reuse the gc analysis). Kept in a fenced block so
-  # glow renders the aligned gc columns monospaced and the markdown stays faithful.
-  echo "## Worktrees and branches"
-  echo '```'
-  # shellcheck source=/dev/null
-  source "$ROOT/scripts/lib/kit-gc.sh"
-  kit_gc_analyze 2>/dev/null | grep -E 'SAFE|ACTIVE|PROTECTED|ORPHAN' | head -12 || echo "(clean)"
-  echo '```'
+  # The three buckets. Each one names its own emptiness, so a clean bucket and a broken one never
+  # look alike — this report is read to decide what to do next.
+  status_buckets_md "$ROOT"
   echo ""
 
   # Resume handoff, if one is saved.
@@ -61,5 +62,17 @@ _status_md() {
   handoff_read
   echo '```'
 }
+
+# `--llm` (or CCKIT_OUTPUT=json, set by the dispatcher) emits the buckets as JSON for an agent —
+# same classifiers as the markdown path, so the two cannot disagree about a verdict.
+for a in "$@"; do
+  case "$a" in
+    --llm|--output=json) CCKIT_OUTPUT=json ;;
+  esac
+done
+if [ "${CCKIT_OUTPUT:-}" = "json" ]; then
+  status_buckets_json "$ROOT"
+  exit 0
+fi
 
 if command -v cckit_render >/dev/null 2>&1; then _status_md | cckit_render; else _status_md; fi

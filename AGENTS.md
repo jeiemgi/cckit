@@ -29,6 +29,7 @@ adapter one) — is described in [the Adapters page](docs-site/src/content/docs/
 | `cckit next` | the next unblocked issue + how to start it | `--llm` → TOON |
 | `cckit plan` | wave plan: deps-ordered, file-disjoint, session-fit | `--llm` → TOON |
 | `cckit plan-next` | forward plan: inventory current skills/verbs/rules/docs → propose what to build next | `--llm` → TOON |
+| `cckit status` | where are we: local undone work, open PRs waiting on a human, cleanup available (local + remote) | `--llm` → JSON |
 | `cckit wave` | read open efforts, propose incoming waves: fan-out brief + captain drive | `--llm` → TOON |
 | `cckit watch [--merge] [--loop]` | captain: gate open PRs, squash-merge CLEAN, advance the wave | — |
 | `cckit start <issue> [slug]` | isolated worktree + branch | `--llm` |
