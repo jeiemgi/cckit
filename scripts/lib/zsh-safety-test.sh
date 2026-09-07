@@ -46,6 +46,12 @@ run_zsh "kit-config.sh :: load_kit_config" \
 run_zsh "kit-gc.sh :: kit_gc_analyze" \
   "cd '$ROOT'; export KIT_GC_REPO=jeiemgi/cckit; source scripts/lib/kit-config.sh; load_kit_config >/dev/null 2>&1; source scripts/lib/kit-gc.sh; kit_gc_analyze >/dev/null 2>&1"
 
+# kit-gc.sh — the sibling-lib load itself (#219). `BASH_SOURCE` is bash-only and an interactive zsh
+# echoes the directory after a `cd`, so both the old `${(%):-%x}` and a bare `$(cd … && pwd)` left
+# worktree-issue.sh unsourced — `wt_protected_reason` undefined, so every branch looked SAFE.
+run_zsh "kit-gc.sh :: sibling worktree-issue.sh actually loads" \
+  "cd '$ROOT'; source scripts/lib/kit-gc.sh; _kit_gc_load_deps >/dev/null 2>&1; command -v wt_protected_reason >/dev/null 2>&1"
+
 # worktree-start.sh — the `path` local in wt_assign_ports (no-op without .worktree.devPorts).
 run_zsh "worktree-start.sh :: wt_assign_ports" \
   "cd '$ROOT'; source scripts/lib/worktree-start.sh; wt_assign_ports '$ROOT' 1 '$ROOT' >/dev/null 2>&1"

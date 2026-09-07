@@ -22,15 +22,14 @@
 _wt_normalize_issue_num() {
   local n="$1" head tail
   case "$n" in
-    ''|*[!0-9a-z]*) return 0 ;;
+    '')       return 0 ;;
+    *[!0-9]*) : ;;                                # has a non-digit — only the sub form survives
+    *)        printf '%s' "$n"; return 0 ;;       # pure digits
   esac
-  case "$n" in
-    *[!0-9]) head="${n%?}"; tail="${n#"$head"}"
-             case "$tail" in [a-z]) : ;; *) return 0 ;; esac
-             case "$head" in ''|*[!0-9]*) return 0 ;; esac
-             printf '%s' "$head"; return 0 ;;
-    *)       printf '%s' "$n"; return 0 ;;
-  esac
+  head="${n%?}"; tail="${n#"$head"}"
+  case "$tail" in [a-z]) : ;; *) return 0 ;; esac # last char must be one lowercase letter
+  case "$head" in ''|*[!0-9]*) return 0 ;; esac   # everything before it must be pure digits
+  printf '%s' "$head"
 }
 
 wt_issue_number() {

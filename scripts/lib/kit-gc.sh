@@ -21,28 +21,35 @@ KIT_GC_REPO="${KIT_GC_REPO:-${KIT_REPO:-}}"
 
 _kit_gc_root() { git worktree list --porcelain 2>/dev/null | awk '/^worktree /{print $2; exit}'; }
 
-# Source worktree-issue.sh (wt_issue_number / wt_protected_reason) from whatever lib dir we live in.
+# This file's own directory, resolved ONCE at load time — the only point where both shells agree.
+# `BASH_SOURCE` is bash-only; inside a zsh *function* it is unset and `$0` is the function name, so
+# the old per-call resolution fell back to `$0`="zsh", worktree-issue.sh was never sourced,
+# `wt_protected_reason` stayed undefined, and every call site's `2>/dev/null || true` turned the
+# resulting "command not found" into an empty reason — i.e. an open issue's branch classified as
+# SAFE to delete. At FILE scope zsh sets `$0` to the sourced file's path, so one expansion covers
+# bash (source or direct exec) and zsh (interactive or not) with no shell-specific syntax. Prompt
+# expansion (`${(%):-%x}`) is deliberately avoided: it is zsh-only, needs `eval` to stay parseable
+# under bash, and is unreliable in an INTERACTIVE zsh — the kit's own shell.
+#
+# `cd`'s own stdout is discarded, not just its stderr: an interactive zsh ECHOES the new directory
+# (tilde-abbreviated) after a `cd`, so the bare `$(cd … && pwd)` idiom captured TWO lines and the
+# resulting path never existed. `pwd` still writes to the substitution.
+_KIT_GC_LIB_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" >/dev/null 2>&1 && pwd)"
+
+# Source worktree-issue.sh (wt_issue_number / wt_protected_reason) from the lib dir we live in.
 _kit_gc_load_deps() {
   command -v wt_protected_reason >/dev/null 2>&1 && return 0
-  # Resolve this file's dir under bash (BASH_SOURCE) AND zsh (%x prompt escape). BASH_SOURCE is
-  # bash-only: under zsh it fell back to $0="zsh", so worktree-issue.sh was never sourced,
-  # wt_protected_reason stayed undefined, and every call site's `2>/dev/null || true` turned the
-  # resulting "command not found" into an empty reason — which classifies an open issue's branch
-  # as SAFE. `eval` keeps the zsh-only syntax out of bash's parser.
-  local src d
-  if [ -n "${BASH_SOURCE[0]:-}" ]; then src="${BASH_SOURCE[0]}"
-  elif [ -n "${ZSH_VERSION:-}" ]; then eval 'src=${(%):-%x}'
-  else src="$0"; fi
-  d="$(CDPATH='' cd -- "$(dirname -- "$src")" && pwd)"
   # shellcheck source=/dev/null
-  [ -f "$d/worktree-issue.sh" ] && . "$d/worktree-issue.sh"
+  [ -n "${_KIT_GC_LIB_DIR:-}" ] && [ -f "$_KIT_GC_LIB_DIR/worktree-issue.sh" ] \
+    && . "$_KIT_GC_LIB_DIR/worktree-issue.sh"
+  command -v wt_protected_reason >/dev/null 2>&1
 }
 
 # Fail LOUD if the protection helper could not be loaded. Without it every issue-open check
 # silently returns empty and gc would offer to delete in-progress work — a wrong "safe" is far
 # worse than a refusal, so callers must not proceed on a degraded analysis.
 _kit_gc_require_deps() {
-  _kit_gc_load_deps
+  _kit_gc_load_deps || :   # never let a load failure abort a `set -e` caller before the FATAL prints
   command -v wt_protected_reason >/dev/null 2>&1 && return 0
   echo "kit-gc: FATAL — worktree-issue.sh not loaded; issue-open protection is unavailable." >&2
   echo "kit-gc: refusing to classify branches: everything would look SAFE to delete." >&2

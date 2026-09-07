@@ -38,7 +38,7 @@ adapter one) — is described in [the Adapters page](docs-site/src/content/docs/
 | `cckit effort plan` | session-fit effort plan | `--llm` → JSON |
 | `cckit orchestrate <a> <b> …` | run N flows in parallel worktrees | — (use `--dry-run`) |
 | `cckit autopilot [<a> …]` | unattended multi-flow: drive (or auto-pick) issues under a cap | — (use `--dry-run`) |
-| `cckit gc` | report prunable branches + worktrees | `--llm` → JSON counts |
+| `cckit gc` | report prunable branches + worktrees — never one whose issue is still open; aborts if the protection helper is missing | `--llm` → JSON counts |
 | `cckit render` | stdin markdown → rich (glow on a TTY; verbatim when piped) | — |
 | `cckit version` | the installed cckit version | `--llm` |
 
