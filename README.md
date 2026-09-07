@@ -95,7 +95,7 @@ cckit start 42                # isolated worktree + branch for issue #42
 cckit pr 42 "what changed"    # commit, push, open the PR
 cckit sync                    # board state, what's unblocked
 cckit handoff "resume note"   # save a handoff — bare `cckit` prints it next session
-cckit gc                      # report prunable branches + worktrees (read-only)
+cckit gc                      # report prunable branches + worktrees (deletes nothing)
 cckit cleanup [--yes]         # act on that report: delete the SAFE rows, keep orphans/stashes
 ```
 

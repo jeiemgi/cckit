@@ -11,8 +11,9 @@ Plugin-direct skill — helpers resolve from `${CLAUDE_PLUGIN_ROOT}`.
 `/kit-gc` classifies; **this skill acts on that classification.** It is the only place in the kit
 that deletes a branch the user did not name, so the whole design is plan-first.
 
-**Safety contract:** the plan is printed before anything is written, `--yes` is the only thing that
-deletes, and three buckets are never deletable at all — see the table below. It reuses
+**Safety contract:** the plan names **everything** `--yes` can touch — branches *and* worktrees, so
+no deletion escapes the user's veto — `--yes` is the only thing that deletes, and three buckets are
+never deletable at all. See the table below. It reuses
 `kit_gc_analyze` as the single classifier rather than re-deriving verdicts, so `gc` and `cleanup`
 can never disagree about what is safe to delete.
 
@@ -23,7 +24,7 @@ can never disagree about what is safe to delete.
 ```bash
 source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/kit-config.sh" && load_kit_config
 KIT_GC_REPO="$KIT_REPO" source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/kit-gc.sh"
-kit_gc_cleanup          # plan only — writes NOTHING
+kit_gc_cleanup          # plan only — deletes NOTHING
 ```
 
 Or through the CLI: `cckit cleanup` (add `--llm` for JSON counts).
@@ -47,8 +48,14 @@ kit_gc_cleanup --yes    # or: cckit cleanup --yes
 ```
 
 Level-ness is recorded **before** the local prune — once the local ref is gone there is nothing left
-to compare, and an "ahead" branch may hold unpushed work. A remote delete that fails (protected ref,
-already gone) is reported and skipped, never retried blindly.
+to compare. It requires **exact equality in both directions**: `origin/<b>..<b>` alone only proves
+local ⊆ remote, so a remote-ahead branch would otherwise lose remote-only history. A local delete is
+likewise skipped when the branch is ahead of its remote (`git branch -D` is a force delete). A remote
+delete that fails (protected ref, already gone) is reported and counted, never retried blindly.
+
+The plan-only path does perform one write: `kit_gc_analyze` refreshes remote-tracking refs
+(`git fetch --prune`) so the classification is not made against a stale remote. It touches no branch,
+worktree, stash, or commit.
 
 ### 4. Orphan handling
 

@@ -197,14 +197,24 @@ case "$cmd" in
     # shellcheck source=/dev/null
     source "$LIB/kit-gc.sh"
     if cckit_is_json; then
-      out="$(kit_gc_cleanup "$@" 2>/dev/null || true)"
-      safe="$(printf '%s\n' "$out" | awk '/^  SAFE to delete/{print $4}')"
+      # Keep BOTH the exit status and the diagnostic. `|| true` + `2>/dev/null` would turn a refusal
+      # (protection helper missing, analysis failed) or a partial run (a remote delete that failed)
+      # into `applied: yes` with zero counts and rc 0 — a JSON consumer would read that as a clean
+      # sweep. Reporting a wrong success is the failure mode this whole op exists to avoid.
+      cleanup_err="$(mktemp)"; cleanup_rc=0
+      out="$(kit_gc_cleanup "$@" 2>"$cleanup_err")" || cleanup_rc=$?
+      safe="$(printf '%s\n' "$out" | awk '/^  SAFE branches/{print $3}')"
+      wt="$(printf '%s\n' "$out" | awk '/^  SAFE worktrees/{print $3}')"
       orphan="$(printf '%s\n' "$out" | awk '/^  ORPHAN kept/{print $3}')"
       protected="$(printf '%s\n' "$out" | awk '/^  PROTECTED kept/{print $3}')"
       stash="$(printf '%s\n' "$out" | awk '/^  stashes kept/{print $3}')"
-      applied=no; case " $* " in *" --yes "*|*" -y "*) applied=yes ;; esac
-      cckit_json verb cleanup safe "${safe:-0}" orphan "${orphan:-0}" \
-        protected "${protected:-0}" stash "${stash:-0}" applied "$applied"
+      applied=no
+      if [ "$cleanup_rc" -eq 0 ]; then case " $* " in *" --yes "*|*" -y "*) applied=yes ;; esac; fi
+      err="$(tr '\n' ' ' < "$cleanup_err" | sed 's/[[:space:]]*$//')"; rm -f "$cleanup_err"
+      cckit_json verb cleanup safe "${safe:-0}" worktrees "${wt:-0}" orphan "${orphan:-0}" \
+        protected "${protected:-0}" stash "${stash:-0}" applied "$applied" \
+        rc "$cleanup_rc" error "$err"
+      [ "$cleanup_rc" -eq 0 ] || exit "$cleanup_rc"
     else
       kit_gc_cleanup "$@"
     fi

@@ -23,6 +23,7 @@ git init -q main
 cd main
 git config user.email t@t; git config user.name t
 echo "base" > base.txt; git add base.txt; git commit -q -m "init"
+init_branch="$(git rev-parse --abbrev-ref HEAD)"   # master or main, per the host git config
 git worktree add -q ../wt -b feat/5-recover >/dev/null 2>&1
 # Stage a NEW file inside the worktree (writes the worktree's admin index; the blob lands in the
 # shared object store and so survives the worktree dir's death).
@@ -123,6 +124,11 @@ plan="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_cleanup 2>&1)"
 has "cleanup prints a plan"                    "$plan" "# cleanup plan"
 has "cleanup says it deleted nothing"          "$plan" "PLAN ONLY"
 has "cleanup counts the merged branch as SAFE" "$plan" "task/40-merged"
+# Findings from review: the plan must NAME the kept buckets, not just count them — a user cannot
+# veto what they cannot see.
+has "plan names the protected branch"          "$plan" "task/41-open"
+has "plan names the orphan branch"             "$plan" "task/42-orphan"
+has "plan has a SAFE worktrees bucket"         "$plan" "SAFE worktrees"
 # Assert the PROTECTED bucket actually FIRED — without this, `task/41-open` surviving below proves
 # nothing, since an unclassified branch lands in ORPHAN and is kept for a different reason.
 t   "open-issue branch counted PROTECTED, not ORPHAN" \
@@ -137,6 +143,37 @@ t   "--yes deleted the merged branch"   "$(git branch --list task/40-merged | wc
 t   "--yes KEPT the open-issue branch"  "$(git branch --list task/41-open   | wc -l | tr -d ' ')" "1"
 t   "--yes KEPT the orphan branch"      "$(git branch --list task/42-orphan | wc -l | tr -d ' ')" "1"
 has "cleanup reports what it left"      "$applied" "left untouched"
+
+# ── ref-comparison guards: a merged PR alone must NEVER authorize a force delete (#226 review) ──
+# `git branch -D` destroys unpushed commits, and one-directional containment does not prove equality.
+git checkout -q -b task/43-ahead 2>/dev/null
+echo ahead > ahead.txt; git add ahead.txt; git commit -qm "unpushed work"
+# Fabricate a remote-tracking ref that does NOT contain this commit, so the branch is "ahead".
+git update-ref "refs/remotes/origin/task/43-ahead" "$(git rev-parse HEAD~1)"
+git checkout -q "$init_branch"
+
+t "_kit_gc_has_unpushed sees the ahead branch"    "$(_kit_gc_has_unpushed task/43-ahead && echo yes || echo no)" "yes"
+t "_kit_gc_has_unpushed clears a level branch"    "$(_kit_gc_has_unpushed task/42-orphan && echo yes || echo no)" "no"
+# Remote-ahead is the OTHER direction: local ⊆ remote passes the level check but the remote holds
+# history the local does not, so deleting the remote would lose it.
+git update-ref "refs/remotes/origin/task/44-behind" "$(git rev-parse task/43-ahead)"
+git branch task/44-behind "$(git rev-parse task/43-ahead~1)" 2>/dev/null
+t "_kit_gc_remote_ahead sees remote-only history" "$(_kit_gc_remote_ahead task/44-behind && echo yes || echo no)" "yes"
+t "_kit_gc_has_unpushed clears it (local ⊆ remote)" "$(_kit_gc_has_unpushed task/44-behind && echo yes || echo no)" "no"
+
+# End to end: a MERGED PR on a branch with unpushed commits must survive --yes.
+cat > "$stub/gh" <<'SH'
+#!/usr/bin/env bash
+case "$1 $2" in
+  "pr list")    printf 'task/43-ahead\tPR#43 MERGED\n' ;;
+  "issue view") echo closed ;;
+  *) : ;;
+esac
+SH
+chmod +x "$stub/gh"
+out="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_prune --yes 2>&1)"
+t   "merged-but-ahead branch survives prune --yes" "$(git branch --list task/43-ahead | wc -l | tr -d ' ')" "1"
+has "prune says why it skipped it"                 "$out" "unpushed commits"
 
 [ "$fail" -eq 0 ] && echo "ALL OK (kit-gc)" || echo "kit-gc: FAILURES"
 exit "$fail"
