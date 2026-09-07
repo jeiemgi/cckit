@@ -88,6 +88,44 @@ STUB
   [ "$(targets "$nws")" = "." ] || bad "npm workspaces root should install at '.', got '$(targets "$nws")'"
   ok
 
+  # ── a workspace declaration with NO MEMBERS is not a workspace root ─────────────────────────
+  # The `packages:` KEY alone is not enough. An empty member list leaves pnpm nothing to resolve,
+  # so it writes only the empty-importer lockfile — the #255 symptom, re-created through the
+  # workspace branch instead of the dependency branch.
+  ws0=$(fixture ws0 '{"name":"ws0"}')
+  printf 'packages: []\n' > "$ws0/pnpm-workspace.yaml"
+  [ "$(targets "$ws0")" = "-" ] || bad "'packages: []' declares no members — should not install, got '$(targets "$ws0")'"
+  ok
+
+  wsb=$(fixture wsb '{"name":"wsb"}')
+  printf 'packages:\nonlyBuiltDependencies:\n  - sharp\n' > "$wsb/pnpm-workspace.yaml"
+  [ "$(targets "$wsb")" = "-" ] || bad "an empty 'packages:' block declares no members, got '$(targets "$wsb")'"
+  ok
+
+  # …but the inline flow-sequence form with a real pattern still counts.
+  wsi=$(fixture wsi '{"name":"wsi"}')
+  printf 'packages: ["apps/*", "libs/*"]\n' > "$wsi/pnpm-workspace.yaml"
+  [ "$(targets "$wsi")" = "." ] || bad "inline 'packages: [\"apps/*\"]' is a workspace root, got '$(targets "$wsi")'"
+  ok
+
+  # The same three empty shapes on the package.json side.
+  jw0=$(fixture jw0 '{"name":"jw0","workspaces":[]}')
+  [ "$(targets "$jw0")" = "-" ] || bad "'workspaces: []' declares no members, got '$(targets "$jw0")'"
+  ok
+
+  jwo=$(fixture jwo '{"name":"jwo","workspaces":{}}')
+  [ "$(targets "$jwo")" = "-" ] || bad "'workspaces: {}' declares no members, got '$(targets "$jwo")'"
+  ok
+
+  jwp=$(fixture jwp '{"name":"jwp","workspaces":{"nohoist":["x"],"packages":[]}}')
+  [ "$(targets "$jwp")" = "-" ] || bad "'workspaces.packages: []' declares no members, got '$(targets "$jwp")'"
+  ok
+
+  # …and the yarn object form WITH members still counts.
+  jwm=$(fixture jwm '{"name":"jwm","workspaces":{"packages":["packages/*"]}}')
+  [ "$(targets "$jwm")" = "." ] || bad "'workspaces.packages: [\"packages/*\"]' is a workspace root, got '$(targets "$jwm")'"
+  ok
+
   # 8. `.worktree.installPaths` wins outright — the generic knob for repos whose Node project lives
   #    in a subdirectory (cckit's own `docs-site/`). No project layout is hardcoded in the kit.
   if command -v jq >/dev/null 2>&1; then
@@ -103,6 +141,43 @@ STUB
     printf '{"worktree":{"installPaths":[]}}\n' > "$none/cckit.config.json"
     [ "$(targets "$none")" = "-" ] || bad "installPaths [] should install nothing, got '$(targets "$none")'"
     ok
+
+    # ── installPaths must never escape the worktree ────────────────────────────────────────────
+    # A worktree sits at <root>/.claude/worktrees/<kind>+<N>-<slug>, three levels under the primary
+    # checkout — which is SHARED and may have another session's work parked on it. A `../../..`
+    # entry that reached the `cd` would run pnpm in that tree. Config is input; it gets validated.
+    mkdir -p "$tmp/victim/inner/esc"
+    printf '{"name":"VICTIM","dependencies":{"left-pad":"^1"}}\n' > "$tmp/victim/package.json"
+    printf '{"name":"esc"}\n' > "$tmp/victim/inner/esc/package.json"
+    mkdir -p "$tmp/victim/inner/esc/.claude"
+    esc="$tmp/victim/inner/esc"
+
+    printf '{"worktree":{"installPaths":["../.."]}}\n' > "$esc/.claude/kit.config.json"
+    [ "$(targets "$esc" 2>/dev/null)" = "-" ] || bad "'../..' should be refused, got '$(targets "$esc" 2>/dev/null)'"
+    wt_bootstrap "$esc" "$esc" 255 >/dev/null 2>&1
+    [ -f "$tmp/victim/pnpm-lock.yaml" ] && bad "traversal escaped the worktree — pnpm ran OUTSIDE it"
+    ok; ok
+
+    # An absolute path is never a worktree-relative target.
+    printf '{"worktree":{"installPaths":["%s"]}}\n' "$tmp/victim" > "$esc/.claude/kit.config.json"
+    [ "$(targets "$esc" 2>/dev/null)" = "-" ] || bad "an absolute installPaths entry should be refused"
+    ok
+
+    # A path that climbs and comes back is fine — it stays inside. It normalizes on the way out.
+    mkdir -p "$esc/docs-site"
+    printf '{"name":"d","dependencies":{"astro":"^5"}}\n' > "$esc/docs-site/package.json"
+    printf '{"worktree":{"installPaths":["./docs-site/../docs-site/"]}}\n' > "$esc/.claude/kit.config.json"
+    [ "$(targets "$esc" 2>/dev/null)" = "docs-site" ] || bad "a contained path should normalize to 'docs-site', got '$(targets "$esc" 2>/dev/null)'"
+    ok
+
+    # A symlink out of the tree is the escape the lexical check alone cannot see.
+    if ln -s "$tmp/victim" "$esc/link-out" 2>/dev/null; then
+      printf '{"worktree":{"installPaths":["link-out"]}}\n' > "$esc/.claude/kit.config.json"
+      [ "$(targets "$esc" 2>/dev/null)" = "-" ] || bad "a symlink pointing outside the worktree should be refused"
+      wt_bootstrap "$esc" "$esc" 255 >/dev/null 2>&1
+      [ -f "$tmp/victim/pnpm-lock.yaml" ] && bad "symlink escape let pnpm run OUTSIDE the worktree"
+      ok; ok
+    fi
   fi
 
   # ── wt_bootstrap end to end: does a root pnpm-lock.yaml appear? ─────────────────────────────

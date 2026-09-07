@@ -91,23 +91,99 @@ _wt_manifest_has_deps() {
     '"(dependencies|devDependencies|optionalDependencies|peerDependencies)":\{"'
 }
 
-# _wt_is_workspace_root <dir> — true when <dir> is the root of a package-manager workspace. A
-# workspace root legitimately declares no dependencies of its own (the MEMBERS hold them) and its
-# root lockfile is the real one, so `pnpm install` there IS genuine work and must still run.
-# A `pnpm-workspace.yaml` carrying only settings (pnpm 10 `overrides:` / `onlyBuiltDependencies:`)
-# with no `packages:` key is NOT a member-bearing workspace and does not qualify on its own.
+# _wt_yaml_has_members <file> — true when a pnpm-workspace.yaml declares at least one ACTUAL member
+# pattern under `packages:`. The KEY alone is not enough: `packages: []` and a `packages:` with an
+# empty block below it declare no members, so pnpm resolves nothing and writes only the empty-
+# importer lockfile — the exact #255 symptom. Handles both YAML sequence forms:
+#   packages: ["apps/*"]     (inline flow)        packages:            (block)
+#                                                   - "apps/*"
+# Comments are stripped first so `packages: []  # later` and `- # nothing` can't fake a member.
+_wt_yaml_has_members() {
+  [[ -f "$1" ]] || return 1
+  awk '
+    { line = $0; sub(/^[[:space:]]*#.*$/, "", line); sub(/[[:space:]]+#.*$/, "", line) }
+    inblock {
+      if (line ~ /^[[:space:]]*$/) next
+      # a member entry: "- " followed by something real
+      if (line ~ /^[[:space:]]*-[[:space:]]*[^[:space:]]/) { found = 1; exit }
+      inblock = 0   # any other content ends the block without a member
+    }
+    !inblock {
+      if (line ~ /^[[:space:]]*packages:[[:space:]]*\[/) {
+        rest = line; sub(/^[^[]*\[/, "", rest); gsub(/[[:space:]]/, "", rest)
+        if (rest !~ /^\]/) { found = 1; exit }   # non-empty inline flow sequence
+      } else if (line ~ /^[[:space:]]*packages:[[:space:]]*$/) {
+        inblock = 1
+      }
+    }
+    END { exit(found ? 0 : 1) }
+  ' "$1" 2>/dev/null
+}
+
+# _wt_is_workspace_root <dir> — true when <dir> is the root of a package-manager workspace WITH AT
+# LEAST ONE MEMBER. Such a root legitimately declares no dependencies of its own (the members hold
+# them) and its root lockfile is the real one, so `pnpm install` there IS genuine work.
+#
+# A declaration with no members is NOT a workspace root, and this distinction is the whole point:
+# `packages: []`, `"workspaces": []`, `"workspaces": {}` and `"workspaces": {"packages": []}` all
+# leave pnpm with nothing to resolve, so treating them as workspace roots would re-create #255.
+# Likewise a `pnpm-workspace.yaml` carrying only settings (pnpm 10 `overrides:` /
+# `onlyBuiltDependencies:`) with no `packages:` key at all.
 _wt_is_workspace_root() {
   local d="$1" f
   for f in "$d/pnpm-workspace.yaml" "$d/pnpm-workspace.yml"; do
-    [[ -f "$f" ]] && grep -qE '^[[:space:]]*packages:' "$f" 2>/dev/null && return 0
+    _wt_yaml_has_members "$f" && return 0
   done
+  # package.json `workspaces`: the array form IS the member list; the object form (npm/yarn) keeps
+  # it under `.packages` alongside `nohoist`. Either way, count real non-empty patterns.
   _wt_json_has "$d/package.json" \
-    '(.workspaces | type) as $t | ($t=="object") or ($t=="array" and (.workspaces|length)>0)' \
-    '"workspaces":(\[.|\{)'
+    'def members: if type=="array" then . elif type=="object" then (.packages // []) else [] end;
+     ((.workspaces // null) | members | map(select(type=="string" and length > 0)) | length) > 0' \
+    '"workspaces":(\["|\{[^}]*"packages":\[")'
+}
+
+# _wt_safe_target <worktree> <target> — echo the normalized, worktree-relative form of <target> when
+# it is SAFE to install in; nothing + rc 1 otherwise. A target MUST stay inside the worktree.
+#
+# This is not hypothetical: a worktree lives at `<root>/.claude/worktrees/<kind>+<N>-<slug>`, three
+# levels under the primary checkout, so an installPaths entry of `../../..` would run `pnpm install`
+# in the SHARED main checkout — writing node_modules and a pnpm-lock.yaml into whatever another
+# session has parked there. Config is project-controlled input, so it gets validated like input.
+#
+# Two gates, because they catch different escapes:
+#   • lexical — reject an absolute path, and resolve `.`/`..` segments, failing if they climb above
+#     the worktree. Pure parameter expansion (no `set --`, which zsh does not word-split), so it
+#     works on a path that does not exist yet and behaves identically in bash and zsh.
+#   • physical — when the directory does exist, compare `pwd -P` against the worktree's, which is
+#     the only thing that catches a symlink pointing out of the tree.
+_wt_safe_target() {
+  local wt="$1" t="$2" rest seg out="" base abs
+  [[ -n "$t" ]] || return 1
+  case "$t" in /*) return 1 ;; esac   # absolute — never a worktree-relative target
+  rest="$t"
+  while [[ -n "$rest" ]]; do
+    seg="${rest%%/*}"
+    if [[ "$seg" == "$rest" ]]; then rest=""; else rest="${rest#*/}"; fi
+    case "$seg" in
+      ''|'.') continue ;;
+      '..')
+        [[ -n "$out" ]] || return 1                       # climbing above the worktree root
+        case "$out" in */*) out="${out%/*}" ;; *) out="" ;; esac ;;
+      *) out="${out:+$out/}$seg" ;;
+    esac
+  done
+  out="${out:-.}"
+  base="$(cd -P "$wt" 2>/dev/null && pwd -P)" || return 1
+  if [[ -d "$wt/$out" ]]; then
+    abs="$(cd -P "$wt/$out" 2>/dev/null && pwd -P)" || return 1
+    case "$abs" in "$base"|"$base"/*) : ;; *) return 1 ;; esac
+  fi
+  printf '%s\n' "$out"
 }
 
 # wt_install_targets <worktree> — emit one worktree-relative directory per line that the bootstrap
-# should run `pnpm install` in. Empty output means "nothing to install" — the correct answer for a
+# should run `pnpm install` in. Every emitted target is validated to live INSIDE the worktree
+# (_wt_safe_target). Empty output means "nothing to install" — the correct answer for a
 # dependency-free root. Decision order:
 #   1. `.worktree.installPaths` in the project config wins outright — explicit project intent for
 #      repos whose Node projects live in subdirectories (e.g. ["docs-site"]). `[]` means install
@@ -116,7 +192,7 @@ _wt_is_workspace_root() {
 #      workspace root.
 #   3. Otherwise nothing.
 wt_install_targets() {
-  local wt="$1" cfg paths n i p
+  local wt="$1" cfg paths n i p safe
   if cfg="$(_wt_cfg "$wt")" && command -v jq >/dev/null 2>&1; then
     paths="$(jq -c '.worktree.installPaths // empty' "$cfg" 2>/dev/null)"
     if [[ -n "$paths" && "$paths" != "null" ]]; then
@@ -124,7 +200,13 @@ wt_install_targets() {
       i=0
       while [[ "$i" -lt "$n" ]]; do
         p="$(jq -r ".[$i] // empty" <<<"$paths")"
-        [[ -n "$p" ]] && printf '%s\n' "$p"
+        if [[ -n "$p" ]]; then
+          if safe="$(_wt_safe_target "$wt" "$p")"; then
+            printf '%s\n' "$safe"
+          else
+            echo "wt_install_targets: refusing installPaths entry '$p' — outside the worktree" >&2
+          fi
+        fi
         i=$(( i + 1 ))
       done
       return 0
@@ -170,6 +252,10 @@ wt_bootstrap() {
     ran=0
     while IFS= read -r target; do
       [[ -n "$target" ]] || continue
+      # Re-validate containment at the point of USE, not just where the target was produced: this
+      # is the line that actually `cd`s and runs pnpm, so it is the one that must never be talked
+      # into stepping outside the worktree (a `../../..` would land in the shared main checkout).
+      target="$(_wt_safe_target "$wt" "$target")" || continue
       [[ -d "$wt/$target" && -f "$wt/$target/package.json" ]] || continue
       ran=1
       [[ "$target" == "." ]] && where="" || where=" in $target"

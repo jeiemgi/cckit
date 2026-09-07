@@ -116,25 +116,40 @@ they copy the gitignored `.env.local*` files and project ids a new checkout can'
 per-worktree dev `PORT` per app, and install dependencies — `node_modules` is per-worktree, never
 shared. Every step is best-effort: a hiccup prints and moves on, it never fails the start.
 
-The install step reads the **project's own manifest** to decide where to run:
+### Where the install runs
 
-| The worktree root… | What the bootstrap does |
-| --- | --- |
-| declares dependencies (`dependencies`, `devDependencies`, `optionalDependencies` or `peerDependencies`) | `pnpm install` at the root |
-| is a workspace root (`pnpm-workspace.yaml` with `packages:`, or `workspaces` in `package.json`) | `pnpm install` at the root — the members hold the deps |
-| declares no dependencies at all | **nothing** — it prints `no dependencies declared — skipping pnpm install` |
+The install step decides from **your project**, in this precedence — the first rule that applies wins,
+and the ones below it are never consulted:
 
-That last row is the point. A root manifest with no dependencies has nothing to resolve, but pnpm
-would still write an empty `pnpm-lock.yaml` (`importers: { .: {} }`) — a file that then trips the
+<Steps>
+
+1. **`worktree.installPaths` is set** → install in exactly those directories, and only those. The
+   root and workspace checks below are skipped entirely; `[]` means *install nothing*.
+
+2. **Otherwise, the worktree root** — but only when its `package.json` declares at least one
+   dependency (in `dependencies`, `devDependencies`, `optionalDependencies` or `peerDependencies`),
+   **or** it is a workspace root **with at least one member** (`pnpm-workspace.yaml` whose
+   `packages:` lists a pattern, or a non-empty `workspaces` in `package.json`). A workspace root
+   holds its members' deps, so the install there is real work.
+
+3. **Otherwise nothing** — the start prints `no dependencies declared — skipping pnpm install`.
+
+</Steps>
+
+Rule 3 is the point. A root manifest with no dependencies has nothing to resolve, but pnpm would
+still write an empty `pnpm-lock.yaml` (`importers: { .: {} }`) — a file that then trips the
 [captain's own lockfile policy floor](#captain-merge-policy) and holds the PR for human review. cckit
 itself is exactly this shape: a published bash CLI with zero dependencies whose only Node project is
 `docs-site/`.
 
+The "at least one member" clause in rule 2 matters for the same reason: `packages: []`,
+`"workspaces": []` and `"workspaces": {"packages": []}` all *look* like workspace roots but declare
+nothing, so installing at them lands right back on the empty lockfile.
+
 ### Installing somewhere other than the root
 
 When your Node project lives in a subdirectory, name the directories under `worktree.installPaths` in
-the config file resolved above. It wins outright over the manifest check, and `[]` means *install
-nothing*:
+the config file resolved above:
 
 ```json
 {
@@ -146,9 +161,16 @@ nothing*:
 
 | Key | Default | What it does | Env override |
 | --- | --- | --- | --- |
-| `worktree.installPaths` | *(unset — decide from the root manifest)* | Worktree-relative directories to run `pnpm install` in. `[]` installs nothing. | — |
+| `worktree.installPaths` | *(unset — fall through to rule 2)* | Worktree-relative directories to run `pnpm install` in. Wins over rules 2–3; `[]` installs nothing. | — |
 | `worktree.devPorts` | `[]` | `{path, base}` per app: the per-worktree dev `PORT` written into that app's `.env.local`. | — |
 | — | install on | Skip the dependency install entirely for one invocation. | `KIT_WT_INSTALL=0` |
+
+<Aside type="caution" title="installPaths cannot leave the worktree">
+Entries are worktree-**relative** and validated for containment: an absolute path, or one that climbs
+out with `..`, or a symlink pointing outside the tree, is refused with a message and skipped. A
+worktree sits three levels under the primary checkout, so an escaping entry would otherwise run pnpm
+in a shared checkout — writing `node_modules` and a lockfile into another session's working tree.
+</Aside>
 
 <Aside type="tip" title="Nothing is hardcoded">
 The kit carries no project's layout. Both keys are config, and the fallback is a question asked of

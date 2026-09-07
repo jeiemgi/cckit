@@ -134,7 +134,7 @@
         "installPaths": {
           "type": "array",
           "items": { "type": "string" },
-          "description": "Worktree-relative directories to run `pnpm install` in during bootstrap (e.g. [\"docs-site\"]). Wins over the default manifest check; [] installs nothing. Unset: install at the root only when its package.json declares dependencies or it is a workspace root — a dependency-free root is skipped so pnpm cannot plant an empty pnpm-lock.yaml (#255). KIT_WT_INSTALL=0 skips the install entirely."
+          "description": "Worktree-relative directories to run `pnpm install` in during bootstrap (e.g. [\"docs-site\"]). Set, it wins outright — only these dirs are installed and the checks below are skipped; [] installs nothing. Entries MUST stay inside the worktree: an absolute path, a `..` that climbs out, or a symlink pointing outside is refused and skipped. Unset: install at the root only when its package.json declares dependencies or it is a workspace root WITH AT LEAST ONE MEMBER — a dependency-free root (or an empty `packages:` / `workspaces` list) is skipped so pnpm cannot plant an empty pnpm-lock.yaml (#255). KIT_WT_INSTALL=0 skips the install entirely."
         },
         "devPorts": {
           "type": "array",

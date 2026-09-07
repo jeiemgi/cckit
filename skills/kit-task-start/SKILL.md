@@ -16,10 +16,12 @@ here (kit-engine-boundary #1/#2 — same single-implementation principle as the 
 - the isolated worktree at `.claude/worktrees/<kind>+<N>-<slug>` (reused if it already exists;
   the dir name encodes issue #N so `kit-gc` won't wipe it while the issue is open)
 - **bootstrap** (`wt_bootstrap`): copies gitignored `.env.local*` + project ids into the worktree,
-  assigns a per-worktree dev PORT, installs deps **only where the project declares any** — the root
-  when its manifest has dependencies or it is a workspace root, else the dirs named in
-  `worktree.installPaths`, else nothing (`KIT_WT_INSTALL=0` opts out entirely). A dependency-free
-  root is skipped so pnpm can't plant an empty `pnpm-lock.yaml` the captain then holds the PR on
+  assigns a per-worktree dev PORT, installs deps **only where there is something to install**, in
+  this precedence: **`worktree.installPaths` if set** — those dirs only, `[]` means nothing, and the
+  checks below are skipped; **else** the root when its manifest declares dependencies or it is a
+  workspace root *with at least one member*; **else nothing**. A dependency-free root is skipped so
+  pnpm can't plant an empty `pnpm-lock.yaml` the captain then holds the PR on. `installPaths`
+  entries that point outside the worktree are refused. `KIT_WT_INSTALL=0` opts out entirely
 - the **claim precheck** (#124): warns when the issue is already In Progress on the board —
   another session may own it
 - the live-session **collision guard**: never disturbs a worktree a live session is sitting in
