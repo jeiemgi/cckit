@@ -1,6 +1,11 @@
 # dependencies / build
 node_modules/
 dist/
+# BACKSTOP ONLY (#255) — the cause is fixed in wt_bootstrap, which no longer installs at a
+# dependency-free root. cckit's root package.json is a published bash CLI with zero dependencies, so
+# a lockfile HERE is always a stray artifact (and one the captain's policy floor would hold a PR on).
+# Anchored to the repo root: docs-site/pnpm-lock.yaml is the real one and is NOT ignored.
+/pnpm-lock.yaml
 .astro/
 .cache/
 .turbo/

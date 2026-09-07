@@ -92,7 +92,12 @@ cckit init --profile software # scaffold cckit.config.json + .claude/ for this r
 cckit plan-next               # propose what to build next, grounded in current capabilities
 cckit status                  # where are we: local undone work, PRs to attend, cleanup available
 cckit next                    # the next unblocked issue + how to start it
-cckit start 42                # isolated worktree + branch for issue #42
+cckit start 42                # isolated worktree + branch for issue #42, bootstrapped:
+                              #   env files copied, dev port assigned, deps installed at the
+                              #   selected targets — worktree.installPaths if set (those dirs
+                              #   regardless of their manifests), else a root that declares
+                              #   deps or is a workspace root with members, else nothing
+                              #   (KIT_WT_INSTALL=0 skips the install entirely)
 cckit brief 42                # the delegation brief for #42, read out of the repo not memory
 cckit lib                     # every scripts/lib helper: functions, purpose, error contract
 cckit pr 42 "what changed"    # commit, push, open the PR

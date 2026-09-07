@@ -33,7 +33,7 @@ adapter one) — is described in [the Adapters page](docs-site/src/content/docs/
 | `cckit brief <issue>` | the delegation brief for an issue, from real state: worktree, seed freshness, owned files, the helpers they sit on, standing gotchas | — |
 | `cckit wave` | read open efforts, propose incoming waves: fan-out brief + captain drive | `--llm` → TOON |
 | `cckit watch [--merge] [--loop]` | captain: gate open PRs, squash-merge CLEAN, advance the wave | — |
-| `cckit start <issue> [slug]` | isolated worktree + branch | `--llm` |
+| `cckit start <issue> [slug]` | isolated worktree + branch, bootstrapped: env files copied, per-worktree dev PORT, deps installed at the selected targets. Precedence: **`worktree.installPaths` if set** (those dirs only, installed whether or not each declares dependencies — `[]` installs nothing, and the root/workspace checks are skipped entirely), **else** the root *only when* its manifest declares dependencies or it is a workspace root **with at least one member** (a non-empty `packages:` list, or a non-empty `workspaces` / `workspaces.packages` array), **else nothing** — so a dependency-free root never gets a stray empty `pnpm-lock.yaml`. `installPaths` entries that escape the worktree are refused. `KIT_WT_INSTALL=0` skips the install | `--llm` |
 | `cckit pr <issue> <summary>` | commit + push + open PR | `--llm` |
 | `cckit close <issue> <summary>` | close issue + mark done | `--llm` |
 | `cckit effort new "<name>" ["sub :: desc" …]` | parent (4-section body + ctx/kind/priority/role/flow labels) + linted native sub-issues — identical to `/kit-effort-new` (one shared core); `start`/`pr`/`close` take `<slug\|N>` | flags: `--flow/--role/--priority/--goal/--scope/--for-agents/--verification/--depends-on/--milestone`, `--slug` |

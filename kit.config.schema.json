@@ -125,6 +125,30 @@
           "description": "Map of original scaffolded path -> the project's new name. The original (key) is treated as removed (never re-added); the value documents where it went."
         }
       }
+    },
+    "worktree": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "How `cckit start` / `cckit effort start` bootstrap a fresh worktree (env copy, dev port, dependency install). Every key is optional; the kit hardcodes no project layout.",
+      "properties": {
+        "installPaths": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Worktree-relative directories to run `pnpm install` in during bootstrap (e.g. [\"docs-site\"]). Set, it wins outright — only these dirs are installed and the checks below are skipped; [] installs nothing. Entries MUST stay inside the worktree: an absolute path, a `..` that climbs out, or a symlink pointing outside is refused and skipped. Unset: install at the root only when its package.json declares dependencies or it is a workspace root WITH AT LEAST ONE MEMBER — a dependency-free root (or an empty `packages:` / `workspaces` list) is skipped so pnpm cannot plant an empty pnpm-lock.yaml (#255). KIT_WT_INSTALL=0 skips the install entirely."
+        },
+        "devPorts": {
+          "type": "array",
+          "description": "Per-app dev PORT lanes. Each entry assigns PORT = base + (issue % 40) * <count> into that app's .env.local, so parallel worktrees never fight for a port.",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {
+              "path": { "type": "string", "description": "Repo-relative path to the app's .env.local file." },
+              "base": { "type": "integer", "description": "Base port for this app's lane." }
+            }
+          }
+        }
+      }
     }
   }
 }
