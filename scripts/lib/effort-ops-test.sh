@@ -187,5 +187,140 @@ tc "$BOARD_LOG" 'ITEM-301 SF1 OPT_DONE' "wave close sets board Done for sub #301
 tc "$BOARD_LOG" 'ITEM-302 SF1 OPT_DONE' "wave close sets board Done for sub #302"
 case "$close_out" in *"kit-sync"*".claude/skills/demo.md"*) echo "ok: wave drift check reads the merged PR diffs" ;; *) echo "FAIL: no kit-sync warning in wave close output"; fail=1 ;; esac
 
+# ── #243 · _eff_relations_add — the ONE `Depends on` formatter (pure: no gh, no network) ──────────
+rel_body="$(printf '## Verification\nV\n')"
+rel1="$(_eff_relations_add "$rel_body" 5)"
+t "relations_add appends a ## Relations section" "$rel1" "$(printf '## Verification\nV\n\n## Relations\n- Depends on #5')"
+t "relations_add is idempotent (same line twice)" "$(_eff_relations_add "$rel1" 5)" "$rel1"
+t "relations_add appends into an existing section" "$(_eff_relations_add "$rel1" 9)" \
+  "$(printf '## Verification\nV\n\n## Relations\n- Depends on #5\n- Depends on #9')"
+t "relations_add on an empty body has no leading blank" "$(_eff_relations_add "" 5)" \
+  "$(printf '## Relations\n- Depends on #5')"
+# a ## Relations section in the MIDDLE of a body keeps its place; the line lands at the section end
+t "relations_add respects a mid-body section" \
+  "$(_eff_relations_add "$(printf '## Relations\n- Depends on #1\n\n## Verification\nV\n')" 2)" \
+  "$(printf '## Relations\n- Depends on #1\n- Depends on #2\n\n## Verification\nV')"
+
+# ── #243 · effort_new --depends-on emits a WELL-FORMED Relations block ────────────────────────────
+# It used to be built inline with `$( … )`, which eats trailing newlines — the section shipped as the
+# single mangled line `## Relations- Depends on #4- Depends on #9`. Both now go through the formatter.
+: > "$GH_LOG"; printf '0' > "$GH_N"
+effort_new --depends-on "#4,9" "depends on effort" >/dev/null 2>&1
+tc "$GH_LOG" '^## Relations$'    "--depends-on writes ## Relations on its own line"
+tc "$GH_LOG" '^- Depends on #4$' "--depends-on writes the first dep on its own line"
+tc "$GH_LOG" '^- Depends on #9( |$)' "--depends-on writes the second dep on its own line"
+t  "--depends-on does not mangle the heading" "$(grep -c '## Relations-' "$GH_LOG")" "0"
+
+# ── #243 · effort_chain — a linear blocked_by chain, idempotent, cycle-refusing ────────────────────
+# Its own gh stub (prepended to PATH) with real STATE: which issues exist, the blocked_by edge set,
+# and per-issue bodies — so the edges and the body lines can be asserted, not just the call log.
+cstub="$tmp/cbin"; mkdir -p "$cstub"
+export CH_DIR="$tmp/chain"; mkdir -p "$CH_DIR"
+export CH_LOG="$CH_DIR/gh.log" CH_EDGES="$CH_DIR/edges" CH_EXISTS="$CH_DIR/exists"
+printf '501\n502\n503\n504\n601\n' > "$CH_EXISTS"   # #999 deliberately absent
+: > "$CH_EDGES"; : > "$CH_LOG"
+for n in 501 502 503 504; do printf '## Goal\ng%s\n\n## Verification\nv\n' "$n" > "$CH_DIR/body.$n"; done
+cat > "$cstub/gh" <<'SH'
+#!/usr/bin/env bash
+# stub gh with state. DB id of issue N is 900000+N (the dependencies API takes the blocker's db id).
+echo "$*" | tr '\n' ' ' >> "$CH_LOG"; echo >> "$CH_LOG"
+_n() { printf '%s' "$1" | sed -nE 's#.*issues/([0-9]+).*#\1#p'; }
+case "$1" in
+  issue)
+    case "$2" in
+      view) cat "$CH_DIR/body.$3" 2>/dev/null; exit 0 ;;
+      edit) n="$3"; shift 3
+            while [ $# -gt 0 ]; do
+              [ "$1" = "--body" ] && { printf '%s' "$2" > "$CH_DIR/body.$n"; break; }
+              shift
+            done
+            exit 0 ;;
+      *) exit 0 ;;
+    esac ;;
+  api)
+    case "$*" in
+      *"--method POST"*"/dependencies/blocked_by"*)
+        n="$(_n "$*")"; bid="$(printf '%s' "$*" | sed -nE 's#.*issue_id=([0-9]+).*#\1#p')"
+        b=$((bid - 900000))
+        grep -qx "$n $b" "$CH_EDGES" && exit 1     # GitHub rejects a duplicate edge
+        echo "$n $b" >> "$CH_EDGES"; exit 0 ;;
+      *"/dependencies/blocked_by"*)
+        awk -v k="$(_n "$*")" '$1==k{print $2}' "$CH_EDGES"; exit 0 ;;
+      *".id"*)     n="$(_n "$*")"; echo $((900000 + n)); exit 0 ;;
+      *".number"*) n="$(_n "$*")"; grep -qx "$n" "$CH_EXISTS" || exit 1; echo "$n"; exit 0 ;;
+      *) exit 0 ;;
+    esac ;;
+  *) exit 0 ;;
+esac
+SH
+chmod +x "$cstub/gh"
+export PATH="$cstub:$PATH"
+edges() { sort "$CH_EDGES" | tr '\n' ';'; }
+
+# happy path: 502 blocked_by 501, 503 blocked_by 502, each body records its predecessor
+: > "$CH_LOG"
+effort_chain 501 502 503 >/dev/null 2>&1; rc=$?
+t "chain happy path returns 0"              "$rc" "0"
+t "chain sets both blocked_by edges"        "$(edges)" "502 501;503 502;"
+tc "$CH_DIR/body.502" '^- Depends on #501$' "chain records 'Depends on #501' in #502"
+tc "$CH_DIR/body.503" '^- Depends on #502$' "chain records 'Depends on #502' in #503"
+tc "$CH_DIR/body.502" '^## Relations$'       "chain adds a ## Relations section"
+t "chain leaves the head issue's body alone" "$(grep -c 'Depends on' "$CH_DIR/body.501")" "0"
+
+# idempotency: a second identical run writes NOTHING — no POST, no body edit, no duplicate line
+: > "$CH_LOG"
+effort_chain 501 502 503 >/dev/null 2>&1; rc=$?
+t "chain re-run returns 0"                   "$rc" "0"
+t "chain re-run sets no new edge"            "$(edges)" "502 501;503 502;"
+t "chain re-run POSTs no dependency"         "$(grep -c 'method POST' "$CH_LOG")" "0"
+t "chain re-run edits no body"               "$(grep -c 'issue edit' "$CH_LOG")" "0"
+t "chain re-run leaves ONE Depends on line"  "$(grep -c 'Depends on #501' "$CH_DIR/body.502")" "1"
+# a `#`-prefixed number is the same issue
+: > "$CH_LOG"
+effort_chain '#501' '#502' >/dev/null 2>&1
+t "chain accepts #-prefixed numbers"         "$(grep -c 'method POST' "$CH_LOG")" "0"
+
+# arity: fewer than two numbers is a usage error and writes nothing
+: > "$CH_LOG"
+effort_chain 501 >/dev/null 2>&1 && rc=0 || rc=1
+t "chain refuses a single issue (rc 1)"      "$rc" "1"
+effort_chain >/dev/null 2>&1 && rc=0 || rc=1
+t "chain refuses zero issues (rc 1)"         "$rc" "1"
+t "chain arity refusal writes nothing"       "$(grep -cE 'method POST|issue edit' "$CH_LOG")" "0"
+
+# a non-numeric argument is rejected up front
+: > "$CH_LOG"
+effort_chain 501 not-a-number >/dev/null 2>&1 && rc=0 || rc=1
+t "chain refuses a non-numeric arg (rc 1)"   "$rc" "1"
+t "chain non-numeric refusal writes nothing" "$(grep -cE 'method POST|issue edit' "$CH_LOG")" "0"
+
+# a nonexistent issue aborts the WHOLE chain — the earlier, valid link is not written either
+: > "$CH_LOG"
+effort_chain 504 999 >/dev/null 2>&1 && rc=0 || rc=1
+t "chain refuses a nonexistent issue (rc 1)" "$rc" "1"
+t "chain missing-issue refusal writes nothing" "$(grep -cE 'method POST|issue edit' "$CH_LOG")" "0"
+t "chain missing-issue refusal adds no edge" "$(edges)" "502 501;503 502;"
+
+# a repeated number is a cycle (`chain 1 2 1`) — refused whole
+: > "$CH_LOG"
+effort_chain 504 501 504 >/dev/null 2>&1 && rc=0 || rc=1
+t "chain refuses a repeated number (rc 1)"   "$rc" "1"
+t "chain repeat refusal writes nothing"      "$(grep -cE 'method POST|issue edit' "$CH_LOG")" "0"
+
+# a cycle through edges GitHub ALREADY holds: 503 → 502 → 501 exists, so 501 blocked_by 503 loops
+: > "$CH_LOG"
+effort_chain 503 501 >/dev/null 2>&1 && rc=0 || rc=1
+t "chain refuses a transitive cycle (rc 1)"  "$rc" "1"
+t "chain cycle refusal writes nothing"       "$(grep -cE 'method POST|issue edit' "$CH_LOG")" "0"
+t "chain cycle refusal adds no edge"         "$(edges)" "502 501;503 502;"
+
+# an issue already blocked by something ELSE keeps that blocker — chain only ever ADDS its edge
+echo "504 601" >> "$CH_EDGES"
+: > "$CH_LOG"
+effort_chain 501 504 >/dev/null 2>&1; rc=$?
+t "chain wires an already-blocked issue (rc 0)" "$rc" "0"
+t "chain preserves the pre-existing blocker"    "$(edges)" "502 501;503 502;504 501;504 601;"
+tc "$CH_DIR/body.504" '^- Depends on #501$'     "chain records its own dep on an already-blocked issue"
+
 [ "$fail" -eq 0 ] && echo "ALL OK (effort-ops)" || echo "effort-ops: FAILURES"
 exit "$fail"

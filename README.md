@@ -138,6 +138,27 @@ A pure-digits argument is always a number; anything else is resolved to the cano
 matching `effort/*` branches, the `slug:<slug>` label, then open effort titles. An unknown or
 ambiguous slug fails with a clear error rather than guessing. Efforts render as `slug #N`.
 
+### Ordering work — `cckit effort chain`
+
+When several issues have to land in a set order, `cckit effort chain` declares that order once:
+
+```bash
+cckit effort chain 241 242 243     # 242 blocked_by 241 · 243 blocked_by 242
+```
+
+Each issue after the first gets a native GitHub `blocked_by` edge on its predecessor **and** a
+`- Depends on #<predecessor>` line in its `## Relations` section — the same line
+`cckit effort new --depends-on` writes, from the same formatter. Those `blocked_by` edges are
+exactly what `cckit plan` reads, so a chained set lands one issue per wave, in the order you gave.
+
+It is **idempotent**: an edge or a `Depends on` line that is already there is reported and skipped,
+so re-running changes nothing. It only ever **adds** — an issue already blocked by something else
+keeps that blocker and ends up with both. And it validates the whole chain before writing anything,
+so a refusal leaves the board untouched: fewer than two numbers, an argument that is not an issue
+number, an issue that does not exist, a number repeated in the list (`chain 1 2 1`), or an edge that
+would close a cycle through dependencies GitHub already holds are all refused whole. A cycle is
+refused rather than written because `cckit plan` cannot layer a cyclic graph into waves.
+
 ## Waves — parallel agentic development
 
 `cckit wave` reads your open efforts and proposes the incoming waves of work — parallel agent tasks

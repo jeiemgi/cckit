@@ -92,6 +92,13 @@ echo "✓ effort #$PARENT_NUM created — next: /kit-effort-start $PARENT_NUM"
 - **Carry the flow + the chain** — set `Flow` so the title shows `[Flow]` and the `flow:<flow>` label
   is applied; pass `Depends on #N` so the native GitHub `blocked_by` edge + a `## Relations` line make
   the chain visible on the board. `ctx:*` (session weight) is applied automatically.
+- **Order EXISTING issues with `cckit effort chain <a> <b> …`**, not by hand — it sets each
+  successor's `blocked_by` edge and writes the same `- Depends on #<predecessor>` line through the
+  same formatter `--depends-on` uses. It is idempotent and additive (a pre-existing blocker is
+  kept), and it refuses the whole chain — writing nothing — on fewer than two numbers, a
+  non-numeric argument, an issue that does not exist, a repeated number, or an edge that would
+  close a cycle. Use it when the sub-issues already exist and only their ORDER is missing;
+  `--depends-on` covers the dependencies known at creation time.
 - The parent body MUST carry all four template sections (Goal / Scope / For agents / Verification) —
   a missing section is a review blocker.
 - Sub-issues are **native** GitHub sub-issues (`POST …/issues/{parent}/sub_issues` with the child's

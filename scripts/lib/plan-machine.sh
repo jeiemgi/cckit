@@ -20,6 +20,11 @@
 # (comma/space-separated paths) drives intra-wave disjointness; absent → ctx budget alone batches.
 # Priority comes from the `priority:pN` label (`cckit effort new --priority p1`).
 #
+# The `blocked_by` edges this reads are written by `cckit effort new --depends-on` and by
+# `cckit effort chain <a> <b> …` (#243), which declares a linear order over existing issues. `chain`
+# refuses any edge that would close a cycle precisely because the wave layering below cannot order a
+# cyclic graph — an issue in a cycle would never satisfy its blockers and never get a wave.
+#
 # DEPENDENCIES ALWAYS BEAT PRIORITY. The priority sort runs strictly INSIDE one wave, and pm_waves
 # only ever co-locates issues with no `blocked_by` edge between them — a blocker is placed in a
 # strictly earlier wave than anything it blocks. So a p3 blocker of a p0 dependent still runs first:

@@ -15,10 +15,12 @@
 #   cckit sync [--llm]              board state / what's unblocked
 #   cckit plan [--llm] [--effort N] wave plan: deps-ordered, p0-first in a wave, file-disjoint (TOON --llm)
 #   cckit plan-next [--llm]         forward plan: current skills/verbs/rules/docs -> what to build next
-#   cckit effort <new|start|pr|close|plan>   the effort lifecycle
+#   cckit effort <new|chain|start|pr|close|plan>   the effort lifecycle
 #     effort new [--flow F --role R --priority p1 --goal G --scope S --for-agents A
 #       --verification V --depends-on "#1,#2" --milestone M] "<name>" ["sub :: desc" …]
 #         parent (4-section body + ctx/kind/priority/role/flow labels) + linted native sub-issues
+#     effort chain <a> <b> [<c> …]  linear order: b blocked_by a, c blocked_by b, + a
+#         `Depends on #<predecessor>` line in each body. Idempotent; refuses a cycle.
 #   cckit orchestrate <a> <b> …     run N flows in parallel worktrees (--dry-run/--cap/--agent)
 #   cckit autopilot [<a> …]         unattended multi-flow: drive (or auto-pick) issues under a cap
 #   cckit watch [--merge] [--loop]  captain: gate open PRs, squash-merge CLEAN, advance the wave
@@ -131,11 +133,12 @@ case "$cmd" in
           source "$LIB/role-identity.sh" 2>/dev/null || true
         fi
         effort_new "$@" ;;
+      chain) effort_chain "$@" ;;
       start) effort_start "$@" ;;
       pr)    effort_pr    "$@" ;;
       close) effort_close "$@" ;;
       plan)  source "$LIB/effort-plan.sh"; effort_plan "$@" ;;
-      *) echo "cckit effort <new|start|pr|close|plan>" >&2; exit 2 ;;
+      *) echo "cckit effort <new|chain|start|pr|close|plan>" >&2; exit 2 ;;
     esac
     ;;
   start)

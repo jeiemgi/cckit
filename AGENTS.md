@@ -37,6 +37,7 @@ adapter one) — is described in [the Adapters page](docs-site/src/content/docs/
 | `cckit pr <issue> <summary>` | commit + push + open PR | `--llm` |
 | `cckit close <issue> <summary>` | close issue + mark done | `--llm` |
 | `cckit effort new "<name>" ["sub :: desc" …]` | parent (4-section body + ctx/kind/priority/role/flow labels) + linted native sub-issues — identical to `/kit-effort-new` (one shared core); `start`/`pr`/`close` take `<slug\|N>` | flags: `--flow/--role/--priority/--goal/--scope/--for-agents/--verification/--depends-on/--milestone`, `--slug` |
+| `cckit effort chain <a> <b> [<c> …]` | wire 2+ issues into a linear order: `b` `blocked_by` `a`, `c` `blocked_by` `b`, plus a `- Depends on #<predecessor>` line in each successor's `## Relations` section. These are the edges `cckit plan` layers into waves. Idempotent (an edge or line already there is skipped); pre-existing blockers are kept, never replaced. Validates everything first — fewer than two numbers, a non-numeric arg, an issue that does not exist, a repeated number, or an edge that would close a cycle refuses the whole chain and writes nothing | — |
 | `cckit effort plan` | session-fit effort plan | `--llm` → JSON |
 | `cckit orchestrate <a> <b> …` | run N flows in parallel worktrees | — (use `--dry-run`) |
 | `cckit autopilot [<a> …]` | unattended multi-flow: drive (or auto-pick) issues under a cap | — (use `--dry-run`) |

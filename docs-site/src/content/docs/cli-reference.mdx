@@ -100,7 +100,8 @@ A **wave** is a set of issues with no blockers between them, so they can run at 
 | `cckit plan-next` | Forward plan: inventory the kit's own skills/verbs/rules/docs, propose what to build next. |
 | `cckit wave [--effort N]` | Read open efforts, propose incoming waves: subagent fan-out + captain drive. |
 | `cckit watch [--merge] [--loop]` | Captain: gate open PRs, squash-merge clean ones, advance. Policy floors (default on) hold PRs touching CI workflows, lockfiles, or security paths — and any `hold`-labelled or draft PR — for human review. |
-| `cckit effort <new\|start\|pr\|close\|plan>` | The effort lifecycle (a parent issue + sub-issues). `new` takes `--slug`; `start`/`pr`/`close` accept a `<slug>` or the effort `<N>`. |
+| `cckit effort <new\|chain\|start\|pr\|close\|plan>` | The effort lifecycle (a parent issue + sub-issues). `new` takes `--slug`; `start`/`pr`/`close` accept a `<slug>` or the effort `<N>`. |
+| `cckit effort chain <a> <b> [<c> …]` | Declare a linear order over 2+ issues: `b` `blocked_by` `a`, `c` `blocked_by` `b`, plus a `- Depends on #<predecessor>` line in each successor's `## Relations` section. These are the edges `cckit plan` layers into waves. Idempotent, and additive — an issue already blocked by something else keeps that blocker. Refuses (and writes nothing) on fewer than two numbers, a non-numeric argument, an issue that does not exist, a repeated number, or an edge that would close a cycle. |
 
 
 ## Run flows in parallel
