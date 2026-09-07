@@ -177,6 +177,42 @@ if [ -n "${KL_TEST_INNER:-}" ]; then
     fi
   fi
 
+  # ── the header bound (#230 review) ───────────────────────────────────────────────────────────
+  # The `# errors:` declaration is part of the file's LEADING comment block. A `# errors:` line that
+  # appears in the BODY — a comment quoting this very convention — must never be read as the
+  # contract, and a header that runs long must still be found (two shipped libs carry headers past
+  # line 25, which is why the bound is structural and not a line window).
+  hdr="$(mktemp -d)"
+  cat > "$hdr/decoy.sh" <<'EOF'
+#!/usr/bin/env bash
+# decoy.sh — the header declares strict.
+# errors: strict — the real declaration
+main() { :; }
+# errors: pure — a comment in the body quoting the convention, NOT the contract
+EOF
+  eq "the body declaration is ignored" "$(kit_lib_errors "$hdr/decoy.sh")" "strict"
+  has "the reason comes from the header too" "$(kit_lib_errors_reason "$hdr/decoy.sh")" "the real declaration"
+
+  # A long header (blank comment lines, a shellcheck directive, 30+ lines) must still be read.
+  { echo '#!/usr/bin/env bash'
+    echo '# shellcheck shell=bash'
+    echo '# long.sh — a helper with a long header.'
+    i=1; while [ "$i" -le 30 ]; do echo "# filler line $i"; i=$((i + 1)); done
+    echo '#'
+    echo '# errors: best-effort — declared on line 35'
+    echo 'main() { :; }'
+  } > "$hdr/long.sh"
+  eq "a header past line 25 is still found" "$(kit_lib_errors "$hdr/long.sh")" "best-effort"
+
+  # A file with no header at all reports unknown, never a guess from its body.
+  printf 'main() { :; }\n# errors: pure — body only\n' > "$hdr/none.sh"
+  eq "no header reports unknown" "$(kit_lib_errors "$hdr/none.sh")" "unknown"
+
+  # `--root` with no value must reject cleanly (bash aborts on `shift 2` with one arg left).
+  KIT_LIB_DIR="" kit_lib --root >/dev/null 2>&1; rrc=$?
+  eq "--root with no value is rc 2" "$rrc" "2"
+
+  rm -rf "$hdr"
   rm -rf "$fix" "$empty"
   if [ "$fail" -eq 0 ]; then echo "PASS($KL_TEST_INNER): kit-lib catalog parsers + verb shapes"; fi
   exit "$fail"

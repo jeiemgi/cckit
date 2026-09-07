@@ -46,6 +46,9 @@ adapter one) — is described in [the Adapters page](docs-site/src/content/docs/
 Every verb accepts a global `--llm` (alias `--output=json`); verbs that produce a result emit a
 single JSON object/array on stdout, with human text on stderr. Interactive/launch verbs
 (`init`, `orchestrate`, `autopilot`) have no JSON result — use `--dry-run` to inspect their plan.
+`cckit brief` has no JSON form either, and deliberately: its output IS the prompt you hand a
+delegated agent, so markdown is the machine-readable form. Read the facts behind it as data with
+`cckit lib --llm` and `cckit status --llm`.
 
 > **`cckit plan-next` is the one exception to "feed verb output back to the model."** Its forward
 > plan is for the human/orchestrator's decision only — never inject it into a monitored model's

@@ -47,7 +47,7 @@ line at the end of its header comment:
 
 | Value | Meaning |
 | --- | --- |
-| `pure` | No network or subprocess dependency; deterministic on its args/stdin. Safe to call anywhere. |
+| `pure` | No network, no state mutation, no side effects; deterministic on its args/stdin. Safe to call anywhere. The kit's baseline tools (`git`, `jq`, `date`, coreutils) are assumed present — a helper that shells out to one of them is still `pure`, because the whole CLI already requires them. Reach for `strict` when the helper depends on something that may genuinely be missing (`gh`, auth, a network call). |
 | `strict` | A failed dependency or API call returns non-zero. A call that could not run is never reported as a clean result. |
 | `best-effort` | Warns on stderr and returns 0, so the calling op is never broken. |
 | `mixed` | Both, per function — the reason says which half is which. |

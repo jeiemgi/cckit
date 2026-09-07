@@ -25,7 +25,11 @@ in_vocab() {
 
 # errors_header <file> — the declared value, or empty when the file has no header line.
 errors_header() {
-  sed -n 's/^# errors:[[:space:]]*\([a-z-]*\).*/\1/p' "$1" | head -1
+  # Bounded to the LEADING comment block, matching kit_lib_errors (_kl_header): the shebang and
+  # blanks skipped, comments taken up to the first line of code. A later `# errors:` line in the
+  # body is not the file's declaration. A fixed line window would be wrong — two libs carry headers
+  # that run past 25 lines.
+  awk 'NR==1 && /^#!/ {next} /^[[:space:]]*#/ {print; next} /^[[:space:]]*$/ {next} {exit}' "$1" | sed -n 's/^# errors:[[:space:]]*\([a-z-]*\).*/\1/p' | head -1
 }
 
 # ── 1. every lib file declares one, and it is in the vocabulary ────────────────────────────────
@@ -50,7 +54,9 @@ t "every value is in the vocabulary" "$bad" "0"
 # point for a mixed file. Require the em-dash reason.
 noreason=0
 for f in "$LIB"/*.sh; do
-  grep -qE '^# errors: (pure|strict|best-effort|mixed) — .+' "$f" || {
+  # `[^[:space:]]` after the dash, not `.+`: `.+` is satisfied by trailing spaces, so a header
+  # ending "— " would count as carrying a reason while telling a reader nothing.
+  grep -qE '^# errors: (pure|strict|best-effort|mixed) —[[:space:]]*[^[:space:]]' "$f" || {
     echo "FAIL: header has no reason after the em dash -> $(basename "$f")"
     noreason=$((noreason + 1)); fail=1
   }

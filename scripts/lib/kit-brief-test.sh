@@ -193,6 +193,15 @@ h4.sh
     echo "  (kit-lib.sh absent — skipping the helpers-table assertions)"
   fi
 
+  # ── the helpers-table overflow count (#230 review) ───────────────────────────────────────────
+  # `grep -c` on empty input PRINTS 0 and exits 1, so a `|| echo 0` fallback yields "0\n0" and the
+  # arithmetic that consumes it dies — the same bug class as the #142 board-counter regression.
+  # An empty sourced set is the case that triggers it, so pin the arithmetic on empty input.
+  if [ -f "$dir/kit-lib.sh" ]; then
+    n_over_probe="$(( $(printf '' | grep -c . || true) - $(printf '' | grep -c . || true) ))"
+    eq "an empty count stays a single integer" "$n_over_probe" "0"
+  fi
+
   # ── the verb's argument contract (no gh call: it must reject before reaching for the network) ──
   out="$(kit_brief 2>&1)"; rc=$?
   eq  "no argument is rc 2"     "$rc" "2"

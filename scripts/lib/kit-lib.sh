@@ -96,12 +96,23 @@ kit_lib_functions() {
     | tr '\n' ' ' | sed 's/ *$//'
 }
 
+# _kl_header <file> — the file's LEADING comment block: the shebang skipped, blank lines skipped,
+# every comment line up to the first line of actual code. A fixed line window cannot do this job —
+# 25 lines is too tight for pr-evidence.sh and kit-task-ops.sh, whose headers run past it, and any
+# larger number is equally arbitrary. Bounding by structure instead means a later `# errors:` line
+# in the body (a comment quoting this convention, say) is never read as the declaration.
+_kl_header() {
+  [ -f "$1" ] || return 0
+  awk 'NR==1 && /^#!/ {next} /^[[:space:]]*#/ {print; next} /^[[:space:]]*$/ {next} {exit}' "$1" 2>/dev/null
+}
+
 # kit_lib_errors <file> — the declared failure contract: pure | strict | best-effort | mixed, or
 # `unknown` when the file carries no `# errors:` header (a file that predates #223, or a host
 # project's own lib). Same parse as scripts/lib/errors-header-test.sh, which enforces it.
 kit_lib_errors() {
   local v=""
-  [ -f "$1" ] && v="$(sed -n 's/^#[[:space:]]*errors:[[:space:]]*\([a-z-]*\).*/\1/p' "$1" 2>/dev/null | head -1)"
+  # Read the header block only (see _kl_header) so a body comment is never taken for the contract.
+  [ -f "$1" ] && v="$(_kl_header "$1" | sed -n 's/^#[[:space:]]*errors:[[:space:]]*\([a-z-]*\).*/\1/p' | head -1)"
   [ -n "$v" ] || v="unknown"
   printf '%s' "$v"
 }
@@ -110,7 +121,7 @@ kit_lib_errors() {
 # file this is the ONLY thing saying which half propagates, so the catalog always shows it there.
 kit_lib_errors_reason() {
   local line=""
-  [ -f "$1" ] && line="$(sed -n 's/^#[[:space:]]*errors:[[:space:]]*//p' "$1" 2>/dev/null | head -1)"
+  [ -f "$1" ] && line="$(_kl_header "$1" | sed -n 's/^#[[:space:]]*errors:[[:space:]]*//p' | head -1)"
   case "$line" in
     *'— '*) printf '%s' "${line#*'— '}" ;;
     *) printf '' ;;
@@ -218,7 +229,10 @@ kit_lib() {
       --llm|--output=json) out="json"; shift ;;
       --all)     all=1; shift ;;
       --reasons) reasons=1; shift ;;
-      --root)    root="${2:-}"; shift 2 ;;
+      --root)    # Validate BEFORE shifting: `shift 2` on a single remaining argument aborts bash
+                 # with "shift count out of range" instead of the parser's own error.
+                 [ "$#" -ge 2 ] || { if [ "$out" = "json" ]; then _kl_err "--root needs a directory"; else echo "lib: --root needs a directory" >&2; fi; return 2; }
+                 root="$2"; shift 2 ;;
       --root=*)  root="${1#*=}"; shift ;;
       -h|--help) _kl_usage; return 0 ;;
       *) if [ "$out" = "json" ]; then _kl_err "unknown arg '$1'"; else echo "lib: unknown arg '$1'" >&2; fi

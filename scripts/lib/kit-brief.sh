@@ -309,7 +309,13 @@ EOF
     shown_owned="$(_kb_rows "$libdir" "$(printf '%s\n' "$owned_libs" | grep . | sort -u)")"
     n_src="$(printf '%s' "$shown_owned" | grep -c . || true)"
     shown_src="$(_kb_rows "$libdir" "$sourced_only" | head -n "$((cap > n_src ? cap - n_src : 0))")"
-    n_over="$(( $(_kb_rows "$libdir" "$sourced_only" | grep -c . || echo 0) - $(printf '%s' "$shown_src" | grep -c . || echo 0) ))"
+    # `|| true`, never `|| echo 0`: `grep -c` on empty input already PRINTS 0 and exits 1, so the
+    # `echo 0` fallback appends a SECOND zero and the arithmetic below sees "0\n0". Same bug class
+    # as the #142 board-counter regression.
+    local n_all n_shown
+    n_all="$(_kb_rows "$libdir" "$sourced_only" | grep -c . || true)"
+    n_shown="$(printf '%s' "$shown_src" | grep -c . || true)"
+    n_over="$(( ${n_all:-0} - ${n_shown:-0} ))"
     if [ -n "$shown_owned$shown_src" ]; then
       echo "| helper | errors | purpose |"
       echo "| --- | --- | --- |"
@@ -321,7 +327,7 @@ EOF
     fi
     echo
     printf -- '_Full catalog: `cckit lib` (%s helpers). Do not reimplement what it already lists._\n' \
-      "$(kit_lib_files "$libdir" | grep -c . || echo 0)"
+      "$(kit_lib_files "$libdir" | grep -c . || true)"
   else
     echo "_No helper catalog here — `cckit lib` is unavailable in this project._"
   fi
