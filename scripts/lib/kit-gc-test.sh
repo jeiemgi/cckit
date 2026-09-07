@@ -23,6 +23,7 @@ git init -q main
 cd main
 git config user.email t@t; git config user.name t
 echo "base" > base.txt; git add base.txt; git commit -q -m "init"
+init_branch="$(git rev-parse --abbrev-ref HEAD)"   # master or main, per the host git config
 git worktree add -q ../wt -b feat/5-recover >/dev/null 2>&1
 # Stage a NEW file inside the worktree (writes the worktree's admin index; the blob lands in the
 # shared object store and so survives the worktree dir's death).
@@ -99,6 +100,113 @@ t   "refusal emits no section header"                       "$(printf '%s\n' "$o
 t   "refusal emits no classification row"                   "$(printf '%s\n' "$out" | grep -cE ' -> ')"   "0"
 out="$(bash -c ". '$lone/kit-gc.sh'; kit_gc_prune" 2>&1)"; rc=$?
 t   "kit_gc_prune refuses without worktree-issue.sh (rc)"    "$rc" "1"
+
+# ── kit_gc_cleanup: plan first, and the three irreversible buckets survive --yes (#226) ─────────
+# A merged branch is SAFE; a branch whose issue is still OPEN is PROTECTED; a branch with local
+# commits and no PR is ORPHAN. Only the first may ever be deleted, and never without --yes.
+git branch task/40-merged  >/dev/null 2>&1
+git branch task/41-open    >/dev/null 2>&1
+git branch task/42-orphan  >/dev/null 2>&1
+cat > "$stub/gh" <<'SH'
+#!/usr/bin/env bash
+echo "$*" >> "$GH_CALLS"
+case "$1 $2" in
+  "pr list")   printf 'task/40-merged\tPR#40 MERGED\n' ;;
+  "issue view")
+    for a in "$@"; do case "$a" in 41) echo open; exit 0 ;; esac; done
+    echo closed ;;
+  *) : ;;
+esac
+SH
+chmod +x "$stub/gh"
+
+plan="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_cleanup 2>&1)"
+has "cleanup prints a plan"                    "$plan" "# cleanup plan"
+has "cleanup says it deleted nothing"          "$plan" "PLAN ONLY"
+has "cleanup counts the merged branch as SAFE" "$plan" "task/40-merged"
+# Findings from review: the plan must NAME the kept buckets, not just count them — a user cannot
+# veto what they cannot see.
+has "plan names the protected branch"          "$plan" "task/41-open"
+has "plan names the orphan branch"             "$plan" "task/42-orphan"
+has "plan has a SAFE worktrees bucket"         "$plan" "SAFE worktrees"
+# The ZOMBIE bucket (#227 review): --yes recovers a zombie's staged delta to its branch and then
+# prunes its metadata, so the plan MUST name those rows too — otherwise --yes acts on a row the
+# user never saw. Needs its OWN zombie: the one fabricated at the top of this file was already
+# pruned by the "prune gating" step above.
+git worktree add -q ../wt2 -b feat/6-zombie2 >/dev/null 2>&1
+echo "staged in the second zombie" > ../wt2/keep2.txt
+git -C ../wt2 add keep2.txt
+Z2_TIP_BEFORE="$(git rev-parse --verify refs/heads/feat/6-zombie2)"
+rm -rf ../wt2
+zplan="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_cleanup 2>&1)"
+has "plan has a ZOMBIE worktrees bucket"       "$zplan" "ZOMBIE worktrees"
+has "plan names the zombie worktree"           "$zplan" "wt2 [feat/6-zombie2]"
+has "plan says the staged work is recovered first" "$zplan" "STAGED work — recovered to a commit"
+t   "zombie counted in the plan" \
+    "$(printf '%s\n' "$zplan" | awk '/^  ZOMBIE worktrees/{print $3}')" "1"
+# Still plan-only: neither the metadata nor the branch tip may move.
+if [ -d "$(git rev-parse --git-common-dir)/worktrees/wt2" ]; then
+  echo "ok: plan-only left the zombie metadata intact"
+else
+  echo "FAIL: plan-only pruned the zombie metadata"; fail=1
+fi
+t "plan-only left the zombie branch tip alone" \
+  "$(git rev-parse --verify refs/heads/feat/6-zombie2)" "$Z2_TIP_BEFORE"
+
+applied="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_cleanup --yes 2>&1)"
+t   "--yes deleted the merged branch"   "$(git branch --list task/40-merged | wc -l | tr -d ' ')" "0"
+t   "--yes KEPT the open-issue branch"  "$(git branch --list task/41-open   | wc -l | tr -d ' ')" "1"
+t   "--yes KEPT the orphan branch"      "$(git branch --list task/42-orphan | wc -l | tr -d ' ')" "1"
+has "cleanup reports what it left"      "$applied" "left untouched"
+# --yes is where the zombie metadata is allowed to go — but only AFTER its staged work is a commit.
+if [ -d "$(git rev-parse --git-common-dir)/worktrees/wt2" ]; then
+  echo "FAIL: --yes left the zombie metadata behind"; fail=1
+else
+  echo "ok: --yes pruned the zombie metadata it listed"
+fi
+Z2_TIP_AFTER="$(git rev-parse --verify refs/heads/feat/6-zombie2)"
+if [ "$Z2_TIP_AFTER" != "$Z2_TIP_BEFORE" ]; then
+  echo "ok: --yes recovered the zombie's staged work before pruning"
+else
+  echo "FAIL: zombie metadata pruned without recovering its staged work"; fail=1
+fi
+has "the recovered commit carries the staged file" "$(git ls-tree -r --name-only "$Z2_TIP_AFTER")" "keep2.txt"
+has "cleanup counts the zombies it pruned" "$applied" "zombie pruned"
+# The failed-remote-delete count must be a real number the plan prints, not just an exit status —
+# the skill promises it and `--llm` serializes it as `remote_failed`.
+t   "cleanup prints a remote-failure count" \
+    "$(printf '%s\n' "$applied" | awk '/^  remote deletes failed/{print $4}')" "0"
+
+# ── ref-comparison guards: a merged PR alone must NEVER authorize a force delete (#226 review) ──
+# `git branch -D` destroys unpushed commits, and one-directional containment does not prove equality.
+git checkout -q -b task/43-ahead 2>/dev/null
+echo ahead > ahead.txt; git add ahead.txt; git commit -qm "unpushed work"
+# Fabricate a remote-tracking ref that does NOT contain this commit, so the branch is "ahead".
+git update-ref "refs/remotes/origin/task/43-ahead" "$(git rev-parse HEAD~1)"
+git checkout -q "$init_branch"
+
+t "_kit_gc_has_unpushed sees the ahead branch"    "$(_kit_gc_has_unpushed task/43-ahead && echo yes || echo no)" "yes"
+t "_kit_gc_has_unpushed clears a level branch"    "$(_kit_gc_has_unpushed task/42-orphan && echo yes || echo no)" "no"
+# Remote-ahead is the OTHER direction: local ⊆ remote passes the level check but the remote holds
+# history the local does not, so deleting the remote would lose it.
+git update-ref "refs/remotes/origin/task/44-behind" "$(git rev-parse task/43-ahead)"
+git branch task/44-behind "$(git rev-parse task/43-ahead~1)" 2>/dev/null
+t "_kit_gc_remote_ahead sees remote-only history" "$(_kit_gc_remote_ahead task/44-behind && echo yes || echo no)" "yes"
+t "_kit_gc_has_unpushed clears it (local ⊆ remote)" "$(_kit_gc_has_unpushed task/44-behind && echo yes || echo no)" "no"
+
+# End to end: a MERGED PR on a branch with unpushed commits must survive --yes.
+cat > "$stub/gh" <<'SH'
+#!/usr/bin/env bash
+case "$1 $2" in
+  "pr list")    printf 'task/43-ahead\tPR#43 MERGED\n' ;;
+  "issue view") echo closed ;;
+  *) : ;;
+esac
+SH
+chmod +x "$stub/gh"
+out="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_prune --yes 2>&1)"
+t   "merged-but-ahead branch survives prune --yes" "$(git branch --list task/43-ahead | wc -l | tr -d ' ')" "1"
+has "prune says why it skipped it"                 "$out" "unpushed commits"
 
 [ "$fail" -eq 0 ] && echo "ALL OK (kit-gc)" || echo "kit-gc: FAILURES"
 exit "$fail"

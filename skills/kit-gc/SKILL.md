@@ -11,6 +11,10 @@ Plugin-direct skill — helpers resolve from `${CLAUDE_PLUGIN_ROOT}`.
 Cleans what accumulates: merged-but-undeleted branches (local + remote), orphan
 worktrees, stale stashes, orphan unpushed commits, and stale-open issues.
 
+> This skill is the **read-only classifier**. To act on its verdicts in one guided pass, use
+> **`/kit-cleanup`** (`cckit cleanup`) — it consumes this same `kit_gc_analyze` output, so the two
+> can never disagree about what is safe to delete.
+
 **Safety contract:** read-only **analysis first** → present a plan → only delete
 after the user confirms. Never touch: the base branch (`main`/`develop`), branches
 with an **open PR**, worktrees of an open-PR branch, **a branch/worktree whose
