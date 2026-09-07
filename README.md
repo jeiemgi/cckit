@@ -184,6 +184,7 @@ prompt** you can paste straight into Claude Code — start exactly where you are
 cckit/
   bin/cckit              # the CLI dispatcher
   scripts/lib/*.sh       # the git-mechanics bundle (effort, worktree, gh, gc, …)
+                         #   each declares `# errors:` — see CONTRIBUTING.md
   scripts/benchmark/     # doc-retrieval benchmark harness (cckit bench)
   .claude-plugin/        # the Claude Code plugin manifest
   skills/ commands/      # Claude Code skills + slash commands

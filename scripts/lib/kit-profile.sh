@@ -11,6 +11,7 @@
 # Source it:  source scripts/lib/kit-profile.sh
 # CLI:        scripts/lib/kit-profile.sh [--user U] [--path | --user-slug | --show | --get JQPATH]
 # Requires: jq.
+# errors: strict — a failed profile read or write propagates
 
 _kit_profile_dir="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
 # shellcheck source=/dev/null

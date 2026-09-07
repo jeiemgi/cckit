@@ -34,6 +34,29 @@ cckit pr <issue> "<summary>" # open the PR
 - **Claude Code plugin** → `skills/`, `commands/`, `.claude-plugin/`.
 - **Docs** → `docs/` (published to [cckit.dev](https://cckit.dev)).
 
+### Every lib file declares how it fails
+
+A helper in `scripts/lib/` either propagates a failure to its caller or swallows it. Both are
+correct — a logger that breaks the op it logs is worse than a lost log line — but a caller mixing
+the two silently inherits the weaker behaviour. So each file states which it is, on one greppable
+line at the end of its header comment:
+
+```
+# errors: best-effort — warns and returns 0 so a failed post never breaks the PR flow
+```
+
+| Value | Meaning |
+| --- | --- |
+| `pure` | No network or subprocess dependency; deterministic on its args/stdin. Safe to call anywhere. |
+| `strict` | A failed dependency or API call returns non-zero. A call that could not run is never reported as a clean result. |
+| `best-effort` | Warns on stderr and returns 0, so the calling op is never broken. |
+| `mixed` | Both, per function — the reason says which half is which. |
+
+The reason after the em dash is required, not decorative: for a `mixed` file it is the only thing
+telling a reader which functions propagate. `scripts/lib/errors-header-test.sh` fails on a missing
+header, a value outside the vocabulary, or a bare value with no reason — so a new lib file cannot
+land without one.
+
 ## License
 
 By contributing, you agree that your contributions are dual licensed under MIT OR Apache-2.0

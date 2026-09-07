@@ -5,6 +5,7 @@
 # effort's build WINDOW [start,end] — the window recovers sessions logged before the branch field
 # existed or from a detached/worktree checkout. Hermetic: a throwaway repo + a stubbed usage log +
 # stubbed transcripts under a temp HOME. Run:  bash scripts/lib/effort-metrics-test.sh
+# errors: strict — a test runner: rc 1 on any failed assertion
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 LIB="$ROOT/scripts/lib"

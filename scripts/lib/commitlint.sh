@@ -14,6 +14,7 @@
 # scripts/lib/version-bump.sh acts on (feat -> minor; fix/perf/refactor/revert -> patch;
 # feat!/BREAKING CHANGE -> major; the rest -> no release). Keeping the two in step means a title
 # that passes here is one release-please can always classify.
+# errors: strict — a validator: rc 1 on an invalid subject
 
 # Conventional Commit subject: type(scope)!: description
 #   type    — one of the known types below

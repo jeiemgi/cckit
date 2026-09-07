@@ -5,6 +5,7 @@
 #   explicit EFFORT_FLOWS env var (wins) -> effort.flows[] in the project config -> built-in default.
 # Hermetic: throwaway configs pointed at via KIT_CONFIG (no network, no gh).
 # Run:  bash scripts/lib/effort-flows-test.sh
+# errors: strict — a test runner: rc 1 on any failed assertion
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 LIB="$ROOT/scripts/lib"

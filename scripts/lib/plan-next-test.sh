@@ -5,6 +5,7 @@
 # invariant that EVERY plan carries the mandatory docs + README step. The pure scanners + proposals
 # run under bash AND zsh; the full plan_next verb (which sources render/toon via BASH_SOURCE) runs
 # under bash, matching how the dispatcher invokes it. Run:  bash scripts/lib/plan-next-test.sh
+# errors: strict — a test runner: rc 1 on any failed assertion
 
 dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 

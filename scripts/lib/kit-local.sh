@@ -15,6 +15,7 @@
 # (non-local) path". This lib never blocks a hook: alive-check 1s, chat bounded by
 # KIT_LOCAL_TIMEOUT (default 90s; hooks should pass lower via env when latency matters).
 # Config: .claude/kit.config.json -> .local {enabled, port, model} (KIT_LOCAL_* env wins).
+# errors: strict — non-zero on any failure; a dead model server is not a silent empty reply
 
 # Resolve config through the ONE shared resolver (config-path.sh, #69): KIT_CONFIG wins, else a root
 # cckit.config.json or a .claude/kit.config.json (walk up). Falls back to the scaffolded path.

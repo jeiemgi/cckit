@@ -16,6 +16,7 @@
 #   render_rule           a markdown horizontal rule.
 #
 # Depends on ui.sh (ui_tty). glow is optional; never required.
+# errors: best-effort — glow when present, verbatim markdown otherwise
 
 # render_width — target wrap width: COLUMNS if sane, else `tput cols`, else 100; clamped to [40,120]
 # so rendered output fits a docs column / normal terminal and never sprawls.

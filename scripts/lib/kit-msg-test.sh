@@ -6,6 +6,7 @@
 # recipient exactly once, project-scoped), steer marking, and the hook driver's per-event JSON
 # (additionalContext events vs the Stop block that fires ONLY for steer mail and never twice).
 # Run:  bash scripts/lib/kit-msg-test.sh
+# errors: strict — a test runner: rc 1 on any failed assertion
 set -u
 LIB="$(cd "$(dirname "$0")" && pwd)"
 fail=0

@@ -6,6 +6,7 @@
 # origin/main on a non-main-based repo (and the KIT_PROJECTS_V2 board guard never fired via the CLI).
 # Static contract test over bin/cckit: extract the branch block, assert load_kit_config comes first.
 # Run:  bash scripts/lib/effort-dispatch-test.sh
+# errors: strict — a test runner: rc 1 on any failed assertion
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 BIN="$ROOT/bin/cckit"

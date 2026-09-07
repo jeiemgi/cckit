@@ -12,6 +12,7 @@
 # Source it:  source scripts/lib/kit-mode.sh   (auto-sources kit-config-resolve.sh alongside)
 # CLI:        scripts/lib/kit-mode.sh [--dir DIR]            -> prints the mode
 #             scripts/lib/kit-mode.sh --gate [--dir DIR]     -> prints block|warn|off
+# errors: pure — cascade lookup; no I/O of its own
 
 _kit_mode_dir="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
 # shellcheck source=/dev/null

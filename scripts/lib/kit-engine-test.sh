@@ -3,6 +3,7 @@
 # Libs are sourced into whatever shell the session runs (zsh on macOS), so they must behave
 # identically under bash AND zsh. Run:  bash scripts/lib/kit-engine-test.sh
 # Re-runs itself under every available shell; set KIT_ENGINE_TEST_INNER to run assertions in-process.
+# errors: strict — a test runner: rc 1 on any failed assertion
 
 set -u
 dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)

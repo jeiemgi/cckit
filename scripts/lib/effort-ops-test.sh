@@ -2,6 +2,7 @@
 # shellcheck shell=bash
 # effort-ops-test.sh — covers the effort lifecycle ops (#48). Hermetic: stubs gh (no network/auth)
 # and uses a throwaway git repo with a bare remote. Run:  bash scripts/lib/effort-ops-test.sh
+# errors: strict — a test runner: rc 1 on any failed assertion
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 LIB="$ROOT/scripts/lib"

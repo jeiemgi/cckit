@@ -3,6 +3,7 @@
 # Network-free: covers cap_checks_summary / cap_classify / cap_action and the branch parser only
 # (the gh-driven captain_gate/pass/loop are not exercised).
 # Run:  bash scripts/lib/captain-test.sh
+# errors: strict — a test runner: rc 1 on any failed assertion
 
 dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 

@@ -16,6 +16,7 @@
 # Commands accept the human slug as well as the canonical number (#93): a pure-digits arg is a number,
 # anything else is resolved via effort_slug_resolve. Repo + base branch come from kit.config.json
 # (EFFORT_REPO / KIT_BASE_BRANCH), loaded by effort.sh.
+# errors: mixed — lifecycle ops propagate; board + label side effects are best-effort
 
 # Slug layer (#93): _eff_slug, _eff_title_slug, effort_display, effort_slug_resolve. One home in
 # effort-slug.sh; source it here so the lifecycle ops accept `<slug|N>` and render `slug #N`.

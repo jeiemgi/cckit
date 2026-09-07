@@ -3,6 +3,7 @@
 # Network-free: covers the wave layering, session/file packer, and file-hint parser only
 # (the gh-calling plan_machine orchestration is not exercised).
 # Run:  bash scripts/lib/plan-machine-test.sh
+# errors: strict — a test runner: rc 1 on any failed assertion
 
 dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 TAB=$(printf '\t')

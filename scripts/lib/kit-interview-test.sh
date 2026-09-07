@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # kit-interview-test.sh — self-test for kit-interview (#372). Runs under bash AND zsh.
 # Run:  bash scripts/lib/kit-interview-test.sh
+# errors: strict — a test runner: rc 1 on any failed assertion
 dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 
 if [ -n "${KIT_IV_TEST_INNER:-}" ]; then

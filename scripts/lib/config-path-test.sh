@@ -3,6 +3,7 @@
 # config-path-test.sh — covers the ONE shared config-path resolver (#69): kit_config_find (pure walk)
 # and kit_config_path (KIT_CONFIG wins, else walk). Every kit entrypoint discovers the project config
 # through these. Hermetic: throwaway dirs. Run:  bash scripts/lib/config-path-test.sh
+# errors: strict — a test runner: rc 1 on any failed assertion
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 LIB="$ROOT/scripts/lib"

@@ -19,6 +19,7 @@
 # Number stays canonical: a pure-digits argument is always treated as a number and passed through
 # unchanged, so every existing `<N>` call keeps working. bash 3.2 compatible. Requires: git; gh (only
 # for the issue-based fallback when no local/remote branch matches).
+# errors: mixed — _eff_slug/effort_display are pure; effort_slug_resolve needs gh
 
 # Repo for the gh fallback — resolved from the same env effort.sh/kit-config populate.
 _eff_slug_repo() { printf '%s' "${EFFORT_REPO:-${KIT_REPO:-}}"; }

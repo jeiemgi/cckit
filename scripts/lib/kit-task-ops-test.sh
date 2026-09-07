@@ -2,6 +2,7 @@
 # kit-task-ops-test.sh — self-test for kit-task-ops.sh pure helpers under bash AND zsh.
 # Network-free: covers the parsers + body composers only (the gh-calling ops are not exercised).
 # Run:  bash scripts/lib/kit-task-ops-test.sh
+# errors: strict — a test runner: rc 1 on any failed assertion
 
 dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 

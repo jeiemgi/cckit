@@ -21,6 +21,7 @@
 #                           from the current repo (omits --repo)
 #   KIT_EVIDENCE_URL_BASE   host base for images — set it and an image embeds as ![caption](URL)
 #   KIT_EVIDENCE_MAX_BYTES  inline truncation cap for text/log files (default 60000)
+# errors: best-effort — warns and returns 0 so a failed post never breaks the PR flow
 
 PR_EVIDENCE_REPO="${PR_EVIDENCE_REPO:-}"
 

@@ -22,6 +22,7 @@
 #   kit_events_path                         -> prints the absolute path to kit-events.jsonl
 #
 # Always non-fatal: a failure to emit (no jq, unwritable dir) never breaks the caller.
+# errors: best-effort — the event bus never breaks the op that emits
 
 # Resolve the durable, absolute path to the event log.
 # git-common-dir may be relative (".git") — resolve it against the repo root.

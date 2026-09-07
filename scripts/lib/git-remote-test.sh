@@ -4,6 +4,7 @@
 # NAME / slug / wing come from the ACTUAL repo name (not a cloned/renamed directory basename). Also
 # checks the host-agnostic URL parsing (ssh, https, GHE/GitLab). Hermetic: a throwaway git repo with
 # a fake remote. Run:  bash scripts/lib/git-remote-test.sh
+# errors: strict — a test runner: rc 1 on any failed assertion
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 LIB="$ROOT/scripts/lib"

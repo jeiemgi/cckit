@@ -18,6 +18,7 @@
 #             kit-interview.sh --render  TIER [--dir DIR]
 #             kit-interview.sh --apply   TIER --answers FILE [--base FILE]
 # Requires: jq.
+# errors: pure — the deriving half: catalog, context, render, apply — no side effects
 
 _kit_iv_dir="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
 # shellcheck source=/dev/null

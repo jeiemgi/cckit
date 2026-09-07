@@ -4,6 +4,7 @@
 # `slug #N` display, and effort_slug_resolve (number passthrough, branch match, ambiguity, no-match,
 # slug:<slug> label vs title-derived precedence). Hermetic: a throwaway git repo with effort/* branches
 # + a stubbed gh (no network/auth). Run:  bash scripts/lib/effort-slug-test.sh
+# errors: strict — a test runner: rc 1 on any failed assertion
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 LIB="$ROOT/scripts/lib"

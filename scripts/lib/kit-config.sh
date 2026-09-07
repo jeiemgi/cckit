@@ -5,6 +5,7 @@
 #
 # Per-folder overrides: any .claudekit/config.json in an ancestor directory is deep-merged over the
 # project config, nearest-wins (like .editorconfig). Projects with no .claudekit/ behave unchanged.
+# errors: strict — refuses to load config without jq
 
 # Source the ONE shared config-path resolver (config-path.sh, #69). Self-locate portably: BASH_SOURCE
 # is bash-only (empty under zsh, where dirname "" -> CWD and the lib is sought in the wrong dir), so

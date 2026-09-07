@@ -10,6 +10,7 @@
 #     returns: 0 on success (created or reused), 1 on failure
 #
 # Requires: gh, jq, git, scripts/lib/gh-project.sh (board update). bash 3.2 compatible.
+# errors: strict — rc 1 on failure; a half-made worktree is never reported as ready
 
 WT_START_REPO="${WT_START_REPO:-${KIT_REPO:-}}"
 

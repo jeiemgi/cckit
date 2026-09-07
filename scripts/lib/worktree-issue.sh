@@ -12,6 +12,7 @@
 # Portable: POSIX parameter expansion only — sourceable from bash 3.2+ AND zsh (#307;
 # BASH_REMATCH stays silently empty in zsh, which switched the gc protection off).
 # Self-test: bash scripts/lib/worktree-issue-test.sh  (runs the cases under bash + zsh)
+# errors: mixed — name parsing is pure; the issue-open check needs gh
 
 # Echo the issue number a branch name / worktree path belongs to (empty if none, e.g. bot branches).
 # Normalize the numeric segment of a branch/dir name to an issue number.

@@ -16,6 +16,7 @@
 #
 # Gate decision is three pure helpers (cap_checks_summary / cap_classify / cap_action) so the policy
 # is unit-tested without the network. Requires gh + jq. bash 3.2 / zsh compatible.
+# errors: mixed — cap_* are pure; captain_gate/captain_pass propagate a gh failure
 
 CAPTAIN_REPO="${CAPTAIN_REPO:-${KIT_REPO:-}}"
 CAPTAIN_STATE="${CAPTAIN_STATE:-.cckit/captain.state}"

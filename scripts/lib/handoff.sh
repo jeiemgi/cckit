@@ -3,6 +3,7 @@
 # "resume here" note; the next session (bare `cckit`) prints it so the operator or agent picks up
 # exactly where the last one left off. The note is LOCAL (.cckit/handoff.md, gitignored) - it is
 # session state, not a repo artifact.
+# errors: best-effort — session state, not a repo artifact
 
 _handoff_root() { git rev-parse --show-toplevel 2>/dev/null || pwd; }
 _handoff_file() { printf '%s/.cckit/handoff.md' "$(_handoff_root)"; }
