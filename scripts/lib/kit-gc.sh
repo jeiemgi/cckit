@@ -316,7 +316,7 @@ _kit_gc_names() {
 # run performs, and it touches no branch, worktree, stash, or commit of yours.
 kit_gc_cleanup() {
   _kit_gc_require_deps || return 1
-  local repo="$KIT_GC_REPO" yes=0 a out b n_safe n_orphan n_prot n_stash n_wt rc=0
+  local repo="$KIT_GC_REPO" yes=0 a out b n_safe n_orphan n_prot n_stash n_wt rc=0 n_rfail=0
   local safe_list orphan_list prot_list stash_list wt_list level_ok
   for a in "$@"; do case "$a" in --yes|-y) yes=1 ;; esac; done
 
@@ -382,17 +382,20 @@ EOF
   kit_gc_prune --yes || rc=1
 
   # Remote side last: only branches proven exactly level above, so nothing unpushed or remote-only
-  # is dropped. A failed delete is reported and counted, never retried blindly.
+  # is dropped. A failed delete is reported AND counted (this loop is heredoc-fed, not piped, so it
+  # runs in the current shell and the counter survives), never retried blindly.
   while IFS= read -r b; do
     [ -n "$b" ] || continue
     if git push origin --delete "$b" >/dev/null 2>&1; then
       echo "  deleted remote branch $b"
     else
-      echo "  SKIP remote $b — delete failed (protected ref or already gone)" >&2; rc=1
+      echo "  SKIP remote $b — delete failed (protected ref or already gone)" >&2
+      n_rfail=$((n_rfail + 1)); rc=1
     fi
   done <<EOF
 $level_ok
 EOF
+  printf '  remote deletes failed %3s\n' "$n_rfail"
   echo "cleanup: done — $n_orphan orphan / $n_prot protected / $n_stash stash left untouched."
   return "$rc"
 }

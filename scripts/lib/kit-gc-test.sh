@@ -143,6 +143,10 @@ t   "--yes deleted the merged branch"   "$(git branch --list task/40-merged | wc
 t   "--yes KEPT the open-issue branch"  "$(git branch --list task/41-open   | wc -l | tr -d ' ')" "1"
 t   "--yes KEPT the orphan branch"      "$(git branch --list task/42-orphan | wc -l | tr -d ' ')" "1"
 has "cleanup reports what it left"      "$applied" "left untouched"
+# The failed-remote-delete count must be a real number the plan prints, not just an exit status —
+# the skill promises it and `--llm` serializes it as `remote_failed`.
+t   "cleanup prints a remote-failure count" \
+    "$(printf '%s\n' "$applied" | awk '/^  remote deletes failed/{print $4}')" "0"
 
 # ── ref-comparison guards: a merged PR alone must NEVER authorize a force delete (#226 review) ──
 # `git branch -D` destroys unpushed commits, and one-directional containment does not prove equality.

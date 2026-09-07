@@ -208,12 +208,13 @@ case "$cmd" in
       orphan="$(printf '%s\n' "$out" | awk '/^  ORPHAN kept/{print $3}')"
       protected="$(printf '%s\n' "$out" | awk '/^  PROTECTED kept/{print $3}')"
       stash="$(printf '%s\n' "$out" | awk '/^  stashes kept/{print $3}')"
+      rfail="$(printf '%s\n' "$out" | awk '/^  remote deletes failed/{print $4}')"
       applied=no
       if [ "$cleanup_rc" -eq 0 ]; then case " $* " in *" --yes "*|*" -y "*) applied=yes ;; esac; fi
       err="$(tr '\n' ' ' < "$cleanup_err" | sed 's/[[:space:]]*$//')"; rm -f "$cleanup_err"
       cckit_json verb cleanup safe "${safe:-0}" worktrees "${wt:-0}" orphan "${orphan:-0}" \
         protected "${protected:-0}" stash "${stash:-0}" applied "$applied" \
-        rc "$cleanup_rc" error "$err"
+        remote_failed "${rfail:-0}" rc "$cleanup_rc" error "$err"
       [ "$cleanup_rc" -eq 0 ] || exit "$cleanup_rc"
     else
       kit_gc_cleanup "$@"

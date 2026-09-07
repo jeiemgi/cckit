@@ -12,8 +12,10 @@ Plugin-direct skill — helpers resolve from `${CLAUDE_PLUGIN_ROOT}`.
 that deletes a branch the user did not name, so the whole design is plan-first.
 
 **Safety contract:** the plan names **everything** `--yes` can touch — branches *and* worktrees, so
-no deletion escapes the user's veto — `--yes` is the only thing that deletes, and three buckets are
-never deletable at all. See the table below. It reuses
+no deletion escapes the user's veto. `--yes` is the only thing that deletes a **cleanup target** (a
+branch, a worktree, a remote ref), and three buckets are not deletable at all. A plan-only run still
+prunes stale *remote-tracking metadata*, because it refreshes them to classify — see step 3. Table
+below. It reuses
 `kit_gc_analyze` as the single classifier rather than re-deriving verdicts, so `gc` and `cleanup`
 can never disagree about what is safe to delete.
 
@@ -24,7 +26,7 @@ can never disagree about what is safe to delete.
 ```bash
 source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/kit-config.sh" && load_kit_config
 KIT_GC_REPO="$KIT_REPO" source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/kit-gc.sh"
-kit_gc_cleanup          # plan only — deletes NOTHING
+kit_gc_cleanup          # plan only — deletes no branch, worktree, remote ref or stash
 ```
 
 Or through the CLI: `cckit cleanup` (add `--llm` for JSON counts).
@@ -51,7 +53,9 @@ Level-ness is recorded **before** the local prune — once the local ref is gone
 to compare. It requires **exact equality in both directions**: `origin/<b>..<b>` alone only proves
 local ⊆ remote, so a remote-ahead branch would otherwise lose remote-only history. A local delete is
 likewise skipped when the branch is ahead of its remote (`git branch -D` is a force delete). A remote
-delete that fails (protected ref, already gone) is reported and counted, never retried blindly.
+delete that fails (protected ref, already gone) is reported, counted on the `remote deletes failed`
+line (`remote_failed` in `--llm`), and makes the verb exit non-zero — a partial sweep is never
+reported as a complete one. It is never retried blindly.
 
 The plan-only path does perform one write: `kit_gc_analyze` refreshes remote-tracking refs
 (`git fetch --prune`) so the classification is not made against a stale remote. It touches no branch,
@@ -72,4 +76,4 @@ decides merge vs close. Same contract as `/kit-gc` step 4.
   both, and that is load-bearing, not incidental.
 - A **dirty worktree is skipped with a warning**, not destroyed (recover-before-prune).
 - If the protection helper cannot load, the sweep **aborts** rather than classify anything — a wrong
-  "safe" is far worse than a refusal. See `skills/kit-gc/SKILL.md`.
+  "safe" is far worse than a refusal. Same contract as `/kit-gc`.
