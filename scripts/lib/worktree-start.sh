@@ -51,12 +51,96 @@ wt_assign_ports() {
   done
 }
 
+# ── Where does `pnpm install` actually have work to do? (#255) ────────────────────────────────
+# The bootstrap install used to run unconditionally at the worktree ROOT. In a repo whose root
+# manifest declares no dependencies (a published CLI, a docs-only repo, a shell toolkit), pnpm has
+# nothing to resolve — but it still WRITES a 9-line `pnpm-lock.yaml` with an empty `.: {}` importer.
+# That stray lockfile then trips the captain's own policy floor (captain.sh, lockfile/dependency-
+# graph paths) and HOLDS the PR for human review. The helpers below answer "is there anything to
+# install, and where?" from the project's ACTUAL manifest — never from a hardcoded layout.
+
+# _wt_cfg <dir> — path to <dir>'s project config, or nothing. Mirrors config-path.sh's two supported
+# layouts (self-host root `cckit.config.json`, scaffolded `.claude/kit.config.json`) without taking
+# a source-time dependency on it — worktree-start.sh is sourced standalone by effort-ops.sh.
+_wt_cfg() {
+  [[ -f "$1/cckit.config.json" ]]       && { printf '%s\n' "$1/cckit.config.json"; return 0; }
+  [[ -f "$1/.claude/kit.config.json" ]] && { printf '%s\n' "$1/.claude/kit.config.json"; return 0; }
+  return 1
+}
+
+# _wt_json_has <file> <jq-filter> <fallback-regex> — true when <file> satisfies <jq-filter>. jq is
+# the stated dependency of this lib, but the install decision must stay correct without it, so a
+# whitespace-stripped regex over the raw JSON is the fallback. Never fails the caller.
+_wt_json_has() {
+  local file="$1" filter="$2" re="$3"
+  [[ -f "$file" ]] || return 1
+  if command -v jq >/dev/null 2>&1; then
+    jq -e "$filter" "$file" >/dev/null 2>&1
+  else
+    tr -d ' \n\t' < "$file" 2>/dev/null | grep -qE "$re"
+  fi
+}
+
+# _wt_manifest_has_deps <dir> — true when <dir>/package.json declares at least ONE dependency in any
+# of the four dependency blocks. An empty block (`"dependencies": {}`) counts as none: pnpm would
+# resolve nothing and write only the empty-importer lockfile.
+_wt_manifest_has_deps() {
+  _wt_json_has "$1/package.json" \
+    '[(.dependencies,.devDependencies,.optionalDependencies,.peerDependencies)
+      | select(type=="object") | length] | add // 0 | . > 0' \
+    '"(dependencies|devDependencies|optionalDependencies|peerDependencies)":\{"'
+}
+
+# _wt_is_workspace_root <dir> — true when <dir> is the root of a package-manager workspace. A
+# workspace root legitimately declares no dependencies of its own (the MEMBERS hold them) and its
+# root lockfile is the real one, so `pnpm install` there IS genuine work and must still run.
+# A `pnpm-workspace.yaml` carrying only settings (pnpm 10 `overrides:` / `onlyBuiltDependencies:`)
+# with no `packages:` key is NOT a member-bearing workspace and does not qualify on its own.
+_wt_is_workspace_root() {
+  local d="$1" f
+  for f in "$d/pnpm-workspace.yaml" "$d/pnpm-workspace.yml"; do
+    [[ -f "$f" ]] && grep -qE '^[[:space:]]*packages:' "$f" 2>/dev/null && return 0
+  done
+  _wt_json_has "$d/package.json" \
+    '(.workspaces | type) as $t | ($t=="object") or ($t=="array" and (.workspaces|length)>0)' \
+    '"workspaces":(\[.|\{)'
+}
+
+# wt_install_targets <worktree> — emit one worktree-relative directory per line that the bootstrap
+# should run `pnpm install` in. Empty output means "nothing to install" — the correct answer for a
+# dependency-free root. Decision order:
+#   1. `.worktree.installPaths` in the project config wins outright — explicit project intent for
+#      repos whose Node projects live in subdirectories (e.g. ["docs-site"]). `[]` means install
+#      nothing. This is the generic escape hatch; the kit hardcodes no project's layout.
+#   2. Otherwise the worktree root ".", but ONLY when its manifest declares dependencies or it is a
+#      workspace root.
+#   3. Otherwise nothing.
+wt_install_targets() {
+  local wt="$1" cfg paths n i p
+  if cfg="$(_wt_cfg "$wt")" && command -v jq >/dev/null 2>&1; then
+    paths="$(jq -c '.worktree.installPaths // empty' "$cfg" 2>/dev/null)"
+    if [[ -n "$paths" && "$paths" != "null" ]]; then
+      n="$(jq 'length' <<<"$paths" 2>/dev/null)"; [[ "$n" =~ ^[0-9]+$ ]] || return 0
+      i=0
+      while [[ "$i" -lt "$n" ]]; do
+        p="$(jq -r ".[$i] // empty" <<<"$paths")"
+        [[ -n "$p" ]] && printf '%s\n' "$p"
+        i=$(( i + 1 ))
+      done
+      return 0
+    fi
+  fi
+  _wt_manifest_has_deps "$wt" || _wt_is_workspace_root "$wt" || return 0
+  printf '.\n'
+}
+
 # wt_bootstrap <root> <worktree> <issue-num> — make a fresh worktree runnable for local dev.
 # A new worktree inherits no .gitignored local config and no node_modules, and parallel worktrees
-# collide on the hardcoded dev port. This copies the local env, installs deps, and assigns a
-# per-worktree dev port. Every step is best-effort + idempotent — never fail the start (#773).
+# collide on the hardcoded dev port. This copies the local env, assigns a per-worktree dev port, and
+# installs deps WHERE THERE ARE ANY (wt_install_targets — #255). Every step is best-effort +
+# idempotent — never fail the start (#773).
 wt_bootstrap() {
-  local root="$1" wt="$2" num="$3" rel src dst offset
+  local root="$1" wt="$2" num="$3" rel src dst offset target where ran
   [[ -d "$wt" ]] || return 0
 
   # 1. Copy gitignored local config the worktree can't inherit: every .env.local* + project ids.
@@ -79,12 +163,25 @@ wt_bootstrap() {
   wt_assign_ports "$wt" "$num" "$root"
 
   # 3. Install deps — node_modules is per-worktree, not shared. Opt out with KIT_WT_INSTALL=0.
+  #    Runs ONLY where wt_install_targets says there is genuinely something to install. A root
+  #    manifest with no dependencies is skipped: pnpm would resolve nothing and leave behind an
+  #    empty `pnpm-lock.yaml` that the captain's lockfile policy floor then holds the PR on (#255).
   if [[ "${KIT_WT_INSTALL:-1}" != "0" ]] && command -v pnpm >/dev/null 2>&1; then
-    echo "[#$num] pnpm install (set KIT_WT_INSTALL=0 to skip)..." >&2
-    ( cd "$wt" && pnpm install --prefer-offline >/dev/null 2>&1 ) \
-      && echo "[#$num] deps installed" >&2 \
-      || echo "[#$num] pnpm install failed — run 'pnpm install' in the worktree manually" >&2
+    ran=0
+    while IFS= read -r target; do
+      [[ -n "$target" ]] || continue
+      [[ -d "$wt/$target" && -f "$wt/$target/package.json" ]] || continue
+      ran=1
+      [[ "$target" == "." ]] && where="" || where=" in $target"
+      echo "[#$num] pnpm install$where (set KIT_WT_INSTALL=0 to skip)..." >&2
+      ( cd "$wt/$target" && pnpm install --prefer-offline >/dev/null 2>&1 ) \
+        && echo "[#$num] deps installed$where" >&2 \
+        || echo "[#$num] pnpm install$where failed — run 'pnpm install' there manually" >&2
+    done < <(wt_install_targets "$wt")
+    [[ "$ran" == "0" ]] \
+      && echo "[#$num] no dependencies declared — skipping pnpm install" >&2
   fi
+  return 0
 }
 
 # ── Idle-worktree pool (OPT-IN, KIT_WT_POOL=1) ──────────────────────────────────────────────

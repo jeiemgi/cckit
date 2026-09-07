@@ -109,6 +109,52 @@ rollup prints that green was assumed, not proved, and names this key. If your re
 `true` — cckit sets it on itself.
 </Aside>
 
+## Worktree bootstrap
+
+`cckit start <issue>` and `cckit effort start <N>` make a fresh worktree runnable before you touch it:
+they copy the gitignored `.env.local*` files and project ids a new checkout can't inherit, assign a
+per-worktree dev `PORT` per app, and install dependencies — `node_modules` is per-worktree, never
+shared. Every step is best-effort: a hiccup prints and moves on, it never fails the start.
+
+The install step reads the **project's own manifest** to decide where to run:
+
+| The worktree root… | What the bootstrap does |
+| --- | --- |
+| declares dependencies (`dependencies`, `devDependencies`, `optionalDependencies` or `peerDependencies`) | `pnpm install` at the root |
+| is a workspace root (`pnpm-workspace.yaml` with `packages:`, or `workspaces` in `package.json`) | `pnpm install` at the root — the members hold the deps |
+| declares no dependencies at all | **nothing** — it prints `no dependencies declared — skipping pnpm install` |
+
+That last row is the point. A root manifest with no dependencies has nothing to resolve, but pnpm
+would still write an empty `pnpm-lock.yaml` (`importers: { .: {} }`) — a file that then trips the
+[captain's own lockfile policy floor](#captain-merge-policy) and holds the PR for human review. cckit
+itself is exactly this shape: a published bash CLI with zero dependencies whose only Node project is
+`docs-site/`.
+
+### Installing somewhere other than the root
+
+When your Node project lives in a subdirectory, name the directories under `worktree.installPaths` in
+the config file resolved above. It wins outright over the manifest check, and `[]` means *install
+nothing*:
+
+```json
+{
+  "worktree": {
+    "installPaths": ["docs-site"]
+  }
+}
+```
+
+| Key | Default | What it does | Env override |
+| --- | --- | --- | --- |
+| `worktree.installPaths` | *(unset — decide from the root manifest)* | Worktree-relative directories to run `pnpm install` in. `[]` installs nothing. | — |
+| `worktree.devPorts` | `[]` | `{path, base}` per app: the per-worktree dev `PORT` written into that app's `.env.local`. | — |
+| — | install on | Skip the dependency install entirely for one invocation. | `KIT_WT_INSTALL=0` |
+
+<Aside type="tip" title="Nothing is hardcoded">
+The kit carries no project's layout. Both keys are config, and the fallback is a question asked of
+*your* `package.json` — so a repo with real root dependencies still gets its install, unchanged.
+</Aside>
+
 ## Identity
 
 cckit asks your name on first run and stores it in `.cckit/identity` (gitignored). Nothing personal is hardcoded; commits use your local git identity.

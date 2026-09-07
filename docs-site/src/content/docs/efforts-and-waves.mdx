@@ -69,7 +69,8 @@ The slug is a *derived* convenience, not a second source of truth. `--slug` only
   var still overrides both for one invocation.
 - **`cckit effort start`** gives the effort's worktree the **same full setup as `cckit start`**:
   it copies your gitignored env files, assigns a per-worktree dev port, and installs dependencies
-  (opt out with `KIT_WT_INSTALL=0`). The worktree lives at `.claude/worktrees/effort+<N>-<slug>`, a
+  **where the project actually declares any** (opt out entirely with `KIT_WT_INSTALL=0`; see
+  [worktree bootstrap](/config-and-permissions/#worktree-bootstrap)). The worktree lives at `.claude/worktrees/effort+<N>-<slug>`, a
   name `cckit gc` recognizes so it is never pruned while the effort issue is open.
 - **`cckit effort pr`** and the `/kit-effort-pr` skill compose the PR title from **one shared
   composer**, and both refuse to open a PR whose title lacks the mandatory `[#N]` effort id.
