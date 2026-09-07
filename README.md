@@ -95,7 +95,7 @@ cckit start 42                # isolated worktree + branch for issue #42
 cckit pr 42 "what changed"    # commit, push, open the PR
 cckit sync                    # board state, what's unblocked
 cckit handoff "resume note"   # save a handoff — bare `cckit` prints it next session
-cckit gc                      # prune merged branches + worktrees
+cckit gc                      # prune merged branches + worktrees (never one whose issue is open)
 ```
 
 Adopting cckit in a repo that already has history? `cckit scan` detects the stack, `cckit adopt`

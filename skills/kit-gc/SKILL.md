@@ -19,9 +19,24 @@ branch's remote** (orphan work is surfaced, never auto-deleted).
 
 > **Worktree↔issue association.** A branch `<kind>/<N>-<slug>` (or worktree dir
 > `<kind>+<N>-<slug>`) belongs to issue **#N** — derived from the name, not registered.
+> The effort **sub** form counts too: `sub/<N><letter>-<slug>` / `sub+<N><letter>-<slug>`
+> (`rules/effort-model.md`) resolves to the parent effort **#N**, so live subs of an open
+> effort are protected. Exactly ONE trailing lowercase letter is a suffix — anything else
+> (`16a04`, `1604a4`, `1604A`) is not an issue number and yields no association at all.
+> The suffix is honored for **any** lowercase kind, not only `sub` (`feat/1604a-x` → #1604).
+> That is deliberate: a spurious association can only ever *add* protection — an unrelated
+> #N is either open (keep) or closed/absent (no claim asserted) — while narrowing it to `sub`
+> would let gc delete a misnamed live branch.
 > `gc` resolves #N and **refuses to remove anything whose issue is still open, even
 > with no PR yet** — this protects in-progress worktrees that haven't opened a PR.
 > Helper: `${CLAUDE_PLUGIN_ROOT}/scripts/lib/worktree-issue.sh` (`wt_issue_number`, `wt_protected_reason`).
+>
+> **The protection helper is mandatory.** `kit_gc_analyze` / `kit_gc_prune` load it via
+> `_kit_gc_require_deps` and **abort with a FATAL (rc=1) if it cannot be sourced** — without it
+> every issue-open check returns empty and the whole repo classifies as SAFE. A refusal is the
+> correct outcome; never present a degraded analysis as a deletion plan. The dir resolution
+> works under bash **and zsh** (`BASH_SOURCE` is bash-only, so zsh silently switched the
+> protection off before #219).
 
 ## Execution
 

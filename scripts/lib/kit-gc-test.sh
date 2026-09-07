@@ -84,5 +84,21 @@ export GH_CALLS="$tmp/ghcalls"; : > "$GH_CALLS"
 PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_analyze >/dev/null 2>&1
 t "kit_gc_analyze makes exactly ONE gh pr list call" "$(grep -c '^pr list' "$GH_CALLS")" "1"
 
+# ── the protection helper is MANDATORY (#219) ───────────────────────────────────────────────────
+# With worktree-issue.sh absent, `wt_protected_reason` is undefined and every issue-open check would
+# return empty — i.e. the whole repo classifies as SAFE to delete. Both entry points must FATAL out
+# instead of emitting a deletion plan. Copy kit-gc.sh ALONE into a dir so the sibling cannot load.
+lone="$tmp/lone"; mkdir -p "$lone"; cp "$LIB/kit-gc.sh" "$lone/kit-gc.sh"
+out="$(bash -c "unset -f wt_protected_reason 2>/dev/null; . '$lone/kit-gc.sh'; kit_gc_analyze" 2>&1)"; rc=$?
+t   "kit_gc_analyze refuses without worktree-issue.sh (rc)" "$rc" "1"
+has "kit_gc_analyze says why it refused"                    "$out" "FATAL"
+# and it must stop BEFORE the table. `kit_gc_analyze` prints `# <section>` headers and indented
+# `  <name> -> <VERDICT>` rows, so match THOSE — an assertion aimed at the wrong shape passes
+# vacuously no matter what the refusal prints.
+t   "refusal emits no section header"                       "$(printf '%s\n' "$out" | grep -cE '^# ')"    "0"
+t   "refusal emits no classification row"                   "$(printf '%s\n' "$out" | grep -cE ' -> ')"   "0"
+out="$(bash -c ". '$lone/kit-gc.sh'; kit_gc_prune" 2>&1)"; rc=$?
+t   "kit_gc_prune refuses without worktree-issue.sh (rc)"    "$rc" "1"
+
 [ "$fail" -eq 0 ] && echo "ALL OK (kit-gc)" || echo "kit-gc: FAILURES"
 exit "$fail"

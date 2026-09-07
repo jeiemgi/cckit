@@ -12,6 +12,13 @@ Canonical naming + merge-order rules so you're never confused about *what a bran
 - `<issue-number>` — the issue this branch closes. **Always required** for human work.
 - `<slug>` — short kebab-case description (≤ 5 words).
 
+**Effort sub-branches** add one lowercase letter to the number — `sub/<N><letter>-<slug>`
+(`sub/1604a-parser`), branched from `effort/<N>` and merged back into it (`rules/effort-model.md`).
+Tooling derives the parent effort **#N** from that form, so `gc` protects a live sub the same way
+it protects any branch whose issue is still open. One trailing letter only — `16a04` or `1604a4`
+is not an issue number and gets no protection. (The parser honors the suffix for any kind, not
+just `sub` — it errs toward protection rather than risk deleting a misnamed live branch.)
+
 ### Closed set of kinds
 
 | Kind       | For                                                | Typical risk |

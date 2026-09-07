@@ -69,7 +69,7 @@ Both are launch verbs with no JSON result — use `--dry-run` to inspect the pla
 
 | Verb | Purpose |
 | --- | --- |
-| `cckit gc [--prune [--yes]]` | Report (default) or prune merged branches + worktrees. |
+| `cckit gc [--prune [--yes]]` | Report (default) or prune merged branches + worktrees. Never touches a branch/worktree whose issue is still open — including an effort sub (`sub/<N><letter>-…`) of an open effort — and aborts rather than classify anything if that protection helper cannot load. |
 | `cckit render` | stdin markdown → rich output (glow on a TTY, verbatim when piped). |
 | `cckit encode-context` | stdin JSON → compact TOON (token-saving for subagents). |
 | `cckit digest <path\|url>` | Summarize a file or URL with the local model. |
