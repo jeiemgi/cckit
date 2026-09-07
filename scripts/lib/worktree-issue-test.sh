@@ -37,7 +37,13 @@ if [ -n "${WT_TEST_INNER:-}" ]; then
   check "sub/16a04-x"                              ""      # letter embedded mid-number
   check "sub/1604A-x"                              ""      # uppercase suffix is not the sub form
   check "sub/a-x"                                  ""      # letter with no number
-  [ "$fail" -eq 0 ] && echo "OK($WT_TEST_INNER): 19 cases"
+  # The <N><letter> suffix is accepted for EVERY lowercase kind, not just `sub`. Deliberate: a
+  # spurious association can only ever ADD issue-open protection (an unrelated #N is either open
+  # → keep, or closed/absent → no claim), never remove it. Narrowing this to `sub` would make gc
+  # willing to delete a misnamed live branch — the failure mode this whole lib exists to prevent.
+  check "feat/1604a-parser"                        "1604"  # non-sub kind, suffix still protects
+  check "feat+1604a-parser"                        "1604"  # same, worktree dirname form
+  [ "$fail" -eq 0 ] && echo "OK($WT_TEST_INNER): 21 cases"
   exit "$fail"
 fi
 

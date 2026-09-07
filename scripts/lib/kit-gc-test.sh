@@ -92,8 +92,11 @@ lone="$tmp/lone"; mkdir -p "$lone"; cp "$LIB/kit-gc.sh" "$lone/kit-gc.sh"
 out="$(bash -c "unset -f wt_protected_reason 2>/dev/null; . '$lone/kit-gc.sh'; kit_gc_analyze" 2>&1)"; rc=$?
 t   "kit_gc_analyze refuses without worktree-issue.sh (rc)" "$rc" "1"
 has "kit_gc_analyze says why it refused"                    "$out" "FATAL"
-# and it must stop BEFORE the table — no branch/worktree row may reach the caller.
-t   "refusal emits no classification row"                   "$(printf '%s\n' "$out" | grep -cE '^(branch|worktree|stash)[[:space:]]')" "0"
+# and it must stop BEFORE the table. `kit_gc_analyze` prints `# <section>` headers and indented
+# `  <name> -> <VERDICT>` rows, so match THOSE — an assertion aimed at the wrong shape passes
+# vacuously no matter what the refusal prints.
+t   "refusal emits no section header"                       "$(printf '%s\n' "$out" | grep -cE '^# ')"    "0"
+t   "refusal emits no classification row"                   "$(printf '%s\n' "$out" | grep -cE ' -> ')"   "0"
 out="$(bash -c ". '$lone/kit-gc.sh'; kit_gc_prune" 2>&1)"; rc=$?
 t   "kit_gc_prune refuses without worktree-issue.sh (rc)"    "$rc" "1"
 

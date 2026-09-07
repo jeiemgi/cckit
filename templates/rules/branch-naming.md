@@ -16,7 +16,8 @@ Canonical naming + merge-order rules so you're never confused about *what a bran
 (`sub/1604a-parser`), branched from `effort/<N>` and merged back into it (`rules/effort-model.md`).
 Tooling derives the parent effort **#N** from that form, so `gc` protects a live sub the same way
 it protects any branch whose issue is still open. One trailing letter only — `16a04` or `1604a4`
-is not an issue number and gets no protection.
+is not an issue number and gets no protection. (The parser honors the suffix for any kind, not
+just `sub` — it errs toward protection rather than risk deleting a misnamed live branch.)
 
 ### Closed set of kinds
 
