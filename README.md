@@ -92,6 +92,8 @@ cckit init --profile software # scaffold cckit.config.json + .claude/ for this r
 cckit plan-next               # propose what to build next, grounded in current capabilities
 cckit next                    # the next unblocked issue + how to start it
 cckit start 42                # isolated worktree + branch for issue #42
+cckit brief 42                # the delegation brief for #42, read out of the repo not memory
+cckit lib                     # every scripts/lib helper: functions, purpose, error contract
 cckit pr 42 "what changed"    # commit, push, open the PR
 cckit sync                    # board state, what's unblocked
 cckit handoff "resume note"   # save a handoff — bare `cckit` prints it next session
