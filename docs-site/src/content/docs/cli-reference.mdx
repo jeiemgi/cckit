@@ -58,6 +58,8 @@ Two details worth knowing, because both are places a naive reading gets it wrong
 - **"Unpushed" means on no remote at all**, not "ahead of its own upstream". An effort sub whose commits were merged into a pushed effort branch has no upstream of its own, yet its work is safely on the remote — reporting it as undone would send you to re-push work that is already there.
 - **A superseded check run never counts.** Re-running a check, or retitling a PR and re-firing a title gate, leaves the old run in GitHub's rollup. Counting every context there reports a PR as failing a check that has since passed, so only the latest run per check name is read.
 
+In Claude Code the same report is `/kit-status`, and it answers the question in whatever wording it arrives in — "where are we", "what's the status", "how are we doing", "catch me up", "what needs my attention", or the same question in the project's own language. It deliberately does **not** fire on a question with a specific subject ("what's the status of PR 41"), which wants a direct answer rather than the whole picture.
+
 The `ai-review` verdict only appears when the repo evidently uses an AI reviewer — a reviewer config file, or an AI review already present on another open PR. In a repo with none, it never fires.
 
 ```bash

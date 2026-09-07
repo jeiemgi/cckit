@@ -1,7 +1,31 @@
 ---
 name: kit-status
-description: Answer "where are we?" in three buckets — local undone work (dirty worktrees, commits on no remote, effort subs not merged in), open PRs waiting on a human (no approval, no AI-reviewer pass, unresolved threads, red checks, conflicts), and cleanup available local + remote. Read-only.
-when_to_use: When the owner asks where things stand — "where are we", "what's the state", "what's left", "what needs my attention", "anything to clean up" — or at the start of a session to pick up where the last one stopped. Read-only, so it is always safe to run first. For the board alone use `/kit-task-sync`; to act on the cleanup it reports use `/kit-cleanup`.
+description: Answer "where are we?" in three buckets — local undone work (dirty worktrees, commits on no remote, effort subs not merged in), open PRs waiting on a human (no approval, no AI-reviewer pass, unresolved threads, red checks, conflicts), and cleanup available local + remote. Read-only, so it is always safe to run first.
+when_to_use: |
+  Whenever the owner asks, in ANY wording, how things stand overall — this is the default answer to
+  an open status question, and it fires on the phrasing people actually use, not one canonical form:
+
+  - "where are we" · "where we at" · "where are we at" · "where do we stand" · "where did we leave off"
+  - "status" · "what's the status" · "give me a status" · "sitrep" · "state of play"
+  - "what's the current state" · "current state" · "what's the state of things"
+  - "how are we doing" · "how's it going" · "how are things" · "how're we looking" · "are we good"
+  - "what's left" · "what's outstanding" · "what's still open" · "anything pending"
+  - "what needs my attention" · "anything waiting on me" · "anything I need to look at"
+  - "anything to clean up" · "is the repo tidy"
+  - "catch me up" · "recap" · "bring me up to speed" · "what did we do" · "update me"
+  - at the start of a session, to pick up where the last one stopped
+  - the same question in whatever language the project speaks (`project.language` in the config) —
+    in Spanish: "cómo vamos" · "en qué estamos" · "qué falta" · "estado" · "dónde quedamos"
+
+  The list is illustrative, not exhaustive. Any open-ended question about overall progress belongs
+  here, including phrasings not written above.
+
+  SKIP it when the question has a specific subject — "how's the login bug doing", "what's the status
+  of PR 41", "where are we on the migration". Those are about one thing; answer them directly. This
+  skill is for the unqualified question, where the owner wants the whole picture.
+
+  For the board alone use `/kit-task-sync`; for what to pick up next use `/kit-next`; to act on the
+  cleanup this reports use `/kit-cleanup`.
 ---
 
 # kit-status — where are we?
@@ -54,8 +78,11 @@ failing a check that has since passed, so the fetcher keeps only the latest run 
 
 ## Rules
 
-- **Never answer a "where are we" question from `git` output alone.** Run this first; drop to raw
-  `git` or `gh` only for something the buckets genuinely do not cover, and say what that was.
+- **Never answer a status question from `git` output alone.** Run this first; drop to raw `git` or
+  `gh` only for something the buckets genuinely do not cover, and say what that was.
+- **Match on intent, not on wording.** "how are we doing", "catch me up", "cómo vamos" and "where
+  we at" are the same question. Do not wait for the phrase "where are we" — an unqualified question
+  about overall progress is this skill, whatever words or language it arrives in.
 - **Present all three buckets, in order, even when one is empty.** Each bucket names its own
   emptiness ("nothing local-only", "no open PRs"). A silently missing bucket is indistinguishable
   from a clean one, and this report is read to decide what to do next.
