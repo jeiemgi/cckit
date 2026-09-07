@@ -39,6 +39,9 @@ const GA_ENABLED = Boolean(import.meta.env.PUBLIC_GA_MEASUREMENT_ID);
       border-block-start: 1px solid var(--sl-color-gray-5);
       box-shadow: var(--sl-shadow-lg);
     }
+    /* `display: flex` above is an author rule, so it beats the UA's `[hidden] { display: none }` —
+       without this the `hidden` attribute is inert and the banner never dismisses. */
+    .cckit-consent[hidden] { display: none; }
     .cckit-consent__text {
       margin: 0;
       max-width: 60ch;
