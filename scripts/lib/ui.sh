@@ -3,6 +3,7 @@
 # Color is gated on a real TTY + NO_COLOR; optional tools (glow, fzf, gum) enhance output when
 # present and degrade silently when not. Keeping this in one place gives every verb consistent,
 # pipe-safe behavior: piped or non-tty output is always plain.
+# errors: best-effort — detect-or-fallback; optional tools degrade silently
 
 # ui_tty - true only when stdout is a real terminal (so pipes/redirects stay plain).
 ui_tty() { [ -t 1 ]; }

@@ -5,6 +5,7 @@
 #
 # Without args: re-runs itself under every available shell. With WT_TEST_INNER set:
 # runs the assertions in the current interpreter.
+# errors: strict — a test runner: rc 1 on any failed assertion
 
 dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 

@@ -3,6 +3,7 @@
 # board-view-test.sh — covers the pure board-view render helpers (#122): the merge-ordered open-PR
 # queue, the stale flag, the not-on-board flag, and Project Status lookup. Hermetic: canned JSON,
 # no gh. Run:  bash scripts/lib/board-view-test.sh
+# errors: strict — a test runner: rc 1 on any failed assertion
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 LIB="$ROOT/scripts/lib"

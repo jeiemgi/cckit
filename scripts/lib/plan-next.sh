@@ -15,6 +15,7 @@
 # not itself agent-context fuel. The verb and the skill both honor this; see rules/plan-next.md.
 #
 # Filesystem-only — needs jq only for --llm (TOON/JSON). bash 3.2 / zsh compatible.
+# errors: best-effort — degrades to whatever capability dirs exist; never crashes
 
 # _pn_first_dir <dir> [dir …] — echo the first directory that exists (graceful host-project fallback).
 _pn_first_dir() {

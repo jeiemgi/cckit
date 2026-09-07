@@ -8,6 +8,7 @@
 #   - sub-issues carry kind/priority/role labels and are native-linked
 #   - every sub title is linted UP FRONT (a bad sub name aborts before anything is created)
 # Hermetic: stubs gh (no network/auth). Run:  bash scripts/lib/effort-parity-test.sh
+# errors: strict — a test runner: rc 1 on any failed assertion
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 LIB="$ROOT/scripts/lib"

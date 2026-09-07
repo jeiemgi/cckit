@@ -16,6 +16,7 @@
 #
 # Requires: git; gh (degrades to "unknown" issue/PR state without it); scripts/lib/worktree-issue.sh.
 # Portable: bash 3.2+ AND zsh.
+# errors: mixed — kit_gc_analyze is read-only and forgiving; the prune path propagates
 
 KIT_GC_REPO="${KIT_GC_REPO:-${KIT_REPO:-}}"
 

@@ -7,6 +7,7 @@
 # Applies to EVERYTHING publishable — code, docs, cookbook, examples, templates.
 # Usage:  source secret-guard.sh && secret_guard_scan [file...]   (default: git-tracked files)
 #         exit 0 = clean, 1 = a finding (with a report on stderr).
+# errors: strict — rc 1 on a finding — a scan that cannot run is not a clean scan
 
 # Files that must never be committed (by basename). Env files include .env.example/.sample —
 # even an example leaks your variable *names* and structure, so it stays local.

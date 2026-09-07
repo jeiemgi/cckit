@@ -3,6 +3,7 @@
 # Network-free: covers cap_checks_summary / cap_classify / cap_action and the branch parser only
 # (the gh-driven captain_gate/pass/loop are not exercised).
 # Run:  bash scripts/lib/captain-test.sh
+# errors: strict — a test runner: rc 1 on any failed assertion
 
 dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 
@@ -31,6 +32,31 @@ if [ -n "${CAP_TEST_INNER:-}" ]; then
   # failing checks must not be hidden even when mergeable says MERGEABLE.
   eq "fail beats mergeable" "$(cap_classify MERGEABLE CLEAN FAIL)"     "CHECKS_FAILING"
 
+  # cap_classify + KIT_CAPTAIN_REQUIRE_CHECKS — an EMPTY rollup (NONE) is an ABSENCE of evidence, not
+  # a pass. Default OFF, so the four cases below are the whole contract.
+  #
+  # 1. OFF (unset AND explicit 0) — behaviour is UNCHANGED. This is the regression assertion: an
+  #    empty rollup still reads CLEAN, exactly as before, so no existing repo's captain moves.
+  eq "require unset: NONE still CLEAN"  "$(KIT_CAPTAIN_REQUIRE_CHECKS=  cap_classify MERGEABLE CLEAN NONE)"    "CLEAN"
+  eq "require 0: NONE still CLEAN"      "$(KIT_CAPTAIN_REQUIRE_CHECKS=0 cap_classify MERGEABLE CLEAN NONE)"    "CLEAN"
+  eq "require 0: unstable NONE CLEAN"   "$(KIT_CAPTAIN_REQUIRE_CHECKS=0 cap_classify MERGEABLE UNSTABLE NONE)" "CLEAN"
+  # 2. ON — the empty rollup gets its own verdict, distinct from FAILING and PENDING.
+  eq "require 1: NONE is missing"       "$(KIT_CAPTAIN_REQUIRE_CHECKS=1 cap_classify MERGEABLE CLEAN NONE)"    "CHECKS_MISSING"
+  eq "require true: NONE is missing"    "$(KIT_CAPTAIN_REQUIRE_CHECKS=true cap_classify MERGEABLE CLEAN NONE)" "CHECKS_MISSING"
+  eq "require 1: unstable NONE missing" "$(KIT_CAPTAIN_REQUIRE_CHECKS=1 cap_classify MERGEABLE UNSTABLE NONE)" "CHECKS_MISSING"
+  # 3. A real rollup is untouched either way — the setting only speaks about the empty case.
+  eq "require 1: PASS still CLEAN"      "$(KIT_CAPTAIN_REQUIRE_CHECKS=1 cap_classify MERGEABLE CLEAN PASS)"       "CLEAN"
+  eq "require 1: FAIL unaffected"       "$(KIT_CAPTAIN_REQUIRE_CHECKS=1 cap_classify MERGEABLE UNSTABLE FAIL)"    "CHECKS_FAILING"
+  eq "require 1: PENDING unaffected"    "$(KIT_CAPTAIN_REQUIRE_CHECKS=1 cap_classify MERGEABLE UNSTABLE PENDING)" "CHECKS_PENDING"
+  eq "require 0: FAIL unaffected"       "$(KIT_CAPTAIN_REQUIRE_CHECKS=0 cap_classify MERGEABLE UNSTABLE FAIL)"    "CHECKS_FAILING"
+  eq "require 0: PENDING unaffected"    "$(KIT_CAPTAIN_REQUIRE_CHECKS=0 cap_classify MERGEABLE UNSTABLE PENDING)" "CHECKS_PENDING"
+  # 4. Only the would-be-CLEAN verdict can change — draft/conflict/blocked keep their own answers
+  #    even with the requirement on, so the rest of the vocabulary provably does not move.
+  eq "require 1: draft still draft"     "$(KIT_CAPTAIN_REQUIRE_CHECKS=1 cap_classify MERGEABLE DRAFT NONE)"    "DRAFT"
+  eq "require 1: conflict still conf"   "$(KIT_CAPTAIN_REQUIRE_CHECKS=1 cap_classify CONFLICTING BLOCKED NONE)" "CONFLICTING"
+  eq "require 1: dirty still conflict"  "$(KIT_CAPTAIN_REQUIRE_CHECKS=1 cap_classify UNKNOWN DIRTY NONE)"      "CONFLICTING"
+  eq "require 1: blocked still blocked" "$(KIT_CAPTAIN_REQUIRE_CHECKS=1 cap_classify UNKNOWN BLOCKED NONE)"    "BLOCKED"
+
   # cap_action — verdict -> action.
   eq "act clean"         "$(cap_action CLEAN)"          "merge"
   eq "act conflicting"   "$(cap_action CONFLICTING)"    "rebase"
@@ -39,6 +65,8 @@ if [ -n "${CAP_TEST_INNER:-}" ]; then
   eq "act draft"         "$(cap_action DRAFT)"          "wait"
   eq "act held"          "$(cap_action HELD)"           "hold"
   eq "act blocked"       "$(cap_action BLOCKED)"        "skip"
+  # the whole point: an unobserved gate must never resolve to merge.
+  eq "act missing"       "$(cap_action CHECKS_MISSING)" "verify"
 
   # cap_policy_floor — floors that block an unattended auto-merge (default ON). Non-empty = held.
   nl="$(printf '\n')"
@@ -56,6 +84,40 @@ if [ -n "${CAP_TEST_INNER:-}" ]; then
   neq "floor: extra glob held"      "$(KIT_CAPTAIN_FLOORS= KIT_CAPTAIN_EXTRA_GLOBS='migrations/*' cap_policy_floor "migrations/001.sql" "")"
   # a disabling override lets even a workflow file through (config/CLI can opt out).
   eq "floor: KIT_CAPTAIN_FLOORS=0 disables" "$(KIT_CAPTAIN_FLOORS=0 cap_policy_floor ".github/workflows/ci.yml" "hold")" ""
+
+  # _cap_load_policy_config — the config bridge for requireChecks, and ENV WINNING over config
+  # (same rule as KIT_CAPTAIN_FLOORS). Subshelled so the exports never leak into later assertions.
+  if command -v jq >/dev/null 2>&1; then
+    bridge() {
+      ( KIT_CONFIG="$1"; KIT_CAPTAIN_REQUIRE_CHECKS="$2"
+        KIT_CAPTAIN_FLOORS=; KIT_CAPTAIN_EXTRA_GLOBS=
+        _cap_load_policy_config
+        printf '%s' "${KIT_CAPTAIN_REQUIRE_CHECKS:-unset}" )
+    }
+    cfgon="$(mktemp)";  printf '{"captain":{"mergePolicy":{"requireChecks":true}}}'  > "$cfgon"
+    cfgoff="$(mktemp)"; printf '{"captain":{"mergePolicy":{"requireChecks":false}}}' > "$cfgoff"
+    cfgnone="$(mktemp)"; printf '{"project":{"name":"x"}}' > "$cfgnone"
+    eq "bridge: config true -> 1"     "$(bridge "$cfgon" "")"   "1"
+    eq "bridge: config false -> 0"    "$(bridge "$cfgoff" "")"  "0"
+    eq "bridge: key absent -> unset"  "$(bridge "$cfgnone" "")" "unset"
+    eq "bridge: env 0 beats config"   "$(bridge "$cfgon" "0")"  "0"
+    eq "bridge: env 1 beats config"   "$(bridge "$cfgoff" "1")" "1"
+    rm -f "$cfgon" "$cfgoff" "$cfgnone"
+
+    # _cap_cfg_bool must distinguish "set to false" from "not set". jq's `//` does NOT — it treats a
+    # literal false as absent — which is why `captain.mergePolicy.floors:false` was documented but
+    # inert until this helper replaced it. Locking that here so the opt-out cannot silently rot again.
+    cfgf="$(mktemp)"; printf '{"captain":{"mergePolicy":{"floors":false}}}' > "$cfgf"
+    eq "cfg_bool: false is not absent" "$(_cap_cfg_bool "$cfgf" floors)" "false"
+    eq "cfg_bool: absent is empty"     "$(_cap_cfg_bool "$cfgf" requireChecks)" ""
+    floorbridge() {
+      ( KIT_CONFIG="$1"; KIT_CAPTAIN_FLOORS="$2"; KIT_CAPTAIN_EXTRA_GLOBS=; KIT_CAPTAIN_REQUIRE_CHECKS=
+        _cap_load_policy_config; printf '%s' "${KIT_CAPTAIN_FLOORS:-unset}" )
+    }
+    eq "bridge: floors:false -> 0"     "$(floorbridge "$cfgf" "")"  "0"
+    eq "bridge: env 1 beats floors cfg" "$(floorbridge "$cfgf" "1")" "1"
+    rm -f "$cfgf"
+  fi
 
   # _cap_issue_of_branch — pull the issue number out of a flow branch.
   eq "branch task"       "$(_cap_issue_of_branch 'task/47-admin-clerk')" "47"

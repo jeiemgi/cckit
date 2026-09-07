@@ -12,6 +12,7 @@
 #   KIT_DRY_RUN=1     show what would happen, write nothing
 #   KIT_ASSUME_YES=1  apply without the interactive confirm (CI / batch / Cowork)
 #   KIT_NO_COLOR / NO_COLOR  plain output
+# errors: strict — the four-beat mutation machine propagates at every beat
 
 _kit_op_dir="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
 # shellcheck source=/dev/null

@@ -4,6 +4,7 @@
 # and emits markdown/text; none call gh, so they are unit-testable with canned fixtures (#122).
 # Ported from the host project's board view: a merge-ordered open-PR queue, a stale-issue flag, a
 # not-on-board flag, and Project Status per issue. bash 3.2 + zsh safe. Requires jq.
+# errors: pure — JSON in, text out; no gh, no network
 
 # board_merge_queue <prs-json> — render the open-PR merge queue as a markdown table. <prs-json> is
 # `gh pr list --json number,title,labels,isDraft,headRefName,reviewDecision,mergeable` output.

@@ -19,6 +19,7 @@
 #     }
 #   }
 # tier A = portable (Cowork/claude.ai), tier B = CLI-only — see kit-v2 plan §5.
+# errors: strict — ownership facts: a failed read or hash propagates rather than guessing
 
 # --- location -------------------------------------------------------------
 # Manifest lives at the project root's .claude/kit.manifest.json. Override with KIT_MANIFEST.

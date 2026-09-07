@@ -2,6 +2,7 @@
 # Helpers for GitHub Projects v2 via gh CLI + GraphQL.
 # Source after kit-config.sh:  source scripts/lib/gh-project.sh; load_project_ids
 # Requires scripts/.project-ids.env — populate via scripts/capture-project-ids.sh.
+# errors: strict — a failed GraphQL call propagates; the board is not guessed
 
 # Locate scripts/ portably when sourced (#313): BASH_SOURCE is bash-only — empty in
 # zsh, where dirname "" resolved to CWD and the env was sought in the wrong dir.

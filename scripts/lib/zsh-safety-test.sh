@@ -11,6 +11,7 @@
 #
 # Skips (rc 0) when zsh is absent, so the gate stays dependency-light (CI installs zsh, so it runs
 # there). bash 3.2 compatible. Run:  bash scripts/lib/zsh-safety-test.sh
+# errors: strict — a test runner: rc 1 on any failed assertion
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 LIB="$ROOT/scripts/lib"

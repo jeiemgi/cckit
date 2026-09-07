@@ -4,6 +4,7 @@
 # Specificity-ordered: Next.js → React Router v7 (framework mode) → Vite → generic React.
 # (A flat "is vite present?" check is unreliable — Next/RR apps often carry vite for tests.)
 # Requires: jq. Safe to source (no `set -e`); never aborts the caller.
+# errors: best-effort — never aborts the caller; falls back to generic React
 
 react_detect() {
   local dir="${1:-$PWD}" pkg deps

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # kit-mode-test.sh — self-test for kit-mode (#371). Runs under bash AND zsh.
 # Run:  bash scripts/lib/kit-mode-test.sh
+# errors: strict — a test runner: rc 1 on any failed assertion
 dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 
 if [ -n "${KIT_MODE_TEST_INNER:-}" ]; then

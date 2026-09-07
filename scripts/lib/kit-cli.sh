@@ -14,6 +14,7 @@
 #                        verified for execute-vs-source in both. MUST be called from the consumer's
 #                        top level (so the bash frame BASH_SOURCE[1] is the consumer itself).
 #   kit_say / kit_warn / kit_die   stderr output helpers (stdout stays clean for pipeable data).
+# errors: pure — zero-dep shell helpers
 
 # True (rc 0) iff the script that sourced this lib is the one being executed directly.
 #   zsh:  inside a function, ZSH_EVAL_CONTEXT is "toplevel:shfunc" when the caller was executed

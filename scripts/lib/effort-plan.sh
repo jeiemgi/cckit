@@ -12,6 +12,7 @@
 # (rules/agent-execution-routing.md).
 #
 # Requires: gh, jq. bash 3.2 (no associative arrays — parallel indexed arrays + linear scan; N small).
+# errors: strict — refuses to plan without gh + jq
 
 EFFORT_REPO="${EFFORT_REPO:-${KIT_REPO:-}}"
 

@@ -3,6 +3,7 @@
 # When CCKIT_OUTPUT=json (set by the --llm / --output=json flag), verbs emit a single JSON
 # object on stdout so any agent can parse the result; otherwise they print human-readable text.
 # Dependency-light: jq when present (correct escaping), a pure-bash fallback otherwise.
+# errors: pure — jq when present, pure-bash fallback; cannot fail
 
 # cckit_is_json - true when the caller asked for machine-readable output.
 cckit_is_json() { [ "${CCKIT_OUTPUT:-human}" = "json" ]; }

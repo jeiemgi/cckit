@@ -4,6 +4,7 @@
 # integration-branch fallback chain (#117) — a host project that names its integration branch under
 # an alternate key (integrationBranch / flow) must still resolve, not silently fall back to "main".
 # Hermetic: throwaway config files pointed at via KIT_CONFIG. Run:  bash scripts/lib/kit-config-test.sh
+# errors: strict — a test runner: rc 1 on any failed assertion
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 LIB="$ROOT/scripts/lib"

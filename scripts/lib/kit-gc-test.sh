@@ -6,6 +6,7 @@
 # must (a) detect zombies + staged deltas as their own analysis bucket, (b) recover any staged delta
 # to its branch as a commit BEFORE pruning, and (c) never prune in a dry-run.
 # Hermetic: a throwaway git repo, no network/gh. Run:  bash scripts/lib/kit-gc-test.sh
+# errors: strict — a test runner: rc 1 on any failed assertion
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 LIB="$ROOT/scripts/lib"

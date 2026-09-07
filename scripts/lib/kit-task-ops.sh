@@ -23,6 +23,7 @@
 #   kto_task_pr_merge [pr-num]                         squash-merge + close issues + switch develop + GC
 #   kto_task_new  <title> <role> <kind> <prio> <ms> [plan] [blocked] <body>   create issue + board fields
 #   kto_task_close <num> <summary> [pr-num]            close issue + board → Done
+# errors: mixed — git/gh ops propagate; board + label side effects are best-effort
 
 # --- repo resolution -----------------------------------------------------------------------------
 # Resolve the repo slug from KIT_REPO (kit-config) when available, else the kit's home repo. A

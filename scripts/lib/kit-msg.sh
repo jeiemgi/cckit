@@ -18,6 +18,7 @@
 # (override root with KIT_MAIL_DIR; "/" encoded as "+" — the worktree-dir precedent). A direct
 # message is read-ONCE (new/ → read/); a broadcast (`all`) is project-scoped, hits each session
 # exactly once via a per-branch seen ledger, and expires after 7 days.
+# errors: mixed — send/read propagate; delivery-side cleanup is best-effort
 
 # Lazily bring in the shared remote-slug resolver (no-op if the caller already sourced it).
 _msg_source_remote() {

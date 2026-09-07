@@ -11,6 +11,7 @@
 # Tunables (env):
 #   KIT_ROLE_EMAIL_DOMAIN  synthetic author-email domain (default: agents.local — not a real inbox)
 #   KIT_AGENT_LABEL        suffix in the author/sig label (default: agent)
+# errors: pure — maps a role slug to an author + signature
 KIT_ROLE_EMAIL_DOMAIN="${KIT_ROLE_EMAIL_DOMAIN:-agents.local}"
 KIT_AGENT_LABEL="${KIT_AGENT_LABEL:-agent}"
 

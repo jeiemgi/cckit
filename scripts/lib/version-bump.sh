@@ -11,6 +11,7 @@
 # `feat:` -> minor; `fix|perf|refactor|revert:` -> patch; non-functional types
 # (`docs|chore|style|test|ci|build`) and anything else -> none (no release).
 # no commits -> none (no release).
+# errors: strict — set -e; a bad manifest or missing tag propagates
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 

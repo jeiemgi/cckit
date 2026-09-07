@@ -13,6 +13,7 @@
 #   cckit wave --llm              the fan-out as TOON rows (wave,number,ctx,prompt) for an agent
 #
 # Requires: gh, jq (via the plan machine). bash 3.2 / zsh compatible.
+# errors: strict — refuses to emit a brief without gh + jq
 
 COPILOT_REPO="${COPILOT_REPO:-${KIT_REPO:-}}"
 

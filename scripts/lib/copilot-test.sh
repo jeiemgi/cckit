@@ -2,6 +2,7 @@
 # copilot-test.sh — self-test for copilot.sh pure helper under bash AND zsh.
 # Network-free: covers the subagent seed composer only (the gh/plan-driven copilot_brief is not
 # exercised). Run:  bash scripts/lib/copilot-test.sh
+# errors: strict — a test runner: rc 1 on any failed assertion
 
 dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 

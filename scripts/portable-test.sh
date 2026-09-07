@@ -70,7 +70,10 @@ t "version is the install version, not the project's" "$got_ver" "$(jq -r '.kitV
 # ── BY CONSTRUCTION: exercise every read-only verb; none may resolve cckit's OWN repo ─────────────
 # Read-only board/config verbs that MUST act on the invoking project. Run each from the fixture and
 # assert the gh call log never mentions cckit's own repo (the leak this whole effort guards against).
-EXERCISE="sync status next plan plan-next wave gc cleanup scan doctor"
+# `lib` belongs here rather than in SKIP: it is read-only and calls no gh, so the assertion below
+# is the guard that keeps it that way — and running it from the fixture also proves the host-project
+# degradation (a project with no scripts/lib of its own falls back to the cckit install, no crash).
+EXERCISE="sync status next plan plan-next wave gc cleanup scan doctor lib"
 for v in $EXERCISE; do
   : > "$GH_REPO_LOG"
   ( cd "$fix" && PATH="$stub:$PATH" GH_REPO_LOG="$GH_REPO_LOG" "$CCKIT" "$v" --llm >/dev/null 2>&1 )
@@ -80,11 +83,19 @@ done
 : > "$GH_REPO_LOG"; ( cd "$fix" && PATH="$stub:$PATH" GH_REPO_LOG="$GH_REPO_LOG" "$CCKIT" gc --llm >/dev/null 2>&1 )
 yes "gc resolves the invoking repo" "$(cat "$GH_REPO_LOG")" "$FIX_REPO"
 
+# `brief` takes an issue argument, so the generic --llm loop above cannot drive it — but it reads an
+# issue through gh, which is exactly the call that must never resolve cckit's own repo from someone
+# else's checkout. Drive it explicitly with an issue number.
+: > "$GH_REPO_LOG"
+( cd "$fix" && PATH="$stub:$PATH" GH_REPO_LOG="$GH_REPO_LOG" "$CCKIT" brief 1 >/dev/null 2>&1 )
+no  "brief never resolves cckit's own repo from a foreign checkout" "$(cat "$GH_REPO_LOG")" "$OWN_REPO"
+yes "brief resolves the invoking repo"                              "$(cat "$GH_REPO_LOG")" "$FIX_REPO"
+
 # ── BY CONSTRUCTION: every verb in `cckit commands` is classified (exercised or explicitly skipped) ─
 # A new verb that is neither exercised nor listed here fails the harness — forcing a coverage
 # decision. SKIP holds verbs that mutate, need args, read stdin, are interactive, or act on the
 # install itself (not the invoking project's board) — deliberately not driven here.
-SKIP="adopt autopilot bench close commands completions contribute copilot debug digest effort encode-context handoff help init install migrate msg orchestrate pr release render resume start ui update version watch"
+SKIP="adopt autopilot bench brief close commands completions contribute copilot debug digest effort encode-context handoff help init install migrate msg orchestrate pr release render resume start ui update version watch"
 classified() { case " $EXERCISE $SKIP " in *" $1 "*) return 0 ;; *) return 1 ;; esac; }
 for v in $("$CCKIT" commands); do
   classified "$v" || { echo "FAIL: verb '$v' is unclassified — add it to EXERCISE (read-only, assert no own-repo leak) or SKIP in portable-test.sh"; fail=1; }

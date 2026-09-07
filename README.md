@@ -93,6 +93,8 @@ cckit plan-next               # propose what to build next, grounded in current 
 cckit status                  # where are we: local undone work, PRs to attend, cleanup available
 cckit next                    # the next unblocked issue + how to start it
 cckit start 42                # isolated worktree + branch for issue #42
+cckit brief 42                # the delegation brief for #42, read out of the repo not memory
+cckit lib                     # every scripts/lib helper: functions, purpose, error contract
 cckit pr 42 "what changed"    # commit, push, open the PR
 cckit sync                    # board state, what's unblocked
 cckit handoff "resume note"   # save a handoff — bare `cckit` prints it next session
@@ -187,6 +189,7 @@ prompt** you can paste straight into Claude Code — start exactly where you are
 cckit/
   bin/cckit              # the CLI dispatcher
   scripts/lib/*.sh       # the git-mechanics bundle (effort, worktree, gh, gc, …)
+                         #   each declares `# errors:` — see CONTRIBUTING.md
   scripts/benchmark/     # doc-retrieval benchmark harness (cckit bench)
   .claude-plugin/        # the Claude Code plugin manifest
   skills/ commands/      # Claude Code skills + slash commands
