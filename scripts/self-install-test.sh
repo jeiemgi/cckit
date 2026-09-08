@@ -246,33 +246,37 @@ if [ "$fail" -eq 0 ]; then echo "PASS: cckit self-install matches its manifest";
 # reports drift without saying how to clear it is a tripwire with no defusal — so print the exact
 # re-render command, using the same substitution this file compares with.
 if [ "$fail" -ne 0 ]; then
-  cat >&2 <<'HINT'
-
-To clear a `mode rendered` or `mode verbatim` drift, re-render the installed copy from its template
-(run from the repo root; needs jq + perl):
-
-  CFG_LANG="$(jq -r '.project.language' cckit.config.json)"
-  CFG_OWNER="$(jq -r '.project.owner' cckit.config.json)"
-  CFG_NAME="$(jq -r '.project.name' cckit.config.json)"
-  CFG_BASE="$(jq -r '.github.baseBranch // .github.integrationBranch // .github.flow // "main"' cckit.config.json)"
-  for r in $(printf '%s\n' "$INSTALLED_RULES_NAMES"); do
-    COMMS_LANG="$CFG_LANG" OWNER_NAME="$CFG_OWNER" PROJECT_NAME="$CFG_NAME" BASE_BRANCH="$CFG_BASE" \
-      perl -0777 -pe 's/\{\{(\w+)\}\}/ exists $ENV{$1} ? $ENV{$1} : "{{$1}}" /ge' \
-      "templates/rules/$r.md" > ".claude/rules/$r.md"
-  done
-
-Substituting one rule by name (the common case — replace <rule>):
-
-  CFG_BASE="$(jq -r '.github.baseBranch // "main"' cckit.config.json)"
-  COMMS_LANG="$(jq -r '.project.language' cckit.config.json)" \
-  OWNER_NAME="$(jq -r '.project.owner' cckit.config.json)" \
-  PROJECT_NAME="$(jq -r '.project.name' cckit.config.json)" \
-  BASE_BRANCH="$CFG_BASE" \
-    perl -0777 -pe 's/\{\{(\w+)\}\}/ exists $ENV{$1} ? $ENV{$1} : "{{$1}}" /ge' \
-    templates/rules/<rule>.md > .claude/rules/<rule>.md
-
-A `mode sections` drift is NOT re-rendered wholesale — that file carries project-specific fill-ins.
-Copy only the kit-owned section the failure names.
-HINT
+  # Generated from the manifest, not hand-written: a static hint drifts from the manifest and from
+  # _render's own fallback chain, and a remediation command that does not match what this script
+  # compares against is the very defect the guard exists to catch. `rendered` and `verbatim` are
+  # both listed — re-rendering a template with no {{VAR}} is a no-op copy, which is exactly right.
+  _hint_rules="$(printf '%s\n' "$INSTALLED_RULES" | awk '$2!="sections"{printf "%s ", $1}' | sed 's/ *$//')"
+  {
+    echo
+    echo "To clear a 'mode rendered' or 'mode verbatim' drift, re-render the installed copy from its"
+    echo "template. Run from the repo root; needs jq + perl:"
+    echo
+    echo "  CFG_LANG=\"\$(jq -r '.project.language' cckit.config.json)\""
+    echo "  CFG_OWNER=\"\$(jq -r '.project.owner' cckit.config.json)\""
+    echo "  CFG_NAME=\"\$(jq -r '.project.name' cckit.config.json)\""
+    echo "  CFG_BASE=\"\$(jq -r '.github.baseBranch // .github.integrationBranch // .github.flow // \"main\"' cckit.config.json)\""
+    echo "  for r in $_hint_rules; do"
+    echo "    COMMS_LANG=\"\$CFG_LANG\" OWNER_NAME=\"\$CFG_OWNER\" PROJECT_NAME=\"\$CFG_NAME\" BASE_BRANCH=\"\$CFG_BASE\" \\"
+    echo "      perl -0777 -pe 's/\\{\\{(\\w+)\\}\\}/ exists \$ENV{\$1} ? \$ENV{\$1} : \"{{\$1}}\" /ge' \\"
+    echo "      \"templates/rules/\$r.md\" > \".claude/rules/\$r.md\""
+    echo "  done"
+    echo
+    echo "For one rule, keep the same four assignments and drop the loop, e.g. effort-model:"
+    echo
+    echo "  … BASE_BRANCH=\"\$CFG_BASE\" perl -0777 -pe 's/…/…/ge' \\"
+    echo "      templates/rules/effort-model.md > .claude/rules/effort-model.md"
+    echo
+    echo "CFG_BASE must keep the full fallback chain — baseBranch, then integrationBranch, then flow,"
+    echo "then \"main\". Checking only .github.baseBranch renders a different value than this script"
+    echo "compares against, so the drift would survive the fix."
+    echo
+    echo "A 'mode sections' drift is NOT re-rendered wholesale: that file carries project-specific"
+    echo "fill-ins. Copy only the kit-owned section the failure names."
+  } >&2
 fi
 exit "$fail"
