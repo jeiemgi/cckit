@@ -139,15 +139,21 @@
         },
         "devPorts": {
           "type": "array",
-          "description": "Per-app dev PORT lanes. Each entry assigns PORT = base + (issue % 40) * <count> into that app's .env.local, so parallel worktrees never fight for a port.",
+          "description": "Per-app dev PORT lanes. Each entry writes PORT = base + <slot> * <devPortStride> into that app's .env.local, so parallel worktrees never fight for a port. <slot> is ALLOCATED and recorded per issue under the git-common-dir (kit-portslots.tsv), not hashed from the issue number: an issue keeps its slot while its worktree exists, and the slot is reclaimed once that worktree is gone. Best-effort: it only takes effect for an app that actually reads the file. `next dev -p ${PORT:-3003}` is expanded by the npm-script shell, which never reads .env.local, so the value is inert for it. cckit does not rely on this — whatever cckit launches itself receives its port explicitly.",
           "items": {
             "type": "object",
             "additionalProperties": true,
             "properties": {
               "path": { "type": "string", "description": "Repo-relative path to the app's .env.local file." },
-              "base": { "type": "integer", "description": "Base port for this app's lane." }
+              "base": { "type": "integer", "description": "Base port for this app's lane. Every app's base must sit inside ONE devPortStride-wide window (e.g. 3001/3003/3004 with stride 10); a wider spread lets two worktrees' blocks overlap, and cckit warns when it sees one." }
             }
           }
+        },
+        "devPortStride": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 10,
+          "description": "Distance between one worktree's port block and the next (default 10 — room for up to 10 services). It must NOT be the number of services: with stride == count, two bases congruent mod count hand the SAME port to two different worktrees (bases 3001/3003/3004 with count 3 gave worktree slot k+1's admin port to slot k's api). Widen it when a project declares more devPorts entries than the stride, or when its bases span further than one stride."
         }
       }
     }

@@ -176,7 +176,26 @@ the config file resolved above:
 | --- | --- | --- | --- |
 | `worktree.installPaths` | *(unset — fall through to rule 2)* | Worktree-relative directories to run `pnpm install` in. Wins over rules 2–3; `[]` installs nothing. | — |
 | `worktree.devPorts` | `[]` | `{path, base}` per app: the per-worktree dev `PORT` written into that app's `.env.local`. | — |
+| `worktree.devPortStride` | `10` | Distance between one worktree's port block and the next. Every app's `base` must sit inside one stride-wide window. | — |
 | — | install on | Skip the dependency install entirely for one invocation. | `KIT_WT_INSTALL=0` |
+
+<Aside type="caution" title="A written port is not always a used port">
+cckit writes `PORT=` into each app's `.env.local`, but that only takes effect **if the app reads the
+file**. A script like `next dev -p ${PORT:-3003}` is expanded by the npm-script shell, which never
+reads `.env.local` — so the value is inert for it and each worktree falls back to the same default.
+
+cckit doesn't depend on this: anything cckit launches itself gets its port passed explicitly. The
+`.env.local` write is a convenience for apps that do read it. If you start a dev server **by hand**
+in a worktree, check which port you actually got — and if you want the assignment to apply, read it
+in the script yourself:
+
+```json
+"dev": "sh -c 'P=$(grep -m1 ^PORT= .env.local 2>/dev/null | cut -d= -f2); exec next dev -p ${P:-3003}'"
+```
+
+Extract just `PORT` — don't `source` the file. A dotenv file is not a shell script, and sourcing it
+lets the shell reinterpret any secret containing `$`, a backtick or a quote.
+</Aside>
 
 <Aside type="caution" title="installPaths cannot leave the worktree">
 Entries are worktree-**relative** and validated for containment: an absolute path, or one that climbs
