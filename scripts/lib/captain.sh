@@ -19,6 +19,25 @@
 # errors: mixed — cap_* are pure; captain_gate/captain_pass propagate a gh failure
 
 CAPTAIN_REPO="${CAPTAIN_REPO:-${KIT_REPO:-}}"
+
+# State lives in the shared .cckit/ (kit-state.sh), never CWD-relative: the captain gates the whole
+# repo, so its record must be the same file from the primary checkout and from every worktree.
+# Locate the sibling portably — BASH_SOURCE is bash-only and empty in zsh (#313).
+if [ -n "${BASH_SOURCE:-}" ]; then
+  _cap_self="$BASH_SOURCE"
+elif [ -n "${ZSH_VERSION:-}" ]; then
+  eval '_cap_self="${(%):-%x}"'
+else
+  _cap_self="$0"
+fi
+if [ -f "$(dirname "$_cap_self")/kit-state.sh" ]; then
+  # shellcheck source=kit-state.sh
+  . "$(dirname "$_cap_self")/kit-state.sh"
+fi
+unset _cap_self
+if [ -z "${CAPTAIN_STATE:-}" ] && command -v kit_state_file >/dev/null 2>&1; then
+  CAPTAIN_STATE="$(kit_state_file captain.state)"
+fi
 CAPTAIN_STATE="${CAPTAIN_STATE:-.cckit/captain.state}"
 
 # cap_checks_summary — collapse a gh statusCheckRollup JSON array (stdin) to one token:
@@ -256,7 +275,11 @@ captain_pass() {
   prs="$(_cap_open_prs "$effort")"
   [ -n "$prs" ] || { echo "captain: no open PRs in scope"; return 0; }
 
-  : > "$CAPTAIN_STATE" 2>/dev/null || true
+  # The braces matter: redirections are processed left to right, so `: > "$f" 2>/dev/null` attempts
+  # the redirect BEFORE the suppression applies and the shell reports the failure anyway. Wrapping
+  # the whole group is what actually silences it. Ensure the dir first so it normally succeeds.
+  command -v kit_state_ensure >/dev/null 2>&1 && kit_state_ensure || true
+  { : > "$CAPTAIN_STATE"; } 2>/dev/null || true
   echo "captain: gating $(printf '%s\n' "$prs" | grep -c .) open PR(s)$( [ -n "$effort" ] && echo " for effort #$effort")"
   for pr in $prs; do
     row="$(captain_gate "$pr")" || continue
@@ -266,7 +289,7 @@ captain_pass() {
     title="$(printf '%s' "$row" | cut -f5)"
     reason="$(printf '%s' "$row" | cut -f6)"
     checks="$(printf '%s' "$row" | cut -f7)"
-    printf '%s\t%s\n' "$pr" "$state" >> "$CAPTAIN_STATE" 2>/dev/null || true
+    { printf '%s\t%s\n' "$pr" "$state" >> "$CAPTAIN_STATE"; } 2>/dev/null || true
     # A merge resting on an EMPTY rollup: green was assumed, never observed. Counted here and named
     # once at the end of the pass, so the assumption is on screen even with the requirement OFF.
     if [ "$action" = "merge" ] && [ "$checks" = "NONE" ]; then unproven=$((unproven + 1)); fi
