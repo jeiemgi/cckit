@@ -19,7 +19,11 @@ name: release-please
 # Settings -> Trusted Publishing -> add this repo + workflow (.github/workflows/release-please.yml).
 # Requires npm >= 11.5.1 (setup-node's bundled npm is older, so the job upgrades it first).
 #
-# The Homebrew channel is still gated on secrets — a release succeeds without them, it just skips that channel:
+# The Homebrew channel is gated on secrets. With NEITHER configured the channel is skipped and the
+# release still succeeds. With one configured it is no longer optional: the bump runs, a verification
+# step reads the tap back and the job FAILS if it does not serve the released version. That is
+# deliberate (#287) — an empty or expired credential still clones a public tap fine and only fails on
+# push, so four releases reported success while `brew` stayed on 0.5.0.
 #   Homebrew tap auth (either — the GitHub App is preferred, the PAT is the fallback):
 #     HOMEBREW_APP_ID          + HOMEBREW_APP_PRIVATE_KEY — a GitHub App (Contents: write) installed on
 #                              homebrew-cckit; the workflow mints a short-lived, tap-scoped token per run.
@@ -86,7 +90,21 @@ jobs:
       # short-lived publish credential, signing the tarball with provenance automatically. Requires
       # the trusted publisher to be configured once on npmjs.com (see the header comment).
       - name: Publish to npm (OIDC trusted publishing)
-        run: npm publish --access public
+        env:
+          VERSION: ${{ needs.release-please.outputs.version }}
+        run: |
+          set -euo pipefail
+          # Idempotent, so a partially-failed release can be RE-DRIVEN. npm refuses to republish a
+          # version ("You cannot publish over the previously published versions"), and this step runs
+          # before the Homebrew steps — so once npm had 0.7.0, every re-run died here and the tap
+          # bump was unreachable. That is why the tap could never catch up on its own (#287): the
+          # release was not recoverable, only re-releasable.
+          if [ -n "${VERSION:-}" ] && npm view "@jeiemgi/cckit@$VERSION" version >/dev/null 2>&1; then
+            echo "::notice title=npm::@jeiemgi/cckit@$VERSION is already published — skipping publish so the remaining channels can run."
+            echo "### :package: npm already at \`$VERSION\` — publish skipped" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          npm publish --access public
 
       # Preferred tap auth: mint a short-lived, tap-scoped token from the cckit-release GitHub App
       # (set HOMEBREW_APP_ID + HOMEBREW_APP_PRIVATE_KEY secrets, install the app on homebrew-cckit
@@ -112,6 +130,14 @@ jobs:
         run: |
           set -euo pipefail
           v="$VERSION"
+          # An EMPTY token is not "no auth path" — it is a broken one. The clone below succeeds
+          # anonymously against a public tap and only the push fails, which is how #287 hid: four
+          # releases in a row reported success because npm and the tag had already landed. Refuse
+          # up front instead, so the failure names its own cause.
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::error title=Homebrew tap::HOMEBREW_APP_ID or HOMEBREW_TAP_TOKEN is set but resolved to an EMPTY token — no credential to push with. Set HOMEBREW_APP_ID + HOMEBREW_APP_PRIVATE_KEY (App with Contents: write, installed on homebrew-cckit), or refresh HOMEBREW_TAP_TOKEN."
+            exit 1
+          fi
           url="https://github.com/${{ github.repository }}/archive/refs/tags/v$v.tar.gz"
           # The tag tarball is generated on demand right after the tag is created — retry until it's ready.
           sha="$(curl -fsSL --retry 6 --retry-delay 5 "$url" | sha256sum | cut -d' ' -f1)"
@@ -124,3 +150,52 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git commit -am "cckit $v"
           git push
+
+      # Assert the tap actually serves the released version, reading it back from the remote rather
+      # than trusting the push. This catches every failure mode, not just a bad credential: a perl
+      # no-op, the wrong repository, a formula whose `version` line drifted from its url. It runs
+      # even when the bump step failed (`always()`), because a skipped verification is exactly how a
+      # stale tap survives a release.
+      - name: Verify the tap serves this version
+        if: ${{ always() && (env.HOMEBREW_APP_ID != '' || env.HOMEBREW_TAP_TOKEN != '') }}
+        env:
+          VERSION: ${{ needs.release-please.outputs.version }}
+        run: |
+          set -euo pipefail
+          v="$VERSION"
+          raw="https://raw.githubusercontent.com/jeiemgi/homebrew-cckit/main/Formula/cckit.rb"
+          # Retry: the push and raw.githubusercontent's cache are not instantaneous.
+          for _ in 1 2 3 4 5 6; do
+            f="$(curl -fsSL "$raw" || true)"
+            printf '%s' "$f" | grep -q "version \"$v\"" && break
+            sleep 10
+          done
+          got_v="$(printf '%s' "$f" | sed -nE 's/^[[:space:]]*version "([^"]*)".*/\1/p' | head -1)"
+          got_u="$(printf '%s' "$f" | sed -nE 's|^[[:space:]]*url "([^"]*)".*|\1|p' | head -1)"
+          got_s="$(printf '%s' "$f" | sed -nE 's/^[[:space:]]*sha256 "([^"]*)".*/\1/p' | head -1)"
+          # The exact URL and the real digest, not a pattern: a formula can carry the right version
+          # with an archive from another repo (brew installs the wrong code), or the right URL with a
+          # stale sha256 (brew refuses to install). Both pass a suffix check.
+          want_u="https://github.com/${{ github.repository }}/archive/refs/tags/v$v.tar.gz"
+          want_s="$(curl -fsSL --retry 6 --retry-delay 5 "$want_u" | sha256sum | cut -d' ' -f1)"
+          if [ "$got_v" != "$v" ]; then
+            echo "::error title=Homebrew tap stale::the tap serves version '$got_v', expected '$v' — brew users will not get this release. See issue #287."
+            {
+              echo "### :beer: Homebrew tap is STALE"
+              echo "Released **$v**, tap serves **${got_v:-unknown}**. \`brew\` users stay on the old version."
+              echo "Fix the tap credential, then re-run this job or bump \`Formula/cckit.rb\` by hand."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          if [ "$got_u" != "$want_u" ]; then
+            echo "::error title=Homebrew tap url::formula url is '$got_u', expected '$want_u' — brew would download an archive that is not this release."
+            echo "### :beer: Homebrew tap url MISMATCH" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          if [ "$got_s" != "$want_s" ]; then
+            echo "::error title=Homebrew tap sha256::formula sha256 is '$got_s', but v$v.tar.gz hashes to '$want_s' — brew would refuse the install."
+            echo "### :beer: Homebrew tap sha256 MISMATCH — \`brew install\` would fail" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          echo "tap serves $got_v · $got_u · sha256 ok"
+          echo "### :beer: Homebrew tap OK — \`$got_v\`, url and sha256 verified" >> "$GITHUB_STEP_SUMMARY"
