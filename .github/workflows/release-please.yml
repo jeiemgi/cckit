@@ -90,7 +90,21 @@ jobs:
       # short-lived publish credential, signing the tarball with provenance automatically. Requires
       # the trusted publisher to be configured once on npmjs.com (see the header comment).
       - name: Publish to npm (OIDC trusted publishing)
-        run: npm publish --access public
+        env:
+          VERSION: ${{ needs.release-please.outputs.version }}
+        run: |
+          set -euo pipefail
+          # Idempotent, so a partially-failed release can be RE-DRIVEN. npm refuses to republish a
+          # version ("You cannot publish over the previously published versions"), and this step runs
+          # before the Homebrew steps — so once npm had 0.7.0, every re-run died here and the tap
+          # bump was unreachable. That is why the tap could never catch up on its own (#287): the
+          # release was not recoverable, only re-releasable.
+          if [ -n "${VERSION:-}" ] && npm view "@jeiemgi/cckit@$VERSION" version >/dev/null 2>&1; then
+            echo "::notice title=npm::@jeiemgi/cckit@$VERSION is already published — skipping publish so the remaining channels can run."
+            echo "### :package: npm already at \`$VERSION\` — publish skipped" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          npm publish --access public
 
       # Preferred tap auth: mint a short-lived, tap-scoped token from the cckit-release GitHub App
       # (set HOMEBREW_APP_ID + HOMEBREW_APP_PRIVATE_KEY secrets, install the app on homebrew-cckit
