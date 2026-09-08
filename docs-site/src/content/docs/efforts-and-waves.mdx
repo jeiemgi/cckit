@@ -112,8 +112,9 @@ effort_start: 2 effort(s) already in progress and the WIP limit is 2.
 `cckit effort start` creates that branch and `cckit effort close` deletes it, so the counted set is
 exactly "started and not yet closed". There is no second definition and no board lookup involved.
 
-The origin half is read with `git ls-remote` on every `cckit effort start`, **not** from your cached
-`refs/remotes`. The cache is wrong in both directions, and a WIP gate is wrong with it:
+The origin half is read with `git ls-remote` **by default** — not from your cached `refs/remotes`.
+(`EFFORT_WIP_REMOTE=0` opts out; see *Working offline* below.) The cache is wrong in both
+directions, and a WIP gate is wrong with it:
 
 | Cached `refs/remotes` says | Reality | Gate with the cache |
 | --- | --- | --- |
@@ -122,8 +123,10 @@ The origin half is read with `git ls-remote` on every `cckit effort start`, **no
 
 `git ls-remote` sees the branch pushed a second ago and does not see the one deleted a second ago,
 and it writes nothing: no fetch, no prune, no ref touched. `effort_slug_resolve` still reads the
-cached refs, because resolving a slug handle sits on the hot path of every effort verb and has to
-stay network-free.
+cached refs, because resolving a slug handle sits on the hot path of every effort verb — that
+**cached-ref lookup** is network-free. Resolution as a whole is not: when no branch matches the
+slug it falls through to `gh` (see below), which is why a WIP refusal on a slug input can still
+make a GitHub read.
 
 The rules, exactly:
 
@@ -169,7 +172,12 @@ limit and is unaffected.
 `EFFORT_WIP_REMOTE=0` skips the origin query and counts local heads plus your cached
 `refs/remotes` — deterministic, no round-trip, and back to the cache's approximation. If origin is
 simply unreachable the gate does the same on its own: it prints one line saying the count may be
-stale and lets the start proceed. `cckit effort start` never fails for want of a network.
+stale, then **applies the limit to that cached count**. So an ordinary start can still be refused
+offline — a stale `origin/effort/<N>-…` that origin no longer has will keep counting until you
+prune. `--force` (or `KIT_FORCE=1`) starts anyway.
+
+What it never does is fail for want of a network: `cckit effort start` degrades to the cache rather
+than erroring out.
 </Aside>
 
 ## Waves

@@ -141,9 +141,12 @@ off.
   since the last fetch is absent (the gate would let the limit be exceeded), and a branch deleted on
   origin lingers until a prune (the gate would block a start that should be allowed). `ls-remote`
   answers both without writing or pruning a ref. `effort_slug_resolve` keeps reading the cached refs
-  because slug lookup is on the hot path of every effort verb and must stay network-free.
-- **At** the limit refuses; only strictly under it starts. `0` refuses every ordinary start —
-  `--force` / `KIT_FORCE=1` still start.
+  because slug lookup is on the hot path of every effort verb — that cached-ref lookup is
+  network-free. Resolution as a whole is not: with no branch matching the slug it falls through to
+  `gh`, so a WIP refusal on a slug input can still make a GitHub read.
+- **At** the limit refuses; only strictly under it starts. `0` refuses every ordinary start of a NEW
+  effort — `--force` / `KIT_FORCE=1` still start, and a re-start of an effort already in progress is
+  never gated.
 - Re-running `effort start` on an effort already in progress is never gated — it adds no WIP, so the
   op stays safe to re-run.
 - The check runs **before** the fetch, branch, worktree and bootstrap — a refusal makes no branch,
