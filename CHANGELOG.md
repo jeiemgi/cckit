@@ -5,6 +5,13 @@ All notable changes to cckit are documented here. New entries below are generate
 [Conventional Commits](https://www.conventionalcommits.org/) and land when the Release PR is
 merged to `main`. Earlier entries follow [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.7.1](https://github.com/jeiemgi/cckit/compare/v0.7.0...v0.7.1) (2026-09-08)
+
+
+### Bug Fixes
+
+* **release:** a stale Homebrew tap can no longer pass as a release [[#287](https://github.com/jeiemgi/cckit/issues/287)] ([#290](https://github.com/jeiemgi/cckit/issues/290)) ([a797ebd](https://github.com/jeiemgi/cckit/commit/a797ebdc79e4abb905745307019fadeb9f5d29ba))
+
 ## [0.7.0](https://github.com/jeiemgi/cckit/compare/v0.6.1...v0.7.0) (2026-09-08)
 
 
