@@ -159,6 +159,44 @@ number, an issue that does not exist, a number repeated in the list (`chain 1 2 
 would close a cycle through dependencies GitHub already holds are all refused whole. A cycle is
 refused rather than written because `cckit plan` cannot layer a cyclic graph into waves.
 
+### One at a time — the effort WIP limit
+
+`cckit effort start` refuses to start a **new** effort once too many are already in progress:
+
+```console
+$ cckit effort start 244
+effort_start: 2 effort(s) already in progress and the WIP limit is 2.
+    · order-and-cadence #241  (effort/241-order-and-cadence)
+    · release-gates #257  (effort/257-release-gates)
+  → refusing to start #244 — nothing was created.
+     Close one with 'cckit effort close <N>', or start anyway with --force (or KIT_FORCE=1).
+     The limit is effort.wipLimit in the project config (default 2); EFFORT_WIP_LIMIT overrides it.
+```
+
+**In progress** means an `effort/<N>-<slug>` branch exists — as a local head, **or** on origin, so
+an effort another machine started counts too. `cckit effort start` creates the branch and
+`cckit effort close` deletes it, so the set is exactly "started and not yet closed".
+
+The origin half is read with `git ls-remote` on each `cckit effort start`, not from your cached
+`refs/remotes`, because the cache is wrong in both directions: a branch pushed since your last fetch
+is missing from it, and a branch deleted on origin lingers in it until a prune. One network
+round-trip buys a count that is right either way.
+
+- The check runs **before** the fetch, the branch, the worktree and the bootstrap, so a refusal
+  makes **no branch, no worktree and no board change**.
+- **At** the limit refuses; only strictly under it starts. The default limit is `2`.
+- Re-running `cckit effort start` on an effort that is **already** in progress is never gated — it
+  adds no WIP, so the verb stays safe to re-run even at or over the limit.
+- `--force` (or `KIT_FORCE=1`, the same escape hatch `cckit effort close` uses) starts anyway.
+- Set your own limit with `effort.wipLimit` in `cckit.config.json`; `0` refuses every ordinary
+  start, **though `--force` still works**. A value that is not a non-negative integer is ignored
+  with a warning and the default `2` is used. `EFFORT_WIP_LIMIT` in the environment overrides the
+  config per invocation.
+- This gates **efforts only**. `cckit start <issue>` (a plain task worktree) has no WIP limit.
+- **No network, no problem.** `EFFORT_WIP_REMOTE=0` skips the origin query and counts local heads
+  plus your cached `refs/remotes`. If origin is simply unreachable, the count falls back to those
+  same cached refs, prints one line saying the count may be stale, and the start proceeds.
+
 ## Waves — parallel agentic development
 
 `cckit wave` reads your open efforts and proposes the incoming waves of work — parallel agent tasks

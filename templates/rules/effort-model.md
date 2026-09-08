@@ -119,13 +119,46 @@ The parent carries the rich narrative; the **PR** carries the human-facing revie
 |------|------|
 | `effort-new` | parent issue (4-section body **filled** + `ctx/kind/priority/role/flow` labels) + native sub-issues, every title linted; optional `--slug` sets the handle |
 | `cckit effort chain <a> <b> …` | declare a running order over EXISTING issues: each successor `blocked_by` its predecessor + a `- Depends on #<predecessor>` line. Idempotent, additive, cycle-refusing (nothing is written on a refusal) |
-| `effort-start <slug\|N>` | `effort/<N>` branch + worktree; board → In Progress |
+| `effort-start [--force] <slug\|N>` | `effort/<N>` branch + worktree; board → In Progress. **WIP-limited** — see below |
 | orchestrate | sub-issues in own worktrees (file-disjoint) → merge into `effort/<N>`; each closes + board Done as it lands |
 | `effort-pr <slug\|N>` | ONE PR `effort/<N>` → {{BASE_BRANCH}} (rich body + `## For agents`) |
 | `effort-close <slug\|N>` | **snapshot sub-diffs pre-squash** → merge → close parent + subs → board Done(all) → GC prune → kit-sync drift check |
 
 Board + record state are correct **by construction** — the close op owns them. Never rely on a
 separate, skippable "mark done" step.
+
+**WIP limit — how many efforts may be open at once.** `effort_start` refuses to start a **new**
+effort once `effort.wipLimit` (default **2**) are already in progress. **In progress** means an
+`effort/<N>-<slug>` branch exists — a local head (`effort_branch_rows_local`) **or** a branch origin
+has right now (`effort_branch_rows_origin`, a `git ls-remote` read), unioned by
+`effort_wip_rows`. That is the kit's one definition of a started effort, not a second one:
+`effort_start` creates the branch and `effort_close` deletes it, so the set is exactly "started and
+not yet closed". The board Status is deliberately **not** the signal — it is written by the
+`/kit-effort-start` skill's board step, never by the verb, and it is empty whenever Projects v2 is
+off.
+
+- **The cached `refs/remotes` is not the source.** It is wrong in both directions: a branch pushed
+  since the last fetch is absent (the gate would let the limit be exceeded), and a branch deleted on
+  origin lingers until a prune (the gate would block a start that should be allowed). `ls-remote`
+  answers both without writing or pruning a ref. `effort_slug_resolve` keeps reading the cached refs
+  because slug lookup is on the hot path of every effort verb — that cached-ref lookup is
+  network-free. Resolution as a whole is not: with no branch matching the slug it falls through to
+  `gh`, so a WIP refusal on a slug input can still make a GitHub read.
+- **At** the limit refuses; only strictly under it starts. `0` refuses every ordinary start of a NEW
+  effort — `--force` / `KIT_FORCE=1` still start, and a re-start of an effort already in progress is
+  never gated.
+- Re-running `effort start` on an effort already in progress is never gated — it adds no WIP, so the
+  op stays safe to re-run.
+- The check runs **before** the fetch, branch, worktree and bootstrap — a refusal makes no branch,
+  no worktree and no board change, the same validate-then-write discipline `effort_new` and
+  `effort_chain` follow. It is not read-free: the gate queries origin, and a `<slug>` argument was
+  already resolved through `effort_slug_resolve`, which can run `gh issue list`.
+- `--force` (or `KIT_FORCE=1`) starts anyway. `EFFORT_WIP_LIMIT` overrides the config per
+  invocation. A non-integer configured value is ignored with a warning; the default `2` is used.
+- The gate is **effort-only**: `cckit start <issue>` (a plain task worktree) has no WIP limit.
+- **Offline:** `EFFORT_WIP_REMOTE=0` skips the origin query and counts local heads + cached remotes.
+  An unreachable origin does the same and warns on stderr; the start proceeds. A gate that
+  hard-failed without network would be worse than one that miscounts.
 
 ## Wave close — the final sub of every effort
 

@@ -343,5 +343,208 @@ case "$out" in
   *)           t "chain banner: ✗ when a link failed"    "$out" "✗ chain" ;;
 esac
 
+# ── #244 · effort_start enforces a WIP limit ──────────────────────────────────────────────────────
+# In progress = an `effort/<N>-<slug>` ref exists (local head OR remote-tracking) — the same scan the
+# slug resolver uses. Its own throwaway repo + bare remote so the branch inventory is exactly what
+# each case sets up, and its own gh log so "a refusal writes NOTHING" can be asserted against zero
+# gh calls as well as zero refs.
+wtmp="$tmp/wip"; mkdir -p "$wtmp"
+( cd "$wtmp" && git init -q --bare remote.git )
+( cd "$wtmp" && git clone -q remote.git work \
+  && cd work && git -c user.email=t@t -c user.name=t commit -q --allow-empty -m init \
+  && git push -q origin HEAD:main )
+cd "$wtmp/work" || exit 1
+unset EFFORT_WIP_LIMIT KIT_EFFORT_WIP_LIMIT KIT_FORCE 2>/dev/null || true
+# `gh` on PATH here is the chain stub, which logs to $CH_LOG — that is the log a refusal must leave
+# empty, so the "writes nothing" assertions read it rather than $GH_LOG.
+
+wip_started() { git show-ref --verify --quiet "refs/heads/effort/$1" && echo yes || echo no; }
+wip_reset() { git checkout -q main 2>/dev/null; \
+  for b in $(git for-each-ref --format='%(refname:short)' 'refs/heads/effort/*'); do
+    git worktree remove --force ".claude/worktrees/effort+${b#effort/}" >/dev/null 2>&1
+    git branch -D "$b" >/dev/null 2>&1
+  done; git worktree prune >/dev/null 2>&1; }
+
+# 1. under the limit → starts. Nothing in progress, default limit 2.
+effort_start 701 one >/dev/null 2>&1; rc=$?
+t "wip: under the limit starts (rc 0)"  "$rc" "0"
+t "wip: under the limit created the branch" "$(wip_started 701-one)" "yes"
+
+# 2. the SECOND effort still starts (1 < 2) — the limit is a ceiling, not a one-at-a-time rule.
+effort_start 702 two >/dev/null 2>&1; rc=$?
+t "wip: the second effort starts (rc 0)" "$rc" "0"
+
+# 3. AT the limit (2 in progress, limit 2) → refuse. A third would make three.
+: > "$CH_LOG"
+out="$(effort_start 703 three 2>&1)"; rc=$?
+t "wip: at the limit refuses (rc 1)" "$rc" "1"
+case "$out" in *"WIP limit is 2"*) echo "ok: refusal names the limit" ;; *) echo "FAIL: refusal did not name the limit: $out"; fail=1 ;; esac
+case "$out" in *"one #701"*) echo "ok: refusal lists what is in progress" ;; *) echo "FAIL: refusal did not list #701: $out"; fail=1 ;; esac
+case "$out" in *"--force"*) echo "ok: refusal says how to override" ;; *) echo "FAIL: refusal did not mention --force: $out"; fail=1 ;; esac
+case "$out" in *"effort.wipLimit"*) echo "ok: refusal names the config key" ;; *) echo "FAIL: refusal did not name effort.wipLimit: $out"; fail=1 ;; esac
+# …and the refusal WRITES nothing: no branch, no worktree dir, no board change.
+t "wip: refusal created no branch"   "$(wip_started 703-three)" "no"
+t "wip: refusal created no worktree" "$(ls -d .claude/worktrees/effort+703-three 2>/dev/null | wc -l | tr -d ' ')" "0"
+# For a NUMERIC argument the refusal also makes no gh call — the number is passed through, so no
+# resolution happens. This is NOT the guarantee for a <slug> argument (see the next assertion), and
+# the docs claim only "no branch, no worktree, no board change" (#244 review).
+t "wip: a numeric-arg refusal made no gh call" "$(grep -c . "$CH_LOG" | tr -d ' ')" "0"
+# A SLUG argument is resolved BEFORE the gate, and the resolver falls through to `gh issue list`
+# when no branch matches — so a refusal on that path can read from GitHub. Asserted on the resolver
+# itself, which is the mechanism the narrowed doc claim refers to.
+: > "$CH_LOG"
+effort_slug_resolve no-such-effort-anywhere >/dev/null 2>&1 || true
+t "wip: resolving a slug with no branch DOES call gh" \
+  "$(grep -c 'issue list' "$CH_LOG" | tr -d ' ')" "2"
+
+# 4. --force starts anyway (and says so).
+out="$(effort_start --force 703 three 2>&1)"; rc=$?
+t "wip: --force starts anyway (rc 0)" "$rc" "0"
+t "wip: --force created the branch"   "$(wip_started 703-three)" "yes"
+case "$out" in *"anyway"*) echo "ok: --force announces the override" ;; *) echo "FAIL: --force said nothing: $out"; fail=1 ;; esac
+
+# 5. ABOVE the limit (3 in progress, limit 2) still refuses.
+effort_start 704 four >/dev/null 2>&1; rc=$?
+t "wip: above the limit refuses (rc 1)" "$rc" "1"
+t "wip: above the limit created no branch" "$(wip_started 704-four)" "no"
+
+# 6. KIT_FORCE=1 — the same escape hatch effort_close uses — starts anyway.
+KIT_FORCE=1 effort_start 704 four >/dev/null 2>&1; rc=$?
+t "wip: KIT_FORCE=1 starts anyway (rc 0)" "$rc" "0"
+t "wip: KIT_FORCE=1 created the branch"   "$(wip_started 704-four)" "yes"
+
+# 7. re-running start on an ALREADY in-progress effort is never gated — it adds no WIP, so
+#    `effort start` stays safe to re-run even when the set is at or over the limit.
+out="$(effort_start 701 one 2>&1)"; rc=$?
+t "wip: re-starting an in-progress effort is allowed (rc 0)" "$rc" "0"
+case "$out" in *"WIP limit"*) echo "FAIL: re-start hit the WIP gate: $out"; fail=1 ;; *) echo "ok: re-start bypasses the gate" ;; esac
+
+# 8. a REMOTE-only effort branch counts as in progress (another machine owns it).
+wip_reset
+git push -q origin main:refs/heads/effort/705-remote-only
+git fetch -q origin
+t "wip: only a remote effort ref is present" "$(effort_wip_rows | tr '\t' '-' | tr '\n' ' ')" "705-remote-only "
+EFFORT_WIP_LIMIT=1 effort_start 706 local-one >/dev/null 2>&1; rc=$?
+t "wip: a remote-only effort branch counts toward the limit (rc 1)" "$rc" "1"
+git push -q origin :refs/heads/effort/705-remote-only; git fetch -q --prune origin
+
+# ── #244 review · the cached refs/remotes is wrong in BOTH directions ─────────────────────────────
+# effort_wip_rows reads origin with `git ls-remote`, not refs/remotes, because the cache under- and
+# over-counts and a gate is wrong with either. Both directions are reproduced here against the real
+# bare remote, with the local cache deliberately left un-fetched / un-pruned.
+
+# 8a. OVER-count: a branch DELETED on origin lingers in refs/remotes until a prune. The stale ref
+#     must not block a start. The delete is written into the bare remote rather than pushed from
+#     here as `origin :ref` — a delete-push updates THIS clone's tracking ref, which would hide the
+#     staleness under test. Writing the remote is the "another machine deleted it" case.
+wip_reset
+git push -q origin main:refs/heads/effort/720-stale
+git fetch -q origin                                   # cache it
+git --git-dir="$wtmp/remote.git" update-ref -d refs/heads/effort/720-stale
+t "wip: the deleted branch is still in the local cache" \
+  "$(git for-each-ref --format='%(refname:short)' refs/remotes 2>/dev/null | grep -c 'effort/720-stale' | tr -d ' ')" "1"
+t "wip: a stale remote-tracking ref is NOT counted" \
+  "$(effort_wip_rows | grep -c '^720' | tr -d ' ')" "0"
+EFFORT_WIP_LIMIT=1 effort_start 721 not-blocked >/dev/null 2>&1; rc=$?
+t "wip: a stale ref does not block a start (rc 0)" "$rc" "0"
+t "wip: the unblocked start created its branch"    "$(wip_started 721-not-blocked)" "yes"
+git fetch -q --prune origin
+
+# 8b. UNDER-count: a branch pushed to origin since the last fetch is absent from refs/remotes — and
+#     effort_start's own fetch is base-only, so it would never appear. It must still be counted.
+#     `git update-ref` inside the bare remote is the "another machine pushed" case with no fetch.
+wip_reset
+git --git-dir="$wtmp/remote.git" update-ref refs/heads/effort/722-unfetched \
+  "$(git rev-parse origin/main)"
+t "wip: the new branch is absent from the local cache" \
+  "$(git for-each-ref --format='%(refname:short)' refs/remotes 2>/dev/null | grep -c 'effort/722-unfetched' | tr -d ' ')" "0"
+t "wip: an unfetched origin branch IS counted" \
+  "$(effort_wip_rows | grep -c '^722' | tr -d ' ')" "1"
+out="$(EFFORT_WIP_LIMIT=1 effort_start 723 blocked-by-unfetched 2>&1)"; rc=$?
+t "wip: an unfetched origin branch blocks a start (rc 1)" "$rc" "1"
+t "wip: that refusal created no branch" "$(wip_started 723-blocked-by-unfetched)" "no"
+case "$out" in *"722"*) echo "ok: the refusal names the unfetched effort" ;; *) echo "FAIL: refusal did not name #722: $out"; fail=1 ;; esac
+
+# 8c. EFFORT_WIP_REMOTE=0 opts out of the origin query and counts the cache — so with the same
+#     un-fetched origin branch the count goes back to the old approximation (absent), which is
+#     exactly what "deterministic offline mode" means.
+t "wip: EFFORT_WIP_REMOTE=0 skips the origin query" \
+  "$(EFFORT_WIP_REMOTE=0 effort_wip_rows | grep -c '^722' | tr -d ' ')" "0"
+EFFORT_WIP_REMOTE=0 EFFORT_WIP_LIMIT=1 effort_start 724 optout >/dev/null 2>&1; rc=$?
+t "wip: EFFORT_WIP_REMOTE=0 starts under the cached count (rc 0)" "$rc" "0"
+wip_reset
+git --git-dir="$wtmp/remote.git" update-ref -d refs/heads/effort/722-unfetched
+
+# 8d. an UNREACHABLE origin must not fail the start: the count falls back to the cached refs, warns
+#     once on stderr, and the gate proceeds. A gate that hard-fails offline is worse than one that
+#     miscounts.
+wip_reset
+git remote set-url origin "$wtmp/nope-does-not-exist.git"
+rows_out="$(effort_wip_rows 2>&1 >/dev/null)"
+case "$rows_out" in *"may be stale"*) echo "ok: an unreachable origin warns" ;; *) echo "FAIL: no staleness warning: $rows_out"; fail=1 ;; esac
+out="$(effort_start 725 offline 2>&1)"; rc=$?
+t "wip: an unreachable origin still starts the effort (rc 0)" "$rc" "0"
+t "wip: the offline start created its branch" "$(wip_started 725-offline)" "yes"
+git remote set-url origin "$wtmp/remote.git"
+wip_reset
+
+# 9. limit 0 freezes new efforts entirely (nothing in progress, and still a refusal).
+wip_reset
+EFFORT_WIP_LIMIT=0 effort_start 707 frozen >/dev/null 2>&1; rc=$?
+t "wip: limit 0 refuses with nothing in progress (rc 1)" "$rc" "1"
+t "wip: limit 0 created no branch" "$(wip_started 707-frozen)" "no"
+EFFORT_WIP_LIMIT=0 effort_start --force 707 frozen >/dev/null 2>&1; rc=$?
+t "wip: limit 0 is still overridable (rc 0)" "$rc" "0"
+
+# 10. a misconfigured limit is IGNORED with a warning and the built-in default (2) is used —
+#     a typo must neither disable the gate nor wedge the verb.
+wip_reset
+out="$(EFFORT_WIP_LIMIT=lots effort_start 708 typo 2>&1)"; rc=$?
+t "wip: a non-numeric limit still starts under the default (rc 0)" "$rc" "0"
+case "$out" in *"must be a non-negative integer"*) echo "ok: a bad limit warns" ;; *) echo "FAIL: no warning for a bad limit: $out"; fail=1 ;; esac
+out="$(EFFORT_WIP_LIMIT=-1 effort_start 709 negative 2>&1)"; rc=$?
+t "wip: a negative limit falls back to the default too (rc 0)" "$rc" "0"
+# two are now in progress under the fallback default of 2 → the next one is refused
+EFFORT_WIP_LIMIT=lots effort_start 710 third >/dev/null 2>&1; rc=$?
+t "wip: the fallback default is really 2 (rc 1)" "$rc" "1"
+
+# 11. the limit is read from `effort.wipLimit` in the project config when no env var is set…
+wip_reset
+mkdir -p .claude
+printf '{"effort":{"wipLimit":1}}\n' > .claude/kit.config.json
+effort_start 711 from-config >/dev/null 2>&1
+out="$(effort_start 712 from-config-two 2>&1)"; rc=$?
+t "wip: effort.wipLimit=1 refuses the second effort (rc 1)" "$rc" "1"
+case "$out" in *"WIP limit is 1"*) echo "ok: the configured limit is the one enforced" ;; *) echo "FAIL: config limit not used: $out"; fail=1 ;; esac
+# …and EFFORT_WIP_LIMIT wins over it, per invocation.
+EFFORT_WIP_LIMIT=3 effort_start 712 from-config-two >/dev/null 2>&1; rc=$?
+t "wip: EFFORT_WIP_LIMIT overrides the config (rc 0)" "$rc" "0"
+# KIT_EFFORT_WIP_LIMIT (what load_kit_config exports) is read when EFFORT_WIP_LIMIT is unset.
+wip_reset
+out="$(KIT_EFFORT_WIP_LIMIT=0 effort_start 713 kitenv 2>&1)"; rc=$?
+t "wip: KIT_EFFORT_WIP_LIMIT is honoured (rc 1)" "$rc" "1"
+rm -f .claude/kit.config.json
+
+# 12. effort_wip_rows counts each effort ONCE even when local + remote refs both carry it.
+wip_reset
+effort_start 714 dedup >/dev/null 2>&1
+git push -q origin effort/714-dedup; git fetch -q origin
+t "wip: local + remote refs count as one effort" "$(effort_wip_rows | wc -l | tr -d ' ')" "1"
+git push -q origin :refs/heads/effort/714-dedup >/dev/null 2>&1; git fetch -q --prune origin
+wip_reset
+
+# 13. an unknown flag is rejected before anything happens.
+: > "$CH_LOG"
+effort_start --nope 715 x >/dev/null 2>&1; rc=$?
+t "wip: an unknown flag is rejected (rc 1)" "$rc" "1"
+t "wip: an unknown flag writes nothing"     "$(grep -c . "$CH_LOG" | tr -d ' ')" "0"
+
+# 14. scope: the gate is an EFFORT gate. `cckit start <issue>` (wt_start, worktree-start.sh) has no
+#     WIP limit — a static guard so widening the scope can't happen by accident.
+t "wip: the plain-task start path is not gated" \
+  "$(grep -c '_eff_wip_gate\|effort_wip_rows' "$LIB/worktree-start.sh" | tr -d ' ')" "0"
+
+cd "$tmp/work" || exit 1
+
 [ "$fail" -eq 0 ] && echo "ALL OK (effort-ops)" || echo "effort-ops: FAILURES"
 exit "$fail"

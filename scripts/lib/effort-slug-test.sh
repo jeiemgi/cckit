@@ -84,5 +84,36 @@ out="$(effort_slug_resolve nope-not-here 2>&1)"; r=$?
 rc "unknown slug returns nonzero rc" "$r" "1"
 case "$out" in *"no effort matches"*) echo "ok: unknown slug explains itself" ;; *) echo "FAIL: no-match message: $out"; fail=1 ;; esac
 
+# ── #244 · effort_branch_rows — the ONE effort-branch scan (shared with the WIP gate) ──────────
+# `<N>\t<slug>` per effort/<N>-<slug> ref, local heads AND remote-tracking. #101 is local+remote
+# (two rows, de-duplication is the caller's job); #102 is remote-only and must still appear.
+t "branch_rows lists local + remote effort refs" \
+  "$(effort_branch_rows | sort | tr '\t' '=' | tr '\n' ' ')" \
+  "101=resolve-slug 101=resolve-slug 102=accept-slug "
+t "branch_rows ignores non-effort branches" \
+  "$(git branch nope/500-not-an-effort >/dev/null 2>&1; effort_branch_rows | grep -c '^500' | tr -d ' ')" "0"
+# refs/heads only — the half that needs no cache and no network. #102 is remote-only, so absent.
+t "branch_rows_local is refs/heads only" \
+  "$(effort_branch_rows_local | sort | tr '\t' '=' | tr '\n' ' ')" "101=resolve-slug "
+
+# ── #244 review · effort_branch_rows_origin — what origin has NOW, not what the cache remembers ──
+# rc 0 with rows for a reachable origin; rc 1 (never a silent empty) when origin cannot be read.
+t "branch_rows_origin lists origin's effort heads" \
+  "$(effort_branch_rows_origin | sort | tr '\t' '=' | tr '\n' ' ')" \
+  "101=resolve-slug 102=accept-slug "
+# A branch deleted on origin drops out immediately — no fetch, no prune. Deleted by writing the bare
+# remote directly, not by `git push origin :ref` from HERE: a delete-push updates this clone's own
+# tracking ref, which would hide the very staleness under test. Writing the remote is the honest
+# "another machine deleted it" case, and it is what leaves refs/remotes stale.
+git --git-dir="$tmp/remote.git" update-ref -d refs/heads/effort/102-accept-slug
+t "branch_rows_origin drops a branch deleted on origin" \
+  "$(effort_branch_rows_origin | grep -c '^102' | tr -d ' ')" "0"
+t "the deleted branch is still in the local cache"  \
+  "$(effort_branch_rows | grep -c '^102' | tr -d ' ')" "1"
+# An unreachable origin is rc 1, so a caller can tell "cannot read" from "origin has none".
+git remote set-url origin "$tmp/absent.git"
+effort_branch_rows_origin >/dev/null 2>&1; rc "branch_rows_origin returns rc 1 when origin is unreachable" "$?" "1"
+git remote set-url origin "$tmp/remote.git"
+
 [ "$fail" -eq 0 ] && echo "ALL OK (effort-slug)" || echo "effort-slug: FAILURES"
 exit "$fail"
