@@ -60,10 +60,21 @@ on. No agents are installed — `AGENTS.md` plus `cckit brief` is this repo's de
   **skipped with a reason**. A new template fails the test until someone decides — which is what
   stops the silent partial install from coming back.
 - Every installed file must still match its template: byte-identical, or byte-identical after
-  `init`'s `{{VAR}}` substitution, or — for `delegation-brief.md`, whose template asks the project to
-  fill in its own specifics — identical in the kit-owned sections.
+  `init`'s `{{VAR}}` substitution (`{{PROJECT_NAME}}`, `{{OWNER_NAME}}`, `{{COMMS_LANG}}`,
+  `{{BASE_BRANCH}}`, …), or — for `delegation-brief.md`, whose template asks the project to fill in
+  its own specifics — identical in the kit-owned sections.
 
 Edit a template and the installed copy in the same commit, or the test fails.
+
+**A template must never hard-code a value the project can override.** `templates/rules/effort-model.md`
+named `main` as the branch efforts cut from and open their PR against; this repo integrates on
+`develop`, so the installed copy told agents to target a releases-only branch — and it passed the
+byte-identical check, because byte-identical to a wrong template is exactly the bug. The integration
+branch is `{{BASE_BRANCH}}` now, resolved by `init.sh` from `github.baseBranch` (falling back to
+`integrationBranch` / `flow` / the repo's GitHub default / `main`, the same precedence as
+`KIT_BASE_BRANCH` in `scripts/lib/kit-config.sh`) and written back into the generated config so the
+rendered rule and the resolver can never disagree. `scripts/self-install-test.sh` fails if either
+half regresses.
 
 ## Scope of changes
 

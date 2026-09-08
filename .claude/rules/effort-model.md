@@ -15,11 +15,11 @@ is fine while building. 1 effort decomposes into **N native GitHub sub-issues** 
 sequential, decided at scoping).
 
 ```
-parent issue #N  ──►  effort/<N> branch + worktree (from main)
+parent issue #N  ──►  effort/<N> branch + worktree (from develop)
    ├─ sub #a ─► sub/<N>a worktree (from effort/<N>)  ─┐
    ├─ sub #b ─► sub/<N>b worktree                     ├─ merge into effort/<N>
    └─ sub #c ─► sub/<N>c worktree                     ┘
-effort/<N>  ──►  ONE PR ──►  main  ──►  effort-close
+effort/<N>  ──►  ONE PR ──►  develop  ──►  effort-close
 ```
 
 Solo/sequential efforts may commit sub-issues directly on `effort/<N>` (one commit per sub-issue —
@@ -121,7 +121,7 @@ The parent carries the rich narrative; the **PR** carries the human-facing revie
 | `cckit effort chain <a> <b> …` | declare a running order over EXISTING issues: each successor `blocked_by` its predecessor + a `- Depends on #<predecessor>` line. Idempotent, additive, cycle-refusing (nothing is written on a refusal) |
 | `effort-start <slug\|N>` | `effort/<N>` branch + worktree; board → In Progress |
 | orchestrate | sub-issues in own worktrees (file-disjoint) → merge into `effort/<N>`; each closes + board Done as it lands |
-| `effort-pr <slug\|N>` | ONE PR `effort/<N>` → main (rich body + `## For agents`) |
+| `effort-pr <slug\|N>` | ONE PR `effort/<N>` → develop (rich body + `## For agents`) |
 | `effort-close <slug\|N>` | **snapshot sub-diffs pre-squash** → merge → close parent + subs → board Done(all) → GC prune → kit-sync drift check |
 
 Board + record state are correct **by construction** — the close op owns them. Never rely on a

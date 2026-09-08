@@ -11,6 +11,12 @@ adapter one) — is described in [the Adapters page](docs-site/src/content/docs/
 - **Read state before acting.** `cckit sync --llm` returns the board as TOON. Decide from data.
 - **One issue = one branch = one worktree = one PR.** `cckit start <issue>` creates the isolated
   worktree; do all work there; `cckit pr <issue>` opens the PR. Never commit to the base branch.
+  **The effort flow is the one exception, and it is deliberate:** an effort is *1 parent issue = 1
+  `effort/<N>` branch = 1 PR* covering **N sub-issues**. Sequential sub-issues commit straight onto
+  `effort/<N>` (one commit per sub-issue — that commit's diff is the sub's patch); parallel ones get
+  their own file-disjoint `sub/<N><letter>` worktree and merge back into `effort/<N>`. Either way
+  exactly one PR opens, from `effort/<N>` — never one per sub-issue. Full spec:
+  `.claude/rules/effort-model.md`.
 - **Structured output, TOON-first.** Append `--llm` to any verb for machine-readable output. List
   reads (sync, next, plan, wave) come back as **TOON** (token-cheap); single-result action verbs
   (start, pr, close) return one JSON object. Human (pretty) output is the default; agents prefer `--llm`.

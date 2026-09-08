@@ -31,8 +31,14 @@ when an agent rediscovers something it should have been handed, add it here.
 - **zsh quirks:** `${VAR:+--flag "$VAR"}` word-splits — pass flags explicitly. `status` and `path`
   are read-only vars — don't use them as loop variables.
 - **Board finder paginates the full board.** `project_find_item_by_issue` (gh-project.sh) pages the
-  whole board — use it; don't hand-roll a `first:100` query that misses recent issues. Owner/project
-  number resolve from `.claude/kit.config.json` (`.github.owner`, `.github.projectNumber`).
+  whole board — use it; don't hand-roll a `first:100` query that misses recent issues.
+- **Never hard-code the config path.** Two layouts exist and both are current, so
+  `.claude/kit.config.json` is a guess, not the answer. `kit_config_path` (`scripts/lib/config-path.sh`)
+  resolves it in this order, walking up from the start dir: `$KIT_CONFIG` if set → a root
+  `cckit.config.json` (self-host layout) → `.claude/kit.config.json` (scaffolded layout). Read
+  `.github.owner` / `.github.projectNumber` / `.github.baseBranch` out of whatever it prints, or let
+  `load_kit_config` (`scripts/lib/kit-config.sh`) export `KIT_REPO` / `KIT_OWNER` /
+  `KIT_BASE_BRANCH` / `KIT_PROJECT_NUMBER` for you.
 - **Project IDs are worktree-durable.** `source scripts/lib/gh-project.sh; load_project_ids` reads
   the captured IDs from the shared git-common-dir, so worktrees see them too.
 

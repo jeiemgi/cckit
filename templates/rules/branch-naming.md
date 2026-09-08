@@ -8,9 +8,21 @@ Canonical naming + merge-order rules so you're never confused about *what a bran
 <kind>/<issue-number>-<slug>
 ```
 
-- `<kind>` — one of the closed set below. No other prefixes.
+- `<kind>` — one of the closed set below, or one of the two effort prefixes named next. No others.
 - `<issue-number>` — the issue this branch closes. **Always required** for human work.
 - `<slug>` — short kebab-case description (≤ 5 words).
+
+### Effort prefixes (the two exceptions to the closed set)
+
+An effort's integration branch and its sub-branches are **not** in the kind table — they are named
+after the effort, not after a kind of change:
+
+| Pattern | What | `N` |
+| --- | --- | --- |
+| `effort/<N>-<slug>` | the effort's ONE integration branch, cut from the base; its ONE PR opens from here (`rules/effort-model.md`) | the **parent effort issue's** GitHub issue number |
+| `sub/<N><letter>-<slug>` | one sub-issue of that effort, cut from `effort/<N>` and merged back into it | the same parent effort issue number, plus one lowercase letter |
+
+`effort-start` creates the first and `orchestrate` the second; do not hand-roll either.
 
 **Effort sub-branches** add one lowercase letter to the number — `sub/<N><letter>-<slug>`
 (`sub/1604a-parser`), branched from `effort/<N>` and merged back into it (`rules/effort-model.md`).

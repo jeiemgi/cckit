@@ -33,7 +33,7 @@ karpathy-guidelines verbatim'
 INSTALLED_RULES='branch-naming verbatim
 communication-style rendered
 delegation-brief sections
-effort-model verbatim
+effort-model rendered
 naming-and-ids verbatim'
 
 # The kit-owned sections of delegation-brief.md — the transferable instruction `cckit brief` lifts.
@@ -102,18 +102,40 @@ t "installed rules == the manifest"  "$(printf '%s\n' "$inst_rules" | tr '\n' ' 
   "$(_names "$INSTALLED_RULES" | tr '\n' ' ')"
 
 # ── 3. content: the installed copy has not drifted from its template ───────────────────────────
-if command -v jq >/dev/null 2>&1; then
-  CFG_LANG="$(jq -r '.project.language' cckit.config.json)"
-  CFG_OWNER="$(jq -r '.project.owner' cckit.config.json)"
-  CFG_NAME="$(jq -r '.project.name' cckit.config.json)"
-else
-  CFG_LANG=""; CFG_OWNER=""; CFG_NAME=""
-  echo "  (jq absent — skipping the rendered-template comparison)"
+# `jq` is REQUIRED here, not optional. A drift guard that skips its content comparison when a tool
+# is absent passes for the wrong reason — the one failure mode this test exists to prevent. `jq` is a
+# Tier-1 dependency (`scripts/doctor.sh`: "git, gh, jq, perl — hard deps, auto-install via brew") and
+# CI installs it, so requiring it costs nothing and removes a silent pass. Same for `perl`, which
+# performs the substitution.
+# A separate flag, not `$fail`: an earlier assertion failing must not be reported as a missing
+# dependency, and must not cut the report short — a reviewer needs every finding in one run.
+dep_missing=0
+for _dep in jq perl; do
+  command -v "$_dep" >/dev/null 2>&1 || {
+    bad "$_dep is required to compare an installed rule against its template — refusing to pass without it (Tier-1 dep, see scripts/doctor.sh)"
+    dep_missing=1
+  }
+done
+if [ "$dep_missing" -ne 0 ]; then
+  echo "FAIL: cckit self-install guard cannot compare content without jq + perl — install them and re-run" >&2
+  exit 1
 fi
+
+# The values init.sh substitutes, read from the config so a config change is caught rather than
+# hard-coded here. BASE_BRANCH uses the same precedence as kit-config.sh's KIT_BASE_BRANCH.
+CFG_LANG="$(jq -r '.project.language' cckit.config.json)"
+CFG_OWNER="$(jq -r '.project.owner' cckit.config.json)"
+CFG_NAME="$(jq -r '.project.name' cckit.config.json)"
+CFG_BASE="$(jq -r '.github.baseBranch // .github.integrationBranch // .github.flow // "main"' cckit.config.json)"
+for _pair in "project.language:$CFG_LANG" "project.owner:$CFG_OWNER" "project.name:$CFG_NAME" "github.baseBranch:$CFG_BASE"; do
+  case "${_pair#*:}" in
+    ''|null) bad "cckit.config.json has no ${_pair%%:*} — the rendered comparison would compare against an empty string" ;;
+  esac
+done
 
 # _render <template> — init.sh's substitution step for the vars these templates actually use.
 _render() {
-  COMMS_LANG="$CFG_LANG" OWNER_NAME="$CFG_OWNER" PROJECT_NAME="$CFG_NAME" \
+  COMMS_LANG="$CFG_LANG" OWNER_NAME="$CFG_OWNER" PROJECT_NAME="$CFG_NAME" BASE_BRANCH="$CFG_BASE" \
     perl -0777 -pe 's/\{\{(\w+)\}\}/ exists $ENV{$1} ? $ENV{$1} : "{{$1}}" /ge' "$1"
 }
 
@@ -133,7 +155,6 @@ _compare() {  # <name> <template> <installed> <mode>
       grep -q '{{' "$got" && bad "$name: $got still contains a {{VAR}} placeholder"
       ;;
     rendered)
-      [ -n "$CFG_NAME" ] || return 0
       _render "$tpl" | cmp -s - "$got" \
         || bad "$name: $got is not $tpl rendered with cckit.config.json values (mode rendered)"
       grep -q '{{' "$got" && bad "$name: $got still contains a {{VAR}} placeholder"
@@ -183,7 +204,23 @@ has "the brief carries O13"                     "$prose" "O13"
 has "the brief carries O14"                     "$prose" "O14"
 has "the brief lists the untouchable evidence"  "$prose" "Untouchable"
 
-# ── 5. #218: every installed rule is a template basename ───────────────────────────────────────
+# ── 5. no installed rule names an integration branch this repo does not use ────────────────────
+# The review finding on PR 284: `.claude/rules/effort-model.md` told agents to branch from and open
+# their PR against `main` while `github.baseBranch` is `develop`. It was byte-identical to its
+# template, which is precisely why it went unnoticed — for a template that hard-codes a value the
+# project overrides, byte-identical IS the bug. The template is parameterized on {{BASE_BRANCH}}
+# now; these assertions fail if either half regresses.
+for _pat in '(from main)' '──►  main' '→ main (rich body'; do
+  grep -qF -- "$_pat" templates/rules/effort-model.md \
+    && bad "templates/rules/effort-model.md hard-codes the integration branch ('$_pat') — use {{BASE_BRANCH}} so each project renders its own"
+  grep -qF -- "$_pat" .claude/rules/effort-model.md \
+    && bad ".claude/rules/effort-model.md names 'main' as the integration branch; this repo integrates on '$CFG_BASE'"
+done
+has "installed effort-model branches from this repo's base"   "$(cat .claude/rules/effort-model.md)" "(from $CFG_BASE)"
+has "installed effort-model targets this repo's base"          "$(cat .claude/rules/effort-model.md)" "ONE PR ──►  $CFG_BASE"
+has "the task-management template parameterizes its base too"  "$(cat templates/rules/task-management.md)" '{{BASE_BRANCH}}'
+
+# ── 6. #218: every installed rule is a template basename ───────────────────────────────────────
 # effort_close's kit-sync drift check (_EO_KIT_MANAGED_RE) matches the whole .claude/rules/ dir, so
 # it flags project-OWNED rules as kit-managed. That false positive cannot arise here: every file in
 # this repo's .claude/rules/ IS a kit template, so the warning is accurate for cckit even before
