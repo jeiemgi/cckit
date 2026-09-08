@@ -179,6 +179,35 @@ The kit carries no project's layout. Both keys are config, and the fallback is a
 *your* `package.json` — so a repo with real root dependencies still gets its install, unchanged.
 </Aside>
 
+## Effort WIP limit
+
+`cckit effort start` refuses to start a **new** effort once too many are already in progress. The
+counted set is the efforts whose `effort/<N>-<slug>` branch exists — a local head **or** a
+remote-tracking ref. Set the ceiling in the config file resolved above:
+
+```json
+{
+  "effort": {
+    "wipLimit": 3
+  }
+}
+```
+
+| Key | Default | What it does | Env override |
+| --- | --- | --- | --- |
+| `effort.wipLimit` | `2` | How many efforts may be in progress before `cckit effort start` refuses a *new* one. **At** the limit refuses; only strictly under it starts. `0` freezes new efforts entirely. A value that is not a non-negative integer is ignored with a warning and the default `2` is used. | `EFFORT_WIP_LIMIT` |
+| — | gate on | Start anyway, past the limit. Flag or env — either alone is enough. | `--force`, or `KIT_FORCE=1` |
+
+Resolution order, first non-empty wins: `EFFORT_WIP_LIMIT` in the environment →
+`KIT_EFFORT_WIP_LIMIT` (what `load_kit_config` exports from `effort.wipLimit`) → `effort.wipLimit`
+read straight from the config file → the built-in default `2`.
+
+The check runs before the base-branch fetch, the branch, the worktree and the bootstrap, so a
+refusal leaves no branch, no worktree, no board change and makes no GitHub call. Re-running
+`cckit effort start` on an effort that is *already* in progress is never gated — it adds no WIP.
+`cckit start <issue>` (a plain task worktree) has no WIP limit. Full behaviour:
+[Only so many efforts at once](/efforts-and-waves/#only-so-many-efforts-at-once).
+
 ## Identity
 
 cckit asks your name on first run and stores it in `.cckit/identity` (gitignored). Nothing personal is hardcoded; commits use your local git identity.

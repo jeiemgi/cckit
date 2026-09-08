@@ -81,6 +81,11 @@ load_kit_config() {
   # from the project config (#150). Empty when unconfigured (effort.sh keeps its built-in default).
   export KIT_EFFORT_FLOWS="$(jq -r '[.effort.flows[]? | tostring] | join(" ")' "$cfg")"
 
+  # Concurrent-effort WIP limit (effort.wipLimit) — how many efforts may be in progress at once
+  # before `cckit effort start` refuses (#244). Empty when unconfigured; effort-ops.sh then falls
+  # back to its built-in default of 2. An EFFORT_WIP_LIMIT env var still wins per invocation.
+  export KIT_EFFORT_WIP_LIMIT="$(jq -r 'if (.effort.wipLimit | type) == "null" then "" else (.effort.wipLimit | tostring) end' "$cfg")"
+
   # Apply per-folder .claudekit/ overrides (no-op when none exist).
   _kit_apply_claudekit_overlays "$cfg"
 }
@@ -115,5 +120,6 @@ _kit_apply_claudekit_overlays() {
   export KIT_ANNOTATE_BACKEND="$(_kit_cfg_get '.annotate.backend // ""')"
   export KIT_ANNOTATE_FRAMEWORK="$(_kit_cfg_get '.annotate.framework // ""')"
   export KIT_EFFORT_FLOWS="$(_kit_cfg_get '[.effort.flows[]? | tostring] | join(" ")')"
+  export KIT_EFFORT_WIP_LIMIT="$(_kit_cfg_get 'if (.effort.wipLimit | type) == "null" then "" else (.effort.wipLimit | tostring) end')"
   export KIT_EFFECTIVE_CONFIG="$merged"
 }

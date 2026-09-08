@@ -71,7 +71,8 @@ The slug is a *derived* convenience, not a second source of truth. `--slug` only
   it copies your gitignored env files, assigns a per-worktree dev port, and installs dependencies
   **where the project actually declares any** (opt out entirely with `KIT_WT_INSTALL=0`; see
   [worktree bootstrap](/config-and-permissions/#worktree-bootstrap)). The worktree lives at `.claude/worktrees/effort+<N>-<slug>`, a
-  name `cckit gc` recognizes so it is never pruned while the effort issue is open.
+  name `cckit gc` recognizes so it is never pruned while the effort issue is open. It is also
+  **WIP-limited** — see [Only so many efforts at once](#only-so-many-efforts-at-once) below.
 - **`cckit effort pr`** and the `/kit-effort-pr` skill compose the PR title from **one shared
   composer**, and both refuse to open a PR whose title lacks the mandatory `[#N]` effort id.
 - **`cckit effort close`** is the single close implementation — the `/kit-effort-close` skill is a
@@ -90,6 +91,69 @@ The slug is a *derived* convenience, not a second source of truth. `--slug` only
   the same close tail — metrics judge/sync, parent close, board **Status=Done** for parent and
   subs, the knowledge-ingest hook, and the kit-sync drift check. If the integration branch does
   exist, the close still asks you to run from it.
+
+## Only so many efforts at once
+
+Three half-finished efforts finish nothing. `cckit effort start` refuses to start a **new** effort
+once the WIP limit is reached:
+
+```console
+$ cckit effort start 244
+effort_start: 2 effort(s) already in progress and the WIP limit is 2.
+    · order-and-cadence #241  (effort/241-order-and-cadence)
+    · release-gates #257  (effort/257-release-gates)
+  → refusing to start #244 — nothing was created.
+     Close one with 'cckit effort close <N>', or start anyway with --force (or KIT_FORCE=1).
+     The limit is effort.wipLimit in the project config (default 2); EFFORT_WIP_LIMIT overrides it.
+```
+
+**What counts as in progress:** an effort whose `effort/<N>-<slug>` branch exists — a local head
+**or** a remote-tracking ref, so an effort a teammate (or another machine) started counts too. That
+is the same ref scan the slug resolver uses; `cckit effort start` creates that branch and
+`cckit effort close` deletes it, so the counted set is exactly "started and not yet closed". There
+is no second definition and no board lookup involved.
+
+The rules, exactly:
+
+| Situation | What happens |
+| --- | --- |
+| Fewer efforts in progress than the limit | Starts. |
+| **At** the limit (2 in progress, limit 2) | Refused. The limit is a ceiling on concurrent efforts. |
+| Above the limit (after a `--force`) | Refused. |
+| Re-running `start` on an effort **already** in progress | Always allowed — it adds no WIP, so the verb stays safe to re-run. |
+| `--force`, or `KIT_FORCE=1` in the environment | Starts anyway, and says so on stderr. |
+| `effort.wipLimit` set to `0` | Every new effort is refused (a deliberate freeze). `--force` still works. |
+| `effort.wipLimit` unset | The built-in default, `2`. |
+| `effort.wipLimit` not a non-negative integer | Ignored with a warning on stderr; the default `2` is used. |
+
+Set the limit in `cckit.config.json` / `.claude/kit.config.json`:
+
+```json
+{
+  "effort": {
+    "wipLimit": 3
+  }
+}
+```
+
+`EFFORT_WIP_LIMIT` in the environment overrides the config for one invocation.
+
+<Aside type="note" title="A refusal writes nothing">
+The check runs **before** the base-branch fetch, the branch, the worktree and the bootstrap — the
+same validate-then-write discipline `cckit effort new` and `cckit effort chain` follow. A refused
+start leaves no branch, no worktree, no board change, and makes no GitHub call at all.
+</Aside>
+
+<Aside type="caution" title="Efforts only">
+This gates `cckit effort start`. `cckit start <issue>` — a plain task worktree — has **no** WIP
+limit and is unaffected.
+</Aside>
+
+<Aside type="tip" title="Counted an effort you already closed?">
+`cckit effort close` deletes the remote branch as part of the squash-merge, but your clone keeps its
+`origin/effort/<N>-…` remote-tracking ref until it prunes. Run `git fetch --prune` and the count is
+right again.
+</Aside>
 
 ## Waves
 

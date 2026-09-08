@@ -69,7 +69,8 @@
       "additionalProperties": true,
       "properties": {
         "flows": { "type": "array", "items": { "type": "string" }, "description": "Controlled flow vocabulary for effort titles — the values accepted by the leading [Flow] title tag and `--flow` (also the flow:<flow> labels). Replaces the built-in default (Core UI API Docs Infra Auth Data Web App); an explicit EFFORT_FLOWS env var still wins per invocation." },
-        "knowledgeIngestHook": { "type": "string", "description": "Optional path to an executable run after `cckit effort close`, invoked as `<hook> <effort-number> <trace-dir>` to fold the closed effort's work record into a knowledge base. No-op when unset or not executable; the kit ships no default." }
+        "knowledgeIngestHook": { "type": "string", "description": "Optional path to an executable run after `cckit effort close`, invoked as `<hook> <effort-number> <trace-dir>` to fold the closed effort's work record into a knowledge base. No-op when unset or not executable; the kit ships no default." },
+        "wipLimit": { "type": "integer", "minimum": 0, "description": "How many efforts may be in progress at once before `cckit effort start` refuses a NEW effort (default 2). In progress = an `effort/<N>-<slug>` branch exists, local or remote-tracking. Refusal happens before anything is written; `--force` (or KIT_FORCE=1) starts anyway. 0 freezes new efforts; a non-integer value is ignored with a warning and the default is used. An explicit EFFORT_WIP_LIMIT env var wins per invocation. Does not affect `cckit start <issue>`." }
       }
     },
     "captain": {

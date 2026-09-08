@@ -84,5 +84,14 @@ out="$(effort_slug_resolve nope-not-here 2>&1)"; r=$?
 rc "unknown slug returns nonzero rc" "$r" "1"
 case "$out" in *"no effort matches"*) echo "ok: unknown slug explains itself" ;; *) echo "FAIL: no-match message: $out"; fail=1 ;; esac
 
+# ── #244 · effort_branch_rows — the ONE effort-branch scan (shared with the WIP gate) ──────────
+# `<N>\t<slug>` per effort/<N>-<slug> ref, local heads AND remote-tracking. #101 is local+remote
+# (two rows, de-duplication is the caller's job); #102 is remote-only and must still appear.
+t "branch_rows lists local + remote effort refs" \
+  "$(effort_branch_rows | sort | tr '\t' '=' | tr '\n' ' ')" \
+  "101=resolve-slug 101=resolve-slug 102=accept-slug "
+t "branch_rows ignores non-effort branches" \
+  "$(git branch nope/500-not-an-effort >/dev/null 2>&1; effort_branch_rows | grep -c '^500' | tr -d ' ')" "0"
+
 [ "$fail" -eq 0 ] && echo "ALL OK (effort-slug)" || echo "effort-slug: FAILURES"
 exit "$fail"

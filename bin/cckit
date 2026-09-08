@@ -21,6 +21,10 @@
 #         parent (4-section body + ctx/kind/priority/role/flow labels) + linted native sub-issues
 #     effort chain <a> <b> [<c> …]  linear order: b blocked_by a, c blocked_by b, + a
 #         `Depends on #<predecessor>` line in each body. Idempotent; refuses a cycle.
+#     effort start [--force] <slug|N> [slug]   effort branch + worktree, WIP-limited: refuses a NEW
+#         effort once effort.wipLimit (default 2) are already in progress — an `effort/<N>-<slug>`
+#         branch exists, local or remote. Refuses before writing anything; --force (or KIT_FORCE=1)
+#         starts anyway. `cckit start <issue>` is not affected.
 #   cckit orchestrate <a> <b> …     run N flows in parallel worktrees (--dry-run/--cap/--agent)
 #   cckit autopilot [<a> …]         unattended multi-flow: drive (or auto-pick) issues under a cap
 #   cckit watch [--merge] [--loop]  captain: gate open PRs, squash-merge CLEAN, advance the wave

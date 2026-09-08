@@ -11,6 +11,8 @@
 #                                    ("[Effort] N · " / "[Effort N] M · ") and any leading [Flow] tag so
 #                                    the number/flow are NOT duplicated into the slug (#93 doubling fix)
 #   effort_display <N> [slug]        render an effort as "slug #N" (or "#N" when no slug is known)
+#   effort_branch_rows               TSV `<N>\t<slug>` per effort/<N>-<slug> ref (local + remote) —
+#                                    the ONE effort-branch scan, shared with the WIP gate (#244)
 #   effort_slug_resolve <slug|N>     resolve a slug OR a number to the canonical effort number.
 #                                    pure-digits → passthrough; otherwise match effort/* branches
 #                                    (local + remote), then slug:<slug> labels, then open effort titles.
@@ -48,6 +50,28 @@ effort_display() {
   if [ -n "$s" ]; then printf '%s #%s' "$s" "$n"; else printf '#%s' "$n"; fi
 }
 
+# effort_branch_rows — one TSV row `<N>\t<slug>` per `effort/<N>-<slug>` ref, scanning BOTH local
+# heads and remote-tracking refs. THE one home for "which efforts have a branch" (#244): the slug
+# resolver below and the WIP-limit gate in effort-ops.sh both read this, so the kit has a single
+# notion of the effort branch inventory rather than two ref scans that can drift apart.
+#
+# Rows are NOT de-duplicated — one row per matching ref, so `effort/7-a` and `origin/effort/7-b`
+# both appear. The slug resolver needs every distinct slug; a caller that wants distinct EFFORTS
+# de-duplicates on the number column (effort_wip_rows does). best-effort: without git, no rows.
+effort_branch_rows() {
+  local ref n s
+  command -v git >/dev/null 2>&1 || return 0
+  git for-each-ref --format='%(refname:short)' refs/heads refs/remotes 2>/dev/null \
+    | grep -E '(^|/)effort/[0-9]+-' \
+    | while IFS= read -r ref; do
+        [ -n "$ref" ] || continue
+        n="$(printf '%s' "$ref" | sed -nE 's#^(.*/)?effort/([0-9]+)-(.*)$#\2#p')"
+        s="$(printf '%s' "$ref" | sed -nE 's#^(.*/)?effort/([0-9]+)-(.*)$#\3#p')"
+        [ -n "$n" ] || continue
+        printf '%s\t%s\n' "$n" "$s"
+      done
+}
+
 # effort_slug_resolve <slug|N> → echo the canonical effort number on stdout (rc 0).
 #   - pure digits → passthrough (number stays canonical; never re-mapped).
 #   - otherwise normalize and match, in order: effort/* branches (local + remote), then (via gh)
@@ -64,16 +88,12 @@ effort_slug_resolve() {
   local norm; norm="$(_eff_slug "$input")"
   [ -n "$norm" ] || { echo "effort_slug_resolve: '$input' is not a usable slug" >&2; return 2; }
 
-  local matches="" ref n s
-  # 1. branches (local refs/heads + remote refs/remotes): effort/<N>-<slug>
-  while IFS= read -r ref; do
-    [ -n "$ref" ] || continue
-    n="$(printf '%s' "$ref" | sed -nE 's#^(.*/)?effort/([0-9]+)-(.*)$#\2#p')"
-    s="$(printf '%s' "$ref" | sed -nE 's#^(.*/)?effort/([0-9]+)-(.*)$#\3#p')"
+  local matches="" n s tab; tab="$(printf '\t')"
+  # 1. branches (local refs/heads + remote refs/remotes): effort/<N>-<slug>, via the shared scan.
+  while IFS="$tab" read -r n s; do
     [ -n "$n" ] || continue
     [ "$s" = "$norm" ] && matches="$matches$n"$'\n'
-  done < <(git for-each-ref --format='%(refname:short)' refs/heads refs/remotes 2>/dev/null \
-             | grep -E '(^|/)effort/[0-9]+-' )
+  done < <(effort_branch_rows)
   matches="$(printf '%s' "$matches" | grep -E '^[0-9]+$' | sort -un)"
 
   # 2. gh fallback (only when no branch matched): slug:<slug> label first, then open effort titles.

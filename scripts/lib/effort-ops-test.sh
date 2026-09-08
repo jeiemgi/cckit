@@ -343,5 +343,138 @@ case "$out" in
   *)           t "chain banner: ✗ when a link failed"    "$out" "✗ chain" ;;
 esac
 
+# ── #244 · effort_start enforces a WIP limit ──────────────────────────────────────────────────────
+# In progress = an `effort/<N>-<slug>` ref exists (local head OR remote-tracking) — the same scan the
+# slug resolver uses. Its own throwaway repo + bare remote so the branch inventory is exactly what
+# each case sets up, and its own gh log so "a refusal writes NOTHING" can be asserted against zero
+# gh calls as well as zero refs.
+wtmp="$tmp/wip"; mkdir -p "$wtmp"
+( cd "$wtmp" && git init -q --bare remote.git )
+( cd "$wtmp" && git clone -q remote.git work \
+  && cd work && git -c user.email=t@t -c user.name=t commit -q --allow-empty -m init \
+  && git push -q origin HEAD:main )
+cd "$wtmp/work" || exit 1
+unset EFFORT_WIP_LIMIT KIT_EFFORT_WIP_LIMIT KIT_FORCE 2>/dev/null || true
+# `gh` on PATH here is the chain stub, which logs to $CH_LOG — that is the log a refusal must leave
+# empty, so the "writes nothing" assertions read it rather than $GH_LOG.
+
+wip_started() { git show-ref --verify --quiet "refs/heads/effort/$1" && echo yes || echo no; }
+wip_reset() { git checkout -q main 2>/dev/null; \
+  for b in $(git for-each-ref --format='%(refname:short)' 'refs/heads/effort/*'); do
+    git worktree remove --force ".claude/worktrees/effort+${b#effort/}" >/dev/null 2>&1
+    git branch -D "$b" >/dev/null 2>&1
+  done; git worktree prune >/dev/null 2>&1; }
+
+# 1. under the limit → starts. Nothing in progress, default limit 2.
+effort_start 701 one >/dev/null 2>&1; rc=$?
+t "wip: under the limit starts (rc 0)"  "$rc" "0"
+t "wip: under the limit created the branch" "$(wip_started 701-one)" "yes"
+
+# 2. the SECOND effort still starts (1 < 2) — the limit is a ceiling, not a one-at-a-time rule.
+effort_start 702 two >/dev/null 2>&1; rc=$?
+t "wip: the second effort starts (rc 0)" "$rc" "0"
+
+# 3. AT the limit (2 in progress, limit 2) → refuse. A third would make three.
+: > "$CH_LOG"
+out="$(effort_start 703 three 2>&1)"; rc=$?
+t "wip: at the limit refuses (rc 1)" "$rc" "1"
+case "$out" in *"WIP limit is 2"*) echo "ok: refusal names the limit" ;; *) echo "FAIL: refusal did not name the limit: $out"; fail=1 ;; esac
+case "$out" in *"one #701"*) echo "ok: refusal lists what is in progress" ;; *) echo "FAIL: refusal did not list #701: $out"; fail=1 ;; esac
+case "$out" in *"--force"*) echo "ok: refusal says how to override" ;; *) echo "FAIL: refusal did not mention --force: $out"; fail=1 ;; esac
+case "$out" in *"effort.wipLimit"*) echo "ok: refusal names the config key" ;; *) echo "FAIL: refusal did not name effort.wipLimit: $out"; fail=1 ;; esac
+# …and the refusal writes NOTHING: no branch, no worktree dir, not even a gh call.
+t "wip: refusal created no branch"   "$(wip_started 703-three)" "no"
+t "wip: refusal created no worktree" "$(ls -d .claude/worktrees/effort+703-three 2>/dev/null | wc -l | tr -d ' ')" "0"
+t "wip: refusal made no gh call"     "$(grep -c . "$CH_LOG" | tr -d ' ')" "0"
+
+# 4. --force starts anyway (and says so).
+out="$(effort_start --force 703 three 2>&1)"; rc=$?
+t "wip: --force starts anyway (rc 0)" "$rc" "0"
+t "wip: --force created the branch"   "$(wip_started 703-three)" "yes"
+case "$out" in *"anyway"*) echo "ok: --force announces the override" ;; *) echo "FAIL: --force said nothing: $out"; fail=1 ;; esac
+
+# 5. ABOVE the limit (3 in progress, limit 2) still refuses.
+effort_start 704 four >/dev/null 2>&1; rc=$?
+t "wip: above the limit refuses (rc 1)" "$rc" "1"
+t "wip: above the limit created no branch" "$(wip_started 704-four)" "no"
+
+# 6. KIT_FORCE=1 — the same escape hatch effort_close uses — starts anyway.
+KIT_FORCE=1 effort_start 704 four >/dev/null 2>&1; rc=$?
+t "wip: KIT_FORCE=1 starts anyway (rc 0)" "$rc" "0"
+t "wip: KIT_FORCE=1 created the branch"   "$(wip_started 704-four)" "yes"
+
+# 7. re-running start on an ALREADY in-progress effort is never gated — it adds no WIP, so
+#    `effort start` stays safe to re-run even when the set is at or over the limit.
+out="$(effort_start 701 one 2>&1)"; rc=$?
+t "wip: re-starting an in-progress effort is allowed (rc 0)" "$rc" "0"
+case "$out" in *"WIP limit"*) echo "FAIL: re-start hit the WIP gate: $out"; fail=1 ;; *) echo "ok: re-start bypasses the gate" ;; esac
+
+# 8. a REMOTE-only effort branch counts as in progress (another machine owns it).
+wip_reset
+git push -q origin main:refs/heads/effort/705-remote-only
+git fetch -q origin
+t "wip: only a remote effort ref is present" "$(effort_wip_rows | tr '\t' '-' | tr '\n' ' ')" "705-remote-only "
+EFFORT_WIP_LIMIT=1 effort_start 706 local-one >/dev/null 2>&1; rc=$?
+t "wip: a remote-only effort branch counts toward the limit (rc 1)" "$rc" "1"
+git push -q origin :refs/heads/effort/705-remote-only; git fetch -q --prune origin
+
+# 9. limit 0 freezes new efforts entirely (nothing in progress, and still a refusal).
+wip_reset
+EFFORT_WIP_LIMIT=0 effort_start 707 frozen >/dev/null 2>&1; rc=$?
+t "wip: limit 0 refuses with nothing in progress (rc 1)" "$rc" "1"
+t "wip: limit 0 created no branch" "$(wip_started 707-frozen)" "no"
+EFFORT_WIP_LIMIT=0 effort_start --force 707 frozen >/dev/null 2>&1; rc=$?
+t "wip: limit 0 is still overridable (rc 0)" "$rc" "0"
+
+# 10. a misconfigured limit is IGNORED with a warning and the built-in default (2) is used —
+#     a typo must neither disable the gate nor wedge the verb.
+wip_reset
+out="$(EFFORT_WIP_LIMIT=lots effort_start 708 typo 2>&1)"; rc=$?
+t "wip: a non-numeric limit still starts under the default (rc 0)" "$rc" "0"
+case "$out" in *"must be a non-negative integer"*) echo "ok: a bad limit warns" ;; *) echo "FAIL: no warning for a bad limit: $out"; fail=1 ;; esac
+out="$(EFFORT_WIP_LIMIT=-1 effort_start 709 negative 2>&1)"; rc=$?
+t "wip: a negative limit falls back to the default too (rc 0)" "$rc" "0"
+# two are now in progress under the fallback default of 2 → the next one is refused
+EFFORT_WIP_LIMIT=lots effort_start 710 third >/dev/null 2>&1; rc=$?
+t "wip: the fallback default is really 2 (rc 1)" "$rc" "1"
+
+# 11. the limit is read from `effort.wipLimit` in the project config when no env var is set…
+wip_reset
+mkdir -p .claude
+printf '{"effort":{"wipLimit":1}}\n' > .claude/kit.config.json
+effort_start 711 from-config >/dev/null 2>&1
+out="$(effort_start 712 from-config-two 2>&1)"; rc=$?
+t "wip: effort.wipLimit=1 refuses the second effort (rc 1)" "$rc" "1"
+case "$out" in *"WIP limit is 1"*) echo "ok: the configured limit is the one enforced" ;; *) echo "FAIL: config limit not used: $out"; fail=1 ;; esac
+# …and EFFORT_WIP_LIMIT wins over it, per invocation.
+EFFORT_WIP_LIMIT=3 effort_start 712 from-config-two >/dev/null 2>&1; rc=$?
+t "wip: EFFORT_WIP_LIMIT overrides the config (rc 0)" "$rc" "0"
+# KIT_EFFORT_WIP_LIMIT (what load_kit_config exports) is read when EFFORT_WIP_LIMIT is unset.
+wip_reset
+out="$(KIT_EFFORT_WIP_LIMIT=0 effort_start 713 kitenv 2>&1)"; rc=$?
+t "wip: KIT_EFFORT_WIP_LIMIT is honoured (rc 1)" "$rc" "1"
+rm -f .claude/kit.config.json
+
+# 12. effort_wip_rows counts each effort ONCE even when local + remote refs both carry it.
+wip_reset
+effort_start 714 dedup >/dev/null 2>&1
+git push -q origin effort/714-dedup; git fetch -q origin
+t "wip: local + remote refs count as one effort" "$(effort_wip_rows | wc -l | tr -d ' ')" "1"
+git push -q origin :refs/heads/effort/714-dedup >/dev/null 2>&1; git fetch -q --prune origin
+wip_reset
+
+# 13. an unknown flag is rejected before anything happens.
+: > "$CH_LOG"
+effort_start --nope 715 x >/dev/null 2>&1; rc=$?
+t "wip: an unknown flag is rejected (rc 1)" "$rc" "1"
+t "wip: an unknown flag writes nothing"     "$(grep -c . "$CH_LOG" | tr -d ' ')" "0"
+
+# 14. scope: the gate is an EFFORT gate. `cckit start <issue>` (wt_start, worktree-start.sh) has no
+#     WIP limit — a static guard so widening the scope can't happen by accident.
+t "wip: the plain-task start path is not gated" \
+  "$(grep -c '_eff_wip_gate\|effort_wip_rows' "$LIB/worktree-start.sh" | tr -d ' ')" "0"
+
+cd "$tmp/work" || exit 1
+
 [ "$fail" -eq 0 ] && echo "ALL OK (effort-ops)" || echo "effort-ops: FAILURES"
 exit "$fail"

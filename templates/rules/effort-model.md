@@ -119,13 +119,33 @@ The parent carries the rich narrative; the **PR** carries the human-facing revie
 |------|------|
 | `effort-new` | parent issue (4-section body **filled** + `ctx/kind/priority/role/flow` labels) + native sub-issues, every title linted; optional `--slug` sets the handle |
 | `cckit effort chain <a> <b> …` | declare a running order over EXISTING issues: each successor `blocked_by` its predecessor + a `- Depends on #<predecessor>` line. Idempotent, additive, cycle-refusing (nothing is written on a refusal) |
-| `effort-start <slug\|N>` | `effort/<N>` branch + worktree; board → In Progress |
+| `effort-start [--force] <slug\|N>` | `effort/<N>` branch + worktree; board → In Progress. **WIP-limited** — see below |
 | orchestrate | sub-issues in own worktrees (file-disjoint) → merge into `effort/<N>`; each closes + board Done as it lands |
 | `effort-pr <slug\|N>` | ONE PR `effort/<N>` → main (rich body + `## For agents`) |
 | `effort-close <slug\|N>` | **snapshot sub-diffs pre-squash** → merge → close parent + subs → board Done(all) → GC prune → kit-sync drift check |
 
 Board + record state are correct **by construction** — the close op owns them. Never rely on a
 separate, skippable "mark done" step.
+
+**WIP limit — how many efforts may be open at once.** `effort_start` refuses to start a **new**
+effort once `effort.wipLimit` (default **2**) are already in progress. **In progress** means an
+`effort/<N>-<slug>` branch exists — local head **or** remote-tracking ref, read through
+`effort_branch_rows` (`scripts/lib/effort-slug.sh`), the same scan the slug resolver uses. That is
+the kit's one definition of a started effort, not a second one: `effort_start` creates the branch
+and `effort_close` deletes it, so the set is exactly "started and not yet closed". The board Status
+is deliberately **not** the signal — it is written by the `/kit-effort-start` skill's board step,
+never by the verb, and it is empty whenever Projects v2 is off.
+
+- **At** the limit refuses; only strictly under it starts. `0` freezes new efforts entirely.
+- Re-running `effort start` on an effort already in progress is never gated — it adds no WIP, so the
+  op stays safe to re-run.
+- The check runs **before** the fetch, branch, worktree and bootstrap — a refusal writes nothing,
+  the same validate-then-write discipline `effort_new` and `effort_chain` follow.
+- `--force` (or `KIT_FORCE=1`) starts anyway. `EFFORT_WIP_LIMIT` overrides the config per
+  invocation. A non-integer configured value is ignored with a warning; the default `2` is used.
+- The gate is **effort-only**: `cckit start <issue>` (a plain task worktree) has no WIP limit.
+- `effort_close` deletes the remote branch (`gh pr merge --delete-branch`), but a clone keeps its
+  `origin/effort/<N>-…` tracking ref until it prunes — `git fetch --prune` clears a stale count.
 
 ## Wave close — the final sub of every effort
 

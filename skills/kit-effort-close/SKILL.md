@@ -102,3 +102,6 @@ effort_close "$NUM"
 - Never force-push to trunk; never delete the default branch.
 - **Heed the kit-sync warning:** a kit-managed change that isn't contributed upstream is a latent
   regression the next `/kit-update` can revert. Treat the warning as a to-do.
+- Closing frees a **WIP slot**: the core's GC deletes the `effort/<N>-<slug>` branch, which is what
+  `cckit effort start`'s WIP limit counts (`effort.wipLimit`, default 2). If a start was just
+  refused, this is the op that unblocks it — not `--force`.

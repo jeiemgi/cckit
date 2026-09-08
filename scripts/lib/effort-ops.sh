@@ -6,7 +6,7 @@
 #
 #   effort_new [flags] "<name>" [<sub spec> …]   parent (4-section body + labels) + native sub-issues
 #   effort_chain <a> <b> [<c> …]          wire N issues into a linear blocked_by chain (#243)
-#   effort_start <slug|N> [<slug>]        effort/<N> branch + worktree from the base branch
+#   effort_start [--force] <slug|N> [<slug>]  effort/<N> branch + worktree from base, WIP-limited (#244)
 #   effort_pr [<slug|N>]                  open the ONE PR effort/<N> → base branch
 #   effort_close <slug|N>                 snapshot sub-diffs, squash-merge the PR, close parent + subs
 #
@@ -419,6 +419,115 @@ effort_chain() {
   return "$rc"
 }
 
+# ── WIP limit: how many efforts may be in progress at once (#244) ──────────────────────────────
+#
+# WHAT COUNTS AS "IN PROGRESS": an effort whose `effort/<N>-<slug>` branch exists — local head or
+# remote-tracking ref — read through effort_branch_rows (effort-slug.sh), the ONE effort-branch scan
+# the slug resolver already uses. This is the kit's existing notion of a started effort, not a new
+# one: `effort_start` CREATES that branch and `effort_close` deletes it, so the ref set is exactly
+# "started and not yet closed", by construction.
+#
+# The Projects v2 board Status is deliberately NOT the signal. It is written by the /kit-effort-start
+# skill's additive board step, never by this verb, so the verb would be gating on state it does not
+# set; it is empty whenever `github.projectsV2` is false (cckit's own default); and there is no
+# status:* label to fall back on. One signal, no fallback chain.
+
+# _eff_wip_limit_from_config — echo `effort.wipLimit` straight from the project config, so a
+# configured limit applies even to callers that never ran load_kit_config. Mirrors
+# _effort_flows_from_config (effort.sh). Empty output / rc 1 when unset or unreadable.
+_eff_wip_limit_from_config() {
+  command -v jq >/dev/null 2>&1 || return 1
+  if ! command -v kit_config_path >/dev/null 2>&1; then
+    local _wl_dir; _wl_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)"
+    # shellcheck source=/dev/null
+    [ -n "$_wl_dir" ] && [ -f "$_wl_dir/config-path.sh" ] && . "$_wl_dir/config-path.sh"
+  fi
+  command -v kit_config_path >/dev/null 2>&1 || return 1
+  local _wl_cfg; _wl_cfg="$(kit_config_path 2>/dev/null)" && [ -f "$_wl_cfg" ] || return 1
+  jq -r 'if (.effort.wipLimit | type) == "null" then empty else (.effort.wipLimit | tostring) end' \
+    "$_wl_cfg" 2>/dev/null
+}
+
+# _eff_wip_limit — echo the effective limit. Resolution order mirrors the flow vocabulary (#150), so
+# the kit has ONE config idiom:
+#   1. EFFORT_WIP_LIMIT in the environment always wins (per-invocation override)
+#   2. the project config `effort.wipLimit` — via KIT_EFFORT_WIP_LIMIT (exported by load_kit_config)
+#      or read straight from the config file
+#   3. the built-in default, 2.
+# A value that is not a non-negative integer (a typo, a float, a negative) is IGNORED with a warning
+# on stderr and the built-in default is used: a misconfigured limit must not silently disable the
+# gate, and must not wedge the verb either. `0` is valid and means "start no new effort".
+_eff_wip_limit() {
+  local v="" src=""
+  if [ -n "${EFFORT_WIP_LIMIT:-}" ]; then
+    v="$EFFORT_WIP_LIMIT"; src="EFFORT_WIP_LIMIT"
+  elif [ -n "${KIT_EFFORT_WIP_LIMIT:-}" ]; then
+    v="$KIT_EFFORT_WIP_LIMIT"; src="effort.wipLimit"
+  else
+    v="$(_eff_wip_limit_from_config 2>/dev/null || true)"; src="effort.wipLimit"
+  fi
+  [ -n "$v" ] || { printf '2'; return 0; }
+  case "$v" in
+    ''|*[!0-9]*)
+      echo "effort_start: ignoring $src='$v' — the WIP limit must be a non-negative integer; using the default 2" >&2
+      printf '2'; return 0 ;;
+  esac
+  printf '%s' "$v"
+}
+
+# effort_wip_rows — one TSV row `<N>\t<slug>` per effort that is IN PROGRESS, each effort exactly
+# once (first slug seen wins), lowest number first. The counted set behind the WIP gate.
+effort_wip_rows() {
+  command -v effort_branch_rows >/dev/null 2>&1 || return 0
+  effort_branch_rows 2>/dev/null | awk -F'\t' '!seen[$1]++' | sort -n
+}
+
+# _eff_wip_gate <num> <force> — rc 0 when starting effort <num> may proceed, rc 1 (with the refusal
+# on stderr) when it may not. PURE PRECHECK: it reads refs and config, and writes nothing anywhere,
+# so a refusal leaves no branch, no worktree and no board change behind (the effort_new /
+# effort_chain discipline).
+#
+# The rules:
+#   already started  an effort whose branch already exists is ALREADY in the counted set, so
+#                    re-running `effort start` on it adds no WIP and the gate does not apply —
+#                    `effort_start` stays safe to re-run at or over the limit.
+#   at the limit     `in-progress count >= limit` REFUSES. The limit is a ceiling on concurrent
+#                    efforts: at 2 of 2, a third would make 3. Only `count < limit` starts.
+#   limit 0          refuses every new effort (a deliberate freeze); the override still works.
+#   override         `--force` (or KIT_FORCE=1, the same escape hatch effort_close uses) starts
+#                    anyway and says so on stderr.
+_eff_wip_gate() {
+  local num="$1" force="${2:-}" limit rows count n tab; tab="$(printf '\t')"
+  limit="$(_eff_wip_limit)"
+  rows="$(effort_wip_rows)"
+
+  while IFS="$tab" read -r n _; do
+    if [ "$n" = "$num" ]; then return 0; fi
+  done <<EOF
+$rows
+EOF
+
+  count="$(printf '%s\n' "$rows" | grep -cE '^[0-9]+' || true)"
+  if [ "${count:-0}" -lt "$limit" ]; then return 0; fi
+
+  {
+    echo "effort_start: $count effort(s) already in progress and the WIP limit is $limit."
+    printf '%s\n' "$rows" | grep -E '^[0-9]+' | while IFS="$tab" read -r n _slug; do
+      printf '    · %s  (effort/%s-%s)\n' "$(effort_display "$n" "$_slug")" "$n" "$_slug"
+    done
+  } >&2
+  if [ -n "$force" ]; then
+    echo "  → starting #$num anyway (override)." >&2
+    return 0
+  fi
+  {
+    echo "  → refusing to start #$num — nothing was created."
+    echo "     Close one with 'cckit effort close <N>', or start anyway with --force (or KIT_FORCE=1)."
+    echo "     The limit is effort.wipLimit in the project config (default 2); EFFORT_WIP_LIMIT overrides it."
+  } >&2
+  return 1
+}
+
 # _eo_source_wt — lazily source the worktree mechanic (worktree-start.sh) so effort_start gets the
 # SAME full worktree setup as `cckit start`: wt_bootstrap (env-file copy + per-worktree dev port +
 # dependency install) and the _wt_session_owns collision guard. bin/cckit's `effort` verb does not
@@ -430,17 +539,40 @@ _eo_source_wt() {
   [ -f "$d/worktree-start.sh" ] && . "$d/worktree-start.sh"
 }
 
-# effort_start <slug|N> [<slug>] — create the effort/<N> integration branch + its worktree from base,
-# with the full `cckit start` worktree setup (env copy, per-worktree dev port, dependency install —
-# opt out with KIT_WT_INSTALL=0) and a live-session collision guard.
+# effort_start [--force] <slug|N> [<slug>] — create the effort/<N> integration branch + its worktree
+# from base, with the full `cckit start` worktree setup (env copy, per-worktree dev port, dependency
+# install — opt out with KIT_WT_INSTALL=0) and a live-session collision guard.
+#
+# Gated by the WIP limit (#244): when as many efforts are already in progress as `effort.wipLimit`
+# allows (default 2), starting a NEW one is refused before anything is written — see _eff_wip_gate
+# above for the counted set and the exact rules. `--force` (or KIT_FORCE=1) starts anyway.
+# The gate is specific to EFFORTS: `cckit start <issue>` (a plain task worktree, wt_start) is not
+# affected and has no WIP limit.
 effort_start() {
   _eff_need git || return 1
-  local raw="${1:-}" slug_override="${2:-}" num repo base root title slug branch wt
+  local raw="" slug_override="" force="" num repo base root title slug branch wt
+  # Flags are position-INDEPENDENT (the effort_new parser shape): `--` forces the rest positional.
+  local pos=()
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --force) force=1; shift ;;
+      --)      shift; while [ $# -gt 0 ]; do pos+=("$1"); shift; done ;;
+      --*)     echo "effort_start: unknown flag $1" >&2; return 1 ;;
+      *)       pos+=("$1"); shift ;;
+    esac
+  done
+  set -- "${pos[@]+"${pos[@]}"}"
+  raw="${1:-}"; slug_override="${2:-}"
+  if [ "${KIT_FORCE:-0}" = "1" ]; then force=1; fi
   [ -n "$raw" ] || { echo "effort_start: <slug|effort issue #> required" >&2; return 1; }
   num="$(effort_slug_resolve "$raw")" || { echo "effort_start: could not resolve '$raw' to an effort" >&2; return 1; }
   repo="$(_eff_repo)"; base="$(_eff_base)"
   root="$(git worktree list --porcelain 2>/dev/null | awk '/^worktree /{print $2; exit}')"
   [ -n "$root" ] || { echo "effort_start: not in a git repo" >&2; return 1; }
+
+  # WIP gate (#244) — BEFORE the fetch, the branch, the worktree and the bootstrap, so a refusal
+  # leaves nothing behind. Reads refs + config only; writes nothing.
+  _eff_wip_gate "$num" "$force" || return 1
 
   if [ -n "$slug_override" ]; then slug="$(_eff_slug "$slug_override")"
   else
