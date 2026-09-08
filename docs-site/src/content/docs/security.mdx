@@ -29,7 +29,19 @@ Nothing project-specific is hardcoded in cckit. You declare what is private to y
 
 <Steps>
 
-1. **Copy the example** — `cp privacy-denylist.example .cckit/privacy-denylist` (the target is gitignored). Copy it into the **primary checkout's** `.cckit/`; that one file is used from every worktree.
+1. **Copy the example** into the state directory (the target is gitignored). `secret-guard.sh` reads
+   the **one shared** `.cckit/` for the whole repository, so a plain relative `cp` run from a
+   worktree writes a file the scan never reads — and it would ignore `KIT_STATE_DIR`. Let the
+   resolver name the destination:
+
+   ```shell
+   # works from the primary checkout and from any worktree, and honors KIT_STATE_DIR
+   d="$(git rev-parse --git-common-dir)"; case "$d" in /*) ;; *) d="$PWD/$d" ;; esac
+   d="${KIT_STATE_DIR:-$(cd "$d/.." && pwd)/.cckit}"
+   mkdir -p "$d" && cp privacy-denylist.example "$d/privacy-denylist"
+   ```
+
+   From the primary checkout with no override, that is just `.cckit/privacy-denylist`.
 
 2. **List your terms** — org names, hosts, emails, anything private to you, one per line.
 
