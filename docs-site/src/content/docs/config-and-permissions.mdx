@@ -61,6 +61,17 @@ It reads three things:
 - **Stack hints** — `package.json`, `pyproject.toml`, `go.mod`, `Cargo.toml`.
 - **Kit state** — `cckit.config.json`, `.claude/`, `.cckit/`.
 
+:::note[`.cckit/` is shared across worktrees]
+There is **one** `.cckit/` per repository, at the primary checkout — not one per worktree. It is
+resolved from git's shared common directory, so the captain's gate record, the resume-here handoff
+and your private denylist are the same files whether you run cckit from the checkout or from a
+worktree. Set `KIT_STATE_DIR` to override the location.
+
+This matters because cckit tells you to work in worktrees. Resolving state against the *current*
+worktree would give each one its own copy — a handoff saved in one place would read back as "no
+resume-here handoff saved" everywhere else.
+:::
+
 ## The permission gate (ask before operating)
 
 cckit asks before it changes anything in a repo it has not worked in before.
