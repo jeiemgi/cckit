@@ -239,4 +239,40 @@ find .claude/rules -maxdepth 1 -type f -name '*.md' 2>/dev/null | while IFS= rea
 done | grep . && fail=1
 
 if [ "$fail" -eq 0 ]; then echo "PASS: cckit self-install matches its manifest"; fi
+
+# Editing a template is a TWO-file change for any rule cckit installs for itself, and nothing else
+# tells an author that (#285: PR 282 edited templates/rules/effort-model.md on a branch cut before
+# the installed copy existed, so develop went red only once both PRs had landed). A guard that
+# reports drift without saying how to clear it is a tripwire with no defusal — so print the exact
+# re-render command, using the same substitution this file compares with.
+if [ "$fail" -ne 0 ]; then
+  cat >&2 <<'HINT'
+
+To clear a `mode rendered` or `mode verbatim` drift, re-render the installed copy from its template
+(run from the repo root; needs jq + perl):
+
+  CFG_LANG="$(jq -r '.project.language' cckit.config.json)"
+  CFG_OWNER="$(jq -r '.project.owner' cckit.config.json)"
+  CFG_NAME="$(jq -r '.project.name' cckit.config.json)"
+  CFG_BASE="$(jq -r '.github.baseBranch // .github.integrationBranch // .github.flow // "main"' cckit.config.json)"
+  for r in $(printf '%s\n' "$INSTALLED_RULES_NAMES"); do
+    COMMS_LANG="$CFG_LANG" OWNER_NAME="$CFG_OWNER" PROJECT_NAME="$CFG_NAME" BASE_BRANCH="$CFG_BASE" \
+      perl -0777 -pe 's/\{\{(\w+)\}\}/ exists $ENV{$1} ? $ENV{$1} : "{{$1}}" /ge' \
+      "templates/rules/$r.md" > ".claude/rules/$r.md"
+  done
+
+Substituting one rule by name (the common case — replace <rule>):
+
+  CFG_BASE="$(jq -r '.github.baseBranch // "main"' cckit.config.json)"
+  COMMS_LANG="$(jq -r '.project.language' cckit.config.json)" \
+  OWNER_NAME="$(jq -r '.project.owner' cckit.config.json)" \
+  PROJECT_NAME="$(jq -r '.project.name' cckit.config.json)" \
+  BASE_BRANCH="$CFG_BASE" \
+    perl -0777 -pe 's/\{\{(\w+)\}\}/ exists $ENV{$1} ? $ENV{$1} : "{{$1}}" /ge' \
+    templates/rules/<rule>.md > .claude/rules/<rule>.md
+
+A `mode sections` drift is NOT re-rendered wholesale — that file carries project-specific fill-ins.
+Copy only the kit-owned section the failure names.
+HINT
+fi
 exit "$fail"
