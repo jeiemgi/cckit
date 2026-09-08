@@ -230,6 +230,9 @@ case "$1" in
     case "$2" in
       view) cat "$CH_DIR/body.$3" 2>/dev/null; exit 0 ;;
       edit) n="$3"; shift 3
+            # CH_FAIL_EDIT=<n> makes the edit fail for that issue — a POST-validation failure, the
+            # only way to reach effort_chain's rc=1 path (pre-flight refusals never write at all).
+            [ -n "${CH_FAIL_EDIT:-}" ] && [ "$n" = "$CH_FAIL_EDIT" ] && exit 1
             while [ $# -gt 0 ]; do
               [ "$1" = "--body" ] && { printf '%s' "$2" > "$CH_DIR/body.$n"; break; }
               shift
@@ -321,6 +324,24 @@ effort_chain 501 504 >/dev/null 2>&1; rc=$?
 t "chain wires an already-blocked issue (rc 0)" "$rc" "0"
 t "chain preserves the pre-existing blocker"    "$(edges)" "502 501;503 502;504 501;504 601;"
 tc "$CH_DIR/body.504" '^- Depends on #501$'     "chain records its own dep on an already-blocked issue"
+
+# The summary banner must agree with rc. A ✓ over a nonzero exit reports a chain that is not fully
+# wired, so the failure is invisible to anything reading stderr rather than $?.
+: > "$CH_LOG"
+out="$(effort_chain 501 502 2>&1)"; rc=$?
+t "chain banner: rc 0 on a clean run"        "$rc" "0"
+case "$out" in *"✓ chain"*) t "chain banner: ✓ on success" ok ok ;; *) t "chain banner: ✓ on success" "$out" "✓ chain" ;; esac
+
+# A POST-validation failure: #601 exists and passes pre-flight, but its body edit fails. This is the
+# only path that reaches rc=1 with writes already attempted — every pre-flight refusal returns early.
+: > "$CH_LOG"
+out="$(CH_FAIL_EDIT=601 effort_chain 502 601 2>&1)"; rc=$?
+t "chain returns rc 1 when a body edit fails" "$rc" "1"
+case "$out" in
+  *"✓ chain"*) t "chain banner: no ✓ when a link failed" "$out" "(no '✓ chain')" ;;
+  *"✗ chain"*) t "chain banner: ✗ when a link failed"    "ok" "ok" ;;
+  *)           t "chain banner: ✗ when a link failed"    "$out" "✗ chain" ;;
+esac
 
 [ "$fail" -eq 0 ] && echo "ALL OK (effort-ops)" || echo "effort-ops: FAILURES"
 exit "$fail"

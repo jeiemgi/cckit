@@ -409,7 +409,13 @@ effort_chain() {
     prev="$next"
   done
 
-  echo "  ✓ chain $(printf '#%s → ' $list | sed 's/ → $//')" >&2
+  # The banner must agree with rc: a ✓ over a nonzero exit reports a chain that is not fully wired.
+  # Individual failures already printed their own ✗ line above; this is the summary for the whole run.
+  if [ "$rc" -eq 0 ]; then
+    echo "  ✓ chain $(printf '#%s → ' $list | sed 's/ → $//')" >&2
+  else
+    echo "  ✗ chain $(printf '#%s → ' $list | sed 's/ → $//') — incomplete, see the errors above" >&2
+  fi
   return "$rc"
 }
 
