@@ -55,9 +55,16 @@ The Claude adapter is the native layer that makes cckit feel built-in inside Cla
 
 Every command and skill ultimately calls a core verb or a `scripts/lib` function. There is one implementation of each operation (in the core); the adapter only routes Claude to it. This is why a fix in the core is a fix for every agent at once.
 
-## Future adapters
+## Claude and Codex support
 
-Any other agent (Codex, Copilot, Antigravity, a custom model) is a future adapter over the same core. An adapter is whatever that agent needs to discover and call the verbs — at minimum, the agent reads `AGENTS.md` and shells out with `--llm`.
+[Effort #257](https://github.com/jeiemgi/cckit/issues/257) establishes shared behavior and
+release checks for Claude Code and Codex. The [compatibility inventory](/agent-compatibility/)
+records current gaps and the acceptance scenarios each adapter must pass. Native Codex support
+is being implemented; shell access alone does not establish behavioral parity.
+
+## Other adapters
+
+Any other agent (Copilot, Antigravity, a custom model) is a future adapter over the same core. An adapter is whatever that agent needs to discover and call the verbs — at minimum, the agent reads `AGENTS.md` and shells out with `--llm`.
 
 No adapter re-implements an operation; they all target the one core contract. Deeper per-agent adapters (native command palettes, richer prompts) are follow-ups. The agnostic CLI contract is the floor every agent already stands on.
 
