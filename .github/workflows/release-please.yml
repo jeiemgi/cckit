@@ -172,6 +172,12 @@ jobs:
           done
           got_v="$(printf '%s' "$f" | sed -nE 's/^[[:space:]]*version "([^"]*)".*/\1/p' | head -1)"
           got_u="$(printf '%s' "$f" | sed -nE 's|^[[:space:]]*url "([^"]*)".*|\1|p' | head -1)"
+          got_s="$(printf '%s' "$f" | sed -nE 's/^[[:space:]]*sha256 "([^"]*)".*/\1/p' | head -1)"
+          # The exact URL and the real digest, not a pattern: a formula can carry the right version
+          # with an archive from another repo (brew installs the wrong code), or the right URL with a
+          # stale sha256 (brew refuses to install). Both pass a suffix check.
+          want_u="https://github.com/${{ github.repository }}/archive/refs/tags/v$v.tar.gz"
+          want_s="$(curl -fsSL --retry 6 --retry-delay 5 "$want_u" | sha256sum | cut -d' ' -f1)"
           if [ "$got_v" != "$v" ]; then
             echo "::error title=Homebrew tap stale::the tap serves version '$got_v', expected '$v' — brew users will not get this release. See issue #287."
             {
@@ -181,10 +187,15 @@ jobs:
             } >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
-          # url and version must agree, or brew resolves a tarball that is not this release.
-          case "$got_u" in
-            *"/v$v.tar.gz") : ;;
-            *) echo "::error title=Homebrew tap mismatch::version says '$v' but url is '$got_u'"; exit 1 ;;
-          esac
-          echo "tap serves $got_v · $got_u"
-          echo "### :beer: Homebrew tap OK — serves \`$got_v\`" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$got_u" != "$want_u" ]; then
+            echo "::error title=Homebrew tap url::formula url is '$got_u', expected '$want_u' — brew would download an archive that is not this release."
+            echo "### :beer: Homebrew tap url MISMATCH" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          if [ "$got_s" != "$want_s" ]; then
+            echo "::error title=Homebrew tap sha256::formula sha256 is '$got_s', but v$v.tar.gz hashes to '$want_s' — brew would refuse the install."
+            echo "### :beer: Homebrew tap sha256 MISMATCH — \`brew install\` would fail" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          echo "tap serves $got_v · $got_u · sha256 ok"
+          echo "### :beer: Homebrew tap OK — \`$got_v\`, url and sha256 verified" >> "$GITHUB_STEP_SUMMARY"
