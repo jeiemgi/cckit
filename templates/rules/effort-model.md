@@ -90,6 +90,15 @@ by `effort_set_blocked_by`) **and** a `## Relations` section in the parent body 
 mirror): `Depends on #N` / `Blocks #N` / `Extends #N` / `Parallel-safe with #N`. This is the
 effort-level analogue of the PR-level `Depends on` in `branch-naming.md`.
 
+Two ops write that pair, and both go through the one `- Depends on #N` formatter
+(`_eff_relations_add`) so the line never drifts: **`cckit effort new --depends-on "#1,#2"`** for the
+dependencies known at creation time, and **`cckit effort chain <a> <b> [<c> …]`** to declare a
+running order over issues that already exist (each successor gets `blocked_by` its predecessor plus
+the matching `Depends on` line). `chain` is idempotent and additive — a pre-existing blocker is kept
+— and it validates the whole chain before writing anything: fewer than two numbers, a non-numeric
+argument, an unknown issue, a repeated number, or an edge that would close a cycle refuses the whole
+chain and writes nothing. A cycle is refused because the wave layering cannot order a cyclic graph.
+
 **Session-fit (`ctx:*` + `kit effort plan`).** Every effort carries a **`ctx:S|M|L|XL`** label —
 how much of one working session it consumes before the context window fills. Derived by
 `effort_ctx_bucket` (`scripts/lib/effort-metrics.sh`) from difficulty + sub count: S=1 · M=2 · L=4 ·
@@ -109,6 +118,7 @@ The parent carries the rich narrative; the **PR** carries the human-facing revie
 | Step | What |
 |------|------|
 | `effort-new` | parent issue (4-section body **filled** + `ctx/kind/priority/role/flow` labels) + native sub-issues, every title linted; optional `--slug` sets the handle |
+| `cckit effort chain <a> <b> …` | declare a running order over EXISTING issues: each successor `blocked_by` its predecessor + a `- Depends on #<predecessor>` line. Idempotent, additive, cycle-refusing (nothing is written on a refusal) |
 | `effort-start <slug\|N>` | `effort/<N>` branch + worktree; board → In Progress |
 | orchestrate | sub-issues in own worktrees (file-disjoint) → merge into `effort/<N>`; each closes + board Done as it lands |
 | `effort-pr <slug\|N>` | ONE PR `effort/<N>` → main (rich body + `## For agents`) |

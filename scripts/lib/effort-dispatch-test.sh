@@ -22,5 +22,14 @@ lib_ln="$(printf '%s\n' "$blk" | grep -n 'source "\$LIB/effort\.sh"' | head -1 |
 t "effort) loads the project config"          "$([ -n "$cfg_ln" ] && echo yes)" "yes"
 t "config load precedes the effort libs"      "$([ -n "$cfg_ln" ] && [ -n "$lib_ln" ] && [ "$cfg_ln" -lt "$lib_ln" ] && echo yes)" "yes"
 
+# #243: every effort subcommand the usage header advertises must actually dispatch, `chain` included
+# — a docs/code drift guard (a subcommand documented but not wired falls through to the usage line).
+usage_subs="$(grep -oE '^#   cckit effort <[a-z|]+>' "$BIN" | head -1 | sed -E 's/.*<//; s/>//; s/\|/ /g')"
+t "usage header lists the effort subcommands" "$usage_subs" "new chain start pr close plan"
+for s in $usage_subs; do
+  t "effort) dispatches '$s'" \
+    "$(printf '%s\n' "$blk" | grep -cE "^      ${s}\)" | tr -d ' ')" "1"
+done
+
 [ "$fail" -eq 0 ] && echo "ALL OK"
 exit "$fail"

@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# effort-ops.sh — the effort lifecycle as shell ops, so `cckit effort new|start|pr|close` works from
-# any shell or agent (not only via the effort-* skills). Thin: composes the git-mechanics helpers in
-# effort.sh (linking, snapshots, title lint) plus gh + git. bash 3.2 compatible. Requires: gh, jq, git.
+# effort-ops.sh — the effort lifecycle as shell ops, so `cckit effort new|chain|start|pr|close` works
+# from any shell or agent (not only via the effort-* skills). Thin: composes the git-mechanics helpers
+# in effort.sh (linking, snapshots, title lint) plus gh + git. bash 3.2 compatible. Requires: gh, jq, git.
 #
 #   effort_new [flags] "<name>" [<sub spec> …]   parent (4-section body + labels) + native sub-issues
+#   effort_chain <a> <b> [<c> …]          wire N issues into a linear blocked_by chain (#243)
 #   effort_start <slug|N> [<slug>]        effort/<N> branch + worktree from the base branch
 #   effort_pr [<slug|N>]                  open the ONE PR effort/<N> → base branch
 #   effort_close <slug|N>                 snapshot sub-diffs, squash-merge the PR, close parent + subs
@@ -33,9 +34,10 @@ _eff_need()  { command -v "$1" >/dev/null 2>&1 || { echo "effort: $1 is required
 
 # Compose the four-section parent body (rules/effort-model.md): the sections double as the work
 # record. An empty section falls back to its template placeholder so a bare call still yields the
-# full four-heading scaffold; passing content fills it. $5 is an optional pre-built ## Relations block.
+# full four-heading scaffold; passing content fills it. The `## Relations` chain is NOT composed
+# here — it is layered on afterwards by _eff_relations_add (one formatter, #243).
 _eff_compose_body() {
-  local goal="$1" scope="$2" for_agents="$3" verification="$4" relations="$5"
+  local goal="$1" scope="$2" for_agents="$3" verification="$4"
   cat <<EOF
 ## Goal
 ${goal:-<!-- problem statement: what outcome, in one or two lines -->}
@@ -47,8 +49,47 @@ ${scope:-<!-- the sub-issue plan; mark each parallel | sequential / dependsOn --
 ${for_agents:-<!-- exact file paths / entry points a future agent needs -->}
 
 ## Verification
-${verification:-<!-- how we know it is done: commands, checks, acceptance -->}${relations}
+${verification:-<!-- how we know it is done: commands, checks, acceptance -->}
 EOF
+}
+
+# _eff_relations_add <body> <blocker> — echo <body> with `- Depends on #<blocker>` recorded in its
+# `## Relations` section. THE one formatter for the human-readable dependency line (rules/
+# effort-model.md): both `effort_new --depends-on` and `effort_chain` go through it, so the two
+# produce byte-identical lines.
+#
+# Placement: appended to the END of an existing `## Relations` section (the lines before the next
+# `## ` heading, or the end of the body); when the body has no such section, a new one is appended
+# at the end of the body. IDEMPOTENT — a body that already carries the exact line comes back
+# unchanged, so re-running never duplicates a line. Trailing blank lines are trimmed.
+# Pure: no gh, no network — stdin-free, argument in / body out.
+_eff_relations_add() {
+  printf '%s\n' "$1" | awk -v dep="$2" '
+    BEGIN { want = "- Depends on #" dep; rel = 0; have = 0 }
+    {
+      L[NR] = $0
+      if (rel == 0 && $0 ~ /^[ \t]*##[ \t]+Relations[ \t]*$/) rel = NR
+      t = $0; sub(/^[ \t]+/, "", t); sub(/[ \t]+$/, "", t)
+      if (t == want) have = 1
+    }
+    END {
+      n = NR
+      while (n > 0 && L[n] ~ /^[ \t]*$/) n--          # trim trailing blank lines
+      if (have) { for (i = 1; i <= n; i++) print L[i]; exit }
+      if (rel == 0) {                                  # no section yet → append one
+        for (i = 1; i <= n; i++) print L[i]
+        if (n > 0) print ""                            # no leading blank on an empty body
+        print "## Relations"; print want
+        exit
+      }
+      e = n                                            # end of the Relations section
+      for (i = rel + 1; i <= n; i++) if (L[i] ~ /^##[ \t]/) { e = i - 1; break }
+      while (e > rel && L[e] ~ /^[ \t]*$/) e--
+      for (i = 1; i <= e; i++) print L[i]
+      print want
+      for (i = e + 1; i <= n; i++) print L[i]
+    }
+  '
 }
 
 # _eff_ensure_label <name> <color> <description> — make sure a kit-defined label exists in the repo
@@ -153,15 +194,16 @@ effort_new() {
       || { echo "effort_new: fix sub title #$i and retry: $sub_name" >&2; return 1; }
   done
 
-  # Compose the four-section body + an optional ## Relations chain from --depends-on.
-  local relations="" d
+  # Compose the four-section body, then layer the ## Relations chain from --depends-on through the
+  # ONE formatter (#243) — the same one `effort_chain` uses, so both write identical lines. (It was
+  # built inline here before, and `$( … )` ate every newline: the section shipped as the single
+  # mangled line `## Relations- Depends on #1- Depends on #2`.)
+  local body d; body="$(_eff_compose_body "$goal" "$scope" "$for_agents" "$verification")"
   if [ -n "$depends_on" ]; then
-    relations="$(printf '\n\n## Relations\n')"
     for d in $(printf '%s' "$depends_on" | tr ',' ' '); do
-      d="${d#\#}"; [ -n "$d" ] && relations="$relations$(printf -- '- Depends on #%s\n' "$d")"
+      d="${d#\#}"; [ -n "$d" ] && body="$(_eff_relations_add "$body" "$d")"
     done
   fi
-  local body; body="$(_eff_compose_body "$goal" "$scope" "$for_agents" "$verification" "$relations")"
 
   # Label set: ctx (session weight from the sub count) + kind + priority + optional role + optional flow.
   local subcount=$#; [ "$subcount" -ge 1 ] || subcount=1
@@ -232,6 +274,149 @@ effort_new() {
     echo "  ✓ sub #$child_num · $sub_name" >&2
   done
   printf '%s\n' "$num"
+}
+
+# _eo_source_effort — lazily source the git-mechanics lib (effort.sh) so the ops that need
+# effort_set_blocked_by work when effort-ops.sh is sourced on its own. No-op if already loaded.
+_eo_source_effort() {
+  command -v effort_set_blocked_by >/dev/null 2>&1 && return 0
+  local d; d="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+  # shellcheck source=/dev/null
+  [ -f "$d/effort.sh" ] && . "$d/effort.sh"
+}
+
+# _eff_blockers <issue> — echo the issue's CURRENT blocked_by numbers, one per line. Empty when the
+# issue has no edges or the API call fails (the caller treats that as "no known edge").
+_eff_blockers() {
+  gh api "repos/$(_eff_repo)/issues/$1/dependencies/blocked_by" --jq '.[].number' 2>/dev/null || true
+}
+
+# _eff_chain_reaches <from> <target> <pending> — is <target> reachable from <from> by following
+# blocked_by edges? Breadth-first over the COMBINED graph: the edges GitHub already holds plus
+# <pending>, a space-separated list of `child>parent` pairs this call is about to write. Used as the
+# cycle pre-flight: adding "<target> blocked_by <from>" closes a cycle exactly when <from> already
+# depends (transitively) on <target>. rc 0 = reachable.
+_eff_chain_reaches() {
+  [ -n "${ZSH_VERSION:-}" ] && setopt local_options ksh_arrays sh_word_split 2>/dev/null
+  local from="$1" target="$2" pending="$3"
+  local queue="$from" seen=" " cur b
+  while [ -n "$queue" ]; do
+    # shellcheck disable=SC2086
+    set -- $queue; cur="$1"; shift; queue="$*"
+    case "$seen" in *" $cur "*) continue ;; esac
+    seen="$seen$cur "
+    for b in $(_eff_blockers "$cur") \
+             $(printf '%s\n' $pending | sed -n "s/^$cur>//p"); do
+      [ "$b" = "$target" ] && return 0
+      queue="$queue $b"
+    done
+  done
+  return 1
+}
+
+# effort_chain <a> <b> [<c> …] — wire N issues into a LINEAR dependency chain (#243): B becomes
+# blocked_by A, C blocked_by B, and so on, and each issue after the first gets a `- Depends on #<its
+# predecessor>` line in its `## Relations` section. This is the verb that FEEDS `cckit plan` — the
+# wave layering in plan-machine.sh reads exactly these `blocked_by` edges, so a chained set lands
+# one issue per wave, in the order given.
+#
+# Everything is VALIDATED BEFORE ANYTHING IS WRITTEN (the effort_new discipline): a rejected chain
+# leaves the board untouched. The rules:
+#   arity        fewer than two numbers is a usage error — a chain needs a predecessor and a
+#                successor. Nothing is written.
+#   numbers      each arg is an issue number, with an optional leading `#`. Anything else is
+#                rejected. Nothing is written.
+#   existence    every issue is fetched first; a number that does not resolve aborts the whole
+#                chain. Nothing is written.
+#   cycles       a repeated number (`chain 1 2 1`) is refused — the chain would revisit a node. So
+#                is a chain whose new edge closes a loop through edges GitHub ALREADY holds (the
+#                pre-flight walks the combined graph). `cckit plan` cannot layer a cyclic graph into
+#                waves, so a cycle is refused rather than written. Nothing is written.
+#   pre-existing an issue already blocked by something else KEEPS that blocker: blocked_by is a set,
+#     blockers  and this only ever ADDS its edge. The issue ends up with both.
+#   idempotent   an edge that is already present is skipped (no duplicate POST, no error) and a body
+#                that already carries the exact `- Depends on #N` line is left alone (no second
+#                line, no `gh issue edit`). A re-run writes nothing and reports each half as
+#                `already blocked_by` / `already records`.
+# Progress goes to stderr; rc 0 only when every link of the chain is in place.
+effort_chain() {
+  [ -n "${ZSH_VERSION:-}" ] && setopt local_options ksh_arrays sh_word_split 2>/dev/null
+  _eff_need gh || return 1
+  _eo_source_effort
+  local repo; repo="$(_eff_repo)"
+  [ -n "$repo" ] || { echo "effort_chain: no repo (KIT_REPO/EFFORT_REPO unset — run in a kit project)" >&2; return 1; }
+
+  # 1. arity, shape, and repeats — all before a single write. `#12` and `12` are the same issue; a
+  #    number that appears twice means the chain revisits a node, which is a cycle, not a chain.
+  [ "$#" -ge 2 ] || { echo 'effort_chain: usage: effort_chain <a> <b> [<c> …]  (two or more issue numbers)' >&2; return 1; }
+  local a n b list=""
+  for a in "$@"; do
+    n="${a#\#}"
+    case "$n" in
+      ''|*[!0-9]*) echo "effort_chain: '$a' is not an issue number — nothing written" >&2; return 1 ;;
+    esac
+    for b in $list; do
+      [ "$b" = "$n" ] && { echo "effort_chain: #$n appears twice — that is a cycle, not a chain; nothing written" >&2; return 1; }
+    done
+    list="$list$n "
+  done
+
+  # 2. every issue must exist before a single edge is written.
+  for n in $list; do
+    gh api "repos/$repo/issues/$n" --jq .number >/dev/null 2>&1 \
+      || { echo "effort_chain: #$n does not exist in $repo — nothing written" >&2; return 1; }
+  done
+
+  # 3. cycle pre-flight over the existing graph PLUS the edges this call would add. Adding
+  #    "next blocked_by prev" closes a loop exactly when prev already depends on next.
+  local pending="" prev="" next
+  for next in $list; do
+    if [ -n "$prev" ] && _eff_chain_reaches "$prev" "$next" "$pending"; then
+      echo "effort_chain: #$next blocked_by #$prev would create a dependency cycle — nothing written" >&2
+      return 1
+    fi
+    [ -n "$prev" ] && pending="$pending$next>$prev "
+    prev="$next"
+  done
+
+  # 4. write. Per link: the native blocked_by edge and the `Depends on` line, each skipped when it
+  #    is already there — so a re-run reports and touches nothing.
+  local rc=0 have body newbody
+  prev=""
+  for next in $list; do
+    if [ -n "$prev" ]; then
+      have=""
+      for b in $(_eff_blockers "$next"); do [ "$b" = "$prev" ] && have=1; done
+      if [ -n "$have" ]; then
+        echo "  · #$next already blocked_by #$prev" >&2
+      else
+        effort_set_blocked_by "$next" "$prev" || rc=1
+      fi
+
+      # A FAILED read is not an empty body: writing the composed body after a failed fetch would
+      # wipe the issue. Only a successful read is edited.
+      if ! body="$(gh issue view "$next" --repo "$repo" --json body --jq .body 2>/dev/null)"; then
+        echo "  ✗ could not read #$next's body — 'Depends on #$prev' not recorded" >&2; rc=1
+      elif printf '%s\n' "$body" | grep -qE "^[[:space:]]*- Depends on #${prev}[[:space:]]*$"; then
+        echo "  · #$next already records 'Depends on #$prev'" >&2
+      else
+        newbody="$(_eff_relations_add "$body" "$prev")"
+        gh issue edit "$next" --repo "$repo" --body "$newbody" >/dev/null 2>&1 \
+          && echo "  ✓ #$next records 'Depends on #$prev'" >&2 \
+          || { echo "  ✗ could not update #$next's body" >&2; rc=1; }
+      fi
+    fi
+    prev="$next"
+  done
+
+  # The banner must agree with rc: a ✓ over a nonzero exit reports a chain that is not fully wired.
+  # Individual failures already printed their own ✗ line above; this is the summary for the whole run.
+  if [ "$rc" -eq 0 ]; then
+    echo "  ✓ chain $(printf '#%s → ' $list | sed 's/ → $//')" >&2
+  else
+    echo "  ✗ chain $(printf '#%s → ' $list | sed 's/ → $//') — incomplete, see the errors above" >&2
+  fi
+  return "$rc"
 }
 
 # _eo_source_wt — lazily source the worktree mechanic (worktree-start.sh) so effort_start gets the

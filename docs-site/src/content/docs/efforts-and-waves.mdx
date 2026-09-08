@@ -119,6 +119,39 @@ p0 work lands in the first batch rather than wherever it happened to fall.
 > different waves, and the priority sort only ever reorders work that dependencies have already
 > declared startable at the same time.
 
+### Declaring the order — `cckit effort chain`
+
+Waves are only as good as the blocked-by links they read, and setting those links by hand is
+tedious. `cckit effort chain` declares a whole running order in one command:
+
+```bash
+cckit effort chain 241 242 243     # 242 blocked_by 241 · 243 blocked_by 242
+```
+
+Every issue after the first gets two things: the native GitHub **`blocked_by`** edge on its
+predecessor — the edge `cckit plan` reads to layer the waves — and a `- Depends on #<predecessor>`
+line in its **`## Relations`** section, the human-readable mirror. It is the same line
+`cckit effort new --depends-on` writes, produced by the same formatter, so the two never drift.
+A chained set therefore lands one issue per wave, in the order you gave.
+
+What it does and does not do:
+
+- **Idempotent.** An edge or a `Depends on` line that is already there is reported and skipped, so
+  running the same chain twice changes nothing — no duplicate line, no duplicate edge.
+- **Additive.** It only ever *adds* its edge. An issue already blocked by something else keeps that
+  blocker and ends up with both.
+- **Validated before anything is written.** A refused chain leaves the board completely untouched.
+  It refuses fewer than two numbers, an argument that is not an issue number, an issue that does not
+  exist in the repo, a number that appears twice in the list (`chain 1 2 1` revisits a node), and an
+  edge that would close a cycle through dependencies GitHub already holds. A cycle is refused rather
+  than written because the wave layering cannot order a cyclic graph.
+
+<Aside type="note" title="Numbers, with or without the hash">
+`cckit effort chain 241 242` and `cckit effort chain '#241' '#242'` are the same command. Unlike
+`start` / `pr` / `close`, `chain` takes issue **numbers** only — not slug handles — because it wires
+plain issues, not just efforts.
+</Aside>
+
 
 ## Worktrees keep parallel work apart
 
