@@ -5,6 +5,29 @@ All notable changes to cckit are documented here. New entries below are generate
 [Conventional Commits](https://www.conventionalcommits.org/) and land when the Release PR is
 merged to `main`. Earlier entries follow [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.7.0](https://github.com/jeiemgi/cckit/compare/v0.6.1...v0.7.0) (2026-09-08)
+
+
+### Features
+
+* **cleanup:** cckit cleanup + /kit-cleanup — one guided destructive sweep ([#227](https://github.com/jeiemgi/cckit/issues/227)) ([2933ff3](https://github.com/jeiemgi/cckit/commit/2933ff3a5d2bde8b8486932b2d0d1cacfb1b1f92))
+* **core:** agents can see what cckit provides [[#220](https://github.com/jeiemgi/cckit/issues/220)] ([#230](https://github.com/jeiemgi/cckit/issues/230)) ([3c3b632](https://github.com/jeiemgi/cckit/commit/3c3b6327a5f9bf42088ecd627df5a05acbde96df))
+* effort chain verb sets the order ([#275](https://github.com/jeiemgi/cckit/issues/275)) ([ed2a436](https://github.com/jeiemgi/cckit/commit/ed2a43627493f911820a830ba72ac1e5aa393005))
+* **effort:** start enforces a WIP limit [[#244](https://github.com/jeiemgi/cckit/issues/244)] ([#282](https://github.com/jeiemgi/cckit/issues/282)) ([89bc25c](https://github.com/jeiemgi/cckit/commit/89bc25cfef8133a319a2e863ef94105edafd92a6))
+* **plan:** order issues by priority within a wave ([#268](https://github.com/jeiemgi/cckit/issues/268)) ([bcfbbad](https://github.com/jeiemgi/cckit/commit/bcfbbad93d495f5d8953ddad75127a8ce2af4480))
+* **self-install:** cckit applies the skills and rules it ships [[#283](https://github.com/jeiemgi/cckit/issues/283)] ([#284](https://github.com/jeiemgi/cckit/issues/284)) ([5cae47f](https://github.com/jeiemgi/cckit/commit/5cae47fc6f96fe003252264c6e296fb4166f7046))
+* **skill:** add concrete — cut AI slop from durable prose ([#247](https://github.com/jeiemgi/cckit/issues/247)) ([1576c7d](https://github.com/jeiemgi/cckit/commit/1576c7dfc4723b4e497be9bf6aaf4c2b51314d9d))
+* **status:** where are we, in three buckets [[#229](https://github.com/jeiemgi/cckit/issues/229)] ([#240](https://github.com/jeiemgi/cckit/issues/240)) ([0bba9d7](https://github.com/jeiemgi/cckit/commit/0bba9d78c68a4985eaa0a8e943486207ba927c14))
+
+
+### Bug Fixes
+
+* **docs-site:** consent banner ignored Accept/Reject clicks ([#256](https://github.com/jeiemgi/cckit/issues/256)) ([8486fc8](https://github.com/jeiemgi/cckit/commit/8486fc8c3fa9fb09745d28620478dd2243d4b4f7))
+* **kit-gc:** issue-open protection silently off under zsh ([#219](https://github.com/jeiemgi/cckit/issues/219)) ([26f15de](https://github.com/jeiemgi/cckit/commit/26f15def4bacadce7ae26a1fe6375ed2f5b6819b))
+* **self-install:** re-render effort-model and tell the author how [[#285](https://github.com/jeiemgi/cckit/issues/285)] ([#286](https://github.com/jeiemgi/cckit/issues/286)) ([4f001d9](https://github.com/jeiemgi/cckit/commit/4f001d93d9d3be15bce4be76ad9884e0d961c9d2))
+* **start:** don't plant an empty root pnpm-lock.yaml ([#267](https://github.com/jeiemgi/cckit/issues/267)) ([12049c7](https://github.com/jeiemgi/cckit/commit/12049c759cd0ad2d4d1419bc61a7cd84b5f80f33))
+* **state:** resolve .cckit/ from the shared repo root, not the CWD [[#280](https://github.com/jeiemgi/cckit/issues/280)] ([#281](https://github.com/jeiemgi/cckit/issues/281)) ([a7896a0](https://github.com/jeiemgi/cckit/commit/a7896a08f928f14786537e1716b3a99388c91774))
+
 ## [0.6.1](https://github.com/jeiemgi/cckit/compare/v0.6.0...v0.6.1) (2026-09-02)
 
 
