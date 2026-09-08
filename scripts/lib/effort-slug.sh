@@ -11,8 +11,12 @@
 #                                    ("[Effort] N · " / "[Effort N] M · ") and any leading [Flow] tag so
 #                                    the number/flow are NOT duplicated into the slug (#93 doubling fix)
 #   effort_display <N> [slug]        render an effort as "slug #N" (or "#N" when no slug is known)
-#   effort_branch_rows               TSV `<N>\t<slug>` per effort/<N>-<slug> ref (local + remote) —
-#                                    the ONE effort-branch scan, shared with the WIP gate (#244)
+#   effort_branch_rows               TSV `<N>\t<slug>` per effort/<N>-<slug> ref in the LOCAL ref
+#                                    store (refs/heads + cached refs/remotes) — network-free (#244)
+#   effort_branch_rows_local         the same, refs/heads only
+#   effort_branch_rows_origin        the same, from `git ls-remote origin` — what origin has NOW,
+#                                    so a stale or unfetched remote ref cannot skew a count. rc 1
+#                                    when origin is unreachable (#244)
 #   effort_slug_resolve <slug|N>     resolve a slug OR a number to the canonical effort number.
 #                                    pure-digits → passthrough; otherwise match effort/* branches
 #                                    (local + remote), then slug:<slug> labels, then open effort titles.
@@ -21,7 +25,8 @@
 # Number stays canonical: a pure-digits argument is always treated as a number and passed through
 # unchanged, so every existing `<N>` call keeps working. bash 3.2 compatible. Requires: git; gh (only
 # for the issue-based fallback when no local/remote branch matches).
-# errors: mixed — _eff_slug/effort_display are pure; effort_slug_resolve needs gh
+# errors: mixed — _eff_slug/effort_display are pure; effort_slug_resolve needs gh;
+#         effort_branch_rows_origin reaches the network and returns rc 1 when it cannot
 
 # Repo for the gh fallback — resolved from the same env effort.sh/kit-config populate.
 _eff_slug_repo() { printf '%s' "${EFFORT_REPO:-${KIT_REPO:-}}"; }
@@ -50,26 +55,64 @@ effort_display() {
   if [ -n "$s" ]; then printf '%s #%s' "$s" "$n"; else printf '#%s' "$n"; fi
 }
 
-# effort_branch_rows — one TSV row `<N>\t<slug>` per `effort/<N>-<slug>` ref, scanning BOTH local
-# heads and remote-tracking refs. THE one home for "which efforts have a branch" (#244): the slug
-# resolver below and the WIP-limit gate in effort-ops.sh both read this, so the kit has a single
-# notion of the effort branch inventory rather than two ref scans that can drift apart.
+# _eff_rows_from_refs — stdin: ref or branch names, one per line (`effort/7-x`,
+# `origin/effort/7-x`, `refs/heads/effort/7-x` all work); stdout: one TSV `<N>\t<slug>` row per name
+# that matches `effort/<N>-<slug>`, others dropped. THE one parser — every effort-branch inventory
+# below funnels through it, so a ref name is decomposed in exactly one place (#244).
+_eff_rows_from_refs() {
+  local ref n s
+  while IFS= read -r ref; do
+    [ -n "$ref" ] || continue
+    n="$(printf '%s' "$ref" | sed -nE 's#^(.*/)?effort/([0-9]+)-(.*)$#\2#p')"
+    s="$(printf '%s' "$ref" | sed -nE 's#^(.*/)?effort/([0-9]+)-(.*)$#\3#p')"
+    [ -n "$n" ] || continue
+    printf '%s\t%s\n' "$n" "$s"
+  done
+}
+
+# effort_branch_rows — one TSV row `<N>\t<slug>` per `effort/<N>-<slug>` ref in the LOCAL ref store:
+# `refs/heads` plus the cached `refs/remotes`. Network-free by contract — the slug resolver below is
+# on the hot path of every effort verb (and of `cckit start <slug>`), so it must never reach the
+# network to answer "which effort is this handle".
+#
+# Cached `refs/remotes` is therefore approximate in BOTH directions: a branch pushed since the last
+# fetch is missing, and a branch deleted on the remote lingers until a prune. That is acceptable for
+# slug lookup, where a wrong hit is caught by the number/ambiguity checks and the gh fallbacks. It is
+# NOT acceptable for counting work in progress, so `effort_wip_rows` (effort-ops.sh) uses
+# effort_branch_rows_origin instead and only falls back here when origin is unreachable (#244).
 #
 # Rows are NOT de-duplicated — one row per matching ref, so `effort/7-a` and `origin/effort/7-b`
 # both appear. The slug resolver needs every distinct slug; a caller that wants distinct EFFORTS
-# de-duplicates on the number column (effort_wip_rows does). best-effort: without git, no rows.
+# de-duplicates on the number column. best-effort: without git, no rows.
 effort_branch_rows() {
-  local ref n s
   command -v git >/dev/null 2>&1 || return 0
   git for-each-ref --format='%(refname:short)' refs/heads refs/remotes 2>/dev/null \
-    | grep -E '(^|/)effort/[0-9]+-' \
-    | while IFS= read -r ref; do
-        [ -n "$ref" ] || continue
-        n="$(printf '%s' "$ref" | sed -nE 's#^(.*/)?effort/([0-9]+)-(.*)$#\2#p')"
-        s="$(printf '%s' "$ref" | sed -nE 's#^(.*/)?effort/([0-9]+)-(.*)$#\3#p')"
-        [ -n "$n" ] || continue
-        printf '%s\t%s\n' "$n" "$s"
-      done
+    | _eff_rows_from_refs
+}
+
+# effort_branch_rows_local — the same rows from `refs/heads` ALONE. The half of the inventory that
+# is always authoritative and always available: a local branch is a fact about this machine, with no
+# cache and no network between the caller and the answer.
+effort_branch_rows_local() {
+  command -v git >/dev/null 2>&1 || return 0
+  git for-each-ref --format='%(refname:short)' 'refs/heads/effort/*' 2>/dev/null \
+    | _eff_rows_from_refs
+}
+
+# effort_branch_rows_origin — the same rows for the effort branches origin ACTUALLY has right now,
+# read with `git ls-remote` instead of the cached `refs/remotes`. This is what makes the WIP count
+# correct in both directions: ls-remote sees a branch pushed one second ago and does not see one
+# deleted one second ago, neither of which the local cache can do without a fetch --prune.
+#
+# rc 1 when origin cannot be reached or does not exist (no remote, offline, auth failure) — the
+# caller decides what to do, and `effort_wip_rows` falls back to the cached refs rather than failing.
+# An EMPTY result with rc 0 is a real answer (origin has no effort branches) and must not be read as
+# a failure. Read-only: no refs are written, nothing is fetched, nothing is pruned.
+effort_branch_rows_origin() {
+  command -v git >/dev/null 2>&1 || return 1
+  local out
+  out="$(git ls-remote --heads origin 'effort/*' 2>/dev/null)" || return 1
+  printf '%s\n' "$out" | awk '{ if (NF >= 2) print $2 }' | _eff_rows_from_refs
 }
 
 # effort_slug_resolve <slug|N> → echo the canonical effort number on stdout (rc 0).

@@ -382,10 +382,20 @@ case "$out" in *"WIP limit is 2"*) echo "ok: refusal names the limit" ;; *) echo
 case "$out" in *"one #701"*) echo "ok: refusal lists what is in progress" ;; *) echo "FAIL: refusal did not list #701: $out"; fail=1 ;; esac
 case "$out" in *"--force"*) echo "ok: refusal says how to override" ;; *) echo "FAIL: refusal did not mention --force: $out"; fail=1 ;; esac
 case "$out" in *"effort.wipLimit"*) echo "ok: refusal names the config key" ;; *) echo "FAIL: refusal did not name effort.wipLimit: $out"; fail=1 ;; esac
-# …and the refusal writes NOTHING: no branch, no worktree dir, not even a gh call.
+# …and the refusal WRITES nothing: no branch, no worktree dir, no board change.
 t "wip: refusal created no branch"   "$(wip_started 703-three)" "no"
 t "wip: refusal created no worktree" "$(ls -d .claude/worktrees/effort+703-three 2>/dev/null | wc -l | tr -d ' ')" "0"
-t "wip: refusal made no gh call"     "$(grep -c . "$CH_LOG" | tr -d ' ')" "0"
+# For a NUMERIC argument the refusal also makes no gh call — the number is passed through, so no
+# resolution happens. This is NOT the guarantee for a <slug> argument (see the next assertion), and
+# the docs claim only "no branch, no worktree, no board change" (#244 review).
+t "wip: a numeric-arg refusal made no gh call" "$(grep -c . "$CH_LOG" | tr -d ' ')" "0"
+# A SLUG argument is resolved BEFORE the gate, and the resolver falls through to `gh issue list`
+# when no branch matches — so a refusal on that path can read from GitHub. Asserted on the resolver
+# itself, which is the mechanism the narrowed doc claim refers to.
+: > "$CH_LOG"
+effort_slug_resolve no-such-effort-anywhere >/dev/null 2>&1 || true
+t "wip: resolving a slug with no branch DOES call gh" \
+  "$(grep -c 'issue list' "$CH_LOG" | tr -d ' ')" "2"
 
 # 4. --force starts anyway (and says so).
 out="$(effort_start --force 703 three 2>&1)"; rc=$?
@@ -417,6 +427,66 @@ t "wip: only a remote effort ref is present" "$(effort_wip_rows | tr '\t' '-' | 
 EFFORT_WIP_LIMIT=1 effort_start 706 local-one >/dev/null 2>&1; rc=$?
 t "wip: a remote-only effort branch counts toward the limit (rc 1)" "$rc" "1"
 git push -q origin :refs/heads/effort/705-remote-only; git fetch -q --prune origin
+
+# ── #244 review · the cached refs/remotes is wrong in BOTH directions ─────────────────────────────
+# effort_wip_rows reads origin with `git ls-remote`, not refs/remotes, because the cache under- and
+# over-counts and a gate is wrong with either. Both directions are reproduced here against the real
+# bare remote, with the local cache deliberately left un-fetched / un-pruned.
+
+# 8a. OVER-count: a branch DELETED on origin lingers in refs/remotes until a prune. The stale ref
+#     must not block a start. The delete is written into the bare remote rather than pushed from
+#     here as `origin :ref` — a delete-push updates THIS clone's tracking ref, which would hide the
+#     staleness under test. Writing the remote is the "another machine deleted it" case.
+wip_reset
+git push -q origin main:refs/heads/effort/720-stale
+git fetch -q origin                                   # cache it
+git --git-dir="$wtmp/remote.git" update-ref -d refs/heads/effort/720-stale
+t "wip: the deleted branch is still in the local cache" \
+  "$(git for-each-ref --format='%(refname:short)' refs/remotes 2>/dev/null | grep -c 'effort/720-stale' | tr -d ' ')" "1"
+t "wip: a stale remote-tracking ref is NOT counted" \
+  "$(effort_wip_rows | grep -c '^720' | tr -d ' ')" "0"
+EFFORT_WIP_LIMIT=1 effort_start 721 not-blocked >/dev/null 2>&1; rc=$?
+t "wip: a stale ref does not block a start (rc 0)" "$rc" "0"
+t "wip: the unblocked start created its branch"    "$(wip_started 721-not-blocked)" "yes"
+git fetch -q --prune origin
+
+# 8b. UNDER-count: a branch pushed to origin since the last fetch is absent from refs/remotes — and
+#     effort_start's own fetch is base-only, so it would never appear. It must still be counted.
+#     `git update-ref` inside the bare remote is the "another machine pushed" case with no fetch.
+wip_reset
+git --git-dir="$wtmp/remote.git" update-ref refs/heads/effort/722-unfetched \
+  "$(git rev-parse origin/main)"
+t "wip: the new branch is absent from the local cache" \
+  "$(git for-each-ref --format='%(refname:short)' refs/remotes 2>/dev/null | grep -c 'effort/722-unfetched' | tr -d ' ')" "0"
+t "wip: an unfetched origin branch IS counted" \
+  "$(effort_wip_rows | grep -c '^722' | tr -d ' ')" "1"
+out="$(EFFORT_WIP_LIMIT=1 effort_start 723 blocked-by-unfetched 2>&1)"; rc=$?
+t "wip: an unfetched origin branch blocks a start (rc 1)" "$rc" "1"
+t "wip: that refusal created no branch" "$(wip_started 723-blocked-by-unfetched)" "no"
+case "$out" in *"722"*) echo "ok: the refusal names the unfetched effort" ;; *) echo "FAIL: refusal did not name #722: $out"; fail=1 ;; esac
+
+# 8c. EFFORT_WIP_REMOTE=0 opts out of the origin query and counts the cache — so with the same
+#     un-fetched origin branch the count goes back to the old approximation (absent), which is
+#     exactly what "deterministic offline mode" means.
+t "wip: EFFORT_WIP_REMOTE=0 skips the origin query" \
+  "$(EFFORT_WIP_REMOTE=0 effort_wip_rows | grep -c '^722' | tr -d ' ')" "0"
+EFFORT_WIP_REMOTE=0 EFFORT_WIP_LIMIT=1 effort_start 724 optout >/dev/null 2>&1; rc=$?
+t "wip: EFFORT_WIP_REMOTE=0 starts under the cached count (rc 0)" "$rc" "0"
+wip_reset
+git --git-dir="$wtmp/remote.git" update-ref -d refs/heads/effort/722-unfetched
+
+# 8d. an UNREACHABLE origin must not fail the start: the count falls back to the cached refs, warns
+#     once on stderr, and the gate proceeds. A gate that hard-fails offline is worse than one that
+#     miscounts.
+wip_reset
+git remote set-url origin "$wtmp/nope-does-not-exist.git"
+rows_out="$(effort_wip_rows 2>&1 >/dev/null)"
+case "$rows_out" in *"may be stale"*) echo "ok: an unreachable origin warns" ;; *) echo "FAIL: no staleness warning: $rows_out"; fail=1 ;; esac
+out="$(effort_start 725 offline 2>&1)"; rc=$?
+t "wip: an unreachable origin still starts the effort (rc 0)" "$rc" "0"
+t "wip: the offline start created its branch" "$(wip_started 725-offline)" "yes"
+git remote set-url origin "$wtmp/remote.git"
+wip_reset
 
 # 9. limit 0 freezes new efforts entirely (nothing in progress, and still a refusal).
 wip_reset

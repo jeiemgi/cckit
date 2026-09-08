@@ -108,10 +108,22 @@ effort_start: 2 effort(s) already in progress and the WIP limit is 2.
 ```
 
 **What counts as in progress:** an effort whose `effort/<N>-<slug>` branch exists — a local head
-**or** a remote-tracking ref, so an effort a teammate (or another machine) started counts too. That
-is the same ref scan the slug resolver uses; `cckit effort start` creates that branch and
-`cckit effort close` deletes it, so the counted set is exactly "started and not yet closed". There
-is no second definition and no board lookup involved.
+**or** a branch on origin, so an effort a teammate (or another machine) started counts too.
+`cckit effort start` creates that branch and `cckit effort close` deletes it, so the counted set is
+exactly "started and not yet closed". There is no second definition and no board lookup involved.
+
+The origin half is read with `git ls-remote` on every `cckit effort start`, **not** from your cached
+`refs/remotes`. The cache is wrong in both directions, and a WIP gate is wrong with it:
+
+| Cached `refs/remotes` says | Reality | Gate with the cache |
+| --- | --- | --- |
+| nothing (branch pushed since your last fetch) | origin has it | undercounts — lets you exceed the limit |
+| `origin/effort/<N>-…` still there (branch deleted on origin, not yet pruned) | origin dropped it | overcounts — blocks a start it should allow |
+
+`git ls-remote` sees the branch pushed a second ago and does not see the one deleted a second ago,
+and it writes nothing: no fetch, no prune, no ref touched. `effort_slug_resolve` still reads the
+cached refs, because resolving a slug handle sits on the hot path of every effort verb and has to
+stay network-free.
 
 The rules, exactly:
 
@@ -122,7 +134,7 @@ The rules, exactly:
 | Above the limit (after a `--force`) | Refused. |
 | Re-running `start` on an effort **already** in progress | Always allowed — it adds no WIP, so the verb stays safe to re-run. |
 | `--force`, or `KIT_FORCE=1` in the environment | Starts anyway, and says so on stderr. |
-| `effort.wipLimit` set to `0` | Every new effort is refused (a deliberate freeze). `--force` still works. |
+| `effort.wipLimit` set to `0` | Every **ordinary** start is refused (a deliberate freeze) — `--force` / `KIT_FORCE=1` still start. |
 | `effort.wipLimit` unset | The built-in default, `2`. |
 | `effort.wipLimit` not a non-negative integer | Ignored with a warning on stderr; the default `2` is used. |
 
@@ -141,7 +153,11 @@ Set the limit in `cckit.config.json` / `.claude/kit.config.json`:
 <Aside type="note" title="A refusal writes nothing">
 The check runs **before** the base-branch fetch, the branch, the worktree and the bootstrap — the
 same validate-then-write discipline `cckit effort new` and `cckit effort chain` follow. A refused
-start leaves no branch, no worktree, no board change, and makes no GitHub call at all.
+start leaves **no branch, no worktree and no board change**.
+
+It does *read*, though: the gate queries origin, and when you pass a `<slug>` instead of a number
+`effort_slug_resolve` has already run — which can fall through to `gh issue list`. "Writes nothing"
+is the guarantee; "reads nothing" is not.
 </Aside>
 
 <Aside type="caution" title="Efforts only">
@@ -149,10 +165,11 @@ This gates `cckit effort start`. `cckit start <issue>` — a plain task worktree
 limit and is unaffected.
 </Aside>
 
-<Aside type="tip" title="Counted an effort you already closed?">
-`cckit effort close` deletes the remote branch as part of the squash-merge, but your clone keeps its
-`origin/effort/<N>-…` remote-tracking ref until it prunes. Run `git fetch --prune` and the count is
-right again.
+<Aside type="tip" title="Working offline">
+`EFFORT_WIP_REMOTE=0` skips the origin query and counts local heads plus your cached
+`refs/remotes` — deterministic, no round-trip, and back to the cache's approximation. If origin is
+simply unreachable the gate does the same on its own: it prints one line saying the count may be
+stale and lets the start proceed. `cckit effort start` never fails for want of a network.
 </Aside>
 
 ## Waves

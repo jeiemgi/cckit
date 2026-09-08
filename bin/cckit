@@ -23,8 +23,10 @@
 #         `Depends on #<predecessor>` line in each body. Idempotent; refuses a cycle.
 #     effort start [--force] <slug|N> [slug]   effort branch + worktree, WIP-limited: refuses a NEW
 #         effort once effort.wipLimit (default 2) are already in progress — an `effort/<N>-<slug>`
-#         branch exists, local or remote. Refuses before writing anything; --force (or KIT_FORCE=1)
-#         starts anyway. `cckit start <issue>` is not affected.
+#         branch exists locally or on origin (git ls-remote, not the cached refs/remotes;
+#         EFFORT_WIP_REMOTE=0 or an unreachable origin uses the cache and still starts). Refuses
+#         before writing anything; --force (or KIT_FORCE=1) starts anyway, at limit 0 too.
+#         `cckit start <issue>` is not affected.
 #   cckit orchestrate <a> <b> …     run N flows in parallel worktrees (--dry-run/--cap/--agent)
 #   cckit autopilot [<a> …]         unattended multi-flow: drive (or auto-pick) issues under a cap
 #   cckit watch [--merge] [--loop]  captain: gate open PRs, squash-merge CLEAN, advance the wave

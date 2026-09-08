@@ -40,15 +40,18 @@ owns ALL of the mechanics:
 ## The WIP limit
 
 The verb refuses to start a **new** effort once `effort.wipLimit` (default **2**) are already in
-progress. **In progress** = an `effort/<N>-<slug>` branch exists, local head **or** remote-tracking
-ref — the same ref scan the slug resolver uses; the verb creates that branch and `effort close`
-deletes it. The board Status is NOT the signal (the board step below is additive and skipped when
-Projects v2 is off).
+progress. **In progress** = an `effort/<N>-<slug>` branch exists, as a local head **or** on origin —
+read with `git ls-remote`, not the cached `refs/remotes`, so a branch pushed since your last fetch
+counts and one deleted on origin does not. `EFFORT_WIP_REMOTE=0` skips that query and counts the
+cached refs instead; an unreachable origin falls back to them with a warning, never a failure. The
+verb creates that branch and `effort close` deletes it. The board Status is NOT the signal
+(the board step below is additive and skipped when Projects v2 is off).
 
-- **At** the limit refuses; only strictly under it starts. `0` freezes new efforts.
+- **At** the limit refuses; only strictly under it starts. `0` freezes new efforts **unless forced**.
 - Re-running the verb on an effort already in progress is never gated — it adds no WIP.
-- The check runs before the fetch/branch/worktree/bootstrap, so a refusal writes **nothing**: no
-  branch, no worktree, no board change, no GitHub call.
+- The check runs before the fetch/branch/worktree/bootstrap, so a refusal makes **no branch, no
+  worktree and no board change**. It is not read-free: the gate queries origin, and a `<slug>`
+  argument is resolved first, which can run `gh issue list`.
 - Do not paper over a refusal. Report it and let the human decide: close an effort
   (`/kit-effort-close`), or re-run with `--force`. Only pass `--force` when the human asked for it.
 - `EFFORT_WIP_LIMIT` overrides the configured limit for one invocation; a configured value that is

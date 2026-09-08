@@ -129,23 +129,33 @@ separate, skippable "mark done" step.
 
 **WIP limit — how many efforts may be open at once.** `effort_start` refuses to start a **new**
 effort once `effort.wipLimit` (default **2**) are already in progress. **In progress** means an
-`effort/<N>-<slug>` branch exists — local head **or** remote-tracking ref, read through
-`effort_branch_rows` (`scripts/lib/effort-slug.sh`), the same scan the slug resolver uses. That is
-the kit's one definition of a started effort, not a second one: `effort_start` creates the branch
-and `effort_close` deletes it, so the set is exactly "started and not yet closed". The board Status
-is deliberately **not** the signal — it is written by the `/kit-effort-start` skill's board step,
-never by the verb, and it is empty whenever Projects v2 is off.
+`effort/<N>-<slug>` branch exists — a local head (`effort_branch_rows_local`) **or** a branch origin
+has right now (`effort_branch_rows_origin`, a `git ls-remote` read), unioned by
+`effort_wip_rows`. That is the kit's one definition of a started effort, not a second one:
+`effort_start` creates the branch and `effort_close` deletes it, so the set is exactly "started and
+not yet closed". The board Status is deliberately **not** the signal — it is written by the
+`/kit-effort-start` skill's board step, never by the verb, and it is empty whenever Projects v2 is
+off.
 
-- **At** the limit refuses; only strictly under it starts. `0` freezes new efforts entirely.
+- **The cached `refs/remotes` is not the source.** It is wrong in both directions: a branch pushed
+  since the last fetch is absent (the gate would let the limit be exceeded), and a branch deleted on
+  origin lingers until a prune (the gate would block a start that should be allowed). `ls-remote`
+  answers both without writing or pruning a ref. `effort_slug_resolve` keeps reading the cached refs
+  because slug lookup is on the hot path of every effort verb and must stay network-free.
+- **At** the limit refuses; only strictly under it starts. `0` refuses every ordinary start —
+  `--force` / `KIT_FORCE=1` still start.
 - Re-running `effort start` on an effort already in progress is never gated — it adds no WIP, so the
   op stays safe to re-run.
-- The check runs **before** the fetch, branch, worktree and bootstrap — a refusal writes nothing,
-  the same validate-then-write discipline `effort_new` and `effort_chain` follow.
+- The check runs **before** the fetch, branch, worktree and bootstrap — a refusal makes no branch,
+  no worktree and no board change, the same validate-then-write discipline `effort_new` and
+  `effort_chain` follow. It is not read-free: the gate queries origin, and a `<slug>` argument was
+  already resolved through `effort_slug_resolve`, which can run `gh issue list`.
 - `--force` (or `KIT_FORCE=1`) starts anyway. `EFFORT_WIP_LIMIT` overrides the config per
   invocation. A non-integer configured value is ignored with a warning; the default `2` is used.
 - The gate is **effort-only**: `cckit start <issue>` (a plain task worktree) has no WIP limit.
-- `effort_close` deletes the remote branch (`gh pr merge --delete-branch`), but a clone keeps its
-  `origin/effort/<N>-…` tracking ref until it prunes — `git fetch --prune` clears a stale count.
+- **Offline:** `EFFORT_WIP_REMOTE=0` skips the origin query and counts local heads + cached remotes.
+  An unreachable origin does the same and warns on stderr; the start proceeds. A gate that
+  hard-failed without network would be worse than one that miscounts.
 
 ## Wave close — the final sub of every effort
 

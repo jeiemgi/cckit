@@ -421,11 +421,12 @@ effort_chain() {
 
 # ── WIP limit: how many efforts may be in progress at once (#244) ──────────────────────────────
 #
-# WHAT COUNTS AS "IN PROGRESS": an effort whose `effort/<N>-<slug>` branch exists — local head or
-# remote-tracking ref — read through effort_branch_rows (effort-slug.sh), the ONE effort-branch scan
-# the slug resolver already uses. This is the kit's existing notion of a started effort, not a new
-# one: `effort_start` CREATES that branch and `effort_close` deletes it, so the ref set is exactly
-# "started and not yet closed", by construction.
+# WHAT COUNTS AS "IN PROGRESS": an effort whose `effort/<N>-<slug>` branch exists — a local head, or
+# a branch origin has right now (`git ls-remote`, not the cached `refs/remotes`; see effort_wip_rows
+# for why). Both halves are parsed by the effort-slug.sh helpers the slug resolver is built on, so a
+# ref name is decomposed in one place. This is the kit's existing notion of a started effort, not a
+# new one: `effort_start` CREATES that branch and `effort_close` deletes it, so the branch set is
+# exactly "started and not yet closed", by construction.
 #
 # The Projects v2 board Status is deliberately NOT the signal. It is written by the /kit-effort-start
 # skill's additive board step, never by this verb, so the verb would be gating on state it does not
@@ -476,16 +477,53 @@ _eff_wip_limit() {
 }
 
 # effort_wip_rows — one TSV row `<N>\t<slug>` per effort that is IN PROGRESS, each effort exactly
-# once (first slug seen wins), lowest number first. The counted set behind the WIP gate.
+# once, lowest number first. The counted set behind the WIP gate: local `refs/heads/effort/*` UNION
+# the effort branches origin actually has right now.
+#
+# Why not the cached `refs/remotes` (#244 review): it is wrong in both directions and the gate is
+# wrong with it. A branch pushed since the last fetch is absent, so the gate lets the limit be
+# exceeded — and the gate runs before effort_start's fetch, which is base-only and would not refresh
+# `refs/remotes/origin/effort/*` anyway. A branch DELETED on origin lingers in `refs/remotes` until
+# a prune, so the gate blocks a start that should be allowed. `git ls-remote` answers both: it sees
+# the new branch and does not see the deleted one, without writing or pruning a single ref.
+#
+# The cost is one network round-trip per `effort start`. That is accepted: a gate that miscounts in
+# both directions is not a gate, and `effort start` is a rare interactive command that already
+# fetches and installs dependencies. Two things keep it from being a liability:
+#
+#   EFFORT_WIP_REMOTE=0  skips the origin query outright and counts local heads + cached remotes —
+#                        for a deterministic offline or CI run, and for anyone who would rather have
+#                        the old approximation than the round-trip.
+#   unreachable origin   ls-remote failing (offline, no remote, auth) is NOT fatal. The count falls
+#                        back to the cached `refs/remotes`, one line says so on stderr, and the start
+#                        proceeds. A gate that hard-fails with no network would be worse than one
+#                        that miscounts.
+#
+# Deliberately NOT cached between invocations: a cache reintroduces the staleness window this
+# replaces, and there is nothing to amortize — one ls-remote per interactive start.
 effort_wip_rows() {
   command -v effort_branch_rows >/dev/null 2>&1 || return 0
-  effort_branch_rows 2>/dev/null | awk -F'\t' '!seen[$1]++' | sort -n
+  local remote=""
+  {
+    effort_branch_rows_local 2>/dev/null
+    if [ "${EFFORT_WIP_REMOTE:-1}" = "0" ]; then
+      effort_branch_rows 2>/dev/null            # opted out: local heads + cached remotes
+    elif remote="$(effort_branch_rows_origin 2>/dev/null)"; then
+      printf '%s\n' "$remote"
+    else
+      echo "effort_start: could not read origin's effort branches — counting work in progress from the last fetch, which may be stale (set EFFORT_WIP_REMOTE=0 to silence this)" >&2
+      effort_branch_rows 2>/dev/null            # offline fallback: local heads + cached remotes
+    fi
+  } | awk -F'\t' 'NF > 0 && $1 != "" && !seen[$1]++' | sort -n
 }
 
 # _eff_wip_gate <num> <force> — rc 0 when starting effort <num> may proceed, rc 1 (with the refusal
-# on stderr) when it may not. PURE PRECHECK: it reads refs and config, and writes nothing anywhere,
-# so a refusal leaves no branch, no worktree and no board change behind (the effort_new /
-# effort_chain discipline).
+# on stderr) when it may not. READ-ONLY: it reads refs (one of them over the network — see
+# effort_wip_rows) and the config, and writes nothing, so a refusal leaves no branch, no worktree and
+# no board change behind (the effort_new / effort_chain discipline). It is not free of reads: the
+# gate itself queries origin, and for a SLUG argument effort_start has already resolved the handle
+# through effort_slug_resolve, which may have run `gh issue list`. "Writes nothing" is the guarantee;
+# "reads nothing" is not.
 #
 # The rules:
 #   already started  an effort whose branch already exists is ALREADY in the counted set, so
