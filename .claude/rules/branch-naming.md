@@ -19,7 +19,7 @@ after the effort, not after a kind of change:
 
 | Pattern | What | `N` |
 | --- | --- | --- |
-| `effort/<N>-<slug>` | the effort's ONE integration branch, cut from the base; its ONE PR opens from here (`rules/effort-model.md`) | the **parent effort issue's** GitHub issue number |
+| `effort/<N>-<slug>` | the effort's ONE integration branch, cut from the base; its ONE PR opens from here. `effort-model.md` writes it `effort/<N>` — same branch, slug elided | the **parent effort issue's** GitHub issue number |
 | `sub/<N><letter>-<slug>` | one sub-issue of that effort, cut from `effort/<N>` and merged back into it | the same parent effort issue number, plus one lowercase letter |
 
 `effort-start` creates the first and `orchestrate` the second; do not hand-roll either.

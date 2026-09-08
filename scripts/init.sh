@@ -377,9 +377,10 @@ if [[ -z "$GH_OWNER" ]]; then GH_OWNER="$(gh api user --jq .login 2>/dev/null ||
 #   2. an existing project config at the target (re-init / --upgrade keeps the project's choice)
 #   3. the repo's actual GitHub default branch (same source as REPO/GH_OWNER above)
 #   4. "main"
-if [[ -z "${BASE_BRANCH:-}" ]]; then
-  BASE_BRANCH="${KIT_BASE_BRANCH:-}"
-fi
+# Unconditional, not `[[ -z ${BASE_BRANCH:-} ]]`: KIT_BASE_BRANCH is the DOCUMENTED override, and
+# BASE_BRANCH is an internal name this script exports for `emit` — an inherited BASE_BRANCH from a
+# caller's environment must not silently outrank it.
+BASE_BRANCH="${KIT_BASE_BRANCH:-}"
 if [[ -z "$BASE_BRANCH" ]]; then
   for _bb_cfg in "$TARGET/cckit.config.json" "$TARGET/.claude/kit.config.json"; do
     [[ -f "$_bb_cfg" ]] || continue

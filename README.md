@@ -230,7 +230,8 @@ cckit/
   profiles/ templates/   # init profiles + scaffold templates
   routines/ modules/     # scheduled routines + optional modules
   docs-site/             # documentation source — Astro/Starlight (deployed to cckit.dev)
-  .claude/skills/ rules/ # the subset of templates/ cckit installs for ITSELF
+  .claude/skills/        # the subset of templates/skills/ cckit installs for ITSELF
+  .claude/rules/         # the subset of templates/rules/ cckit installs for ITSELF
                          #   the manifest + every skip reason: scripts/self-install-test.sh
   cckit.config.json      # project configuration (no hardcoded org/repo)
 ```

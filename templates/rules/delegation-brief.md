@@ -16,7 +16,8 @@ when an agent rediscovers something it should have been handed, add it here.
 
 - **Refresh the base first.** An isolation worktree can seed from a **stale commit**. Start with
   `git fetch origin <base> && git reset --hard origin/<base>` on a fresh branch; confirm
-  `git rev-parse --short HEAD` == `origin/<base>`.
+  `git rev-parse --short HEAD` == `git rev-parse --short origin/<base>` — resolve BOTH sides to a
+  commit id, or you are comparing a SHA to a ref name and the check always "fails".
 - **Commit so the guard sees the right branch.** A base-branch commit guard inspects the command's
   named directory — a `$VAR` path can resolve to the main checkout and false-block. Commit via
   `git -C <literal-worktree-path>` or `cd <literal-path>` (never a variable).
@@ -41,10 +42,10 @@ commit message, a rule, an ADR, a knowledge doc — applies the `concrete` catal
 **before** writing it.
 
 The brief has to say this, because a sub-agent applies a skill only when it is told to or can read
-the skill file. An installed skill that no brief mentions does not fire. That is what happened in
-this kit: `concrete` shipped in PR 247, `communication-style.md` has mandated the pass for durable
-prose ever since — and no brief mentioned it, so no issue or PR body records one (issue #254 exists
-to run the kit's own prose through it after the fact).
+the skill file. **An installed skill that no brief mentions does not fire** — a mandate written only
+in `communication-style.md` reaches the orchestrator and stops there, and the artifacts it governs
+keep shipping without the pass. Nothing warns you: the rule is present, the skill is installed, and
+the output looks fine.
 
 The constraints, so this block is self-sufficient when the skill file is not in the agent's context:
 

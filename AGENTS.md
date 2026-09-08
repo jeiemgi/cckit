@@ -25,8 +25,9 @@ adapter one) — is described in [the Adapters page](docs-site/src/content/docs/
 - **Hand off when you stop with unfinished work.** `cckit handoff "<what's pending, next step, refs>"`
   saves a local resume-here note; bare `cckit` (no verb) prints it so the next session resumes
   exactly where this one stopped.
-- **Run durable prose through `concrete` before writing it.** Commit messages, PR bodies and issue
-  bodies go through `.claude/skills/concrete/SKILL.md`: cut only by named offense, never by length;
+- **Run durable prose through `concrete` before writing it.** Every durable artifact — a commit
+  message, a PR or issue body, a rule, an ADR, a knowledge doc — goes through
+  `.claude/skills/concrete/SKILL.md`: cut only by named offense, never by length;
   evidence, commands, paths and numbers are untouchable; `O13` unverifiable claim and `O14` undecided
   decision are fixed at the gap, not reworded. `cckit brief <issue>` emits this instruction in its
   `## Durable prose` section, so a delegated agent gets it without being told twice.

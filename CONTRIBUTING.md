@@ -30,8 +30,8 @@ cckit pr <issue> "<summary>" # open the PR
 
 ## Durable prose goes through `concrete`
 
-Commit messages, PR bodies and issue bodies go through the `concrete` skill
-(`.claude/skills/concrete/SKILL.md`) before they are written. It diagnoses first, cuts only by
+Every durable artifact — a commit message, a PR or issue body, a rule, an ADR, a knowledge doc —
+goes through the `concrete` skill (`.claude/skills/concrete/SKILL.md`) before it is written. It diagnoses first, cuts only by
 **named offense** and never by length, and treats evidence — commands, output, exit codes,
 reproductions, file paths, numbers, stated limits — as untouchable. The two offenses that matter are
 `O13` unverifiable claim and `O14` undecided decision: when either fires, fix the gap (verify the
@@ -41,6 +41,11 @@ claim, make the decision) instead of rewording it.
 `.claude/rules/delegation-brief.md` § *Durable prose — the concrete pass* is what carries it to a
 delegated agent, and `cckit brief <issue>` emits that block. A sub-agent applies a skill only when
 it is told to, so the brief is where the instruction has to live.
+
+The receipt for why that matters is this repo's own history: `concrete` shipped in PR 247 and
+`communication-style.md` has mandated the pass ever since, but no brief mentioned it, so no issue or
+PR body written before #283 records one. Issue #254 exists to run the kit's own prose through it
+after the fact.
 
 ## cckit's own `.claude/`
 
