@@ -25,12 +25,38 @@ which appears nowhere in that title. You should be able to act on what you can a
 `<n>` is the effort's **own GitHub issue number**. `<step>` is its 1-based position in the
 effort, the same index the sub title already carries.
 
-Two absolutes:
+Two absolutes, and they govern **human-facing text** — issue and PR titles, prose, commit subjects,
+docs, chat:
 
 - An effort is **never** written bare as `#241`. Write `E241`.
 - A PR is **never** written bare as `#268`. Write `PR 268`.
 
-Everything else stays `#N`, which now unambiguously means *a standalone issue*.
+Everything else stays `#N`, which in human-facing text now unambiguously means *a standalone issue*.
+
+### Machine-parsed references stay bare `#N`
+
+The tokens do **not** govern a reference that code writes and reads back. A token is for a reader
+deciding what a reference points at; a bare `#N` is for a parser matching a literal. Where both
+have to be true, the human-facing text carries the token and the machine-readable line stays `#N`.
+
+Two concrete cases, both of which a token would break:
+
+- **The `## Relations` mirror — `- Depends on #N`.** `_eff_relations_add`
+  (`scripts/lib/effort-ops.sh:66`) is the one formatter for that line, and it matches an existing
+  one with `want = "- Depends on #" dep` (line 68). `effort_chain` re-checks it with
+  `grep -qE "^[[:space:]]*- Depends on #${prev}[[:space:]]*$"` (line 400) before writing through the
+  same formatter. That literal match is what makes a re-run idempotent instead of appending a
+  duplicate line — a tested behavior (`effort-ops-test.sh:194`, "relations_add is idempotent (same
+  line twice)"). The blocker is often an effort, so a chained effort body legitimately contains a
+  bare `#N` pointing at one.
+- **GitHub's own syntax — `Closes #N`, `blocked_by`.** GitHub parses these to link and auto-close;
+  so does the kit's fallback, `grep -ioE '(close[sd]?|fix(e[sd])?|resolve[sd]?) +#[0-9]+'`
+  (`scripts/lib/kit-task-ops.sh`). `Closes E241` closes nothing.
+
+The same asymmetry runs the other way for pull requests, which is why the `PR <n>` absolute is
+scoped to human-facing text too. A squash-merge commit subject ends in `(#268)` — **GitHub writes
+that**, and this rule documents the format two sections down (`… [E241.2] (#275)`). The trailing
+parenthetical is GitHub's, not a person's, and it stays as GitHub writes it.
 
 ## Why `E241.2` and not the sub's own number
 
@@ -168,4 +194,6 @@ changes nothing. Set the priority that is true, and re-triage when the distribut
 | `E241.2` | step 2 of effort 241 |
 | `#209` | a standalone issue |
 | `PR 268` | a pull request |
-| `… [E241.2] (#275)` | a squashed commit: the work, then the PR that carried it |
+| `… [E241.2] (#275)` | a squashed commit: the work, then the PR that carried it — GitHub writes the parenthetical |
+| `- Depends on #241` | a machine-parsed dependency line; bare `#N` even when 241 is an effort |
+| `Closes #209` | GitHub's closing keyword; bare `#N` because GitHub parses it |
