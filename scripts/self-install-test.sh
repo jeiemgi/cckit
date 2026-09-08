@@ -73,6 +73,14 @@ tpl_rules="$(find templates/rules -maxdepth 1 -type f -name '*.md' 2>/dev/null \
 decided_skills="$( { _names "$INSTALLED_SKILLS"; _skipped_names "$SKIPPED_SKILLS"; } | sort -u)"
 decided_rules="$( { _names "$INSTALLED_RULES";  _skipped_names "$SKIPPED_RULES";  } | sort -u)"
 
+# A name in BOTH lists is a contradiction the `sort -u` above would hide: coverage still passes, the
+# installed-set check still passes, and the manifest reads as though the template were skipped while
+# the file is on disk. Reject the overlap explicitly.
+t "no skill template is both installed and skipped" \
+  "$(comm -12 <(_names "$INSTALLED_SKILLS") <(_skipped_names "$SKIPPED_SKILLS") | tr '\n' ' ' | sed 's/ *$//')" ""
+t "no rule template is both installed and skipped" \
+  "$(comm -12 <(_names "$INSTALLED_RULES") <(_skipped_names "$SKIPPED_RULES") | tr '\n' ' ' | sed 's/ *$//')" ""
+
 t "every skill template is decided (installed or skipped)" \
   "$(comm -23 <(printf '%s\n' "$tpl_skills") <(printf '%s\n' "$decided_skills") | tr '\n' ' ' | sed 's/ *$//')" ""
 t "every rule template is decided (installed or skipped)" \

@@ -374,7 +374,9 @@ if [[ -z "$GH_OWNER" ]]; then GH_OWNER="$(gh api user --jq .login 2>/dev/null ||
 # -> flow -> "main"), then WRITTEN into the generated config below — a rendered rule that disagrees
 # with KIT_BASE_BRANCH is the bug this parameterization exists to remove.
 #   1. KIT_BASE_BRANCH from the environment (an explicit caller override)
-#   2. an existing project config at the target (re-init / --upgrade keeps the project's choice)
+#   2. the project's existing config, found by kit_config_path (re-init / --upgrade keeps the
+#      project's choice) — the ONE resolver, so this honors $KIT_CONFIG and finds a config in an
+#      ancestor directory. Hand-checking two TARGET-local filenames skipped both.
 #   3. the repo's actual GitHub default branch (same source as REPO/GH_OWNER above)
 #   4. "main"
 # Unconditional, not `[[ -z ${BASE_BRANCH:-} ]]`: KIT_BASE_BRANCH is the DOCUMENTED override, and
@@ -382,11 +384,12 @@ if [[ -z "$GH_OWNER" ]]; then GH_OWNER="$(gh api user --jq .login 2>/dev/null ||
 # caller's environment must not silently outrank it.
 BASE_BRANCH="${KIT_BASE_BRANCH:-}"
 if [[ -z "$BASE_BRANCH" ]]; then
-  for _bb_cfg in "$TARGET/cckit.config.json" "$TARGET/.claude/kit.config.json"; do
-    [[ -f "$_bb_cfg" ]] || continue
+  # shellcheck source=/dev/null
+  . "$KIT_ROOT/scripts/lib/config-path.sh"
+  _bb_cfg="$(kit_config_path "$TARGET" 2>/dev/null || true)"
+  if [[ -n "$_bb_cfg" && -f "$_bb_cfg" ]]; then
     BASE_BRANCH="$(jq -r '.github.baseBranch // .github.integrationBranch // .github.flow // empty' "$_bb_cfg" 2>/dev/null || true)"
-    [[ -n "$BASE_BRANCH" ]] && break
-  done
+  fi
 fi
 [[ -z "$BASE_BRANCH" ]] && BASE_BRANCH="$(cd "$TARGET" 2>/dev/null && gh repo view --json defaultBranchRef -q .defaultBranchRef.name 2>/dev/null || true)"
 [[ -z "$BASE_BRANCH" ]] && BASE_BRANCH="main"
