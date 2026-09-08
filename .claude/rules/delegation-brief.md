@@ -4,13 +4,21 @@ When spawning a sub-agent (Agent tool, orchestrate, CI agent), **prepend this**.
 environment knowns so agents don't burn turns rediscovering "how do I get X". Keep it current —
 when an agent rediscovers something it should have been handed, add it here.
 
-## Project specifics (fill these in for {{PROJECT_NAME}})
+## Project specifics (cckit)
 
-- Repo `<owner>/<repo>` · base branch **`<base>`** · owner **`<owner>`** · project board number **`<N>`**.
-- Build/dep tooling (e.g. pnpm + turbo monorepo, workspaces, package scope).
-- **Secrets by NAME, never value** — the GitHub API token env var (some apps use a custom name like
-  `GH_PAT`, **not** `GITHUB_TOKEN` — state which), model/API env vars, auth keys. Say which file/code
-  path reads each.
+- Repo `jeiemgi/cckit` · base branch **`develop`** (`main` is releases-only) · owner **`jeiemgi`** ·
+  **no Projects v2 board** (`github.projectsV2: false` in `cckit.config.json`) — GitHub issues are
+  the whole board, so every board-writing step is a no-op here.
+- Build/dep tooling: the CLI is bash with **no root dependencies** — there is no build step and no
+  root lockfile (`/pnpm-lock.yaml` is gitignored as a stray artifact). `docs-site/` is the one
+  installable package (Astro/Starlight, pnpm, `docs-site/pnpm-lock.yaml`).
+- **Secrets by NAME, never value** — no API-token env var is read anywhere in `bin/` or `scripts/`;
+  every GitHub call goes through the authenticated `gh` CLI. The one token in the repo is
+  `GH_TOKEN` in `.github/workflows/release-please.yml`, fed from the `HOMEBREW_TAP_TOKEN` secret
+  for the Homebrew tap push.
+- Config lives in **`cckit.config.json` at the repo root**, not `.claude/kit.config.json` — cckit is
+  the kit, so it was never `cckit init`'d against itself. Anything reading the scaffolded path finds
+  nothing here.
 
 ## Standing gotchas (transferable — these bite on most projects)
 
@@ -55,10 +63,17 @@ The constraints, so this block is self-sufficient when the skill file is not in 
 `communication-style.md` states the mandate; this block is what carries it into a delegated agent's
 context.
 
-## Gate commands (fill in for {{PROJECT_NAME}})
+## Gate commands (cckit)
 
-- Build / typecheck / lint commands; shell scripts: `bash -n`; any knowledge/plan lint. A green
-  build/typecheck is the bar. State whether CI exists or the gate is local + deploy-provider build.
+- **`bash scripts/check.sh` is the whole gate** and the bar for a PR: `bash -n` over every script in
+  `bin/` + `scripts/`, `shellcheck --severity=error`, JSON validity of `.claude-plugin/plugin.json`
+  and `cckit.config.json`, the branding scan, the secret + privacy guard, then `scripts/test.sh`
+  (every `*-test.sh` under `bin/` and `scripts/`). `shellcheck` and `jq` are skipped when absent
+  locally; CI installs both, so run them locally before trusting a green.
+- CI runs the same script: `.github/workflows/test.yml` on push to `main`/`develop` and on every PR.
+  `.github/workflows/commitlint.yml` separately fails a PR whose **title** is not a Conventional
+  Commit subject — PRs are squash-merged, so the title becomes the commit.
+- There is no build and no typecheck. `docs-site/` builds on Vercel from its own package.
 
 ## Effort flow (the unit of work)
 

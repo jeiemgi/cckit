@@ -19,6 +19,22 @@ adapter one) — is described in [the Adapters page](docs-site/src/content/docs/
 - **Hand off when you stop with unfinished work.** `cckit handoff "<what's pending, next step, refs>"`
   saves a local resume-here note; bare `cckit` (no verb) prints it so the next session resumes
   exactly where this one stopped.
+- **Run durable prose through `concrete` before writing it.** Commit messages, PR bodies and issue
+  bodies go through `.claude/skills/concrete/SKILL.md`: cut only by named offense, never by length;
+  evidence, commands, paths and numbers are untouchable; `O13` unverifiable claim and `O14` undecided
+  decision are fixed at the gap, not reworded. `cckit brief <issue>` emits this instruction in its
+  `## Durable prose` section, so a delegated agent gets it without being told twice.
+
+## What cckit installs for itself
+
+`templates/` is what `cckit init` writes into a consuming project. `.claude/skills/` and
+`.claude/rules/` in this repo are the subset cckit applies to its **own** work — `concrete`,
+`karpathy-guidelines`, and the rules for branches, efforts, PR titles, delegation and communication
+style. No agents are installed: this file plus `cckit brief` is the delegation contract here.
+
+The manifest and the reason for every skipped template are in `scripts/self-install-test.sh`, which
+also fails if an installed copy drifts from its template. Edit a template and its installed copy in
+the same commit.
 
 ## Core verbs
 

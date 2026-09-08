@@ -103,6 +103,42 @@ EOF
   no  "gotchas stop at the next heading"    "$g" "not a gotcha"
   eq  "no rule file yields nothing"         "$(kit_brief_gotchas "$tmp/empty-root")" ""
 
+  # ── kit_brief_durable_prose (#283) ───────────────────────────────────────────────────────────
+  # The concrete mandate has to reach the GENERATED brief: an agent applies a skill only when it is
+  # told to, so a mandate that lives only in communication-style.md never fires.
+  mkdir -p "$tmp/dp/.claude/rules"
+  cat > "$tmp/dp/.claude/rules/delegation-brief.md" <<'EOF'
+# Delegation brief
+## Standing gotchas
+- a gotcha
+## Durable prose — the concrete pass
+- apply the `concrete` catalogue before writing
+- O13 unverifiable claim / O14 undecided decision
+## Gate commands
+- not durable prose
+EOF
+  dp="$(kit_brief_durable_prose "$tmp/dp")"
+  has "durable prose names the skill"    "$dp" 'concrete'
+  has "durable prose carries O13/O14"    "$dp" "O13"
+  no  "durable prose stops at the next heading" "$dp" "not durable prose"
+  no  "durable prose is not the gotchas block"  "$dp" "a gotcha"
+  eq  "absent durable-prose section is empty" \
+      "$(kit_brief_durable_prose "$tmp/proj")" ""
+  eq  "no rule file yields no durable prose" "$(kit_brief_durable_prose "$tmp/empty-root")" ""
+
+  # The kit's OWN template must carry the section, or every project scaffolds a brief without it.
+  ktpl="$dir/../../templates/rules/delegation-brief.md"
+  if [ -f "$ktpl" ]; then
+    tpl_prose="$(awk '/^##[[:space:]]/ { in_s = ($0 ~ /[Dd]urable prose/) ? 1 : 0; next } in_s' "$ktpl")"
+    has "kit template has a Durable prose section" "$tpl_prose" 'concrete'
+    has "kit template names O13"                   "$tpl_prose" "O13"
+    has "kit template names O14"                   "$tpl_prose" "O14"
+    has "kit template forbids cutting by length"   "$tpl_prose" "never by length"
+    has "kit template cross-refs communication-style" "$tpl_prose" "communication-style.md"
+  else
+    echo "  (templates/rules/delegation-brief.md absent — skipping the kit-template assertions)"
+  fi
+
   # ── git-dependent lookups, against a throwaway repo ──────────────────────────────────────────
   if command -v git >/dev/null 2>&1; then
     repo="$tmp/r"; mkdir -p "$repo"
@@ -200,6 +236,40 @@ h4.sh
   if [ -f "$dir/kit-lib.sh" ]; then
     n_over_probe="$(( $(printf '' | grep -c . || true) - $(printf '' | grep -c . || true) ))"
     eq "an empty count stays a single integer" "$n_over_probe" "0"
+  fi
+
+  # ── the whole brief renders under `set -eu` (#283) ───────────────────────────────────────────
+  # `bin/cckit` runs `set -eu`, and a while loop's rc is its LAST iteration's: an issue whose file
+  # list ended in a non-file token (`templates/skills/` — the parser keeps directory tokens) made
+  # the sourced-helpers assignment rc 1 and killed the brief mid-render. Every section after the
+  # helpers table — standing gotchas, the durable-prose mandate — was silently absent. gh is stubbed
+  # so this stays network-free; jq and git are real, because the verb requires both.
+  if command -v git >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 && [ -f "$dir/kit-lib.sh" ]; then
+    ghstub="$tmp/ghbin"; mkdir -p "$ghstub"
+    cat > "$ghstub/gh" <<'EOF'
+#!/bin/sh
+# stub: only `gh issue view … --json …` is used by kit_brief.
+printf '%s' '{"title":"t","state":"OPEN","labels":[],"body":"Files: scripts/lib/only-here.sh, templates/skills/"}'
+EOF
+    chmod +x "$ghstub/gh"
+    mkdir -p "$repo/.claude/rules"
+    cat > "$repo/.claude/rules/delegation-brief.md" <<'EOF'
+# Delegation brief
+## Standing gotchas
+- fixture gotcha
+## Durable prose — the concrete pass
+- apply the `concrete` catalogue before writing
+EOF
+    # A subshell, not `sh -c`: kit_brief is a function in THIS shell, and `set -eu` has to apply
+    # to it exactly as `bin/cckit` applies it. And NO trailing `|| true` — bash suppresses errexit
+    # for a command that is part of a `||` list, and the suppression reaches into the subshell, so
+    # a `|| true` here would make these assertions pass against the very bug they pin.
+    brief_out="$(cd "$repo" && export PATH="$ghstub:$PATH" && ( set -eu; kit_brief 5 ) 2>&1)"
+    has "the brief reaches the helpers table"   "$brief_out" "## Helpers you already have"
+    has "the brief reaches the standing gotchas" "$brief_out" "fixture gotcha"
+    has "the brief reaches the durable-prose mandate" "$brief_out" 'concrete'
+  else
+    echo "  (git, jq or kit-lib.sh absent — skipping the full-render assertions)"
   fi
 
   # ── the verb's argument contract (no gh call: it must reject before reaching for the network) ──
