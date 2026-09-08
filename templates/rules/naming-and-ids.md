@@ -38,7 +38,7 @@ Everything else stays `#N`, which now unambiguously means *a standalone issue*.
 step 2 — so you can act on it without first resolving `#243`. That is the whole point: the
 identifier you read is the identifier you type.
 
-```
+```shell
 cckit start E241.2      # not: cckit start 243
 ```
 
@@ -49,7 +49,7 @@ Both resolve to the same worktree. The number still works; `E241.2` is what you 
 A PR title carries its token in trailing **square brackets**, after the conventional-commit
 subject:
 
-```
+```text
 feat(effort): chain verb sets the order [E241.2]
 fix(start): don't plant an empty root pnpm-lock.yaml [#255]
 chore(security): update docs-site deps to clear Dependabot alerts [#249]
@@ -60,11 +60,25 @@ chore(security): update docs-site deps to clear Dependabot alerts [#249]
 - The conventional-commit prefix is unchanged and still governs release-please's version bump.
   The token is additive; it never replaces `type(scope):`.
 
+### What is enforced today vs. what this rule targets
+
+**Enforced now:** `effort_pr_title_check` (`scripts/lib/effort.sh`) requires a `[#<num>]` token —
+the exact `[#num]` when given a number, otherwise any `[#digits]` — and `effort_pr` refuses to open
+a PR without it. That check runs on **effort PRs only**; standalone task PRs are unchecked.
+
+**This rule targets** `[E<n>]` / `[E<n>.<step>]` on effort and sub PRs, and the check extended to
+every PR. Until that ships, `[#<num>]` is correct and `effort_pr` will keep generating it.
+
+Do not hand-write `[E241.2]` into a PR title before the checker understands it — `effort_pr` would
+reject the title for lacking `[#241]`. The migration is tracked in the implementation issue for
+this rule, and it must move the generator (`effort_pr_title`), the validator
+(`effort_pr_title_check`) and this section together.
+
 **Brackets, never parentheses — this is load-bearing.** GitHub's squash-merge appends the PR
 number in parentheses when it writes the commit subject, so the trailing-parens slot is already
 taken:
 
-```
+```text
 feat(core): agents can see what cckit provides [#220] (#230)
                                                ↑ the work   ↑ the PR
 ```
@@ -96,7 +110,7 @@ The token belongs where humans read. Branch names are where tooling parses safet
 
 A chain is a linear dependency between steps of one effort, written with `→`:
 
-```
+```text
 E241.1 → E241.2 → E241.3
 ```
 
