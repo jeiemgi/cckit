@@ -11,6 +11,12 @@ adapter one) — is described in [the Adapters page](docs-site/src/content/docs/
 - **Read state before acting.** `cckit sync --llm` returns the board as TOON. Decide from data.
 - **One issue = one branch = one worktree = one PR.** `cckit start <issue>` creates the isolated
   worktree; do all work there; `cckit pr <issue>` opens the PR. Never commit to the base branch.
+  **The effort flow is the one exception, and it is deliberate:** an effort is *1 parent issue = 1
+  `effort/<N>` branch = 1 PR* covering **N sub-issues**. Sequential sub-issues commit straight onto
+  `effort/<N>` (one commit per sub-issue — that commit's diff is the sub's patch); parallel ones get
+  their own file-disjoint `sub/<N><letter>` worktree and merge back into `effort/<N>`. Either way
+  exactly one PR opens, from `effort/<N>` — never one per sub-issue. Full spec:
+  `.claude/rules/effort-model.md`.
 - **Structured output, TOON-first.** Append `--llm` to any verb for machine-readable output. List
   reads (sync, next, plan, wave) come back as **TOON** (token-cheap); single-result action verbs
   (start, pr, close) return one JSON object. Human (pretty) output is the default; agents prefer `--llm`.
@@ -19,6 +25,23 @@ adapter one) — is described in [the Adapters page](docs-site/src/content/docs/
 - **Hand off when you stop with unfinished work.** `cckit handoff "<what's pending, next step, refs>"`
   saves a local resume-here note; bare `cckit` (no verb) prints it so the next session resumes
   exactly where this one stopped.
+- **Run durable prose through `concrete` before writing it.** Every durable artifact — a commit
+  message, a PR or issue body, a rule, an ADR, a knowledge doc — goes through
+  `.claude/skills/concrete/SKILL.md`: cut only by named offense, never by length;
+  evidence, commands, paths and numbers are untouchable; `O13` unverifiable claim and `O14` undecided
+  decision are fixed at the gap, not reworded. `cckit brief <issue>` emits this instruction in its
+  `## Durable prose` section, so a delegated agent gets it without being told twice.
+
+## What cckit installs for itself
+
+`templates/` is what `cckit init` writes into a consuming project. `.claude/skills/` and
+`.claude/rules/` in this repo are the subset cckit applies to its **own** work — `concrete`,
+`karpathy-guidelines`, and the rules for branches, efforts, PR titles, delegation and communication
+style. No agents are installed: this file plus `cckit brief` is the delegation contract here.
+
+The manifest and the reason for every skipped template are in `scripts/self-install-test.sh`, which
+also fails if an installed copy drifts from its template. Edit a template and its installed copy in
+the same commit.
 
 ## Core verbs
 

@@ -199,6 +199,14 @@ public: [every issue closed in the repo →](https://github.com/jeiemgi/cckit/is
 — including [the effort that produced this README](https://github.com/jeiemgi/cckit/issues/160).
 The board is both the plan and the proof.
 
+cckit also runs on the rules and skills it ships. `templates/` is what `cckit init` writes into a
+project; `.claude/skills/` and `.claude/rules/` here are the subset cckit applies to its own work —
+`concrete` (the anti-slop catalogue every commit and PR body goes through) and
+`karpathy-guidelines`, plus the rules that govern this repo's branches, efforts, PR titles and
+delegation. It is a subset on purpose: several templates target stacks cckit does not have.
+`scripts/self-install-test.sh` holds the manifest, the reason for every skip, and the assertion that
+the installed copies have not drifted from their templates.
+
 ## Documentation
 
 Full docs live at **[cckit.dev](https://cckit.dev)** — start with
@@ -222,6 +230,9 @@ cckit/
   profiles/ templates/   # init profiles + scaffold templates
   routines/ modules/     # scheduled routines + optional modules
   docs-site/             # documentation source — Astro/Starlight (deployed to cckit.dev)
+  .claude/skills/        # the subset of templates/skills/ cckit installs for ITSELF
+  .claude/rules/         # the subset of templates/rules/ cckit installs for ITSELF
+                         #   the manifest + every skip reason: scripts/self-install-test.sh
   cckit.config.json      # project configuration (no hardcoded org/repo)
 ```
 

@@ -8,7 +8,8 @@
 # whether its seed is stale, the helper that already does the thing it is about to reimplement.
 # This verb reads all of that out of the repo instead: `gh` for the issue, `git worktree list` for
 # the isolation, `origin/<base>` for the seed, `kit_lib_rows` (#222) for the helpers, and the
-# project's own delegation-brief rule for the standing gotchas. Nothing here is remembered.
+# project's own delegation-brief rule for the standing gotchas + the durable-prose (`concrete`)
+# mandate. Nothing here is remembered.
 #
 # Source it:  source scripts/lib/kit-brief.sh
 # Depends on: kit-lib.sh (the helper catalog), and for the verb body: gh, git, the project config.
@@ -75,23 +76,36 @@ kit_brief_sourced() {
   done | sort -u
 }
 
-# kit_brief_gotchas [root] — echo the "Standing gotchas" block from the project's own
+# kit_brief_rule_section <heading-regex> [root] — echo one `## ` block of the project's own
 # delegation-brief rule (`.claude/rules/delegation-brief.md`), falling back to the kit's template.
-# The block is transferable advice the project already maintains; re-typing it into a brief is how
-# it goes stale. Echoes nothing when neither file exists — the caller says so.
-kit_brief_gotchas() {
-  local root="${1:-.}" f
+# The blocks are transferable instruction the project already maintains; re-typing them into a
+# brief is how they go stale. <heading-regex> is an ERE matched against the whole heading line, so
+# it must tolerate the heading's own suffixes ("Standing gotchas (transferable — …)"). Echoes
+# nothing when no rule file exists — the caller says so.
+# The FIRST file that exists wins for every section, so a project that owns the rule owns all of it.
+kit_brief_rule_section() {
+  local want="$1" root="${2:-.}" f
   for f in "$root/.claude/rules/delegation-brief.md" \
            "$root/templates/rules/delegation-brief.md" \
            "${CCKIT_ROOT:-$root}/templates/rules/delegation-brief.md"; do
     [ -f "$f" ] || continue
-    awk '
-      /^##[[:space:]]/ { in_s = ($0 ~ /[Ss]tanding gotchas/) ? 1 : 0; next }
+    awk -v want="$want" '
+      /^##[[:space:]]/ { in_s = ($0 ~ want) ? 1 : 0; next }
       in_s { print }
     ' "$f" | _kb_rtrim
     return 0
   done
 }
+
+# kit_brief_gotchas [root] — the "Standing gotchas" block. Thin caller of kit_brief_rule_section.
+kit_brief_gotchas() { kit_brief_rule_section '[Ss]tanding gotchas' "${1:-.}"; }
+
+# kit_brief_durable_prose [root] — the "Durable prose" block: the instruction that an agent about to
+# write a durable artifact (issue body, PR body, commit message, rule, ADR, knowledge doc) applies
+# the `concrete` catalogue first. It is in the GENERATED brief, not only in the rule, because a
+# sub-agent applies a skill only when it is told to — an installed skill no brief mentions does not
+# fire (that is why `concrete` shipped in PR 247 and no body records a pass; see #283).
+kit_brief_durable_prose() { kit_brief_rule_section '[Dd]urable prose' "${1:-.}"; }
 
 # ── real-state lookups ─────────────────────────────────────────────────────────────────────────
 
@@ -171,7 +185,7 @@ _kb_rows() {
 # a brief that silently omits a section is the failure mode this verb exists to remove.
 kit_brief() {
   local n="${1:-}" root base repo body title state labels foragents files files_from wt wtpath wtbranch
-  local seed gotchas libdir row f gate
+  local seed gotchas prose libdir row f gate
   case "$n" in
     ''|--*) echo "usage: cckit brief <issue>" >&2; return 2 ;;
   esac
@@ -292,9 +306,14 @@ EOF
     # Two derived sources: helpers the issue OWNS, and helpers its existing files actually source.
     local owned_libs sourced_libs want_libs table
     owned_libs="$(printf '%s\n' "$files" | sed -n 's#.*/\([A-Za-z0-9_.-]*\.sh\)$#\1#p')"
+    # `if`, not `[ -f … ] &&`: a while loop's rc is its LAST iteration's, so a trailing non-file
+    # token (`templates/skills/` — the parser keeps directory tokens) made this assignment rc 1 and
+    # `bin/cckit`'s `set -eu` killed the brief right here. Every section below — the helpers table,
+    # the standing gotchas, the durable-prose mandate — was silently missing from every generated
+    # brief. An `if` with no else always returns 0, so the loop's rc no longer depends on the input.
     sourced_libs="$(while IFS= read -r f; do
         [ -n "$f" ] || continue
-        [ -f "$root/$f" ] && kit_brief_sourced "$root/$f"
+        if [ -f "$root/$f" ]; then kit_brief_sourced "$root/$f" || true; fi
       done <<EOF
 $files
 EOF
@@ -341,5 +360,17 @@ EOF
     printf '%s\n' "$gotchas"
   else
     echo "_No \`delegation-brief.md\` rule found — add one so this section stops being empty._"
+  fi
+
+  # ── durable prose, from the same rule. An agent applies a skill only when it is told to, so the
+  # concrete mandate has to reach the brief; stating it in communication-style.md alone never fired.
+  echo
+  echo "## Durable prose"
+  echo
+  prose="$(kit_brief_durable_prose "$root")"
+  if [ -n "$prose" ]; then
+    printf '%s\n' "$prose"
+  else
+    echo "_No \`Durable prose\` section in \`delegation-brief.md\` — add one so an agent writing an issue body, a PR body or a commit message is told to run the \`concrete\` pass first._"
   fi
 }

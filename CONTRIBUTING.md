@@ -28,11 +28,66 @@ cckit pr <issue> "<summary>" # open the PR
 - Run the local gate before opening a PR: `bash scripts/check.sh` (shell syntax, valid manifests,
   no stray branding, the commitlint rules). A green gate is the bar.
 
+## Durable prose goes through `concrete`
+
+Every durable artifact — a commit message, a PR or issue body, a rule, an ADR, a knowledge doc —
+goes through the `concrete` skill (`.claude/skills/concrete/SKILL.md`) before it is written. It diagnoses first, cuts only by
+**named offense** and never by length, and treats evidence — commands, output, exit codes,
+reproductions, file paths, numbers, stated limits — as untouchable. The two offenses that matter are
+`O13` unverifiable claim and `O14` undecided decision: when either fires, fix the gap (verify the
+claim, make the decision) instead of rewording it.
+
+`.claude/rules/communication-style.md` states the mandate;
+`.claude/rules/delegation-brief.md` § *Durable prose — the concrete pass* is what carries it to a
+delegated agent, and `cckit brief <issue>` emits that block. A sub-agent applies a skill only when
+it is told to, so the brief is where the instruction has to live.
+
+The receipt for why that matters is this repo's own history: `concrete` shipped in PR 247 and
+`communication-style.md` has mandated the pass ever since, but no brief mentioned it, so no issue or
+PR body written before #283 records one. Issue #254 exists to run the kit's own prose through it
+after the fact.
+
+## cckit's own `.claude/`
+
+`templates/skills/` and `templates/rules/` are what `cckit init` writes into a **consuming**
+project. cckit is the kit, so it was never `cckit init`'d against itself — for its whole history
+those templates shipped to every consumer and applied to nothing here.
+
+`.claude/skills/` and `.claude/rules/` are now the subset cckit applies to its own work. It is a
+subset by decision, not by accident: `supabase-patterns` has no Supabase to pattern,
+`feature-build-refine` is gated on a `@refinedev/*` dependency this repo does not have,
+`plan-output-format` mandates a plans dir cckit does not use (the parent issue is the plan), and so
+on. No agents are installed — `AGENTS.md` plus `cckit brief` is this repo's delegation contract.
+
+`scripts/self-install-test.sh` is the guard, and the manifest lives in it:
+
+- Every template under `templates/skills/` and `templates/rules/` must be listed as **installed** or
+  **skipped with a reason**. A new template fails the test until someone decides — which is what
+  stops the silent partial install from coming back.
+- Every installed file must still match its template: byte-identical, or byte-identical after
+  `init`'s `{{VAR}}` substitution (`{{PROJECT_NAME}}`, `{{OWNER_NAME}}`, `{{COMMS_LANG}}`,
+  `{{BASE_BRANCH}}`, …), or — for `delegation-brief.md`, whose template asks the project to fill in
+  its own specifics — identical in the kit-owned sections.
+
+Edit a template and the installed copy in the same commit, or the test fails.
+
+**A template must never hard-code a value the project can override.** `templates/rules/effort-model.md`
+named `main` as the branch efforts cut from and open their PR against; this repo integrates on
+`develop`, so the installed copy told agents to target a releases-only branch — and it passed the
+byte-identical check, because byte-identical to a wrong template is exactly the bug. The integration
+branch is `{{BASE_BRANCH}}` now, resolved by `init.sh` from `github.baseBranch` (falling back to
+`integrationBranch` / `flow` / the repo's GitHub default / `main`, the same precedence as
+`KIT_BASE_BRANCH` in `scripts/lib/kit-config.sh`) and written back into the generated config so the
+rendered rule and the resolver can never disagree. `scripts/self-install-test.sh` fails if either
+half regresses.
+
 ## Scope of changes
 
 - **bash CLI + lib** → `bin/cckit`, `scripts/lib/*.sh`.
 - **Claude Code plugin** → `skills/`, `commands/`, `.claude-plugin/`.
 - **Docs** → `docs/` (published to [cckit.dev](https://cckit.dev)).
+- **What cckit installs for itself** → `.claude/skills/`, `.claude/rules/`, and the manifest in
+  `scripts/self-install-test.sh`.
 
 ### Every lib file declares how it fails
 

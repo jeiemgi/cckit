@@ -48,6 +48,14 @@ Afterwards your repo looks roughly like this — your own files are untouched, c
 Run `cckit scan` before `init` — it reports the repo's stack and whether any kit-shaped files already exist.
 </Aside>
 
+<Aside type="note" title="Where those rules and skills come from">
+`.claude/rules/*.md` and `.claude/skills/*/SKILL.md` are copies of the kit's own
+`templates/rules/` and `templates/skills/`, selected by your profile and filled in with your project's
+values. They become **yours** once written: `cckit init --upgrade` preserves every file that already
+exists and only adds genuinely missing ones, so your edits survive an upgrade. Run `cckit init --dry-run`
+to see the exact list before anything is written.
+</Aside>
+
 ## 2 · No issues yet? Have Claude find your first one
 
 A fresh board is empty. Instead of inventing a task, point Claude at the code and let it surface

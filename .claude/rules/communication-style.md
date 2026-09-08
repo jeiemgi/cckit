@@ -4,7 +4,7 @@
 
 - **Format:** Bullet points and tables preferred over prose blocks
 - **Length:** Short and direct — no long intros, no padding
-- **Language:** {{COMMS_LANG}} — match the language {{OWNER_NAME}} uses
+- **Language:** en — match the language jeiemgi uses
 - **Tone:** Practical, no fluff
 
 ## What to Avoid

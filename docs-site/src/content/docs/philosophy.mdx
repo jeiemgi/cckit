@@ -48,6 +48,13 @@ this site went through its own lifecycle: an issue, an isolated worktree, a pull
 The receipts are public: [every issue closed in the repo →](https://github.com/jeiemgi/cckit/issues?q=is%3Aissue%20state%3Aclosed).
 The board is both the plan and the proof.
 
+It runs on the rules it ships, too. `cckit init` writes the kit's rule and skill templates into a
+consuming project; the cckit repo installs the subset that governs its own work — including
+`concrete`, the catalogue every commit and PR body is cut against. A subset, because several
+templates target stacks cckit does not have, and a test that fails when a template is neither
+installed nor skipped-with-a-reason, because a template nobody applies is a template nobody has
+tested.
+
 ## The invitation
 
 That's it. You bring the ideas; cckit keeps the memory and runs the machinery. Come in, be interested,
