@@ -239,4 +239,44 @@ find .claude/rules -maxdepth 1 -type f -name '*.md' 2>/dev/null | while IFS= rea
 done | grep . && fail=1
 
 if [ "$fail" -eq 0 ]; then echo "PASS: cckit self-install matches its manifest"; fi
+
+# Editing a template is a TWO-file change for any rule cckit installs for itself, and nothing else
+# tells an author that (#285: PR 282 edited templates/rules/effort-model.md on a branch cut before
+# the installed copy existed, so develop went red only once both PRs had landed). A guard that
+# reports drift without saying how to clear it is a tripwire with no defusal — so print the exact
+# re-render command, using the same substitution this file compares with.
+if [ "$fail" -ne 0 ]; then
+  # Generated from the manifest, not hand-written: a static hint drifts from the manifest and from
+  # _render's own fallback chain, and a remediation command that does not match what this script
+  # compares against is the very defect the guard exists to catch. `rendered` and `verbatim` are
+  # both listed — re-rendering a template with no {{VAR}} is a no-op copy, which is exactly right.
+  _hint_rules="$(printf '%s\n' "$INSTALLED_RULES" | awk '$2!="sections"{printf "%s ", $1}' | sed 's/ *$//')"
+  {
+    echo
+    echo "To clear a 'mode rendered' or 'mode verbatim' drift, re-render the installed copy from its"
+    echo "template. Run from the repo root; needs jq + perl:"
+    echo
+    echo "  CFG_LANG=\"\$(jq -r '.project.language' cckit.config.json)\""
+    echo "  CFG_OWNER=\"\$(jq -r '.project.owner' cckit.config.json)\""
+    echo "  CFG_NAME=\"\$(jq -r '.project.name' cckit.config.json)\""
+    echo "  CFG_BASE=\"\$(jq -r '.github.baseBranch // .github.integrationBranch // .github.flow // \"main\"' cckit.config.json)\""
+    echo "  for r in $_hint_rules; do"
+    echo "    COMMS_LANG=\"\$CFG_LANG\" OWNER_NAME=\"\$CFG_OWNER\" PROJECT_NAME=\"\$CFG_NAME\" BASE_BRANCH=\"\$CFG_BASE\" \\"
+    echo "      perl -0777 -pe 's/\\{\\{(\\w+)\\}\\}/ exists \$ENV{\$1} ? \$ENV{\$1} : \"{{\$1}}\" /ge' \\"
+    echo "      \"templates/rules/\$r.md\" > \".claude/rules/\$r.md\""
+    echo "  done"
+    echo
+    echo "For one rule, keep the same four assignments and drop the loop, e.g. effort-model:"
+    echo
+    echo "  … BASE_BRANCH=\"\$CFG_BASE\" perl -0777 -pe 's/…/…/ge' \\"
+    echo "      templates/rules/effort-model.md > .claude/rules/effort-model.md"
+    echo
+    echo "CFG_BASE must keep the full fallback chain — baseBranch, then integrationBranch, then flow,"
+    echo "then \"main\". Checking only .github.baseBranch renders a different value than this script"
+    echo "compares against, so the drift would survive the fix."
+    echo
+    echo "A 'mode sections' drift is NOT re-rendered wholesale: that file carries project-specific"
+    echo "fill-ins. Copy only the kit-owned section the failure names."
+  } >&2
+fi
 exit "$fail"
