@@ -16,7 +16,15 @@ WT_START_REPO="${WT_START_REPO:-${KIT_REPO:-}}"
 
 # _wt_set_port <app-env-file> <port> <issue-num> — append a per-worktree dev PORT to an app's
 # .env.local, but only where one exists (i.e. the app is locally runnable). Idempotent: an existing
-# PORT= line wins. The app dev scripts read ${PORT:-300X} (sub B) so this assignment takes effect.
+# PORT= line wins.
+#
+# BEST-EFFORT, NOT A GUARANTEE. This write only takes effect for an app that actually reads the
+# file. A script like `next dev -p ${PORT:-3003}` is expanded by the npm-script shell, which never
+# reads .env.local, so the value is INERT for it and every worktree falls back to the same default.
+# cckit therefore does not RELY on it: everything cckit launches itself passes the port explicitly
+# (scripts/lib/qa-lane.sh injects one QA_PORT_<service> per service). Treat the .env.local write as
+# a convenience for apps that do read it — and if you start a dev server by hand in a worktree,
+# check which port you actually got.
 _wt_set_port() {
   local file="$1" port="$2" num="$3"
   [[ -f "$file" ]] || return 0
@@ -27,14 +35,66 @@ _wt_set_port() {
 
 # wt_assign_ports <worktree> <issue-num> <root> — assign a per-worktree dev PORT to each app whose
 # env file is listed in `.worktree.devPorts` of <root>/.claude/kit.config.json. Each entry is
-# {path, base}; the port = base + (issue % 40) * <count> so lanes stay disjoint within and across
-# worktrees. Config-driven (no hardcoded app paths) so the kit stays portable: a project with no
+# {path, base}; the port = base + (issue % 40) * <stride> so lanes stay disjoint within and across
+# worktrees (stride = `worktree.devPortStride`, default 10 — never the service count, see below). Config-driven (no hardcoded app paths) so the kit stays portable: a project with no
 # `.worktree.devPorts` (or no kit.config.json) is a silent no-op. bash 3.2.
+# ── port SLOTS: an allocation, not a hash (the QA lane depends on lanes never colliding) ──────
+# `issue % 40` is a hash: two issues 40 apart get byte-identical ports, and a repo whose numbers are
+# in the thousands hits that constantly (#1700 and #1740 in the same wave is unremarkable). A slot is
+# RECORDED instead, so uniqueness is by construction rather than by hoping about issue numbers.
+#
+# State lives beside the event log under the git-common-dir, so it is worktree-durable and shared by
+# every checkout. Each line: <issue>\t<slot>\t<worktree-path>. A slot whose worktree is gone is
+# reclaimed on the next call, which is what keeps the 40 slots from leaking away over a long project.
+_wt_slots_file() {
+  local gcd
+  gcd="$(git -C "${1:-.}" rev-parse --git-common-dir 2>/dev/null)" || return 1
+  case "$gcd" in /*) : ;; *) gcd="$(cd "${1:-.}" && cd "$gcd" 2>/dev/null && pwd)" || return 1 ;; esac
+  printf '%s/kit-portslots.tsv' "$gcd"
+}
+
+# _wt_slot_for <root> <issue-num> <worktree> — echo this issue's slot (0-39), allocating on first
+# call. IDEMPOTENT: an issue keeps its slot for as long as its worktree exists, so re-running
+# `cckit start` never renumbers a live lane. Falls back to the old hash (with a warning) only when
+# every slot is genuinely held.
+_wt_slot_for() {
+  local root="$1" num="$2" wt="$3" f line i held mine
+  f="$(_wt_slots_file "$root")" || { printf '%s' $(( num % 40 )); return 0; }
+  [[ -f "$f" ]] || : > "$f" 2>/dev/null || { printf '%s' $(( num % 40 )); return 0; }
+
+  # Reclaim: keep only rows whose worktree still exists (or that have no path recorded).
+  local tmp; tmp="$(mktemp 2>/dev/null)" || tmp=""
+  if [[ -n "$tmp" ]]; then
+    while IFS="$(printf '\t')" read -r i_num i_slot i_path; do
+      [[ -n "$i_num" ]] || continue
+      if [[ -z "$i_path" || -d "$i_path" ]]; then printf '%s\t%s\t%s\n' "$i_num" "$i_slot" "$i_path" >> "$tmp"; fi
+    done < "$f"
+    mv "$tmp" "$f" 2>/dev/null || rm -f "$tmp"
+  fi
+
+  # Already allocated? Keep it.
+  mine="$(awk -F"\t" -v n="$num" '$1==n {print $2; exit}' "$f" 2>/dev/null)"
+  if [[ "$mine" =~ ^[0-9]+$ ]]; then printf '%s' "$mine"; return 0; fi
+
+  held="$(cut -f2 "$f" 2>/dev/null | tr '\n' ' ')"
+  i=0
+  while [[ "$i" -lt 40 ]]; do
+    case " $held " in *" $i "*) : ;; *) printf '%s\t%s\t%s\n' "$num" "$i" "$wt" >> "$f" 2>/dev/null; printf '%s' "$i"; return 0 ;; esac
+    i=$(( i + 1 ))
+  done
+  echo "[#$num] warn: all 40 dev-port slots are held — falling back to a hashed port (collisions possible); run cckit gc" >&2
+  printf '%s' $(( num % 40 ))
+}
+
 wt_assign_ports() {
   # `apppath`, not `path`: under zsh `path` is tied to PATH (special array); a bare `path` local
   # would clobber the command search path on assignment. A namespaced name is inert.
-  local wt="$1" num="$2" root="$3" cfg ports n offset i apppath base
-  cfg="$root/.claude/kit.config.json"
+  local wt="$1" num="$2" root="$3" cfg ports n offset i apppath base stride spread
+  # Both supported layouts (self-host root cckit.config.json · scaffolded
+  # .claude/kit.config.json) via the same resolver used below. Hardcoding the scaffolded
+  # path made this a silent no-op in every self-hosting repo: ports read as "assigned"
+  # and nothing was ever written.
+  cfg="$(_wt_cfg "$root")" || return 0
   # jq is a stated requirement of this file (see header) — don't pre-check `command -v jq` here: the
   # `command -v … || return` idiom mis-fires under zsh, and the jq read below already no-ops on a
   # missing config / missing jq. Guard only on the config file existing.
@@ -42,11 +102,30 @@ wt_assign_ports() {
   ports="$(jq -c '.worktree.devPorts // []' "$cfg" 2>/dev/null)" || return 0
   [[ -n "$ports" && "$ports" != "[]" ]] || return 0
   n="$(jq 'length' <<<"$ports" 2>/dev/null)"; [[ "$n" =~ ^[0-9]+$ && "$n" -gt 0 ]] || return 0
-  offset=$(( num % 40 )); i=0
+
+  # STRIDE — the distance between one worktree's port block and the next. It must NOT be the
+  # service count: with stride == n, two bases that are congruent mod n hand the same port to two
+  # different worktrees. Real example (bases 3001/3003/3004, n=3): worktree offset k+1's admin port
+  # (3004+3k) IS worktree offset k's api port. Configurable as `worktree.devPortStride`; the default
+  # leaves room for up to 10 services per project.
+  stride="$(jq -r '.worktree.devPortStride // empty' "$cfg" 2>/dev/null)"
+  [[ "$stride" =~ ^[0-9]+$ && "$stride" -gt 0 ]] || stride=10
+
+  # The invariant that keeps blocks disjoint: every base must sit inside ONE stride-wide window.
+  # Warn rather than fail — the ports still work, they just stop being collision-proof, and a
+  # config the owner can fix should not break `cckit start`.
+  spread="$(jq -r '[.[].base] | (max - min)' <<<"$ports" 2>/dev/null)"
+  if [[ "$spread" =~ ^[0-9]+$ && "$spread" -ge "$stride" ]]; then
+    echo "[#$num] warn: worktree.devPorts bases span $spread >= stride $stride — port blocks can overlap across worktrees; widen worktree.devPortStride" >&2
+  fi
+
+  offset="$(_wt_slot_for "$root" "$num" "$wt")"
+  [[ "$offset" =~ ^[0-9]+$ ]] || offset=$(( num % 40 ))
+  i=0
   while [[ "$i" -lt "$n" ]]; do
     apppath="$(jq -r ".[$i].path // empty" <<<"$ports")"
     base="$(jq -r ".[$i].base // empty" <<<"$ports")"
-    [[ -n "$apppath" && "$base" =~ ^[0-9]+$ ]] && _wt_set_port "$wt/$apppath" $(( base + offset * n )) "$num"
+    [[ -n "$apppath" && "$base" =~ ^[0-9]+$ ]] && _wt_set_port "$wt/$apppath" $(( base + offset * stride )) "$num"
     i=$(( i + 1 ))
   done
 }
