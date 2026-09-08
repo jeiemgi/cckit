@@ -30,7 +30,7 @@ The role determines which agent owns the work. Spawn that agent for the actual e
 2. `/kit-task-start <N>` — isolated worktree + branch from the base, mark In Progress
 3. Do the work (spawn the owning agent)
 4. `/kit-task-pr <N>` — commit, push, open PR
-5. `/kit-task-pr-merge` — squash-merge, back to main
+5. `/kit-task-pr-merge` — squash-merge, back to `{{BASE_BRANCH}}`
 6. `/kit-task-close <N>` — close issue<!-- IF:PLANS -->, archive plan if all deliverables merged<!-- /IF:PLANS -->
 
 ## Rules

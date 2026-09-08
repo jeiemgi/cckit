@@ -11,6 +11,12 @@ adapter one) — is described in [the Adapters page](docs-site/src/content/docs/
 - **Read state before acting.** `cckit sync --llm` returns the board as TOON. Decide from data.
 - **One issue = one branch = one worktree = one PR.** `cckit start <issue>` creates the isolated
   worktree; do all work there; `cckit pr <issue>` opens the PR. Never commit to the base branch.
+  **The effort flow is the one exception, and it is deliberate:** an effort is *1 parent issue = 1
+  `effort/<N>` branch = 1 PR* covering **N sub-issues**. Sequential sub-issues commit straight onto
+  `effort/<N>` (one commit per sub-issue — that commit's diff is the sub's patch); parallel ones get
+  their own file-disjoint `sub/<N><letter>` worktree and merge back into `effort/<N>`. Either way
+  exactly one PR opens, from `effort/<N>` — never one per sub-issue. Full spec:
+  `.claude/rules/effort-model.md`.
 - **Structured output, TOON-first.** Append `--llm` to any verb for machine-readable output. List
   reads (sync, next, plan, wave) come back as **TOON** (token-cheap); single-result action verbs
   (start, pr, close) return one JSON object. Human (pretty) output is the default; agents prefer `--llm`.
@@ -19,6 +25,23 @@ adapter one) — is described in [the Adapters page](docs-site/src/content/docs/
 - **Hand off when you stop with unfinished work.** `cckit handoff "<what's pending, next step, refs>"`
   saves a local resume-here note; bare `cckit` (no verb) prints it so the next session resumes
   exactly where this one stopped.
+- **Run durable prose through `concrete` before writing it.** Every durable artifact — a commit
+  message, a PR or issue body, a rule, an ADR, a knowledge doc — goes through
+  `.claude/skills/concrete/SKILL.md`: cut only by named offense, never by length;
+  evidence, commands, paths and numbers are untouchable; `O13` unverifiable claim and `O14` undecided
+  decision are fixed at the gap, not reworded. `cckit brief <issue>` emits this instruction in its
+  `## Durable prose` section, so a delegated agent gets it without being told twice.
+
+## What cckit installs for itself
+
+`templates/` is what `cckit init` writes into a consuming project. `.claude/skills/` and
+`.claude/rules/` in this repo are the subset cckit applies to its **own** work — `concrete`,
+`karpathy-guidelines`, and the rules for branches, efforts, PR titles, delegation and communication
+style. No agents are installed: this file plus `cckit brief` is the delegation contract here.
+
+The manifest and the reason for every skipped template are in `scripts/self-install-test.sh`, which
+also fails if an installed copy drifts from its template. Edit a template and its installed copy in
+the same commit.
 
 ## Core verbs
 
@@ -27,24 +50,32 @@ adapter one) — is described in [the Adapters page](docs-site/src/content/docs/
 | `cckit init` | scaffold config + `.claude/` | — |
 | `cckit sync` | board state / what's unblocked | `--llm` → TOON |
 | `cckit next` | the next unblocked issue + how to start it | `--llm` → TOON |
-| `cckit plan` | wave plan: deps-ordered, file-disjoint, session-fit | `--llm` → TOON |
+| `cckit plan` | wave plan: deps-ordered, priority-sorted within a wave, file-disjoint, session-fit | `--llm` → TOON |
 | `cckit plan-next` | forward plan: inventory current skills/verbs/rules/docs → propose what to build next | `--llm` → TOON |
+| `cckit status` | where are we: local undone work, open PRs waiting on a human, cleanup available (local + remote) | `--llm` → JSON |
+| `cckit brief <issue>` | the delegation brief for an issue, from real state: worktree, seed freshness, owned files, the helpers they sit on, standing gotchas | — |
 | `cckit wave` | read open efforts, propose incoming waves: fan-out brief + captain drive | `--llm` → TOON |
 | `cckit watch [--merge] [--loop]` | captain: gate open PRs, squash-merge CLEAN, advance the wave | — |
-| `cckit start <issue> [slug]` | isolated worktree + branch | `--llm` |
+| `cckit start <issue> [slug]` | isolated worktree + branch, bootstrapped: env files copied, per-worktree dev PORT, deps installed at the selected targets. Precedence: **`worktree.installPaths` if set** (those dirs only, installed whether or not each declares dependencies — `[]` installs nothing, and the root/workspace checks are skipped entirely), **else** the root *only when* its manifest declares dependencies or it is a workspace root **with at least one member** (a non-empty `packages:` list, or a non-empty `workspaces` / `workspaces.packages` array), **else nothing** — so a dependency-free root never gets a stray empty `pnpm-lock.yaml`. `installPaths` entries that escape the worktree are refused. `KIT_WT_INSTALL=0` skips the install | `--llm` |
 | `cckit pr <issue> <summary>` | commit + push + open PR | `--llm` |
 | `cckit close <issue> <summary>` | close issue + mark done | `--llm` |
 | `cckit effort new "<name>" ["sub :: desc" …]` | parent (4-section body + ctx/kind/priority/role/flow labels) + linted native sub-issues — identical to `/kit-effort-new` (one shared core); `start`/`pr`/`close` take `<slug\|N>` | flags: `--flow/--role/--priority/--goal/--scope/--for-agents/--verification/--depends-on/--milestone`, `--slug` |
+| `cckit effort chain <a> <b> [<c> …]` | wire 2+ issues into a linear order: `b` `blocked_by` `a`, `c` `blocked_by` `b`, plus a `- Depends on #<predecessor>` line in each successor's `## Relations` section. These are the edges `cckit plan` layers into waves. Idempotent (an edge or line already there is skipped); pre-existing blockers are kept, never replaced. Validates everything first — fewer than two numbers, a non-numeric arg, an issue that does not exist, a repeated number, or an edge that would close a cycle refuses the whole chain and writes nothing | — |
+| `cckit effort start [--force] <slug\|N> [slug]` | effort branch + bootstrapped worktree, **WIP-limited**: refuses a NEW effort once `effort.wipLimit` (default 2) are already in progress. In progress = an `effort/<N>-<slug>` branch exists as a local head **or** on origin, read with `git ls-remote` rather than the cached `refs/remotes` (which is wrong both ways: it misses a branch pushed since the last fetch and keeps one deleted on origin until a prune). At the limit refuses; only strictly under it starts. Re-starting an effort that is already in progress is never gated. The check runs before the fetch/branch/worktree/bootstrap, so a refusal makes no branch, no worktree and no board change — it is not read-free (it queries origin, and a `<slug>` arg was resolved first, which can run `gh issue list`). `0` refuses every ordinary start; `--force` still starts. A non-integer value is ignored with a warning and the default 2 is used; `EFFORT_WIP_LIMIT` overrides the config per invocation. `EFFORT_WIP_REMOTE=0` — or an unreachable origin, which warns and proceeds — counts the cached refs instead. Does **not** gate `cckit start <issue>` | `--force`, or `KIT_FORCE=1` |
 | `cckit effort plan` | session-fit effort plan | `--llm` → JSON |
 | `cckit orchestrate <a> <b> …` | run N flows in parallel worktrees | — (use `--dry-run`) |
 | `cckit autopilot [<a> …]` | unattended multi-flow: drive (or auto-pick) issues under a cap | — (use `--dry-run`) |
-| `cckit gc` | report prunable branches + worktrees | `--llm` → JSON counts |
+| `cckit gc` | report prunable branches + worktrees — never one whose issue is still open; aborts if the protection helper is missing | `--llm` → JSON counts |
+| `cckit cleanup [--yes]` | the guided destructive sweep over that report: plan first, delete only the SAFE rows and prune the listed ZOMBIE metadata (staged work recovered to its branch first); ORPHAN / PROTECTED / stashes are never deletable | `--llm` → JSON counts + `applied` |
 | `cckit render` | stdin markdown → rich (glow on a TTY; verbatim when piped) | — |
 | `cckit version` | the installed cckit version | `--llm` |
 
 Every verb accepts a global `--llm` (alias `--output=json`); verbs that produce a result emit a
 single JSON object/array on stdout, with human text on stderr. Interactive/launch verbs
 (`init`, `orchestrate`, `autopilot`) have no JSON result — use `--dry-run` to inspect their plan.
+`cckit brief` has no JSON form either, and deliberately: its output IS the prompt you hand a
+delegated agent, so markdown is the machine-readable form. Read the facts behind it as data with
+`cckit lib --llm` and `cckit status --llm`.
 
 > **`cckit plan-next` is the one exception to "feed verb output back to the model."** Its forward
 > plan is for the human/orchestrator's decision only — never inject it into a monitored model's

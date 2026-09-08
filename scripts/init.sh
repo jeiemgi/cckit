@@ -367,6 +367,33 @@ if [[ -z "$GH_OWNER" ]]; then GH_OWNER="$(gh api user --jq .login 2>/dev/null ||
 [[ -z "$REPO" && -n "$GH_OWNER" ]] && REPO="$GH_OWNER/$SLUG"
 [[ -z "$REPO" ]] && REPO="$SLUG"
 
+# ---- base branch ---------------------------------------------------------
+# Rules that name the integration branch are TEMPLATED on it ({{BASE_BRANCH}}), so a project that
+# integrates on `develop` does not scaffold a rule telling agents to branch from `main` (#283).
+# Resolved the same way the rest of the kit resolves it (kit-config.sh: baseBranch -> integrationBranch
+# -> flow -> "main"), then WRITTEN into the generated config below — a rendered rule that disagrees
+# with KIT_BASE_BRANCH is the bug this parameterization exists to remove.
+#   1. KIT_BASE_BRANCH from the environment (an explicit caller override)
+#   2. the project's existing config, found by kit_config_path (re-init / --upgrade keeps the
+#      project's choice) — the ONE resolver, so this honors $KIT_CONFIG and finds a config in an
+#      ancestor directory. Hand-checking two TARGET-local filenames skipped both.
+#   3. the repo's actual GitHub default branch (same source as REPO/GH_OWNER above)
+#   4. "main"
+# Unconditional, not `[[ -z ${BASE_BRANCH:-} ]]`: KIT_BASE_BRANCH is the DOCUMENTED override, and
+# BASE_BRANCH is an internal name this script exports for `emit` — an inherited BASE_BRANCH from a
+# caller's environment must not silently outrank it.
+BASE_BRANCH="${KIT_BASE_BRANCH:-}"
+if [[ -z "$BASE_BRANCH" ]]; then
+  # shellcheck source=/dev/null
+  . "$KIT_ROOT/scripts/lib/config-path.sh"
+  _bb_cfg="$(kit_config_path "$TARGET" 2>/dev/null || true)"
+  if [[ -n "$_bb_cfg" && -f "$_bb_cfg" ]]; then
+    BASE_BRANCH="$(jq -r '.github.baseBranch // .github.integrationBranch // .github.flow // empty' "$_bb_cfg" 2>/dev/null || true)"
+  fi
+fi
+[[ -z "$BASE_BRANCH" ]] && BASE_BRANCH="$(cd "$TARGET" 2>/dev/null && gh repo view --json defaultBranchRef -q .defaultBranchRef.name 2>/dev/null || true)"
+[[ -z "$BASE_BRANCH" ]] && BASE_BRANCH="main"
+
 # profile defaults
 [[ -z "$PLANS_FORMAT" ]] && PLANS_FORMAT="$(jq -r '.defaults.plans_format' "$PROFILE_FILE")"
 [[ -z "$MEMORY" ]] && MEMORY="$(jq -r '.defaults.memory' "$PROFILE_FILE")"
@@ -465,6 +492,7 @@ done
 # ---- export vars for substitution ---------------------------------------
 export PROJECT_NAME="$NAME" PROJECT_SLUG="$SLUG" OWNER_NAME="$OWNER_NAME" COMMS_LANG="$LANG_PREF"
 export PROFILE GH_REPO="$REPO" GH_OWNER="$GH_OWNER" PROJECT_NUMBER PROJECT_BOARD_TITLE="$NAME"
+export BASE_BRANCH
 export PLANS_DIR PLANS_FORMAT KNOWLEDGE_DIR="knowledge" WING="$SLUG" CLAUDE_PROJECT_SLUG
 export MILESTONES_HUMAN ROLES_HUMAN AGENT_TABLE SKILL_TABLE
 export KIT_FLAGS_ON="$FLAGS_ON"
@@ -538,6 +566,7 @@ if [[ $DRY_RUN -eq 1 ]]; then
   echo "  Profile : $PROFILE"
   echo "  Project : $NAME ($SLUG)"
   echo "  Repo    : $REPO"
+  echo "  Base    : $BASE_BRANCH   (rules that name the integration branch render this)"
   echo "  Board   : $([[ "$PROJECTS_V2" == "true" ]] && echo "Projects v2 #$PROJECT_NUMBER" || echo "off (gh issues only)")"
   echo "  Memory  : $MEMORY_BOOL   Plans: $PLANS_FORMAT   Lang: $LANG_PREF"
   echo "  Spec Kit: $SPECKIT_ON   Pre-push gate: $PREPUSH_ENABLED   Local model: $LOCAL_ON   kitVersion: $PLUGIN_VERSION"
@@ -603,6 +632,7 @@ jq -n \
   --arg name "$NAME" --arg slug "$SLUG" --arg owner "$OWNER_NAME" --arg lang "$LANG_PREF" --arg path "$TARGET" \
   --arg profile "$PROFILE" --argjson roles "$ROLES_JSON" \
   --arg repo "$REPO" --arg ghowner "$GH_OWNER" \
+  --arg base "$BASE_BRANCH" \
   --argjson pv2 "$PROJECTS_V2" --argjson pnum "$PNUM_JSON" --arg ptitle "$NAME" \
   --argjson milestones "$MS_JSON" \
   --arg pfmt "$PLANS_FORMAT" --arg pdir "$PLANS_DIR" \
@@ -613,7 +643,7 @@ jq -n \
   '{kitVersion:$kitver,
     project:{name:$name,slug:$slug,owner:$owner,language:$lang,path:$path},
     profile:$profile, roles:$roles,
-    github:{repo:$repo,owner:$ghowner,projectsV2:$pv2,projectNumber:$pnum,projectTitle:$ptitle},
+    github:{repo:$repo,owner:$ghowner,baseBranch:$base,projectsV2:$pv2,projectNumber:$pnum,projectTitle:$ptitle},
     milestones:$milestones,
     plans:{format:$pfmt,dir:$pdir},
     knowledge:{dir:"knowledge"},

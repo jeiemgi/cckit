@@ -11,6 +11,7 @@
 #   "engine": { "mode": "off" | "http", "url": "https://engine.example", "token_env": "CCKIT_ENGINE_TOKEN" }
 #
 # Source it, then call engine_cmd / engine_call.  Requires: jq, curl (only when mode != off).
+# errors: mixed — no-op when engine.mode=off; propagates once http is on
 
 _engine_cfg() { echo "${KIT_CONFIG:-.claude/kit.config.json}"; }
 

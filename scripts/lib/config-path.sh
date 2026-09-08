@@ -10,6 +10,7 @@
 #   kit_config_find <startdir>   walk startdir -> / for a project config; prints path (rc 0) or rc 1.
 #                                Ignores KIT_CONFIG — a pure "is <dir> under a kit project?" answer.
 #   kit_config_path [startdir]   KIT_CONFIG wins, else kit_config_find; prints path (rc 0) or rc 1.
+# errors: pure — dependency-free path resolution
 
 kit_config_find() {
   local d="${1:-$PWD}"

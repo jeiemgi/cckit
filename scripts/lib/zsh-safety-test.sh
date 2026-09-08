@@ -11,6 +11,7 @@
 #
 # Skips (rc 0) when zsh is absent, so the gate stays dependency-light (CI installs zsh, so it runs
 # there). bash 3.2 compatible. Run:  bash scripts/lib/zsh-safety-test.sh
+# errors: strict — a test runner: rc 1 on any failed assertion
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 LIB="$ROOT/scripts/lib"
@@ -45,6 +46,15 @@ run_zsh "kit-config.sh :: load_kit_config" \
 # kit-gc.sh — the `path` local in kit_gc_analyze's while-read (read-only, safe to run).
 run_zsh "kit-gc.sh :: kit_gc_analyze" \
   "cd '$ROOT'; export KIT_GC_REPO=jeiemgi/cckit; source scripts/lib/kit-config.sh; load_kit_config >/dev/null 2>&1; source scripts/lib/kit-gc.sh; kit_gc_analyze >/dev/null 2>&1"
+
+# kit-gc.sh — the sibling-lib load itself (#219). `BASH_SOURCE` is bash-only and an interactive zsh
+# echoes the directory after a `cd`, so both the old `${(%):-%x}` and a bare `$(cd … && pwd)` left
+# worktree-issue.sh unsourced — `wt_protected_reason` undefined, so every branch looked SAFE.
+# `unset -f` first: this runs `zsh -i`, which sources the user's init. If that already defined
+# `wt_protected_reason`, `_kit_gc_load_deps` returns early and the case would pass without ever
+# resolving the dir — the exact thing under test.
+run_zsh "kit-gc.sh :: sibling worktree-issue.sh actually loads" \
+  "cd '$ROOT'; unset -f wt_protected_reason 2>/dev/null; source scripts/lib/kit-gc.sh; _kit_gc_load_deps >/dev/null 2>&1; command -v wt_protected_reason >/dev/null 2>&1"
 
 # worktree-start.sh — the `path` local in wt_assign_ports (no-op without .worktree.devPorts).
 run_zsh "worktree-start.sh :: wt_assign_ports" \

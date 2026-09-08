@@ -61,6 +61,17 @@ It reads three things:
 - **Stack hints** — `package.json`, `pyproject.toml`, `go.mod`, `Cargo.toml`.
 - **Kit state** — `cckit.config.json`, `.claude/`, `.cckit/`.
 
+:::note[`.cckit/` is shared across worktrees]
+There is **one** `.cckit/` per repository, at the primary checkout — not one per worktree. It is
+resolved from git's shared common directory, so the captain's gate record, the resume-here handoff
+and your private denylist are the same files whether you run cckit from the checkout or from a
+worktree. Set `KIT_STATE_DIR` to override the location.
+
+This matters because cckit tells you to work in worktrees. Resolving state against the *current*
+worktree would give each one its own copy — a handoff saved in one place would read back as "no
+resume-here handoff saved" everywhere else.
+:::
+
 ## The permission gate (ask before operating)
 
 cckit asks before it changes anything in a repo it has not worked in before.
@@ -68,6 +79,148 @@ cckit asks before it changes anything in a repo it has not worked in before.
 - **Read-only by default in an unknown repo.** Before the first *mutating* operation, cckit records your consent in `.cckit/consent` (gitignored).
 - **The secret and privacy guard always runs** before anything is committed or published. It is not optional and consent does not bypass it — see [Security](/security/).
 - **Destructive or irreversible operations** (force-push, repo create, history rewrite) always require a separate, explicit confirmation.
+
+## Captain merge policy
+
+`cckit watch --merge` is the one place cckit lands code without a human in the loop, so its policy is
+config, not code. Everything below lives under `captain.mergePolicy` in the config file resolved
+above, and every key has an environment override that **always wins** — so you can opt in or out for
+a single invocation without editing the file.
+
+| Key | Default | What it does | Env override |
+| --- | --- | --- | --- |
+| `floors` | `true` | Refuse to auto-merge a PR that touches `.github/workflows/**`, a lockfile or dependency-graph file, or a security-sensitive path — and always honour a `hold` label. Verdict becomes `HELD`. | `KIT_CAPTAIN_FLOORS=0` |
+| `protectedGlobs` | `[]` | Extra path globs added to the floors above. | `KIT_CAPTAIN_EXTRA_GLOBS` |
+| `requireChecks` | `false` | Treat a PR with **no checks at all** as unverified rather than green. Verdict becomes `CHECKS_MISSING`, action `verify`. | `KIT_CAPTAIN_REQUIRE_CHECKS=1` |
+
+### Why `requireChecks` exists
+
+The captain decides from three things GitHub reports about a PR: whether it merges cleanly, its merge
+state, and its **check rollup**. When that rollup is *empty* there is nothing to read — and an empty
+rollup is not a pass, it is the **absence of evidence**. Read as green, it means a repo with no CI is
+auto-mergeable by construction: "the gates are green" was never observed, only assumed.
+
+Turn `requireChecks` on and that case gets its own verdict, distinct from the two that already exist:
+
+| Verdict | Action | What actually happened |
+| --- | --- | --- |
+| `CHECKS_FAILING` | `fix` | Something ran and went red. |
+| `CHECKS_PENDING` | `wait` | Something is still running — come back. |
+| `CHECKS_MISSING` | `verify` | Nothing ran. There is no evidence to wait for. |
+
+It also closes a smaller race: a PR gated in the seconds before CI registers has an empty rollup too,
+so with `requireChecks` on the captain waits for the checks to appear instead of merging into the gap.
+
+<Aside type="caution" title="It is off by default — on purpose">
+A repo with no CI, reviewed by a human, is a legitimate setup. Requiring evidence everywhere would
+turn that into a captain that merges nothing and reports steady state with no explanation — a silent
+stall, harder to debug than the thing it prevents. So the default keeps existing behaviour, and
+instead `cckit watch` **says the assumption out loud**: any pass that would merge a PR with an empty
+rollup prints that green was assumed, not proved, and names this key. If your repo has CI, set it to
+`true` — cckit sets it on itself.
+</Aside>
+
+## Worktree bootstrap
+
+`cckit start <issue>` and `cckit effort start <N>` make a fresh worktree runnable before you touch it:
+they copy the gitignored `.env.local*` files and project ids a new checkout can't inherit, assign a
+per-worktree dev `PORT` per app, and install dependencies — `node_modules` is per-worktree, never
+shared. Every step is best-effort: a hiccup prints and moves on, it never fails the start.
+
+### Where the install runs
+
+The install step decides from **your project**, in this precedence — the first rule that applies wins,
+and the ones below it are never consulted:
+
+<Steps>
+
+1. **`worktree.installPaths` is set** → install in exactly those directories, and only those. The
+   root and workspace checks below are skipped entirely; `[]` means *install nothing*.
+
+2. **Otherwise, the worktree root** — but only when its `package.json` declares at least one
+   dependency (in `dependencies`, `devDependencies`, `optionalDependencies` or `peerDependencies`),
+   **or** it is a workspace root **with at least one member** (`pnpm-workspace.yaml` whose
+   `packages:` lists a pattern, or — in `package.json` — a non-empty `workspaces` array or a
+   non-empty `workspaces.packages` array). A workspace root holds its members' deps, so the
+   install there is real work. A `workspaces` object whose `packages` list is empty counts as
+   memberless, however many other keys it carries.
+
+3. **Otherwise nothing** — the start prints `no dependencies declared — skipping pnpm install`.
+
+</Steps>
+
+Rule 3 is the point. A root manifest with no dependencies has nothing to resolve, but pnpm would
+still write an empty `pnpm-lock.yaml` (`importers: { .: {} }`) — a file that then trips the
+[captain's own lockfile policy floor](#captain-merge-policy) and holds the PR for human review. cckit
+itself is exactly this shape: a published bash CLI with zero dependencies whose only Node project is
+`docs-site/`.
+
+The "at least one member" clause in rule 2 matters for the same reason: `packages: []`,
+`"workspaces": []` and `"workspaces": {"packages": []}` all *look* like workspace roots but declare
+nothing, so installing at them lands right back on the empty lockfile.
+
+### Installing somewhere other than the root
+
+When your Node project lives in a subdirectory, name the directories under `worktree.installPaths` in
+the config file resolved above:
+
+```json
+{
+  "worktree": {
+    "installPaths": ["docs-site"]
+  }
+}
+```
+
+| Key | Default | What it does | Env override |
+| --- | --- | --- | --- |
+| `worktree.installPaths` | *(unset — fall through to rule 2)* | Worktree-relative directories to run `pnpm install` in. Wins over rules 2–3; `[]` installs nothing. | — |
+| `worktree.devPorts` | `[]` | `{path, base}` per app: the per-worktree dev `PORT` written into that app's `.env.local`. | — |
+| — | install on | Skip the dependency install entirely for one invocation. | `KIT_WT_INSTALL=0` |
+
+<Aside type="caution" title="installPaths cannot leave the worktree">
+Entries are worktree-**relative** and validated for containment: an absolute path, or one that climbs
+out with `..`, or a symlink pointing outside the tree, is refused with a message and skipped. A
+worktree sits three levels under the primary checkout, so an escaping entry would otherwise run pnpm
+in a shared checkout — writing `node_modules` and a lockfile into another session's working tree.
+</Aside>
+
+<Aside type="tip" title="Nothing is hardcoded">
+The kit carries no project's layout. Both keys are config, and the fallback is a question asked of
+*your* `package.json` — so a repo with real root dependencies still gets its install, unchanged.
+</Aside>
+
+## Effort WIP limit
+
+`cckit effort start` refuses to start a **new** effort once too many are already in progress. The
+counted set is the efforts whose `effort/<N>-<slug>` branch exists — a local head **or** a branch
+origin has right now, read with `git ls-remote` rather than the cached `refs/remotes`. Set the
+ceiling in the config file resolved above:
+
+```json
+{
+  "effort": {
+    "wipLimit": 3
+  }
+}
+```
+
+| Key | Default | What it does | Env override |
+| --- | --- | --- | --- |
+| `effort.wipLimit` | `2` | How many efforts may be in progress before `cckit effort start` refuses a *new* one. **At** the limit refuses; only strictly under it starts. `0` refuses every *ordinary* start — a forced one still runs. A value that is not a non-negative integer is ignored with a warning and the default `2` is used. | `EFFORT_WIP_LIMIT` |
+| — | gate on | Start anyway, past the limit. Flag or env — either alone is enough. | `--force`, or `KIT_FORCE=1` |
+| — | origin queried | Skip the `git ls-remote` origin query; count local heads + cached `refs/remotes` instead. An unreachable origin falls back to the same cached refs, warns once on stderr, and the start proceeds. | `EFFORT_WIP_REMOTE=0` |
+
+Resolution order, first non-empty wins: `EFFORT_WIP_LIMIT` in the environment →
+`KIT_EFFORT_WIP_LIMIT` (what `load_kit_config` exports from `effort.wipLimit`) → `effort.wipLimit`
+read straight from the config file → the built-in default `2`.
+
+The check runs before the base-branch fetch, the branch, the worktree and the bootstrap, so a
+refusal leaves no branch, no worktree and no board change. It is not read-free: the gate queries
+origin, and a `<slug>` argument was resolved before it, which can run `gh issue list`. Re-running
+`cckit effort start` on an effort that is *already* in progress is never gated — it adds no WIP.
+`cckit start <issue>` (a plain task worktree) has no WIP limit. Full behaviour:
+[Only so many efforts at once](/efforts-and-waves/#only-so-many-efforts-at-once).
 
 ## Identity
 

@@ -25,3 +25,6 @@
 
 - Commits, PR and issue bodies, rules, ADRs and knowledge docs go through the `concrete` skill
   before they are written: it names each cut by offense and never deletes for length.
+- **A delegated agent inherits this only through its brief.** Stating the mandate here does not make
+  it fire in a sub-agent — `delegation-brief.md` § *Durable prose — the concrete pass* is what
+  carries it into a delegated agent's context, and `cckit brief` emits that block.

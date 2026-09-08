@@ -5,6 +5,7 @@
 #
 # Without args: re-runs itself under every available shell. With WT_TEST_INNER set:
 # runs the assertions in the current interpreter.
+# errors: strict — a test runner: rc 1 on any failed assertion
 
 dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 
@@ -30,7 +31,20 @@ if [ -n "${WT_TEST_INNER:-}" ]; then
   check "main"                                     ""      # base branch
   check "task/29a3-x"                              ""      # malformed number
   check "task/293mobbin"                           ""      # missing dash
-  [ "$fail" -eq 0 ] && echo "OK($WT_TEST_INNER): 12 cases"
+  check "sub/1604a-parser"                         "1604"  # effort sub form <N><letter>
+  check "sub/1283m-x"                              "1283"  # effort sub, later letter
+  check "sub+1604a-parser"                         "1604"  # effort sub worktree dirname
+  check "sub/1604a4-x"                             ""      # letter not trailing
+  check "sub/16a04-x"                              ""      # letter embedded mid-number
+  check "sub/1604A-x"                              ""      # uppercase suffix is not the sub form
+  check "sub/a-x"                                  ""      # letter with no number
+  # The <N><letter> suffix is accepted for EVERY lowercase kind, not just `sub`. Deliberate: a
+  # spurious association can only ever ADD issue-open protection (an unrelated #N is either open
+  # → keep, or closed/absent → no claim), never remove it. Narrowing this to `sub` would make gc
+  # willing to delete a misnamed live branch — the failure mode this whole lib exists to prevent.
+  check "feat/1604a-parser"                        "1604"  # non-sub kind, suffix still protects
+  check "feat+1604a-parser"                        "1604"  # same, worktree dirname form
+  [ "$fail" -eq 0 ] && echo "OK($WT_TEST_INNER): 21 cases"
   exit "$fail"
 fi
 

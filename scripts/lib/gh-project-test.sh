@@ -6,6 +6,7 @@
 # Covered: _ghp_owner_root resolution, kit-config exporting KIT_PROJECT_OWNER_TYPE, and
 # capture-project-ids.sh selecting the matching root end-to-end (stubbed gh — no network).
 # Run:  bash scripts/lib/gh-project-test.sh
+# errors: strict — a test runner: rc 1 on any failed assertion
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 LIB="$ROOT/scripts/lib"

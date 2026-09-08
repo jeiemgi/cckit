@@ -3,10 +3,10 @@
 # next unblocked wave, and checkpoint so the loop can stop and resume (Effort 75 · #77).
 #
 # Autopilot has two halves. `orchestrate`/`autopilot` LAUNCH the per-issue flows; the captain CLOSES
-# them — it inspects each PR, decides (CLEAN / CONFLICTING / CHECKS_FAILING / CHECKS_PENDING / DRAFT /
-# BLOCKED), merges what is ready, and lets the freshly-merged issues unblock the next wave. This is
-# the half that used to be left to the driving agent; now it is a script the agent (or `cckit watch`)
-# runs in a loop.
+# them — it inspects each PR, decides (CLEAN / CONFLICTING / CHECKS_FAILING / CHECKS_PENDING /
+# CHECKS_MISSING / DRAFT / BLOCKED), merges what is ready, and lets the freshly-merged issues unblock
+# the next wave. This is the half that used to be left to the driving agent; now it is a script the
+# agent (or `cckit watch`) runs in a loop.
 #
 #   cckit watch                 one pass: gate every open PR, report (no merge) — safe default
 #   cckit watch --merge         gate + squash-merge the CLEAN PRs, then show the next wave
@@ -16,8 +16,28 @@
 #
 # Gate decision is three pure helpers (cap_checks_summary / cap_classify / cap_action) so the policy
 # is unit-tested without the network. Requires gh + jq. bash 3.2 / zsh compatible.
+# errors: mixed — cap_* are pure; captain_gate/captain_pass propagate a gh failure
 
 CAPTAIN_REPO="${CAPTAIN_REPO:-${KIT_REPO:-}}"
+
+# State lives in the shared .cckit/ (kit-state.sh), never CWD-relative: the captain gates the whole
+# repo, so its record must be the same file from the primary checkout and from every worktree.
+# Locate the sibling portably — BASH_SOURCE is bash-only and empty in zsh (#313).
+if [ -n "${BASH_SOURCE:-}" ]; then
+  _cap_self="$BASH_SOURCE"
+elif [ -n "${ZSH_VERSION:-}" ]; then
+  eval '_cap_self="${(%):-%x}"'
+else
+  _cap_self="$0"
+fi
+if [ -f "$(dirname "$_cap_self")/kit-state.sh" ]; then
+  # shellcheck source=kit-state.sh
+  . "$(dirname "$_cap_self")/kit-state.sh"
+fi
+unset _cap_self
+if [ -z "${CAPTAIN_STATE:-}" ] && command -v kit_state_file >/dev/null 2>&1; then
+  CAPTAIN_STATE="$(kit_state_file captain.state)"
+fi
 CAPTAIN_STATE="${CAPTAIN_STATE:-.cckit/captain.state}"
 
 # cap_checks_summary — collapse a gh statusCheckRollup JSON array (stdin) to one token:
@@ -35,8 +55,22 @@ cap_checks_summary() {
 
 # cap_classify <mergeable> <mergeStateStatus> <checksSummary> — pure verdict for one PR.
 # mergeable: MERGEABLE|CONFLICTING|UNKNOWN · mss: CLEAN|DIRTY|DRAFT|BLOCKED|BEHIND|UNSTABLE|…
+#
+# CHECKS_MISSING — "the exit criteria could not be observed". An EMPTY statusCheckRollup collapses to
+# NONE, and NONE is not a pass: it is the ABSENCE of evidence. Read as green it means a repo with no
+# CI is auto-mergeable by construction, which is how an unattended captain lands a change nothing
+# ever verified. When evidence is REQUIRED (KIT_CAPTAIN_REQUIRE_CHECKS=1, or
+# captain.mergePolicy.requireChecks:true in the kit config — env wins) that case becomes its own
+# verdict, distinct from CHECKS_FAILING (something ran and went red) and CHECKS_PENDING (something is
+# still running), and its action is `verify`, never `merge`.
+#
+# DEFAULT OFF. Requiring evidence in every repo would turn a legitimate no-CI, human-reviewed
+# workflow into a captain that silently merges nothing and reports steady state, so the default keeps
+# today's behaviour and `captain_pass` instead PRINTS the assumption it is making (see the "green was
+# assumed" advisory) with the key that closes it. The narrow guard below is deliberate: only the
+# verdict that would have been CLEAN can change, so nothing else in the vocabulary moves.
 cap_classify() {
-  local mergeable="$1" mss="$2" checks="$3"
+  local mergeable="$1" mss="$2" checks="$3" require
   case "$mss" in DRAFT) echo DRAFT; return 0 ;; esac
   case "$mergeable" in CONFLICTING) echo CONFLICTING; return 0 ;; esac
   case "$mss" in DIRTY) echo CONFLICTING; return 0 ;; esac
@@ -44,22 +78,32 @@ cap_classify() {
     FAIL)    echo CHECKS_FAILING; return 0 ;;
     PENDING) echo CHECKS_PENDING; return 0 ;;
   esac
+  # Literal case patterns only (a variable in a case pattern matches literally under zsh).
+  case "${KIT_CAPTAIN_REQUIRE_CHECKS:-0}" in 1|true|yes|on) require=1 ;; *) require=0 ;; esac
   case "$mergeable" in
     MERGEABLE)
       # passing or no required checks, and not draft/dirty/conflicting -> ready.
-      case "$mss" in CLEAN|UNSTABLE|HAS_HOOKS|"") echo CLEAN; return 0 ;; esac
+      case "$mss" in
+        CLEAN|UNSTABLE|HAS_HOOKS|"")
+          if [ "$require" = "1" ] && [ "$checks" = "NONE" ]; then echo CHECKS_MISSING; return 0; fi
+          echo CLEAN; return 0 ;;
+      esac
       echo BLOCKED; return 0 ;;
   esac
   echo BLOCKED
 }
 
 # cap_action <state> — the action the captain takes for a verdict.
+# CHECKS_MISSING -> `verify`, not `wait` (nothing is coming — no check exists to finish) and not
+# `hold` (that is the policy-floor action, reported as "policy floor: <reason>"). Someone must go
+# produce or point at the evidence.
 cap_action() {
   case "$1" in
     CLEAN)          echo merge ;;
     CONFLICTING)    echo rebase ;;
     CHECKS_FAILING) echo fix ;;
     CHECKS_PENDING) echo wait ;;
+    CHECKS_MISSING) echo verify ;;
     DRAFT)          echo wait ;;
     HELD)           echo hold ;;
     *)              echo skip ;;
@@ -77,6 +121,12 @@ cap_action() {
 # Disable entirely with KIT_CAPTAIN_FLOORS=0 (or captain.mergePolicy.floors:false in config). Extend
 # the protected set with KIT_CAPTAIN_EXTRA_GLOBS (space-separated case-globs). Draft state is honored
 # separately by cap_classify (DRAFT -> wait). Pure — no gh; unit-tested. bash 3.2 / zsh safe.
+#
+# A floor is about WHAT THE PR TOUCHES, so it needs the file list and labels and it downgrades a
+# would-be merge to HELD. Missing check evidence is about WHAT IS KNOWN about the PR — decidable from
+# the rollup token alone — so it is a cap_classify verdict (CHECKS_MISSING) instead. Keeping them
+# apart keeps both reasons legible: "a human must sign off on this path" is not the same finding as
+# "nothing ever verified this", and HELD's report line names a floor that would not exist.
 cap_policy_floor() {
   local files="$1" labels="$2" f g extra hit
   [ "${KIT_CAPTAIN_FLOORS:-1}" = "0" ] && return 0
@@ -117,23 +167,40 @@ EOF
   return 0
 }
 
+# _cap_cfg_bool <cfg> <key> — echo "true"/"false" for captain.mergePolicy.<key>, or NOTHING when the
+# key is absent. Deliberately NOT `// empty`: jq's `//` treats a literal `false` as absent, so
+# `.foo // empty` silently swallows an explicit opt-out — which is exactly how
+# `captain.mergePolicy.floors:false` came to be documented but inert. `has()` distinguishes
+# "set to false" from "not set", which is the whole distinction a tri-state override needs.
+_cap_cfg_bool() {
+  jq -r --arg k "$2" '
+    .captain.mergePolicy
+    | if type == "object" and has($k) and (.[$k] | type == "boolean")
+      then (.[$k] | tostring) else empty end' "$1" 2>/dev/null
+}
+
 # _cap_load_policy_config — bridge captain.mergePolicy from the kit config into the env the pure
-# floor helper reads, so a project can override the floors declaratively. Env always wins (a value
-# already set is left untouched). Best-effort: no config / no jq -> defaults (floors ON).
+# helpers read, so a project can set the merge policy declaratively. Env always wins (a value already
+# set is left untouched). Best-effort: no config / no jq -> defaults (floors ON, requireChecks OFF).
 _cap_load_policy_config() {
   command -v jq >/dev/null 2>&1 || return 0
   local cfg="${KIT_CONFIG:-}"
   [ -n "$cfg" ] || { [ -f cckit.config.json ] && cfg=cckit.config.json || cfg=.claude/kit.config.json; }
   [ -f "$cfg" ] || return 0
   if [ -z "${KIT_CAPTAIN_FLOORS:-}" ]; then
-    case "$(jq -r '.captain.mergePolicy.floors // empty' "$cfg" 2>/dev/null)" in
+    case "$(_cap_cfg_bool "$cfg" floors)" in
       false) KIT_CAPTAIN_FLOORS=0 ;; true) KIT_CAPTAIN_FLOORS=1 ;;
     esac
   fi
   if [ -z "${KIT_CAPTAIN_EXTRA_GLOBS:-}" ]; then
     KIT_CAPTAIN_EXTRA_GLOBS="$(jq -r '(.captain.mergePolicy.protectedGlobs // []) | join(" ")' "$cfg" 2>/dev/null || echo "")"
   fi
-  export KIT_CAPTAIN_FLOORS KIT_CAPTAIN_EXTRA_GLOBS
+  if [ -z "${KIT_CAPTAIN_REQUIRE_CHECKS:-}" ]; then
+    case "$(_cap_cfg_bool "$cfg" requireChecks)" in
+      true) KIT_CAPTAIN_REQUIRE_CHECKS=1 ;; false) KIT_CAPTAIN_REQUIRE_CHECKS=0 ;;
+    esac
+  fi
+  export KIT_CAPTAIN_FLOORS KIT_CAPTAIN_EXTRA_GLOBS KIT_CAPTAIN_REQUIRE_CHECKS
 }
 
 # _cap_issue_of_branch <branch> — issue number a flow branch encodes (task/47-x, fix/9-y, effort/12-z).
@@ -142,9 +209,10 @@ _cap_issue_of_branch() {
 }
 
 # captain_gate <pr#> — fetch + classify one PR. Echoes
-# "pr<TAB>issue<TAB>state<TAB>action<TAB>title<TAB>reason". A CLEAN PR that trips a policy floor
-# (cap_policy_floor) is downgraded to HELD/hold so the captain never auto-merges it; `reason` carries
-# the floor that tripped (empty otherwise).
+# "pr<TAB>issue<TAB>state<TAB>action<TAB>title<TAB>reason<TAB>checks". A CLEAN PR that trips a policy
+# floor (cap_policy_floor) is downgraded to HELD/hold so the captain never auto-merges it; `reason`
+# carries the floor that tripped (empty otherwise). `checks` is the raw rollup token (FAIL/PENDING/
+# PASS/NONE) — REPORTED, not re-decided, so captain_pass can say when a merge rests on NONE.
 captain_gate() {
   local repo="$CAPTAIN_REPO" pr="$1" j mergeable mss checks issue state action title branch files labels reason
   j="$(gh pr view "$pr" --repo "$repo" --json number,title,headRefName,mergeable,mergeStateStatus,statusCheckRollup,files,labels 2>/dev/null)" \
@@ -165,7 +233,7 @@ captain_gate() {
     reason="$(cap_policy_floor "$files" "$labels")"
     [ -n "$reason" ] && { state="HELD"; action="hold"; }
   fi
-  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$pr" "${issue:-—}" "$state" "$action" "$title" "$reason"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$pr" "${issue:-—}" "$state" "$action" "$title" "$reason" "$checks"
 }
 
 # _cap_open_prs [effort] — open PR numbers, optionally only those whose branch-issue is a sub of <effort>.
@@ -203,11 +271,15 @@ captain_pass() {
   CAPTAIN_MERGED=0
   _cap_load_policy_config   # bridge captain.mergePolicy from config into the floor env (env wins)
 
-  local prs pr row state action issue title reason merged_any=0
+  local prs pr row state action issue title reason checks merged_any=0 unproven=0
   prs="$(_cap_open_prs "$effort")"
   [ -n "$prs" ] || { echo "captain: no open PRs in scope"; return 0; }
 
-  : > "$CAPTAIN_STATE" 2>/dev/null || true
+  # The braces matter: redirections are processed left to right, so `: > "$f" 2>/dev/null` attempts
+  # the redirect BEFORE the suppression applies and the shell reports the failure anyway. Wrapping
+  # the whole group is what actually silences it. Ensure the dir first so it normally succeeds.
+  command -v kit_state_ensure >/dev/null 2>&1 && kit_state_ensure || true
+  { : > "$CAPTAIN_STATE"; } 2>/dev/null || true
   echo "captain: gating $(printf '%s\n' "$prs" | grep -c .) open PR(s)$( [ -n "$effort" ] && echo " for effort #$effort")"
   for pr in $prs; do
     row="$(captain_gate "$pr")" || continue
@@ -216,7 +288,11 @@ captain_pass() {
     issue="$(printf '%s' "$row" | cut -f2)"
     title="$(printf '%s' "$row" | cut -f5)"
     reason="$(printf '%s' "$row" | cut -f6)"
-    printf '%s\t%s\n' "$pr" "$state" >> "$CAPTAIN_STATE" 2>/dev/null || true
+    checks="$(printf '%s' "$row" | cut -f7)"
+    { printf '%s\t%s\n' "$pr" "$state" >> "$CAPTAIN_STATE"; } 2>/dev/null || true
+    # A merge resting on an EMPTY rollup: green was assumed, never observed. Counted here and named
+    # once at the end of the pass, so the assumption is on screen even with the requirement OFF.
+    if [ "$action" = "merge" ] && [ "$checks" = "NONE" ]; then unproven=$((unproven + 1)); fi
     if [ "$action" = "merge" ] && [ "$do_merge" = "1" ] && [ "$dry" = "0" ]; then
       if gh pr merge "$pr" --repo "$repo" --squash --delete-branch >/dev/null 2>&1; then
         printf '  PR #%-4s %-14s MERGED   (#%s %s)\n' "$pr" "$state" "$issue" "$title"
@@ -232,6 +308,18 @@ captain_pass() {
     fi
   done
   CAPTAIN_MERGED="$merged_any"
+
+  # Say the assumption out loud. `requireChecks` is default-off, so this advisory is what keeps it
+  # from being a safety feature nobody knows about: it fires at exactly the moment the risk is real
+  # (a PR the captain will merge whose rollup was EMPTY), names the key that closes it, and
+  # self-silences once the key is on — those PRs then read CHECKS_MISSING, so `unproven` stays 0.
+  if [ "$unproven" -gt 0 ]; then
+    printf 'captain: %s PR(s) read CLEAN with NO checks observed (empty rollup) — %s\n' \
+      "$unproven" "green was ASSUMED, not proved."
+    printf '         require evidence instead: captain.mergePolicy.requireChecks:true in your kit\n'
+    printf '         config (or KIT_CAPTAIN_REQUIRE_CHECKS=1). Those PRs then read CHECKS_MISSING\n'
+    printf '         -> verify, and the captain will not merge them.\n'
+  fi
 
   # advance: after merges, the newly-unblocked work shows up as the next wave.
   if [ "$merged_any" -gt 0 ]; then

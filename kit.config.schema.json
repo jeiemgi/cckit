@@ -69,7 +69,8 @@
       "additionalProperties": true,
       "properties": {
         "flows": { "type": "array", "items": { "type": "string" }, "description": "Controlled flow vocabulary for effort titles — the values accepted by the leading [Flow] title tag and `--flow` (also the flow:<flow> labels). Replaces the built-in default (Core UI API Docs Infra Auth Data Web App); an explicit EFFORT_FLOWS env var still wins per invocation." },
-        "knowledgeIngestHook": { "type": "string", "description": "Optional path to an executable run after `cckit effort close`, invoked as `<hook> <effort-number> <trace-dir>` to fold the closed effort's work record into a knowledge base. No-op when unset or not executable; the kit ships no default." }
+        "knowledgeIngestHook": { "type": "string", "description": "Optional path to an executable run after `cckit effort close`, invoked as `<hook> <effort-number> <trace-dir>` to fold the closed effort's work record into a knowledge base. No-op when unset or not executable; the kit ships no default." },
+        "wipLimit": { "type": "integer", "minimum": 0, "description": "How many efforts may be in progress at once before `cckit effort start` refuses a NEW effort (default 2). In progress = an `effort/<N>-<slug>` branch exists as a local head or on origin (read with `git ls-remote`, not the cached refs/remotes; EFFORT_WIP_REMOTE=0 or an unreachable origin counts the cached refs instead). Refusal happens before anything is written; `--force` (or KIT_FORCE=1) starts anyway. 0 refuses every ordinary start of a NEW effort but not a forced one, and not a re-start of an effort already in progress (that adds no WIP, so it is never gated); a non-integer value is ignored with a warning and the default is used. An explicit EFFORT_WIP_LIMIT env var wins per invocation. Does not affect `cckit start <issue>`." }
       }
     },
     "captain": {
@@ -123,6 +124,30 @@
           "type": "object",
           "additionalProperties": { "type": "string" },
           "description": "Map of original scaffolded path -> the project's new name. The original (key) is treated as removed (never re-added); the value documents where it went."
+        }
+      }
+    },
+    "worktree": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "How `cckit start` / `cckit effort start` bootstrap a fresh worktree (env copy, dev port, dependency install). Every key is optional; the kit hardcodes no project layout.",
+      "properties": {
+        "installPaths": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Worktree-relative directories to run `pnpm install` in during bootstrap (e.g. [\"docs-site\"]). Set, it wins outright — only these dirs are installed and the checks below are skipped; [] installs nothing. Entries MUST stay inside the worktree: an absolute path, a `..` that climbs out, or a symlink pointing outside is refused and skipped. Unset: install at the root only when its package.json declares dependencies or it is a workspace root WITH AT LEAST ONE MEMBER — a dependency-free root (or an empty `packages:` / `workspaces` list) is skipped so pnpm cannot plant an empty pnpm-lock.yaml (#255). KIT_WT_INSTALL=0 skips the install entirely."
+        },
+        "devPorts": {
+          "type": "array",
+          "description": "Per-app dev PORT lanes. Each entry assigns PORT = base + (issue % 40) * <count> into that app's .env.local, so parallel worktrees never fight for a port.",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {
+              "path": { "type": "string", "description": "Repo-relative path to the app's .env.local file." },
+              "base": { "type": "integer", "description": "Base port for this app's lane." }
+            }
+          }
         }
       }
     }

@@ -13,12 +13,20 @@
 #   cckit close <issue> <summary>   close issue + mark done
 #   cckit contribute "<summary>"    open a contribution PR to cckit, gated on scripts/check.sh
 #   cckit sync [--llm]              board state / what's unblocked
-#   cckit plan [--llm] [--effort N] wave plan: deps-ordered, file-disjoint, session-fit (TOON --llm)
+#   cckit plan [--llm] [--effort N] wave plan: deps-ordered, p0-first in a wave, file-disjoint (TOON --llm)
 #   cckit plan-next [--llm]         forward plan: current skills/verbs/rules/docs -> what to build next
-#   cckit effort <new|start|pr|close|plan>   the effort lifecycle
+#   cckit effort <new|chain|start|pr|close|plan>   the effort lifecycle
 #     effort new [--flow F --role R --priority p1 --goal G --scope S --for-agents A
 #       --verification V --depends-on "#1,#2" --milestone M] "<name>" ["sub :: desc" …]
 #         parent (4-section body + ctx/kind/priority/role/flow labels) + linted native sub-issues
+#     effort chain <a> <b> [<c> …]  linear order: b blocked_by a, c blocked_by b, + a
+#         `Depends on #<predecessor>` line in each body. Idempotent; refuses a cycle.
+#     effort start [--force] <slug|N> [slug]   effort branch + worktree, WIP-limited: refuses a NEW
+#         effort once effort.wipLimit (default 2) are already in progress — an `effort/<N>-<slug>`
+#         branch exists locally or on origin (git ls-remote, not the cached refs/remotes;
+#         EFFORT_WIP_REMOTE=0 or an unreachable origin uses the cache and still starts). Refuses
+#         before writing anything; --force (or KIT_FORCE=1) starts anyway, at limit 0 too.
+#         `cckit start <issue>` is not affected.
 #   cckit orchestrate <a> <b> …     run N flows in parallel worktrees (--dry-run/--cap/--agent)
 #   cckit autopilot [<a> …]         unattended multi-flow: drive (or auto-pick) issues under a cap
 #   cckit watch [--merge] [--loop]  captain: gate open PRs, squash-merge CLEAN, advance the wave
@@ -26,6 +34,7 @@
 #   cckit wave [--effort N]         read open efforts, propose incoming waves: fan-out + captain drive
 #   cckit msg <send|read|list>      session mail across projects: steer a live session (--steer)
 #   cckit gc [--prune [--yes]]      report (default) or prune merged branches + worktrees
+#   cckit cleanup [--yes]           guided destructive sweep over the gc report (plan first)
 #   cckit status                    thin dashboard: board + worktrees + resume handoff
 #   cckit scan [--llm]              detect this repo's stack + kit state (JSON)
 #   cckit debug [--check] <args>    optional browser-debug via chrome-devtools-axi (auto-detected)
@@ -40,6 +49,8 @@
 #   cckit release <ver> [--publish] cut a release (dry-run by default)
 #   cckit version [--llm]           the installed cckit version
 #   cckit commands [--llm]          list every verb (the command catalog)
+#   cckit lib [--llm] [--all]       list every scripts/lib helper: functions, purpose, error contract
+#   cckit brief <issue>             the delegation brief for an issue, from real state
 #   cckit completions [bash|zsh]    print a shell-completion script to source
 #   cckit help
 set -eu
@@ -128,11 +139,12 @@ case "$cmd" in
           source "$LIB/role-identity.sh" 2>/dev/null || true
         fi
         effort_new "$@" ;;
+      chain) effort_chain "$@" ;;
       start) effort_start "$@" ;;
       pr)    effort_pr    "$@" ;;
       close) effort_close "$@" ;;
       plan)  source "$LIB/effort-plan.sh"; effort_plan "$@" ;;
-      *) echo "cckit effort <new|start|pr|close|plan>" >&2; exit 2 ;;
+      *) echo "cckit effort <new|chain|start|pr|close|plan>" >&2; exit 2 ;;
     esac
     ;;
   start)
@@ -188,6 +200,38 @@ case "$cmd" in
     source "$LIB/kit-config.sh" && load_kit_config 2>/dev/null || true
     # shellcheck source=/dev/null
     source "$LIB/plan-next.sh"; plan_next "$@"
+    ;;
+  cleanup)
+    # ONE guided destructive sweep over the gc analysis: plan first, delete only the SAFE rows, and
+    # only with --yes. Orphans, protected branches and stashes are surfaced and left alone.
+    # shellcheck source=/dev/null
+    source "$LIB/kit-config.sh" && load_kit_config
+    # shellcheck source=/dev/null
+    source "$LIB/kit-gc.sh"
+    if cckit_is_json; then
+      # Keep BOTH the exit status and the diagnostic. `|| true` + `2>/dev/null` would turn a refusal
+      # (protection helper missing, analysis failed) or a partial run (a remote delete that failed)
+      # into `applied: yes` with zero counts and rc 0 — a JSON consumer would read that as a clean
+      # sweep. Reporting a wrong success is the failure mode this whole op exists to avoid.
+      cleanup_err="$(mktemp)"; cleanup_rc=0
+      out="$(kit_gc_cleanup "$@" 2>"$cleanup_err")" || cleanup_rc=$?
+      safe="$(printf '%s\n' "$out" | awk '/^  SAFE branches/{print $3}')"
+      wt="$(printf '%s\n' "$out" | awk '/^  SAFE worktrees/{print $3}')"
+      orphan="$(printf '%s\n' "$out" | awk '/^  ORPHAN kept/{print $3}')"
+      protected="$(printf '%s\n' "$out" | awk '/^  PROTECTED kept/{print $3}')"
+      stash="$(printf '%s\n' "$out" | awk '/^  stashes kept/{print $3}')"
+      zombie="$(printf '%s\n' "$out" | awk '/^  ZOMBIE worktrees/{print $3}')"
+      rfail="$(printf '%s\n' "$out" | awk '/^  remote deletes failed/{print $4}')"
+      applied=no
+      if [ "$cleanup_rc" -eq 0 ]; then case " $* " in *" --yes "*|*" -y "*) applied=yes ;; esac; fi
+      err="$(tr '\n' ' ' < "$cleanup_err" | sed 's/[[:space:]]*$//')"; rm -f "$cleanup_err"
+      cckit_json verb cleanup safe "${safe:-0}" worktrees "${wt:-0}" orphan "${orphan:-0}" \
+        protected "${protected:-0}" stash "${stash:-0}" zombie "${zombie:-0}" applied "$applied" \
+        remote_failed "${rfail:-0}" rc "$cleanup_rc" error "$err"
+      [ "$cleanup_rc" -eq 0 ] || exit "$cleanup_rc"
+    else
+      kit_gc_cleanup "$@"
+    fi
     ;;
   gc)
     # shellcheck source=/dev/null
@@ -303,6 +347,31 @@ case "$cmd" in
     # The command catalog - verbs parsed from this dispatcher's own case labels (single source).
     verbs="$(grep -oE '^  [a-z][a-z|-]*\)' "$BIN/cckit" | sed 's/[) ]//g' | tr '|' '\n' | grep -vE '^(-|$)' | sort -u)"
     if cckit_is_json; then printf '%s\n' "$verbs" | jq -R . | jq -cs .; else printf '%s\n' "$verbs" | tr '\n' ' '; echo; fi
+    ;;
+  lib)
+    # The HELPER catalog — the companion to `commands` (#222). `commands` lists the verbs; this
+    # lists the library they are built from, so a helper like pr-evidence.sh is discoverable
+    # without an `ls`. Filesystem-only; config is loaded purely for the project-root inference
+    # (KIT_CONFIG), then it catalogs that project's scripts/lib, else cckit's own.
+    # shellcheck source=/dev/null
+    source "$LIB/kit-config.sh" && load_kit_config 2>/dev/null || true
+    # shellcheck source=/dev/null
+    source "$LIB/kit-lib.sh"; kit_lib "$@"
+    ;;
+  brief)
+    # The delegation BRIEF for an issue, generated from real state (#221). The companion to `lib`:
+    # `lib` says what helpers exist, this says which of them THIS issue's files sit on, where the
+    # work happens, and whether the branch's seed is stale. Reads the issue via gh; every other
+    # section degrades to an explicit line rather than going quietly missing.
+    # shellcheck source=/dev/null
+    source "$LIB/kit-config.sh" && load_kit_config 2>/dev/null || true
+    # shellcheck source=/dev/null
+    source "$LIB/worktree-issue.sh" 2>/dev/null || true
+    # shellcheck source=/dev/null
+    source "$LIB/kit-lib.sh"
+    # shellcheck source=/dev/null
+    source "$LIB/kit-brief.sh"
+    CCKIT_ROOT="$ROOT" kit_brief "$@"
     ;;
   completions)
     case "${1:-bash}" in

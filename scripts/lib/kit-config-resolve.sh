@@ -22,6 +22,7 @@
 # Source it:  source scripts/lib/kit-config-resolve.sh
 # CLI:        scripts/lib/kit-config-resolve.sh [--dir DIR] [--explain JQPATH] [--layers] [--get JQPATH]
 # Requires: jq.
+# errors: strict — refuses to resolve a cascade without jq
 
 KIT_CONFIG_NAMES="${KIT_CONFIG_NAMES:-kit.workspace.json kit.config.json}"
 KIT_MERGE_MODE="${KIT_MERGE_MODE:-replace}"   # replace | concat  (see header)

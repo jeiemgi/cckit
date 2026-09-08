@@ -69,8 +69,10 @@ The slug is a *derived* convenience, not a second source of truth. `--slug` only
   var still overrides both for one invocation.
 - **`cckit effort start`** gives the effort's worktree the **same full setup as `cckit start`**:
   it copies your gitignored env files, assigns a per-worktree dev port, and installs dependencies
-  (opt out with `KIT_WT_INSTALL=0`). The worktree lives at `.claude/worktrees/effort+<N>-<slug>`, a
-  name `cckit gc` recognizes so it is never pruned while the effort issue is open.
+  **where the project actually declares any** (opt out entirely with `KIT_WT_INSTALL=0`; see
+  [worktree bootstrap](/config-and-permissions/#worktree-bootstrap)). The worktree lives at `.claude/worktrees/effort+<N>-<slug>`, a
+  name `cckit gc` recognizes so it is never pruned while the effort issue is open. It is also
+  **WIP-limited** — see [Only so many efforts at once](#only-so-many-efforts-at-once) below.
 - **`cckit effort pr`** and the `/kit-effort-pr` skill compose the PR title from **one shared
   composer**, and both refuse to open a PR whose title lacks the mandatory `[#N]` effort id.
 - **`cckit effort close`** is the single close implementation — the `/kit-effort-close` skill is a
@@ -90,6 +92,94 @@ The slug is a *derived* convenience, not a second source of truth. `--slug` only
   subs, the knowledge-ingest hook, and the kit-sync drift check. If the integration branch does
   exist, the close still asks you to run from it.
 
+## Only so many efforts at once
+
+Three half-finished efforts finish nothing. `cckit effort start` refuses to start a **new** effort
+once the WIP limit is reached:
+
+```console
+$ cckit effort start 244
+effort_start: 2 effort(s) already in progress and the WIP limit is 2.
+    · order-and-cadence #241  (effort/241-order-and-cadence)
+    · release-gates #257  (effort/257-release-gates)
+  → refusing to start #244 — nothing was created.
+     Close one with 'cckit effort close <N>', or start anyway with --force (or KIT_FORCE=1).
+     The limit is effort.wipLimit in the project config (default 2); EFFORT_WIP_LIMIT overrides it.
+```
+
+**What counts as in progress:** an effort whose `effort/<N>-<slug>` branch exists — a local head
+**or** a branch on origin, so an effort a teammate (or another machine) started counts too.
+`cckit effort start` creates that branch and `cckit effort close` deletes it, so the counted set is
+exactly "started and not yet closed". There is no second definition and no board lookup involved.
+
+The origin half is read with `git ls-remote` **by default** — not from your cached `refs/remotes`.
+(`EFFORT_WIP_REMOTE=0` opts out; see *Working offline* below.) The cache is wrong in both
+directions, and a WIP gate is wrong with it:
+
+| Cached `refs/remotes` says | Reality | Gate with the cache |
+| --- | --- | --- |
+| nothing (branch pushed since your last fetch) | origin has it | undercounts — lets you exceed the limit |
+| `origin/effort/<N>-…` still there (branch deleted on origin, not yet pruned) | origin dropped it | overcounts — blocks a start it should allow |
+
+`git ls-remote` sees the branch pushed a second ago and does not see the one deleted a second ago,
+and it writes nothing: no fetch, no prune, no ref touched. `effort_slug_resolve` still reads the
+cached refs, because resolving a slug handle sits on the hot path of every effort verb — that
+**cached-ref lookup** is network-free. Resolution as a whole is not: when no branch matches the
+slug it falls through to `gh` (see below), which is why a WIP refusal on a slug input can still
+make a GitHub read.
+
+The rules, exactly:
+
+| Situation | What happens |
+| --- | --- |
+| Fewer efforts in progress than the limit | Starts. |
+| **At** the limit (2 in progress, limit 2) | Refused. The limit is a ceiling on concurrent efforts. |
+| Above the limit (after a `--force`) | Refused. |
+| Re-running `start` on an effort **already** in progress | Always allowed — it adds no WIP, so the verb stays safe to re-run. |
+| `--force`, or `KIT_FORCE=1` in the environment | Starts anyway, and says so on stderr. |
+| `effort.wipLimit` set to `0` | Every **ordinary** start is refused (a deliberate freeze) — `--force` / `KIT_FORCE=1` still start. |
+| `effort.wipLimit` unset | The built-in default, `2`. |
+| `effort.wipLimit` not a non-negative integer | Ignored with a warning on stderr; the default `2` is used. |
+
+Set the limit in `cckit.config.json` / `.claude/kit.config.json`:
+
+```json
+{
+  "effort": {
+    "wipLimit": 3
+  }
+}
+```
+
+`EFFORT_WIP_LIMIT` in the environment overrides the config for one invocation.
+
+<Aside type="note" title="A refusal writes nothing">
+The check runs **before** the base-branch fetch, the branch, the worktree and the bootstrap — the
+same validate-then-write discipline `cckit effort new` and `cckit effort chain` follow. A refused
+start leaves **no branch, no worktree and no board change**.
+
+It does *read*, though: the gate queries origin, and when you pass a `<slug>` instead of a number
+`effort_slug_resolve` has already run — which can fall through to `gh issue list`. "Writes nothing"
+is the guarantee; "reads nothing" is not.
+</Aside>
+
+<Aside type="caution" title="Efforts only">
+This gates `cckit effort start`. `cckit start <issue>` — a plain task worktree — has **no** WIP
+limit and is unaffected.
+</Aside>
+
+<Aside type="tip" title="Working offline">
+`EFFORT_WIP_REMOTE=0` skips the origin query and counts local heads plus your cached
+`refs/remotes` — deterministic, no round-trip, and back to the cache's approximation. If origin is
+simply unreachable the gate does the same on its own: it prints one line saying the count may be
+stale, then **applies the limit to that cached count**. So an ordinary start can still be refused
+offline — a stale `origin/effort/<N>-…` that origin no longer has will keep counting until you
+prune. `--force` (or `KIT_FORCE=1`) starts anyway.
+
+What it never does is fail for want of a network: `cckit effort start` degrades to the cache rather
+than erroring out.
+</Aside>
+
 ## Waves
 
 Some sub-issues depend on others: sub #4 can't start until sub #1 is merged. cckit reads those
@@ -104,6 +194,52 @@ Some sub-issues depend on others: sub #4 can't start until sub #1 is merged. cck
 </Steps>
 
 `cckit plan` shows the waves. Each wave is exactly "what can run in parallel right now".
+
+### Inside a wave, the most urgent work comes first
+
+A wave can hold a dozen issues, and they are not equally urgent. Within one wave `cckit plan` orders
+them by their `priority:pN` label — **p0 → p1 → p2 → p3**, with unlabeled issues last. Issues that
+share a priority keep the order they already had, and the batch packing follows that order, so the
+p0 work lands in the first batch rather than wherever it happened to fall.
+
+> **Dependencies still win.** Priority never overrides a blocked-by link. Two issues only share a
+> wave when there is *no* dependency between them — a blocker is always placed in a strictly earlier
+> wave than the issue it blocks. So a p3 issue that blocks a p0 issue still runs first: they are in
+> different waves, and the priority sort only ever reorders work that dependencies have already
+> declared startable at the same time.
+
+### Declaring the order — `cckit effort chain`
+
+Waves are only as good as the blocked-by links they read, and setting those links by hand is
+tedious. `cckit effort chain` declares a whole running order in one command:
+
+```bash
+cckit effort chain 241 242 243     # 242 blocked_by 241 · 243 blocked_by 242
+```
+
+Every issue after the first gets two things: the native GitHub **`blocked_by`** edge on its
+predecessor — the edge `cckit plan` reads to layer the waves — and a `- Depends on #<predecessor>`
+line in its **`## Relations`** section, the human-readable mirror. It is the same line
+`cckit effort new --depends-on` writes, produced by the same formatter, so the two never drift.
+A chained set therefore lands one issue per wave, in the order you gave.
+
+What it does and does not do:
+
+- **Idempotent.** An edge or a `Depends on` line that is already there is reported and skipped, so
+  running the same chain twice changes nothing — no duplicate line, no duplicate edge.
+- **Additive.** It only ever *adds* its edge. An issue already blocked by something else keeps that
+  blocker and ends up with both.
+- **Validated before anything is written.** A refused chain leaves the board completely untouched.
+  It refuses fewer than two numbers, an argument that is not an issue number, an issue that does not
+  exist in the repo, a number that appears twice in the list (`chain 1 2 1` revisits a node), and an
+  edge that would close a cycle through dependencies GitHub already holds. A cycle is refused rather
+  than written because the wave layering cannot order a cyclic graph.
+
+<Aside type="note" title="Numbers, with or without the hash">
+`cckit effort chain 241 242` and `cckit effort chain '#241' '#242'` are the same command. Unlike
+`start` / `pr` / `close`, `chain` takes issue **numbers** only — not slug handles — because it wires
+plain issues, not just efforts.
+</Aside>
 
 
 ## Worktrees keep parallel work apart

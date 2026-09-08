@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# effort-ops.sh — the effort lifecycle as shell ops, so `cckit effort new|start|pr|close` works from
-# any shell or agent (not only via the effort-* skills). Thin: composes the git-mechanics helpers in
-# effort.sh (linking, snapshots, title lint) plus gh + git. bash 3.2 compatible. Requires: gh, jq, git.
+# effort-ops.sh — the effort lifecycle as shell ops, so `cckit effort new|chain|start|pr|close` works
+# from any shell or agent (not only via the effort-* skills). Thin: composes the git-mechanics helpers
+# in effort.sh (linking, snapshots, title lint) plus gh + git. bash 3.2 compatible. Requires: gh, jq, git.
 #
 #   effort_new [flags] "<name>" [<sub spec> …]   parent (4-section body + labels) + native sub-issues
-#   effort_start <slug|N> [<slug>]        effort/<N> branch + worktree from the base branch
+#   effort_chain <a> <b> [<c> …]          wire N issues into a linear blocked_by chain (#243)
+#   effort_start [--force] <slug|N> [<slug>]  effort/<N> branch + worktree from base, WIP-limited (#244)
 #   effort_pr [<slug|N>]                  open the ONE PR effort/<N> → base branch
 #   effort_close <slug|N>                 snapshot sub-diffs, squash-merge the PR, close parent + subs
 #
@@ -16,6 +17,7 @@
 # Commands accept the human slug as well as the canonical number (#93): a pure-digits arg is a number,
 # anything else is resolved via effort_slug_resolve. Repo + base branch come from kit.config.json
 # (EFFORT_REPO / KIT_BASE_BRANCH), loaded by effort.sh.
+# errors: mixed — lifecycle ops propagate; board + label side effects are best-effort
 
 # Slug layer (#93): _eff_slug, _eff_title_slug, effort_display, effort_slug_resolve. One home in
 # effort-slug.sh; source it here so the lifecycle ops accept `<slug|N>` and render `slug #N`.
@@ -32,9 +34,10 @@ _eff_need()  { command -v "$1" >/dev/null 2>&1 || { echo "effort: $1 is required
 
 # Compose the four-section parent body (rules/effort-model.md): the sections double as the work
 # record. An empty section falls back to its template placeholder so a bare call still yields the
-# full four-heading scaffold; passing content fills it. $5 is an optional pre-built ## Relations block.
+# full four-heading scaffold; passing content fills it. The `## Relations` chain is NOT composed
+# here — it is layered on afterwards by _eff_relations_add (one formatter, #243).
 _eff_compose_body() {
-  local goal="$1" scope="$2" for_agents="$3" verification="$4" relations="$5"
+  local goal="$1" scope="$2" for_agents="$3" verification="$4"
   cat <<EOF
 ## Goal
 ${goal:-<!-- problem statement: what outcome, in one or two lines -->}
@@ -46,8 +49,47 @@ ${scope:-<!-- the sub-issue plan; mark each parallel | sequential / dependsOn --
 ${for_agents:-<!-- exact file paths / entry points a future agent needs -->}
 
 ## Verification
-${verification:-<!-- how we know it is done: commands, checks, acceptance -->}${relations}
+${verification:-<!-- how we know it is done: commands, checks, acceptance -->}
 EOF
+}
+
+# _eff_relations_add <body> <blocker> — echo <body> with `- Depends on #<blocker>` recorded in its
+# `## Relations` section. THE one formatter for the human-readable dependency line (rules/
+# effort-model.md): both `effort_new --depends-on` and `effort_chain` go through it, so the two
+# produce byte-identical lines.
+#
+# Placement: appended to the END of an existing `## Relations` section (the lines before the next
+# `## ` heading, or the end of the body); when the body has no such section, a new one is appended
+# at the end of the body. IDEMPOTENT — a body that already carries the exact line comes back
+# unchanged, so re-running never duplicates a line. Trailing blank lines are trimmed.
+# Pure: no gh, no network — stdin-free, argument in / body out.
+_eff_relations_add() {
+  printf '%s\n' "$1" | awk -v dep="$2" '
+    BEGIN { want = "- Depends on #" dep; rel = 0; have = 0 }
+    {
+      L[NR] = $0
+      if (rel == 0 && $0 ~ /^[ \t]*##[ \t]+Relations[ \t]*$/) rel = NR
+      t = $0; sub(/^[ \t]+/, "", t); sub(/[ \t]+$/, "", t)
+      if (t == want) have = 1
+    }
+    END {
+      n = NR
+      while (n > 0 && L[n] ~ /^[ \t]*$/) n--          # trim trailing blank lines
+      if (have) { for (i = 1; i <= n; i++) print L[i]; exit }
+      if (rel == 0) {                                  # no section yet → append one
+        for (i = 1; i <= n; i++) print L[i]
+        if (n > 0) print ""                            # no leading blank on an empty body
+        print "## Relations"; print want
+        exit
+      }
+      e = n                                            # end of the Relations section
+      for (i = rel + 1; i <= n; i++) if (L[i] ~ /^##[ \t]/) { e = i - 1; break }
+      while (e > rel && L[e] ~ /^[ \t]*$/) e--
+      for (i = 1; i <= e; i++) print L[i]
+      print want
+      for (i = e + 1; i <= n; i++) print L[i]
+    }
+  '
 }
 
 # _eff_ensure_label <name> <color> <description> — make sure a kit-defined label exists in the repo
@@ -152,15 +194,16 @@ effort_new() {
       || { echo "effort_new: fix sub title #$i and retry: $sub_name" >&2; return 1; }
   done
 
-  # Compose the four-section body + an optional ## Relations chain from --depends-on.
-  local relations="" d
+  # Compose the four-section body, then layer the ## Relations chain from --depends-on through the
+  # ONE formatter (#243) — the same one `effort_chain` uses, so both write identical lines. (It was
+  # built inline here before, and `$( … )` ate every newline: the section shipped as the single
+  # mangled line `## Relations- Depends on #1- Depends on #2`.)
+  local body d; body="$(_eff_compose_body "$goal" "$scope" "$for_agents" "$verification")"
   if [ -n "$depends_on" ]; then
-    relations="$(printf '\n\n## Relations\n')"
     for d in $(printf '%s' "$depends_on" | tr ',' ' '); do
-      d="${d#\#}"; [ -n "$d" ] && relations="$relations$(printf -- '- Depends on #%s\n' "$d")"
+      d="${d#\#}"; [ -n "$d" ] && body="$(_eff_relations_add "$body" "$d")"
     done
   fi
-  local body; body="$(_eff_compose_body "$goal" "$scope" "$for_agents" "$verification" "$relations")"
 
   # Label set: ctx (session weight from the sub count) + kind + priority + optional role + optional flow.
   local subcount=$#; [ "$subcount" -ge 1 ] || subcount=1
@@ -233,6 +276,296 @@ effort_new() {
   printf '%s\n' "$num"
 }
 
+# _eo_source_effort — lazily source the git-mechanics lib (effort.sh) so the ops that need
+# effort_set_blocked_by work when effort-ops.sh is sourced on its own. No-op if already loaded.
+_eo_source_effort() {
+  command -v effort_set_blocked_by >/dev/null 2>&1 && return 0
+  local d; d="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+  # shellcheck source=/dev/null
+  [ -f "$d/effort.sh" ] && . "$d/effort.sh"
+}
+
+# _eff_blockers <issue> — echo the issue's CURRENT blocked_by numbers, one per line. Empty when the
+# issue has no edges or the API call fails (the caller treats that as "no known edge").
+_eff_blockers() {
+  gh api "repos/$(_eff_repo)/issues/$1/dependencies/blocked_by" --jq '.[].number' 2>/dev/null || true
+}
+
+# _eff_chain_reaches <from> <target> <pending> — is <target> reachable from <from> by following
+# blocked_by edges? Breadth-first over the COMBINED graph: the edges GitHub already holds plus
+# <pending>, a space-separated list of `child>parent` pairs this call is about to write. Used as the
+# cycle pre-flight: adding "<target> blocked_by <from>" closes a cycle exactly when <from> already
+# depends (transitively) on <target>. rc 0 = reachable.
+_eff_chain_reaches() {
+  [ -n "${ZSH_VERSION:-}" ] && setopt local_options ksh_arrays sh_word_split 2>/dev/null
+  local from="$1" target="$2" pending="$3"
+  local queue="$from" seen=" " cur b
+  while [ -n "$queue" ]; do
+    # shellcheck disable=SC2086
+    set -- $queue; cur="$1"; shift; queue="$*"
+    case "$seen" in *" $cur "*) continue ;; esac
+    seen="$seen$cur "
+    for b in $(_eff_blockers "$cur") \
+             $(printf '%s\n' $pending | sed -n "s/^$cur>//p"); do
+      [ "$b" = "$target" ] && return 0
+      queue="$queue $b"
+    done
+  done
+  return 1
+}
+
+# effort_chain <a> <b> [<c> …] — wire N issues into a LINEAR dependency chain (#243): B becomes
+# blocked_by A, C blocked_by B, and so on, and each issue after the first gets a `- Depends on #<its
+# predecessor>` line in its `## Relations` section. This is the verb that FEEDS `cckit plan` — the
+# wave layering in plan-machine.sh reads exactly these `blocked_by` edges, so a chained set lands
+# one issue per wave, in the order given.
+#
+# Everything is VALIDATED BEFORE ANYTHING IS WRITTEN (the effort_new discipline): a rejected chain
+# leaves the board untouched. The rules:
+#   arity        fewer than two numbers is a usage error — a chain needs a predecessor and a
+#                successor. Nothing is written.
+#   numbers      each arg is an issue number, with an optional leading `#`. Anything else is
+#                rejected. Nothing is written.
+#   existence    every issue is fetched first; a number that does not resolve aborts the whole
+#                chain. Nothing is written.
+#   cycles       a repeated number (`chain 1 2 1`) is refused — the chain would revisit a node. So
+#                is a chain whose new edge closes a loop through edges GitHub ALREADY holds (the
+#                pre-flight walks the combined graph). `cckit plan` cannot layer a cyclic graph into
+#                waves, so a cycle is refused rather than written. Nothing is written.
+#   pre-existing an issue already blocked by something else KEEPS that blocker: blocked_by is a set,
+#     blockers  and this only ever ADDS its edge. The issue ends up with both.
+#   idempotent   an edge that is already present is skipped (no duplicate POST, no error) and a body
+#                that already carries the exact `- Depends on #N` line is left alone (no second
+#                line, no `gh issue edit`). A re-run writes nothing and reports each half as
+#                `already blocked_by` / `already records`.
+# Progress goes to stderr; rc 0 only when every link of the chain is in place.
+effort_chain() {
+  [ -n "${ZSH_VERSION:-}" ] && setopt local_options ksh_arrays sh_word_split 2>/dev/null
+  _eff_need gh || return 1
+  _eo_source_effort
+  local repo; repo="$(_eff_repo)"
+  [ -n "$repo" ] || { echo "effort_chain: no repo (KIT_REPO/EFFORT_REPO unset — run in a kit project)" >&2; return 1; }
+
+  # 1. arity, shape, and repeats — all before a single write. `#12` and `12` are the same issue; a
+  #    number that appears twice means the chain revisits a node, which is a cycle, not a chain.
+  [ "$#" -ge 2 ] || { echo 'effort_chain: usage: effort_chain <a> <b> [<c> …]  (two or more issue numbers)' >&2; return 1; }
+  local a n b list=""
+  for a in "$@"; do
+    n="${a#\#}"
+    case "$n" in
+      ''|*[!0-9]*) echo "effort_chain: '$a' is not an issue number — nothing written" >&2; return 1 ;;
+    esac
+    for b in $list; do
+      [ "$b" = "$n" ] && { echo "effort_chain: #$n appears twice — that is a cycle, not a chain; nothing written" >&2; return 1; }
+    done
+    list="$list$n "
+  done
+
+  # 2. every issue must exist before a single edge is written.
+  for n in $list; do
+    gh api "repos/$repo/issues/$n" --jq .number >/dev/null 2>&1 \
+      || { echo "effort_chain: #$n does not exist in $repo — nothing written" >&2; return 1; }
+  done
+
+  # 3. cycle pre-flight over the existing graph PLUS the edges this call would add. Adding
+  #    "next blocked_by prev" closes a loop exactly when prev already depends on next.
+  local pending="" prev="" next
+  for next in $list; do
+    if [ -n "$prev" ] && _eff_chain_reaches "$prev" "$next" "$pending"; then
+      echo "effort_chain: #$next blocked_by #$prev would create a dependency cycle — nothing written" >&2
+      return 1
+    fi
+    [ -n "$prev" ] && pending="$pending$next>$prev "
+    prev="$next"
+  done
+
+  # 4. write. Per link: the native blocked_by edge and the `Depends on` line, each skipped when it
+  #    is already there — so a re-run reports and touches nothing.
+  local rc=0 have body newbody
+  prev=""
+  for next in $list; do
+    if [ -n "$prev" ]; then
+      have=""
+      for b in $(_eff_blockers "$next"); do [ "$b" = "$prev" ] && have=1; done
+      if [ -n "$have" ]; then
+        echo "  · #$next already blocked_by #$prev" >&2
+      else
+        effort_set_blocked_by "$next" "$prev" || rc=1
+      fi
+
+      # A FAILED read is not an empty body: writing the composed body after a failed fetch would
+      # wipe the issue. Only a successful read is edited.
+      if ! body="$(gh issue view "$next" --repo "$repo" --json body --jq .body 2>/dev/null)"; then
+        echo "  ✗ could not read #$next's body — 'Depends on #$prev' not recorded" >&2; rc=1
+      elif printf '%s\n' "$body" | grep -qE "^[[:space:]]*- Depends on #${prev}[[:space:]]*$"; then
+        echo "  · #$next already records 'Depends on #$prev'" >&2
+      else
+        newbody="$(_eff_relations_add "$body" "$prev")"
+        gh issue edit "$next" --repo "$repo" --body "$newbody" >/dev/null 2>&1 \
+          && echo "  ✓ #$next records 'Depends on #$prev'" >&2 \
+          || { echo "  ✗ could not update #$next's body" >&2; rc=1; }
+      fi
+    fi
+    prev="$next"
+  done
+
+  # The banner must agree with rc: a ✓ over a nonzero exit reports a chain that is not fully wired.
+  # Individual failures already printed their own ✗ line above; this is the summary for the whole run.
+  if [ "$rc" -eq 0 ]; then
+    echo "  ✓ chain $(printf '#%s → ' $list | sed 's/ → $//')" >&2
+  else
+    echo "  ✗ chain $(printf '#%s → ' $list | sed 's/ → $//') — incomplete, see the errors above" >&2
+  fi
+  return "$rc"
+}
+
+# ── WIP limit: how many efforts may be in progress at once (#244) ──────────────────────────────
+#
+# WHAT COUNTS AS "IN PROGRESS": an effort whose `effort/<N>-<slug>` branch exists — a local head, or
+# a branch origin has right now (`git ls-remote`, not the cached `refs/remotes`; see effort_wip_rows
+# for why). Both halves are parsed by the effort-slug.sh helpers the slug resolver is built on, so a
+# ref name is decomposed in one place. This is the kit's existing notion of a started effort, not a
+# new one: `effort_start` CREATES that branch and `effort_close` deletes it, so the branch set is
+# exactly "started and not yet closed", by construction.
+#
+# The Projects v2 board Status is deliberately NOT the signal. It is written by the /kit-effort-start
+# skill's additive board step, never by this verb, so the verb would be gating on state it does not
+# set; it is empty whenever `github.projectsV2` is false (cckit's own default); and there is no
+# status:* label to fall back on. One signal, no fallback chain.
+
+# _eff_wip_limit_from_config — echo `effort.wipLimit` straight from the project config, so a
+# configured limit applies even to callers that never ran load_kit_config. Mirrors
+# _effort_flows_from_config (effort.sh). Empty output / rc 1 when unset or unreadable.
+_eff_wip_limit_from_config() {
+  command -v jq >/dev/null 2>&1 || return 1
+  if ! command -v kit_config_path >/dev/null 2>&1; then
+    local _wl_dir; _wl_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)"
+    # shellcheck source=/dev/null
+    [ -n "$_wl_dir" ] && [ -f "$_wl_dir/config-path.sh" ] && . "$_wl_dir/config-path.sh"
+  fi
+  command -v kit_config_path >/dev/null 2>&1 || return 1
+  local _wl_cfg; _wl_cfg="$(kit_config_path 2>/dev/null)" && [ -f "$_wl_cfg" ] || return 1
+  jq -r 'if (.effort.wipLimit | type) == "null" then empty else (.effort.wipLimit | tostring) end' \
+    "$_wl_cfg" 2>/dev/null
+}
+
+# _eff_wip_limit — echo the effective limit. Resolution order mirrors the flow vocabulary (#150), so
+# the kit has ONE config idiom:
+#   1. EFFORT_WIP_LIMIT in the environment always wins (per-invocation override)
+#   2. the project config `effort.wipLimit` — via KIT_EFFORT_WIP_LIMIT (exported by load_kit_config)
+#      or read straight from the config file
+#   3. the built-in default, 2.
+# A value that is not a non-negative integer (a typo, a float, a negative) is IGNORED with a warning
+# on stderr and the built-in default is used: a misconfigured limit must not silently disable the
+# gate, and must not wedge the verb either. `0` is valid and means "start no new effort".
+_eff_wip_limit() {
+  local v="" src=""
+  if [ -n "${EFFORT_WIP_LIMIT:-}" ]; then
+    v="$EFFORT_WIP_LIMIT"; src="EFFORT_WIP_LIMIT"
+  elif [ -n "${KIT_EFFORT_WIP_LIMIT:-}" ]; then
+    v="$KIT_EFFORT_WIP_LIMIT"; src="effort.wipLimit"
+  else
+    v="$(_eff_wip_limit_from_config 2>/dev/null || true)"; src="effort.wipLimit"
+  fi
+  [ -n "$v" ] || { printf '2'; return 0; }
+  case "$v" in
+    ''|*[!0-9]*)
+      echo "effort_start: ignoring $src='$v' — the WIP limit must be a non-negative integer; using the default 2" >&2
+      printf '2'; return 0 ;;
+  esac
+  printf '%s' "$v"
+}
+
+# effort_wip_rows — one TSV row `<N>\t<slug>` per effort that is IN PROGRESS, each effort exactly
+# once, lowest number first. The counted set behind the WIP gate: local `refs/heads/effort/*` UNION
+# the effort branches origin actually has right now.
+#
+# Why not the cached `refs/remotes` (#244 review): it is wrong in both directions and the gate is
+# wrong with it. A branch pushed since the last fetch is absent, so the gate lets the limit be
+# exceeded — and the gate runs before effort_start's fetch, which is base-only and would not refresh
+# `refs/remotes/origin/effort/*` anyway. A branch DELETED on origin lingers in `refs/remotes` until
+# a prune, so the gate blocks a start that should be allowed. `git ls-remote` answers both: it sees
+# the new branch and does not see the deleted one, without writing or pruning a single ref.
+#
+# The cost is one network round-trip per `effort start`. That is accepted: a gate that miscounts in
+# both directions is not a gate, and `effort start` is a rare interactive command that already
+# fetches and installs dependencies. Two things keep it from being a liability:
+#
+#   EFFORT_WIP_REMOTE=0  skips the origin query outright and counts local heads + cached remotes —
+#                        for a deterministic offline or CI run, and for anyone who would rather have
+#                        the old approximation than the round-trip.
+#   unreachable origin   ls-remote failing (offline, no remote, auth) is NOT fatal. The count falls
+#                        back to the cached `refs/remotes`, one line says so on stderr, and the start
+#                        proceeds. A gate that hard-fails with no network would be worse than one
+#                        that miscounts.
+#
+# Deliberately NOT cached between invocations: a cache reintroduces the staleness window this
+# replaces, and there is nothing to amortize — one ls-remote per interactive start.
+effort_wip_rows() {
+  command -v effort_branch_rows >/dev/null 2>&1 || return 0
+  local remote=""
+  {
+    effort_branch_rows_local 2>/dev/null
+    if [ "${EFFORT_WIP_REMOTE:-1}" = "0" ]; then
+      effort_branch_rows 2>/dev/null            # opted out: local heads + cached remotes
+    elif remote="$(effort_branch_rows_origin 2>/dev/null)"; then
+      printf '%s\n' "$remote"
+    else
+      echo "effort_start: could not read origin's effort branches — counting work in progress from the last fetch, which may be stale (set EFFORT_WIP_REMOTE=0 to silence this)" >&2
+      effort_branch_rows 2>/dev/null            # offline fallback: local heads + cached remotes
+    fi
+  } | awk -F'\t' 'NF > 0 && $1 != "" && !seen[$1]++' | sort -n
+}
+
+# _eff_wip_gate <num> <force> — rc 0 when starting effort <num> may proceed, rc 1 (with the refusal
+# on stderr) when it may not. READ-ONLY: it reads refs (one of them over the network — see
+# effort_wip_rows) and the config, and writes nothing, so a refusal leaves no branch, no worktree and
+# no board change behind (the effort_new / effort_chain discipline). It is not free of reads: the
+# gate itself queries origin, and for a SLUG argument effort_start has already resolved the handle
+# through effort_slug_resolve, which may have run `gh issue list`. "Writes nothing" is the guarantee;
+# "reads nothing" is not.
+#
+# The rules:
+#   already started  an effort whose branch already exists is ALREADY in the counted set, so
+#                    re-running `effort start` on it adds no WIP and the gate does not apply —
+#                    `effort_start` stays safe to re-run at or over the limit.
+#   at the limit     `in-progress count >= limit` REFUSES. The limit is a ceiling on concurrent
+#                    efforts: at 2 of 2, a third would make 3. Only `count < limit` starts.
+#   limit 0          refuses every new effort (a deliberate freeze); the override still works.
+#   override         `--force` (or KIT_FORCE=1, the same escape hatch effort_close uses) starts
+#                    anyway and says so on stderr.
+_eff_wip_gate() {
+  local num="$1" force="${2:-}" limit rows count n tab; tab="$(printf '\t')"
+  limit="$(_eff_wip_limit)"
+  rows="$(effort_wip_rows)"
+
+  while IFS="$tab" read -r n _; do
+    if [ "$n" = "$num" ]; then return 0; fi
+  done <<EOF
+$rows
+EOF
+
+  count="$(printf '%s\n' "$rows" | grep -cE '^[0-9]+' || true)"
+  if [ "${count:-0}" -lt "$limit" ]; then return 0; fi
+
+  {
+    echo "effort_start: $count effort(s) already in progress and the WIP limit is $limit."
+    printf '%s\n' "$rows" | grep -E '^[0-9]+' | while IFS="$tab" read -r n _slug; do
+      printf '    · %s  (effort/%s-%s)\n' "$(effort_display "$n" "$_slug")" "$n" "$_slug"
+    done
+  } >&2
+  if [ -n "$force" ]; then
+    echo "  → starting #$num anyway (override)." >&2
+    return 0
+  fi
+  {
+    echo "  → refusing to start #$num — nothing was created."
+    echo "     Close one with 'cckit effort close <N>', or start anyway with --force (or KIT_FORCE=1)."
+    echo "     The limit is effort.wipLimit in the project config (default 2); EFFORT_WIP_LIMIT overrides it."
+  } >&2
+  return 1
+}
+
 # _eo_source_wt — lazily source the worktree mechanic (worktree-start.sh) so effort_start gets the
 # SAME full worktree setup as `cckit start`: wt_bootstrap (env-file copy + per-worktree dev port +
 # dependency install) and the _wt_session_owns collision guard. bin/cckit's `effort` verb does not
@@ -244,17 +577,40 @@ _eo_source_wt() {
   [ -f "$d/worktree-start.sh" ] && . "$d/worktree-start.sh"
 }
 
-# effort_start <slug|N> [<slug>] — create the effort/<N> integration branch + its worktree from base,
-# with the full `cckit start` worktree setup (env copy, per-worktree dev port, dependency install —
-# opt out with KIT_WT_INSTALL=0) and a live-session collision guard.
+# effort_start [--force] <slug|N> [<slug>] — create the effort/<N> integration branch + its worktree
+# from base, with the full `cckit start` worktree setup (env copy, per-worktree dev port, dependency
+# install — opt out with KIT_WT_INSTALL=0) and a live-session collision guard.
+#
+# Gated by the WIP limit (#244): when as many efforts are already in progress as `effort.wipLimit`
+# allows (default 2), starting a NEW one is refused before anything is written — see _eff_wip_gate
+# above for the counted set and the exact rules. `--force` (or KIT_FORCE=1) starts anyway.
+# The gate is specific to EFFORTS: `cckit start <issue>` (a plain task worktree, wt_start) is not
+# affected and has no WIP limit.
 effort_start() {
   _eff_need git || return 1
-  local raw="${1:-}" slug_override="${2:-}" num repo base root title slug branch wt
+  local raw="" slug_override="" force="" num repo base root title slug branch wt
+  # Flags are position-INDEPENDENT (the effort_new parser shape): `--` forces the rest positional.
+  local pos=()
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --force) force=1; shift ;;
+      --)      shift; while [ $# -gt 0 ]; do pos+=("$1"); shift; done ;;
+      --*)     echo "effort_start: unknown flag $1" >&2; return 1 ;;
+      *)       pos+=("$1"); shift ;;
+    esac
+  done
+  set -- "${pos[@]+"${pos[@]}"}"
+  raw="${1:-}"; slug_override="${2:-}"
+  if [ "${KIT_FORCE:-0}" = "1" ]; then force=1; fi
   [ -n "$raw" ] || { echo "effort_start: <slug|effort issue #> required" >&2; return 1; }
   num="$(effort_slug_resolve "$raw")" || { echo "effort_start: could not resolve '$raw' to an effort" >&2; return 1; }
   repo="$(_eff_repo)"; base="$(_eff_base)"
   root="$(git worktree list --porcelain 2>/dev/null | awk '/^worktree /{print $2; exit}')"
   [ -n "$root" ] || { echo "effort_start: not in a git repo" >&2; return 1; }
+
+  # WIP gate (#244) — BEFORE the fetch, the branch, the worktree and the bootstrap, so a refusal
+  # leaves nothing behind. Reads refs + config only; writes nothing.
+  _eff_wip_gate "$num" "$force" || return 1
 
   if [ -n "$slug_override" ]; then slug="$(_eff_slug "$slug_override")"
   else

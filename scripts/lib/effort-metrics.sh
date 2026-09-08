@@ -12,6 +12,7 @@
 #
 # Cost = metered API; retroactively $ is computed from current Opus-4.8 list price (no per-call bill
 # access here) → cost_source="list-price". bash 3.2 compatible. Requires: git, jq.
+# errors: best-effort — local telemetry must never break the op it measures
 
 # Opus 4.8 list price, USD per 1M tokens (correct as of 2026-06; update when prices change).
 _EM_PRICE_IN=5.00; _EM_PRICE_OUT=25.00; _EM_PRICE_CACHE_READ=0.50; _EM_PRICE_CACHE_WRITE=6.25

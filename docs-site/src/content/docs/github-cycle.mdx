@@ -44,6 +44,29 @@ commands — you don't need to memorize it or do any of it manually.
 
 </Steps>
 
+## The pull request carries its own proof
+
+A pull request shouldn't just *claim* the checks passed — it should show them. So when cckit opens
+a request it can attach the actual output as a comment: the build log, the typecheck log, a
+screenshot of the working screen. That's the **evidence** on the request, and it's what lets a
+reviewer (a person or an agent) trust step 5 without re-running everything by hand.
+
+Each piece of evidence gets its own comment, named by its caption — one for `build`, one for
+`typecheck`, one for a screenshot. Push again and cckit **updates that same comment in place**
+rather than adding a second one, so a request that took ten pushes still shows one current build
+log instead of ten stale ones.
+
+<Aside type="caution" title="Evidence never breaks your work">
+By default, a comment that fails to post warns and gets out of the way — a lost log line should
+never fail the request it was only annotating. A caller that genuinely needs the evidence to
+exist can ask for the opposite and have the failure stop the run. Either way the failure is
+printed, never silently reported as success.
+</Aside>
+
+Image evidence has one real limit: GitHub has no supported way to upload a file to a comment from
+the command line, so a screenshot is **referenced by its path** with instructions, not embedded.
+Drag it into the comment box yourself, or host the file and cckit will embed it.
+
 ## The commands, in order
 
 | Step | Command |

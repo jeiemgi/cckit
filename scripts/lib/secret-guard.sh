@@ -7,6 +7,22 @@
 # Applies to EVERYTHING publishable — code, docs, cookbook, examples, templates.
 # Usage:  source secret-guard.sh && secret_guard_scan [file...]   (default: git-tracked files)
 #         exit 0 = clean, 1 = a finding (with a report on stderr).
+# errors: strict — rc 1 on a finding — a scan that cannot run is not a clean scan
+
+# kit-state.sh resolves the shared .cckit/ so the private denylist is found from any worktree.
+# BASH_SOURCE is bash-only and empty in zsh (#313), hence the portable self-locate.
+if [ -n "${BASH_SOURCE:-}" ]; then
+  _sg_self="$BASH_SOURCE"
+elif [ -n "${ZSH_VERSION:-}" ]; then
+  eval '_sg_self="${(%):-%x}"'
+else
+  _sg_self="$0"
+fi
+if [ -f "$(dirname "$_sg_self")/kit-state.sh" ]; then
+  # shellcheck source=kit-state.sh
+  . "$(dirname "$_sg_self")/kit-state.sh"
+fi
+unset _sg_self
 
 # Files that must never be committed (by basename). Env files include .env.example/.sample —
 # even an example leaks your variable *names* and structure, so it stays local.
@@ -77,7 +93,11 @@ secret_guard_scan() {
   done < <(printf '%s\n' "${files[@]:-}" | tr '\n' '\0' | xargs -0 grep -niIE "$_sg_assign_pattern" 2>/dev/null | head -20)
 
   # (d) user-supplied privacy denylist (agnostic: YOU declare what is yours; file stays local)
-  denylist=".cckit/privacy-denylist"
+  # Resolve against the shared .cckit/, not the CWD: the denylist is the user's declaration of what
+  # is private, and a CWD-relative path meant it was silently NOT loaded from any worktree — the
+  # scan ran weaker there than in the primary checkout, with no indication it had.
+  if command -v kit_state_file >/dev/null 2>&1; then denylist="$(kit_state_file privacy-denylist)"
+  else denylist=".cckit/privacy-denylist"; fi
   if [ -f "$denylist" ]; then
     while IFS= read -r term; do
       term="$(printf '%s' "$term" | sed 's/#.*//;s/^[[:space:]]*//;s/[[:space:]]*$//')"

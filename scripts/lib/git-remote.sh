@@ -8,6 +8,7 @@
 #   git_remote_slug [dir]       -> "owner/repo" from origin (rc 1 + empty when no remote)
 #   git_remote_repo_name [dir]  -> "repo"
 #   git_remote_owner [dir]      -> "owner"
+# errors: strict — rc 1 + empty when there is no remote
 
 git_remote_slug() {
   local dir="${1:-$PWD}" url

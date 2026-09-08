@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # project-scan.sh — agnostic project detection. Reports what cckit is pointed at, from the
 # filesystem only (no baked-in project knowledge). Usage: source it && project_scan [dir]
+# errors: pure — filesystem detection only
 project_scan() {
   local dir="${1:-$PWD}" root stack=() kit="none"
   # ONE shared config discovery (config-path.sh, #69), sourced from this file's own dir when needed.

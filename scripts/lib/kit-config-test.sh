@@ -4,6 +4,7 @@
 # integration-branch fallback chain (#117) — a host project that names its integration branch under
 # an alternate key (integrationBranch / flow) must still resolve, not silently fall back to "main".
 # Hermetic: throwaway config files pointed at via KIT_CONFIG. Run:  bash scripts/lib/kit-config-test.sh
+# errors: strict — a test runner: rc 1 on any failed assertion
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 LIB="$ROOT/scripts/lib"
@@ -32,6 +33,19 @@ t "flow fallback" \
 # nothing set -> "main", the safe default.
 t "default main when unset" \
   "$(base_branch_for '{"github":{}}')" "main"
+
+# ── #244 · effort.wipLimit is exported as KIT_EFFORT_WIP_LIMIT ────────────────────────────────
+# The effort WIP gate reads this env var when EFFORT_WIP_LIMIT is unset. An UNSET key must export
+# an EMPTY string (not the literal "null"), because effort-ops treats non-empty as "configured" and
+# would otherwise reject "null" as a bad value on every repo that never set the key.
+wip_for() {
+  local json="$1" d; d="$(mktemp -d "$tmp/wip.XXXXXX")"
+  printf '%s' "$json" > "$d/cckit.config.json"
+  KIT_CONFIG="$d/cckit.config.json" bash -c "source '$LIB/kit-config.sh'; load_kit_config >/dev/null 2>&1; printf '%s' \"\$KIT_EFFORT_WIP_LIMIT\""
+}
+t "effort.wipLimit is exported"        "$(wip_for '{"github":{},"effort":{"wipLimit":3}}')" "3"
+t "effort.wipLimit 0 survives export"  "$(wip_for '{"github":{},"effort":{"wipLimit":0}}')" "0"
+t "unset effort.wipLimit exports ''"   "$(wip_for '{"github":{}}')" ""
 
 [ "$fail" -eq 0 ] && echo "ALL OK (kit-config)" || echo "kit-config: FAILURES"
 exit "$fail"

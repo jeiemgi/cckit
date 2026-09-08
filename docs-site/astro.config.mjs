@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { defineConfig } from 'astro/config';
+import { unified } from '@astrojs/markdown-remark';
 import starlight from '@astrojs/starlight';
 import starlightDocSearch from '@astrojs/starlight-docsearch';
 import react from '@astrojs/react';
@@ -65,8 +66,13 @@ export default defineConfig({
   vite: { define: { __CCKIT_VERSION__: JSON.stringify(pkg.version) } },
   // External links open in a new tab (safely) and get an "opens externally" icon via CSS
   // (a[target="_blank"] in theme.css). Relative in-site links are untouched.
+  // Astro 7 made Satteri the default Markdown processor; keep rendering on the `unified`
+  // (remark/rehype) processor so output is byte-identical to Astro 6 and the rehype plugin below
+  // still applies. `markdown.rehypePlugins` is the deprecated spelling of exactly this.
   markdown: {
-    rehypePlugins: [[rehypeExternalLinks, { target: '_blank', rel: ['noopener', 'noreferrer'] }]],
+    processor: unified({
+      rehypePlugins: [[rehypeExternalLinks, { target: '_blank', rel: ['noopener', 'noreferrer'] }]],
+    }),
   },
   integrations: [
     react(),

@@ -6,6 +6,7 @@
 #
 #   toon_encode            read JSON on stdin, write TOON (or JSON fallback) on stdout
 #   TOON_MIN_ROWS=N        size gate: arrays shorter than N stay JSON (default 2)
+# errors: pure — stdin JSON to stdout TOON, JSON fallback
 
 # toon_encode - stdin JSON -> stdout TOON-or-JSON.
 toon_encode() {

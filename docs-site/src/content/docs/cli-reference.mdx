@@ -35,13 +35,60 @@ One issue becomes one branch, one worktree, one PR. These verbs walk that path.
 | Verb | Purpose |
 | --- | --- |
 | `cckit next [--effort N]` | The unblocked set + how to start the top issue. |
-| `cckit start <issue> [slug]` | Create an isolated worktree + branch for an issue. |
+| `cckit start <issue> [slug]` | Create an isolated worktree + branch for an issue, [bootstrapped](/config-and-permissions/#worktree-bootstrap) — env files copied, dev port assigned, deps installed at the selected targets (`worktree.installPaths` if set — those dirs regardless of their manifests — else a root that declares dependencies or is a workspace root with members, else nothing). |
 | `cckit pr <issue> <summary>` | Commit, push, and open the PR. |
 | `cckit close <issue> <summary>` | Close the issue and mark it done. |
 | `cckit sync` | Board state: issues by role with Project Status, a merge-ordered open-PR queue, and blocked / not-on-board / stale (>14d) flags. |
-| `cckit status` | Dashboard: board + worktrees + resume handoff. |
+| `cckit status` | "Where are we?" in three buckets — local undone work, open PRs waiting on a human, cleanup available (local + remote) — plus the board and the resume handoff. Read-only. |
 | `cckit handoff "<note>"` | Save a resume-here note for the next session. |
 
+
+### Where are we?
+
+`cckit status` answers the question a session actually opens with, which is not what `git status` answers. Plain `git` output describes refs; it cannot see which PRs are waiting on a person, or which branches are safe to delete. The three buckets, in this order:
+
+| # | Bucket | What it reports |
+| --- | --- | --- |
+| 1 | **Local undone work** | Worktrees with uncommitted changes; branches holding commits reachable from **no** remote ref; effort subs not yet merged into their effort branch. Plus the worktree inventory, because a clean worktree on an issue branch is still work in progress. |
+| 2 | **PRs waiting on a human** | Each open PR with the one thing it needs: `conflict` · `checks` · `draft` · `wait` · `threads` · `ai-review` · `review` · `ready`. |
+| 3 | **Cleanup available** | What can go, local **and** remote, plus what is deliberately kept (orphan work, open-issue branches). `cckit gc` shows the same classification in full; acting on it is the `/kit-cleanup` skill. |
+
+Two details worth knowing, because both are places a naive reading gets it wrong:
+
+- **"Unpushed" means on no remote at all**, not "ahead of its own upstream". An effort sub whose commits were merged into a pushed effort branch has no upstream of its own, yet its work is safely on the remote — reporting it as undone would send you to re-push work that is already there.
+- **A superseded check run never counts.** Re-running a check, or retitling a PR and re-firing a title gate, leaves the old run in GitHub's rollup. Counting every context there reports a PR as failing a check that has since passed, so only the latest run per check name is read.
+
+In Claude Code the same report is `/kit-status`, and it answers the question in whatever wording it arrives in — "where are we", "what's the status", "how are we doing", "catch me up", "what needs my attention", or the same question in the project's own language. It deliberately does **not** fire on a question with a specific subject ("what's the status of PR 41"), which wants a direct answer rather than the whole picture.
+
+The `ai-review` verdict only appears when the repo evidently uses an AI reviewer — a reviewer config file, or an AI review already present on another open PR. In a repo with none, it never fires.
+
+```bash
+cckit status          # the three buckets
+cckit status --llm    # the same verdicts as JSON: local_undone, worktrees, prs, cleanup
+```
+
+## Verb ↔ skill map
+
+Every verb below is drivable from the CLI. The ones with a skill are also reachable as a slash command in Claude Code; the ones without are CLI-only, which means an agent that only reads the skills list cannot see them. Kept here so that gap stays visible rather than being rediscovered.
+
+| Verb | Skill | |
+| --- | --- | --- |
+| `status` | `kit-status` | |
+| `sync` | `kit-task-sync` | |
+| `next` | `kit-next` | |
+| `plan-next` | `kit-plan-next` | |
+| `start` · `pr` · `close` | `kit-task-start` · `kit-task-pr` · `kit-task-close` | |
+| `gc` | `kit-gc` | (`kit-cleanup` acts on its report) |
+| `autopilot` | `kit-autopilot` | |
+| `contribute` | `kit-contribute` | |
+| `digest` | `kit-digest` | |
+| `doctor` · `init` · `update` | `kit-doctor` · `kit-init` · `kit-update` | plugin commands |
+| `effort` | `kit-effort-new` · `-start` · `-pr` · `-close` | one skill per phase |
+| `brief` | — | CLI-only |
+| `plan` · `wave` · `watch` · `orchestrate` | — | CLI-only |
+| `msg` · `handoff` | — | CLI-only |
+| `adopt` · `migrate` · `scan` | — | CLI-only |
+| `lib` · `commands` · `version` · `render` · `encode-context` · `bench` · `release` · `install` · `completions` · `debug` | — | plumbing; no skill intended |
 
 ## Plan and drive a wave
 
@@ -49,11 +96,13 @@ A **wave** is a set of issues with no blockers between them, so they can run at 
 
 | Verb | Purpose |
 | --- | --- |
-| `cckit plan [--effort N]` | Wave plan: deps-ordered, file-disjoint, session-fit. |
+| `cckit plan [--effort N]` | Wave plan: deps-ordered, file-disjoint, session-fit. Inside a wave, issues are ordered by their `priority:pN` label — p0 → p1 → p2 → p3, unlabeled last — with ties keeping the dependency-derived order. Dependencies always win: a blocker sits in an earlier wave than what it blocks, so priority never pulls a dependent ahead of its blocker. |
 | `cckit plan-next` | Forward plan: inventory the kit's own skills/verbs/rules/docs, propose what to build next. |
 | `cckit wave [--effort N]` | Read open efforts, propose incoming waves: subagent fan-out + captain drive. |
 | `cckit watch [--merge] [--loop]` | Captain: gate open PRs, squash-merge clean ones, advance. Policy floors (default on) hold PRs touching CI workflows, lockfiles, or security paths — and any `hold`-labelled or draft PR — for human review. |
-| `cckit effort <new\|start\|pr\|close\|plan>` | The effort lifecycle (a parent issue + sub-issues). `new` takes `--slug`; `start`/`pr`/`close` accept a `<slug>` or the effort `<N>`. |
+| `cckit effort <new\|chain\|start\|pr\|close\|plan>` | The effort lifecycle (a parent issue + sub-issues). `new` takes `--slug`; `start`/`pr`/`close` accept a `<slug>` or the effort `<N>`. |
+| `cckit effort start [--force] <slug\|N> [slug]` | Create the effort's `effort/<N>-<slug>` branch + bootstrapped worktree. **WIP-limited:** refuses a *new* effort once `effort.wipLimit` (default 2) are already in progress — in progress meaning an `effort/<N>-<slug>` branch exists as a local head **or** on origin, read with `git ls-remote` rather than the cached `refs/remotes`. At the limit refuses; only strictly under it starts. Re-starting an effort that is already in progress is never gated. The check runs before anything is written, so a refusal makes no branch, no worktree and no board change. `--force` (or `KIT_FORCE=1`) starts anyway; `0` refuses every ordinary start but not a forced one. `EFFORT_WIP_REMOTE=0`, or an unreachable origin, counts the cached refs instead and the start still proceeds. Does not affect `cckit start <issue>`. |
+| `cckit effort chain <a> <b> [<c> …]` | Declare a linear order over 2+ issues: `b` `blocked_by` `a`, `c` `blocked_by` `b`, plus a `- Depends on #<predecessor>` line in each successor's `## Relations` section. These are the edges `cckit plan` layers into waves. Idempotent, and additive — an issue already blocked by something else keeps that blocker. Refuses (and writes nothing) on fewer than two numbers, a non-numeric argument, an issue that does not exist, a repeated number, or an edge that would close a cycle. |
 
 
 ## Run flows in parallel
@@ -69,15 +118,63 @@ Both are launch verbs with no JSON result — use `--dry-run` to inspect the pla
 
 | Verb | Purpose |
 | --- | --- |
-| `cckit gc [--prune [--yes]]` | Report (default) or prune merged branches + worktrees. |
+| `cckit gc [--prune [--yes]]` | Report (default) or prune merged branches + worktrees. Never touches a branch/worktree whose issue is still open — including an effort sub (`sub/<N><letter>-…`) of an open effort — and aborts rather than classify anything if that protection helper cannot load. |
+| `cckit cleanup [--yes]` | The guided destructive sweep over the `gc` classification: prints the plan (SAFE branches + worktrees, ZOMBIE worktrees, ORPHAN, PROTECTED, stashes) and deletes nothing without `--yes`. Both verbs refresh remote-tracking refs (`git fetch --prune`) so the classification is not made against a stale view of the remote — that is the only write a plan-only run performs, and it touches no branch, worktree, stash, or commit of yours. `--yes` deletes the SAFE local branches, the **clean** SAFE worktrees (a dirty one is skipped with a warning, never destroyed), and the remote refs of branches proven exactly level with theirs. It also prunes the admin metadata of the **ZOMBIE** worktrees the plan listed — a worktree whose directory is gone but whose metadata lingers — after committing any staged work it still holds to its branch (recover-before-prune), so no blob is orphaned by the prune. An ORPHAN branch, a branch whose issue is still open, and a stash are never deletable — they are surfaced and left alone. |
 | `cckit render` | stdin markdown → rich output (glow on a TTY, verbatim when piped). |
 | `cckit encode-context` | stdin JSON → compact TOON (token-saving for subagents). |
 | `cckit digest <path\|url>` | Summarize a file or URL with the local model. |
 | `cckit bench [run\|report\|…]` | [Documentation benchmark](/benchmark/): score how well this project finds + uses its own canonical docs. |
 | `cckit version` | The installed cckit version. |
 | `cckit commands` | List every verb (the command catalog). |
+| `cckit lib [--all] [--reasons]` | List every `scripts/lib` helper: its public functions, its one-line purpose, and its declared error behaviour. The companion to `commands` — that lists the verbs, this lists the library they are built from. |
+| `cckit brief <issue>` | Generate an issue's delegation brief from real repo state: its worktree and branch, whether that branch's seed is stale, the files it owns, the helpers those files sit on, and the project's standing gotchas. |
 | `cckit update` | Report whether this project is behind the installed cckit. |
 | `cckit release <ver> [--publish]` | Cut a release (dry-run by default). |
+
+### Finding a helper before you write one
+
+`cckit commands` answers "which verbs exist?". `cckit lib` answers the question underneath it — "which helper already does this?" — so an agent asked to, say, attach gate evidence to a PR finds `pr-evidence.sh` instead of writing that from scratch.
+
+Each row carries the four facts you need before sourcing a file:
+
+| Column | What it is |
+| --- | --- |
+| `file` | The basename to `source`. The footer prints the resolved absolute path. |
+| `errors` | The file's declared failure contract — `pure`, `strict`, `best-effort`, or `mixed` — read from its `# errors:` header (see [CONTRIBUTING](https://github.com/jeiemgi/cckit/blob/main/CONTRIBUTING.md)). A caller that composes a `strict` helper with a `best-effort` one silently inherits the weaker behaviour, so check this first. `mixed` rows also show their reason, because that is the only thing saying which half propagates; `--reasons` shows every file's reason. `unknown` means the file has no header yet — reported, never fatal. |
+| `public functions` | The functions meant for callers. `_`-prefixed names are private by convention and excluded, as are functions defined inside another function. Never elided. |
+| `purpose` | The first sentence of the file's own header comment — derived, never invented. |
+
+`*-test.sh` runners are excluded by default (they are test entry points, not a library); the footer always states how many, and `--all` includes them.
+
+Run from a project cckit is installed in, it catalogs that project's own `scripts/lib` when it has one and otherwise the cckit install itself — which is the library `cckit` on your PATH can actually source. `--root <dir>` points it somewhere else.
+
+```bash
+cckit lib                 # the markdown table
+cckit lib --llm           # TOON rows {file,errors,functions,purpose}
+cckit lib --all           # include the *-test.sh runners
+cckit lib --reasons       # every failure reason, not only the mixed ones
+```
+
+### Briefing an agent without retyping the repo
+
+A hand-written delegation brief drops whatever its author forgot, and what gets forgotten is exactly what the delegated agent then rediscovers by hand. `cckit brief <issue>` reads it out of the repo instead:
+
+| Section | Where it comes from |
+| --- | --- |
+| worktree + branch | `git worktree list`, matched to the issue by the same branch-name rule `gc` uses to decide what is protected — so the brief and `gc` cannot disagree about which worktree an issue owns. No worktree yet reads as an instruction to run `cckit start <issue>`, never as silence. |
+| seed freshness | Whether `origin/<base>` is already an ancestor of the branch. A **STALE** seed means a green check on that branch proves nothing until it is rebased — the omission that quietly costs a whole session. |
+| files this issue owns | The paths named in the issue's `## For agents` section, falling back to the whole issue when that section carries build order rather than paths (it says which). A bare basename lifted from prose is resolved against the tracked files, so `captain-test.sh` reports as `scripts/lib/captain-test.sh` and not as a new file. |
+| helpers you already have | `cckit lib` rows for the helpers the issue **owns**, then the ones its files actually `source`, capped at ten with the overflow counted (`KIT_BRIEF_MAX_HELPERS` raises the cap). |
+| standing gotchas | The `## Standing gotchas` block of the project's own `.claude/rules/delegation-brief.md`, falling back to the kit's template. Lifted, never retyped, so it cannot go stale against the rule. |
+| durable prose | The `## Durable prose` block of the same rule: the instruction that an agent about to write an issue body, a PR body, a commit message, a rule, an ADR or a knowledge doc runs the `concrete` pass on it first, with the constraints that make the pass reproducible (cut only by named offense, evidence untouchable, `O13`/`O14` fixed at the gap and not reworded). A sub-agent applies a skill only when it is told to, so a mandate that lives only in `communication-style.md` never reaches it. |
+
+Every section that cannot be filled says so on its own line. A brief that silently omits a section is the failure this verb exists to remove, so an empty file list reads "the issue names no paths — ask before starting" rather than nothing at all.
+
+```bash
+cckit brief 226           # the brief for issue #226
+```
+
+Reading the issue is the verb's one hard dependency: a `gh` failure propagates rather than yielding a brief with an empty issue in it.
 
 ## Structured output for agents
 
@@ -87,6 +184,7 @@ Append `--llm` (or `--output=json`) to any verb for parseable output, so an agen
 cckit sync --llm
 cckit plan --llm
 cckit plan-next --llm   # the forward plan as TOON rows {rank,area,proposal,next}
+cckit lib --llm         # the helper catalog as TOON rows {file,errors,functions,purpose}
 cckit effort plan --llm
 ```
 

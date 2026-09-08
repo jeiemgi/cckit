@@ -6,6 +6,7 @@
 # package.json lagged behind. Guards: (1) vb_write stamps all four files, (2) publish.sh calls the
 # shared bumper (no second implementation), (3) the repo's four version files currently agree.
 # Run:  bash scripts/lib/version-bump-test.sh
+# errors: strict — a test runner: rc 1 on any failed assertion
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 fail=0

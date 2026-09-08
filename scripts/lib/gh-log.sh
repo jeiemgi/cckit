@@ -12,6 +12,7 @@
 # Log: one JSON line per call appended to <git-common-dir>/gh-requests.jsonl
 #   {ts, kind:"graphql|rest", op:"query|mutation|GET|POST|…", label, points, surface, pid}
 # Disable with KIT_GH_LOG=0. Never fails a caller (logging is best-effort).
+# errors: best-effort — logging never fails a caller
 
 GH_LOG_FILE="${GH_LOG_FILE:-$(git rev-parse --git-common-dir 2>/dev/null)/gh-requests.jsonl}"
 

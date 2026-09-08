@@ -13,6 +13,7 @@
 #   effort_set_blocked_by <issue> <blocker>             set a native GitHub blocked_by dependency edge
 #
 # Requires: gh, jq, git. bash 3.2 compatible.
+# errors: strict — git mechanics: a failed link, snapshot or lint propagates
 
 # Repo resolves from kit.config.json (KIT_REPO) — load it if a caller hasn't already.
 if [[ -z "${KIT_REPO:-}" ]]; then

@@ -16,17 +16,45 @@
 #
 # Requires: git; gh (degrades to "unknown" issue/PR state without it); scripts/lib/worktree-issue.sh.
 # Portable: bash 3.2+ AND zsh.
+# errors: mixed — kit_gc_analyze is read-only and forgiving; the prune path propagates
 
 KIT_GC_REPO="${KIT_GC_REPO:-${KIT_REPO:-}}"
 
 _kit_gc_root() { git worktree list --porcelain 2>/dev/null | awk '/^worktree /{print $2; exit}'; }
 
-# Source worktree-issue.sh (wt_issue_number / wt_protected_reason) from whatever lib dir we live in.
+# This file's own directory, resolved ONCE at load time — the only point where both shells agree.
+# `BASH_SOURCE` is bash-only; inside a zsh *function* it is unset and `$0` is the function name, so
+# the old per-call resolution fell back to `$0`="zsh", worktree-issue.sh was never sourced,
+# `wt_protected_reason` stayed undefined, and every call site's `2>/dev/null || true` turned the
+# resulting "command not found" into an empty reason — i.e. an open issue's branch classified as
+# SAFE to delete. At FILE scope zsh sets `$0` to the sourced file's path, so one expansion covers
+# bash (source or direct exec) and zsh (interactive or not) with no shell-specific syntax. Prompt
+# expansion (`${(%):-%x}`) is deliberately avoided: it is zsh-only, needs `eval` to stay parseable
+# under bash, and is unreliable in an INTERACTIVE zsh — the kit's own shell.
+#
+# `cd`'s own stdout is discarded, not just its stderr: an interactive zsh ECHOES the new directory
+# (tilde-abbreviated) after a `cd`, so the bare `$(cd … && pwd)` idiom captured TWO lines and the
+# resulting path never existed. `pwd` still writes to the substitution.
+_KIT_GC_LIB_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" >/dev/null 2>&1 && pwd)"
+
+# Source worktree-issue.sh (wt_issue_number / wt_protected_reason) from the lib dir we live in.
 _kit_gc_load_deps() {
   command -v wt_protected_reason >/dev/null 2>&1 && return 0
-  local d; d="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
   # shellcheck source=/dev/null
-  [ -f "$d/worktree-issue.sh" ] && . "$d/worktree-issue.sh"
+  [ -n "${_KIT_GC_LIB_DIR:-}" ] && [ -f "$_KIT_GC_LIB_DIR/worktree-issue.sh" ] \
+    && . "$_KIT_GC_LIB_DIR/worktree-issue.sh"
+  command -v wt_protected_reason >/dev/null 2>&1
+}
+
+# Fail LOUD if the protection helper could not be loaded. Without it every issue-open check
+# silently returns empty and gc would offer to delete in-progress work — a wrong "safe" is far
+# worse than a refusal, so callers must not proceed on a degraded analysis.
+_kit_gc_require_deps() {
+  _kit_gc_load_deps || :   # never let a load failure abort a `set -e` caller before the FATAL prints
+  command -v wt_protected_reason >/dev/null 2>&1 && return 0
+  echo "kit-gc: FATAL — worktree-issue.sh not loaded; issue-open protection is unavailable." >&2
+  echo "kit-gc: refusing to classify branches: everything would look SAFE to delete." >&2
+  return 1
 }
 
 # _kit_gc_pr_index [repo] — echo one "<headRefName>\tPR#<num> <STATE>" line per PR in ONE gh call, so
@@ -46,7 +74,7 @@ _kit_gc_pr_for() {
 # kit_gc_analyze — read-only classification of worktrees, branches, and stashes. Writes NOTHING.
 # Each row is tagged PROTECTED / SAFE / ACTIVE / ORPHAN so a human or UI can decide what to prune.
 kit_gc_analyze() {
-  _kit_gc_load_deps
+  _kit_gc_require_deps || return 1
   # `wtpath`, not `path`: under zsh `path` is tied to PATH (special array), so a bare `path` local
   # here would clobber the command search path on assignment. A namespaced name is inert.
   local repo="$KIT_GC_REPO" b ref wtpath reason pr prot
@@ -173,13 +201,34 @@ kit_gc_recover_zombies() {
   done
 }
 
+# _kit_gc_has_unpushed <branch> — rc 0 when the LOCAL branch holds commits its remote does not, i.e.
+# deleting it locally would destroy the only copy. A missing remote ref is NOT unpushed work: the
+# branch's PR merged, so the commits reached the base branch and the remote was deleted at merge.
+# `git branch -D` is a force delete, so this is the guard that makes it safe (kit-gc SKILL: "verify a
+# branch is level with its remote before deleting — an 'ahead' branch may hold orphan work").
+_kit_gc_has_unpushed() {
+  local b="$1"
+  git show-ref --verify --quiet "refs/remotes/origin/$b" 2>/dev/null || return 1
+  [ "$(git rev-list --count "origin/$b..$b" 2>/dev/null || echo 1)" != "0" ]
+}
+
+# _kit_gc_remote_ahead <branch> — rc 0 when the REMOTE holds commits the local branch does not.
+# Containment in one direction is not equality: `origin/<b>..<b>` = 0 only proves local ⊆ remote, so
+# a remote-ahead branch would otherwise pass the level check and lose remote-only history on delete.
+# Remote deletion requires BOTH directions empty.
+_kit_gc_remote_ahead() {
+  local b="$1"
+  git show-ref --verify --quiet "refs/remotes/origin/$b" 2>/dev/null || return 1
+  [ "$(git rev-list --count "$b..origin/$b" 2>/dev/null || echo 1)" != "0" ]
+}
+
 # kit_gc_prune [--yes] - remove worktrees + local branches whose PR is MERGED (the SAFE rows).
 # DRY-RUN by default (lists what it WOULD remove); --yes performs the deletions. Never touches a
 # PROTECTED/ACTIVE/ORPHAN branch, and never a DIRTY worktree (recover-before-prune): a worktree with
 # staged/unstaged/untracked changes is skipped with a warning, not destroyed. The remote branch is
 # already deleted at merge time (gh pr merge --delete-branch); this cleans up the local side.
 kit_gc_prune() {
-  _kit_gc_load_deps
+  _kit_gc_require_deps || return 1
   # `wtpath`, not `path`: under zsh `path` is tied to PATH (special array), so assigning to a bare
   # `path` local would clobber the command search path. A namespaced name is inert.
   local repo="$KIT_GC_REPO" yes=0 a wtpath ref b pr pr_index
@@ -224,6 +273,11 @@ kit_gc_prune() {
     [ -n "$(wt_protected_reason "$b" "$repo" 2>/dev/null || true)" ] && continue
     pr="$(_kit_gc_pr_for "$pr_index" "$b")"
     printf '%s' "$pr" | grep -q 'MERGED' || continue
+    # A merged PR is not on its own sufficient: the local ref may carry commits that were never
+    # pushed, and `git branch -D` would be their last rites.
+    if _kit_gc_has_unpushed "$b"; then
+      echo "  SKIP $b — ahead of origin/$b (unpushed commits); recover before pruning" >&2; continue
+    fi
     if [ "$yes" -eq 1 ]; then
       git branch -D "$b" >/dev/null 2>&1 && echo "  deleted local branch $b (PR MERGED)"
     else
@@ -231,4 +285,138 @@ kit_gc_prune() {
     fi
   done
   [ "$yes" -eq 1 ] && echo "gc prune: done" || echo "gc prune: DRY RUN - pass --yes to delete"
+}
+
+# _kit_gc_names <analysis> <section> <verdict-regex> — echo one bare name per matching row inside a
+# `# <section>` block of a kit_gc_analyze dump. The analysis is the SINGLE classifier (Family 1):
+# cleanup reads its verdicts rather than re-deriving them, so the two can never disagree about what
+# is safe to delete — the failure mode #219 was about.
+_kit_gc_names() {
+  printf '%s\n' "$1" | awk -v sect="$2" -v want="$3" '
+    /^# /     { in_s = ($0 == "# " sect); next }
+    !in_s     { next }
+    $0 ~ want { sub(/^  /, ""); sub(/ ->.*/, ""); print }
+  '
+}
+
+# kit_gc_cleanup [--yes] — the ONE guided destructive sweep over the gc analysis.
+#
+# PLAN FIRST, always: print every bucket with its counts and names, then execute only the SAFE rows,
+# and only with --yes. Without --yes nothing is written — the plan IS the output. Every row the plan
+# omits is a deletion the user did not get to veto, so the plan must name EVERYTHING --yes can touch:
+# worktrees as well as branches.
+#
+# What --yes deletes: merged worktrees, merged local branches (via kit_gc_prune, which also runs the
+# recover-before-prune zombie pass), and the REMOTE ref of a merged branch that is exactly level with
+# it. What it NEVER deletes: an ORPHAN branch (local commits not on the base remote), a PROTECTED
+# branch (its issue is still open), or a stash. Those three are irreversible or hold the only copy of
+# work, so they are surfaced BY NAME for a human and left exactly where they are.
+#
+# NOTE: the underlying kit_gc_analyze refreshes remote-tracking refs (`git fetch --prune`) so the
+# classification is not made against a stale view of the remote. That is the only write a plan-only
+# run performs, and it touches no branch, worktree, stash, or commit of yours.
+kit_gc_cleanup() {
+  _kit_gc_require_deps || return 1
+  local repo="$KIT_GC_REPO" yes=0 a out b n_safe n_orphan n_prot n_stash n_wt rc=0 n_rfail=0
+  local zname zbranch zstaged
+  local safe_list orphan_list prot_list stash_list wt_list zomb_list level_ok n_zomb
+  for a in "$@"; do case "$a" in --yes|-y) yes=1 ;; esac; done
+
+  out="$(kit_gc_analyze)" || return 1
+  safe_list="$(_kit_gc_names "$out" branches ' -> SAFE ')"
+  orphan_list="$(_kit_gc_names "$out" branches ' -> ORPHAN')"
+  prot_list="$(_kit_gc_names "$out" branches ' -> PROTECTED:')"
+  stash_list="$(printf '%s\n' "$out" | awk '/^# /{in_s=($0=="# stashes"); next} in_s && NF' | sed 's/^  //')"
+
+  # Worktrees kit_gc_prune would remove: the ones whose branch is itself SAFE (same condition prune
+  # applies — unprotected + PR MERGED). Derived from the SAFE list so the two cannot diverge.
+  wt_list="$(git worktree list --porcelain 2>/dev/null \
+    | awk '/^worktree /{w=$2} /^branch /{print w" "$2}' \
+    | while read -r wtpath ref; do
+        b="${ref#refs/heads/}"
+        printf '%s\n' "$safe_list" | grep -qxF "$b" || continue
+        if [ -n "$(git -C "$wtpath" status --porcelain 2>/dev/null)" ]; then
+          echo "$wtpath [$b] (DIRTY — will be skipped, not destroyed)"
+        else
+          echo "$wtpath [$b]"
+        fi
+      done)"
+
+  # ZOMBIE worktrees (dir gone, admin metadata lingers). kit_gc_prune --yes acts on these two ways
+  # — kit_gc_recover_zombies commits any staged delta to the branch, then `git worktree prune`
+  # drops the metadata — so the plan MUST name them or --yes would touch a row nobody approved
+  # (#227 review). Same helper as the analyze report, so the two cannot diverge.
+  zomb_list="$(while IFS="$(printf '\t')" read -r zname zbranch zstaged; do
+        [ -n "$zname" ] || continue
+        if [ "$zstaged" = yes ]; then
+          echo "$zname [$zbranch] (STAGED work — recovered to a commit on $zbranch, then metadata pruned)"
+        else
+          echo "$zname [$zbranch] (no staged delta — metadata pruned)"
+        fi
+      done <<ZEOF
+$(_kit_gc_zombies)
+ZEOF
+)"
+
+  n_safe="$(printf '%s' "$safe_list"   | grep -c . || true)"
+  n_orphan="$(printf '%s' "$orphan_list" | grep -c . || true)"
+  n_prot="$(printf '%s' "$prot_list"   | grep -c . || true)"
+  n_stash="$(printf '%s' "$stash_list" | grep -c . || true)"
+  n_wt="$(printf '%s' "$wt_list"       | grep -c . || true)"
+  n_zomb="$(printf '%s' "$zomb_list"   | grep -c . || true)"
+
+  echo "# cleanup plan"
+  printf '  SAFE branches     %3s  merged PR, issue closed/absent\n' "$n_safe"
+  printf '%s\n' "$safe_list" | grep . | sed 's/^/      /' || true
+  printf '  SAFE worktrees    %3s  removed with their branch\n' "$n_wt"
+  printf '%s\n' "$wt_list" | grep . | sed 's/^/      /' || true
+  printf '  ZOMBIE worktrees  %3s  staged work recovered to its branch, then metadata pruned\n' "$n_zomb"
+  printf '%s\n' "$zomb_list" | grep . | sed 's/^/      /' || true
+  printf '  ORPHAN kept       %3s  commits not on the base remote — never auto-deleted\n' "$n_orphan"
+  printf '%s\n' "$orphan_list" | grep . | sed 's/^/      /' || true
+  printf '  PROTECTED kept    %3s  issue still OPEN\n' "$n_prot"
+  printf '%s\n' "$prot_list" | grep . | sed 's/^/      /' || true
+  printf '  stashes kept      %3s  irreversible — drop by hand after reading each diff\n' "$n_stash"
+  printf '%s\n' "$stash_list" | grep . | sed 's/^/      /' || true
+
+  if [ "$yes" -ne 1 ]; then
+    echo "cleanup: PLAN ONLY — nothing deleted. Pass --yes to delete the SAFE rows and prune the ZOMBIE rows."
+    return 0
+  fi
+  [ "$n_safe" -eq 0 ] && [ "$n_wt" -eq 0 ] && [ "$n_zomb" -eq 0 ] && { echo "cleanup: nothing SAFE to delete."; return 0; }
+
+  # Which SAFE branches may have their REMOTE deleted — decided BEFORE the local prune, because once
+  # the local ref is gone there is nothing left to compare. Requires exact equality in BOTH
+  # directions: local ⊆ remote alone would let a remote-ahead branch lose remote-only history.
+  level_ok=""
+  while IFS= read -r b; do
+    [ -n "$b" ] || continue
+    git show-ref --verify --quiet "refs/remotes/origin/$b" 2>/dev/null || continue
+    _kit_gc_has_unpushed  "$b" && { echo "  SKIP remote $b — local is ahead of origin/$b" >&2; continue; }
+    _kit_gc_remote_ahead  "$b" && { echo "  SKIP remote $b — origin/$b is ahead of local" >&2; continue; }
+    level_ok="$level_ok$b
+"
+  done <<EOF
+$safe_list
+EOF
+
+  kit_gc_prune --yes || rc=1
+
+  # Remote side last: only branches proven exactly level above, so nothing unpushed or remote-only
+  # is dropped. A failed delete is reported AND counted (this loop is heredoc-fed, not piped, so it
+  # runs in the current shell and the counter survives), never retried blindly.
+  while IFS= read -r b; do
+    [ -n "$b" ] || continue
+    if git push origin --delete "$b" >/dev/null 2>&1; then
+      echo "  deleted remote branch $b"
+    else
+      echo "  SKIP remote $b — delete failed (protected ref or already gone)" >&2
+      n_rfail=$((n_rfail + 1)); rc=1
+    fi
+  done <<EOF
+$level_ok
+EOF
+  printf '  remote deletes failed %3s\n' "$n_rfail"
+  echo "cleanup: done — $n_zomb zombie pruned / $n_orphan orphan / $n_prot protected / $n_stash stash left untouched."
+  return "$rc"
 }

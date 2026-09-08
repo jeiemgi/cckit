@@ -10,6 +10,7 @@
 #   cckit next --llm            the unblocked set as TOON rows {number,ctx,title}
 #
 # Requires gh + jq (via the plan machine). bash 3.2 / zsh compatible.
+# errors: strict — refuses to recommend an issue without gh + jq
 
 NEXT_REPO="${NEXT_REPO:-${KIT_REPO:-}}"
 

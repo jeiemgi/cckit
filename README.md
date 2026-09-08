@@ -90,17 +90,27 @@ cckit doctor                  # onboarding preflight: deps, gh auth
 cckit init --profile software # scaffold cckit.config.json + .claude/ for this repo
                               #   profiles: software · content · research · automation · minimal
 cckit plan-next               # propose what to build next, grounded in current capabilities
+cckit status                  # where are we: local undone work, PRs to attend, cleanup available
 cckit next                    # the next unblocked issue + how to start it
-cckit start 42                # isolated worktree + branch for issue #42
+cckit start 42                # isolated worktree + branch for issue #42, bootstrapped:
+                              #   env files copied, dev port assigned, deps installed at the
+                              #   selected targets — worktree.installPaths if set (those dirs
+                              #   regardless of their manifests), else a root that declares
+                              #   deps or is a workspace root with members, else nothing
+                              #   (KIT_WT_INSTALL=0 skips the install entirely)
+cckit brief 42                # the delegation brief for #42, read out of the repo not memory
+cckit lib                     # every scripts/lib helper: functions, purpose, error contract
 cckit pr 42 "what changed"    # commit, push, open the PR
 cckit sync                    # board state, what's unblocked
 cckit handoff "resume note"   # save a handoff — bare `cckit` prints it next session
-cckit gc                      # prune merged branches + worktrees
+cckit gc                      # report prunable branches + worktrees (deletes nothing)
+cckit cleanup [--yes]         # act on that report: delete the SAFE rows, prune listed zombies, keep orphans/stashes
 ```
 
 Adopting cckit in a repo that already has history? `cckit scan` detects the stack, `cckit adopt`
-records kit-shaped files the repo already has, and `cckit status` is the thin dashboard — board,
-worktrees, and the resume handoff in one screen. Run `cckit help` for the full verb list, or
+records kit-shaped files the repo already has, and `cckit status` answers "where are we" — local
+undone work, the open PRs waiting on a human, and the cleanup available, plus the board and the
+resume handoff in one screen. Run `cckit help` for the full verb list, or
 `cckit <verb> --help` for any one.
 
 ## Efforts and slug handles
@@ -128,13 +138,72 @@ A pure-digits argument is always a number; anything else is resolved to the cano
 matching `effort/*` branches, the `slug:<slug>` label, then open effort titles. An unknown or
 ambiguous slug fails with a clear error rather than guessing. Efforts render as `slug #N`.
 
+### Ordering work — `cckit effort chain`
+
+When several issues have to land in a set order, `cckit effort chain` declares that order once:
+
+```bash
+cckit effort chain 241 242 243     # 242 blocked_by 241 · 243 blocked_by 242
+```
+
+Each issue after the first gets a native GitHub `blocked_by` edge on its predecessor **and** a
+`- Depends on #<predecessor>` line in its `## Relations` section — the same line
+`cckit effort new --depends-on` writes, from the same formatter. Those `blocked_by` edges are
+exactly what `cckit plan` reads, so a chained set lands one issue per wave, in the order you gave.
+
+It is **idempotent**: an edge or a `Depends on` line that is already there is reported and skipped,
+so re-running changes nothing. It only ever **adds** — an issue already blocked by something else
+keeps that blocker and ends up with both. And it validates the whole chain before writing anything,
+so a refusal leaves the board untouched: fewer than two numbers, an argument that is not an issue
+number, an issue that does not exist, a number repeated in the list (`chain 1 2 1`), or an edge that
+would close a cycle through dependencies GitHub already holds are all refused whole. A cycle is
+refused rather than written because `cckit plan` cannot layer a cyclic graph into waves.
+
+### One at a time — the effort WIP limit
+
+`cckit effort start` refuses to start a **new** effort once too many are already in progress:
+
+```console
+$ cckit effort start 244
+effort_start: 2 effort(s) already in progress and the WIP limit is 2.
+    · order-and-cadence #241  (effort/241-order-and-cadence)
+    · release-gates #257  (effort/257-release-gates)
+  → refusing to start #244 — nothing was created.
+     Close one with 'cckit effort close <N>', or start anyway with --force (or KIT_FORCE=1).
+     The limit is effort.wipLimit in the project config (default 2); EFFORT_WIP_LIMIT overrides it.
+```
+
+**In progress** means an `effort/<N>-<slug>` branch exists — as a local head, **or** on origin, so
+an effort another machine started counts too. `cckit effort start` creates the branch and
+`cckit effort close` deletes it, so the set is exactly "started and not yet closed".
+
+The origin half is read with `git ls-remote` on each `cckit effort start`, not from your cached
+`refs/remotes`, because the cache is wrong in both directions: a branch pushed since your last fetch
+is missing from it, and a branch deleted on origin lingers in it until a prune. One network
+round-trip buys a count that is right either way.
+
+- The check runs **before** the fetch, the branch, the worktree and the bootstrap, so a refusal
+  makes **no branch, no worktree and no board change**.
+- **At** the limit refuses; only strictly under it starts. The default limit is `2`.
+- Re-running `cckit effort start` on an effort that is **already** in progress is never gated — it
+  adds no WIP, so the verb stays safe to re-run even at or over the limit.
+- `--force` (or `KIT_FORCE=1`, the same escape hatch `cckit effort close` uses) starts anyway.
+- Set your own limit with `effort.wipLimit` in `cckit.config.json`; `0` refuses every ordinary
+  start, **though `--force` still works**. A value that is not a non-negative integer is ignored
+  with a warning and the default `2` is used. `EFFORT_WIP_LIMIT` in the environment overrides the
+  config per invocation.
+- This gates **efforts only**. `cckit start <issue>` (a plain task worktree) has no WIP limit.
+- **No network, no problem.** `EFFORT_WIP_REMOTE=0` skips the origin query and counts local heads
+  plus your cached `refs/remotes`. If origin is simply unreachable, the count falls back to those
+  same cached refs, prints one line saying the count may be stale, and the start proceeds.
+
 ## Waves — parallel agentic development
 
 `cckit wave` reads your open efforts and proposes the incoming waves of work — parallel agent tasks
 that gate and merge themselves. This is the part that turns one keyboard into a small team:
 
 ```bash
-cckit plan                 # the wave plan: deps-ordered, file-disjoint, session-fit
+cckit plan                 # the wave plan: deps-ordered, p0-first inside a wave, file-disjoint
 cckit wave                 # a Task-subagent fan-out brief Claude Code enacts (proposes the next wave)
 cckit orchestrate 12 14 17 # run N flows in parallel worktrees (--dry-run / --cap / --agent)
 cckit watch --merge        # the captain: gate open PRs, squash-merge the CLEAN ones, advance
@@ -168,6 +237,14 @@ public: [every issue closed in the repo →](https://github.com/jeiemgi/cckit/is
 — including [the effort that produced this README](https://github.com/jeiemgi/cckit/issues/160).
 The board is both the plan and the proof.
 
+cckit also runs on the rules and skills it ships. `templates/` is what `cckit init` writes into a
+project; `.claude/skills/` and `.claude/rules/` here are the subset cckit applies to its own work —
+`concrete` (the anti-slop catalogue every commit and PR body goes through) and
+`karpathy-guidelines`, plus the rules that govern this repo's branches, efforts, PR titles and
+delegation. It is a subset on purpose: several templates target stacks cckit does not have.
+`scripts/self-install-test.sh` holds the manifest, the reason for every skip, and the assertion that
+the installed copies have not drifted from their templates.
+
 ## Documentation
 
 Full docs live at **[cckit.dev](https://cckit.dev)** — start with
@@ -184,12 +261,16 @@ prompt** you can paste straight into Claude Code — start exactly where you are
 cckit/
   bin/cckit              # the CLI dispatcher
   scripts/lib/*.sh       # the git-mechanics bundle (effort, worktree, gh, gc, …)
+                         #   each declares `# errors:` — see CONTRIBUTING.md
   scripts/benchmark/     # doc-retrieval benchmark harness (cckit bench)
   .claude-plugin/        # the Claude Code plugin manifest
   skills/ commands/      # Claude Code skills + slash commands
   profiles/ templates/   # init profiles + scaffold templates
   routines/ modules/     # scheduled routines + optional modules
   docs-site/             # documentation source — Astro/Starlight (deployed to cckit.dev)
+  .claude/skills/        # the subset of templates/skills/ cckit installs for ITSELF
+  .claude/rules/         # the subset of templates/rules/ cckit installs for ITSELF
+                         #   the manifest + every skip reason: scripts/self-install-test.sh
   cckit.config.json      # project configuration (no hardcoded org/repo)
 ```
 

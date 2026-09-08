@@ -2,6 +2,7 @@
 # render-test.sh — self-test for render.sh under bash AND zsh.
 # Network-free, TTY-free: covers width clamping, the markdown table composers, and the pipe-safety
 # guarantee (non-TTY in == verbatim out). Run:  bash scripts/lib/render-test.sh
+# errors: strict — a test runner: rc 1 on any failed assertion
 
 dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 
