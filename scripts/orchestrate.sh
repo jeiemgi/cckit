@@ -56,7 +56,8 @@ while [ "$#" -gt 0 ]; do
 done
 
 [ "${#ISSUES[@]}" -ge 1 ] || { echo "orchestrate: pass at least one issue number" >&2; usage; exit 2; }
-case "$CAP" in ''|*[!0-9]*) echo "orchestrate: --cap needs a number (got '$CAP')" >&2; exit 2 ;; esac
+case "$CAP" in ''|*[!0-9]*) echo "orchestrate: --cap needs a positive number (got '$CAP')" >&2; exit 2 ;; esac
+[ "$CAP" -gt 0 ] || { echo "orchestrate: --cap must be greater than zero" >&2; exit 2; }
 
 # Resolve the main worktree root + load config (repo + base branch drive everything).
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -71,11 +72,14 @@ REPO="$KIT_REPO"
 # blocked_by gate: echo the OPEN blocker numbers of an issue (native GitHub dependency edge).
 open_blockers() {
   local n="$1" b st blk
-  blk="$(gh api "repos/$REPO/issues/$n/dependencies/blocked_by" --jq '.[].number' 2>/dev/null || true)"
+  blk="$(gh api "repos/$REPO/issues/$n/dependencies/blocked_by" --jq '.[].number')" || {
+    echo "orchestrate: could not read blockers for #$n" >&2; return 1;
+  }
   for b in $blk; do
     st="$(gh issue view "$b" --repo "$REPO" --json state --jq .state 2>/dev/null || echo OPEN)"
     [ "$st" = "OPEN" ] && printf '%s ' "$b"
   done
+  return 0
 }
 
 # Partition the requested issues into eligible / blocked / (later) queued.

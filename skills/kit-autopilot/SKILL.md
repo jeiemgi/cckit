@@ -6,6 +6,17 @@ when_to_use: When delegating work to run unattended — a single capped objectiv
 
 # kit-autopilot — capped, hands-off execution
 
+## Current implementation limit
+
+The current `cckit autopilot` CLI launches issue flows through `orchestrate.sh`. It accepts
+issue numbers, `--cap`, `--agent`, `--dry-run`, `--no-seed`, `--force`, and `--session`.
+The objective, `--plan`, `--max-tokens`, `--max-iters`, `--until`, and `--notify` examples below
+are workflow requirements, not implemented CLI flags. Do not invoke them as working commands.
+Before accepting an unattended objective, verify that the selected runtime actually enforces each
+requested limit. If it cannot, report the unsupported limit and do not start that bounded run.
+A prompt asking an agent to stay under a token budget does not enforce that budget.
+Implementation and cross-runtime verification are tracked in cckit effort #257, sub-issue #264.
+
 One skill, two modes — both delegate work that runs **autonomously to a verifiable stop, under hard
 caps**. It is a **thin wrapper**: it composes the built-in `/loop` and the kit's `orchestrate`
 scripts; it never reimplements looping or orchestration.
