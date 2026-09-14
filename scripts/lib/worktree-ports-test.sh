@@ -91,5 +91,37 @@ wt_assign_ports "$W" 999 "$P" >/dev/null 2>&1
 rows_after="$(grep -c . "$slots/kit-portslots.tsv" 2>/dev/null || echo 0)"
 [ "$rows_after" -le "$rows_before" ] && ok || bad "slot ledger grew instead of reclaiming ($rows_before -> $rows_after)"
 
+# ── 6. parallel allocation: concurrent starts never share a slot ──────────────────────────────
+# Slot selection is a read-modify-write over one ledger file. Unserialized, N processes all read
+# the same `held` set and all take the same lowest free slot; the reclaim rewrite also `mv`s a
+# snapshot over rows a sibling appended. Both produce duplicate port blocks — the exact failure the
+# ledger was added to prevent, reappearing only under contention.
+P="$TMP/race"; mk_project "$P" scaffold
+RACE_NUMS="101 102 103 104 105 106 107 108"
+pids=""
+for num in $RACE_NUMS; do
+  W="$P/wt$num"; mk_worktree "$W"
+  ( wt_assign_ports "$W" "$num" "$P" >/dev/null 2>&1 ) &
+  pids="$pids $!"
+done
+for pid in $pids; do wait "$pid"; done
+
+race=""
+for num in $RACE_NUMS; do
+  for p in $(ports_of "$P/wt$num"); do race="$race$p"$'\n'; done
+done
+race_total="$(printf '%s' "$race" | grep -c .)"
+race_uniq="$(printf '%s' "$race" | sort -u | grep -c .)"
+[ "$race_total" = 24 ] && ok || bad "parallel: expected 24 ports over 8 concurrent worktrees, got $race_total"
+if [ "$race_total" = "$race_uniq" ]; then ok; else
+  bad "parallel port collision: $race_total ports but only $race_uniq distinct ($(printf '%s' "$race" | sort | uniq -d | tr '\n' ' '))"
+fi
+
+# The lock is released on the way out — a leftover lock directory wedges every later start until
+# the one-minute abandonment window elapses.
+race_gcd="$(git -C "$P" rev-parse --git-common-dir 2>/dev/null)"
+case "$race_gcd" in /*) : ;; *) race_gcd="$(cd "$P" && cd "$race_gcd" && pwd)" ;; esac
+[ ! -d "$race_gcd/kit-portslots.tsv.lock" ] && ok || bad "the port-slot lock was left behind after allocation"
+
 echo "worktree-ports-test: $n assertion(s), $([ "$fail" = 0 ] && echo "all passed" || echo "FAILURES")"
 exit "$fail"

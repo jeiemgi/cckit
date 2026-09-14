@@ -178,6 +178,7 @@ the config file resolved above:
 | `worktree.devPorts` | `[]` | `{path, base}` per app: the per-worktree dev `PORT` written into that app's `.env.local`. | — |
 | `worktree.devPortStride` | `10` | Distance between one worktree's port block and the next. Every app's `base` must sit inside one stride-wide window. | — |
 | — | install on | Skip the dependency install entirely for one invocation. | `KIT_WT_INSTALL=0` |
+| — | `10` | Seconds `cckit start` waits for the port-slot ledger lock before allocating unserialized. | `_WT_LOCK_WAIT` |
 
 <Aside type="caution" title="A written port is not always a used port">
 cckit writes `PORT=` into each app's `.env.local`, but that only takes effect **if the app reads the
@@ -195,6 +196,21 @@ in the script yourself:
 
 Extract just `PORT` — don't `source` the file. A dotenv file is not a shell script, and sourcing it
 lets the shell reinterpret any secret containing `$`, a backtick or a quote.
+</Aside>
+
+<Aside type="note" title="Slots are allocated under a lock, not hashed">
+A worktree's block is `base + slot * stride`, and the **slot** comes from a ledger at
+`<git-common-dir>/kit-portslots.tsv` — one row per issue, reclaimed once its worktree is gone. The
+offset used to be `issue % 40`, which hands two issues 40 apart byte-identical ports.
+
+Choosing a slot reads the ledger and writes it back, so the whole transaction runs under an
+exclusive lock: the directory `kit-portslots.tsv.lock`, since `flock(1)` is absent on a stock macOS.
+Unserialized, eight concurrent `cckit start` runs produced as few as 3 distinct ports out of 24.
+
+A lock held by a live process is waited out for `_WT_LOCK_WAIT` seconds; one untouched for a minute
+is treated as abandoned and broken, so a process killed mid-allocation cannot wedge later starts.
+When the lock cannot be taken at all, `cckit start` warns and allocates unserialized rather than
+refusing to run.
 </Aside>
 
 <Aside type="caution" title="installPaths cannot leave the worktree">

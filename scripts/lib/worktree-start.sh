@@ -53,17 +53,50 @@ _wt_slots_file() {
   printf '%s/kit-portslots.tsv' "$gcd"
 }
 
-# _wt_slot_for <root> <issue-num> <worktree> — echo this issue's slot (0-39), allocating on first
-# call. IDEMPOTENT: an issue keeps its slot for as long as its worktree exists, so re-running
-# `cckit start` never renumbers a live lane. Falls back to the old hash (with a warning) only when
-# every slot is genuinely held.
-_wt_slot_for() {
-  local root="$1" num="$2" wt="$3" f line i held mine
-  f="$(_wt_slots_file "$root")" || { printf '%s' $(( num % 40 )); return 0; }
-  [[ -f "$f" ]] || : > "$f" 2>/dev/null || { printf '%s' $(( num % 40 )); return 0; }
+# ── the ledger LOCK: allocation is a read-modify-write, so it has to be serialized ────────────
+# Two `cckit start` processes racing through _wt_slot_alloc both read the same `held` set, both
+# pick the same lowest free slot, and both append it — two worktrees, one port block, which is the
+# very defect the slot ledger exists to remove. The reclaim rewrite races worse than the append:
+# it `mv`s a snapshot over the ledger, silently dropping any row another process added in between.
+#
+# mkdir is the lock primitive. A stock macOS has no flock(1) and this file targets bash 3.2, while
+# `set -C` redirection is not atomic on every filesystem; mkdir is atomic everywhere and fails when
+# the name already exists.
+_WT_LOCK_WAIT="${_WT_LOCK_WAIT:-10}"   # seconds to wait for a held lock before giving up
+
+# _wt_lock <lockdir> — 0 when the lock is held, 1 when it is not. A caller that fails to lock
+# proceeds ANYWAY: an unserialized allocation can collide, but a `cckit start` that refuses to run
+# cannot be worked around. Degrade, don't block.
+#
+# A lock directory older than a minute is treated as abandoned and broken, so a process killed
+# mid-allocation cannot wedge every future start. The age floor is well above _WT_LOCK_WAIT, so a
+# slow-but-live holder is never stolen from.
+_wt_lock() {
+  local d="$1" tries=0 max
+  max=$(( _WT_LOCK_WAIT * 10 ))
+  while [[ "$tries" -lt "$max" ]]; do
+    mkdir "$d" 2>/dev/null && return 0
+    sleep 0.1 2>/dev/null || sleep 1
+    tries=$(( tries + 1 ))
+  done
+  if [[ -n "$(find "$d" -maxdepth 0 -mmin +1 2>/dev/null)" ]]; then
+    rm -rf "$d" 2>/dev/null
+    mkdir "$d" 2>/dev/null && { echo "warn: broke an abandoned port-slot lock ($d)" >&2; return 0; }
+  fi
+  return 1
+}
+
+_wt_unlock() { rmdir "$1" 2>/dev/null || rm -rf "$1" 2>/dev/null; }
+
+# _wt_slot_alloc <ledger> <issue-num> <worktree> — the ledger transaction: reclaim dead rows,
+# return the issue's existing allocation if it has one, else take the lowest free slot and append
+# it. Every step reads and writes <ledger>, so the CALLER must hold the lock around the whole
+# function — splitting any step out of it reopens the race.
+_wt_slot_alloc() {
+  local f="$1" num="$2" wt="$3" i held mine tmp i_num i_slot i_path
 
   # Reclaim: keep only rows whose worktree still exists (or that have no path recorded).
-  local tmp; tmp="$(mktemp 2>/dev/null)" || tmp=""
+  tmp="$(mktemp 2>/dev/null)" || tmp=""
   if [[ -n "$tmp" ]]; then
     while IFS="$(printf '\t')" read -r i_num i_slot i_path; do
       [[ -n "$i_num" ]] || continue
@@ -84,6 +117,24 @@ _wt_slot_for() {
   done
   echo "[#$num] warn: all 40 dev-port slots are held — falling back to a hashed port (collisions possible); run cckit gc" >&2
   printf '%s' $(( num % 40 ))
+}
+
+# _wt_slot_for <root> <issue-num> <worktree> — echo this issue's slot (0-39), allocating on first
+# call under the ledger lock. IDEMPOTENT: an issue keeps its slot for as long as its worktree
+# exists, so re-running `cckit start` never renumbers a live lane. Falls back to the old hash (with
+# a warning) only when every slot is genuinely held.
+_wt_slot_for() {
+  local root="$1" num="$2" wt="$3" f lock out locked=0
+  f="$(_wt_slots_file "$root")" || { printf '%s' $(( num % 40 )); return 0; }
+  [[ -f "$f" ]] || : > "$f" 2>/dev/null || { printf '%s' $(( num % 40 )); return 0; }
+
+  lock="$f.lock"
+  if _wt_lock "$lock"; then locked=1; else
+    echo "[#$num] warn: the port-slot ledger stayed locked — allocating unserialized, so two lanes can land on one slot" >&2
+  fi
+  out="$(_wt_slot_alloc "$f" "$num" "$wt")"
+  [[ "$locked" = 1 ]] && _wt_unlock "$lock"
+  printf '%s' "$out"
 }
 
 wt_assign_ports() {
