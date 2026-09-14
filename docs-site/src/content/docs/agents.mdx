@@ -78,6 +78,10 @@ human output or re-fetching JSON would cost.
 
 cckit shells out to whatever agent invokes it; it does not embed a model. For the few verbs that synthesize text (digests, ingest), the model endpoint is set through environment variables.
 
+Effort metadata does not choose an implementation model. `ctx:S|M|L|XL` estimates session size,
+`role:*` records responsibility, and orchestration's `--agent` flag chooses the CLI program. A
+launched Codex or Claude session uses that program's configured default model.
+
 ## Paste-ready agent prompt
 
 Drop this verbatim into your agent's system prompt (or the first message of a session). It is self-contained and not repo-specific, so it works for any project that has run `cckit init`.
@@ -103,4 +107,3 @@ Operating rules:
 ```
 
 </div>
-
