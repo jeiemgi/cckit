@@ -165,6 +165,7 @@ nobody consumes.
 | `flow:` | `core` `docs` … | effort dispatch | which flow owns it |
 | `role:` | `tech-lead` `docs` … | delegation brief | who it is written for |
 | `kind:` | must discriminate | board grouping | what sort of work it is |
+| `agent:` | one per declared profile | `ap_profile_from_labels` | which agent profile runs the work |
 | `slug:` | one per effort | `effort_slug_resolve` | resolve a name to an effort |
 
 ### Rules
@@ -177,7 +178,9 @@ nobody consumes.
   anything unknown, so an `XL` effort with no `ctx:XL` label silently weighs the same as an `M`.
   A scale the code knows but the board cannot express is a scale that quietly misreports.
 - **Do not create per-item labels beyond `slug:`.** They grow without bound and match one issue
-  each, which makes them useless as a board axis.
+  each, which makes them useless as a board axis. `agent:<profile>` is not one of these: it is
+  bounded by the profiles the config declares, and `scripts/setup-labels.sh` provisions exactly
+  those, so the family stays a board axis rather than a per-issue tag.
 - **Leave `autorelease:*` alone** — release-please owns those.
 
 ### Priority means urgency, not membership

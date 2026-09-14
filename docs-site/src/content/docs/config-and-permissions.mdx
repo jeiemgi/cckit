@@ -272,6 +272,31 @@ profile with no `kind`, a `stages` entry outside the vocabulary, a profile selec
 does not list, and an `agents.default` that names nothing declared. Each refusal names the profile
 and prints what was declared, so the fix does not require reading the source.
 
+### Which profile runs a given issue
+
+Resolution walks four levels, highest first, and stops at the first that supplies a name:
+
+| # | Level | Where it comes from |
+| --- | --- | --- |
+| 1 | Command override | the flag on this invocation |
+| 2 | Issue label | `agent:<profile>` on the issue itself |
+| 3 | Parent effort label | `agent:<profile>` on the parent effort |
+| 4 | Project default | `agents.default` |
+
+`scripts/setup-labels.sh` provisions one `agent:<profile>` label per profile the config declares, so
+the family stays bounded by the config rather than growing one label per issue.
+
+Two refusals are deliberate, because both would otherwise run an agent nobody chose:
+
+- **Two different `agent:` labels on one issue is ambiguous** and refuses. It does not pick one.
+- **The resolved name is validated against the stage before it is returned.** An explicit
+  `agent:review` label on a `build` stage is refused, not honoured — so a rc-0 result is always
+  launchable and a caller never re-checks.
+
+When nothing resolves at all — no override, no label, no `agents.default` — that is its own distinct
+failure, separate from "a profile was named and rejected", so the message can tell you which of the
+two happened.
+
 ## Identity
 
 cckit asks your name on first run and stores it in `.cckit/identity` (gitignored). Nothing personal is hardcoded; commits use your local git identity.
