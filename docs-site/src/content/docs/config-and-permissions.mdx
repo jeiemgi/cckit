@@ -263,7 +263,7 @@ when nothing else is chosen.
 | `agents.stages` | `build review design docs` | The stage vocabulary a profile's `stages` are checked against. Env override: `CCKIT_AGENT_STAGES`. |
 | `kind` | **required** | The agent CLI to run (`claude`, `codex`, …). The Herdr runtime validates it before any worktree exists. |
 | `tier` | `low` | What this profile is expected to **cost** relative to the others: `low`, `mid`, `high`. Unstated means `low` — assuming the cheap end is the safe direction to be wrong in. |
-| `args` | `[]` | Extra CLI arguments as an **argv array**, never a shell string, so an argument containing spaces is not re-split. **Your model selection goes here**, spelled the way your CLI spells it. |
+| `args` | `[]` | Extra CLI arguments as an **argv array**, never a shell string, so an argument containing spaces is not re-split. **Your model selection goes here**, spelled the way your CLI spells it. Passed through on both runtimes — Herdr receives the array after its `--`, tmux gets it quoted onto the pane's command line. |
 | `permissions` | *(unset)* | Permission/sandbox policy, forwarded to the CLI that implements it and recorded in the stage receipt. |
 | `stages` | *(none)* | Stages this profile may run at. **A profile with no `stages` is allowed nowhere** — an unstated permission is not a granted one. |
 | `write` | `false` | Whether the profile may write to a branch. One writer owns a branch at a time; review profiles stay read-only until ownership is transferred. |

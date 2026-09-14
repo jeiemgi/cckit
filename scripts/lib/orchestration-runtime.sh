@@ -85,6 +85,31 @@ or_herdr_agent_name() {
   printf '%.*s-%s' "$room" "$base" "$issue"
 }
 
+# or_tmux_agent_cmd <kind> <agent-args-nl> — echo the command LINE tmux types into a pane.
+#
+# The two runtimes receive a profile's argv differently, and the difference is the whole reason this
+# exists. Herdr takes an argv array and never meets a shell; tmux `send-keys` writes a command line
+# INTO the pane's shell, so every argument must be single-quoted here or that shell re-splits it.
+#
+# Skipping this dropped a profile's args on the DEFAULT runtime while orchestrate still printed the
+# resolved profile — a profile selecting a model ran on the CLI's default model with no warning.
+or_tmux_agent_cmd() {
+  local kind="${1:-}" args_nl="${2:-}" cmd="${1:-}" a esc
+  [ -n "$args_nl" ] || { printf '%s\n' "$kind"; return 0; }
+  while IFS= read -r a; do
+    [ -n "$a" ] || continue
+    # Escape in its OWN assignment, not inline in the concatenation: the `'\''` idiom needs one
+    # level of quoting and doing it inside a double-quoted string silently adds another. The
+    # seed prompt a few lines down in orchestrate.sh uses this exact two-step form for the same
+    # reason — it was arrived at by a bug, not by taste.
+    esc=${a//\'/\'\\\'\'}
+    cmd="$cmd '$esc'"
+  done <<EOF
+$args_nl
+EOF
+  printf '%s\n' "$cmd"
+}
+
 # or_herdr_launch <session> <kind> <seed?> <detach?> <project> <agent-args-nl> <entry>...
 #
 # <agent-args-nl> is the profile's extra CLI argv, ONE PER LINE (empty for none). They are handed to

@@ -94,6 +94,21 @@ no "a space-bearing arg is not split into two" "$(cat "$HERDR_TEST_LOG")" "|some
 or_herdr_launch sweep codex 0 1 demo "" "/tmp/wt1|task/41-one|41" >/dev/null
 no "no profile args means no trailing -- separator" "$(cat "$HERDR_TEST_LOG")" "--pane|w1:p1|--"
 
+# ── the SAME argv reaches the agent on the tmux path, which is the DEFAULT runtime ─────────────
+# This had no test, and that is why it shipped broken: the argv was threaded to or_herdr_launch and
+# nowhere else, so a profile's `args` were dropped on the runtime almost everyone runs.
+t "no args is the bare command" "$(or_tmux_agent_cmd claude '')" "claude"
+t "args are quoted onto the command line" \
+  "$(or_tmux_agent_cmd claude "$(printf -- '--model\nsome model')")" "claude '--model' 'some model'"
+# Assert the ROUND TRIP, not the literal: what matters is the argv the pane's shell ends up with,
+# and an eval is the only thing that proves it. Comparing the quoted string to an expected literal
+# is how a doubly-escaped `'\''` passes a test and still breaks the pane.
+argv() { eval "printf '[%s]' $(or_tmux_agent_cmd claude "$1")"; }
+t "the pane shell sees one arg per declared arg" \
+  "$(argv "$(printf -- '--model\nsome model')")" "[claude][--model][some model]"
+t "a single quote survives instead of terminating the quoting" \
+  "$(argv "$(printf -- "it's odd")")" "[claude][it's odd]"
+
 PATH="/usr/bin:/bin"
 missing="$(or_runtime_preflight herdr codex 0 2>&1)"; rc=$?
 t "missing Herdr fails before worktree creation" "$rc" "1"
@@ -106,6 +121,18 @@ yes "Herdr dry-run creates no runtime state" "$dry" "no worktrees created, no pa
 
 auto="$(cd "$ROOT" && PATH="$stub:$PATH" "$ROOT/bin/cckit" autopilot --runtime herdr --agent codex --dry-run 41 2>&1)"
 yes "autopilot passes the runtime to orchestrate" "$auto" "runtime 'herdr', agent 'codex'"
+
+# autopilot forwards an explicit allow-list, so a flag orchestrate grew is rejected until it is
+# added here too — `--profile` was, and the unattended driver is where a profile matters most.
+prof="$(cd "$ROOT" && PATH="$stub:$PATH" "$ROOT/bin/cckit" autopilot --profile build --dry-run 41 2>&1)"
+no "autopilot forwards --profile instead of rejecting it" "$prof" "unknown arg '--profile'"
+# Forwarding is proven by WHO refuses. cckit's own config declares no profiles, so the resolver
+# must be the one to say so — a message from agent-profile means the flag reached orchestrate.
+yes "--profile reaches the resolver, not autopilot's arg parser" "$prof" "agent-profile: no profile named 'build'"
+yes "autopilot lists --profile in its help" \
+  "$(cd "$ROOT" && "$ROOT/bin/cckit" autopilot --help 2>&1)" "--profile build"
+no "autopilot help stops before the script body" \
+  "$(cd "$ROOT" && "$ROOT/bin/cckit" autopilot --help 2>&1)" "set -euo pipefail"
 
 rm -rf "$stub"
 [ "$fail" -eq 0 ] && echo "ALL OK" || echo "orchestration runtime: FAILURES"

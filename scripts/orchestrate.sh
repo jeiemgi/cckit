@@ -191,6 +191,11 @@ if [ "$RUNTIME" = "herdr" ]; then
   exit $?
 fi
 
+# The profile's argv on the tmux path. Herdr got it as an argv array above; tmux types a command
+# LINE into the pane's shell, so the quoting lives in or_tmux_agent_cmd beside the Herdr launcher —
+# both runtimes answer the same question and neither may drop the args the resolution line promised.
+AGENT_CMD="$(or_tmux_agent_cmd "$AGENT" "$AGENT_ARGS_NL")"
+
 tmux kill-session -t "$SESSION" 2>/dev/null || true
 first=1
 for entry in "${ENTRIES[@]}"; do
@@ -211,9 +216,9 @@ for entry in "${ENTRIES[@]}"; do
     # so the agent never launched. Escape any single quotes for safe single-quote wrapping.
     seed="$(seed_for "$num" "$branch" "$wt")"
     esc=${seed//\'/\'\\\'\'}
-    tmux send-keys -t "$pane" "$AGENT '$esc'" C-m
+    tmux send-keys -t "$pane" "$AGENT_CMD '$esc'" C-m
   else
-    tmux send-keys -t "$pane" "$AGENT" C-m
+    tmux send-keys -t "$pane" "$AGENT_CMD" C-m
   fi
 done
 tmux select-layout -t "$SESSION:flows" tiled >/dev/null

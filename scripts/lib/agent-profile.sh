@@ -57,7 +57,7 @@ ap_profile_exists() {
 }
 
 # ap_profile_field <cfg> <name> <field> — echo one scalar field, empty when absent.
-# Scalars only (kind, model, reasoning, permissions, contextBudget); `args`/`stages` are arrays.
+# Scalars only (kind, tier, permissions, contextBudget, write); `args`/`stages` are arrays.
 ap_profile_field() {
   local cfg="${1:-}" name="${2:-}" field="${3:-}"
   [ -n "$cfg" ] && [ -f "$cfg" ] && [ -n "$name" ] && [ -n "$field" ] || return 0

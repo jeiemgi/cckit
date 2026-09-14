@@ -11,6 +11,7 @@
 #   cckit autopilot 6 7 8           # drive exactly these issues
 #   cckit autopilot --cap 3         # cap concurrent flows (passed through to orchestrate)
 #   cckit autopilot --agent codex   # drive a different agent CLI
+#   cckit autopilot --profile build # drive a declared agent profile (kind + argv)
 #   cckit autopilot --runtime herdr # run the selected agents in Herdr
 #   cckit autopilot --dry-run       # print the plan, launch nothing
 set -euo pipefail
@@ -19,9 +20,9 @@ PASS=()        # flags forwarded to orchestrate
 ISSUES=()
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --cap|--agent|--runtime) PASS+=("$1" "$2"); shift 2 ;;
-    --cap=*|--agent=*|--runtime=*|--dry-run|--no-seed|--force|--session=*) PASS+=("$1"); shift ;;
-    -h|--help) sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --cap|--agent|--profile|--runtime) PASS+=("$1" "$2"); shift 2 ;;
+    --cap=*|--agent=*|--profile=*|--runtime=*|--dry-run|--no-seed|--force|--session=*) PASS+=("$1"); shift ;;
+    -h|--help) sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     [0-9]*) ISSUES+=("$1"); shift ;;
     *) echo "autopilot: unknown arg '$1'" >&2; exit 2 ;;
   esac
