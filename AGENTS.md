@@ -63,8 +63,8 @@ the same commit.
 | `cckit effort chain <a> <b> [<c> …]` | wire 2+ issues into a linear order: `b` `blocked_by` `a`, `c` `blocked_by` `b`, plus a `- Depends on #<predecessor>` line in each successor's `## Relations` section. These are the edges `cckit plan` layers into waves. Idempotent (an edge or line already there is skipped); pre-existing blockers are kept, never replaced. Validates everything first — fewer than two numbers, a non-numeric arg, an issue that does not exist, a repeated number, or an edge that would close a cycle refuses the whole chain and writes nothing | — |
 | `cckit effort start [--force] <slug\|N> [slug]` | effort branch + bootstrapped worktree, **WIP-limited**: refuses a NEW effort once `effort.wipLimit` (default 2) are already in progress. In progress = an `effort/<N>-<slug>` branch exists as a local head **or** on origin, read with `git ls-remote` rather than the cached `refs/remotes` (which is wrong both ways: it misses a branch pushed since the last fetch and keeps one deleted on origin until a prune). At the limit refuses; only strictly under it starts. Re-starting an effort that is already in progress is never gated. The check runs before the fetch/branch/worktree/bootstrap, so a refusal makes no branch, no worktree and no board change — it is not read-free (it queries origin, and a `<slug>` arg was resolved first, which can run `gh issue list`). `0` refuses every ordinary start; `--force` still starts. A non-integer value is ignored with a warning and the default 2 is used; `EFFORT_WIP_LIMIT` overrides the config per invocation. `EFFORT_WIP_REMOTE=0` — or an unreachable origin, which warns and proceeds — counts the cached refs instead. Does **not** gate `cckit start <issue>` | `--force`, or `KIT_FORCE=1` |
 | `cckit effort plan` | session-fit effort plan | `--llm` → JSON |
-| `cckit orchestrate <a> <b> …` | run N flows in parallel worktrees | — (use `--dry-run`) |
-| `cckit autopilot [<a> …]` | unattended multi-flow: drive (or auto-pick) issues under a cap | — (use `--dry-run`) |
+| `cckit orchestrate <a> <b> …` | run N flows in parallel worktrees, in tmux or Herdr | — (use `--dry-run`) |
+| `cckit autopilot [<a> …]` | select work, then call `orchestrate --detach` under a cap | — (use `--dry-run`) |
 | `cckit gc` | report prunable branches + worktrees — never one whose issue is still open; aborts if the protection helper is missing | `--llm` → JSON counts |
 | `cckit cleanup [--yes]` | the guided destructive sweep over that report: plan first, delete only the SAFE rows and prune the listed ZOMBIE metadata (staged work recovered to its branch first); ORPHAN / PROTECTED / stashes are never deletable | `--llm` → JSON counts + `applied` |
 | `cckit render` | stdin markdown → rich (glow on a TTY; verbatim when piped) | — |
@@ -102,6 +102,7 @@ Every operation an unattended run needs is reachable through the one CLI:
 | `--dry-run` | resolve + print the launch plan; create no worktrees, start nothing |
 | `--cap <N>` | concurrency cap (default 4); flows past the cap are queued + reported |
 | `--agent <cmd>` | per-pane agent command (default `claude`, or `CCKIT_AGENT=`) — drive any CLI agent |
+| `--runtime <tmux\|herdr>` | terminal owner (default `tmux`, or `CCKIT_RUNTIME=`); Herdr requires a supported agent kind such as `codex` or `claude` |
 | `--force` | launch even if an issue is `blocked_by` an OPEN issue (the gate is on by default) |
 | `--no-seed` | start the agent without an auto-prompt |
 

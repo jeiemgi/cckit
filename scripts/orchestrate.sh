@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
-# orchestrate.sh - run N issue flows as live tmux panes, each an agent in its own worktree.
+# orchestrate.sh - run N issue flows as live terminal panes, each an agent in its own worktree.
 #
 # For each issue: create an isolated worktree + branch off the configured base branch
-# (cckit.config.json: github.repo + github.baseBranch), then open a tmux session with one tiled
-# pane per flow running the agent command. Branches must be file-disjoint - the flows edit in
-# parallel, so disjointness is the caller's responsibility.
+# (cckit.config.json: github.repo + github.baseBranch), then open a tmux session or Herdr workspace
+# with one pane per flow running the agent command. Branches must be file-disjoint - the flows edit
+# in parallel, so disjointness is the caller's responsibility.
 #
 # Agent-agnostic: the per-pane command defaults to `claude` but is overridable, so cckit drives any
 # CLI agent that takes a prompt as its first argument.
 #   --agent <cmd> / CCKIT_AGENT=<cmd>
+#   --runtime <tmux|herdr> / CCKIT_RUNTIME=<runtime>
 #
 # Hardening:
 #   --dry-run      resolve + print the launch plan; create no worktrees, start no panes
@@ -21,6 +22,7 @@
 #   cckit orchestrate <issueA> <issueB> [<issueC> ...]
 #   cckit orchestrate --dry-run 6 7 8
 #   cckit orchestrate --cap 3 --agent codex 2 3 6 9
+#   cckit orchestrate --runtime herdr --agent codex 2 3 6 9
 #   cckit orchestrate --no-seed 6 7          # don't auto-prompt each agent
 #   cckit orchestrate --force 7              # launch even if blocked_by an open issue
 #   cckit orchestrate --session=sweep 1 2    # custom tmux session name
@@ -34,6 +36,7 @@ FORCE=0
 DETACH=0
 CAP=4
 AGENT="${CCKIT_AGENT:-claude}"
+RUNTIME="${CCKIT_RUNTIME:-tmux}"
 ISSUES=()
 
 usage() { sed -n '2,28p' "$0" | sed 's/^# \{0,1\}//'; }
@@ -48,6 +51,8 @@ while [ "$#" -gt 0 ]; do
     --cap=*)     CAP="${1#*=}"; shift ;;
     --agent)     AGENT="$2"; shift 2 ;;
     --agent=*)   AGENT="${1#*=}"; shift ;;
+    --runtime)   RUNTIME="$2"; shift 2 ;;
+    --runtime=*) RUNTIME="${1#*=}"; shift ;;
     --session=*) SESSION="${1#*=}"; shift ;;
     -h|--help)   usage; exit 0 ;;
     [0-9]*)      ISSUES+=("$1"); shift ;;
@@ -61,6 +66,9 @@ case "$CAP" in ''|*[!0-9]*) echo "orchestrate: --cap needs a number (got '$CAP')
 # Resolve the main worktree root + load config (repo + base branch drive everything).
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"   # cckit INSTALL root — for sourcing libs (works on brew/npm installs)
+# shellcheck source=/dev/null
+source "$ROOT/scripts/lib/orchestration-runtime.sh"
+or_runtime_preflight "$RUNTIME" "$AGENT" "$DRYRUN"
 # The git-repo guard validates the INVOKING project ($PWD), not cckit's install dir; wt_start and
 # load_kit_config below resolve the project + its config from the invoking directory.
 git -C "$PWD" rev-parse --show-toplevel >/dev/null 2>&1 || { echo "orchestrate: not in a git repo" >&2; exit 1; }
@@ -80,7 +88,7 @@ open_blockers() {
 
 # Partition the requested issues into eligible / blocked / (later) queued.
 ELIGIBLE=()
-echo "orchestrate: repo $REPO (base ${KIT_BASE_BRANCH:-main}), cap $CAP, agent '$AGENT'"
+echo "orchestrate: repo $REPO (base ${KIT_BASE_BRANCH:-main}), cap $CAP, runtime '$RUNTIME', agent '$AGENT'"
 for num in "${ISSUES[@]}"; do
   blockers="$(open_blockers "$num")"
   if [ -n "$blockers" ] && [ "$FORCE" -eq 0 ]; then
@@ -108,21 +116,23 @@ if [ "$DRYRUN" -eq 1 ]; then
   exit 0
 fi
 
-command -v tmux >/dev/null || { echo "orchestrate: tmux not installed (brew install tmux)" >&2; exit 1; }
-command -v "$AGENT" >/dev/null || { echo "orchestrate: agent '$AGENT' not on PATH" >&2; exit 1; }
-
 # shellcheck source=/dev/null
 source "$ROOT/scripts/lib/worktree-start.sh"
 
 # Headless seed: the agent runs with NO human present - it must never ask, decide autonomously,
 # gauge difficulty + apply proportional effort, and close no-op issues itself. cckit verbs only.
 seed_for() {
-  local num="$1" branch="$2"
-  printf '%s' "You are running HEADLESS inside a cckit orchestration: there is NO human to answer \
-questions, so NEVER ask - decide autonomously and proceed. Gauge the task difficulty and apply \
-proportional effort. Worktree + branch $branch for issue #$num are ready. Run: gh issue view $num, \
-implement it, run bash scripts/check.sh until green, then open the PR with: cckit pr $num \"<summary>\". \
-If it is a no-op (nothing to change), comment why and run: cckit close $num \"<reason>\". Do not wait for input."
+  local num="$1" branch="$2" wt="${3:-$PWD}" brief
+  brief="$(cd "$wt" && "$ROOT/bin/cckit" brief "$num" 2>/dev/null)" || brief=""
+  printf '%s\n' "You are running HEADLESS inside a cckit orchestration. There is no human in this worker session: decide within the issue's scope and proceed. Do not read the whole board or take another issue. Work only on issue #$num in branch $branch."
+  if [ -n "$brief" ]; then
+    printf '\n%s\n' "$brief"
+  else
+    # Nested single quotes would terminate the format string and make printf recycle it over the
+    # stray words as arguments, so the fallback names the command without quoting it.
+    printf '\nThe generated cckit brief was unavailable. Read only issue #%s with: gh issue view %s\n' "$num" "$num"
+  fi
+  printf '\n%s\n' "Implement the issue, run the brief's gate until green, then open the PR with: cckit pr $num \"<summary>\". If no change is needed, comment why and run: cckit close $num \"<reason>\". Finish by reporting only the PR or issue URL, gate result, and any blocker."
 }
 
 ENTRIES=()
@@ -130,6 +140,11 @@ for num in "${LAUNCH[@]}"; do
   entry="$(wt_start "$num")" || { echo "orchestrate: wt_start #$num failed" >&2; exit 1; }
   ENTRIES+=("$entry")
 done
+
+if [ "$RUNTIME" = "herdr" ]; then
+  or_herdr_launch "$SESSION" "$AGENT" "$SEED" "$DETACH" "${KIT_PROJECT_SLUG:-project}" "${ENTRIES[@]}"
+  exit $?
+fi
 
 tmux kill-session -t "$SESSION" 2>/dev/null || true
 first=1
@@ -149,7 +164,7 @@ for entry in "${ENTRIES[@]}"; do
     # parsed by the pane's shell. Double-quoting collided with the seed's own quotes and
     # dumped `<summary>` onto zsh as a redirection ("no such file or directory: summary"),
     # so the agent never launched. Escape any single quotes for safe single-quote wrapping.
-    seed="$(seed_for "$num" "$branch")"
+    seed="$(seed_for "$num" "$branch" "$wt")"
     esc=${seed//\'/\'\\\'\'}
     tmux send-keys -t "$pane" "$AGENT '$esc'" C-m
   else
