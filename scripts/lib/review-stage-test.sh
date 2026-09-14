@@ -71,6 +71,9 @@ for w in pr-open blocked pass fail; do
 done
 
 # ── dispatch ───────────────────────────────────────────────────────────────────────────────────
+# The mirror is a network call. Off for the run so nothing here touches GitHub; the cases at the end
+# assert that a dispatch still records a verdict with the mirror unavailable.
+export CCKIT_RECEIPT_REMOTE=0
 # ap_pr_context is the gh half; agent-resolve-test.sh covers it. Here it is fixed so the rest is real.
 FX_CTX="42\t\t"
 ap_pr_context() { printf "$FX_CTX\n"; }
@@ -133,6 +136,20 @@ rs_dispatch "$tmp/mute.json" 'o/r' 8 55 >/dev/null 2>&1
 rc "a report with no outcome: line is refused" "$?" "2"
 t "and it writes no receipt either" \
   "$(ls "$KIT_STATE_DIR/receipts" 2>/dev/null | wc -l | tr -d ' ')" "$before"
+
+# ── the mirror never costs the verdict (#347) ──────────────────────────────────────────────────
+# sr_mirror is best-effort: an unmirrored receipt is still the receipt the merge gate reads. Failing
+# a dispatch on an offline mirror would stall every PR at `verify` over a visibility problem.
+FX_CTX="42\tagent:critic\t"
+# NOT a command substitution: SR_MIRROR_LAST_RESULT is set by sr_mirror in whatever shell runs it,
+# and `$(rs_dispatch …)` would set it in a subshell that then exits. Redirect to a file instead.
+rs_dispatch "$CFG" 'o/r' 7 42 > "$tmp/p2"
+rc "a dispatch succeeds with the mirror off" "$?" "0"
+p2="$(cat "$tmp/p2")"
+t  "sr_mirror reported why it did not post" "$SR_MIRROR_LAST_RESULT" "no-remote"
+[ -f "$p2" ] && echo "ok: the receipt is on disk anyway" || { echo "FAIL: no receipt at '$p2'"; fail=1; }
+t  "and it is a second attempt, not an overwrite" "$(jq -r .attempt "$p2")" "2"
+[ "$p2" != "$p" ] && echo "ok: the two attempts are separate files" || { echo "FAIL: attempt 2 reused $p"; fail=1; }
 
 [ "$fail" -eq 0 ] && echo "review-stage-test: PASS" || echo "review-stage-test: FAILED"
 exit "$fail"

@@ -21,7 +21,8 @@
 # relying on the reviewer to behave.
 # errors: mixed — the predicates and the brief are pure; rs_dispatch propagates rc 2 from
 # ap_resolve_pr (undeclared/ambiguous/stage-barred profile) and from a write-capable profile, rc 3
-# when the configured command fails, and rc 4 when no profile resolves at all.
+# when the configured command fails, and rc 4 when no profile resolves at all. The issue mirror
+# never changes the rc — sr_mirror is best-effort and a lost mirror does not lose the verdict.
 
 # BASH_SOURCE is bash-only and empty under zsh, the session shell here; `dirname ""` then yields
 # "." and the sibling source below silently missed. Same defect and same fix as kit-gc.sh:38 (#219):
@@ -104,7 +105,7 @@ EOF
 # report sr_record parses.
 rs_dispatch() {
   local cfg="${1:-}" repo="${2:-}" pr="${3:-}" num="${4:-}"
-  local cmd prof tier src ctx report rc_=0
+  local cmd prof tier src ctx report attempt path rc_=0
   [ -n "$num" ] || { echo "review: PR #${pr:-?} has no linked issue — nothing to record a receipt against" >&2; return 2; }
   cmd="$(rs_command "$cfg")"
   [ -n "$cmd" ] || return 4
@@ -131,6 +132,19 @@ rs_dispatch() {
     return 3
   }
 
-  printf '%s\n' "$report" | sr_record "$num" review "$(sr_next_attempt "$num" review)" \
-    "$prof" "$tier" "$src" "read-only"
+  attempt="$(sr_next_attempt "$num" review)"
+  path="$(printf '%s\n' "$report" | sr_record "$num" review "$attempt" "$prof" "$tier" "$src" "read-only")" || return $?
+
+  # Mirror onto the issue so the verdict is readable on GitHub, not only in local .cckit/ state.
+  # BEST-EFFORT by sr_mirror's own contract (always rc 0, outcome in SR_MIRROR_LAST_RESULT): an
+  # unmirrored verdict is still a verdict. The receipt on disk is what the merge gate reads, so
+  # failing the dispatch on an offline or rate-limited mirror would stall every PR at `verify` over
+  # a visibility problem. SR_REPO is what _sr_repo reads; without it gh would resolve the comment
+  # against whatever repo the captain's CWD happens to be.
+  # A caller that wants to know WHETHER it posted must not wrap this call in `$(…)`:
+  # SR_MIRROR_LAST_RESULT would then be set in a subshell that immediately exits. Redirect the
+  # receipt path to a file instead. captain_pass does exactly that (`>/dev/null`).
+  SR_REPO="$repo" sr_mirror "$num" review "$attempt" "$path"
+
+  printf '%s\n' "$path"
 }
