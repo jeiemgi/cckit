@@ -5,7 +5,8 @@
 #   1. an explicit command override      — the operator said so on this invocation
 #   2. the issue's own `agent:<profile>` label
 #   3. the parent effort's `agent:<profile>` label
-#   4. `agents.default` from the config
+#   4. `agents.default` — or, when that is unset, the CHEAPEST declared profile, so an
+#      unconfigured project lands on the inexpensive path instead of an arbitrary one
 #
 # The walk is PURE: it takes label strings as arguments rather than fetching them, so the precedence
 # rules are testable without gh, a network, or a fixture repo. `ap_labels_fetch` is the one impure

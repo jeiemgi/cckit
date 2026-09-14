@@ -78,12 +78,13 @@ human output or re-fetching JSON would cost.
 
 cckit shells out to whatever agent invokes it; it does not embed a model. For the few verbs that synthesize text (digests, ingest), the model endpoint is set through environment variables.
 
-Effort metadata still does not choose a model: `ctx:S|M|L|XL` estimates session size and `role:*`
-records responsibility. The model comes from an **agent profile** — `agents.profiles.<name>.model`
-in the config — which also carries the reasoning level, permission policy and extra CLI argv. An
-`agent:<profile>` label on the issue (or its parent effort) selects one; `agents.default` applies
-when nothing else does. Orchestration's `--agent` flag still names the CLI program directly, and a
-session launched that way uses that program's own configured model.
+Nothing in cckit picks a model — not `ctx:S|M|L|XL` (which estimates session size), not `role:*`
+(which records responsibility), and not the config schema. An **agent profile** declares a spend
+`tier` and the CLI arguments to run; you spell any model selection yourself in `args`. An
+`agent:<profile>` label on the issue (or its parent effort) selects a profile, and with
+`agents.default` unset the cheapest-tier profile wins, so the inexpensive path is the default.
+Orchestration's `--agent` flag still names a CLI program directly, and that path uses the
+program's own configured model.
 
 ## Paste-ready agent prompt
 

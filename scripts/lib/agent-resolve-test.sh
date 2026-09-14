@@ -79,14 +79,19 @@ case "$(ap_resolve "$CFG" build '' 'agent:review' '' 2>&1 >/dev/null)" in
 esac
 
 # ── nothing resolves at all ────────────────────────────────────────────────────────────────────
+# With no agents.default, level 4 is the CHEAPEST declared profile, not a failure — an
+# unconfigured project runs the inexpensive path rather than refusing.
 cat > "$tmp/nodefault.json" <<'JSON'
-{ "agents": { "profiles": { "b": { "kind": "claude", "stages": ["build"] } } } }
+{ "agents": { "profiles": {
+  "spendy":  { "kind": "claude", "tier": "high", "stages": ["build"] },
+  "thrifty": { "kind": "claude", "tier": "low",  "stages": ["build"] }
+} } }
 JSON
-ap_resolve "$tmp/nodefault.json" build '' '' '' >/dev/null 2>&1
-rc "no override, no label and no default is rc 4" "$?" "4"
+t "no override/label/default resolves to the CHEAPEST profile" "$(ap_resolve "$tmp/nodefault.json" build '' '' '' 2>/dev/null)" "thrifty"
+# Only a config declaring NO profiles at all resolves nothing.
 echo '{}' > "$tmp/empty.json"
 ap_resolve "$tmp/empty.json" build '' '' '' >/dev/null 2>&1
-rc "an empty config resolves nothing" "$?" "4"
+rc "a config with no profiles at all is rc 4" "$?" "4"
 
 # A dangling agents.default must still refuse through the resolver, not fall through to rc 4.
 cat > "$tmp/dangling.json" <<'JSON'

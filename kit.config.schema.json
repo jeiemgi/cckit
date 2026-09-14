@@ -76,9 +76,9 @@
     "agents": {
       "type": "object",
       "additionalProperties": true,
-      "description": "Named agent profiles and the stage vocabulary they are allowed at. A profile is project configuration, not workflow logic: cckit reads the vendor model id, reasoning level and CLI arguments from here so no stage in the kit hard-codes them. Resolution precedence is command override > issue metadata > parent effort metadata > `agents.default` (see `cckit effort`/orchestration docs).",
+      "description": "Named agent profiles and the stage vocabulary they are allowed at. A profile declares a SPEND POSTURE (`tier`) and the CLI arguments to run (`args`) — cckit never names a model, so it cannot push you onto an expensive one. Resolution precedence is command override > issue metadata > parent effort metadata > `agents.default` (see `cckit effort`/orchestration docs).",
       "properties": {
-        "default": { "type": "string", "description": "Profile name used when nothing more specific resolves. Must name a key of `agents.profiles`; a `default` that names no declared profile is a validation error, not a silent fallback." },
+        "default": { "type": "string", "description": "Profile name used when nothing more specific resolves. Must name a key of `agents.profiles`; a `default` that names no declared profile is a validation error, not a silent fallback. OMIT IT to get the lowest-tier declared profile, which is the recommended setting: naming an expensive profile here makes every unlabelled issue expensive." },
         "stages": { "type": "array", "items": { "type": "string" }, "description": "Controlled stage vocabulary a profile's `stages` entries are checked against. Replaces the built-in default (build review design docs); an explicit CCKIT_AGENT_STAGES env var wins per invocation." },
         "profiles": {
           "type": "object",
@@ -88,9 +88,8 @@
             "required": ["kind"],
             "properties": {
               "kind": { "type": "string", "description": "The agent CLI/provider this profile runs, e.g. `claude` or `codex`. Must be a kind the selected runtime can start — the Herdr runtime validates it before any worktree is created." },
-              "model": { "type": "string", "description": "Vendor model identifier passed to the CLI. Lives here precisely so stage logic never names a model; the kit only forwards whatever this says. Omit to use the CLI's own configured default." },
-              "reasoning": { "type": "string", "description": "Reasoning/effort level, for CLIs that accept one. Forwarded verbatim; the kit does not validate vendor-specific values because they change per provider." },
-              "args": { "type": "array", "items": { "type": "string" }, "description": "Extra CLI arguments appended to the launch command, as an argv array (never a shell string, so nothing is re-parsed by a shell)." },
+              "tier": { "type": "string", "enum": ["low", "mid", "high"], "description": "How much this profile is expected to COST to run, relative to the others. cckit never names a model: the spend posture lives here and the actual flags live in `args`. `low` is assumed when unstated, and the lowest-tier profile is what runs when `agents.default` is not set — so the cheap path is the default by construction rather than by discipline." },
+              "args": { "type": "array", "items": { "type": "string" }, "description": "Extra CLI arguments appended to the launch command, as an argv array (never a shell string, so nothing is re-parsed by a shell). The project spells its own flags here — including any model selection — so no vendor CLI syntax and no model id lives in kit code." },
               "permissions": { "type": "string", "description": "Permission/sandbox policy this profile runs under, forwarded to the CLI that implements it. Recorded in the stage receipt so a run's effective policy is auditable after the fact." },
               "stages": { "type": "array", "items": { "type": "string" }, "description": "Stages this profile may run at, each a value from `agents.stages`. A profile selected for a stage it does not list is refused before a worktree or pane exists." },
               "write": { "type": "boolean", "description": "Whether this profile may write to a branch (default false). One writer owns a branch at a time; review profiles stay read-only until ownership is explicitly transferred." },

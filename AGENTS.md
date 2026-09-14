@@ -120,9 +120,10 @@ cckit shells out to whatever agent invokes it; it does not embed a model. For ve
 text (digests, ingest), the model endpoint is configurable via environment — see the docs site (
 [cckit.dev](https://cckit.dev).
 
-**Agent profiles** (`agents.profiles` in the config) are where a model id, reasoning level,
-permission policy and extra CLI argv live. Stage logic reads them and forwards them, so no verb in
-the kit names a vendor model. A profile also declares the `stages` it may run at and whether it may
+**Agent profiles** (`agents.profiles` in the config) carry a spend `tier`, a permission policy and
+extra CLI argv. **cckit never names a model** — you spell your own flags in `args`, and the
+cheapest-tier profile runs when `agents.default` is unset, so the inexpensive path is the default
+by construction. A profile also declares the `stages` it may run at and whether it may
 `write` to a branch; a profile with no `stages` is allowed nowhere, and `write` defaults to false.
 Validation refuses an undeclared profile, a missing `kind`, an unknown stage, or a dangling
 `agents.default` **before** a worktree or pane exists. See

@@ -26,8 +26,7 @@ cat > "$CFG" <<'JSON'
     "profiles": {
       "build": {
         "kind": "claude",
-        "model": "claude-opus-5",
-        "reasoning": "high",
+        "tier": "high",
         "permissions": "acceptEdits",
         "stages": ["build"],
         "write": true,
@@ -36,7 +35,7 @@ cat > "$CFG" <<'JSON'
       },
       "review": {
         "kind": "codex",
-        "model": "gpt-5-codex",
+        "tier": "low",
         "stages": ["review", "design"]
       },
       "nostages": { "kind": "claude" }
@@ -48,11 +47,10 @@ JSON
 # ── readers ────────────────────────────────────────────────────────────────────────────────────
 t "names lists every declared profile" "$(ap_profile_names "$CFG" | tr '\n' ' ')" "build nostages review "
 t "field reads kind"                   "$(ap_profile_field "$CFG" build kind)"    "claude"
-t "field reads the vendor model"       "$(ap_profile_field "$CFG" build model)"   "claude-opus-5"
-t "field reads reasoning"              "$(ap_profile_field "$CFG" build reasoning)" "high"
+t "field reads the spend tier"         "$(ap_profile_field "$CFG" build tier)"    "high"
 t "field reads permissions"            "$(ap_profile_field "$CFG" build permissions)" "acceptEdits"
 t "field reads a numeric budget"       "$(ap_profile_field "$CFG" build contextBudget)" "8000"
-t "field is empty for an absent key"   "$(ap_profile_field "$CFG" review reasoning)" ""
+t "field is empty for an absent key"   "$(ap_profile_field "$CFG" review permissions)" ""
 t "field is empty for an absent profile" "$(ap_profile_field "$CFG" ghost kind)" ""
 
 # An arg containing a space must survive as ONE argument — the reason args is an argv array in the
@@ -80,6 +78,22 @@ cat > "$tmp/stages.json" <<'JSON'
 JSON
 t "config replaces the vocabulary" "$(ap_stages "$tmp/stages.json" | tr '\n' ' ')" "build qa "
 t "env wins per invocation" "$(CCKIT_AGENT_STAGES='only' ap_stages "$CFG" | tr '\n' ' ')" "only "
+
+# ── spend tier: the cheap default is structural, not a convention ──────────────────────────────
+t "tier is read"                    "$(ap_profile_tier "$CFG" build)"    "high"
+t "tier defaults to low when unstated" "$(ap_profile_tier "$CFG" nostages)" "low"
+t "rank orders low < mid < high"    "$(ap_tier_rank low)$(ap_tier_rank mid)$(ap_tier_rank high)" "012"
+t "an unknown tier ranks as cheap"  "$(ap_tier_rank bogus)" "0"
+t "cheapest wins over an expensive one" "$(ap_cheapest_profile "$CFG")" "nostages"
+
+cat > "$tmp/tiers.json" <<'JSON'
+{ "agents": { "profiles": {
+  "zeta": { "kind": "claude", "tier": "low" },
+  "alpha": { "kind": "claude", "tier": "low" },
+  "pricey": { "kind": "claude", "tier": "high" }
+} } }
+JSON
+t "ties break alphabetically, not by jq key order" "$(ap_cheapest_profile "$tmp/tiers.json")" "alpha"
 
 # ── validation refuses BEFORE anything is created ──────────────────────────────────────────────
 ap_profile_validate "$CFG" build build 2>/dev/null;  rc "a declared profile at an allowed stage passes" "$?" "0"
@@ -111,21 +125,25 @@ cat > "$tmp/dangling.json" <<'JSON'
 JSON
 ap_default_profile "$tmp/dangling.json" >/dev/null 2>&1
 rc "a default naming no declared profile is refused, not silently ignored" "$?" "2"
+# No agents.default must NOT mean "no profile" — it means the cheapest, so an unconfigured project
+# runs the inexpensive path instead of failing or picking whatever jq listed first.
 cat > "$tmp/nodefault.json" <<'JSON'
-{ "agents": { "profiles": { "b": { "kind": "claude" } } } }
+{ "agents": { "profiles": {
+  "spendy": { "kind": "claude", "tier": "high" },
+  "thrifty": { "kind": "claude", "tier": "low" }
+} } }
 JSON
-ap_default_profile "$tmp/nodefault.json" >/dev/null 2>&1
-rc "no default declared is not an error" "$?" "0"
+t "no agents.default falls back to the CHEAPEST profile" "$(ap_default_profile "$tmp/nodefault.json" 2>/dev/null)" "thrifty"
 
 # ── a config with no agents block at all stays inert ───────────────────────────────────────────
 echo '{}' > "$tmp/empty.json"
 t "no agents block yields no profiles" "$(ap_profile_names "$tmp/empty.json" | wc -l | tr -d ' ')" "0"
-ap_default_profile "$tmp/empty.json" >/dev/null 2>&1
-rc "no agents block is not an error" "$?" "0"
+t "no agents block yields no default" "$(ap_default_profile "$tmp/empty.json" 2>/dev/null)" ""
 
 # ── the acceptance that matters: no vendor model id is hard-coded in kit logic ──────────────────
-# #318 requires stage logic to name no model. The model must reach the kit ONLY from config, so a
-# grep for a vendor id across the shipped libs must come back empty.
+# cckit must never name a model — not in code, and (since the schema dropped `model`) not in the
+# config shape either. A kit that suggests an expensive model pushes every user toward spending
+# more. A grep for any vendor id across the shipped libs must come back empty.
 hits="$(grep -rEl 'claude-(opus|sonnet|haiku)-[0-9]|gpt-[0-9]|gemini-[0-9]' "$ROOT/scripts/lib" "$ROOT/bin" 2>/dev/null | grep -v -- '-test\.sh$' | wc -l | tr -d ' ')"
 t "no vendor model id appears in shipped lib or bin code" "$hits" "0"
 
