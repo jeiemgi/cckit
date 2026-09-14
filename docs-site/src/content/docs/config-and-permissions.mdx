@@ -222,6 +222,56 @@ origin, and a `<slug>` argument was resolved before it, which can run `gh issue 
 `cckit start <issue>` (a plain task worktree) has no WIP limit. Full behaviour:
 [Only so many efforts at once](/efforts-and-waves/#only-so-many-efforts-at-once).
 
+## Agent profiles
+
+A **profile** is a named agent configuration: which CLI to run, which model, at which reasoning
+level, under which permissions, and at which stages. It is project data, so no stage in the kit
+names a vendor model — the kit forwards whatever the profile says.
+
+```json
+{
+  "agents": {
+    "default": "build",
+    "stages": ["build", "review", "design", "docs"],
+    "profiles": {
+      "build": {
+        "kind": "claude",
+        "model": "claude-opus-5",
+        "reasoning": "high",
+        "permissions": "acceptEdits",
+        "stages": ["build"],
+        "write": true,
+        "contextBudget": 8000
+      },
+      "review": {
+        "kind": "codex",
+        "model": "gpt-5-codex",
+        "stages": ["review"],
+        "args": ["--sandbox", "read-only"]
+      }
+    }
+  }
+}
+```
+
+| Key | Default | What it does |
+| --- | --- | --- |
+| `agents.default` | *(none)* | Profile used when nothing more specific resolves. Naming a profile that is not declared is a **validation error**, not a silent fallback. |
+| `agents.stages` | `build review design docs` | The stage vocabulary a profile's `stages` are checked against. Env override: `CCKIT_AGENT_STAGES`. |
+| `kind` | **required** | The agent CLI to run (`claude`, `codex`, …). The Herdr runtime validates it before any worktree exists. |
+| `model` | CLI's own default | Vendor model id, forwarded verbatim. |
+| `reasoning` | *(unset)* | Reasoning/effort level, for CLIs that accept one. Forwarded verbatim — vendor values change per provider, so the kit does not validate them. |
+| `args` | `[]` | Extra CLI arguments as an **argv array**, never a shell string, so an argument containing spaces is not re-split. |
+| `permissions` | *(unset)* | Permission/sandbox policy, forwarded to the CLI that implements it and recorded in the stage receipt. |
+| `stages` | *(none)* | Stages this profile may run at. **A profile with no `stages` is allowed nowhere** — an unstated permission is not a granted one. |
+| `write` | `false` | Whether the profile may write to a branch. One writer owns a branch at a time; review profiles stay read-only until ownership is transferred. |
+| `contextBudget` | *(unset)* | Upper bound in bytes on the generated brief handed to the worker. The board and prior conversations are never included. |
+
+Validation runs **before** a worktree or pane is created, and refuses on: an undeclared profile, a
+profile with no `kind`, a `stages` entry outside the vocabulary, a profile selected for a stage it
+does not list, and an `agents.default` that names nothing declared. Each refusal names the profile
+and prints what was declared, so the fix does not require reading the source.
+
 ## Identity
 
 cckit asks your name on first run and stores it in `.cckit/identity` (gitignored). Nothing personal is hardcoded; commits use your local git identity.
