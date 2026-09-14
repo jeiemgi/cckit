@@ -1,0 +1,97 @@
+---
+title: Codified review gates
+description: Two ratchets that keep an AI reviewer's mechanical findings, and a skill listing's context cost, from coming back.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+An AI reviewer finds the same classes of defect over and over, and its findings live in pull-request
+threads and die there. `scripts/review-lint.sh` is where the mechanical slice of that stream goes to
+stay fixed; `scripts/skill-frontmatter-lint.sh` does the same job for a cost that no reviewer sees at
+all — the bytes a skill listing occupies in every session. `scripts/check.sh` runs both, and
+`cckit init` scaffolds both into your project.
+
+Both are **ratchets, not caps**: today's offenders are recorded in a baseline and allowed to stay,
+but nothing may grow past its recorded size and nothing new may land dirty. Adding a rule therefore
+never forces a repo-wide fix.
+
+## review-lint — findings that became a gate
+
+```bash
+scripts/review-lint.sh                 # the gate: fails on new or grown hits
+scripts/review-lint.sh --report        # every rule's current hit count; never fails
+scripts/review-lint.sh --rule <ID>     # every hit for one rule, with context
+scripts/review-lint.sh --update        # re-baseline from current hits
+```
+
+Rules live in `scripts/review-rules.conf`, one block per rule, each carrying the PR it was earned
+from. A rule is either a per-line `pattern` (regex) or a stateful `awk` program for findings that
+need to see more than one line — fence parity, for instance, where an unlabelled fence is a defect
+only when it *opens* a block.
+
+<Aside type="caution" title="Only the mechanical slice belongs here">
+A finding maps to a rule when it is wrong every time it appears, regardless of intent. Doc-vs-code
+drift, architectural contracts, and "is this the right abstraction" stay with the reviewer. A noisy
+gate is worse than no gate.
+</Aside>
+
+### The baseline is TAB-separated
+
+```text
+# <RULE>\t<path>\t<count>   (TAB-separated: a path may contain a space)
+fence-missing-language	docs/my file.md	1
+```
+
+A space-separated baseline written by an earlier version is still read, so upgrading does not turn
+the gate red.
+
+## skill-frontmatter-lint — the context budget
+
+Claude Code concatenates a skill's `description` and `when_to_use` into the always-loaded skill
+listing. Both sit in every session's context whether or not the skill is ever invoked — only the
+`SKILL.md` *body* is lazy. Unbudgeted, those fields grow into second bodies: rent paid on every turn,
+and past the harness cap the tail is silently truncated, so an over-long field costs tokens while
+delivering nothing.
+
+```bash
+scripts/skill-frontmatter-lint.sh              # the gate
+scripts/skill-frontmatter-lint.sh --report     # every skill's cost, sorted; never fails
+scripts/skill-frontmatter-lint.sh --update     # re-baseline from current sizes
+```
+
+The default budget is **500 bytes** per skill (`KIT_SKILL_LISTING_BUDGET`). Both `skills/` and
+`.claude/skills/` are measured, so the lint works in the kit's own layout and in the one `cckit init`
+scaffolds.
+
+<Aside type="note" title="Bytes, not characters — the locale is pinned">
+`${#s}` counts characters under a UTF-8 locale and bytes under `C`/`POSIX`, and skill descriptions
+are full of em-dashes and `·`. A baseline generated under one and checked under the other makes the
+ratchet fire on skills nobody touched — this repo's UTF-8 baseline reported 15 false "grown" skills
+under `LC_ALL=C`, and CI only looked green because `ubuntu-latest` happens to export `LANG=C.UTF-8`.
+
+The lint therefore pins `LC_ALL=C` and measures bytes. Every environment can produce a byte count,
+and no locale has to be installed to reproduce a number. An em-dash costs the three bytes it occupies.
+</Aside>
+
+## Baselines are seeded once
+
+`cckit init` seeds each baseline the first time it scaffolds the lint, so a fresh project starts green
+and only *new* defects fail. It never regenerates an existing baseline — that would silently
+re-grandfather whatever drifted since the last upgrade.
+
+Seeding sets `KIT_LINT_WALK=1`, which forces the filesystem walk instead of `git ls-files`.
+Scaffolding usually lands in a repo that already has commits, so the kit's freshly written files are
+untracked and invisible to the index; without the walk the baseline comes out empty and the gate goes
+red on your first commit of the scaffold.
+
+Each lint reports its own baseline path, which is how `init.sh` finds it:
+
+```bash
+scripts/review-lint.sh --baseline-path             # scripts/review-lint-baseline.txt
+scripts/skill-frontmatter-lint.sh --baseline-path  # scripts/skill-frontmatter-baseline.txt
+```
+
+## Both self-disable
+
+`review-lint` exits 0 when there is no rule table; `skill-frontmatter-lint` exits 0 when there is no
+`skills/` or `.claude/skills/` directory. Shipping them to every project is safe.
