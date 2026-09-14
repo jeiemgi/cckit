@@ -166,18 +166,23 @@ source "$ROOT/scripts/lib/worktree-start.sh"
 
 # Headless seed: the agent runs with NO human present - it must never ask, decide autonomously,
 # gauge difficulty + apply proportional effort, and close no-op issues itself. cckit verbs only.
+#
+# The framing and the receipt contract live in worker-brief.sh (#321), not here, because they are
+# the two parts that must survive truncation and a budget is the resolved profile's to set.
+# shellcheck source=/dev/null
+source "$ROOT/scripts/lib/worker-brief.sh"
+SEED_BUDGET=""
+[ -n "${_oc_cfg:-}" ] && [ -n "${_oc_prof:-}" ] && SEED_BUDGET="$(wb_profile_budget "$_oc_cfg" "$_oc_prof")"
+
 seed_for() {
   local num="$1" branch="$2" wt="${3:-$PWD}" brief
   brief="$(cd "$wt" && "$ROOT/bin/cckit" brief "$num" 2>/dev/null)" || brief=""
-  printf '%s\n' "You are running HEADLESS inside a cckit orchestration. There is no human in this worker session: decide within the issue's scope and proceed. Do not read the whole board or take another issue. Work only on issue #$num in branch $branch."
-  if [ -n "$brief" ]; then
-    printf '\n%s\n' "$brief"
-  else
+  if [ -z "$brief" ]; then
     # Nested single quotes would terminate the format string and make printf recycle it over the
     # stray words as arguments, so the fallback names the command without quoting it.
-    printf '\nThe generated cckit brief was unavailable. Read only issue #%s with: gh issue view %s\n' "$num" "$num"
+    brief="$(printf 'The generated cckit brief was unavailable. Read only issue #%s with: gh issue view %s\n' "$num" "$num")"
   fi
-  printf '\n%s\n' "Implement the issue, run the brief's gate until green, then open the PR with: cckit pr $num \"<summary>\". If no change is needed, comment why and run: cckit close $num \"<reason>\". Finish by reporting only the PR or issue URL, gate result, and any blocker."
+  printf '%s\n' "$brief" | wb_compose "$num" "$branch" "$SEED_BUDGET" || true
 }
 
 ENTRIES=()
