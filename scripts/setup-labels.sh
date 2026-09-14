@@ -14,6 +14,10 @@ ensure_label() { # name color description
 }
 
 echo "→ Labels on $KIT_REPO"
+# The one label that marks a parent AS an effort, and the one `effort_plan` queries. It was read
+# and never provisioned, so `cckit effort plan` found nothing on every repo.
+echo "effort:"
+ensure_label "effort" "5319e7" "An effort parent issue"
 echo "kinds:"
 for k in task plan adr scaffold spike; do ensure_label "kind:$k" "5319e7" "Kind: $k"; done
 echo "priorities:"

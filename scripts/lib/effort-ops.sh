@@ -214,7 +214,13 @@ effort_new() {
   _eff_ensure_label "$ctx" bfd4f2 "effort session weight"
   _eff_ensure_label "kind:task" d4c5f9 "kit issue kind"
   _eff_ensure_label "priority:$priority" e99695 "kit priority"
-  local labels="$ctx,kind:task,priority:$priority"
+  # `effort` is what marks the parent AS an effort, and it is the label `effort_plan` queries
+  # (`gh issue list --label effort`, effort-plan.sh). It was read and never written: the label did
+  # not exist in this repo at all, so `cckit effort plan` answered "no open efforts found" for
+  # every effort ever created here. A label something reads and nothing writes is the same defect
+  # as one something writes and nothing reads — see rules/naming-and-ids.md § Labels.
+  _eff_ensure_label "effort" 5319e7 "an effort parent issue"
+  local labels="effort,$ctx,kind:task,priority:$priority"
   if [ -n "$role" ]; then
     _eff_ensure_label "role:$role" 0e8a16 "kit role lane"
     labels="$labels,role:$role"
