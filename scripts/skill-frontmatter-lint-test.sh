@@ -85,10 +85,72 @@ else
   fail "shrunk skill passes but no re-baseline nudge"
 fi
 
-# --- 7. a repo with no skills/ is a no-op, not a failure --------------------
+# --- 7. the measurement does not move with the locale -----------------------
+# `${#s}` counts CHARACTERS under a UTF-8 locale and BYTES under C/POSIX. With multibyte text in a
+# description, a baseline generated under one locale fires the ratchet under the other — on skills
+# nobody touched. The lint pins LC_ALL, so both runs must agree exactly.
+rm -rf "$TMP/skills"; mkdir -p "$TMP/skills"; rm -f "$TMP/scripts/skill-frontmatter-baseline.txt"
+mkdir -p "$TMP/skills/multibyte"
+{
+  echo "---"
+  echo "name: multibyte"
+  printf 'description: %s — %s · %s\n' "$(head -c 200 < /dev/zero | tr '\0' 'd')" \
+                                       "$(head -c 200 < /dev/zero | tr '\0' 'e')" \
+                                       "$(head -c 200 < /dev/zero | tr '\0' 'f')"
+  echo "---"
+  echo
+  echo "body"
+} > "$TMP/skills/multibyte/SKILL.md"
+c_out="$( cd "$TMP" && LC_ALL=C            bash scripts/skill-frontmatter-lint.sh --report 2>&1 )"
+u_out="$( cd "$TMP" && LC_ALL=en_US.UTF-8  bash scripts/skill-frontmatter-lint.sh --report 2>&1 )"
+[ "$c_out" = "$u_out" ] && pass "the count is identical under LC_ALL=C and UTF-8" \
+  || fail "the count moves with the locale:
+C:    $c_out
+UTF8: $u_out"
+
+# A baseline written under one locale must still pass the gate under the other.
+( cd "$TMP" && LC_ALL=en_US.UTF-8 bash scripts/skill-frontmatter-lint.sh --update ) >/dev/null 2>&1
+lc_out="$( cd "$TMP" && LC_ALL=C bash scripts/skill-frontmatter-lint.sh 2>&1 )"; lc_rc=$?
+[ "$lc_rc" -eq 0 ] && pass "a UTF-8 baseline passes under LC_ALL=C" \
+  || fail "a UTF-8 baseline passes under LC_ALL=C (rc=$lc_rc: $lc_out)"
+rm -f "$TMP/scripts/skill-frontmatter-baseline.txt"
+
+# --- 8. .claude/skills/ is linted too — the layout init.sh actually scaffolds
+# Hard-coding `skills` made the shipped lint a permanent no-op in every consumer project.
 rm -rf "$TMP/skills"
-run >/dev/null 2>&1 && pass "missing skills/ is a no-op" \
-                    || fail "missing skills/ is a no-op"
+mkdir -p "$TMP/.claude/skills/scaffolded"
+{
+  echo "---"
+  echo "name: scaffolded"
+  printf 'description: %s\n' "$(head -c 700 < /dev/zero | tr '\0' 'd')"
+  echo "---"
+} > "$TMP/.claude/skills/scaffolded/SKILL.md"
+capture
+if [ "$run_rc" -ne 0 ] && printf '%s' "$run_out" | grep -q 'scaffolded'; then
+  pass ".claude/skills/ is linted"
+else
+  fail ".claude/skills/ is linted (rc=$run_rc: $run_out)"
+fi
+rm -rf "$TMP/.claude"
+
+# --- 9. --baseline-path is the one place the filename is spelled ------------
+# init.sh used to reconstruct it as "<lint>-baseline.txt", which for THIS lint names a file that
+# never exists — so its "seed once" guard never matched and every upgrade re-baselined silently.
+bp_out="$( cd "$TMP" && bash scripts/skill-frontmatter-lint.sh --baseline-path 2>&1 )"
+[ "$bp_out" = "scripts/skill-frontmatter-baseline.txt" ] \
+  && pass "--baseline-path reports the baseline" \
+  || fail "--baseline-path reports the baseline (got '$bp_out')"
+# It answers even with no skills tree at all — init.sh asks before anything is scaffolded.
+[ -d "$TMP/skills" ] && fail "fixture leaked a skills/ dir into the no-tree check"
+bp2="$( cd "$TMP" && bash scripts/skill-frontmatter-lint.sh --baseline-path 2>&1 )"
+[ "$bp2" = "scripts/skill-frontmatter-baseline.txt" ] \
+  && pass "--baseline-path answers with no skills tree" \
+  || fail "--baseline-path answers with no skills tree (got '$bp2')"
+
+# --- 10. a repo with no skills tree is a no-op, not a failure ---------------
+rm -rf "$TMP/skills"
+run >/dev/null 2>&1 && pass "missing skills tree is a no-op" \
+                    || fail "missing skills tree is a no-op"
 
 [ "$fails" -eq 0 ] && echo "ok skill-frontmatter-lint-test passed" || echo "FAIL skill-frontmatter-lint-test"
 exit "$fails"

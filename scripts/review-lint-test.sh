@@ -40,7 +40,7 @@ title: fenced block needs a language
 why: test rule
 kind: awk
 scope: docs/*
-awk: FNR==1{n=0} /^```/{n++; if(n%2==1 && $0=="```") print FILENAME":"FNR":"$0}
+awk: FNR==1{inb=0;fence=""} match($0,/^[ \t]*(`{3,}|~{3,})/){m=substr($0,RSTART,RLENGTH);sub(/^[ \t]+/,"",m);rest=substr($0,RSTART+RLENGTH);sub(/^[ \t]+/,"",rest);sub(/[ \t]+$/,"",rest);if(!inb){inb=1;fence=m;if(rest=="")print FILENAME":"FNR":"$0}else if(substr(m,1,1)==substr(fence,1,1)&&length(m)>=length(fence)&&rest==""){inb=0;fence=""}}
 source: test
 CONF
 
@@ -166,7 +166,103 @@ else
 fi
 rm -rf "$TMP2"
 
-# --- 16. missing rule table is a no-op, not a failure ----------------------
+# --- 16. a path containing a space keeps its own baseline row --------------
+# `uniq -c | awk '{ print $2, $1 }'` keeps only the first whitespace token, so `docs/my file.md`
+# is recorded as `docs/my` — and a second file sharing that prefix lands on the SAME row, so its
+# hits are compared against the first file's count and pass unnoticed.
+TMP4="$(mktemp -d)"; mkdir -p "$TMP4/scripts" "$TMP4/docs"
+cp "$ENGINE" "$TMP4/scripts/"; cp "$TMP/scripts/review-rules.conf" "$TMP4/scripts/"
+( cd "$TMP4" && git init -q . && git config user.email t@t && git config user.name t ) >/dev/null 2>&1
+printf '```\nx\n```\n'                 > "$TMP4/docs/my file.md"    # 1 bare opener
+printf '```\ny\n```\nz\n```\nw\n```\n' > "$TMP4/docs/my other.md"   # 2 bare openers
+( cd "$TMP4" && git add -A . ) >/dev/null 2>&1
+( cd "$TMP4" && bash scripts/review-lint.sh --update ) >/dev/null 2>&1
+bl="$TMP4/scripts/review-lint-baseline.txt"
+rows="$(grep -c 'docs/my' "$bl" 2>/dev/null | tr -d ' ')"
+if [ "$rows" = 2 ] \
+  && grep -q "$(printf 'docs/my file.md\t1')" "$bl" \
+  && grep -q "$(printf 'docs/my other.md\t2')" "$bl"; then
+  pass "a path with a space keeps its own row and count"
+else
+  fail "a path with a space keeps its own row and count (rows=$rows: $(grep 'docs/my' "$bl" | tr '\t' '|' | tr '\n' ' '))"
+fi
+# ...and the gate reads those rows back, so both files stay grandfathered.
+out4="$( cd "$TMP4" && bash scripts/review-lint.sh 2>&1 )"; rc4=$?
+[ "$rc4" -eq 0 ] && pass "both spaced paths are grandfathered" \
+  || fail "both spaced paths are grandfathered (rc=$rc4: $out4)"
+
+# --- 17. a space-separated baseline from an older kit is still readable -----
+# Rows are written TAB-separated now. Refusing to read the old format would report every
+# grandfathered file as a new hit and turn the gate red the moment a project upgrades.
+printf '# legacy\nT002 docs/legacy.md 1\n' > "$TMP4/scripts/review-lint-baseline.txt"
+rm -f "$TMP4/docs/my file.md" "$TMP4/docs/my other.md"
+printf '```\nx\n```\n' > "$TMP4/docs/legacy.md"
+( cd "$TMP4" && git add -A . ) >/dev/null 2>&1
+out5="$( cd "$TMP4" && bash scripts/review-lint.sh 2>&1 )"; rc5=$?
+[ "$rc5" -eq 0 ] && pass "a space-separated legacy baseline is honored" \
+  || fail "a space-separated legacy baseline is honored (rc=$rc5: $out5)"
+rm -rf "$TMP4"
+
+# --- 18. a 4-backtick outer fence does not invert parity for the rest -------
+# `/^```/` matches ```` too: the counter increments but the line never satisfies $0=="```", so it
+# is never reported AND `n` stays odd — every later CLOSING fence is then flagged as a bare opener.
+TMP5="$(mktemp -d)"; mkdir -p "$TMP5/scripts" "$TMP5/docs"
+cp "$ENGINE" "$TMP5/scripts/"; cp "$TMP/scripts/review-rules.conf" "$TMP5/scripts/"
+( cd "$TMP5" && git init -q . && git config user.email t@t && git config user.name t ) >/dev/null 2>&1
+printf '````md\n```sh\necho hi\n```\n````\n\n```sh\necho ok\n```\n' > "$TMP5/docs/nested.md"
+( cd "$TMP5" && git add -A . ) >/dev/null 2>&1
+out6="$( cd "$TMP5" && bash scripts/review-lint.sh 2>&1 )"; rc6=$?
+[ "$rc6" -eq 0 ] && pass "a 4-backtick outer fence leaves later fences clean" \
+  || fail "a 4-backtick outer fence leaves later fences clean (rc=$rc6: $out6)"
+# A genuinely bare ~~~ fence is still caught — the rule sees tilde fences at all now.
+printf '~~~\nx\n~~~\n' > "$TMP5/docs/tilde.md"
+( cd "$TMP5" && git add -A . ) >/dev/null 2>&1
+out7="$( cd "$TMP5" && bash scripts/review-lint.sh 2>&1 )"; rc7=$?
+if [ "$rc7" -ne 0 ] && printf '%s' "$out7" | grep -q 'docs/tilde.md'; then
+  pass "a bare ~~~ fence is caught"
+else
+  fail "a bare ~~~ fence is caught (rc=$rc7: $out7)"
+fi
+rm -rf "$TMP5"
+
+# --- 19. KIT_LINT_WALK seeds from disk even when the index is NOT empty -----
+# The scaffold case init.sh actually hits: a repo that already has commits, with the kit's files
+# freshly written and untracked. Without the walk the baseline comes out empty and the gate goes
+# red on the user's first commit of the scaffold.
+TMP6="$(mktemp -d)"; mkdir -p "$TMP6/scripts" "$TMP6/docs"
+cp "$ENGINE" "$TMP6/scripts/"; cp "$TMP/scripts/review-rules.conf" "$TMP6/scripts/"
+( cd "$TMP6" && git init -q . && git config user.email t@t && git config user.name t ) >/dev/null 2>&1
+echo readme > "$TMP6/README.md"
+( cd "$TMP6" && git add README.md && git commit -qm init ) >/dev/null 2>&1
+printf '```\nx\n```\n' > "$TMP6/docs/scaffolded.md"   # written by the scaffold, still untracked
+( cd "$TMP6" && KIT_LINT_WALK=1 bash scripts/review-lint.sh --update ) >/dev/null 2>&1
+if grep -q 'docs/scaffolded.md' "$TMP6/scripts/review-lint-baseline.txt" 2>/dev/null; then
+  pass "KIT_LINT_WALK seeds untracked scaffold files"
+else
+  fail "KIT_LINT_WALK seeds untracked scaffold files ($(cat "$TMP6/scripts/review-lint-baseline.txt" 2>&1))"
+fi
+( cd "$TMP6" && git add -A . ) >/dev/null 2>&1
+out8="$( cd "$TMP6" && bash scripts/review-lint.sh 2>&1 )"; rc8=$?
+[ "$rc8" -eq 0 ] && pass "the seeded scaffold is green once committed" \
+  || fail "the seeded scaffold is green once committed (rc=$rc8: $out8)"
+# Without the walk the seed is empty — the defect this guards against.
+rm -f "$TMP6/scripts/review-lint-baseline.txt"
+printf '```\ny\n```\n' > "$TMP6/docs/second.md"
+( cd "$TMP6" && bash scripts/review-lint.sh --update ) >/dev/null 2>&1
+if grep -q 'docs/second.md' "$TMP6/scripts/review-lint-baseline.txt" 2>/dev/null; then
+  fail "an unwalked seed must not see untracked files"
+else
+  pass "an unwalked seed sees only tracked files"
+fi
+rm -rf "$TMP6"
+
+# --- 20. --baseline-path is the one place the filename is spelled ----------
+out9="$(run --baseline-path)"
+[ "$out9" = "scripts/review-lint-baseline.txt" ] \
+  && pass "--baseline-path reports the baseline" \
+  || fail "--baseline-path reports the baseline (got '$out9')"
+
+# --- 21. missing rule table is a no-op, not a failure ----------------------
 rm "$TMP/scripts/review-rules.conf"
 capture
 [ "$run_rc" -eq 0 ] && pass "missing rule table is a no-op" || fail "missing rule table is a no-op"

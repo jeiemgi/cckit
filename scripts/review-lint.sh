@@ -52,10 +52,18 @@ rule_field() {
 # Tracked files when there are any; otherwise a filesystem walk. The fallback matters for a
 # freshly scaffolded project, where the kit has written files but nothing is staged yet -
 # `git ls-files` is empty there, and without this the gate would silently scan nothing.
+#
+# KIT_LINT_WALK=1 forces the walk. Seeding a baseline needs it: init.sh scaffolds into a repo that
+# usually ALREADY has commits, so `git ls-files` is non-empty and the just-written kit files are
+# invisible to it. `--update` then grandfathers nothing, and the gate turns red the moment the user
+# commits the scaffold - failing on templates the kit itself shipped. "Seed once so a fresh project
+# starts green" only holds if the seed can see the whole tree, tracked or not.
 list_files() {
   local tracked
-  tracked="$(git ls-files 2>/dev/null)"
-  if [ -n "$tracked" ]; then printf '%s\n' "$tracked"; return 0; fi
+  if [ "${KIT_LINT_WALK:-0}" != "1" ]; then
+    tracked="$(git ls-files 2>/dev/null)"
+    if [ -n "$tracked" ]; then printf '%s\n' "$tracked"; return 0; fi
+  fi
   find . -type f \
     -not -path './.git/*' -not -path '*/node_modules/*' \
     -not -path './dist/*' -not -path './.cckit/*' 2>/dev/null | sed 's|^\./||'
@@ -131,14 +139,41 @@ hits_for_rule() {
       '
 }
 
+# count_by_file — read "path:line:text" hits on stdin, emit "<path><TAB><count>", path-sorted.
+#
+# The obvious `uniq -c | awk '{ print $2, $1 }'` keeps only the FIRST whitespace token of the path,
+# so `docs/my file.md` is recorded as `docs/my`. Two offending files sharing that prefix then
+# collapse onto one row and are both compared against a single baseline entry - the second file's
+# hits pass unnoticed. Counting in awk, keyed on the whole path, and separating with a TAB (which
+# cannot occur in the paths git reports) keeps the field boundary unambiguous for every reader.
+count_by_file() {
+  awk -F: '{ c[$1]++ } END { for (p in c) printf "%s\t%s\n", p, c[p] }' | LC_ALL=C sort
+}
+
+# baseline_count <rule> <path> — the recorded count, 0 when absent.
+#
+# Reads BOTH layouts. Rows are written TAB-separated so a path with a space survives, but a project
+# upgrading from an earlier kit still has a space-separated baseline on disk; refusing to read it
+# would report every grandfathered file as a new hit and turn the gate red on upgrade.
 baseline_count() {
   [ -f "$BASELINE" ] || { echo 0; return; }
   grep -v '^[[:space:]]*#' "$BASELINE" 2>/dev/null \
-    | awk -v r="$1" -v p="$2" '$1 == r && $2 == p { print $3; found = 1; exit } END { if (!found) print 0 }'
+    | awk -v r="$1" -v p="$2" '
+        { n = index($0, "\t") ? split($0, F, "\t") : split($0, F, " ") }
+        n >= 3 && F[1] == r && F[2] == p { print F[3]; found = 1; exit }
+        END { if (!found) print 0 }
+      '
 }
 
 MODE="${1:-lint}"
 ARG="${2:-}"
+
+# The one place the baseline filename is spelled, so init.sh's "seed once" guard cannot go looking
+# for a name that does not exist.
+if [ "$MODE" = "--baseline-path" ]; then
+  printf '%s\n' "$BASELINE"
+  exit 0
+fi
 
 # ---- --rule <ID> ------------------------------------------------------------
 if [ "$MODE" = "--rule" ]; then
@@ -171,11 +206,11 @@ if [ "$MODE" = "--update" ]; then
     echo "# Pre-existing hits, GRANDFATHERED per file: they may stay, but may never grow, and a"
     echo "# file not listed here must have zero hits. Fix a file and re-run --update to tighten."
     echo "#"
-    echo "# <RULE> <path> <count>"
+    echo "# <RULE>\t<path>\t<count>   (TAB-separated: a path may contain a space)"
     rule_ids | while IFS= read -r id; do
       [ -n "$id" ] || continue
-      hits_for_rule "$id" | awk -F: '{ print $1 }' | sort | uniq -c \
-        | awk -v r="$id" '{ print r, $2, $1 }'
+      hits_for_rule "$id" | count_by_file \
+        | awk -v r="$id" -F"\t" '{ printf "%s\t%s\t%s\n", r, $1, $2 }'
     done
   } > "$BASELINE"
   echo "ok wrote $BASELINE ($(grep -cv '^[[:space:]]*#' "$BASELINE" | tr -d ' ') grandfathered file(s))"
@@ -191,12 +226,13 @@ while IFS= read -r id; do
   why="$(rule_field "$id" why)"
   src="$(rule_field "$id" source)"
 
-  # Per-file counts for this rule.
-  counts="$(hits_for_rule "$id" | awk -F: '{ print $1 }' | sort | uniq -c | awk '{ print $2, $1 }')"
+  # Per-file counts for this rule, "<path><TAB><count>".
+  counts="$(hits_for_rule "$id" | count_by_file)"
   [ -n "$counts" ] || continue
 
-  while read -r path n; do
+  while IFS="$(printf '\t')" read -r path n; do
     [ -n "$path" ] || continue
+    [ "$n" -ge 0 ] 2>/dev/null || continue
     total=$(( total + n ))
     base="$(baseline_count "$id" "$path")"
     if [ "$n" -gt "$base" ]; then
@@ -207,7 +243,7 @@ while IFS= read -r id; do
       fi
       note "why:    $why"
       note "source: $src"
-      hits_for_rule "$id" | grep "^$path:" | head -3 | sed 's/^/    /'
+      hits_for_rule "$id" | awk -F: -v p="$path" '$1 == p' | head -3 | sed 's/^/    /'
       note "see all: scripts/review-lint.sh --rule $id"
     else
       grandfathered=$(( grandfathered + n ))

@@ -757,10 +757,22 @@ done
 safe_copy "$KIT_ROOT/scripts/review-rules.conf" "$TARGET/scripts/review-rules.conf"
 # Seed each baseline ONCE so a fresh project starts green and only *new* defects fail. Never
 # regenerate an existing baseline - that would silently re-grandfather drift on upgrade.
+#
+# ASK for the path, never reconstruct it. This used to test "$_lint-baseline.txt", which is right
+# for review-lint and wrong for skill-frontmatter-lint (it writes skill-frontmatter-baseline.txt, no
+# "-lint"). The guessed name never existed, so the "already seeded" guard never matched and every
+# upgrade re-baselined it - exactly what the line above forbids.
+#
+# KIT_LINT_WALK=1 so the seed sees the files just written. init.sh usually scaffolds into a repo
+# that already has commits, where `git ls-files` is non-empty and the untracked kit files are
+# invisible to it; the baseline would come out empty and the gate would go red on the user's first
+# commit of the scaffold.
 for _lint in review-lint skill-frontmatter-lint; do
   [[ -f "$TARGET/scripts/$_lint.sh" ]] || continue
-  [[ -e "$TARGET/scripts/$_lint-baseline.txt" ]] && continue
-  ( cd "$TARGET" && bash "scripts/$_lint.sh" --update ) >/dev/null 2>&1 || true
+  _baseline="$( cd "$TARGET" && bash "scripts/$_lint.sh" --baseline-path 2>/dev/null )"
+  [[ -n "$_baseline" ]] || continue
+  [[ -e "$TARGET/$_baseline" ]] && continue
+  ( cd "$TARGET" && KIT_LINT_WALK=1 bash "scripts/$_lint.sh" --update ) >/dev/null 2>&1 || true
 done
 echo "  + scripts/ (libs + setup + task-sync + version-check + knowledge-lint + review-lint + skill-frontmatter-lint)"
 
