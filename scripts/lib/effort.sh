@@ -80,29 +80,50 @@ effort_snapshot_subs() {
     return 0
   fi
 
-  # An index file ties the snapshot together for an exporter.
-  local index="$dir/index.jsonl"
-  : > "$index"
+  # Split on newlines EXPLICITLY. `for sha in $shas` relied on the shell word-splitting an unquoted
+  # expansion: bash does, zsh does not. Sourced into zsh the loop ran once with every SHA as one
+  # argument, `git rev-parse --short` failed, and the run still printed "✓ snapshotted 1 commit(s)"
+  # and exited 0 — a silently collapsed work record that effort_close's no-trace backstop accepts,
+  # because the empty NN-.diff it leaves behind satisfies that check (#339).
+  local -a sha_list=()
+  local line
+  while IFS= read -r line; do
+    [[ -n "$line" ]] && sha_list+=("$line")
+  done <<EOF_SHAS
+$shas
+EOF_SHAS
 
-  local sha sub subj body
-  for sha in $shas; do
+  # Build the index beside the real one and move it into place only once every record is written.
+  # Truncating index.jsonl up front made a failed re-run destroy the previous trace's pairing while
+  # leaving its NN-<short>.diff files on disk — readable bytes nothing could tie to a sub-issue.
+  local index="$dir/index.jsonl" staged="$dir/.index.jsonl.part"
+  : > "$staged"
+
+  local sha sub subj body short stub
+  for sha in "${sha_list[@]}"; do
+    short="$(git rev-parse --short "$sha" 2>/dev/null)"
+    if [[ -z "$short" ]]; then
+      echo "effort_snapshot_subs: '$sha' is not a commit — refusing to write a partial trace" >&2
+      rm -f "$staged"; return 1
+    fi
     seq=$((seq + 1))
     subj="$(git log -1 --format='%s' "$sha")"
     body="$(git log -1 --format='%b' "$sha")"
     # Last #<num> mentioned = the sub-issue this commit closes/implements (effort-model convention).
     sub="$(printf '%s\n%s' "$subj" "$body" | grep -oE '#[0-9]+' | tail -1 | tr -d '#')"
-    local stub
-    stub="$(printf '%02d-%s' "$seq" "$(git rev-parse --short "$sha")")"
+    stub="$(printf '%02d-%s' "$seq" "$short")"
     git show --no-color --format=fuller "$sha" > "$dir/$stub.diff" 2>/dev/null
-    # meta: commit→sub-issue pairing + outcome hint for the record.
-    jq -n --arg parent "$parent" --arg sub "${sub:-}" --arg sha "$sha" \
+    # meta: commit→sub-issue pairing + outcome hint for the record. -c so one record is one line —
+    # index.jsonl is read line-wise by exporters, and pretty-printed records spanned ~9 lines each.
+    jq -c -n --arg parent "$parent" --arg sub "${sub:-}" --arg sha "$sha" \
           --arg subject "$subj" --arg branch "$branch" --arg file "$stub.diff" \
       '{parent:($parent|tonumber), sub_issue:(if $sub=="" then null else ($sub|tonumber) end),
         commit:$sha, subject:$subject, branch:$branch, diff_file:$file, outcome:"merged"}' \
       > "$dir/$stub.meta"
-    cat "$dir/$stub.meta" >> "$index"
+    cat "$dir/$stub.meta" >> "$staged"
   done
 
+  mv "$staged" "$index"
   echo "  ✓ snapshotted $seq commit(s) to $dir (index.jsonl)" >&2
   printf '%s' "$dir"
 }
@@ -118,8 +139,10 @@ effort_snapshot_merged_subs() {
   [[ -n "$parent" && -n "$rows" ]] || { echo "effort_snapshot_merged_subs: parent + sub rows required" >&2; return 1; }
   dir="$(effort_trace_dir "$parent")" || { echo "effort_snapshot_merged_subs: could not create trace dir" >&2; return 1; }
 
-  local index="$dir/index.jsonl"
-  : > "$index"
+  # Same staged-then-moved index as effort_snapshot_subs: a failed re-run must not leave the
+  # previous trace unreadable (#339).
+  local index="$dir/index.jsonl" staged="$dir/.index.jsonl.part"
+  : > "$staged"
 
   local sub state pr oid title stub short
   while IFS='|' read -r sub state pr oid title; do
@@ -129,17 +152,18 @@ effort_snapshot_merged_subs() {
     stub="$(printf '%02d-%s' "$seq" "$short")"
     gh pr diff "$pr" --repo "$EFFORT_REPO" > "$dir/$stub.diff" 2>/dev/null || rm -f "$dir/$stub.diff"
     [[ -s "$dir/$stub.diff" ]] || { rm -f "$dir/$stub.diff"; seq=$((seq - 1)); continue; }
-    jq -n --arg parent "$parent" --arg sub "${sub:-}" --arg sha "${oid:-}" \
+    jq -c -n --arg parent "$parent" --arg sub "${sub:-}" --arg sha "${oid:-}" \
           --arg subject "$title" --arg pr "$pr" --arg file "$stub.diff" \
       '{parent:($parent|tonumber), sub_issue:(if $sub=="" then null else ($sub|tonumber) end),
         commit:(if $sha=="" then null else $sha end), pr:($pr|tonumber), subject:$subject,
         branch:null, diff_file:$file, outcome:"merged"}' \
       > "$dir/$stub.meta"
-    cat "$dir/$stub.meta" >> "$index"
+    cat "$dir/$stub.meta" >> "$staged"
   done <<EOF_ROWS
 $rows
 EOF_ROWS
 
+  mv "$staged" "$index"
   echo "  ✓ snapshotted $seq merged sub PR diff(s) to $dir (index.jsonl)" >&2
   printf '%s' "$dir"
 }

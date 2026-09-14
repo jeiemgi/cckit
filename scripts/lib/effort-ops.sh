@@ -780,7 +780,10 @@ effort_close() {
 
   # (a2) refuse-squash-without-trace backstop: the squash is irreversible and collapses the per-sub
   # commits that ARE the work record. If nothing was snapshotted, refuse — unless KIT_FORCE=1.
-  if [ -z "$trace_dir" ] || ! ls "$trace_dir"/*.diff >/dev/null 2>&1; then
+  # index.jsonl is the marker, not the presence of a .diff: the snapshot moves it into place only
+  # after every record is written, so a non-empty index means a complete trace. The old `ls *.diff`
+  # test passed on the empty NN-.diff a collapsed run left behind (#339).
+  if [ -z "$trace_dir" ] || [ ! -s "$trace_dir/index.jsonl" ]; then
     if [ "${KIT_FORCE:-0}" = "1" ]; then
       echo "effort_close: no per-sub work trace captured — proceeding anyway (KIT_FORCE=1)" >&2
     else
