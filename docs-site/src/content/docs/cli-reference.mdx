@@ -132,9 +132,12 @@ before creating worktrees. It also starts each worker with the issue's generated
 the worker does not need to read the board, and asks for a final receipt containing only the PR or
 issue URL, gate result, and blocker.
 
-Neither efforts nor orchestration currently select a model. `ctx:S|M|L|XL` sizes session work,
-`role:*` records responsibility, and `--agent` selects the CLI. The CLI's own configured model is
-used.
+`ctx:S|M|L|XL` sizes session work and `role:*` records responsibility — neither picks a model. The
+model, reasoning level, permissions and extra CLI argv come from an **agent profile**; see
+[Agent profiles](/config-and-permissions/#agent-profiles) for the fields and the resolution order.
+`--agent` still names a CLI program directly, and that path uses the program's own configured model.
+No stage in the kit hard-codes a vendor model id — a test greps the shipped `scripts/lib` and `bin`
+for one and requires zero hits.
 
 ## Housekeeping and output
 

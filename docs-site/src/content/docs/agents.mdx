@@ -78,9 +78,12 @@ human output or re-fetching JSON would cost.
 
 cckit shells out to whatever agent invokes it; it does not embed a model. For the few verbs that synthesize text (digests, ingest), the model endpoint is set through environment variables.
 
-Effort metadata does not choose an implementation model. `ctx:S|M|L|XL` estimates session size,
-`role:*` records responsibility, and orchestration's `--agent` flag chooses the CLI program. A
-launched Codex or Claude session uses that program's configured default model.
+Effort metadata still does not choose a model: `ctx:S|M|L|XL` estimates session size and `role:*`
+records responsibility. The model comes from an **agent profile** — `agents.profiles.<name>.model`
+in the config — which also carries the reasoning level, permission policy and extra CLI argv. An
+`agent:<profile>` label on the issue (or its parent effort) selects one; `agents.default` applies
+when nothing else does. Orchestration's `--agent` flag still names the CLI program directly, and a
+session launched that way uses that program's own configured model.
 
 ## Paste-ready agent prompt
 
