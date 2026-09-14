@@ -6,6 +6,7 @@
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 LIB="$ROOT/scripts/lib"
+SCRIPTS="$ROOT/scripts"
 fail=0
 t()  { if [ "$2" = "$3" ]; then echo "ok: $1"; else echo "FAIL: $1 -> got '[$2]' want '[$3]'"; fail=1; fi; }
 tc() { if grep -qE "$2" "$1"; then echo "ok: $3"; else echo "FAIL: $3 (no /$2/ in gh log)"; fail=1; fi; }
@@ -545,6 +546,21 @@ t "wip: the plain-task start path is not gated" \
   "$(grep -c '_eff_wip_gate\|effort_wip_rows' "$LIB/worktree-start.sh" | tr -d ' ')" "0"
 
 cd "$tmp/work" || exit 1
+
+# 15. the label `effort_plan` READS is a label `effort_new` WRITES.
+#     These drifted apart silently: effort-plan.sh queried `--label effort`, effort_new applied
+#     ctx/kind/priority/role/flow/par/slug and never `effort`, and setup-labels.sh never created
+#     it. `cckit effort plan` therefore answered "no open efforts found" for every effort ever
+#     made, in every repo, with no error anywhere. A static check because the failure mode is
+#     silence — there is nothing at runtime to notice.
+plan_label="$(sed -n 's/.*gh issue list [^|]*--label \([a-z][a-z-]*\).*/\1/p' "$LIB/effort-plan.sh" | head -1)"
+t "plan queries a label at all" "${plan_label:-MISSING}" "effort"
+t "effort_new applies the label plan queries" \
+  "$(grep -c "labels=\"$plan_label," "$LIB/effort-ops.sh" | tr -d ' ')" "1"
+t "effort_new ensures the label exists before using it" \
+  "$(grep -c "_eff_ensure_label \"$plan_label\"" "$LIB/effort-ops.sh" | tr -d ' ')" "1"
+t "setup-labels provisions the label plan queries" \
+  "$(grep -c "ensure_label \"$plan_label\"" "$SCRIPTS/setup-labels.sh" | tr -d ' ')" "1"
 
 [ "$fail" -eq 0 ] && echo "ALL OK (effort-ops)" || echo "effort-ops: FAILURES"
 exit "$fail"

@@ -51,6 +51,7 @@
 #   cckit commands [--llm]          list every verb (the command catalog)
 #   cckit lib [--llm] [--all]       list every scripts/lib helper: functions, purpose, error contract
 #   cckit brief <issue>             the delegation brief for an issue, from real state
+#   cckit receipt <issue> …        record/read one stage receipt (a worker's durable report)
 #   cckit completions [bash|zsh]    print a shell-completion script to source
 #   cckit help
 set -eu
@@ -372,6 +373,16 @@ case "$cmd" in
     # shellcheck source=/dev/null
     source "$LIB/kit-brief.sh"
     CCKIT_ROOT="$ROOT" kit_brief "$@"
+    ;;
+
+  receipt)
+    # One durable record per stage attempt (#322). The WORKER calls this itself: cckit never reads
+    # pane output, because #326 requires that pane history — off by default, and able to hold
+    # secrets — is never a dependency. The report arrives on stdin in the shape `cckit brief`'s
+    # receipt contract asked for, so the prompt and this parser cannot drift apart.
+    # shellcheck source=/dev/null
+    source "$LIB/stage-receipt.sh"
+    sr_cli "$@"
     ;;
   completions)
     case "${1:-bash}" in

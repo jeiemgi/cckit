@@ -102,6 +102,7 @@ Every operation an unattended run needs is reachable through the one CLI:
 | `--dry-run` | resolve + print the launch plan; create no worktrees, start nothing |
 | `--cap <N>` | concurrency cap (default 4); flows past the cap are queued + reported |
 | `--agent <cmd>` | per-pane agent command (default `claude`, or `CCKIT_AGENT=`) — drive any CLI agent |
+| `--profile <name>` | run a declared agent profile (or `CCKIT_PROFILE=`): its `kind` becomes the agent and its `args` are passed to the CLI. Unset picks the cheapest-tier profile; `--agent` overrides and skips profiles entirely. A project that declares none is unaffected |
 | `--runtime <tmux\|herdr>` | terminal owner (default `tmux`, or `CCKIT_RUNTIME=`); Herdr requires a supported agent kind such as `codex` or `claude` |
 | `--force` | launch even if an issue is `blocked_by` an OPEN issue (the gate is on by default) |
 | `--no-seed` | start the agent without an auto-prompt |
@@ -119,6 +120,15 @@ Every operation an unattended run needs is reachable through the one CLI:
 cckit shells out to whatever agent invokes it; it does not embed a model. For verbs that synthesize
 text (digests, ingest), the model endpoint is configurable via environment — see the docs site (
 [cckit.dev](https://cckit.dev).
+
+**Agent profiles** (`agents.profiles` in the config) carry a spend `tier`, a permission policy and
+extra CLI argv. **cckit never names a model** — you spell your own flags in `args`, and the
+cheapest-tier profile runs when `agents.default` is unset, so the inexpensive path is the default
+by construction. A profile also declares the `stages` it may run at and whether it may
+`write` to a branch; a profile with no `stages` is allowed nowhere, and `write` defaults to false.
+Validation refuses an undeclared profile, a missing `kind`, an unknown stage, or a dangling
+`agents.default` **before** a worktree or pane exists. See
+[Agent profiles](https://cckit.dev/config-and-permissions/#agent-profiles).
 
 ## Paste-ready agent prompt
 

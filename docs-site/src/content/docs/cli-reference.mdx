@@ -109,8 +109,9 @@ A **wave** is a set of issues with no blockers between them, so they can run at 
 
 | Verb | Purpose |
 | --- | --- |
+| `cckit receipt <issue> --stage <s>` | Record one stage receipt from stdin. `receipt list [<issue>]` and `receipt show <issue> <stage> [<attempt>]` read them back. |
 | `cckit orchestrate <a> <b> …` | Run N flows in parallel worktrees (`--dry-run` / `--cap` / `--agent` / `--runtime tmux\|herdr`). |
-| `cckit autopilot [<a> …]` | Select the passed issues, or the current unblocked set, then call `orchestrate --detach`. It accepts the same cap, agent, and runtime flags. |
+| `cckit autopilot [<a> …]` | Select the passed issues, or the current unblocked set, then call `orchestrate --detach`. It accepts the same cap, agent, profile, and runtime flags. |
 
 Both are launch verbs with no JSON result — use `--dry-run` to inspect the plan before anything starts.
 
@@ -125,16 +126,34 @@ persistence and live agent state.
 cckit orchestrate --dry-run --runtime herdr --agent codex 46 47 48
 cckit orchestrate --runtime herdr --agent codex 46 47 48
 cckit autopilot --runtime herdr --agent codex --cap 3
+
+# or run a declared profile instead of naming a CLI:
+cckit orchestrate --runtime herdr --profile cheap 46 47 48
+cckit orchestrate --profile cheap 46 47 48              # tmux is the default runtime
+cckit autopilot --profile cheap --cap 3
 ```
+
+`--profile <name>` takes the agent `kind` and the extra CLI `args` from a declared
+[agent profile](/config-and-permissions/#agent-profiles). With no `--profile` and no `--agent`, the
+cheapest-tier profile runs. `--agent` overrides both and skips profiles entirely, and a project
+that declares no profiles behaves exactly as before. The profile's `args` reach the agent on **both**
+runtimes, so the same profile selects the same model whether it runs under tmux or Herdr.
+
+The kinds Herdr accepts are read from the installed binary (`herdr agent start --help`), not from a
+list kept inside cckit — a hand-written copy drifts against the runtime, and a kind that cckit
+accepts but Herdr rejects would fail *after* the worktree was created.
 
 Herdr accepts canonical agent kinds rather than arbitrary shell commands. cckit validates the kind
 before creating worktrees. It also starts each worker with the issue's generated `cckit brief`, so
 the worker does not need to read the board, and asks for a final receipt containing only the PR or
 issue URL, gate result, and blocker.
 
-Neither efforts nor orchestration currently select a model. `ctx:S|M|L|XL` sizes session work,
-`role:*` records responsibility, and `--agent` selects the CLI. The CLI's own configured model is
-used.
+`ctx:S|M|L|XL` sizes session work and `role:*` records responsibility — neither picks a model, and
+neither does cckit. An **agent profile** declares a spend `tier`, a permission policy and the CLI
+arguments to run; any model selection is spelled by you in `args`. See
+[Agent profiles](/config-and-permissions/#agent-profiles) for the fields and the resolution order.
+`--agent` still names a CLI program directly, and that path uses the program's own configured model.
+A test greps the shipped `scripts/lib` and `bin` for any vendor model id and requires zero hits.
 
 ## Housekeeping and output
 
