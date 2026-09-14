@@ -124,6 +124,73 @@ if [ -n "${CAP_TEST_INNER:-}" ]; then
   eq "branch fix"        "$(_cap_issue_of_branch 'fix/9-roadmap')"        "9"
   eq "branch effort"     "$(_cap_issue_of_branch 'effort/123-copilot')"   "123"
   eq "branch plain"      "$(_cap_issue_of_branch 'main')"                 ""
+  # The effort sub form. The local regex needs a "-" straight after the digits and so returns
+  # nothing here; wt_issue_number is what parses it. A sub-branch PR with no issue has no review
+  # verdict to look up and would read CLEAN (#348).
+  if command -v wt_issue_number >/dev/null 2>&1; then
+    eq "branch effort sub" "$(_cap_issue_of_branch 'sub/1604a-parser')"   "1604"
+  fi
+
+  # ── the agent review gate (#348) ─────────────────────────────────────────────────────────────
+  # cap_review_summary: one token out of a receipt, the same shape cap_checks_summary has.
+  if command -v jq >/dev/null 2>&1; then
+    eq "review: gate pass"          "$(printf '{"gate":"pass"}'            | cap_review_summary)" "PASS"
+    eq "review: gate fail"          "$(printf '{"gate":"fail"}'            | cap_review_summary)" "FAIL"
+    # The detail after the dash is the useful half of a real verdict; matching the whole field
+    # would score every annotated receipt as NONE.
+    eq "review: annotated fail"     "$(printf '{"gate":"fail — the retry loop never exits"}' | cap_review_summary)" "FAIL"
+    eq "review: annotated pass"     "$(printf '{"gate":"pass — read the whole diff"}'        | cap_review_summary)" "PASS"
+    eq "review: no gate field"      "$(printf '{"outcome":"pr-open"}'      | cap_review_summary)" "NONE"
+    eq "review: empty stdin"        "$(printf ''                          | cap_review_summary)" "NONE"
+    eq "review: unknown word"       "$(printf '{"gate":"maybe"}'          | cap_review_summary)" "NONE"
+  fi
+
+  # A recorded FAIL always blocks — it is evidence, not absence of it, so no flag gates it.
+  ( KIT_CAPTAIN_REQUIRE_REVIEW=0
+    eq "review FAIL blocks even unrequired" "$(cap_classify MERGEABLE CLEAN PASS FAIL)" "REVIEW_FAILING" ) || fail=1
+  eq "REVIEW_FAILING -> fix"  "$(cap_action REVIEW_FAILING)" "fix"
+
+  # A MISSING verdict is gated on the requirement, exactly like CHECKS_MISSING.
+  ( KIT_CAPTAIN_REQUIRE_REVIEW=0
+    eq "no verdict merges when not required" "$(cap_classify MERGEABLE CLEAN PASS NONE)" "CLEAN" ) || fail=1
+  ( KIT_CAPTAIN_REQUIRE_REVIEW=1
+    eq "no verdict blocks when required"     "$(cap_classify MERGEABLE CLEAN PASS NONE)" "REVIEW_MISSING" ) || fail=1
+  eq "REVIEW_MISSING -> verify" "$(cap_action REVIEW_MISSING)" "verify"
+
+  # A passing verdict never blocks, required or not.
+  ( KIT_CAPTAIN_REQUIRE_REVIEW=1
+    eq "a passing verdict merges" "$(cap_classify MERGEABLE CLEAN PASS PASS)" "CLEAN" ) || fail=1
+
+  # Red CI outranks the review: the PR will be rewritten before the review matters.
+  ( KIT_CAPTAIN_REQUIRE_REVIEW=1
+    eq "failing checks outrank a missing review" "$(cap_classify MERGEABLE CLEAN FAIL NONE)" "CHECKS_FAILING"
+    eq "a conflict outranks a failing review"    "$(cap_classify CONFLICTING DIRTY PASS FAIL)" "CONFLICTING"
+    eq "a draft outranks a failing review"       "$(cap_classify MERGEABLE DRAFT PASS FAIL)"   "DRAFT" ) || fail=1
+
+  # Omitting the argument must not change any existing verdict — every caller predating #348 passes
+  # three arguments, and a default of anything but NONE would re-decide them.
+  eq "a 3-arg call still reads CLEAN" "$(cap_classify MERGEABLE CLEAN PASS)" "CLEAN"
+  ( KIT_CAPTAIN_REQUIRE_REVIEW=1
+    eq "a 3-arg call defaults to NONE" "$(cap_classify MERGEABLE CLEAN PASS)" "REVIEW_MISSING" ) || fail=1
+
+  # The config bridge: review.command implies the requirement; requireReview:false opts back out.
+  if command -v jq >/dev/null 2>&1; then
+    revbridge() {
+      ( KIT_CONFIG="$1"; KIT_CAPTAIN_FLOORS=; KIT_CAPTAIN_EXTRA_GLOBS=; KIT_CAPTAIN_REQUIRE_CHECKS=
+        KIT_CAPTAIN_REQUIRE_REVIEW="$2"
+        _cap_load_policy_config; printf '%s' "${KIT_CAPTAIN_REQUIRE_REVIEW:-unset}" )
+    }
+    rc1="$(mktemp)"; printf '{"review":{"command":"true"}}' > "$rc1"
+    rc2="$(mktemp)"; printf '{"review":{"command":"true"},"captain":{"mergePolicy":{"requireReview":false}}}' > "$rc2"
+    rc3="$(mktemp)"; printf '{"captain":{"mergePolicy":{"requireReview":true}}}' > "$rc3"
+    rc4="$(mktemp)"; printf '{}' > "$rc4"
+    eq "bridge: review.command implies required" "$(revbridge "$rc1" "")"  "1"
+    eq "bridge: requireReview:false opts out"    "$(revbridge "$rc2" "")"  "0"
+    eq "bridge: requireReview:true with no cmd"  "$(revbridge "$rc3" "")"  "1"
+    eq "bridge: neither is off"                  "$(revbridge "$rc4" "")"  "0"
+    eq "bridge: env 0 beats review.command"      "$(revbridge "$rc1" "0")" "0"
+    rm -f "$rc1" "$rc2" "$rc3" "$rc4"
+  fi
 
   if [ "$fail" -eq 0 ]; then echo "PASS($CAP_TEST_INNER): captain gate policy"; fi
   exit "$fail"
