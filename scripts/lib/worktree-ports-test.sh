@@ -98,10 +98,25 @@ rows_after="$(grep -c . "$slots/kit-portslots.tsv" 2>/dev/null || echo 0)"
 # ledger was added to prevent, reappearing only under contention.
 P="$TMP/race"; mk_project "$P" scaffold
 RACE_NUMS="101 102 103 104 105 106 107 108"
+RACE_N=8
+
+# START BARRIER. Backgrounding eight jobs does not make them contend: the first can finish its whole
+# allocation before the eighth is forked, and a sequential run passes under any implementation. Each
+# worker registers, then blocks until all eight have registered, so they enter allocation together
+# and an unlocked implementation is actually exercised. Appending one short line is atomic (well
+# under PIPE_BUF), and the wait is bounded so a lost worker times out instead of hanging the suite.
+barrier="$P/.barrier"; : > "$barrier"
 pids=""
 for num in $RACE_NUMS; do
   W="$P/wt$num"; mk_worktree "$W"
-  ( wt_assign_ports "$W" "$num" "$P" >/dev/null 2>&1 ) &
+  (
+    echo ready >> "$barrier"
+    waited=0
+    while [ "$(grep -c . "$barrier" 2>/dev/null || echo 0)" -lt "$RACE_N" ] && [ "$waited" -lt 50 ]; do
+      sleep 0.1; waited=$(( waited + 1 ))
+    done
+    wt_assign_ports "$W" "$num" "$P" >/dev/null 2>&1
+  ) &
   pids="$pids $!"
 done
 for pid in $pids; do wait "$pid"; done
