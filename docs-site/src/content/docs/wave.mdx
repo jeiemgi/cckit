@@ -73,6 +73,31 @@ Code's own tools — Task subagents, worktrees, background runs — instead of a
 can't see.
 </Aside>
 
+## One writer per branch
+
+Git refuses to check one branch out in two worktrees. That is a narrower guarantee than it sounds:
+it says nothing about two agent processes driving the branch cckit just handed them — a second wave
+launched onto a branch a live worker is still pushing, or a re-run of `orchestrate` over an issue
+whose pane is already open.
+
+So `orchestrate` takes a **lease** on every branch in the wave before it starts a single pane. A
+branch already owned by a live writer refuses the launch, and every lease the wave took is released
+— a half-launched wave is worse than none.
+
+```text
+orchestrate: #323 — another writer already owns effort/318-agents-run-by-profile-in-herdr;
+             not launching this wave
+```
+
+The ledger lives with the rest of cckit's local state, so every worktree of the repo reads the same
+one. A lease is dropped only on **positive evidence** the holder is gone: its worktree no longer
+exists, or the process died on the host that recorded it. A lease written on another machine is
+never reclaimed on a process check — process ids are not comparable across hosts, and stealing a
+live remote worker's branch is the corruption the lease exists to prevent. It expires on age
+instead, after `BO_LEASE_TTL` (default 24 hours), so a decommissioned host cannot wedge a branch
+permanently either.
+
+
 ## The commands
 
 | Do this | Command |

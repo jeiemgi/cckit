@@ -195,6 +195,34 @@ for num in "${LAUNCH[@]}"; do
   ENTRIES+=("$entry")
 done
 
+# ── one writer per branch (#323) ────────────────────────────────────────────────────────────────
+# wt_start hands back the branch each flow will push. A second wave launched onto a branch a live
+# worker is already writing is the corruption rules/branch-naming.md describes, and git does not
+# catch it: git refuses one branch in two WORKTREES, which says nothing about two agent processes
+# driving the branch cckit just handed them. Claim the lease before a single pane starts, and
+# release every claim if any one of them is contested — a half-launched wave is worse than none.
+# shellcheck source=/dev/null
+source "$ROOT/scripts/lib/branch-owner.sh"
+BO_OWNER="orchestrate:$SESSION:$$"
+CLAIMED=()
+_bo_release_all() {
+  local c
+  for c in ${CLAIMED+"${CLAIMED[@]}"}; do bo_release "$c" "$BO_OWNER" >/dev/null 2>&1 || true; done
+}
+for entry in "${ENTRIES[@]}"; do
+  rest="${entry#*|}"; branch="${rest%%|*}"; num="${rest##*|}"
+  # Empty pid: orchestrate exits while the panes keep writing, so the lease must not be tied to
+  # this process. The worktree is the liveness signal (branch-owner.sh explains the argument).
+  if ! bo_claim "$branch" "$BO_OWNER" "${entry%%|*}" ""; then
+    echo "orchestrate: #$num — another writer already owns $branch; not launching this wave" >&2
+    _bo_release_all
+    exit 1
+  fi
+  CLAIMED+=("$branch")
+done
+# The lease outlives this process on purpose: the pane keeps writing after orchestrate returns, and
+# the ledger reclaims it on positive evidence (the worktree is gone, or the pid died on this host).
+
 if [ "$RUNTIME" = "herdr" ]; then
   or_herdr_launch "$SESSION" "$AGENT" "$SEED" "$DETACH" "${KIT_PROJECT_SLUG:-project}" "$AGENT_ARGS_NL" "${ENTRIES[@]}"
   exit $?

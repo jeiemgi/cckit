@@ -399,6 +399,26 @@ cckit receipt list 321          # 321  build   1  blocked
 cckit receipt show 321 build    # the latest attempt's JSON
 ```
 
+**Every receipt is also posted as a comment on its issue.** `.cckit/` is gitignored and
+per-machine, so a receipt that lived only there dies with the clone — and `effort-model.md` opens
+with "GitHub is the single source of truth". The local file stays: it is what lets `receipt list`
+and `receipt show` answer offline, with no network round trip per read. The comment is the second
+copy, not a relocation.
+
+The comment carries an invisible marker keyed to the same `<issue>-<stage>-<attempt>`, so a re-run
+**edits that attempt's comment** rather than appending a second one — the same guarantee the local
+file gives. A new attempt gets its own comment.
+
+```bash
+cckit receipt 321 --stage build --no-remote <<'RECEIPT'   # write the file, post nothing
+```
+
+The mirror is best-effort, and the local write has already succeeded before it runs: a failure
+warns on stderr and the command still exits 0. `--no-remote`, or `CCKIT_RECEIPT_REMOTE=0`, skips it
+outright. One case deliberately does *nothing* rather than degrade — if the comment lookup itself
+fails, cckit does not post, because a blind post is exactly how a duplicate record appears.
+
+
 Alongside the five reported fields, each receipt records the resolved `profile`, its `tier`, where
 it was resolved from, and its `permissions` — so a run's effective agent and policy are auditable
 after the fact.
