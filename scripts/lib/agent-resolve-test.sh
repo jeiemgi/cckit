@@ -103,6 +103,54 @@ rc "a dangling default refuses rather than resolving nothing" "$?" "2"
 # ── the impure helper degrades instead of dying ────────────────────────────────────────────────
 t "labels_fetch with no args is empty" "$(ap_labels_fetch)" ""
 t "labels_fetch with no issue is empty" "$(ap_labels_fetch 'o/r')" ""
+t "issue_title with no args is empty" "$(ap_issue_title)" ""
+t "issue_title with no issue is empty" "$(ap_issue_title 'o/r')" ""
+t "pr_issue with no args is empty" "$(ap_pr_issue)" ""
+t "pr_issue with no pr is empty" "$(ap_pr_issue 'o/r')" ""
+
+# ── resolving for a pull request (#345) ────────────────────────────────────────────────────────
+# The three fetchers are shadowed, so this exercises the REAL ap_pr_context / ap_resolve_pr
+# composition — the field packing and the precedence hand-off — without gh or a network.
+FX_BRANCH="" FX_TITLE="" FX_LABELS_345="" FX_LABELS_PARENT=""
+ap_pr_issue()    { [ -n "$FX_BRANCH" ] && wt_issue_number "$FX_BRANCH"; return 0; }
+ap_issue_title() { printf '%s' "$FX_TITLE"; }
+ap_labels_fetch() {
+  case "${2:-}" in
+    345) printf '%s' "$FX_LABELS_345" ;;
+    344) printf '%s' "$FX_LABELS_PARENT" ;;
+  esac
+  return 0
+}
+
+# A sub-branch PR: the issue, its labels, and the parent effort's labels all land in one row.
+FX_BRANCH="sub/345a-resolve" FX_TITLE="[Effort 344] 1 · resolve the review profile"
+FX_LABELS_345="ctx:S,agent:review" FX_LABELS_PARENT="flow:core,agent:both"
+t "pr_context packs issue + own labels + parent labels" \
+  "$(ap_pr_context 'o/r' 9 | tr '\t' '|')" "345|ctx:S,agent:review|flow:core,agent:both"
+t "the issue label wins over the parent's" "$(ap_resolve_pr "$CFG" 'o/r' 9 review)" "review"
+t "an override still outranks both labels"  "$(ap_resolve_pr "$CFG" 'o/r' 9 review both)" "both"
+
+# No agent: label on the sub, so the parent effort's label decides.
+FX_LABELS_345="ctx:S"
+t "the parent effort label is the fallback" "$(ap_resolve_pr "$CFG" 'o/r' 9 review)" "both"
+
+# Neither carries one: agents.default. It is `build`, which does NOT list the review stage —
+# so a review stage refuses rather than launching a build agent against a PR.
+FX_LABELS_PARENT="flow:core"
+ap_resolve_pr "$CFG" 'o/r' 9 review >/dev/null 2>&1
+rc "a default barred from the stage refuses" "$?" "2"
+t "the same default resolves for its own stage" "$(ap_resolve_pr "$CFG" 'o/r' 9 build)" "build"
+
+# A standalone issue has no parent, so the parent lookup is skipped, not guessed.
+FX_BRANCH="fix/345-thing" FX_TITLE="a standalone fix" FX_LABELS_345="agent:review"
+t "a standalone title yields no parent labels" \
+  "$(ap_pr_context 'o/r' 9 | tr '\t' '|')" "345|agent:review|"
+
+# An unreadable PR (or a bot branch) must not fetch labels for issue "" and must not die:
+# the row is empty and the walk falls through to agents.default.
+FX_BRANCH=""
+t "an unresolvable PR yields an empty row" "$(ap_pr_context 'o/r' 9 | tr '\t' '|')" "||"
+t "an unresolvable PR falls through to the default" "$(ap_resolve_pr "$CFG" 'o/r' 9 build)" "build"
 
 [ "$fail" -eq 0 ] && echo "agent-resolve-test: PASS" || echo "agent-resolve-test: FAILED"
 exit "$fail"

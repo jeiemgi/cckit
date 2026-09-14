@@ -9,8 +9,10 @@
 #      unconfigured project lands on the inexpensive path instead of an arbitrary one
 #
 # The walk is PURE: it takes label strings as arguments rather than fetching them, so the precedence
-# rules are testable without gh, a network, or a fixture repo. `ap_labels_fetch` is the one impure
-# helper, kept separate and thin for exactly that reason.
+# rules are testable without gh, a network, or a fixture repo. The gh-touching helpers are kept
+# separate and thin for exactly that reason: ap_labels_fetch, ap_issue_title and ap_pr_issue each
+# make one call, ap_pr_context composes the three, and every one is best-effort — a failure echoes
+# empty so the walk falls through a precedence level instead of dying.
 #
 # A resolved name is always validated against the stage before it is returned, so a caller can treat
 # a rc-0 result as launchable and never has to re-check.
@@ -22,6 +24,9 @@
 _ar_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=/dev/null
 [ -n "${AP_STAGES_DEFAULT:-}" ] || . "$_ar_dir/agent-profile.sh"
+# shellcheck source=/dev/null
+# wt_issue_number owns the branch -> issue forms, the effort sub-branch suffix included (#345).
+command -v wt_issue_number >/dev/null 2>&1 || . "$_ar_dir/worktree-issue.sh"
 
 # ap_profile_from_labels <labels> — echo the profile named by a single `agent:<name>` label.
 # Labels may be comma- or newline-separated. TWO different agent: labels is ambiguous and refused
@@ -102,4 +107,67 @@ ap_resolve_source() {
   n="$(ap_profile_from_labels "$plabels" 2>/dev/null)" && [ -n "$n" ] && { printf 'parent effort label\n'; return 0; }
   n="$(ap_default_profile "$cfg" 2>/dev/null)" && [ -n "$n" ] && { printf 'agents.default\n'; return 0; }
   return 4
+}
+
+# ── resolving for a pull request (#345) ─────────────────────────────────────────────────────────
+# A build stage resolves ONE profile for a whole run, which is why orchestrate.sh passes empty label
+# strings: it has no single issue to read them from. A review stage runs against ONE pull request,
+# so it is the first caller that CAN supply them — and the first to use ap_labels_fetch and
+# ap_parent_effort_num, both written for this walk and without a caller until now.
+#
+# The labels come from the linked ISSUE, not the PR. `agent:` is applied to issues; the PR-side
+# labels a repo applies automatically (size:, risk:) name the diff, not who should run.
+#
+# Every fetch here is best-effort by the same rule ap_labels_fetch already follows: a gh failure
+# echoes empty and the walk falls through to the next precedence level. A review stage that cannot
+# reach GitHub should land on agents.default, not die.
+
+# ap_pr_issue <repo> <pr> — the issue number a PR's head branch encodes. Empty when gh is absent,
+# the PR is unreadable, or the branch carries no issue segment (a bot branch).
+# Delegates to wt_issue_number, which also parses the effort sub form `sub/<N><letter>-<slug>`.
+# A local regex would miss those, and every sub-branch PR would resolve to no issue and no labels.
+ap_pr_issue() {
+  local repo="${1:-}" pr="${2:-}" br
+  [ -n "$repo" ] && [ -n "$pr" ] || return 0
+  command -v gh >/dev/null 2>&1 || return 0
+  br="$(gh pr view "$pr" --repo "$repo" --json headRefName --jq '.headRefName' 2>/dev/null)" || return 0
+  [ -n "$br" ] || return 0
+  wt_issue_number "$br"
+}
+
+# ap_issue_title <repo> <issue> — an issue's title, for ap_parent_effort_num. Best-effort; REST for
+# the same reason ap_labels_fetch uses it (GraphQL has a separately-exhaustible rate limit).
+ap_issue_title() {
+  local repo="${1:-}" num="${2:-}"
+  [ -n "$repo" ] && [ -n "$num" ] || return 0
+  command -v gh >/dev/null 2>&1 || return 0
+  gh api "repos/$repo/issues/$num" --jq '.title // ""' 2>/dev/null || true
+}
+
+# ap_pr_context <repo> <pr> — echo "<issue>\t<issue-labels>\t<parent-labels>", TAB-separated.
+# The issue number is carried alongside the labels because the stage that follows records its
+# receipt against that issue (sr_record takes an issue, not a PR), and re-deriving it there would
+# mean a second round of the same three fetches.
+ap_pr_context() {
+  local repo="${1:-}" pr="${2:-}" issue="" ilabels="" plabels="" title="" parent=""
+  issue="$(ap_pr_issue "$repo" "$pr")"
+  if [ -n "$issue" ]; then
+    ilabels="$(ap_labels_fetch "$repo" "$issue")"
+    title="$(ap_issue_title "$repo" "$issue")"
+    parent="$(ap_parent_effort_num "$title")"
+    [ -n "$parent" ] && plabels="$(ap_labels_fetch "$repo" "$parent")"
+  fi
+  printf '%s\t%s\t%s\n' "$issue" "$ilabels" "$plabels"
+}
+
+# ap_resolve_pr <cfg> <repo> <pr> <stage> [override] — resolve the profile for a stage that runs
+# against one pull request. The precedence walk is ap_resolve's, unchanged; the only difference
+# from a build stage is that the labels are fetched rather than left empty. rc is ap_resolve's:
+# 2 on an invalid or ambiguous selection, 4 when nothing resolves.
+ap_resolve_pr() {
+  local cfg="${1:-}" repo="${2:-}" pr="${3:-}" stage="${4:-}" override="${5:-}" ctx
+  ctx="$(ap_pr_context "$repo" "$pr")"
+  ap_resolve "$cfg" "$stage" "$override" \
+    "$(printf '%s' "$ctx" | cut -f2)" \
+    "$(printf '%s' "$ctx" | cut -f3)"
 }
