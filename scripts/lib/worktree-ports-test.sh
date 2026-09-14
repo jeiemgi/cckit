@@ -32,6 +32,10 @@ TMP="$(mktemp -d)" || exit 1
 trap 'rm -rf "$TMP"' EXIT
 fail=0; n=0
 ok()  { n=$((n+1)); }
+# `grep -c` prints 0 AND exits 1 on no match, so the familiar `grep -c … || echo 0` yields "0\n0"
+# and every arithmetic comparison against it breaks. Read the count once and default only the
+# genuinely empty case (no such file).
+lines_in() { local c; c="$(grep -c . "$1" 2>/dev/null)"; [ -n "$c" ] || c=0; printf '%s' "$c"; }
 bad() { n=$((n+1)); echo "FAIL: $1"; fail=1; }
 
 APPS="admin console api"
@@ -84,11 +88,11 @@ after="$(ports_of "$W" | tr '\n' ' ')"
 # ── 5. a freed slot is reclaimed, not leaked ──────────────────────────────────────────────────
 slots="$(git -C "$P" rev-parse --git-common-dir 2>/dev/null)"
 case "$slots" in /*) : ;; *) slots="$(cd "$P" && cd "$slots" && pwd)" ;; esac
-rows_before="$(grep -c . "$slots/kit-portslots.tsv" 2>/dev/null || echo 0)"
+rows_before="$(lines_in "$slots/kit-portslots.tsv")"
 rm -rf "$P/wt1"                       # that worktree is gone
 W="$P/wt999"; mk_worktree "$W"
 wt_assign_ports "$W" 999 "$P" >/dev/null 2>&1
-rows_after="$(grep -c . "$slots/kit-portslots.tsv" 2>/dev/null || echo 0)"
+rows_after="$(lines_in "$slots/kit-portslots.tsv")"
 [ "$rows_after" -le "$rows_before" ] && ok || bad "slot ledger grew instead of reclaiming ($rows_before -> $rows_after)"
 
 # ── 6. parallel allocation: concurrent starts never share a slot ──────────────────────────────
@@ -112,7 +116,7 @@ for num in $RACE_NUMS; do
   (
     echo ready >> "$barrier"
     waited=0
-    while [ "$(grep -c . "$barrier" 2>/dev/null || echo 0)" -lt "$RACE_N" ] && [ "$waited" -lt 50 ]; do
+    while [ "$(lines_in "$barrier")" -lt "$RACE_N" ] && [ "$waited" -lt 50 ]; do
       sleep 0.1; waited=$(( waited + 1 ))
     done
     wt_assign_ports "$W" "$num" "$P" >/dev/null 2>&1
