@@ -197,6 +197,9 @@ The parent issue **is** the plan. Strategy / roadmap narrative lives in your kno
 
 - Snapshot each sub-branch diff **before squash** (squash destroys per-sub-issue pairs) — `effort-close`
   step (a) does this automatically, to a durable dir under the shared git-common-dir.
+- `index.jsonl` is the completeness marker, not the presence of a `.diff`. The snapshot moves it
+  into place only once every record is written, and `effort-close` step (a2) refuses the squash
+  unless it is non-empty. A `.diff` on disk proves a file was created, not that the trace is whole.
 - Scrub secrets from diffs/bodies before they enter an issue or any exported record.
 - Keep client/tenant data out of the dev-workflow record (it is not your development history).
 - Outcome labels: merged-clean = positive · abandoned/reverted = negative · a manual flag for exemplars.

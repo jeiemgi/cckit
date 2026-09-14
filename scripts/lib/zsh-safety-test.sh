@@ -18,6 +18,7 @@ LIB="$ROOT/scripts/lib"
 fail=0
 ok()   { echo "ok: $1"; }
 bad()  { echo "FAIL: $1"; fail=1; }
+t()    { if [ "$2" = "$3" ]; then ok "$1"; else bad "$1 -> got '$2' want '$3'"; fi; }
 
 if ! command -v zsh >/dev/null 2>&1; then
   echo "zsh-safety-test: zsh absent — skipping (dependency-light gate)"
@@ -63,6 +64,54 @@ run_zsh "worktree-start.sh :: wt_assign_ports" \
 # kit-events.sh — the `path` local in emit_event.
 run_zsh "kit-events.sh :: emit_event" \
   "cd '$ROOT'; source scripts/lib/kit-events.sh; emit_event test op '{}' >/dev/null 2>&1"
+
+# effort.sh :: effort_snapshot_subs — the work-record collapse (#339). `for sha in $shas` relied on
+# the shell word-splitting an unquoted expansion. bash splits on IFS; zsh does not, so the loop ran
+# ONCE with every SHA as a single argument, `git rev-parse --short` failed, and the run still printed
+# "✓ snapshotted 1 commit(s)" and exited 0. This is a BEHAVIOURAL case, not a source-and-run one: a
+# collapsed snapshot returns 0, so only counting the output files catches it.
+#
+# Throwaway repo, 3 commits past the base, snapshot under zsh, then assert one .diff and one
+# index.jsonl line per commit. The trace lands under that repo's git-common-dir, so it goes with the
+# tmpdir.
+snap_tmp="$(mktemp -d)"
+(
+  cd "$snap_tmp" || exit 1
+  git init -q .
+  git config user.email t@t && git config user.name t
+  echo base > f.txt && git add f.txt && git commit -qm "base"
+  git branch -q effortbase
+  for n in 1 2 3; do
+    echo "$n" >> f.txt && git add f.txt && git commit -qm "feat: step $n [E99.$n] (#10$n)"
+  done
+) >/dev/null 2>&1
+
+# `zsh -fc`, not `-ic`: this case reads the function's STDOUT (the trace dir), and an interactive zsh
+# sources the user's rc, which can print shell-integration escapes into it. The cases above only
+# check exit codes, so they can afford `-i`; this one cannot. Word-splitting — what #339 is about —
+# does not depend on interactivity, so `-f` exercises the same behavior.
+snap_out="$(zsh -fc "cd ${snap_tmp}; source ${LIB}/effort.sh; effort_snapshot_subs 99 effortbase" 2>/dev/null)"
+if [ -z "$snap_out" ] || [ ! -d "$snap_out" ]; then
+  bad "effort.sh :: effort_snapshot_subs ran under zsh (no trace dir echoed)"
+else
+  ndiff="$(ls "$snap_out"/[0-9][0-9]-*.diff 2>/dev/null | wc -l | tr -d ' ')"
+  nidx="$(wc -l < "$snap_out/index.jsonl" 2>/dev/null | tr -d ' ')"
+  t "effort_snapshot_subs :: one .diff per commit under zsh" "$ndiff" "3"
+  t "effort_snapshot_subs :: one index.jsonl line per commit" "$nidx" "3"
+  # A `for sha in $shas` collapse names its stub `NN-` — rev-parse --short fails on the joined list.
+  if ls "$snap_out"/[0-9][0-9]-.diff >/dev/null 2>&1; then
+    bad "effort_snapshot_subs — wrote a short-sha-less NN-.diff stub (the #339 collapse)"
+  else
+    ok "effort_snapshot_subs — no short-sha-less stub"
+  fi
+  # index.jsonl must be true JSONL: one parseable record per line, no `jq -s` needed.
+  if jq -e . "$snap_out/index.jsonl" >/dev/null 2>&1; then
+    ok "effort_snapshot_subs — index.jsonl is line-parseable JSONL"
+  else
+    bad "effort_snapshot_subs — index.jsonl is not one JSON record per line"
+  fi
+fi
+rm -rf "$snap_tmp"
 
 # ── static regression guard: no bare reserved-name local reintroduced ──────────────────────────
 # Match a `local` declaration listing a bare `path` word, or a bare `g()` function definition. The
