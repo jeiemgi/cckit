@@ -213,6 +213,13 @@ cckit watch --loop         # self-pace gate/merge passes until steady state
 cckit autopilot            # select unblocked work, then call orchestrate --detach under a cap
 ```
 
+Set `review.command` in your config and the captain sends every PR it would merge to an agent
+reviewer first, records the verdict as a stage receipt, and refuses to merge on a `fail`. You name
+the command that runs the reviewer — cckit pipes it a brief on stdin and reads the report off
+stdout, so it asserts nothing about any agent's flags. A PR with **no** verdict recorded reads
+`verify`, never merges silently: absence of evidence is not a pass. Off until you configure it.
+→ [the agent review stage](https://cckit.dev/config-and-permissions/#the-agent-review-stage)
+
 ## Driven by agents
 
 cckit is meant to be operated by an agent loop, not only a human. See [`AGENTS.md`](AGENTS.md) for
