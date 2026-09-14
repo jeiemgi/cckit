@@ -1,0 +1,113 @@
+---
+title: Claude and Codex compatibility
+description: Shared behavior, current adapter gaps, and the acceptance scenarios required for both agents.
+---
+
+## Status and scope
+
+[Effort #257](https://github.com/jeiemgi/cckit/issues/257) makes ongoing Claude Code and
+Codex support a release requirement. This document defines the target and records the initial
+inventory for [#258](https://github.com/jeiemgi/cckit/issues/258). It does not certify that the
+Codex adapter is complete.
+
+Baseline inspected on 2026-09-08: cckit `0.7.1`, commit
+`b6f9fbb9195084cf53922033b8a76a5fbd57253f`. The installed executables reported
+`2.1.263 (Claude Code)` and `codex-cli 0.153.4`. These are candidate validation versions,
+not a tested minimum-version guarantee. No complete cross-runtime acceptance run has been recorded
+for this baseline. Codex desktop needs its own app/build identification in the eventual evidence.
+
+Support targets are Claude Code and Codex desktop/CLI on cckit's existing operating-system targets.
+Hosted/cloud execution is outside this effort. A runtime feature documented by its vendor is a
+candidate adapter mechanism; it becomes a supported cckit feature only after the scenario passes.
+
+## Decisions that apply to every update
+
+1. Keep GitHub, worktree, dependency, gate, and cleanup operations in the shared CLI. Both adapters
+   call the same implementation. An adapter must not duplicate an operation in a skill prompt.
+2. Keep common workflow instructions and role responsibilities in one authoritative source.
+   Generate or directly reuse them in both adapters. Runtime-specific discovery, configuration,
+   event decoding, and worker dispatch belong to the adapters.
+3. Ship both adapters with the same cckit version. Installation selects Claude, Codex, or both.
+   An update preserves that selection and user-owned configuration. Enabling the second adapter
+   must not reset the first adapter's setup.
+4. Run the same behavioral scenarios against both adapters for every candidate release. Shared
+   behavior changes require evidence from both runtimes. Missing credentials, runtime binaries,
+   or live-test evidence are missing coverage, never a passing result.
+5. Publish runtime limitations and the supported equivalent workflow. Do not silently replace a
+   guard with advice or describe a prompt-only limit as enforced.
+
+Common behavior means the same observable outcome. It does not require identical slash-command
+syntax, transcript formats, tool names, or user interfaces.
+
+## Initial capability inventory
+
+“Implemented” below means the source contains the mechanic. It does not mean it passed a live
+agent run. “Unverified” requires evidence before a support claim. Paths are relative to the repo.
+
+| Capability | Shared or Claude implementation | Codex baseline and required work | Acceptance |
+| --- | --- | --- | --- |
+| Project and board discovery | `bin/cckit`, `scripts/task-sync.sh`, `scripts/lib/config-path.sh`, `AGENTS.md` | Shared CLI is callable; fresh-session automatic discovery is unverified. Preserve TOON for agent reads and explicit data formats for shell consumers. | A02, A03 |
+| Issue and effort lifecycle | `scripts/lib/worktree-start.sh`, `scripts/lib/effort-ops.sh`, `scripts/lib/kit-task-ops.sh` | Reuse existing operations. Preserve the effort exception: sequential subs share the effort branch and one effort PR. | A03 |
+| Skills and project rules | `skills/`, `commands/`, `templates/rules/`, `templates/skills/` | Claude paths and plugin variables occur in instructions. Add Codex discovery without copying common instructions into separately maintained files. | A02 |
+| Install and upgrade | `scripts/init.sh`, `profiles/`, `templates/settings/` | Installer targets Claude configuration. Add explicit adapter selection and managed-file ownership for either or both agents. Local hand-written Codex files are not distribution evidence. | A01 |
+| Specialist agents | `templates/agents/` contains Claude tool names and skill references | Translate runtime definitions while sharing role responsibilities. Verify referenced skills actually exist. | A06 |
+| Startup and command guards | `templates/hooks/`, including base-branch and pre-push guards | Port registration and verify event inputs, command working directories, and blocking semantics. Shell hooks are fast feedback, not complete enforcement of all Git actions. | A04 |
+| Session mail | `scripts/lib/kit-msg.sh`, `templates/hooks/kit-mail-check.sh.tmpl` | Mailbox logic is shared. Verify runtime delivery and stop continuation; test combined installs for duplicate delivery. | A05 |
+| Handoff and resume | `scripts/lib/handoff.sh`, bare `cckit` | Reuse durable handoff; confirm the next session reads it in the correct worktree/project. | A05 |
+| Optional memory | `templates/hooks/mempal_save.sh.tmpl`, `mempal_precompact.sh.tmpl` mine Claude transcript paths | A renamed hook cannot ingest Codex transcripts. Validate a compatible input format or report automatic ingestion unavailable; explicit supported memory-tool calls remain a separate capability. | A09 |
+| Waves and captain | `scripts/lib/copilot.sh`, `scripts/orchestrate.sh`, captain helpers | Wave prose names Claude Task isolation and `/loop`. Emit shared work data and dispatch through each runtime. cckit must create the worker worktrees before dispatch. | A06, A07 |
+| Unattended launch | `scripts/autopilot.sh` forwards to tmux orchestration | `--agent codex` only changes the executable. Add non-interactive execution, terminal states, restart handling, and bounded progress checks. | A07 |
+| Budgets and accounting | `skills/kit-autopilot/SKILL.md` promises caps; `scripts/lib/effort-metrics.sh` contains Claude pricing assumptions | The CLI does not accept the skill's objective budget flags at this baseline. Enforce supported limits in code; identify provider/model/source for usage and cost, using unknown rather than invented cost. | A07, A09 |
+| Optional annotations | `skills/kit-annotate/SKILL.md`, `templates/rules/react-annotate.md` explicitly scope their instructions to Claude | Verify the annotation tool's Codex connection and feedback loop or document the limitation. Do not claim a shared MCP protocol alone proves the workflow. | A09 |
+| Optional routines | `scripts/kit-routines.sh`, `routines/catalogue.json` use OS cron and Claude-layout config paths | Preserve explicit opt-in and one scheduled job per project/routine in a combined install. Resolve the actual project config; do not create duplicate desktop and cron schedules. | A09 |
+| Packaging and releases | `package.json`, `.claude-plugin/plugin.json`, `release-please-config.json`, `.github/workflows/release-please.yml` | Add the Codex package to release/version checks and verify installed artifacts, not only source folders. | A01, A08 |
+
+## Acceptance scenarios
+
+Use disposable fixture repositories with the same initial issues, dependencies, configuration,
+and test commands. Compare resulting state, not the wording of model responses. Live GitHub
+writes belong to a designated test repository; fixtures must not mutate unrelated user projects.
+
+| ID | Setup and action | Required result |
+| --- | --- | --- |
+| A01 | Install the same candidate as Claude-only, Codex-only, and combined; add a user customization; upgrade; repeat the upgrade. | Both packaged adapters report the candidate version. Selected adapters remain enabled. User content survives. Repeated upgrades add no duplicate skills, hooks, agents, or schedules. An unsupported runtime receives a diagnostic. |
+| A02 | Start a fresh session in each client and request tracked work without pasting kit instructions; repeat inside a worktree. | The session discovers the applicable cckit workflow and reads state before editing. Shared policy is available to the main agent and workers. No Claude-only variable or unavailable skill is required by the Codex path. |
+| A03 | Start a fixture issue, implement a bounded change, verify it, open a PR, and retry start. Repeat for an effort with two sequential subs. | Work starts from the configured base. Task work has one reusable isolated worktree and PR. Effort subs produce one effort PR. Base checkout stays unchanged. Closed/merged status is not inferred from a successful launch. |
+| A04 | Attempt a direct base commit and a push with a failing configured check, including commands run with an explicit worktree directory. | The runtime guard blocks the prohibited action and reports its reason. An allowed worktree commit passes. Shared publication gates reject missing/failed evidence independently of whether the agent remembered a hook. Record known bypass boundaries. |
+| A05 | Save a handoff; restart; send ordinary and steer mail; interrupt delivery; trigger stop twice. | Correct project context is restored. Ordinary mail does not trap a finished session. Steer mail continues work at most as intended, with no infinite stop loop. Interrupted delivery follows the mailbox's documented at-least-once behavior. Combined hooks do not silently lose mail. |
+| A06 | Run two file-disjoint fixture tasks and one dependent task under a cap; fail one worker. | Each writer has its own cckit worktree. The dependency stays blocked. Worker success, failure, and interruption are distinct results. The cap holds and no shared checkout is mutated by concurrent writers. |
+| A07 | Run a bounded objective; force a failing check, no-progress round, process interruption, and configured limit. Resume the interrupted run. | Stop conditions are evaluated by code. Report the exact reason and durable resume state. A restart does not duplicate PRs. Merges occur only under the approved execution policy with fresh successful gate evidence; a launch or prompt alone cannot authorize a merge. |
+| A08 | Remove an adapter artifact, change only one adapter's shared behavior, or omit required runtime evidence from a release candidate. | Release verification fails and identifies the missing artifact, mismatch, or evidence. A clean candidate publishes both adapters under one version. Tests use the artifact intended for distribution. |
+| A09 | Enable each optional integration separately, then repeat with its dependency absent; inspect usage accounting. | Document which integrations passed per runtime. Disabled integrations are inert. Enabled unavailable integrations report their limitation. Memory reads the correct transcript format, schedules are not duplicated, and unknown usage/cost stays unknown. |
+
+Each result records the candidate commit and package version, runtime/client version, operating
+system, scenario ID, command or prompt, expected state, observed state, exit status where applicable,
+and evidence location. Record Claude, Codex CLI, and Codex desktop separately. A shell fixture can
+prove data handling; it cannot stand in for live skill discovery or a trusted hook event.
+
+The evidence schema and release gate are delivered by #265. Until then, this table specifies the
+checks to implement; it is not a list of passing tests.
+
+## Known prerequisites and ownership
+
+- #259 repairs autopilot's board parsing: `task-sync.sh --llm` emits TOON with flattened labels,
+  while `autopilot.sh` feeds it to `jq` expecting a JSON array and array labels. The initial dry run
+  printed parse errors and then “nothing open to drive.” Verify again on the implementation commit.
+- #260 owns installer, shared instructions, packaging, and upgrades. Check the release artifact's
+  file list as well as the generated project tree.
+- #261 owns the live issue lifecycle; #262 owns hooks and mail; #263 owns specialist/wave dispatch;
+  #264 owns unattended execution and truthful accounting; #265 owns release enforcement and docs.
+- Existing #228 gate-evidence work must be incorporated or verified before unattended merge support
+  is released. The adapter must not weaken that gate. Related #220 and #231 work should be read
+  at its current state before duplicating helpers or rules.
+
+## Runtime references
+
+Codex documents local [skill discovery](https://learn.chatgpt.com/docs/build-skills),
+[custom agents](https://learn.chatgpt.com/docs/agent-configuration/subagents), and
+[lifecycle hooks](https://learn.chatgpt.com/docs/hooks). Its hook sources include project
+`.codex/hooks.json`; non-managed hooks require trust. These are candidate building blocks,
+not proof that cckit's existing scripts work unchanged.
+
+Compare event behavior with the [Claude Code hook reference](https://code.claude.com/docs/en/hooks).
+Keep the lifecycle requirements shared while translating each runtime's configuration and events.
