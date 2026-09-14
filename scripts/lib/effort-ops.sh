@@ -805,10 +805,11 @@ effort_close() {
   # issue + record state are owned by this ONE op (effort-model.md) — never a separate "mark done".
   _eo_source_board
   local sub
-  for sub in $(gh api "repos/$repo/issues/$num/sub_issues" --jq '.[].number' 2>/dev/null); do
+  while IFS= read -r sub; do
+    [ -n "$sub" ] || continue
     gh issue close "$sub" --repo "$repo" --reason completed >/dev/null 2>&1 && echo "  ✓ closed sub #$sub" >&2
     _eo_board_done "$sub"
-  done
+  done < <(gh api "repos/$repo/issues/$num/sub_issues" --jq '.[].number' 2>/dev/null)
   gh issue close "$num" --repo "$repo" --reason completed >/dev/null 2>&1 && echo "  ✓ closed effort #$num" >&2
   _eo_board_done "$num"
 
