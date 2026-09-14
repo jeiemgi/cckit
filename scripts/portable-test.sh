@@ -91,11 +91,29 @@ yes "gc resolves the invoking repo" "$(cat "$GH_REPO_LOG")" "$FIX_REPO"
 no  "brief never resolves cckit's own repo from a foreign checkout" "$(cat "$GH_REPO_LOG")" "$OWN_REPO"
 yes "brief resolves the invoking repo"                              "$(cat "$GH_REPO_LOG")" "$FIX_REPO"
 
+# `receipt` makes no gh call, so the --repo log cannot judge it — but it WRITES, and writing into
+# cckit's own .cckit/ from someone else's checkout is the same leak in a different resource. The
+# state dir is derived from --git-common-dir, so a foreign repo must get its own.
+if command -v jq >/dev/null 2>&1; then
+  ( cd "$fix" && PATH="$stub:$PATH" "$CCKIT" receipt 1 --stage build >/dev/null 2>&1 <<'EOF'
+outcome: pr-open
+url: https://example/1
+gate: pass
+blocker: none
+next stage: review
+EOF
+  )
+  yes "receipt writes into the INVOKING repo's state dir" \
+    "$([ -f "$fix/.cckit/receipts/1-build-1.json" ] && echo yes || echo no)" "yes"
+  no  "receipt leaves nothing in cckit's own state dir" \
+    "$(ls "$ROOT/.cckit/receipts" 2>/dev/null | grep -c '^1-build-1\.json$' || true)" "1"
+fi
+
 # ── BY CONSTRUCTION: every verb in `cckit commands` is classified (exercised or explicitly skipped) ─
 # A new verb that is neither exercised nor listed here fails the harness — forcing a coverage
 # decision. SKIP holds verbs that mutate, need args, read stdin, are interactive, or act on the
 # install itself (not the invoking project's board) — deliberately not driven here.
-SKIP="adopt autopilot bench brief close commands completions contribute copilot debug digest effort encode-context handoff help init install migrate msg orchestrate pr release render resume start ui update version watch"
+SKIP="adopt autopilot bench brief close commands completions contribute copilot debug digest effort encode-context handoff help init install migrate msg orchestrate pr receipt release render resume start ui update version watch"
 classified() { case " $EXERCISE $SKIP " in *" $1 "*) return 0 ;; *) return 1 ;; esac; }
 for v in $("$CCKIT" commands); do
   classified "$v" || { echo "FAIL: verb '$v' is unclassified — add it to EXERCISE (read-only, assert no own-repo leak) or SKIP in portable-test.sh"; fail=1; }

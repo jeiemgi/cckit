@@ -335,6 +335,60 @@ can parse, and the receipt is the only durable record of the run.
 
 The board and prior conversations are never included, at any budget — including unbounded.
 
+### Stage receipts
+
+A worker's pane is not a record. It dies with the pane, it does not survive a Herdr server restart,
+and nothing can query it — and pane history, which might preserve it, is off by default and can
+hold secrets, so cckit must never depend on it.
+
+So the worker records its own receipt, through a verb:
+
+```bash
+cckit receipt 321 --stage build <<'RECEIPT'
+outcome:    pr-open
+url:        https://github.com/jeiemgi/cckit/pull/999
+gate:       pass
+blocker:    none
+next stage: review
+RECEIPT
+```
+
+One JSON file per attempt, under `.cckit/receipts/`, keyed `<issue>-<stage>-<attempt>`. The
+directory resolves from the repo's shared git dir, so a receipt a worker writes inside its own
+isolation worktree is readable by a captain standing anywhere else.
+
+```bash
+cckit receipt list 321          # 321  build   1  blocked
+                                # 321  build   2  pr-open
+                                # 321  review  1  merged
+cckit receipt show 321 build    # the latest attempt's JSON
+```
+
+Alongside the five reported fields, each receipt records the resolved `profile`, its `tier`, where
+it was resolved from, and its `permissions` — so a run's effective agent and policy are auditable
+after the fact.
+
+**Re-running the verb with the same five values rewrites its own attempt** instead of recording a
+second one, which is what makes it safe to retry after an unknown result. A re-run that says
+something *different* is a real second try and takes the next number, so neither record is lost.
+
+**A value outside its vocabulary is recorded and flagged, not refused.** Refusing would make two
+states look identical:
+
+| What happened | Refuse | Record + flag |
+| --- | --- | --- |
+| Agent crashed | no receipt | no receipt |
+| Agent finished, wrote `outcome: shipped` | *no receipt* | `outcome: shipped` · `invalid: ["outcome"]` |
+
+The first needs the stage re-run; the second has a PR sitting there and just used a word outside
+the list. Keeping the value preserves the difference, and `receipt list` shows the flag so a wave
+scan cannot miss it. The one hard refusal is a report with **no `outcome:` line at all** — that is
+not an odd receipt, it is no receipt.
+
+Nothing is verified against GitHub. The receipt says what the worker reported; the captain already
+reads PR state before it merges anything, so checking here would ask GitHub the same question twice
+and would break an offline run.
+
 ## Identity
 
 cckit asks your name on first run and stores it in `.cckit/identity` (gitignored). Nothing personal is hardcoded; commits use your local git identity.

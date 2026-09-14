@@ -47,13 +47,19 @@ If no change is needed, close the issue yourself with the reason:
 
     cckit close $num "<reason>"
 
-Report ONLY this receipt — no transcript, no summary of your reasoning:
+Then RECORD your receipt — this is the only durable record of the run, and your pane is not one:
 
+    cckit receipt $num --stage <your stage> <<'RECEIPT'
     outcome:    merged | pr-open | closed-no-op | blocked
     url:        <PR or issue URL>
     gate:       pass | fail — <the failing check, if any>
     blocker:    <what stopped you, or: none>
     next stage: build | review | design | docs | none
+    RECEIPT
+
+Re-running that with the same five values is safe — it rewrites its own attempt rather than
+recording a second one. Then report the same five lines and nothing else: no transcript, no
+summary of your reasoning.
 EOF
 }
 

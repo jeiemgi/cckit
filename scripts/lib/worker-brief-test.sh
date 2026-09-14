@@ -48,6 +48,10 @@ for f in outcome url gate blocker "next stage"; do
 done
 yes "the receipt contract names the PR verb" "$rc" "cckit pr 41"
 yes "the receipt contract names the no-op close" "$rc" "cckit close 41"
+# The contract must name the verb that PERSISTS it (#322). A prompt that only asks the worker to
+# "report" leaves the record in the pane, which is what the receipt exists to replace.
+yes "the receipt contract names the recording verb" "$rc" "cckit receipt 41 --stage"
+yes "the receipt contract says a re-run is safe" "$rc" "rewrites its own attempt"
 
 # ── unbounded: everything survives ─────────────────────────────────────────────────────────────
 full="$(printf '%s\n' "$BRIEF" | wb_compose 41 task/41-x '')"
