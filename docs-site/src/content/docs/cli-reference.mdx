@@ -109,10 +109,32 @@ A **wave** is a set of issues with no blockers between them, so they can run at 
 
 | Verb | Purpose |
 | --- | --- |
-| `cckit orchestrate <a> <b> …` | Run N flows in parallel worktrees (`--dry-run` / `--cap` / `--agent`). |
-| `cckit autopilot [<a> …]` | Unattended multi-flow: drive (or auto-pick) issues under a cap. |
+| `cckit orchestrate <a> <b> …` | Run N flows in parallel worktrees (`--dry-run` / `--cap` / `--agent` / `--runtime tmux\|herdr`). |
+| `cckit autopilot [<a> …]` | Select the passed issues, or the current unblocked set, then call `orchestrate --detach`. It accepts the same cap, agent, and runtime flags. |
 
 Both are launch verbs with no JSON result — use `--dry-run` to inspect the plan before anything starts.
+
+### Tmux and Herdr
+
+Tmux is the default runtime and preserves the existing tiled session. `--runtime herdr` creates one
+Herdr workspace, then one tab and named agent for every cckit worktree. cckit still owns issue
+selection, dependencies, branches, worktrees, pull requests, and cleanup; Herdr owns terminal
+persistence and live agent state.
+
+```bash
+cckit orchestrate --dry-run --runtime herdr --agent codex 46 47 48
+cckit orchestrate --runtime herdr --agent codex 46 47 48
+cckit autopilot --runtime herdr --agent codex --cap 3
+```
+
+Herdr accepts canonical agent kinds rather than arbitrary shell commands. cckit validates the kind
+before creating worktrees. It also starts each worker with the issue's generated `cckit brief`, so
+the worker does not need to read the board, and asks for a final receipt containing only the PR or
+issue URL, gate result, and blocker.
+
+Neither efforts nor orchestration currently select a model. `ctx:S|M|L|XL` sizes session work,
+`role:*` records responsibility, and `--agent` selects the CLI. The CLI's own configured model is
+used.
 
 ## Housekeeping and output
 
@@ -189,4 +211,3 @@ cckit effort plan --llm
 ```
 
 Human (pretty) output is the default; agents should prefer `--llm`. See [Driving cckit from agents](/agents/) for the full contract.
-

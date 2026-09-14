@@ -205,11 +205,12 @@ that gate and merge themselves. This is the part that turns one keyboard into a 
 ```bash
 cckit plan                 # the wave plan: deps-ordered, p0-first inside a wave, file-disjoint
 cckit wave                 # a Task-subagent fan-out brief Claude Code enacts (proposes the next wave)
-cckit orchestrate 12 14 17 # run N flows in parallel worktrees (--dry-run / --cap / --agent)
+cckit orchestrate 12 14 17 # run N flows in parallel worktrees (tmux by default)
+cckit orchestrate --runtime herdr --agent codex 12 14 17 # persistent, state-aware agent terminals
 cckit watch --merge        # the captain: gate open PRs, squash-merge the CLEAN ones, advance
                            #   (policy floors hold PRs touching CI, lockfiles, or secrets for review)
 cckit watch --loop         # self-pace gate/merge passes until steady state
-cckit autopilot            # unattended multi-flow: drive (or auto-pick) issues under a cap
+cckit autopilot            # select unblocked work, then call orchestrate --detach under a cap
 ```
 
 ## Driven by agents
