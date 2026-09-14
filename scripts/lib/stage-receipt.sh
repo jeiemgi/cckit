@@ -27,6 +27,7 @@
 #   sr_read <issue> <stage> <attempt>       echo one receipt's JSON
 #   sr_latest <issue> <stage>               echo the most recent attempt's JSON
 #   sr_list [<issue>]                       one `issue stage attempt outcome` row per receipt
+#   sr_mirror <issue> <stage> <attempt>     upsert that receipt as a comment on the issue (#333)
 #
 # errors: mixed — the parsers are pure; sr_record returns 2 on an invalid field, 3 without jq,
 # 1 when the state directory cannot be created.
@@ -233,7 +234,7 @@ _sr_same_as_latest() {
 sr_cli() {
   # Every local gets a value: `local n stage` leaves them UNSET, not empty, and a caller running
   # under `set -u` (bin/cckit does) dies on the first reference instead of reaching the refusal.
-  local sub="${1:-}" n="" stage="" attempt="" prof="" tier="" src="" perms="" report=""
+  local sub="${1:-}" n="" stage="" attempt="" prof="" tier="" src="" perms="" report="" remote=1
   case "$sub" in
     list) shift; sr_list "${1:-}"; return $? ;;
     show)
@@ -245,12 +246,16 @@ sr_cli() {
     ''|-h|--help)
       cat >&2 <<'EOF'
 cckit receipt <issue> --stage <stage> [--attempt <n>] [--profile <p>] [--tier <t>]
-                      [--source <where>] [--permissions <policy>]   < the report on stdin
+                      [--source <where>] [--permissions <policy>] [--no-remote]
+                      < the report on stdin
 cckit receipt list [<issue>]
 cckit receipt show <issue> <stage> [<attempt>]
 
 Stages:   build review design docs none
 Outcomes: merged pr-open closed-no-op blocked
+
+The receipt is written locally AND mirrored as a comment on the issue. --no-remote (or
+CCKIT_RECEIPT_REMOTE=0) writes the file and posts nothing; a remote failure only warns.
 EOF
       return 2
       ;;
@@ -272,6 +277,7 @@ EOF
       --source=*)      src="${1#*=}"; shift ;;
       --permissions)   perms="$2"; shift 2 ;;
       --permissions=*) perms="${1#*=}"; shift ;;
+      --no-remote)     remote=0; shift ;;
       *) echo "cckit receipt: unknown arg '$1'" >&2; return 2 ;;
     esac
   done
@@ -292,5 +298,134 @@ PARSED
       attempt="$(sr_next_attempt "$n" "$stage")"
     fi
   fi
-  printf '%s\n' "$report" | sr_record "$n" "$stage" "$attempt" "$prof" "$tier" "$src" "$perms"
+  local written
+  written="$(printf '%s\n' "$report" | sr_record "$n" "$stage" "$attempt" "$prof" "$tier" "$src" "$perms")" || return $?
+  printf '%s\n' "$written"
+
+  # Mirror AFTER the local write, never instead of it (#333). sr_mirror is best-effort and always
+  # returns 0, so a network failure cannot turn a recorded receipt into a failed command.
+  if [ "$remote" -eq 1 ]; then
+    sr_mirror "$n" "$stage" "$attempt" "$written"
+  else
+    SR_MIRROR_LAST_RESULT=no-remote
+  fi
+  return 0
+}
+
+# ── the GitHub mirror (#333) ────────────────────────────────────────────────────────────────────
+# The local file is per-machine and gitignored. `effort-model.md` opens with "GitHub is the single
+# source of truth" and #326 calls receipts the durable workflow record — a record that dies with
+# the clone is neither. So every receipt is ALSO posted as a comment on its issue.
+#
+# The local store is not moved. It is what makes `cckit receipt list` and `show` answer offline,
+# with no network round trip per read; the mirror is a second copy, not a relocation.
+#
+# UPSERT on the same marker pattern as pr-evidence.sh, keyed by issue+stage+ATTEMPT — the same key
+# the local file uses. Re-running one attempt edits that attempt's comment; a genuinely new attempt
+# gets its own. Neither doubles a record, which matches what sr_path already guarantees on disk.
+#
+# BEST-EFFORT BY DESIGN. Every remote failure warns and returns 0, because the local write has
+# already succeeded by the time this runs: a receipt lost because the network blipped is worse than
+# one that is only local. `$SR_MIRROR_LAST_RESULT` names the outcome so a caller can still tell —
+# created · updated · no-gh · no-file · no-remote · lookup-failed · post-failed.
+
+SR_MIRROR_LAST_RESULT="${SR_MIRROR_LAST_RESULT:-}"
+
+# Stable across versions by contract: changing it orphans every receipt comment already posted, so
+# an older cckit's comments would be appended to instead of edited.
+SR_MARKER_PREFIX='<!-- cckit:receipt key='
+
+# _sr_marker <issue> <stage> <attempt> — the invisible identity line. GitHub renders nothing.
+_sr_marker() { printf '%s%s-%s-%s -->' "$SR_MARKER_PREFIX" "$1" "$2" "$3"; }
+
+# _sr_api_path <repo> <suffix> — an empty repo yields the {owner}/{repo} placeholders, which gh
+# fills from the current repo.
+_sr_api_path() {
+  if [ -n "$1" ]; then printf 'repos/%s/%s' "$1" "$2"; else printf 'repos/{owner}/{repo}/%s' "$2"; fi
+}
+
+# _sr_repo — the target repo, or empty to let gh resolve it.
+_sr_repo() { printf '%s' "${SR_REPO:-${KIT_REPO:-}}"; }
+
+# _sr_mirror_body <issue> <stage> <attempt> <receipt-file> — the comment, marker first.
+# Deterministic given the file, so re-posting an unchanged receipt is a genuine no-op edit rather
+# than timeline churn. The JSON goes in verbatim: the receipt IS the record, and a prose rendering
+# of it would be a second format to keep in sync with sr_record.
+_sr_mirror_body() {
+  printf '%s\n\n' "$(_sr_marker "$1" "$2" "$3")"
+  printf '**cckit receipt** — stage `%s`, attempt %s\n\n' "$2" "$3"
+  printf '```json\n'
+  cat "$4"
+  printf '```\n'
+}
+
+# _sr_mirror_list <repo> <issue> — `<id><TAB><json-escaped body>` per comment. @json keeps each
+# body on ONE line so a multi-line receipt can never be mistaken for another comment's row.
+_sr_mirror_list() {
+  gh api --paginate "$(_sr_api_path "$1" "issues/$2/comments")" --jq '.[] | "\(.id)\t\(.body | @json)"' 2>/dev/null
+}
+
+# _sr_mirror_match_id <marker> — ids of every comment carrying the marker, oldest first. Pure:
+# reads `<id><TAB><body>` on stdin, no gh. rc 1 when none match.
+_sr_mirror_match_id() {
+  local marker="$1" id rest found=1
+  while read -r id rest; do
+    case "$rest" in *"$marker"*) ;; *) continue ;; esac
+    case "$id" in ''|*[!0-9]*) continue ;; esac
+    printf '%s\n' "$id"
+    found=0
+  done
+  return "$found"
+}
+
+_sr_mirror_edit()   { gh api --method PATCH "$(_sr_api_path "$1" "issues/comments/$2")" -F "body=@$3" >/dev/null 2>&1; }
+_sr_mirror_create() {
+  if [ -n "$1" ]; then gh issue comment "$2" --repo "$1" --body-file "$3" >/dev/null 2>&1
+  else gh issue comment "$2" --body-file "$3" >/dev/null 2>&1; fi
+}
+
+_sr_mirror_warn() { SR_MIRROR_LAST_RESULT="$1"; echo "sr_mirror: $2" >&2; return 0; }
+
+# sr_mirror <issue> <stage> <attempt> [<receipt-file>] — upsert the receipt onto the issue.
+# Always rc 0 (see BEST-EFFORT above); read $SR_MIRROR_LAST_RESULT for what happened.
+sr_mirror() {
+  local n="${1:-}" stage="${2:-}" attempt="${3:-1}" file="${4:-}" repo marker ids id body rc
+  [ -n "$n" ] && [ -n "$stage" ] || { echo "sr_mirror: <issue> <stage> required" >&2; return 2; }
+  [ -n "$file" ] || file="$(sr_path "$n" "$stage" "$attempt")"
+
+  case "${CCKIT_RECEIPT_REMOTE:-1}" in
+    0|false|no|off|FALSE|NO|OFF) _sr_mirror_warn no-remote "CCKIT_RECEIPT_REMOTE is off — receipt written locally only"; return 0 ;;
+  esac
+  command -v gh >/dev/null 2>&1 || { _sr_mirror_warn no-gh "gh is not installed — receipt written locally only"; return 0; }
+  [ -f "$file" ] || { _sr_mirror_warn no-file "no receipt at $file"; return 0; }
+
+  repo="$(_sr_repo)"
+  marker="$(_sr_marker "$n" "$stage" "$attempt")"
+
+  body="$(mktemp 2>/dev/null)" || { _sr_mirror_warn post-failed "no temp file"; return 0; }
+  _sr_mirror_body "$n" "$stage" "$attempt" "$file" > "$body"
+
+  # A lookup that FAILED and a lookup that found nothing are different: posting after a failed
+  # lookup is how a duplicate comment appears. Separate the gh rc from the match rc.
+  local listing
+  listing="$(_sr_mirror_list "$repo" "$n")"; rc=$?
+  if [ "$rc" -ne 0 ]; then
+    rm -f "$body"
+    _sr_mirror_warn lookup-failed "could not read the comments on #$n — not posting (a blind post would duplicate)"
+    return 0
+  fi
+
+  ids="$(printf '%s\n' "$listing" | _sr_mirror_match_id "$marker")" || ids=""
+  if [ -n "$ids" ]; then
+    id="$(printf '%s\n' "$ids" | head -1)"
+    if _sr_mirror_edit "$repo" "$id" "$body"; then
+      rm -f "$body"; SR_MIRROR_LAST_RESULT=updated; return 0
+    fi
+    rm -f "$body"; _sr_mirror_warn post-failed "could not edit comment $id on #$n"; return 0
+  fi
+
+  if _sr_mirror_create "$repo" "$n" "$body"; then
+    rm -f "$body"; SR_MIRROR_LAST_RESULT=created; return 0
+  fi
+  rm -f "$body"; _sr_mirror_warn post-failed "could not comment on #$n"; return 0
 }

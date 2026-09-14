@@ -9,6 +9,11 @@ command -v jq >/dev/null 2>&1 || { echo "stage-receipt-test: jq absent — skipp
 
 # Every receipt lands in a scratch dir, never the real .cckit/.
 KIT_STATE_DIR="$(mktemp -d)/state"; export KIT_STATE_DIR
+
+# The GitHub mirror (#333) is ON by default, and `gh` is authenticated on a developer machine — an
+# unguarded `sr_cli` case here would post real comments to the real repo from the test suite. Off
+# for every case above; the mirror's own cases below stub `gh` and turn it back on explicitly.
+CCKIT_RECEIPT_REMOTE=0; export CCKIT_RECEIPT_REMOTE
 # shellcheck source=/dev/null
 source "$ROOT/scripts/lib/stage-receipt.sh"
 
@@ -159,6 +164,88 @@ yes "the verb help names the stages" "$(sr_cli --help 2>&1)" "build review desig
 here="$(sr_dir)"
 there="$(cd /tmp && KIT_STATE_DIR="$KIT_STATE_DIR" bash -c "source '$ROOT/scripts/lib/stage-receipt.sh'; sr_dir")"
 t "sr_dir is the same from another directory" "$there" "$here"
+
+# ── the GitHub mirror (#333) ───────────────────────────────────────────────────────────────────
+# `gh` is stubbed on PATH: it logs every invocation and serves a canned comment list, so the upsert
+# is exercised end to end with no network and no real repo touched.
+ghtmp="$(mktemp -d)"; mkdir -p "$ghtmp/bin"
+export GH_LOG="$ghtmp/gh.log"; export GH_COMMENTS="$ghtmp/comments.txt"
+: > "$GH_LOG"; : > "$GH_COMMENTS"
+cat > "$ghtmp/bin/gh" <<'SH'
+#!/usr/bin/env bash
+echo "$*" >> "$GH_LOG"
+case "$*" in
+  *"issues/"*"/comments"*) cat "$GH_COMMENTS" ;;   # the listing (--jq is applied by the real gh)
+  *) : ;;
+esac
+exit "${GH_RC:-0}"
+SH
+chmod +x "$ghtmp/bin/gh"
+OLDPATH="$PATH"; PATH="$ghtmp/bin:$PATH"; export PATH
+
+# ── pure: the marker is the identity, and it is per ATTEMPT ────────────────────────────────────
+t "the marker keys on issue, stage and attempt" \
+  "$(_sr_marker 42 build 2)" "<!-- cckit:receipt key=42-build-2 -->"
+yes "a different attempt is a different marker" "$(_sr_marker 42 build 3)" "42-build-3"
+
+# ── pure: matching finds only this receipt's own comment ───────────────────────────────────────
+listing="$(printf '%s\t%s\n%s\t%s\n' \
+  111 '"<!-- cckit:receipt key=42-build-1 --> other"' \
+  222 '"<!-- cckit:receipt key=42-build-2 --> mine"')"
+t "the matching attempt's comment id"  "$(printf '%s\n' "$listing" | _sr_mirror_match_id "$(_sr_marker 42 build 2)")" "222"
+printf '%s\n' "$listing" | _sr_mirror_match_id "$(_sr_marker 42 build 9)" >/dev/null 2>&1
+t "no match returns rc 1" "$?" "1"
+
+# The receipt the mirror cases post. Written with the mirror off so this setup step posts nothing.
+printf '%s\n' "$REPORT" | CCKIT_RECEIPT_REMOTE=0 sr_cli 42 --stage build --attempt 1 >/dev/null 2>&1
+
+# ── a first mirror CREATES ─────────────────────────────────────────────────────────────────────
+CCKIT_RECEIPT_REMOTE=1 sr_mirror 42 build 1 >/dev/null 2>&1
+t "a first mirror creates" "$SR_MIRROR_LAST_RESULT" "created"
+yes "and it commented on the issue" "$(cat "$GH_LOG")" "issue comment 42"
+
+# ── the same attempt again EDITS the one comment, it does not append a second ──────────────────
+printf '%s\t%s\n' 777 '"<!-- cckit:receipt key=42-build-1 --> already here"' > "$GH_COMMENTS"
+: > "$GH_LOG"
+CCKIT_RECEIPT_REMOTE=1 sr_mirror 42 build 1 >/dev/null 2>&1
+t "a second identical run edits" "$SR_MIRROR_LAST_RESULT" "updated"
+yes "and it PATCHed the existing comment" "$(cat "$GH_LOG")" "issues/comments/777"
+t "it did not also create one" "$(grep -c 'issue comment' "$GH_LOG" || true)" "0"
+
+# ── a FAILED lookup must not post: a blind post is how a duplicate appears ─────────────────────
+: > "$GH_LOG"
+GH_RC=1 CCKIT_RECEIPT_REMOTE=1 sr_mirror 42 build 1 >/dev/null 2>&1
+t "a failed lookup does not post" "$SR_MIRROR_LAST_RESULT" "lookup-failed"
+t "and nothing was created"       "$(grep -c 'issue comment' "$GH_LOG" || true)" "0"
+
+# ── an unreachable GitHub still leaves the local file, and exits 0 ─────────────────────────────
+GH_RC=1 CCKIT_RECEIPT_REMOTE=1 sr_mirror 42 build 1 >/dev/null 2>&1
+t "an unreachable GitHub exits 0" "$?" "0"
+t "and the local receipt is still there" "$([ -f "$(sr_path 42 build 1)" ] && echo yes)" "yes"
+
+# ── --no-remote writes the file and posts nothing ──────────────────────────────────────────────
+: > "$GH_LOG"
+out="$(printf '%s\n' "$REPORT" | CCKIT_RECEIPT_REMOTE=1 sr_cli 43 --stage build --attempt 1 --no-remote 2>/dev/null)"
+t "--no-remote still writes the receipt" "$([ -f "$out" ] && echo yes)" "yes"
+t "--no-remote posts nothing"            "$(wc -l < "$GH_LOG" | tr -d ' ')" "0"
+# SR_MIRROR_LAST_RESULT is checked on sr_mirror directly, not through sr_cli: a command
+# substitution runs in a subshell, so a variable the callee sets never reaches this shell.
+
+# ── CCKIT_RECEIPT_REMOTE=0 is the same switch, as an env var ───────────────────────────────────
+: > "$GH_LOG"
+CCKIT_RECEIPT_REMOTE=0 sr_mirror 42 build 1 >/dev/null 2>&1
+t "the env var turns the mirror off" "$SR_MIRROR_LAST_RESULT" "no-remote"
+t "and posts nothing"                "$(wc -l < "$GH_LOG" | tr -d ' ')" "0"
+
+# ── the body carries the receipt verbatim ──────────────────────────────────────────────────────
+body="$(_sr_mirror_body 42 build 1 "$(sr_path 42 build 1)")"
+yes "the body carries its marker"   "$body" "<!-- cckit:receipt key=42-build-1 -->"
+yes "the body names the stage"      "$body" 'stage `build`'
+yes "the body embeds the JSON"      "$body" '"outcome": "pr-open"'
+
+PATH="$OLDPATH"; export PATH
+rm -rf "$ghtmp"
+
 
 rm -rf "$(dirname "$KIT_STATE_DIR")"
 [ "$fail" -eq 0 ] && echo "ALL OK" || echo "stage receipt: FAILURES"
