@@ -51,3 +51,12 @@ Thumbs.db
 .idea/
 .vscode/
 *.iml
+
+# Local agent scratch — other tools' working dirs and graphify's knowledge-graph
+# export. None of it is kit state, and left untracked it reports the primary
+# checkout as dirty in every `cckit status`, which trains you to ignore that
+# signal. graphify-out/ also holds markdown, so a KIT_LINT_WALK=1 baseline seed
+# would grandfather scratch paths into review-lint's baseline.
+.agents/
+.codex/
+graphify-out/
