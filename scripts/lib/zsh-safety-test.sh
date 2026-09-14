@@ -57,6 +57,21 @@ run_zsh "kit-gc.sh :: kit_gc_analyze" \
 run_zsh "kit-gc.sh :: sibling worktree-issue.sh actually loads" \
   "cd '$ROOT'; unset -f wt_protected_reason 2>/dev/null; source scripts/lib/kit-gc.sh; _kit_gc_load_deps >/dev/null 2>&1; command -v wt_protected_reason >/dev/null 2>&1"
 
+# agent-resolve.sh / stage-receipt.sh / review-stage.sh — the same sibling-load defect as kit-gc
+# above (#346). Both E318 files resolved their lib dir from a bare `${BASH_SOURCE[0]}`, which is
+# empty under zsh: `dirname ""` is ".", so the sources missed and the walk lost ap_profile_validate
+# and kit_state_dir. Nothing sourced them under zsh until the captain did, so it never fired.
+# `unset -f` first for the same reason kit-gc's case does it — a user init that already defined the
+# symbol would pass the case without resolving anything.
+run_zsh "agent-resolve.sh :: sibling agent-profile.sh actually loads" \
+  "cd '$ROOT'; unset -f ap_profile_validate 2>/dev/null; source scripts/lib/agent-resolve.sh; command -v ap_profile_validate >/dev/null 2>&1"
+
+run_zsh "stage-receipt.sh :: sibling kit-state.sh actually loads" \
+  "cd '$ROOT'; unset -f kit_state_dir 2>/dev/null; source scripts/lib/stage-receipt.sh; command -v kit_state_dir >/dev/null 2>&1"
+
+run_zsh "review-stage.sh :: loads both of its dependencies" \
+  "cd '$ROOT'; unset -f ap_resolve_pr sr_record 2>/dev/null; source scripts/lib/review-stage.sh; command -v ap_resolve_pr >/dev/null 2>&1 && command -v sr_record >/dev/null 2>&1"
+
 # worktree-start.sh — the `path` local in wt_assign_ports (no-op without .worktree.devPorts).
 run_zsh "worktree-start.sh :: wt_assign_ports" \
   "cd '$ROOT'; source scripts/lib/worktree-start.sh; wt_assign_ports '$ROOT' 1 '$ROOT' >/dev/null 2>&1"

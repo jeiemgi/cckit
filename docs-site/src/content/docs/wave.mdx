@@ -56,6 +56,10 @@ Here's the whole shape, then the steps below walk each part:
    cckit watch --merge
    ```
 
+   If you have configured [a review stage](/config-and-permissions/#the-agent-review-stage), a PR
+   the captain would merge goes to a reviewer first and waits for its verdict — one extra turn of
+   the loop, not a separate command.
+
 4. **Advance** — merging unblocks the next wave. Re-run `cckit wave` and the loop repeats until
    there's nothing left to propose.
 
@@ -107,6 +111,7 @@ permanently either.
 | Gate + merge the wave | `cckit watch --merge` |
 | Let the captain self-pace | `cckit watch --loop` |
 | Machine-readable plan | `cckit plan --llm` |
+| Read a recorded verdict | `cckit receipt show <issue> review` |
 
 
 ## Links to learn more

@@ -92,6 +92,7 @@ a single invocation without editing the file.
 | `floors` | `true` | Refuse to auto-merge a PR that touches `.github/workflows/**`, a lockfile or dependency-graph file, or a security-sensitive path — and always honour a `hold` label. Verdict becomes `HELD`. | `KIT_CAPTAIN_FLOORS=0` |
 | `protectedGlobs` | `[]` | Extra path globs added to the floors above. | `KIT_CAPTAIN_EXTRA_GLOBS` |
 | `requireChecks` | `false` | Treat a PR with **no checks at all** as unverified rather than green. Verdict becomes `CHECKS_MISSING`, action `verify`. | `KIT_CAPTAIN_REQUIRE_CHECKS=1` |
+| `requireReview` | *(implied)* | Treat a PR with **no agent review recorded** as unverified. Verdict becomes `REVIEW_MISSING`, action `verify`. Defaults to on when `review.command` is set and off when it is not — set it explicitly to break that link either way. | `KIT_CAPTAIN_REQUIRE_REVIEW=1` |
 
 ### Why `requireChecks` exists
 
@@ -118,6 +119,109 @@ stall, harder to debug than the thing it prevents. So the default keeps existing
 instead `cckit watch` **says the assumption out loud**: any pass that would merge a PR with an empty
 rollup prints that green was assumed, not proved, and names this key. If your repo has CI, set it to
 `true` — cckit sets it on itself.
+</Aside>
+
+## The agent review stage
+
+The captain can run an agent over a pull request before it merges, and refuse to merge on what that
+agent finds. It is **off until you name the command that runs a reviewer**:
+
+```json
+{ "review": { "command": "claude -p", "timeoutSeconds": 900 } }
+```
+
+cckit pipes a brief to that command's **stdin** and reads the reviewer's report off its **stdout**.
+That report becomes a [stage receipt](#stage-receipts) at stage `review`, written locally and
+mirrored onto the issue.
+
+The command also receives the resolved profile in its environment, so it can dispatch the agent the
+issue's `agent:` label actually asked for rather than a fixed one:
+
+| Variable | What |
+| --- | --- |
+| `CCKIT_REVIEW_PROFILE` | the resolved profile name |
+| `CCKIT_REVIEW_KIND` | its `kind` (the agent executable) |
+| `CCKIT_REVIEW_ARGS` | its `args`, one per line |
+| `CCKIT_REVIEW_PR` / `CCKIT_REVIEW_ISSUE` / `CCKIT_REVIEW_REPO` | what is being reviewed |
+
+A command that ignores all of them still works.
+
+`timeoutSeconds` (default `900`) bounds the run. The captain is unattended and single-threaded, so a
+reviewer that never returns blocks the whole pass — every other PR in it included — with nobody
+watching. On expiry the process is killed and **no receipt is written**: a killed reviewer is not a
+verdict. A non-numeric or zero value falls back to the default rather than disabling the bound.
+
+<Aside type="note" title="Why you name the command and cckit does not">
+cckit has no way to start an agent without a terminal. Every launcher it has attaches to something
+a human is looking at — a Herdr pane, a tmux window — and the captain runs with neither. Running an
+agent non-interactively is [an open gap](/agent-compatibility/) tracked under effort 257.
+
+So cckit does not guess at anyone's flags. You write the command that works on your machine; cckit
+only supplies the brief and reads the answer. That also means the reviewer can be anything that
+reads stdin and writes the report format — an agent CLI, a wrapper script, a hosted service.
+</Aside>
+
+### What gets reviewed, and when
+
+A PR is dispatched to a reviewer only when the captain **would otherwise merge it**. One that
+conflicts, fails a check or is still a draft is going to change before anyone should read it, and a
+PR already stopped by a [policy floor](#captain-merge-policy) belongs to a human who does not need a
+second opinion first.
+
+After a dispatch the PR reads `verify` for the rest of that pass — **whether or not the reviewer
+succeeded**. The verdict is gated on the next pass, once it is recorded. A review that is still
+running is not a review that passed.
+
+### The reviewer never writes
+
+A review profile must not touch the branch it is reviewing. Three things hold that:
+
+- `write` defaults to `false` on every profile, and a profile with `write: true` is **refused** at
+  the review stage rather than trusted to behave.
+- `orchestrate` leases each branch to one writer, so a second writer is refused anyway.
+- The brief says READ ONLY in as many words.
+
+The first is the one that matters — the other two are downstream of a profile you already declared
+able to write.
+
+### A verdict belongs to one commit
+
+Each review receipt records the PR head it was produced from, and the gate compares it against the
+current head. Push a new commit and the previous verdict reads as **absent**, not as a pass — the
+reviewer read code that is no longer there. That applies to a `fail` too: a stale finding is not a
+finding against the new revision.
+
+That is also what makes the loop terminate. A PR with a `REVIEW_FAILING` verdict is not re-reviewed
+on its own; the author acts on the finding and pushes, which moves the head, which makes the verdict
+stale, which earns the next review.
+
+### The two verdicts
+
+| Verdict | Action | What happened |
+| --- | --- | --- |
+| `REVIEW_FAILING` | `fix` | The reviewer ran and said `gate: fail`. |
+| `REVIEW_MISSING` | `verify` | No review recorded. |
+
+`REVIEW_FAILING` always blocks. A recorded failure is **evidence**, so no configuration switch
+turns it off — if you disagree with a verdict, record a new one.
+
+`REVIEW_MISSING` is the same shape as `CHECKS_MISSING`: the **absence** of evidence, which is the
+state of every repository that has not run a reviewer yet. Requiring it unconditionally would stop
+every captain everywhere the moment you upgraded, so it blocks only when review is required.
+
+<Aside type="caution" title="Absence is not failure — and not a pass either">
+The distinction runs through both gates. Something that ran and went red is a fact you can act on.
+Nothing having run is a hole where a fact should be. cckit reports them as different verdicts
+because the fix is different: one is "go read the finding", the other is "go produce the evidence".
+
+While review is **not** required, `cckit watch` says so out loud — any pass that would merge a PR
+with no verdict prints that, names both keys that close it, and goes quiet once either is set.
+</Aside>
+
+<Aside type="tip" title="Not the same thing as review-lint">
+[Codified review gates](/review-gates/) are static linters that run inside `scripts/check.sh` —
+patterns earned from past review findings, enforced on every commit. This page's review stage is an
+**agent** reading a diff. They are complementary and neither replaces the other.
 </Aside>
 
 ## Worktree bootstrap
