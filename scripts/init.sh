@@ -594,7 +594,7 @@ if [[ $DRY_RUN -eq 1 ]]; then
     [[ -f "$KIT_ROOT/templates/skills/$s/SKILL.md" ]] && echo "    .claude/skills/$_dn/SKILL.md"
     [[ -d "$KIT_ROOT/templates/skills/$s/references" ]] && echo "    .claude/skills/$_dn/references/"
   done
-  echo "    scripts/ (kit-config.sh, gh-project.sh, kit-version-check.sh, setup-labels.sh, setup-milestones.sh, capture-project-ids.sh, task-sync.sh, knowledge-lint.sh)"
+  echo "    scripts/ (kit-config.sh, gh-project.sh, kit-version-check.sh, setup-labels.sh, setup-milestones.sh, capture-project-ids.sh, task-sync.sh, knowledge-lint.sh, review-lint.sh + review-rules.conf, skill-frontmatter-lint.sh)"
   echo "    knowledge/INDEX.md                        (knowledge-base manifest — rules/knowledge-base.md)"
   echo "    .claude/lib/kit-sigil.sh                  (claude-kit attribution sigil helper, sourced by task-* footers)"
   [[ "$MEMORY_BOOL"     == "true" ]] && echo "    .claude/hooks/mempal_session_start.sh + mempal_save.sh + mempal_precompact.sh + mempal_followup.sh   (SessionStart / Stop / PreCompact / SessionEnd)"
@@ -747,10 +747,34 @@ safe_copy "$KIT_ROOT/scripts/lib/gh-log.sh"         "$TARGET/scripts/lib/gh-log.
 safe_copy "$KIT_ROOT/scripts/lib/kit-events.sh"     "$TARGET/scripts/lib/kit-events.sh"
 safe_copy "$KIT_ROOT/scripts/lib/worktree-start.sh" "$TARGET/scripts/lib/worktree-start.sh"
 safe_copy "$KIT_ROOT/scripts/kit-version-check.sh"  "$TARGET/scripts/kit-version-check.sh" exec
-for sc in setup-labels.sh setup-milestones.sh capture-project-ids.sh task-sync.sh knowledge-lint.sh; do
+for sc in setup-labels.sh setup-milestones.sh capture-project-ids.sh task-sync.sh knowledge-lint.sh \
+          review-lint.sh skill-frontmatter-lint.sh; do
   safe_copy "$KIT_ROOT/scripts/$sc" "$TARGET/scripts/$sc" exec
 done
-echo "  + scripts/ (libs + setup + task-sync + version-check + knowledge-lint)"
+# review-lint is table-driven: the engine is useless without a rule table, so the starter table
+# travels with it. Both lints self-disable when they do not apply (no rule table / no skills dir),
+# so shipping them to every project is safe.
+safe_copy "$KIT_ROOT/scripts/review-rules.conf" "$TARGET/scripts/review-rules.conf"
+# Seed each baseline ONCE so a fresh project starts green and only *new* defects fail. Never
+# regenerate an existing baseline - that would silently re-grandfather drift on upgrade.
+#
+# ASK for the path, never reconstruct it. This used to test "$_lint-baseline.txt", which is right
+# for review-lint and wrong for skill-frontmatter-lint (it writes skill-frontmatter-baseline.txt, no
+# "-lint"). The guessed name never existed, so the "already seeded" guard never matched and every
+# upgrade re-baselined it - exactly what the line above forbids.
+#
+# KIT_LINT_WALK=1 so the seed sees the files just written. init.sh usually scaffolds into a repo
+# that already has commits, where `git ls-files` is non-empty and the untracked kit files are
+# invisible to it; the baseline would come out empty and the gate would go red on the user's first
+# commit of the scaffold.
+for _lint in review-lint skill-frontmatter-lint; do
+  [[ -f "$TARGET/scripts/$_lint.sh" ]] || continue
+  _baseline="$( cd "$TARGET" && bash "scripts/$_lint.sh" --baseline-path 2>/dev/null )"
+  [[ -n "$_baseline" ]] || continue
+  [[ -e "$TARGET/$_baseline" ]] && continue
+  ( cd "$TARGET" && KIT_LINT_WALK=1 bash "scripts/$_lint.sh" --update ) >/dev/null 2>&1 || true
+done
+echo "  + scripts/ (libs + setup + task-sync + version-check + knowledge-lint + review-lint + skill-frontmatter-lint)"
 
 # ---- benchmark harness (generic machinery; kit-owned) + example dataset ----
 # The harness measures how well THIS project's own canonical docs can be found + used by a cold

@@ -189,6 +189,7 @@ export default defineConfig({
           { label: 'Config & permissions', slug: 'config-and-permissions' },
           { label: 'Releasing', slug: 'releasing' },
           { label: 'Security & secret guard', slug: 'security' },
+          { label: 'Codified review gates', slug: 'review-gates' },
           { label: '"Built with cckit" badge', slug: 'badge' },
           { label: 'Disclaimer & trademarks', slug: 'disclaimer' },
         ]},
