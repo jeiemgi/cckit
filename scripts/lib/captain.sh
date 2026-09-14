@@ -34,6 +34,20 @@ if [ -f "$(dirname "$_cap_self")/kit-state.sh" ]; then
   # shellcheck source=kit-state.sh
   . "$(dirname "$_cap_self")/kit-state.sh"
 fi
+# The review stage (#346) is sourced here, not left to a caller: captain_pass guards on
+# `command -v rs_needs_dispatch`, so a missing source would switch the stage off silently rather
+# than fail. CAPTAIN_CFG is what rs_command reads `review.command` out of — resolved through
+# kit_config_path because two config layouts are current and neither path is safe to hard-code.
+if [ -f "$(dirname "$_cap_self")/review-stage.sh" ]; then
+  # shellcheck source=config-path.sh
+  [ -f "$(dirname "$_cap_self")/config-path.sh" ] && . "$(dirname "$_cap_self")/config-path.sh"
+  # shellcheck source=review-stage.sh
+  . "$(dirname "$_cap_self")/review-stage.sh"
+fi
+if [ -z "${CAPTAIN_CFG:-}" ] && command -v kit_config_path >/dev/null 2>&1; then
+  CAPTAIN_CFG="$(kit_config_path 2>/dev/null || true)"
+fi
+CAPTAIN_CFG="${CAPTAIN_CFG:-}"
 unset _cap_self
 if [ -z "${CAPTAIN_STATE:-}" ] && command -v kit_state_file >/dev/null 2>&1; then
   CAPTAIN_STATE="$(kit_state_file captain.state)"
@@ -293,6 +307,23 @@ captain_pass() {
     # A merge resting on an EMPTY rollup: green was assumed, never observed. Counted here and named
     # once at the end of the pass, so the assumption is on screen even with the requirement OFF.
     if [ "$action" = "merge" ] && [ "$checks" = "NONE" ]; then unproven=$((unproven + 1)); fi
+    # Review stage (#346). Dispatch runs INSIDE this pass, before the merge decision is acted on,
+    # so a PR the captain would merge gets a reviewer first. A fresh dispatch never unblocks the
+    # same pass: the receipt it writes is read by the gate on the NEXT pass, which is correct —
+    # a verdict must be recorded before it can be gated on, not assumed while the agent is running.
+    # Off unless review.command is configured; rs_dispatch echoes rc 4 and does nothing then.
+    if command -v rs_needs_dispatch >/dev/null 2>&1 && rs_enabled "$CAPTAIN_CFG"; then
+      local have=0; rs_have_receipt "$issue" && have=1
+      if rs_needs_dispatch "$action" "$have"; then
+        if rs_dispatch "$CAPTAIN_CFG" "$repo" "$pr" "$issue" >/dev/null; then
+          printf '  PR #%-4s %-14s -> reviewed (#%s %s)\n' "$pr" "$state" "$issue" "$title"
+        fi
+        # Held whether or not the reviewer succeeded. A failed dispatch leaves no receipt, and
+        # no receipt is missing evidence, not a pass — the same rule the empty-rollup advisory
+        # below states for checks.
+        action=verify
+      fi
+    fi
     if [ "$action" = "merge" ] && [ "$do_merge" = "1" ] && [ "$dry" = "0" ]; then
       if gh pr merge "$pr" --repo "$repo" --squash --delete-branch >/dev/null 2>&1; then
         printf '  PR #%-4s %-14s MERGED   (#%s %s)\n' "$pr" "$state" "$issue" "$title"

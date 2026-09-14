@@ -21,7 +21,11 @@
 # and rc 4 when nothing resolves at all. ap_labels_fetch is best-effort and echoes empty on failure.
 # shellcheck shell=bash
 
-_ar_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# BASH_SOURCE is bash-only and empty under zsh, the session shell here; `dirname ""` then yields
+# "." and the sibling source below silently missed. Same defect and same fix as kit-gc.sh:38 (#219):
+# `${BASH_SOURCE[0]:-$0}` covers zsh, CDPATH='' and the redirect stop an interactive zsh echoing the
+# directory into the substitution.
+_ar_dir="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" >/dev/null 2>&1 && pwd)"
 # shellcheck source=/dev/null
 [ -n "${AP_STAGES_DEFAULT:-}" ] || . "$_ar_dir/agent-profile.sh"
 # shellcheck source=/dev/null
