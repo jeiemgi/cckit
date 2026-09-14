@@ -16,11 +16,37 @@ or_runtime_validate() {
   esac
 }
 
-or_herdr_kind_supported() {
-  case "${1:-}" in
-    pi|claude|codex|gemini|cursor|devin|agy|cline|omp|mastracode|opencode|copilot|kimi|kiro|droid|amp|grok|hermes|kilo|qodercli|qwen|letta|maki|muse) return 0 ;;
-    *) return 1 ;;
+# The kinds Herdr can start. Read from the INSTALLED binary rather than a copy kept here: a
+# hand-written list drifts silently against the runtime, and it already had — it carried `letta`,
+# which herdr 0.9.0 does not support, so `--agent letta` passed preflight and then failed at
+# `agent start`, after the worktree existed. The fallback list is only for when herdr is absent
+# (a dry run) or its help output changes shape; it is deliberately the 0.9.0 set.
+_OR_HERDR_KINDS_FALLBACK="pi claude codex gemini cursor devin agy cline omp mastracode opencode copilot kimi kiro droid amp grok hermes kilo qodercli qwen maki muse"
+_OR_HERDR_KINDS=""
+
+or_herdr_kinds() {
+  [ -n "$_OR_HERDR_KINDS" ] && { printf '%s\n' "$_OR_HERDR_KINDS"; return 0; }
+  local live=""
+  if command -v herdr >/dev/null 2>&1; then
+    live="$(herdr agent start --help 2>&1 \
+      | tr -d '\n' \
+      | sed -n 's/.*\[possible values:\([^]]*\)\].*/\1/p' \
+      | tr -d ' ' | tr ',' ' ')"
+  fi
+  case "$live" in
+    *claude*) _OR_HERDR_KINDS="$live" ;;   # sanity: a parse that lost `claude` is a bad parse
+    *)        _OR_HERDR_KINDS="$_OR_HERDR_KINDS_FALLBACK" ;;
   esac
+  printf '%s\n' "$_OR_HERDR_KINDS"
+}
+
+or_herdr_kind_supported() {
+  local want="${1:-}" k
+  [ -n "$want" ] || return 1
+  for k in $(or_herdr_kinds); do
+    [ "$k" = "$want" ] && return 0
+  done
+  return 1
 }
 
 or_runtime_preflight() {
@@ -29,7 +55,7 @@ or_runtime_preflight() {
 
   if [ "$runtime" = "herdr" ] && ! or_herdr_kind_supported "$agent"; then
     echo "orchestrate: Herdr needs a supported agent kind, not '$agent'" >&2
-    echo "             use --agent codex, --agent claude, or another kind listed by 'herdr agent start --help'" >&2
+    echo "             supported here: $(or_herdr_kinds)" >&2
     return 2
   fi
 
@@ -59,10 +85,22 @@ or_herdr_agent_name() {
   printf '%.*s-%s' "$room" "$base" "$issue"
 }
 
+# or_herdr_launch <session> <kind> <seed?> <detach?> <project> <agent-args-nl> <entry>...
+#
+# <agent-args-nl> is the profile's extra CLI argv, ONE PER LINE (empty for none). They are handed to
+# `herdr agent start ... -- <args>`, which is Herdr's documented passthrough to the agent process.
+# One-per-line, then rebuilt into an array, so an argument containing spaces stays one argument —
+# a flat string would be re-split by the shell and silently change what the agent was asked to do.
 or_herdr_launch() {
-  local session="$1" agent="$2" seed_enabled="$3" detach="$4" project="$5"
-  shift 5
+  local session="$1" agent="$2" seed_enabled="$3" detach="$4" project="$5" args_nl="${6:-}"
+  shift 6
   local entries=("$@") first entry wt rest branch num created workspace pane tab name seed
+  local aargs=() _a
+  if [ -n "$args_nl" ]; then
+    while IFS= read -r _a; do [ -n "$_a" ] && aargs+=("$_a"); done <<EOF
+$args_nl
+EOF
+  fi
 
   first=1
   workspace=""
@@ -87,7 +125,11 @@ or_herdr_launch() {
     fi
 
     name="$(or_herdr_agent_name "$project" "$num")"
-    herdr agent start "$name" --kind "$agent" --pane "$pane" >/dev/null || return $?
+    if [ "${#aargs[@]}" -gt 0 ]; then
+      herdr agent start "$name" --kind "$agent" --pane "$pane" -- "${aargs[@]}" >/dev/null || return $?
+    else
+      herdr agent start "$name" --kind "$agent" --pane "$pane" >/dev/null || return $?
+    fi
     if [ "$seed_enabled" -eq 1 ]; then
       seed="$(seed_for "$num" "$branch" "$wt")"
       herdr agent prompt "$name" "$seed" >/dev/null || return $?

@@ -8,7 +8,8 @@
 #
 # Agent-agnostic: the per-pane command defaults to `claude` but is overridable, so cckit drives any
 # CLI agent that takes a prompt as its first argument.
-#   --agent <cmd> / CCKIT_AGENT=<cmd>
+#   --agent <cmd> / CCKIT_AGENT=<cmd>        the CLI directly (profile-free path)
+#   --profile <name> / CCKIT_PROFILE=<name>  a declared agent profile: its kind + its argv
 #   --runtime <tmux|herdr> / CCKIT_RUNTIME=<runtime>
 #
 # Hardening:
@@ -37,6 +38,9 @@ DETACH=0
 CAP=4
 AGENT="${CCKIT_AGENT:-claude}"
 RUNTIME="${CCKIT_RUNTIME:-tmux}"
+PROFILE="${CCKIT_PROFILE:-}"
+AGENT_ARGS_NL=""
+AGENT_EXPLICIT=0
 ISSUES=()
 
 usage() { sed -n '2,28p' "$0" | sed 's/^# \{0,1\}//'; }
@@ -49,8 +53,10 @@ while [ "$#" -gt 0 ]; do
     --detach)    DETACH=1; shift ;;
     --cap)       CAP="$2"; shift 2 ;;
     --cap=*)     CAP="${1#*=}"; shift ;;
-    --agent)     AGENT="$2"; shift 2 ;;
-    --agent=*)   AGENT="${1#*=}"; shift ;;
+    --agent)     AGENT="$2"; AGENT_EXPLICIT=1; shift 2 ;;
+    --agent=*)   AGENT="${1#*=}"; AGENT_EXPLICIT=1; shift ;;
+    --profile)   PROFILE="$2"; shift 2 ;;
+    --profile=*) PROFILE="${1#*=}"; shift ;;
     --runtime)   RUNTIME="$2"; shift 2 ;;
     --runtime=*) RUNTIME="${1#*=}"; shift ;;
     --session=*) SESSION="${1#*=}"; shift ;;
@@ -68,6 +74,45 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"   # cckit INSTALL root — for sourcing libs (works on brew/npm installs)
 # shellcheck source=/dev/null
 source "$ROOT/scripts/lib/orchestration-runtime.sh"
+
+# Agent profiles (#320). A profile supplies the agent KIND and its extra argv; cckit never names a
+# model, so whatever model flag the project wants lives in the profile's `args`. Resolution runs
+# BEFORE the preflight so an unknown or stage-barred profile is refused with everything else — no
+# worktree, no pane. `--agent` remains the direct, profile-free path and wins when given.
+if [ "$AGENT_EXPLICIT" -eq 0 ]; then
+  # shellcheck source=/dev/null
+  source "$ROOT/scripts/lib/config-path.sh" 2>/dev/null || true
+  # shellcheck source=/dev/null
+  source "$ROOT/scripts/lib/agent-resolve.sh" 2>/dev/null || true
+  _oc_cfg=""
+  command -v kit_config_path >/dev/null 2>&1 && _oc_cfg="$(kit_config_path 2>/dev/null || true)"
+  if [ -n "$_oc_cfg" ] && [ -f "$_oc_cfg" ] && command -v ap_resolve >/dev/null 2>&1; then
+    # No issue labels here: this is the run-wide profile. Per-issue `agent:` labels select a
+    # profile per entry, which the launch loop cannot express yet (it takes one kind for the run).
+    # rc 2 is a REFUSAL (unknown profile, barred stage) and must stop before any worktree. rc 4 is
+    # "this project declares no profiles", which is the normal state of every project that has not
+    # opted in — it falls through to --agent's default rather than breaking plain orchestration.
+    _oc_rc=0
+    _oc_prof="$(ap_resolve "$_oc_cfg" build "$PROFILE" '' '')" || _oc_rc=$?
+    case "$_oc_rc" in
+      0) : ;;
+      4) if [ -n "$PROFILE" ]; then
+           echo "orchestrate: --profile '$PROFILE' given but no agent profiles are declared" >&2; exit 2
+         fi
+         _oc_prof="" ;;
+      *) exit "$_oc_rc" ;;
+    esac
+    if [ -n "$_oc_prof" ]; then
+      AGENT="$(ap_profile_field "$_oc_cfg" "$_oc_prof" kind)"
+      AGENT_ARGS_NL="$(ap_profile_args "$_oc_cfg" "$_oc_prof")"
+      echo "orchestrate: profile '$_oc_prof' (tier $(ap_profile_tier "$_oc_cfg" "$_oc_prof"), kind $AGENT)"
+    fi
+  elif [ -n "$PROFILE" ]; then
+    echo "orchestrate: --profile '$PROFILE' given but no kit config declares agents.profiles" >&2
+    exit 2
+  fi
+fi
+
 or_runtime_preflight "$RUNTIME" "$AGENT" "$DRYRUN"
 # The git-repo guard validates the INVOKING project ($PWD), not cckit's install dir; wt_start and
 # load_kit_config below resolve the project + its config from the invoking directory.
@@ -142,7 +187,7 @@ for num in "${LAUNCH[@]}"; do
 done
 
 if [ "$RUNTIME" = "herdr" ]; then
-  or_herdr_launch "$SESSION" "$AGENT" "$SEED" "$DETACH" "${KIT_PROJECT_SLUG:-project}" "${ENTRIES[@]}"
+  or_herdr_launch "$SESSION" "$AGENT" "$SEED" "$DETACH" "${KIT_PROJECT_SLUG:-project}" "$AGENT_ARGS_NL" "${ENTRIES[@]}"
   exit $?
 fi
 

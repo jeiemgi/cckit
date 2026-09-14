@@ -102,6 +102,7 @@ Every operation an unattended run needs is reachable through the one CLI:
 | `--dry-run` | resolve + print the launch plan; create no worktrees, start nothing |
 | `--cap <N>` | concurrency cap (default 4); flows past the cap are queued + reported |
 | `--agent <cmd>` | per-pane agent command (default `claude`, or `CCKIT_AGENT=`) — drive any CLI agent |
+| `--profile <name>` | run a declared agent profile (or `CCKIT_PROFILE=`): its `kind` becomes the agent and its `args` are passed to the CLI. Unset picks the cheapest-tier profile; `--agent` overrides and skips profiles entirely. A project that declares none is unaffected |
 | `--runtime <tmux\|herdr>` | terminal owner (default `tmux`, or `CCKIT_RUNTIME=`); Herdr requires a supported agent kind such as `codex` or `claude` |
 | `--force` | launch even if an issue is `blocked_by` an OPEN issue (the gate is on by default) |
 | `--no-seed` | start the agent without an auto-prompt |

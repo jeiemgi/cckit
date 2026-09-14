@@ -62,7 +62,7 @@ chmod +x "$stub/herdr" "$stub/codex" "$stub/gh"
 seed_for() { printf 'seed issue %s on %s in %s' "$1" "$2" "$3"; }
 old_path="$PATH"
 PATH="$stub:$PATH"
-out="$(or_herdr_launch sweep codex 1 1 demo "/tmp/wt1|task/41-one|41" "/tmp/wt2|task/42-two|42")"
+out="$(or_herdr_launch sweep codex 1 1 demo "" "/tmp/wt1|task/41-one|41" "/tmp/wt2|task/42-two|42")"
 log="$(cat "$HERDR_TEST_LOG")"
 yes "Herdr creates one orchestration workspace" "$log" "workspace|create|--cwd|/tmp/wt1|--label|cckit:demo:sweep|--no-focus"
 yes "Herdr starts the first issue agent" "$log" "agent|start|cckit-demo-41|--kind|codex|--pane|w1:p1"
@@ -71,8 +71,28 @@ yes "Herdr sends the existing headless seed" "$log" "agent|prompt|cckit-demo-41|
 yes "detached launch prints a reopen command" "$out" "herdr workspace focus w1 && herdr"
 
 : > "$HERDR_TEST_LOG"
-or_herdr_launch sweep codex 0 1 demo "/tmp/wt1|task/41-one|41" >/dev/null
+or_herdr_launch sweep codex 0 1 demo "" "/tmp/wt1|task/41-one|41" >/dev/null
 no "--no-seed starts the agent without prompting" "$(cat "$HERDR_TEST_LOG")" "agent|prompt"
+
+# ── the supported-kind list comes from the INSTALLED binary, not a copy kept in cckit ───────────
+# A hand-written list drifts: it carried `letta`, which herdr 0.9.0 rejects, so the kind passed
+# preflight and failed later — after the worktree existed, which is exactly what preflight exists
+# to prevent.
+or_herdr_kind_supported claude; t "a kind herdr supports is accepted" "$?" "0"
+or_herdr_kind_supported letta;  t "a kind herdr does NOT support is rejected" "$?" "1"
+or_herdr_kind_supported '';     t "an empty kind is rejected" "$?" "1"
+yes "the refusal lists the kinds actually supported" "$(or_runtime_preflight herdr letta 1 2>&1)" "supported here:"
+
+# ── a profile's argv reaches the agent through Herdr's `--` passthrough ─────────────────────────
+: > "$HERDR_TEST_LOG"
+or_herdr_launch sweep codex 0 1 demo "$(printf -- '--model\nsome model')" "/tmp/wt1|task/41-one|41" >/dev/null
+yes "profile args are passed after herdr's --" "$(cat "$HERDR_TEST_LOG")" "--kind|codex|--pane|w1:p1|--|--model|some model"
+# One-per-line then rebuilt as an array: an argument containing a space must stay ONE argument.
+no "a space-bearing arg is not split into two" "$(cat "$HERDR_TEST_LOG")" "|some|model"
+
+: > "$HERDR_TEST_LOG"
+or_herdr_launch sweep codex 0 1 demo "" "/tmp/wt1|task/41-one|41" >/dev/null
+no "no profile args means no trailing -- separator" "$(cat "$HERDR_TEST_LOG")" "--pane|w1:p1|--"
 
 PATH="/usr/bin:/bin"
 missing="$(or_runtime_preflight herdr codex 0 2>&1)"; rc=$?
