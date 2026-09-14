@@ -74,15 +74,26 @@ cap_checks_summary() {
 # `gate` is read on its FIRST WORD, the same way sr_invalid_fields reads it: a receipt says
 # `fail — the retry loop never exits` and the detail after the dash is the useful half, not part of
 # the verdict. Matching the whole field would score every annotated verdict as NONE.
+#
+# <head-sha> BINDS THE VERDICT TO A REVISION. sr_latest returns the newest receipt for an issue and
+# knows nothing about commits, so without this a PASS earned on one commit gates every commit
+# pushed after it — the reviewer approved code that is no longer there. Given a head, a receipt
+# recorded against a different one reads NONE: not a failure, an absence, which is what it is. An
+# empty head skips the check, for a caller with no revision to compare (and for every receipt
+# written before head_sha existed, whose field is empty and would otherwise never match).
 cap_review_summary() {
+  local head="${1:-}"
   command -v jq >/dev/null 2>&1 || { echo NONE; return 0; }
   # Empty stdin is the common case — sr_latest echoes nothing when there is no receipt — and jq
   # reads no values from it, printing nothing and exiting 0. So the `|| echo NONE` fallback never
   # fires and the caller gets an empty token instead of a verdict. Substitute an empty object.
   local j; j="$(cat)"
   [ -n "$j" ] || j='{}'
-  printf '%s' "$j" | jq -r '(.gate // "") | split(" ")[0] | ascii_upcase
-         | if . == "FAIL" then "FAIL" elif . == "PASS" then "PASS" else "NONE" end' 2>/dev/null \
+  printf '%s' "$j" | jq -r --arg head "$head" '
+      if ($head != "" and ((.head_sha // "") != $head)) then "NONE"
+      else (.gate // "") | split(" ")[0] | ascii_upcase
+           | if . == "FAIL" then "FAIL" elif . == "PASS" then "PASS" else "NONE" end
+      end' 2>/dev/null \
     || echo NONE
 }
 
@@ -288,8 +299,8 @@ _cap_issue_of_branch() {
 # carries the floor that tripped (empty otherwise). `checks` is the raw rollup token (FAIL/PENDING/
 # PASS/NONE) — REPORTED, not re-decided, so captain_pass can say when a merge rests on NONE.
 captain_gate() {
-  local repo="$CAPTAIN_REPO" pr="$1" j mergeable mss checks review issue state action title branch files labels reason
-  j="$(gh pr view "$pr" --repo "$repo" --json number,title,headRefName,mergeable,mergeStateStatus,statusCheckRollup,files,labels 2>/dev/null)" \
+  local repo="$CAPTAIN_REPO" pr="$1" j mergeable mss checks review head issue state action title branch files labels reason
+  j="$(gh pr view "$pr" --repo "$repo" --json number,title,headRefName,headRefOid,mergeable,mergeStateStatus,statusCheckRollup,files,labels 2>/dev/null)" \
     || { echo "captain: cannot read PR #$pr" >&2; return 1; }
   mergeable="$(printf '%s' "$j" | jq -r '.mergeable // "UNKNOWN"')"
   mss="$(printf '%s' "$j" | jq -r '.mergeStateStatus // "UNKNOWN"')"
@@ -302,9 +313,10 @@ captain_gate() {
   # The review verdict is local state, not a GitHub field: sr_latest reads the receipt this repo's
   # reviewer wrote. No receipt, no issue, or no stage-receipt lib all collapse to NONE — absence,
   # which cap_classify gates on only when review is required.
+  head="$(printf '%s' "$j" | jq -r '.headRefOid // ""')"
   review=NONE
   if [ -n "$issue" ] && command -v sr_latest >/dev/null 2>&1; then
-    review="$(sr_latest "$issue" review 2>/dev/null | cap_review_summary)"
+    review="$(sr_latest "$issue" review 2>/dev/null | cap_review_summary "$head")"
     [ -n "$review" ] || review=NONE
   fi
   state="$(cap_classify "$mergeable" "$mss" "$checks" "$review")"
@@ -315,7 +327,7 @@ captain_gate() {
     reason="$(cap_policy_floor "$files" "$labels")"
     [ -n "$reason" ] && { state="HELD"; action="hold"; }
   fi
-  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$pr" "${issue:-—}" "$state" "$action" "$title" "$reason" "$checks"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$pr" "${issue:-—}" "$state" "$action" "$title" "$reason" "$checks" "$head"
 }
 
 # _cap_open_prs [effort] — open PR numbers, optionally only those whose branch-issue is a sub of <effort>.
@@ -353,7 +365,7 @@ captain_pass() {
   CAPTAIN_MERGED=0
   _cap_load_policy_config   # bridge captain.mergePolicy from config into the floor env (env wins)
 
-  local prs pr row state action issue title reason checks merged_any=0 unproven=0 unreviewed=0
+  local prs pr row state action issue issue_num title reason checks head merged_any=0 unproven=0 unreviewed=0
   prs="$(_cap_open_prs "$effort")"
   [ -n "$prs" ] || { echo "captain: no open PRs in scope"; return 0; }
 
@@ -371,6 +383,11 @@ captain_pass() {
     title="$(printf '%s' "$row" | cut -f5)"
     reason="$(printf '%s' "$row" | cut -f6)"
     checks="$(printf '%s' "$row" | cut -f7)"
+    head="$(printf '%s' "$row" | cut -f8)"
+    # Field 2 is a DISPLAY field carrying `—` for a PR whose branch encodes no issue. rs_issue_num
+    # is what everything keying storage off it goes through — see its comment for why.
+    issue_num="$issue"
+    command -v rs_issue_num >/dev/null 2>&1 && issue_num="$(rs_issue_num "$issue")"
     { printf '%s\t%s\n' "$pr" "$state" >> "$CAPTAIN_STATE"; } 2>/dev/null || true
     # A merge resting on an EMPTY rollup: green was assumed, never observed. Counted here and named
     # once at the end of the pass, so the assumption is on screen even with the requirement OFF.
@@ -380,8 +397,8 @@ captain_pass() {
     # and never reach `merge` — so the advisory self-silences exactly like the checks one.
     if [ "$action" = "merge" ] && [ "${KIT_CAPTAIN_REQUIRE_REVIEW:-0}" != "1" ]; then
       local rv=NONE
-      [ -n "$issue" ] && command -v sr_latest >/dev/null 2>&1 \
-        && rv="$(sr_latest "$issue" review 2>/dev/null | cap_review_summary)"
+      [ -n "$issue_num" ] && command -v sr_latest >/dev/null 2>&1 \
+        && rv="$(sr_latest "$issue_num" review 2>/dev/null | cap_review_summary "$head")"
       [ "${rv:-NONE}" = "NONE" ] && unreviewed=$((unreviewed + 1))
     fi
     # Review stage (#346). Dispatch runs INSIDE this pass, before the merge decision is acted on,
@@ -390,9 +407,9 @@ captain_pass() {
     # a verdict must be recorded before it can be gated on, not assumed while the agent is running.
     # Off unless review.command is configured; rs_dispatch echoes rc 4 and does nothing then.
     if command -v rs_needs_dispatch >/dev/null 2>&1 && rs_enabled "$CAPTAIN_CFG"; then
-      local have=0; rs_have_receipt "$issue" && have=1
-      if rs_needs_dispatch "$action" "$have"; then
-        if rs_dispatch "$CAPTAIN_CFG" "$repo" "$pr" "$issue" >/dev/null; then
+      local have=0; rs_have_receipt "$issue_num" "$head" && have=1
+      if rs_needs_dispatch "$state" "$action" "$have"; then
+        if rs_dispatch "$CAPTAIN_CFG" "$repo" "$pr" "$issue_num" "$head" >/dev/null; then
           printf '  PR #%-4s %-14s -> reviewed (#%s %s)\n' "$pr" "$state" "$issue" "$title"
         fi
         # Held whether or not the reviewer succeeded. A failed dispatch leaves no receipt, and

@@ -127,12 +127,29 @@ The captain can run an agent over a pull request before it merges, and refuse to
 agent finds. It is **off until you name the command that runs a reviewer**:
 
 ```json
-{ "review": { "command": "claude -p" } }
+{ "review": { "command": "claude -p", "timeoutSeconds": 900 } }
 ```
 
 cckit pipes a brief to that command's **stdin** and reads the reviewer's report off its **stdout**.
 That report becomes a [stage receipt](#stage-receipts) at stage `review`, written locally and
 mirrored onto the issue.
+
+The command also receives the resolved profile in its environment, so it can dispatch the agent the
+issue's `agent:` label actually asked for rather than a fixed one:
+
+| Variable | What |
+| --- | --- |
+| `CCKIT_REVIEW_PROFILE` | the resolved profile name |
+| `CCKIT_REVIEW_KIND` | its `kind` (the agent executable) |
+| `CCKIT_REVIEW_ARGS` | its `args`, one per line |
+| `CCKIT_REVIEW_PR` / `CCKIT_REVIEW_ISSUE` / `CCKIT_REVIEW_REPO` | what is being reviewed |
+
+A command that ignores all of them still works.
+
+`timeoutSeconds` (default `900`) bounds the run. The captain is unattended and single-threaded, so a
+reviewer that never returns blocks the whole pass — every other PR in it included — with nobody
+watching. On expiry the process is killed and **no receipt is written**: a killed reviewer is not a
+verdict. A non-numeric or zero value falls back to the default rather than disabling the bound.
 
 <Aside type="note" title="Why you name the command and cckit does not">
 cckit has no way to start an agent without a terminal. Every launcher it has attaches to something
@@ -166,6 +183,17 @@ A review profile must not touch the branch it is reviewing. Three things hold th
 
 The first is the one that matters — the other two are downstream of a profile you already declared
 able to write.
+
+### A verdict belongs to one commit
+
+Each review receipt records the PR head it was produced from, and the gate compares it against the
+current head. Push a new commit and the previous verdict reads as **absent**, not as a pass — the
+reviewer read code that is no longer there. That applies to a `fail` too: a stale finding is not a
+finding against the new revision.
+
+That is also what makes the loop terminate. A PR with a `REVIEW_FAILING` verdict is not re-reviewed
+on its own; the author acts on the finding and pushes, which moves the head, which makes the verdict
+stale, which earns the next review.
 
 ### The two verdicts
 

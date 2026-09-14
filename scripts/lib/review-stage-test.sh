@@ -47,12 +47,29 @@ rs_enabled "$CFG";           rc "a configured command is on"             "$?" "0
 t  "a missing config file is empty"    "$(rs_command "$tmp/absent.json")" ""
 
 # ── when a PR earns a reviewer (pure) ──────────────────────────────────────────────────────────
-rs_needs_dispatch merge 0;  rc "a mergeable PR with no receipt gets one" "$?" "0"
-rs_needs_dispatch merge 1;  rc "a PR already reviewed does not"          "$?" "1"
-rs_needs_dispatch verify 0; rc "a PR still verifying does not"           "$?" "1"
-rs_needs_dispatch hold 0;   rc "a PR held by a policy floor does not"    "$?" "1"
-rs_needs_dispatch rebase 0; rc "a conflicting PR does not"               "$?" "1"
-rs_needs_dispatch '' 0;     rc "an empty action does not"                "$?" "1"
+rs_needs_dispatch CLEAN merge 0;  rc "a mergeable PR with no receipt gets one" "$?" "0"
+rs_needs_dispatch CLEAN merge 1;  rc "a PR already reviewed does not"          "$?" "1"
+rs_needs_dispatch CHECKS_MISSING verify 0; rc "a PR still verifying does not"  "$?" "1"
+rs_needs_dispatch HELD hold 0;    rc "a PR held by a policy floor does not"    "$?" "1"
+rs_needs_dispatch CONFLICTING rebase 0; rc "a conflicting PR does not"         "$?" "1"
+rs_needs_dispatch '' '' 0;        rc "an empty state and action does not"      "$?" "1"
+
+# The deadlock (#351 review). REVIEW_MISSING is `verify`, not `merge`: a merge-only predicate meant
+# that once review.command turned the requirement on, the FIRST pass classified every unreviewed PR
+# REVIEW_MISSING, the reviewer never ran, and the PR sat at `verify` for good.
+rs_needs_dispatch REVIEW_MISSING verify 0; rc "a PR blocked ON the missing review gets one" "$?" "0"
+# Unless it already has a verdict — then REVIEW_MISSING means the verdict is stale, and a receipt
+# the head check rejected sets have=0, so this case only arises from a caller that lost track.
+rs_needs_dispatch REVIEW_MISSING verify 1; rc "but never twice for the same verdict" "$?" "1"
+# A recorded FAIL is not re-reviewed on its own: the author acts on it and pushes, which changes the
+# head, which makes the verdict stale, which is what earns the next review.
+rs_needs_dispatch REVIEW_FAILING fix 1;    rc "a failing review is not re-run"       "$?" "1"
+
+# The display placeholder must never reach receipt storage.
+t "a real issue number passes through" "$(rs_issue_num 42)" "42"
+t "the em-dash placeholder is empty"   "$(rs_issue_num '—')" ""
+t "an empty field stays empty"         "$(rs_issue_num '')" ""
+t "a non-numeric field is empty"       "$(rs_issue_num 'main')" ""
 
 # ── the brief carries its three invariants ─────────────────────────────────────────────────────
 b="$(rs_brief 'o/r' 7 42)"
@@ -112,7 +129,7 @@ t "nothing is flagged invalid"         "$(jq -r '.invalid | length' "$p")" "0"
 rs_have_receipt 42; rc "the verdict is findable afterwards" "$?" "0"
 rs_have_receipt 99; rc "an unreviewed issue has none"       "$?" "1"
 have=0; rs_have_receipt 42 && have=1
-rs_needs_dispatch merge "$have"; rc "a reviewed PR is not dispatched twice" "$?" "1"
+rs_needs_dispatch CLEAN merge "$have"; rc "a reviewed PR is not dispatched twice" "$?" "1"
 
 # A command that exits non-zero writes NO receipt — a failed reviewer must not look like a verdict.
 cat > "$tmp/fail.json" <<'JSON'
@@ -150,6 +167,75 @@ t  "sr_mirror reported why it did not post" "$SR_MIRROR_LAST_RESULT" "no-remote"
 [ -f "$p2" ] && echo "ok: the receipt is on disk anyway" || { echo "FAIL: no receipt at '$p2'"; fail=1; }
 t  "and it is a second attempt, not an overwrite" "$(jq -r .attempt "$p2")" "2"
 [ "$p2" != "$p" ] && echo "ok: the two attempts are separate files" || { echo "FAIL: attempt 2 reused $p"; fail=1; }
+
+# ── the PR review findings (#351) ──────────────────────────────────────────────────────────────
+
+# The timeout bound. review.timeoutSeconds, with a default and a refusal to honour "no limit".
+t "the default bound is 900s"        "$(rs_timeout "$CFG")" "900"
+cat > "$tmp/to.json" <<'JSON'
+{ "review": { "command": "true", "timeoutSeconds": 30 } }
+JSON
+t "a configured bound is used"       "$(rs_timeout "$tmp/to.json")" "30"
+cat > "$tmp/tobad.json" <<'JSON'
+{ "review": { "command": "true", "timeoutSeconds": "none" } }
+JSON
+# "none" reads like a request for NO limit. Honouring it would hand an unattended captain the hang
+# the bound exists to prevent, so it falls back to the default instead.
+t "a non-numeric bound falls back"   "$(rs_timeout "$tmp/tobad.json" 2>/dev/null)" "900"
+cat > "$tmp/tozero.json" <<'JSON'
+{ "review": { "command": "true", "timeoutSeconds": 0 } }
+JSON
+t "a zero bound falls back"          "$(rs_timeout "$tmp/tozero.json" 2>/dev/null)" "900"
+
+# _rs_run actually kills a hung command, on whichever path this system takes.
+start=$(date +%s)
+printf 'ignored
+' | _rs_run 2 'sleep 60' >/dev/null 2>&1
+rc "a command past its bound is rc 124" "$?" "124"
+elapsed=$(( $(date +%s) - start ))
+[ "$elapsed" -lt 30 ] && echo "ok: it was killed in ${elapsed}s, not left running" \
+  || { echo "FAIL: still ran ${elapsed}s after a 2s bound"; fail=1; }
+t "a command inside its bound returns its output" "$(printf '' | _rs_run 10 'echo alive' 2>/dev/null)" "alive"
+printf '' | _rs_run 10 'exit 7' >/dev/null 2>&1
+rc "a command's own exit code survives" "$?" "7"
+
+# A dispatch whose reviewer hangs writes NO receipt — a killed reviewer is not a verdict.
+cat > "$tmp/hang.json" <<'JSON'
+{ "review": { "command": "sleep 60", "timeoutSeconds": 2 },
+  "agents": { "default": "critic",
+    "profiles": { "critic": { "kind": "codex", "stages": ["review"] } } } }
+JSON
+FX_CTX="77\t\t"
+before2="$(ls "$KIT_STATE_DIR/receipts" 2>/dev/null | wc -l | tr -d ' ')"
+rs_dispatch "$tmp/hang.json" 'o/r' 9 77 >/dev/null 2>&1
+rc "a hung reviewer is rc 3" "$?" "3"
+t "a hung reviewer writes no receipt" \
+  "$(ls "$KIT_STATE_DIR/receipts" 2>/dev/null | wc -l | tr -d ' ')" "$before2"
+
+# The resolved profile reaches the command. Without this an agent: label named a profile that only
+# labelled the receipt, while the fixed command ran something else.
+cat > "$tmp/env.json" <<'JSON'
+{ "review": { "command": "cat > /dev/null; printf 'outcome: pr-open\nurl: u\ngate: pass — %s/%s\nblocker: none\nnext stage: none\n' $CCKIT_REVIEW_PROFILE $CCKIT_REVIEW_KIND" },
+  "agents": { "default": "critic",
+    "profiles": { "critic": { "kind": "codex", "stages": ["review"] } } } }
+JSON
+FX_CTX="78\t\t"
+pe="$(rs_dispatch "$tmp/env.json" 'o/r' 9 78)"
+t "the command sees the resolved profile and kind" \
+  "$(jq -r .gate "$pe" | sed 's/^pass — //')" "critic/codex"
+
+# head_sha binds a verdict to a revision (the stale-PASS hole).
+FX_CTX="80\tagent:critic\t"
+ph="$(rs_dispatch "$CFG" 'o/r' 9 80 'abc123')"
+t "the receipt records the head it reviewed" "$(jq -r .head_sha "$ph")" "abc123"
+rs_have_receipt 80 'abc123'; rc "the verdict counts for that head"        "$?" "0"
+rs_have_receipt 80 'def456'; rc "it does NOT count for a later commit"    "$?" "1"
+rs_have_receipt 80;          rc "with no head given, the issue alone counts" "$?" "0"
+
+# A receipt written before head_sha existed has an empty field. Asked about a head it cannot match,
+# it reads as absent — which is correct, and is why the gate skips the check on an empty head.
+rs_have_receipt 42 'abc123'; rc "a head-less receipt does not cover a head" "$?" "1"
+rs_have_receipt 42;          rc "but still counts when no head is asked"     "$?" "0"
 
 [ "$fail" -eq 0 ] && echo "review-stage-test: PASS" || echo "review-stage-test: FAILED"
 exit "$fail"

@@ -173,6 +173,25 @@ if [ -n "${CAP_TEST_INNER:-}" ]; then
   ( KIT_CAPTAIN_REQUIRE_REVIEW=1
     eq "a 3-arg call defaults to NONE" "$(cap_classify MERGEABLE CLEAN PASS)" "REVIEW_MISSING" ) || fail=1
 
+  # head_sha binds a verdict to a revision (#351 review). Without it a PASS earned on one commit
+  # gates every commit pushed after it — sr_latest is newest-by-issue and knows nothing about SHAs.
+  if command -v jq >/dev/null 2>&1; then
+    eq "review: a matching head still passes" \
+      "$(printf '{"gate":"pass","head_sha":"abc"}' | cap_review_summary abc)" "PASS"
+    eq "review: a stale verdict reads NONE, not PASS" \
+      "$(printf '{"gate":"pass","head_sha":"abc"}' | cap_review_summary def)" "NONE"
+    # A stale FAIL is also absence: the reviewer read code that is no longer there, so it is neither
+    # a finding against this revision nor a pass for it.
+    eq "review: a stale fail reads NONE too" \
+      "$(printf '{"gate":"fail","head_sha":"abc"}' | cap_review_summary def)" "NONE"
+    # No head asked: the check is skipped. This is also what keeps a receipt written before head_sha
+    # existed (empty field) readable instead of permanently stale.
+    eq "review: no head asked skips the check" \
+      "$(printf '{"gate":"pass","head_sha":"abc"}' | cap_review_summary)" "PASS"
+    eq "review: a head-less receipt does not match a head" \
+      "$(printf '{"gate":"pass"}' | cap_review_summary abc)" "NONE"
+  fi
+
   # The config bridge: review.command implies the requirement; requireReview:false opts back out.
   if command -v jq >/dev/null 2>&1; then
     revbridge() {

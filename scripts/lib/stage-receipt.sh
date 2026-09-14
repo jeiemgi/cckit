@@ -140,10 +140,15 @@ sr_validate() {
   return 2
 }
 
-# sr_record <issue> <stage> <attempt> <profile> <tier> <source> <permissions> — stdin is the
-# worker's report. Parse, validate, then write. Echoes the path it wrote.
+# sr_record <issue> <stage> <attempt> <profile> <tier> <source> <permissions> [<head-sha>] — stdin
+# is the worker's report. Parse, validate, then write. Echoes the path it wrote.
+#
+# <head-sha> is the commit the work applies to. It is OPTIONAL and empty by default, so every caller
+# written before it stays correct — but a receipt without one cannot be checked against the revision
+# it was produced from, and a gate reading such a receipt is trusting a verdict that may predate the
+# code. The review gate (captain.sh) requires it for exactly that reason.
 sr_record() {
-  local n="${1:-}" stage="${2:-}" attempt="${3:-1}" prof="${4:-}" tier="${5:-}" src="${6:-}" perms="${7:-}"
+  local n="${1:-}" stage="${2:-}" attempt="${3:-1}" prof="${4:-}" tier="${5:-}" src="${6:-}" perms="${7:-}" head="${8:-}"
   local parsed="" outcome="" url="" gate="" blocker="" next="" d="" p=""
   [ -n "$n" ] && [ -n "$stage" ] || { echo "sr_record: <issue> <stage> required" >&2; return 2; }
   _sr_need_jq || return $?
@@ -167,12 +172,14 @@ EOF
   jq -n \
     --argjson issue "$n" --arg stage "$stage" --argjson attempt "$attempt" \
     --arg profile "$prof" --arg tier "$tier" --arg profile_source "$src" --arg permissions "$perms" \
+    --arg head_sha "$head" \
     --arg outcome "$outcome" --arg url "$url" --arg gate "$gate" \
     --arg blocker "$blocker" --arg next_stage "$next" \
     --arg recorded_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     --arg invalid "$invalid" \
     '{issue:$issue, stage:$stage, attempt:$attempt,
       profile:$profile, tier:$tier, profile_source:$profile_source, permissions:$permissions,
+      head_sha:$head_sha,
       outcome:$outcome, url:$url, gate:$gate, blocker:$blocker, next_stage:$next_stage,
       invalid:($invalid | split("\n") | map(select(length > 0))),
       recorded_at:$recorded_at}' > "$p" || return 1
