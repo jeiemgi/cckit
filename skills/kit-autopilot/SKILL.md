@@ -17,6 +17,10 @@ requested limit. If it cannot, report the unsupported limit and do not start tha
 A prompt asking an agent to stay under a token budget does not enforce that budget.
 Implementation and cross-runtime verification are tracked in cckit effort #257, sub-issue #264.
 
+**Exception — night mode.** The Workflow runtime does enforce a token budget, so an approved plan
+can run unattended through `scripts/night-run.mjs` (see _Mode: night_ below). The CLI flags above
+are still unimplemented.
+
 One skill, two modes — both delegate work that runs **autonomously to a verifiable stop, under hard
 caps**. It is a **thin wrapper**: it composes the built-in `/loop` and the kit's `orchestrate`
 scripts; it never reimplements looping or orchestration.
@@ -105,6 +109,64 @@ kit autopilot --plan            # read the plan and launch the planned set
    checks / merged, and GCs each worktree + branch on merge.
 4. **Decide + advance** — as each wave's gates go green, **merge it** (established-plan autonomy
    above) and advance any effort that was `blocked_by` it. Surface to the human only a genuine blocker.
+
+## Mode: night (an approved plan, unattended, through a Workflow)
+
+The one mode whose caps a runtime enforces. `scripts/night-run.mjs` is a Workflow script: the
+Workflow runtime throws once the `+N` budget is spent, and the script holds the rest of the caps in
+code.
+
+**Before the owner leaves** — the plan is approved (no effort still carries `grill:assumed`) and
+the owner posts the night grant: ONE comment on the plan parent issue. The latest grant wins.
+
+````markdown
+<!-- night-grant -->
+Tonight: run the two approved waves. I accept the lockfile floor.
+
+```json
+{ "budget": "+2000k", "waves": [[12], [15]], "waivers": ["lockfile"], "stopCommand": null }
+```
+````
+
+**Launch** — from the repo root:
+
+1. `scripts/night-grant.sh preflight` — exit 1 names the allowlist entries an unattended run lacks
+   in the tracked `.claude/settings.json` (merge, push, issue comment/edit/close, `gh api`). Stop and
+   tell the owner; it never edits the file.
+2. `scripts/night-grant.sh read <parent>` — prints the engine args (line 1) and `budget=+N`
+   (line 2), or refuses a malformed grant or a never-waivable waiver.
+3. Launch the Workflow with line 1 as `args` and the budget as the `+N` directive. The runtime
+   counts the **whole turn**, the captain's own output included, so size `+N` with headroom.
+
+| Cap | Value | Enforced by |
+| --- | --- | --- |
+| Token budget | the grant's `+N` | the Workflow runtime (`budget.total`); no budget = refused |
+| Concurrency | ≤ 4 agents, whatever `maxConcurrent` says | the script, in groups of 4 |
+| Wave reserve | 150k tokens left, or the next wave does not start | the script |
+| Stall | 2 waves in a row with nothing merged | the script |
+| Stop | every wave merged + the gate green on the base branch, or `stopCommand` exits 0 | the script |
+
+**Floors.** Base floors: `lockfile`, `auth`, `security-code`, `security-prose`, `workflows`, `cost`,
+`secret`. `security-prose` (a `security/*` diff that is prose only) is waived by standing rule;
+`workflows`, `cost` and `secret` are never waived. A project adds its own floors, its own
+never-waivable list and its gate command under `night` in the kit config:
+
+```json
+"night": { "floors": { "auth-dep": "the auth library version" },
+           "neverWaivable": ["auth-dep"], "gate": "pnpm typecheck && pnpm lint" }
+```
+
+**Refused and parked.** An effort carrying `grill:assumed`, or with no `## Grilling`/`## Assumed`
+section, is refused. A red gate or a floor the grant did not waive parks the effort for the owner.
+
+**When it returns `usage-limit`** — an agent came back empty mid-wave. Do not relaunch. Sleep with
+`ScheduleWakeup` until the window resets, then resume **one** workflow with `resumeFromRunId`.
+Finished agents replay from cache; a sub whose commit already landed is never rebuilt.
+
+**Every other stop** (`done`, `stall`, `budget`, `blocked`, `refused`) — write the wake report from
+the returned `efforts` (status, reason, bare PR URL each), update the one status comment on the plan
+parent, and stop. A plan grilled tonight carries `grill:assumed` and waits for the owner: a night
+never plans and executes the same work.
 
 ## On wake / on a pause (the report — always)
 
