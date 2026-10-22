@@ -106,6 +106,7 @@ role_option_id() {
     QA)        echo "${ROLE_OPT_QA:-}" ;;
     TECH_LEAD) echo "${ROLE_OPT_TECH_LEAD:-}" ;;
     RESEARCH)  echo "${ROLE_OPT_RESEARCH:-}" ;;
+    BACKEND)   echo "${ROLE_OPT_BACKEND:-}" ;;
     *)         echo "" ;;
   esac
 }

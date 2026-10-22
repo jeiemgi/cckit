@@ -92,5 +92,12 @@ t "project_issue_status returns the board Status for our project" "$st" "In Prog
 PATH="$tmp/bin2:$PATH" KIT_REPO="" KIT_PROJECT_NUMBER="" bash -c "source '$LIB/gh-project.sh'; project_issue_status 42" >/dev/null 2>&1
 t "project_issue_status fails (rc 1) with unresolved repo/number" "$?" "1"
 
+# ── role_option_id maps every role label to its board option (backend was missing) ───────────────
+for r in designer devops pm frontend tauri ai-eng security qa tech-lead research backend; do
+  var="ROLE_OPT_$(printf '%s' "$r" | tr 'a-z-' 'A-Z_')"
+  got="$(env "$var=opt-$r" bash -c "source '$LIB/gh-project.sh'; role_option_id '$r'")"
+  t "role_option_id $r" "$got" "opt-$r"
+done
+
 [ "$fail" -eq 0 ] && echo "ALL OK (gh-project)" || echo "gh-project: FAILURES"
 exit "$fail"
