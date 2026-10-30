@@ -39,7 +39,7 @@ One issue becomes one branch, one worktree, one PR. These verbs walk that path.
 | `cckit pr <issue> <summary>` | Commit, push, and open the PR. |
 | `cckit close <issue> <summary>` | Close the issue and mark it done. |
 | `cckit new --role R "<title>"` | File one issue: labels, board add, Role and Status fields. Milestone optional. |
-| `cckit merge [<pr>]` | Squash-merge the PR, close its linked issues, clean the branch and worktree. |
+| `cckit merge [<pr>] [--merge\|--rebase]` | Merge the PR (squash by default), close its linked issues, clean the branch and worktree, and update the PR's base, which may be an `effort/<N>` branch. |
 | `cckit sync` | Board state: issues by role with Project Status, a merge-ordered open-PR queue, and blocked / not-on-board / stale (>14d) flags. |
 | `cckit status` | "Where are we?" in three buckets — local undone work, open PRs waiting on a human, cleanup available (local + remote) — plus the board and the resume handoff. Read-only. |
 | `cckit handoff "<note>"` | Save a resume-here note for the next session. |

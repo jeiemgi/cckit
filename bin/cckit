@@ -13,7 +13,8 @@
 #   cckit close <issue> <summary>   close issue + mark done
 #   cckit new [--role R --kind K --priority P --milestone M --blocked-by "#1" --body B|--body-file F] "<title>"
 #                                   file ONE issue: labels + board (Todo) in one step (never raw gh issue create)
-#   cckit merge [<pr>]              squash-merge the PR (rebases on conflict), close its issues, GC the branch
+#   cckit merge [<pr>] [--merge|--rebase]   merge the PR (squash by default; rebases on conflict), close
+#                                   its issues, GC the branch, update the PR's base (develop or effort/<N>)
 #   cckit contribute "<summary>"    open a contribution PR to cckit, gated on scripts/check.sh
 #                                   (from the cckit checkout or worktree you are in; else the installed one)
 #   cckit sync [--llm]              board state / what's unblocked
@@ -231,14 +232,14 @@ case "$cmd" in
     kto_task_new "$n_title" "$n_role" "$n_kind" "$n_prio" "$n_ms" "$n_plan" "$n_blocked" "$n_body"; echo
     ;;
   merge)
-    # Squash-merge through kto_task_pr_merge: rebase on conflict, close the PR's linked issues (native
+    # Merge (squash by default, --merge / --rebase, #376) through kto_task_pr_merge: rebase on conflict, close the PR's linked issues (native
     # auto-close only fires on the default branch), then clean the branch + worktree. The verb behind
     # every raw `gh pr merge` (#361). An effort's PR merges with `cckit effort close <N>`.
     # shellcheck source=/dev/null
     source "$LIB/kit-config.sh" && load_kit_config
     # shellcheck source=/dev/null
     source "$LIB/role-identity.sh"; source "$LIB/gh-project.sh"; source "$LIB/kit-task-ops.sh"
-    case "${1:-}" in -h|--help) echo 'cckit merge [<pr>]   squash-merge (rebases on conflict), close linked issues, GC branch + worktree'; exit 0 ;; esac
+    case "${1:-}" in -h|--help) echo 'cckit merge [<pr>] [--squash|--merge|--rebase]   merge (squash by default; rebases on conflict), close linked issues, GC branch + worktree, update the PR base'; exit 0 ;; esac
     kto_task_pr_merge "$@"
     ;;
   sync)        exec "$ROOT/scripts/task-sync.sh" "$@" ;;
