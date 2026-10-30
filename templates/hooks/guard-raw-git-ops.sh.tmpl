@@ -52,6 +52,8 @@ _grg_segments() {
 # _grg_classify <segment> — print the raw-op key for one simple command, or nothing.
 _grg_classify() {
   local s="$1"
+  # `--help` / `-h` only prints usage: read-only, never a bypass.
+  printf '%s' "$s" | grep -qE '[[:space:]](--help|-h)([[:space:]]|$)' && return 0
   if printf '%s' "$s" | grep -qE '^gh([[:space:]]+(-R|--repo)[[:space:]]+[^[:space:]]+|[[:space:]]+--repo=[^[:space:]]+)*[[:space:]]+issue[[:space:]]+create([[:space:]]|$)'; then echo issue-create
   elif printf '%s' "$s" | grep -qE '^gh([[:space:]]+(-R|--repo)[[:space:]]+[^[:space:]]+|[[:space:]]+--repo=[^[:space:]]+)*[[:space:]]+issue[[:space:]]+close([[:space:]]|$)'; then echo issue-close
   elif printf '%s' "$s" | grep -qE '^gh([[:space:]]+(-R|--repo)[[:space:]]+[^[:space:]]+|[[:space:]]+--repo=[^[:space:]]+)*[[:space:]]+pr[[:space:]]+create([[:space:]]|$)'; then echo pr-create
@@ -61,12 +63,21 @@ _grg_classify() {
 }
 
 # _grg_hint <key> — the verb to run instead.
-_grg_hint() {
+_grg_hint() {  # <key> [segment] — the segment's flags pick the matching verb flag (#376/#377)
+  local seg="${2:-}" n
   case "$1" in
     issue-create) echo 'cckit new --role <role> [--kind K --priority P --body-file F] "<title>"   (multi-part work: cckit effort new)' ;;
-    issue-close)  echo 'cckit close <issue> "<summary>"   (an effort: cckit effort close <N>)' ;;
+    issue-close)
+      n="$(printf '%s' "$seg" | sed -nE 's/.*--duplicate-of[= ]+#?([0-9]+).*/\1/p')"
+      if [ -n "$n" ]; then echo "cckit close <issue> --duplicate-of $n   (state_reason duplicate, board Done)"
+      elif printf '%s' "$seg" | grep -qiE -- '(--reason|-r)[= ]+.?not[ _-]?planned'; then
+        echo 'cckit close <issue> "<why>" --reason not-planned   (superseded: --superseded-by <N>)'
+      else echo 'cckit close <issue> "<summary>" [--reason completed|not-planned|duplicate]   (an effort: cckit effort close <N>)'; fi ;;
     pr-create)    echo 'cckit pr <issue> "<summary>"   (an effort: cckit effort pr <N> --summary-file F --for-agents-file F)' ;;
-    pr-merge)     echo 'cckit merge [<pr>]   (an effort: cckit effort close <N>)' ;;
+    pr-merge)
+      if printf '%s' "$seg" | grep -qE -- '(--merge|-m)([[:space:]]|$)'; then echo 'cckit merge [<pr>] --merge   (a merge commit; also into an effort/<N> base)'
+      elif printf '%s' "$seg" | grep -qE -- '(--rebase|-r)([[:space:]]|$)'; then echo 'cckit merge [<pr>] --rebase'
+      else echo 'cckit merge [<pr>] [--merge|--rebase]   (an effort: cckit effort close <N>)'; fi ;;
     branch)       echo 'cckit start <issue>   (an effort: cckit effort start <N>)' ;;
   esac
 }
@@ -109,6 +120,8 @@ branch|git -C /tmp/r switch -c feat/1-x
 branch|git worktree add ../wt -b feat/1-x
 branch|git checkout -q -b feat/1-x origin/develop
 |gh issue view 5
+|gh issue close --help
+|gh pr merge -h
 |gh pr list --state open
 |gh pr view 7 --json body
 |git checkout develop
@@ -135,10 +148,10 @@ cmd="$(printf '%s' "$input" | jq -r '.tool_input.command // empty' 2>/dev/null)"
 # Cheap prefilter: nothing to inspect unless gh or git appears at all.
 printf '%s' "$cmd" | grep -qE '(^|[^A-Za-z0-9_-])(gh|git)[[:space:]]' || exit 0
 
-key=""
+key=""; hit=""
 while IFS= read -r seg; do
   [ -z "$seg" ] && continue
-  key="$(_grg_classify "$seg")"; [ -n "$key" ] && break
+  key="$(_grg_classify "$seg")"; [ -n "$key" ] && { hit="$seg"; break; }
 done <<< "$(_grg_segments "$cmd")"
 [ -z "$key" ] && exit 0
 
@@ -174,7 +187,7 @@ fi
 
 {
   echo "BLOCKED: raw '$key' in a cckit repo. The verb owns the side effects (board, labels, worktree); the raw command skips them silently."
-  echo "Run instead:  $(_grg_hint "$key")"
+  echo "Run instead:  $(_grg_hint "$key" "${hit:-}")"
   echo "If the verb is broken, fix the verb. Deliberate one-off: prefix KIT_ALLOW_RAW=1 (recorded in <git-common-dir>/cckit/raw-bypass.log)."
 } >&2
 exit 2
