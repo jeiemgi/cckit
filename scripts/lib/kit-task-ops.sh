@@ -22,7 +22,7 @@
 #   kto_task_pr   <num> <summary> [commit-msg]        commit+push+open PR (board → In Review)
 #   kto_task_pr_merge [pr-num]                         squash-merge + close issues + switch develop + GC
 #   kto_task_new  <title> <role> <kind> <prio> [ms] [plan] [blocked] <body>   create issue + board fields (ms may be empty)
-#   kto_task_close <num> <summary> [pr-num]            close issue + board → Done
+#   kto_task_close <num> <summary> [pr-num] [--reason R] [--duplicate-of N] [--superseded-by N]   close + reason + board → Done
 # errors: mixed — git/gh ops propagate; board + label side effects are best-effort
 
 # --- repo resolution -----------------------------------------------------------------------------
@@ -407,15 +407,60 @@ kto_task_new() {
   printf '%s' "$num"
 }
 
-# kit task close — set the board Status to Done and close the issue (with a summary comment).
-# Plan-badge flip stays in the skill (it edits a repo file → needs a worktree/PR). Args: <num> <summary> [pr-num]
+# kit task close — set the board Status to Done and close the issue with a summary comment and a
+# close reason (#377). Plan-badge flip stays in the skill (it edits a repo file → needs a worktree/PR).
+# Args: <num> <summary> [pr-num] [--reason completed|not-planned|duplicate] [--duplicate-of <N>]
+#       [--superseded-by <N>]
+#   --duplicate-of N   GitHub state_reason duplicate, linked to #N (implies --reason duplicate)
+#   --superseded-by N  state_reason not planned + "Superseded by #N" in the comment
+# The summary may be omitted with --duplicate-of / --superseded-by: it defaults to "Duplicate of #N."
+# / "Superseded by #N.". Flags may come anywhere; the closed set is the close-reason vocabulary.
 kto_task_close() {
-  local num="${1:-}" summary="${2:-}"
-  local repo issue_json state item
-  repo="$(kto_repo)"
+  local num="" summary="" reason="" dup="" sup="" a pos=0
+  while [[ $# -gt 0 ]]; do
+    a="$1"
+    case "$a" in
+      --reason)        reason="${2:-}"; shift 2 ;;
+      --reason=*)      reason="${a#--reason=}"; shift ;;
+      --duplicate-of)  dup="${2:-}"; shift 2 ;;
+      --superseded-by) sup="${2:-}"; shift 2 ;;
+      -*) echo "✗ kto_task_close: unknown flag '$a' — usage: cckit close <issue> [\"<summary>\"] [--reason completed|not-planned|duplicate] [--duplicate-of N] [--superseded-by N]" >&2; return 2 ;;
+      *)
+        pos=$((pos+1))
+        case "$pos" in 1) num="$a" ;; 2) summary="$a" ;; *) : ;; esac   # 3rd positional = legacy pr-num
+        shift ;;
+    esac
+  done
+  dup="${dup#\#}"; sup="${sup#\#}"
   [[ -n "$num" ]] || { echo "✗ kto_task_close: issue number required" >&2; return 1; }
+  [[ -z "$dup" || "$dup" =~ ^[0-9]+$ ]] || { echo "✗ kto_task_close: --duplicate-of needs an issue number" >&2; return 2; }
+  [[ -z "$sup" || "$sup" =~ ^[0-9]+$ ]] || { echo "✗ kto_task_close: --superseded-by needs an issue number" >&2; return 2; }
+  [[ -n "$dup" && -n "$sup" ]] && { echo "✗ kto_task_close: --duplicate-of and --superseded-by are exclusive" >&2; return 2; }
+
+  # The close-reason set (completed · not planned · duplicate · superseded) → GitHub's state_reason.
+  local gh_reason
+  case "$reason" in
+    ""|completed)          gh_reason="completed" ;;
+    not-planned|"not planned"|not_planned) gh_reason="not planned" ;;
+    duplicate)             gh_reason="duplicate" ;;
+    *) echo "✗ kto_task_close: --reason must be completed, not-planned or duplicate (got '$reason')" >&2; return 2 ;;
+  esac
+  if [[ -n "$dup" ]]; then
+    [[ -z "$reason" || "$gh_reason" == "duplicate" ]] || { echo "✗ kto_task_close: --duplicate-of implies --reason duplicate" >&2; return 2; }
+    gh_reason="duplicate"; summary="${summary:-Duplicate of #$dup.}"
+  fi
+  if [[ -n "$sup" ]]; then
+    [[ -z "$reason" || "$gh_reason" == "not planned" ]] || { echo "✗ kto_task_close: --superseded-by implies --reason not-planned" >&2; return 2; }
+    gh_reason="not planned"
+    if [[ -z "$summary" ]]; then summary="Superseded by #$sup."
+    else case "$summary" in *"#$sup"*) : ;; *) summary="$summary"$'\n\n'"Superseded by #$sup." ;; esac
+    fi
+  fi
+  [[ "$gh_reason" == "duplicate" && -z "$dup" ]] && { echo "✗ kto_task_close: --reason duplicate needs --duplicate-of <N>" >&2; return 2; }
   [[ -n "$summary" ]] || { echo "✗ kto_task_close: a summary is required" >&2; return 1; }
 
+  local repo issue_json state item
+  repo="$(kto_repo)"
   issue_json=$(gh issue view "$num" --repo "$repo" --json state,projectItems) || return 1
   state=$(printf '%s' "$issue_json" | jq -r .state)
 
@@ -427,7 +472,12 @@ kto_task_close() {
   fi
 
   if [[ "$state" == "OPEN" ]]; then
-    gh issue close "$num" --repo "$repo" --comment "$summary" && echo "✓ Closed issue #$num"
+    if [[ -n "$dup" ]]; then
+      gh issue close "$num" --repo "$repo" --duplicate-of "$dup" --comment "$summary" || return 1
+    else
+      gh issue close "$num" --repo "$repo" --reason "$gh_reason" --comment "$summary" || return 1
+    fi
+    echo "✓ Closed issue #$num ($gh_reason${dup:+ of #$dup}${sup:+, superseded by #$sup})"
   else
     echo "  issue #$num already $state — board status updated only"
   fi
