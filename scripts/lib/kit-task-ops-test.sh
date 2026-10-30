@@ -55,6 +55,12 @@ if [ -n "${KTO_TEST_INNER:-}" ]; then
   eq "conventional summary wins over derivation" \
      "$(kto_pr_title '[Effort 182] 2 · Publish to npm' 'ci: publish via OIDC' 'kind:task')" \
      "ci: publish via OIDC"
+  eq "titleStyle issue-title → the issue title verbatim" \
+     "$(KIT_PR_TITLE_STYLE=issue-title kto_pr_title '[Effort 182] 1 · Enforce it' 'ci: x' 'kind:task')" \
+     "[Effort 182] 1 · Enforce it"
+  eq "titleStyle conventional (explicit) → derive" \
+     "$(KIT_PR_TITLE_STYLE=conventional kto_pr_title 'mail hook goes silent' '' 'bug')" \
+     "fix: mail hook goes silent"
   eq "non-conventional summary ignored → derive" \
      "$(kto_pr_title 'Benchmark harness' 'ported a harness' 'kind:feat')" \
      "feat: Benchmark harness"

@@ -81,6 +81,11 @@ kto_labels_kind() {
 # Network-free (covered by the self-test). Output always passes commitlint_check.
 kto_pr_title() {
   local raw="${1:-}" summary="${2:-}" labels="${3:-}" kind ctype desc
+  # pr.titleStyle = issue-title (KIT_PR_TITLE_STYLE): the PR title IS the issue title, verbatim — for
+  # repos whose convention is "PR title = exact issue title" and that run no commitlint gate.
+  if [ "${KIT_PR_TITLE_STYLE:-conventional}" = "issue-title" ] && [ -n "$raw" ]; then
+    printf '%s' "$raw"; return 0
+  fi
   # Reuse the ONE commit-lint implementation. bin/cckit sources it; if a bare caller hasn't, pull it
   # from the repo (kto_task_pr always runs in-repo). Degrades gracefully if it can't be found.
   if ! type commitlint_check >/dev/null 2>&1; then

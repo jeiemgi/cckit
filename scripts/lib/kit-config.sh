@@ -86,6 +86,12 @@ load_kit_config() {
   # back to its built-in default of 2. An EFFORT_WIP_LIMIT env var still wins per invocation.
   export KIT_EFFORT_WIP_LIMIT="$(jq -r 'if (.effort.wipLimit | type) == "null" then "" else (.effort.wipLimit | tostring) end' "$cfg")"
 
+  # PR conventions (#361). pr.titleStyle: "conventional" (default — release-please + commitlint read
+  # the squash subject) or "issue-title" (the PR title is the issue title, verbatim).
+  # pr.orchestratorSection: true adds a 2-line `## For the orchestrator` section to `cckit pr` bodies.
+  export KIT_PR_TITLE_STYLE="$(jq -r '.pr.titleStyle // "conventional"' "$cfg")"
+  export KIT_PR_ORCHESTRATOR_SECTION="$(jq -r '.pr.orchestratorSection // false' "$cfg")"
+
   # Apply per-folder .claudekit/ overrides (no-op when none exist).
   _kit_apply_claudekit_overlays "$cfg"
 }
