@@ -284,7 +284,12 @@ kto_task_pr_merge() {
     echo "✗ Working tree is dirty — commit or stash changes first" >&2; return 1
   fi
 
-  pr_num="$input_pr"
+  # Refuse anything but a PR number. `gh pr merge --help` exits 0, so a flag taken as the number
+  # used to "merge", then run the cleanup below on the base branch (#366).
+  if [[ -n "$input_pr" && ! "$input_pr" =~ ^#?[0-9]+$ ]]; then
+    echo "✗ kto_task_pr_merge: '$input_pr' is not a PR number — usage: cckit merge [<pr>]" >&2; return 2
+  fi
+  pr_num="${input_pr#\#}"
   if [[ -z "$pr_num" ]]; then
     pr_num=$(gh pr list --repo "$repo" --head "$branch" --state open --json number --jq '.[0].number // empty')
     [[ -z "$pr_num" ]] && { echo "✗ No open PR found for branch $branch" >&2; return 1; }
@@ -297,6 +302,9 @@ kto_task_pr_merge() {
   echo "  mergeable=$merge_state status=$(printf '%s' "$mergeable" | jq -r .status)"
 
   if [[ "$merge_state" == "CONFLICTING" ]]; then
+    case "$branch" in "$base"|main|master|develop|HEAD)
+      echo "✗ PR #$pr_num conflicts — rebase it from its own worktree (never rebase $branch here)" >&2; return 1 ;;
+    esac
     echo "→ Conflicts detected — rebasing onto $base..."
     git fetch origin "$base"
     if git rebase "origin/$base"; then
@@ -337,8 +345,14 @@ kto_task_pr_merge() {
   if [[ -n "$wt" && "$wt" != "$main_wt" ]]; then
     git worktree remove "$wt" --force && echo "✓ Removed worktree $wt"
   fi
-  git branch -D "$branch" 2>/dev/null && echo "✓ Deleted local branch $branch"
-  git push origin --delete "$branch" 2>/dev/null && echo "✓ Deleted remote branch $branch" || echo "  (remote branch already gone)"
+  # Never delete the base (or a release) branch: merging a PR from the hub leaves $branch = base.
+  case "$branch" in
+    "$base"|main|master|develop|HEAD)
+      echo "  (on $branch — no branch cleanup; run cckit merge from the PR's worktree to GC it)" ;;
+    *)
+      git branch -D "$branch" 2>/dev/null && echo "✓ Deleted local branch $branch"
+      git push origin --delete "$branch" 2>/dev/null && echo "✓ Deleted remote branch $branch" || echo "  (remote branch already gone)" ;;
+  esac
   git worktree prune
   echo "✓ On $base, up to date — merged branch + worktree cleaned"
 }
