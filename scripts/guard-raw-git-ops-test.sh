@@ -41,6 +41,14 @@ git -C "$kit" checkout -q develop
 out="$(jq -n --arg c 'gh issue create -t x' --arg d "$kit" '{tool_input:{command:$c},cwd:$d}' | bash "$HOOK" 2>&1)"
 case "$out" in *"cckit new --role"*) echo "ok: the block names the verb to run" ;; *) echo "FAIL: no verb hint in: $out"; fail=1 ;; esac
 
+# #376/#377: the hint names the verb flag matching the raw command's flag
+hint() { jq -n --arg c "$1" --arg d "$kit" '{tool_input:{command:$c},cwd:$d}' | bash "$HOOK" 2>&1 | sed -n 's/^Run instead:  //p'; }
+case "$(hint 'gh pr merge 5 --merge')" in "cckit merge [<pr>] --merge"*) echo "ok: gh pr merge --merge -> cckit merge --merge" ;; *) echo "FAIL: merge hint: $(hint 'gh pr merge 5 --merge')"; fail=1 ;; esac
+case "$(hint 'gh pr merge 5 --rebase')" in "cckit merge [<pr>] --rebase"*) echo "ok: gh pr merge --rebase -> cckit merge --rebase" ;; *) echo "FAIL: rebase hint"; fail=1 ;; esac
+case "$(hint 'gh issue close 9 --duplicate-of 4')" in "cckit close <issue> --duplicate-of 4"*) echo "ok: gh issue close --duplicate-of N -> cckit close --duplicate-of N" ;; *) echo "FAIL: duplicate hint: $(hint 'gh issue close 9 --duplicate-of 4')"; fail=1 ;; esac
+case "$(hint 'gh issue close 9 --reason "not planned"')" in *"--reason not-planned"*) echo "ok: gh issue close --reason 'not planned' -> --reason not-planned" ;; *) echo "FAIL: not-planned hint"; fail=1 ;; esac
+t "gh issue close --help is not blocked"          "$(run "$kit" 'gh issue close --help')" 0
+
 t "KIT_ALLOW_RAW=1 lets one command through"     "$(run "$kit" 'KIT_ALLOW_RAW=1 gh pr create --fill')" 0
 t "the bypass is recorded"                        "$(grep -c 'pr-create' "$kit/.git/cckit/raw-bypass.log" 2>/dev/null)" 1
 

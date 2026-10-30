@@ -10,7 +10,8 @@
 #   cckit init --profile <p>        scaffold cckit.config.json + .claude/ (--profile required)
 #   cckit start <issue> [slug]      isolated worktree + branch for an issue
 #   cckit pr <issue> <summary>      commit + push + open the PR
-#   cckit close <issue> <summary>   close issue + mark done
+#   cckit close <issue> <summary> [--reason completed|not-planned|duplicate] [--duplicate-of N]
+#               [--superseded-by N]  close the issue with a reason + summary comment; board Done
 #   cckit new [--role R --kind K --priority P --milestone M --blocked-by "#1" --body B|--body-file F] "<title>"
 #                                   file ONE issue: labels + board (Todo) in one step (never raw gh issue create)
 #   cckit merge [<pr>]              squash-merge the PR (rebases on conflict), close its issues, GC the branch
@@ -179,6 +180,8 @@ case "$cmd" in
     source "$LIB/kit-config.sh" && load_kit_config
     # shellcheck source=/dev/null
     source "$LIB/role-identity.sh"; source "$LIB/gh-project.sh"; source "$LIB/kit-task-ops.sh"
+    if [ "$cmd" = close ]; then case "${1:-}" in -h|--help)
+      echo 'cckit close <issue> ["<summary>"] [--reason completed|not-planned|duplicate] [--duplicate-of N] [--superseded-by N]'; exit 0 ;; esac; fi
     if cckit_is_json; then
       case "$cmd" in
         pr)    out="$(kto_task_pr    "$@" 2>&1)"; rc=$? ;;
