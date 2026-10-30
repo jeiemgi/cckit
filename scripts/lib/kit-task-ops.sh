@@ -207,7 +207,7 @@ _kto_role_option_for_slug() {
 kto_task_pr() {
   # Default-safe reads: callers (scripts/kit) may run under `set -u`.
   local num="${1:-}" summary="${2:-}" commit_msg="${3:-}"
-  local repo branch meta title labels milestone role author url pr_num pr_node item role_opt issue_item
+  local repo branch meta title labels milestone role author="" url pr_num pr_node item role_opt issue_item
   repo="$(kto_repo)"
   branch="$(git rev-parse --abbrev-ref HEAD)"
 
@@ -224,8 +224,14 @@ kto_task_pr() {
   local pr_title; pr_title="$(kto_pr_title "$title" "$summary" "$labels")"
   [[ -z "$commit_msg" ]] && commit_msg="$pr_title"
 
-  if [[ -n "$(git status --porcelain)" ]]; then
-    git add -A
+  # TRACKED changes only: `git add -A` would sweep an untracked .env.local (copied into every worktree)
+  # into the PR. Untracked files are listed, never committed — `git add` them yourself if they belong.
+  if [[ -n "$(git ls-files --others --exclude-standard 2>/dev/null)" ]]; then
+    echo "kto_task_pr: untracked files NOT committed (git add them first if they belong):" >&2
+    git ls-files --others --exclude-standard 2>/dev/null | sed 's/^/  /' >&2
+  fi
+  if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
+    git add -u
     if type role_git_author >/dev/null 2>&1; then author="$(role_git_author "$role")"; fi
     if [[ -n "$author" ]]; then
       git commit -m "$commit_msg" -m "Co-authored-by: ${author%%|*} <${author##*|}>"
