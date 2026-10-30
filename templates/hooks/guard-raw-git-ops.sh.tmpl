@@ -67,7 +67,7 @@ _grg_hint() {
     issue-close)  echo 'cckit close <issue> "<summary>"   (an effort: cckit effort close <N>)' ;;
     pr-create)    echo 'cckit pr <issue> "<summary>"   (an effort: cckit effort pr <N> --summary-file F --for-agents-file F)' ;;
     pr-merge)     echo 'cckit merge [<pr>]   (an effort: cckit effort close <N>)' ;;
-    branch)       echo 'cckit start <issue>   (an effort: cckit effort start <N>; a sub: cckit effort sub <N> <sub>)' ;;
+    branch)       echo 'cckit start <issue>   (an effort: cckit effort start <N>)' ;;
   esac
 }
 
@@ -173,7 +173,7 @@ if [ "${KIT_ALLOW_RAW:-}" = 1 ] || printf '%s' "$cmd" | grep -qE '(^|[^A-Za-z0-9
 fi
 
 {
-  echo "BLOCKED: raw '$key' in a cckit repo. The verb does the board add, labels and fields; the raw command skips them silently."
+  echo "BLOCKED: raw '$key' in a cckit repo. The verb owns the side effects (board, labels, worktree); the raw command skips them silently."
   echo "Run instead:  $(_grg_hint "$key")"
   echo "If the verb is broken, fix the verb. Deliberate one-off: prefix KIT_ALLOW_RAW=1 (recorded in <git-common-dir>/cckit/raw-bypass.log)."
 } >&2
