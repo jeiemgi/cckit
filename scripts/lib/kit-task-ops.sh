@@ -21,7 +21,7 @@
 #   kto_closing_issue_numbers <pr-num>                echo the issue #s a merged PR closes
 #   kto_task_pr   <num> <summary> [commit-msg]        commit+push+open PR (board → In Review)
 #   kto_task_pr_merge [pr-num]                         squash-merge + close issues + switch develop + GC
-#   kto_task_new  <title> <role> <kind> <prio> <ms> [plan] [blocked] <body>   create issue + board fields
+#   kto_task_new  <title> <role> <kind> <prio> [ms] [plan] [blocked] <body>   create issue + board fields (ms may be empty)
 #   kto_task_close <num> <summary> [pr-num]            close issue + board → Done
 # errors: mixed — git/gh ops propagate; board + label side effects are best-effort
 
@@ -330,13 +330,15 @@ kto_task_pr_merge() {
 # kit task new — create a GitHub issue with labels + milestone, add it to the board, set Role +
 # Status(Todo) + Plan Link. Inputs are passed (the caller does the AskUserQuestion). No invented
 # values; fails loudly on an unknown label family upstream (the caller validates the closed sets).
-# Args: <title> <role-display-or-slug> <kind> <priority> <milestone> [plan-link] [blocked-by] <body>
+# Args: <title> <role-display-or-slug> <kind> <priority> [milestone|""] [plan-link] [blocked-by] <body>
 kto_task_new() {
   local title="${1:-}" role="${2:-}" kind="${3:-}" prio="${4:-}" milestone="${5:-}" plan="${6:-}" blocked="${7:-}" body_user="${8:-}"
   local repo role_slug labels body url num node item role_opt
   repo="$(kto_repo)"
-  [[ -n "$title" && -n "$role" && -n "$kind" && -n "$prio" && -n "$milestone" ]] || {
-    echo "✗ kto_task_new: title, role, kind, priority, milestone are required" >&2; return 1; }
+  # Milestone is optional: a repo with no milestones (cckit itself) must still be able to file an
+  # issue through the verb, or agents fall back to raw `gh issue create` and the board drops it.
+  [[ -n "$title" && -n "$role" && -n "$kind" && -n "$prio" ]] || {
+    echo "✗ kto_task_new: title, role, kind, priority are required" >&2; return 1; }
 
   role_slug="$(printf '%s' "$role" | tr 'A-Z ' 'a-z-')"
   labels="kind:${kind},priority:${prio},role:${role_slug}"
@@ -344,14 +346,17 @@ kto_task_new() {
 
   url=$(gh issue create --repo "$repo" \
     --title "$title" --body "$body" \
-    --label "$labels" --milestone "$milestone" --assignee "@me") || return 1
+    --label "$labels" ${milestone:+--milestone "$milestone"} --assignee "@me") || return 1
   num=$(basename "$url")
   echo "✓ $url"
 
   if kto_board_enabled && type load_project_ids >/dev/null 2>&1 && load_project_ids 2>/dev/null; then
     node=$(gh api "repos/$repo/issues/$num" --jq .node_id 2>/dev/null)
+    item=""
+    [[ -n "$node" ]] && item=$(project_add_item "$node" 2>/dev/null || true)
+    # Loud, not silent: an issue missing from the board is the failure this verb exists to prevent.
+    [[ -z "$item" ]] && echo "⚠ #$num was created but NOT added to the board — add it by hand" >&2
     if [[ -n "$node" ]]; then
-      item=$(project_add_item "$node" 2>/dev/null || true)
       if [[ -n "$item" ]]; then
         role_opt="$(_kto_role_option_for_slug "$role_slug")"
         [[ -n "$role_opt" ]] && project_set_single_select "$item" "$ROLE_FIELD_ID" "$role_opt" 2>/dev/null || true
