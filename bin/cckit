@@ -237,6 +237,7 @@ case "$cmd" in
     source "$LIB/kit-config.sh" && load_kit_config
     # shellcheck source=/dev/null
     source "$LIB/role-identity.sh"; source "$LIB/gh-project.sh"; source "$LIB/kit-task-ops.sh"
+    case "${1:-}" in -h|--help) echo 'cckit merge [<pr>]   squash-merge (rebases on conflict), close linked issues, GC branch + worktree'; exit 0 ;; esac
     kto_task_pr_merge "$@"
     ;;
   sync)        exec "$ROOT/scripts/task-sync.sh" "$@" ;;
