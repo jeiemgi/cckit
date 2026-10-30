@@ -15,6 +15,7 @@
 #                                   file ONE issue: labels + board (Todo) in one step (never raw gh issue create)
 #   cckit merge [<pr>]              squash-merge the PR (rebases on conflict), close its issues, GC the branch
 #   cckit contribute "<summary>"    open a contribution PR to cckit, gated on scripts/check.sh
+#                                   (from the cckit checkout or worktree you are in; else the installed one)
 #   cckit sync [--llm]              board state / what's unblocked
 #   cckit plan [--llm] [--effort N] wave plan: deps-ordered, p0-first in a wave, file-disjoint (TOON --llm)
 #   cckit plan-next [--llm]         forward plan: current skills/verbs/rules/docs -> what to build next
@@ -383,7 +384,14 @@ case "$cmd" in
   encode-context) source "$LIB/toon.sh"; toon_encode ;;
   render)      source "$LIB/render.sh"; cckit_render ;;
   debug)       exec "$ROOT/scripts/debug.sh" "$@" ;;
-  contribute)  cd "$ROOT"; exec "$ROOT/scripts/contribute.sh" "$@" ;;
+  contribute)
+    # The cckit checkout containing cwd (a worktree, per the rules) wins over the installed one, so
+    # the gate runs on — and the PR opens from — the branch being worked on (#368).
+    # shellcheck source=/dev/null
+    source "$LIB/contribute-root.sh"
+    croot="$(contribute_root "$PWD" "$ROOT")"
+    [ "$croot" = "$ROOT" ] || echo "contribute: using the checkout at $croot" >&2
+    cd "$croot"; exec "$croot/scripts/contribute.sh" "$@" ;;
   status|ui)   exec "$ROOT/scripts/status.sh" "$@" ;;
   resume)      source "$LIB/handoff.sh"; handoff_read ;;
   handoff)     source "$LIB/handoff.sh"; handoff_write "$@" ;;
