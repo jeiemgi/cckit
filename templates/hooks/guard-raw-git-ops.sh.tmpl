@@ -1,0 +1,180 @@
+#!/usr/bin/env bash
+# guard-raw-git-ops.sh — PreToolUse(Bash) hook. Scaffolded by cckit (#364).
+#
+# In a repo with a cckit config, the verbs own the side effects of the GitHub lifecycle: board add,
+# Role/Status fields, labels, milestone, the worktree claim, the trace. A raw `gh issue create`
+# skips every one of them, silently. This hook blocks the raw form and prints the verb to run:
+#
+#   gh issue create                      -> cckit new --role <role> "<title>"   (multi-part: cckit effort new)
+#   gh pr create                         -> cckit pr <issue> "<summary>"        (effort: cckit effort pr <N>)
+#   gh pr merge                          -> cckit merge [<pr>]                  (effort: cckit effort close <N>)
+#   gh issue close                       -> cckit close <issue> "<summary>"
+#   git checkout -b / switch -c / worktree add, on the base branch
+#                                        -> cckit start <issue>                 (effort: cckit effort start <N>)
+#
+# Only the agent's OWN command is inspected. The gh/git calls the verbs make internally run in a
+# child process, which this hook never sees, so the verbs cannot trip it.
+#
+# Escape hatch, recorded: prefix the command with KIT_ALLOW_RAW=1 (or export it). Each bypass is
+# appended to <git-common-dir>/cckit/raw-bypass.log, so the trail survives worktree removal.
+#
+# Exit 2 blocks (the agent sees stderr). Fails OPEN on anything ambiguous: no jq, no command, no
+# git repo, no cckit config. A guard must never block work it cannot read.
+# Self-test: bash <this file> --selftest
+
+set -uo pipefail
+
+# _grg_strip <cmd> — drop the text that is never executed: single-quoted strings and heredoc
+# bodies. A commit message or a doc snippet that MENTIONS `gh pr create` is not a call to it.
+_grg_strip() {
+  printf '%s\n' "$1" | awk '
+    term != "" { t=$0; sub(/^[ \t]+/, "", t); if (t == term) term=""; next }
+    {
+      line=$0
+      if (match(line, /<<-?[ \t]*["\x27]?[A-Za-z_][A-Za-z0-9_]*/)) {
+        h=substr(line, RSTART, RLENGTH); gsub(/^<<-?[ \t]*["\x27]?/, "", h); term=h
+      }
+      gsub(/\x27[^\x27]*\x27/, "\x27\x27", line)
+      print line
+    }'
+}
+
+# _grg_segments <cmd> — one simple command per line: split on ; & | ( ) { } ` and newlines, trim,
+# then drop leading VAR=value assignments and wrapper words (command exec env time nohup sudo).
+_grg_segments() {
+  _grg_strip "$1" | tr ';&|(){}`' '\n\n\n\n\n\n\n\n' | sed -E \
+    -e 's/^[[:space:]]+//' \
+    -e ':a' -e 's/^[A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+//' -e 'ta' \
+    -e ':b' -e 's/^(command|exec|env|time|nohup|sudo)[[:space:]]+//' -e 'tb' \
+    -e 's/^\$//' -e 's/^[[:space:]]+//'
+}
+
+# _grg_classify <segment> — print the raw-op key for one simple command, or nothing.
+_grg_classify() {
+  local s="$1"
+  if printf '%s' "$s" | grep -qE '^gh([[:space:]]+(-R|--repo)[[:space:]]+[^[:space:]]+|[[:space:]]+--repo=[^[:space:]]+)*[[:space:]]+issue[[:space:]]+create([[:space:]]|$)'; then echo issue-create
+  elif printf '%s' "$s" | grep -qE '^gh([[:space:]]+(-R|--repo)[[:space:]]+[^[:space:]]+|[[:space:]]+--repo=[^[:space:]]+)*[[:space:]]+issue[[:space:]]+close([[:space:]]|$)'; then echo issue-close
+  elif printf '%s' "$s" | grep -qE '^gh([[:space:]]+(-R|--repo)[[:space:]]+[^[:space:]]+|[[:space:]]+--repo=[^[:space:]]+)*[[:space:]]+pr[[:space:]]+create([[:space:]]|$)'; then echo pr-create
+  elif printf '%s' "$s" | grep -qE '^gh([[:space:]]+(-R|--repo)[[:space:]]+[^[:space:]]+|[[:space:]]+--repo=[^[:space:]]+)*[[:space:]]+pr[[:space:]]+merge([[:space:]]|$)'; then echo pr-merge
+  elif printf '%s' "$s" | grep -qE '^git([[:space:]]+-C[[:space:]]+[^[:space:]]+)*[[:space:]]+(checkout[[:space:]]+(.*[[:space:]])?-[bB]|switch[[:space:]]+(.*[[:space:]])?(-c|-C|--create)|worktree[[:space:]]+add)([[:space:]]|$)'; then echo branch
+  fi
+}
+
+# _grg_hint <key> — the verb to run instead.
+_grg_hint() {
+  case "$1" in
+    issue-create) echo 'cckit new --role <role> [--kind K --priority P --body-file F] "<title>"   (multi-part work: cckit effort new)' ;;
+    issue-close)  echo 'cckit close <issue> "<summary>"   (an effort: cckit effort close <N>)' ;;
+    pr-create)    echo 'cckit pr <issue> "<summary>"   (an effort: cckit effort pr <N> --summary-file F --for-agents-file F)' ;;
+    pr-merge)     echo 'cckit merge [<pr>]   (an effort: cckit effort close <N>)' ;;
+    branch)       echo 'cckit start <issue>   (an effort: cckit effort start <N>; a sub: cckit effort sub <N> <sub>)' ;;
+  esac
+}
+
+# _grg_config <dir> — the cckit config governing <dir>, or rc 1 (same walk as config-path.sh).
+_grg_config() {
+  local d; d="$(cd "${1:-.}" 2>/dev/null && pwd)" || return 1
+  while [ -n "$d" ]; do
+    [ -f "$d/cckit.config.json" ]       && { printf '%s\n' "$d/cckit.config.json"; return 0; }
+    [ -f "$d/.claude/kit.config.json" ] && { printf '%s\n' "$d/.claude/kit.config.json"; return 0; }
+    [ "$d" = "/" ] && break
+    d="$(dirname "$d")"
+  done
+  return 1
+}
+
+_grg_selftest() {
+  local fail=0 c want got
+  while IFS='|' read -r want c; do
+    [ -z "$c" ] && continue
+    got=""
+    while IFS= read -r seg; do
+      [ -z "$seg" ] && continue
+      k="$(_grg_classify "$seg")"; [ -n "$k" ] && { got="$k"; break; }
+    done <<< "$(_grg_segments "$c")"
+    if [ "$got" = "$want" ]; then echo "ok: [$want] $c"; else echo "FAIL: '$c' -> got '$got' want '$want'"; fail=1; fi
+  done <<'CASES'
+issue-create|gh issue create --title x --body y
+issue-create|gh -R o/r issue create -t x
+issue-create|cd /tmp && gh issue create -t x
+issue-create|url=$(gh issue create -t x)
+issue-create|FOO=1 gh issue create -t x
+pr-create|gh pr create --base develop
+pr-create|git push -u origin HEAD; gh pr create --fill
+pr-merge|gh pr merge 12 --squash
+pr-merge|gh --repo o/r pr merge 12
+issue-close|gh issue close 5 --comment done
+branch|git checkout -b feat/1-x
+branch|git -C /tmp/r switch -c feat/1-x
+branch|git worktree add ../wt -b feat/1-x
+branch|git checkout -q -b feat/1-x origin/develop
+|gh issue view 5
+|gh pr list --state open
+|gh pr view 7 --json body
+|git checkout develop
+|git switch feat/1-x
+|git commit -m 'never run gh pr create by hand'
+|rg -n 'gh issue create' .claude
+|cckit pr 12 "summary"
+|cckit new --role tech-lead "title"
+|echo 'gh pr merge 1'
+CASES
+  # heredoc bodies are data, not commands
+  got=""; while IFS= read -r seg; do k="$(_grg_classify "$seg")"; [ -n "$k" ] && got="$k"; done \
+    <<< "$(_grg_segments "$(printf 'cat > f.md <<EOF\ngh pr create --fill\nEOF\necho done')")"
+  if [ -z "$got" ]; then echo "ok: heredoc body ignored"; else echo "FAIL: heredoc body classified as $got"; fail=1; fi
+  return "$fail"
+}
+
+[ "${1:-}" = "--selftest" ] && { _grg_selftest; exit $?; }
+
+command -v jq >/dev/null 2>&1 || exit 0
+input="$(cat 2>/dev/null)"
+cmd="$(printf '%s' "$input" | jq -r '.tool_input.command // empty' 2>/dev/null)"
+[ -z "$cmd" ] && exit 0
+# Cheap prefilter: nothing to inspect unless gh or git appears at all.
+printf '%s' "$cmd" | grep -qE '(^|[^A-Za-z0-9_-])(gh|git)[[:space:]]' || exit 0
+
+key=""
+while IFS= read -r seg; do
+  [ -z "$seg" ] && continue
+  key="$(_grg_classify "$seg")"; [ -n "$key" ] && break
+done <<< "$(_grg_segments "$cmd")"
+[ -z "$key" ] && exit 0
+
+# Resolve the directory the command runs in (as guard-base-branch-commit does): `git -C <dir>`, a
+# leading `cd <dir>`, else the tool's cwd.
+cwd="$(printf '%s' "$input" | jq -r '.cwd // empty' 2>/dev/null)"
+dir=""
+if [[ "$cmd" =~ git[[:space:]]+-C[[:space:]]+([^[:space:]]+) ]]; then dir="${BASH_REMATCH[1]}"
+elif [[ "$cmd" =~ (^|[\&\;\|])[[:space:]]*cd[[:space:]]+([^[:space:]\&\;\|]+) ]]; then dir="${BASH_REMATCH[2]}"; fi
+dir="${dir%\"}"; dir="${dir#\"}"; dir="${dir%\'}"; dir="${dir#\'}"
+case "$dir" in ""|*'$'*) dir="${cwd:-${CLAUDE_PROJECT_DIR:-$PWD}}" ;; esac
+
+cfg="$(_grg_config "$dir")" || exit 0   # not a cckit repo: not our business
+
+# A branch op is only a bypass when it cuts work from the base branch (cckit start's job).
+# Branching inside an issue or effort worktree (a sub branch, a scratch branch) is fine.
+if [ "$key" = branch ]; then
+  base="$(jq -r '.github.baseBranch // .git.baseBranch // empty' "$cfg" 2>/dev/null)"
+  cur="$(git -C "$dir" rev-parse --abbrev-ref HEAD 2>/dev/null)" || exit 0
+  case "$cur" in "${base:-develop}"|main|master|develop) : ;; *) exit 0 ;; esac
+fi
+
+if [ "${KIT_ALLOW_RAW:-}" = 1 ] || printf '%s' "$cmd" | grep -qE '(^|[^A-Za-z0-9_])KIT_ALLOW_RAW=1([[:space:]]|$)'; then
+  common="$(git -C "$dir" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"
+  if [ -n "$common" ]; then
+    mkdir -p "$common/cckit" 2>/dev/null
+    printf '%s\t%s\t%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$key" "$dir" \
+      "$(printf '%s' "$cmd" | tr '\n\t' '  ' | cut -c1-300)" >> "$common/cckit/raw-bypass.log" 2>/dev/null
+  fi
+  echo "cckit: raw $key allowed by KIT_ALLOW_RAW=1 — recorded in ${common:-<no git dir>}/cckit/raw-bypass.log" >&2
+  exit 0
+fi
+
+{
+  echo "BLOCKED: raw '$key' in a cckit repo. The verb does the board add, labels and fields; the raw command skips them silently."
+  echo "Run instead:  $(_grg_hint "$key")"
+  echo "If the verb is broken, fix the verb. Deliberate one-off: prefix KIT_ALLOW_RAW=1 (recorded in <git-common-dir>/cckit/raw-bypass.log)."
+} >&2
+exit 2
