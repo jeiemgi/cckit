@@ -657,10 +657,10 @@ effort_pr() {
   # The ONE effort-PR implementation (#363). The kit-effort-pr skill calls this; before, the skill
   # carried its own inline copy, so agents hand-copied the script and the copy drifted (a PR missing
   # from the board, a mangled body). Args: [<slug|N>] [--summary S|--summary-file F]
-  # [--for-agents A|--for-agents-file F] [--message M]. SUMMARY / FOR_AGENTS / COMMIT_MSG env are
+  # [--for-agents A|--for-agents-file F] [--message M] [--title T]. SUMMARY / FOR_AGENTS / COMMIT_MSG env are
   # honoured as fallbacks.
   _eff_need gh || return 1
-  local raw="" summary="${SUMMARY:-}" for_agents="${FOR_AGENTS:-}" msg="${COMMIT_MSG:-}"
+  local raw="" summary="${SUMMARY:-}" for_agents="${FOR_AGENTS:-}" msg="${COMMIT_MSG:-}" title_override=""
   while [ $# -gt 0 ]; do
     case "$1" in
       --summary)          summary="${2:-}"; shift 2 ;;
@@ -668,6 +668,7 @@ effort_pr() {
       --for-agents)       for_agents="${2:-}"; shift 2 ;;
       --for-agents-file)  for_agents="$(cat "${2:-/dev/null}")"; shift 2 ;;
       --message|-m)       msg="${2:-}"; shift 2 ;;
+      --title)            title_override="${2:-}"; shift 2 ;;
       *)                  [ -z "$raw" ] && raw="$1"; shift ;;
     esac
   done
@@ -718,7 +719,9 @@ effort_pr() {
 
   # ONE shared composer (effort.sh) so every surface titles identically, then the mandatory-[#N]
   # check before we ever call gh — refuse rather than open an id-less PR (#121).
-  pr_title="$(effort_pr_title "$num" "${name:-effort}" "$role_disp")"
+  # --title serves a repo whose PR titles follow another convention (Conventional Commits under a
+  # commitlint gate); it must still carry the [#N] id, checked below.
+  pr_title="${title_override:-$(effort_pr_title "$num" "${name:-effort}" "$role_disp")}"
   effort_pr_title_check "$pr_title" "$num" || { echo "effort_pr: refusing to open a PR without the [#$num] effort id" >&2; return 1; }
   body="$(_eff_pr_body "$num" "$summary" "$for_agents" "$role")"
 

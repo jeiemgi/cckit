@@ -32,6 +32,7 @@ From the effort worktree (branch `effort/<N>-<slug>`):
 ```bash
 cckit effort pr <N> --summary-file <summary.md> --for-agents-file <for-agents.md>
 # short form: cckit effort pr <N> --summary "<what + why>" --for-agents "<paths>"
+# a repo with its own PR-title convention: add --title "<title carrying [#N]>"
 ```
 
 What the verb does, in order: commits pending **tracked** changes (role identity as a

@@ -30,7 +30,7 @@
 #         EFFORT_WIP_REMOTE=0 or an unreachable origin uses the cache and still starts). Refuses
 #         before writing anything; --force (or KIT_FORCE=1) starts anyway, at limit 0 too.
 #         `cckit start <issue>` is not affected.
-#     effort pr [<N>] [--summary S|--summary-file F] [--for-agents A|--for-agents-file F]
+#     effort pr [<N>] [--summary S|--summary-file F] [--for-agents A|--for-agents-file F] [--title T]
 #         the ONE effort PR: inherits labels + milestone, rich body, board In Review
 #   cckit orchestrate <a> <b> …     run N flows in parallel worktrees (--runtime tmux|herdr)
 #   cckit autopilot [<a> …]         unattended multi-flow: drive (or auto-pick) issues under a cap

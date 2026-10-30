@@ -106,6 +106,12 @@ tc "$GH_LOG" 'SUMMARY-MARKER'                                "effort_pr puts --s
 tc "$GH_LOG" 'AGENTS-MARKER'                                 "effort_pr puts --for-agents in the body"
 tc "$GH_LOG" '^Closes #99$'                                  "effort_pr body closes the parent"
 t  "effort_pr never commits an untracked .env.local" "$(git ls-files .env.local)" ""
+: > "$GH_LOG"
+effort_pr 99 --title "feat(x): a conventional title" >/dev/null 2>&1 && rc=0 || rc=1
+t  "effort_pr refuses a --title without the [#N] id" "$rc" "1"
+t  "effort_pr opened nothing on a bad --title"      "$(grep -c 'pr create' "$GH_LOG")" "0"
+effort_pr 99 --title "feat(x): a conventional title [#99]" >/dev/null 2>&1
+tc "$GH_LOG" 'pr create .*--title feat\(x\): a conventional title \[#99\]' "effort_pr honours --title"
 
 # ── effort_close #120: refuse-squash-without-trace backstop ────────────────────────────────────
 # With NO commits on the effort branch, effort_snapshot_subs captures no trace → close must refuse
