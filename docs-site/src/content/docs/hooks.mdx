@@ -59,6 +59,10 @@ Hooks are plain scripts under `.claude/hooks/` in your project, registered in
 `.claude/settings.json`, so it also runs in every worktree. They are yours to read and edit — every one is a safe no-op when its
 tool isn't installed, so nothing breaks if a dependency is missing.
 
+`cckit init --upgrade` refreshes a hook you never edited: one whose content matches an earlier
+version of its template, or the hash recorded in `.claude/kit.manifest.json`. A hook you customized
+is kept and listed as **Drifted** in the upgrade summary, for you to compare with the template.
+
 | Do this | Command |
 | ------- | ------- |
 | Scaffold the hooks | `cckit init` |

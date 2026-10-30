@@ -356,6 +356,8 @@ BASENAME="$(basename "$TARGET")"
 # different name — and only fall back to the directory basename (#73).
 # shellcheck source=/dev/null
 . "$KIT_ROOT/scripts/lib/git-remote.sh"
+# shellcheck source=/dev/null
+. "$KIT_ROOT/scripts/lib/hook-refresh.sh"   # hook_refresh_state — refresh unmodified hooks (#370)
 NAME_SRC="$(git_remote_repo_name "$TARGET" 2>/dev/null || true)"; NAME_SRC="${NAME_SRC:-$BASENAME}"
 [[ -z "$NAME" ]] && NAME="$NAME_SRC"
 [[ -z "$SLUG" ]] && SLUG="$(echo "$NAME_SRC" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed -E 's/^-|-$//g')"
@@ -557,6 +559,22 @@ safe_copy() {  # <src> <dest> [exec]
   return 0
 }
 
+# hook_write: safe_write for a kit-owned HOOK (#370). In --upgrade an existing hook is refreshed when
+# it is an unmodified copy of an earlier template version (hook_refresh_state: the manifest hash or
+# cckit's own template history), and reported as drifted — never overwritten — when the repo
+# customized it. Everything else (new file, config-excluded path, normal init) is safe_write.
+hook_write() {  # <src> <dest>
+  local rel="${2#"$TARGET"/}" state
+  if [[ $UPGRADE -ne 1 || ! -e "$2" ]] || _upgrade_excluded "$rel"; then safe_write "$1" "$2"; return 0; fi
+  state="$(hook_refresh_state "$2" "$1" "$KIT_ROOT" "$TARGET/.claude/kit.manifest.json" "$rel")"
+  case "$state" in
+    refresh) emit "$1" "$2"; UPGRADE_REFRESHED+=("$rel") ;;
+    drifted) UPGRADE_DRIFTED+=("$rel") ;;
+    *)       UPGRADE_PRESERVED+=("$rel") ;;
+  esac
+  return 0
+}
+
 # ---- dry run: print the plan and exit, writing nothing -------------------
 if [[ $DRY_RUN -eq 1 ]]; then
   echo "-> DRY RUN — nothing will be written. Plan for $TARGET:"
@@ -622,7 +640,7 @@ if [[ $UPGRADE -eq 0 ]]; then
   _kit_init_banner "$PLUGIN_VERSION"
 fi
 
-UPGRADE_ADDED=(); UPGRADE_PRESERVED=(); UPGRADE_SKIPPED=()
+UPGRADE_ADDED=(); UPGRADE_PRESERVED=(); UPGRADE_SKIPPED=(); UPGRADE_REFRESHED=(); UPGRADE_DRIFTED=()
 echo "-> $([[ $UPGRADE -eq 1 ]] && echo Upgrading || echo Scaffolding) $PROFILE profile $([[ $UPGRADE -eq 1 ]] && echo in || echo into) $TARGET"
 mkdir -p "$TARGET/.claude/agents" "$TARGET/.claude/skills" "$TARGET/.claude/rules" "$TARGET/scripts/lib"
 
@@ -861,7 +879,7 @@ fi
 # ---- local model layer SessionStart hook (opt-in; idempotent, also on --upgrade) ----
 if [[ "$LOCAL_ON" == "true" ]]; then
   mkdir -p "$TARGET/.claude/hooks"
-  safe_write "$KIT_ROOT/templates/hooks/kit-local-status.sh.tmpl" "$TARGET/.claude/hooks/kit-local-status.sh"
+  hook_write "$KIT_ROOT/templates/hooks/kit-local-status.sh.tmpl" "$TARGET/.claude/hooks/kit-local-status.sh"
   chmod +x "$TARGET/.claude/hooks/kit-local-status.sh" 2>/dev/null || true
   merge_settings --arg ls "$TARGET/.claude/hooks/kit-local-status.sh" \
     '.hooks.SessionStart = (((.hooks.SessionStart // []) | map(select((.hooks[0].command // "") != $ls))) + [{matcher:"",hooks:[{type:"command",command:$ls,timeout:10}]}])'
@@ -870,7 +888,7 @@ fi
 
 # ---- repo-hygiene SessionStart hook (all projects; read-only; idempotent) ----
 mkdir -p "$TARGET/.claude/hooks"
-safe_write "$KIT_ROOT/templates/hooks/repo-hygiene.sh.tmpl" "$TARGET/.claude/hooks/repo-hygiene.sh"
+hook_write "$KIT_ROOT/templates/hooks/repo-hygiene.sh.tmpl" "$TARGET/.claude/hooks/repo-hygiene.sh"
 chmod +x "$TARGET/.claude/hooks/repo-hygiene.sh" 2>/dev/null || true
 merge_settings --arg rh "$TARGET/.claude/hooks/repo-hygiene.sh" \
   '.hooks.SessionStart = (((.hooks.SessionStart // []) | map(select((.hooks[0].command // "") != $rh))) + [{matcher:"",hooks:[{type:"command",command:$rh,timeout:10}]}])'
@@ -878,7 +896,7 @@ HOOK_NOTE="$HOOK_NOTE + repo-hygiene"
 
 # ---- base-branch commit guard PreToolUse(Bash) hook (all projects; idempotent) ----
 mkdir -p "$TARGET/.claude/hooks"
-safe_write "$KIT_ROOT/templates/hooks/guard-base-branch-commit.sh.tmpl" "$TARGET/.claude/hooks/guard-base-branch-commit.sh"
+hook_write "$KIT_ROOT/templates/hooks/guard-base-branch-commit.sh.tmpl" "$TARGET/.claude/hooks/guard-base-branch-commit.sh"
 chmod +x "$TARGET/.claude/hooks/guard-base-branch-commit.sh" 2>/dev/null || true
 merge_settings --arg gd "$TARGET/.claude/hooks/guard-base-branch-commit.sh" \
   '.hooks.PreToolUse = (((.hooks.PreToolUse // []) | map(select((.hooks[0].command // "") != $gd))) + [{matcher:"Bash",hooks:[{type:"command",command:$gd,timeout:10}]}])'
@@ -889,7 +907,7 @@ HOOK_NOTE="$HOOK_NOTE + commit-guard"
 # cckit verb to run instead (#364). Wired in the TRACKED settings.json with $CLAUDE_PROJECT_DIR, not
 # settings.local.json: the local file is per-checkout and gitignored, so a guard wired there never
 # reaches a worktree — which is exactly where agents work.
-safe_write "$KIT_ROOT/templates/hooks/guard-raw-git-ops.sh.tmpl" "$TARGET/.claude/hooks/guard-raw-git-ops.sh"
+hook_write "$KIT_ROOT/templates/hooks/guard-raw-git-ops.sh.tmpl" "$TARGET/.claude/hooks/guard-raw-git-ops.sh"
 chmod +x "$TARGET/.claude/hooks/guard-raw-git-ops.sh" 2>/dev/null || true
 _TRACKED="$TARGET/.claude/settings.json"
 [[ -f "$_TRACKED" ]] || echo '{}' > "$_TRACKED"
@@ -901,7 +919,7 @@ echo "  + .claude/hooks/guard-raw-git-ops.sh (PreToolUse Bash, wired in tracked 
 
 # ---- version-check SessionStart hook (all projects; idempotent) ---------
 mkdir -p "$TARGET/.claude/hooks"
-safe_write "$KIT_ROOT/templates/hooks/kit_version_check.sh.tmpl" "$TARGET/.claude/hooks/kit_version_check.sh"
+hook_write "$KIT_ROOT/templates/hooks/kit_version_check.sh.tmpl" "$TARGET/.claude/hooks/kit_version_check.sh"
 chmod +x "$TARGET/.claude/hooks/kit_version_check.sh" 2>/dev/null || true
 merge_settings --arg vc "$TARGET/.claude/hooks/kit_version_check.sh" \
   '.hooks.SessionStart = (((.hooks.SessionStart // []) | map(select((.hooks[0].command // "") != $vc))) + [{matcher:"",hooks:[{type:"command",command:$vc,timeout:10}]}])'
@@ -950,6 +968,8 @@ if [[ $UPGRADE -eq 1 ]]; then
   if [[ ${#UPGRADE_ADDED[@]}     -gt 0 ]]; then echo "  Added (new in this kit version):"; printf '    + %s\n' "${UPGRADE_ADDED[@]}"; fi
   if [[ ${#UPGRADE_PRESERVED[@]} -gt 0 ]]; then echo "  Preserved (your edits, untouched):"; printf '    = %s\n' "${UPGRADE_PRESERVED[@]}"; fi
   if [[ ${#UPGRADE_SKIPPED[@]}   -gt 0 ]]; then echo "  Skipped (removed/renamed via kit.config upgrade):"; printf '    - %s\n' "${UPGRADE_SKIPPED[@]}"; fi
+  if [[ ${#UPGRADE_REFRESHED[@]} -gt 0 ]]; then echo "  Refreshed (unmodified hook, now the current template):"; printf '    ~ %s\n' "${UPGRADE_REFRESHED[@]}"; fi
+  if [[ ${#UPGRADE_DRIFTED[@]}   -gt 0 ]]; then echo "  Drifted (customized hook, kept — diff it against templates/hooks/ by hand):"; printf '    ! %s\n' "${UPGRADE_DRIFTED[@]}"; fi
 else
   echo ""
   echo "Next steps:"
