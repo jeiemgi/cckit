@@ -165,6 +165,7 @@ t  "effort_close GC deleted the local branch" \
 cat > "$stub/khook" <<'SH'
 #!/usr/bin/env bash
 printf 'ingested %s\n' "$1" > "$KHOOK_MARKER"
+pwd -P > "$KHOOK_MARKER.cwd" 2>/dev/null || echo "NO-CWD" > "$KHOOK_MARKER.cwd"
 SH
 chmod +x "$stub/khook"
 start_out="$(effort_start 88 forced 2>/dev/null)"
@@ -174,6 +175,9 @@ forced_out="$(KHOOK_MARKER="$tmp/khook.out" KIT_EFFORT_KNOWLEDGE_HOOK="$stub/kho
 cd "$tmp/work"
 tc "$GH_LOG" 'pr merge effort/88-forced .*--squash' "KIT_FORCE=1 close merges despite no trace"
 t  "knowledge-ingest hook ran with the effort number" "$(cat "$tmp/khook.out" 2>/dev/null)" "ingested 88"
+# #371: the close GCs the worktree it was run from; the hook must run in the main checkout, not in
+# that deleted directory (where every relative path and git call fails).
+t  "knowledge-ingest hook runs in the main checkout" "$(cat "$tmp/khook.out.cwd" 2>/dev/null)" "$(cd "$tmp/work" && pwd -P)"
 # #148: no kit-managed file touched → the drift check stays silent
 case "$forced_out" in *"kit-sync"*) echo "FAIL: kit-sync warning fired with no kit-managed change"; fail=1 ;; *) echo "ok: drift check silent when no kit-managed file changed" ;; esac
 
