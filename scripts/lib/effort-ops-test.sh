@@ -25,7 +25,10 @@ case "$1 $2" in
   "issue create")  n=$(( $(cat "$GH_N" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$GH_N"
                    echo "https://github.com/o/r/issues/$n" ;;
   "issue edit"|"issue close"|"pr merge") exit 0 ;;
-  "issue view")    echo "[Effort] 99 · demo effort" ;;          # --json title -q .title
+  "issue view")    case "$*" in                                 # effort_pr reads title+labels+milestone
+                     *labels,milestone*) echo '{"title":"[Effort] 99 · demo effort","labels":[{"name":"role:tech-lead"},{"name":"kind:task"}],"milestone":{"title":"M1"}}' ;;
+                     *) echo "[Effort] 99 · demo effort" ;;     # --json title -q .title
+                   esac ;;
   "pr create")     echo "https://github.com/o/r/pull/7" ;;
   "pr diff")       # a merged sub PR's diff (wave-style close, #164): one kit-managed + one app file
     printf 'diff --git a/.claude/skills/demo.md b/.claude/skills/demo.md\n+kit\ndiff --git a/src/app.ts b/src/app.ts\n+app\n' ;;
@@ -93,8 +96,16 @@ t  "effort_start bootstrapped the worktree (.env.local copied)" \
 # move onto the effort branch (its worktree) for pr/close
 cd "$tmp/work/.claude/worktrees/effort+99-demo"
 : > "$GH_LOG"
-effort_pr 99 >/dev/null 2>&1
+effort_pr 99 --summary "SUMMARY-MARKER" --for-agents "AGENTS-MARKER" >/dev/null 2>&1
 tc "$GH_LOG" 'pr create .*--base main --head effort/99-demo' "effort_pr opens effort/99 → main"
+# #363: parity with the kit-effort-pr skill — the verb is the one implementation.
+tc "$GH_LOG" 'pr create .*--title \[#99\] demo effort' "effort_pr titles with the [#N] id + parent name"
+tc "$GH_LOG" '[-]-label role:tech-lead,kind:task' "effort_pr inherits the parent's labels"
+tc "$GH_LOG" '[-]-milestone M1'                 "effort_pr inherits the parent's milestone"
+tc "$GH_LOG" 'SUMMARY-MARKER'                                "effort_pr puts --summary in the body"
+tc "$GH_LOG" 'AGENTS-MARKER'                                 "effort_pr puts --for-agents in the body"
+tc "$GH_LOG" '^Closes #99$'                                  "effort_pr body closes the parent"
+t  "effort_pr never commits an untracked .env.local" "$(git ls-files .env.local)" ""
 
 # ── effort_close #120: refuse-squash-without-trace backstop ────────────────────────────────────
 # With NO commits on the effort branch, effort_snapshot_subs captures no trace → close must refuse

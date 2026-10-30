@@ -30,6 +30,8 @@
 #         EFFORT_WIP_REMOTE=0 or an unreachable origin uses the cache and still starts). Refuses
 #         before writing anything; --force (or KIT_FORCE=1) starts anyway, at limit 0 too.
 #         `cckit start <issue>` is not affected.
+#     effort pr [<N>] [--summary S|--summary-file F] [--for-agents A|--for-agents-file F]
+#         the ONE effort PR: inherits labels + milestone, rich body, board In Review
 #   cckit orchestrate <a> <b> …     run N flows in parallel worktrees (--runtime tmux|herdr)
 #   cckit autopilot [<a> …]         unattended multi-flow: drive (or auto-pick) issues under a cap
 #   cckit watch [--merge] [--loop]  captain: gate open PRs, squash-merge CLEAN, advance the wave
@@ -145,7 +147,12 @@ case "$cmd" in
         effort_new "$@" ;;
       chain) effort_chain "$@" ;;
       start) effort_start "$@" ;;
-      pr)    effort_pr    "$@" ;;
+      pr)
+        # role-identity gives the PR its role title, commit trailer and signature; the board
+        # helpers load lazily inside effort_pr (_eo_source_board).
+        # shellcheck source=/dev/null
+        source "$LIB/role-identity.sh" 2>/dev/null || true
+        effort_pr "$@" ;;
       close) effort_close "$@" ;;
       plan)  source "$LIB/effort-plan.sh"; effort_plan "$@" ;;
       *) echo "cckit effort <new|chain|start|pr|close|plan>" >&2; exit 2 ;;
