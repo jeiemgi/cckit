@@ -8,6 +8,9 @@
 # Hermetic: stubs `gh` (no network/auth). Run: bash scripts/portable-test.sh
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# Sealed from the caller's KIT_*/CCKIT_*/EFFORT_* (#369): this suite builds its own fixture.
+# shellcheck source=/dev/null
+. "$ROOT/scripts/lib/test-env.sh" && test_env_seal
 CCKIT="$ROOT/bin/cckit"
 fail=0
 t()   { if [ "$2" = "$3" ]; then echo "ok: $1"; else echo "FAIL: $1 -> got '[$2]' want '[$3]'"; fail=1; fi; }

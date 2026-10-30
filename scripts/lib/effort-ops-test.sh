@@ -5,6 +5,9 @@
 # errors: strict — a test runner: rc 1 on any failed assertion
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+# Sealed from the caller's KIT_*/CCKIT_*/EFFORT_* (#369): this suite builds its own fixture.
+# shellcheck source=/dev/null
+. "$ROOT/scripts/lib/test-env.sh" && test_env_seal
 LIB="$ROOT/scripts/lib"
 SCRIPTS="$ROOT/scripts"
 fail=0

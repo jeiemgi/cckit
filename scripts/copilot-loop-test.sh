@@ -8,6 +8,9 @@
 #   stop  — with no open PRs the captain stops cleanly
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# Sealed from the caller's KIT_*/CCKIT_*/EFFORT_* (#369): this suite builds its own fixture.
+# shellcheck source=/dev/null
+. "$ROOT/scripts/lib/test-env.sh" && test_env_seal
 command -v jq >/dev/null 2>&1 || { echo "copilot-loop-test: jq required" >&2; exit 1; }
 fail=0
 ok() { if [ "$1" = "$2" ]; then echo "ok: $3"; else echo "FAIL: $3 -> got '[$1]' want '[$2]'"; fail=1; fi; }
