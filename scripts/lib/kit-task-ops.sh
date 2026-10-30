@@ -336,24 +336,33 @@ kto_task_pr_merge() {
     fi
   done
 
-  # Locate the branch's worktree + the main worktree, switch develop + pull, clean up.
+  # Locate the branch's worktree + the main checkout, then clean up FROM the main checkout (#371).
+  # Run from the PR's own worktree, removing that worktree deleted our cwd, and every git call after
+  # it died with "Unable to read current working directory" — leaving the local branch behind. The
+  # main checkout = the parent of the shared git dir; fall back to the first `worktree list` entry.
+  local common
   wt=$(git worktree list --porcelain | awk -v b="refs/heads/$branch" '/^worktree /{p=$2} /^branch /{if($2==b) print p}')
-  main_wt=$(git worktree list --porcelain | awk '/^worktree /{print $2; exit}')
-  git -C "$main_wt" checkout "$base" 2>/dev/null || git checkout "$base"
-  git -C "$main_wt" pull origin "$base" 2>/dev/null || git pull origin "$base"
+  common="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"
+  main_wt=""
+  [[ -n "$common" && "$(basename "$common")" == ".git" ]] && main_wt="$(dirname "$common")"
+  [[ -n "$main_wt" ]] || main_wt=$(git worktree list --porcelain | awk '/^worktree /{print $2; exit}')
+  cd "$main_wt" || { echo "✗ cannot reach the main checkout $main_wt for cleanup" >&2; return 1; }
+  git -C "$main_wt" checkout "$base" 2>/dev/null || true
+  git -C "$main_wt" pull origin "$base" 2>/dev/null || true
 
   if [[ -n "$wt" && "$wt" != "$main_wt" ]]; then
-    git worktree remove "$wt" --force && echo "✓ Removed worktree $wt"
+    git -C "$main_wt" worktree remove "$wt" --force && echo "✓ Removed worktree $wt"
   fi
   # Never delete the base (or a release) branch: merging a PR from the hub leaves $branch = base.
+  # -D, not -d: a squash merge leaves the branch "not fully merged" by ancestry.
   case "$branch" in
     "$base"|main|master|develop|HEAD)
       echo "  (on $branch — no branch cleanup; run cckit merge from the PR's worktree to GC it)" ;;
     *)
-      git branch -D "$branch" 2>/dev/null && echo "✓ Deleted local branch $branch"
-      git push origin --delete "$branch" 2>/dev/null && echo "✓ Deleted remote branch $branch" || echo "  (remote branch already gone)" ;;
+      git -C "$main_wt" branch -D "$branch" 2>/dev/null && echo "✓ Deleted local branch $branch"
+      git -C "$main_wt" push origin --delete "$branch" 2>/dev/null && echo "✓ Deleted remote branch $branch" || echo "  (remote branch already gone)" ;;
   esac
-  git worktree prune
+  git -C "$main_wt" worktree prune
   echo "✓ On $base, up to date — merged branch + worktree cleaned"
 }
 
