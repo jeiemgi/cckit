@@ -65,6 +65,15 @@ if [ -n "${KTO_TEST_INNER:-}" ]; then
      "$(kto_pr_title 'Benchmark harness' 'ported a harness' 'kind:feat')" \
      "feat: Benchmark harness"
 
+  # pr.orchestratorSection: off by default, a 2-line section first when on
+  ob="$(kto_compose_pr_body 42 'S.' 'tech-lead' 'Fix the thing')"
+  case "$ob" in *"For the orchestrator"*) echo "FAIL($KTO_TEST_INNER): orchestrator section present by default"; fail=1 ;; *) ;; esac
+  ob="$(KIT_PR_ORCHESTRATOR_SECTION=true kto_compose_pr_body 42 'S.' 'tech-lead' 'Fix the thing')"
+  eq "orchestrator section opens the body" "$(printf '%s\n' "$ob" | sed -n 1p)" "## For the orchestrator"
+  eq "orchestrator line 1 = id + title"   "$(printf '%s\n' "$ob" | sed -n 3p)" "#42 · Fix the thing"
+  eq "orchestrator line 2 = what to review" "$(printf '%s\n' "$ob" | sed -n 4p)" "Review: the summary below and the diff."
+  case "$ob" in *"Closes #42"*) ;; *) echo "FAIL($KTO_TEST_INNER): Closes line lost with the section on"; fail=1 ;; esac
+
   # kto_compose_pr_body must carry Closes #N and the Summary
   body="$(kto_compose_pr_body 42 'Did the thing.' 'tech-lead')"
   case "$body" in *"Closes #42"*) ;; *) echo "FAIL($KTO_TEST_INNER): pr body missing Closes #42"; fail=1 ;; esac

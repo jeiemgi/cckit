@@ -121,10 +121,15 @@ kto_pr_title() {
   printf '%s: %s' "$ctype" "$desc"
 }
 
-# Compose a PR body from the kit-task-pr template. Args: <num> <summary> <role-slug>
+# Compose a PR body from the kit-task-pr template. Args: <num> <summary> <role-slug> [issue-title]
+# pr.orchestratorSection = true (KIT_PR_ORCHESTRATOR_SECTION) prepends a 2-line
+# `## For the orchestrator` section: the issue id + title, then what to review.
 kto_compose_pr_body() {
-  local num="$1" summary="$2" role="$3" sig=""
+  local num="$1" summary="$2" role="$3" title="${4:-}" sig=""
   if type role_signature >/dev/null 2>&1; then sig="$(role_signature "$role")"; fi
+  if [ "${KIT_PR_ORCHESTRATOR_SECTION:-false}" = "true" ]; then
+    printf '## For the orchestrator\n\n#%s%s\nReview: the summary below and the diff.\n\n' "$num" "${title:+ · $title}"
+  fi
   cat <<EOF
 ## Closes
 
@@ -234,7 +239,7 @@ kto_task_pr() {
   url=$(gh pr create --repo "$repo" \
     --base "$(kto_base_branch)" --head "$branch" \
     --title "$pr_title" \
-    --body "$(kto_compose_pr_body "$num" "$summary" "$role")" \
+    --body "$(kto_compose_pr_body "$num" "$summary" "$role" "$title")" \
     --label "$labels" \
     ${milestone:+--milestone "$milestone"} \
     --assignee "@me") || return 1
