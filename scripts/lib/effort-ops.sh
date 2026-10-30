@@ -853,7 +853,9 @@ _eo_knowledge_ingest() {
   case "$hook" in /*) : ;; *) hook="$root/$hook" ;; esac   # resolve a relative hook against the root
   [ -x "$hook" ] || { echo "effort_close: knowledge-ingest hook '$hook' not executable — skipping" >&2; return 0; }
   echo "  → knowledge-ingest hook: $hook $num" >&2
-  "$hook" "$num" "$trace" >/dev/null 2>&1 || echo "effort_close: knowledge-ingest hook failed (non-fatal)" >&2
+  # Run it from the main checkout (#371): the close has just removed the worktree it was invoked from,
+  # so the inherited cwd no longer exists and a hook's relative paths / bare git calls would fail.
+  ( cd "${root:-/}" && "$hook" "$num" "$trace" ) >/dev/null 2>&1 || echo "effort_close: knowledge-ingest hook failed (non-fatal)" >&2
 }
 
 # effort_close <N> — the SINGLE close implementation (#148): the /kit-effort-close skill is a thin

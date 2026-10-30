@@ -53,5 +53,20 @@ t "a conflicting PR from the base branch is refused" "$rc" "1"
 t "the base branch was not rebased"              "$(git rev-parse develop)" "$before"
 t "nothing was merged on a conflict refusal"     "$(grep -c 'pr merge' "$GH_LOG")" "0"
 
+# ── #371: merged from the PR's OWN worktree, the cleanup still finishes ─────────────────────────
+: > "$GH_LOG"; GH_MERGEABLE="MERGEABLE"
+wt="$tmp/work/.claude/worktrees/fix+9-x"
+git worktree add -q -b fix/9-x "$wt" develop
+git -C "$wt" commit -q --allow-empty -m "the fix"
+git -C "$wt" push -q origin fix/9-x
+( cd "$wt" && kto_task_pr_merge 9 ) >/dev/null 2>"$tmp/err9"; rc=$?
+t "merge from inside its worktree exits 0"        "$rc" "0"
+t "the PR was merged"                             "$(grep -c 'pr merge 9' "$GH_LOG")" "1"
+t "its worktree is removed"                       "$([ -d "$wt" ] && echo present || echo gone)" "gone"
+t "its local branch is deleted"                   "$(git branch --list fix/9-x | wc -l | tr -d ' ')" "0"
+t "its remote branch is deleted"                  "$(git ls-remote --heads origin fix/9-x | wc -l | tr -d ' ')" "0"
+t "no 'Unable to read current working directory'" "$(grep -c 'current working directory' "$tmp/err9")" "0"
+t "the base branch survives"                      "$(git branch --list develop | tr -d ' *')" "develop"
+
 [ "$fail" -eq 0 ] && echo "kto-task-pr-merge: all passed" || echo "kto-task-pr-merge: FAILURES"
 exit "$fail"
