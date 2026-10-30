@@ -577,6 +577,7 @@ if [[ $DRY_RUN -eq 1 ]]; then
   echo "    .claude/settings.local.json"
   echo "    .claude/hooks/repo-hygiene.sh             (SessionStart: read-only repo-hygiene report)"
   echo "    .claude/hooks/guard-base-branch-commit.sh (PreToolUse Bash: block commits to base branch)"
+  echo "    .claude/hooks/guard-raw-git-ops.sh   (PreToolUse Bash, tracked settings.json: raw gh/git -> cckit verb)"
   echo "    .claude/hooks/kit_version_check.sh   (SessionStart: update check)"
   for r in $RULES; do
     case "$r" in
@@ -882,6 +883,21 @@ chmod +x "$TARGET/.claude/hooks/guard-base-branch-commit.sh" 2>/dev/null || true
 merge_settings --arg gd "$TARGET/.claude/hooks/guard-base-branch-commit.sh" \
   '.hooks.PreToolUse = (((.hooks.PreToolUse // []) | map(select((.hooks[0].command // "") != $gd))) + [{matcher:"Bash",hooks:[{type:"command",command:$gd,timeout:10}]}])'
 HOOK_NOTE="$HOOK_NOTE + commit-guard"
+
+# ---- raw-git guard PreToolUse(Bash) hook (all projects; init AND --upgrade; idempotent) ----
+# Blocks raw gh issue create / pr create / pr merge / issue close and branch-from-base, and names the
+# cckit verb to run instead (#364). Wired in the TRACKED settings.json with $CLAUDE_PROJECT_DIR, not
+# settings.local.json: the local file is per-checkout and gitignored, so a guard wired there never
+# reaches a worktree — which is exactly where agents work.
+safe_write "$KIT_ROOT/templates/hooks/guard-raw-git-ops.sh.tmpl" "$TARGET/.claude/hooks/guard-raw-git-ops.sh"
+chmod +x "$TARGET/.claude/hooks/guard-raw-git-ops.sh" 2>/dev/null || true
+_TRACKED="$TARGET/.claude/settings.json"
+[[ -f "$_TRACKED" ]] || echo '{}' > "$_TRACKED"
+jq --arg g '$CLAUDE_PROJECT_DIR/.claude/hooks/guard-raw-git-ops.sh' \
+  '.hooks.PreToolUse = (((.hooks.PreToolUse // []) | map(.hooks |= map(select(.command != $g))) | map(select((.hooks | length) > 0)))
+     + [{matcher:"Bash",hooks:[{type:"command",command:$g,timeout:10}]}])' \
+  "$_TRACKED" > "$_TRACKED.tmp" && mv "$_TRACKED.tmp" "$_TRACKED"
+echo "  + .claude/hooks/guard-raw-git-ops.sh (PreToolUse Bash, wired in tracked settings.json: raw gh/git -> cckit verb)"
 
 # ---- version-check SessionStart hook (all projects; idempotent) ---------
 mkdir -p "$TARGET/.claude/hooks"

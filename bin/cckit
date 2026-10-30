@@ -11,6 +11,9 @@
 #   cckit start <issue> [slug]      isolated worktree + branch for an issue
 #   cckit pr <issue> <summary>      commit + push + open the PR
 #   cckit close <issue> <summary>   close issue + mark done
+#   cckit new [--role R --kind K --priority P --milestone M --blocked-by "#1" --body B|--body-file F] "<title>"
+#                                   file ONE issue: labels + board (Todo) in one step (never raw gh issue create)
+#   cckit merge [<pr>]              squash-merge the PR (rebases on conflict), close its issues, GC the branch
 #   cckit contribute "<summary>"    open a contribution PR to cckit, gated on scripts/check.sh
 #   cckit sync [--llm]              board state / what's unblocked
 #   cckit plan [--llm] [--effort N] wave plan: deps-ordered, p0-first in a wave, file-disjoint (TOON --llm)
@@ -27,6 +30,8 @@
 #         EFFORT_WIP_REMOTE=0 or an unreachable origin uses the cache and still starts). Refuses
 #         before writing anything; --force (or KIT_FORCE=1) starts anyway, at limit 0 too.
 #         `cckit start <issue>` is not affected.
+#     effort pr [<N>] [--summary S|--summary-file F] [--for-agents A|--for-agents-file F] [--title T]
+#         the ONE effort PR: inherits labels + milestone, rich body, board In Review
 #   cckit orchestrate <a> <b> …     run N flows in parallel worktrees (--runtime tmux|herdr)
 #   cckit autopilot [<a> …]         unattended multi-flow: drive (or auto-pick) issues under a cap
 #   cckit watch [--merge] [--loop]  captain: gate open PRs, squash-merge CLEAN, advance the wave
@@ -142,7 +147,12 @@ case "$cmd" in
         effort_new "$@" ;;
       chain) effort_chain "$@" ;;
       start) effort_start "$@" ;;
-      pr)    effort_pr    "$@" ;;
+      pr)
+        # role-identity gives the PR its role title, commit trailer and signature; the board
+        # helpers load lazily inside effort_pr (_eo_source_board).
+        # shellcheck source=/dev/null
+        source "$LIB/role-identity.sh" 2>/dev/null || true
+        effort_pr "$@" ;;
       close) effort_close "$@" ;;
       plan)  source "$LIB/effort-plan.sh"; effort_plan "$@" ;;
       *) echo "cckit effort <new|chain|start|pr|close|plan>" >&2; exit 2 ;;
@@ -182,6 +192,52 @@ case "$cmd" in
       pr)    kto_task_pr    "$@" ;;
       close) kto_task_close "$@" ;;
     esac
+    ;;
+  new)
+    # File ONE issue through kto_task_new (labels + board add + Role/Status fields). This verb is why
+    # an agent never needs raw `gh issue create`, which skips the board (#361). Multi-part work is
+    # `cckit effort new`. Defaults: kind task, priority p2; role from --role or KIT_DEFAULT_ROLE.
+    # shellcheck source=/dev/null
+    source "$LIB/kit-config.sh" && load_kit_config
+    # shellcheck source=/dev/null
+    source "$LIB/role-identity.sh"; source "$LIB/gh-project.sh"; source "$LIB/kit-task-ops.sh"
+    n_role="${KIT_DEFAULT_ROLE:-}"; n_kind="task"; n_prio="p2"; n_ms=""; n_plan=""; n_blocked=""; n_body=""; n_title=""
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --role)       n_role="${2:-}"; shift 2 ;;
+        --kind)       n_kind="${2:-}"; shift 2 ;;
+        --priority)   n_prio="${2:-}"; shift 2 ;;
+        --milestone)  n_ms="${2:-}"; shift 2 ;;
+        --plan)       n_plan="${2:-}"; shift 2 ;;
+        --blocked-by) n_blocked="${2:-}"; shift 2 ;;
+        --body)       n_body="${2:-}"; shift 2 ;;
+        --body-file)  n_body="$(cat "${2:-/dev/null}")"; shift 2 ;;
+        -h|--help)    echo 'cckit new [--role R --kind K --priority P --milestone M --plan L --blocked-by "#1" --body B|--body-file F] "<title>"'; exit 0 ;;
+        --)           shift; n_title="${n_title:+$n_title }$*"; break ;;
+        -*)           echo "cckit new: unknown flag $1" >&2; exit 2 ;;
+        *)            n_title="${n_title:+$n_title }$1"; shift ;;
+      esac
+    done
+    [ -n "$n_title" ] || { echo 'cckit new: a title is required — cckit new --role R "<title>"' >&2; exit 2; }
+    [ -n "$n_role" ]  || { echo 'cckit new: --role is required (or set KIT_DEFAULT_ROLE)' >&2; exit 2; }
+    if cckit_is_json; then
+      rc=0; out="$(kto_task_new "$n_title" "$n_role" "$n_kind" "$n_prio" "$n_ms" "$n_plan" "$n_blocked" "$n_body" 2>&1)" || rc=$?
+      url="$(printf '%s' "$out" | grep -oE 'https://[^ ]+/issues/[0-9]+' | tail -1)"
+      cckit_json verb new issue "$(basename "${url:-x}")" ok "$([ "$rc" -eq 0 ] && echo true || echo false)" \
+        url "$url" detail "$(printf '%s' "$out" | tail -1)"
+      exit "$rc"
+    fi
+    kto_task_new "$n_title" "$n_role" "$n_kind" "$n_prio" "$n_ms" "$n_plan" "$n_blocked" "$n_body"; echo
+    ;;
+  merge)
+    # Squash-merge through kto_task_pr_merge: rebase on conflict, close the PR's linked issues (native
+    # auto-close only fires on the default branch), then clean the branch + worktree. The verb behind
+    # every raw `gh pr merge` (#361). An effort's PR merges with `cckit effort close <N>`.
+    # shellcheck source=/dev/null
+    source "$LIB/kit-config.sh" && load_kit_config
+    # shellcheck source=/dev/null
+    source "$LIB/role-identity.sh"; source "$LIB/gh-project.sh"; source "$LIB/kit-task-ops.sh"
+    kto_task_pr_merge "$@"
     ;;
   sync)        exec "$ROOT/scripts/task-sync.sh" "$@" ;;
   plan)

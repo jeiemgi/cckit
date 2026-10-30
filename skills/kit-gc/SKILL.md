@@ -78,7 +78,7 @@ git worktree remove <path> --force && git worktree prune
 git branch -D <branch>
 git push origin --delete <branch>
 # Stale-open issues (PR already merged)
-gh issue close <n> --repo "$KIT_REPO" --reason completed --comment "Delivered via PR #<pr>."
+cckit close <n> "Delivered via PR #<pr>."   # board Done + close; raw gh issue close is blocked (#364)
 # Stashes — only after showing each diff and getting an explicit OK
 git stash drop 'stash@{n}'   # or: git stash clear
 ```

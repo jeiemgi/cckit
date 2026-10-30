@@ -22,7 +22,7 @@ know what runs and when; there's nothing here for you to trigger.
 
 ## Always set up
 
-These three are scaffolded for every project.
+These four are scaffolded for every project.
 
 <div class="cckit-nowrap-2">
 
@@ -31,6 +31,7 @@ These three are scaffolded for every project.
 | `SessionStart` | `repo-hygiene.sh` | A read-only report at the start of each session: stale branches, leftover worktrees, and stashes — the same things `cckit gc` cleans up. |
 | `SessionStart` | `kit_version_check.sh` | A quiet notice if this project is behind the installed cckit — the prompt to run `cckit update`. |
 | `PreToolUse` (Bash) | `guard-base-branch-commit.sh` | Blocks a commit made straight to the base branch, so work always goes through a branch and a PR. |
+| `PreToolUse` (Bash) | `guard-raw-git-ops.sh` | Blocks a raw `gh issue create`, `gh pr create`, `gh pr merge`, `gh issue close`, or a branch cut from the base branch, and prints the cckit verb to run instead. The verb adds the item to the board; the raw command does not. `KIT_ALLOW_RAW=1` lets one command through and records it in `<git-common-dir>/cckit/raw-bypass.log`. |
 
 </div>
 
@@ -54,7 +55,8 @@ These three are scaffolded for every project.
 ## Where they live
 
 Hooks are plain scripts under `.claude/hooks/` in your project, registered in
-`.claude/settings.local.json`. They are yours to read and edit — every one is a safe no-op when its
+`.claude/settings.local.json`. The raw-git guard is the exception: it is registered in the checked-in
+`.claude/settings.json`, so it also runs in every worktree. They are yours to read and edit — every one is a safe no-op when its
 tool isn't installed, so nothing breaks if a dependency is missing.
 
 | Do this | Command |

@@ -45,7 +45,8 @@ build a wave → merge its PRs → close subs+parent → gc → launch the next 
   (`risk-tiered-review.md`) govern **ad-hoc** PRs, **not** execution of an approved plan.
 - **The permission is shipped, not improvised.** `cckit init` scaffolds a **versioned**
   `.claude/settings.json` (from `templates/settings/settings.json.tmpl`) whose explicit
-  `Bash(gh pr merge:*)` allow pre-authorizes the wave-merge — checked in, so it travels to every
+  `Bash(cckit merge:*)` / `Bash(cckit watch:*)` allow pre-authorizes the wave-merge (a raw
+  `gh pr merge` is blocked by the guard hook, #364) — checked in, so it travels to every
   worktree and collaborator (the gitignored `settings.local.json` does not). A captain merge that
   still prompts means the project predates the template: re-run `cckit init --upgrade`.
 

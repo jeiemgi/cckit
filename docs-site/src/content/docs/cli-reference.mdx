@@ -38,6 +38,8 @@ One issue becomes one branch, one worktree, one PR. These verbs walk that path.
 | `cckit start <issue> [slug]` | Create an isolated worktree + branch for an issue, [bootstrapped](/config-and-permissions/#worktree-bootstrap) — env files copied, dev port assigned, deps installed at the selected targets (`worktree.installPaths` if set — those dirs regardless of their manifests — else a root that declares dependencies or is a workspace root with members, else nothing). |
 | `cckit pr <issue> <summary>` | Commit, push, and open the PR. |
 | `cckit close <issue> <summary>` | Close the issue and mark it done. |
+| `cckit new --role R "<title>"` | File one issue: labels, board add, Role and Status fields. Milestone optional. |
+| `cckit merge [<pr>]` | Squash-merge the PR, close its linked issues, clean the branch and worktree. |
 | `cckit sync` | Board state: issues by role with Project Status, a merge-ordered open-PR queue, and blocked / not-on-board / stale (>14d) flags. |
 | `cckit status` | "Where are we?" in three buckets — local undone work, open PRs waiting on a human, cleanup available (local + remote) — plus the board and the resume handoff. Read-only. |
 | `cckit handoff "<note>"` | Save a resume-here note for the next session. |

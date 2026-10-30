@@ -64,6 +64,14 @@
       }
     },
     "milestones": { "type": "array", "items": { "type": "string" } },
+    "pr": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "titleStyle": { "type": "string", "enum": ["conventional", "issue-title"], "default": "conventional", "description": "How `cckit pr` titles a single-issue PR. conventional (default): a Conventional Commits subject derived from the kind label, which release-please and a commitlint gate read. issue-title: the issue title, verbatim." },
+        "orchestratorSection": { "type": "boolean", "default": false, "description": "When true, `cckit pr` opens the PR body with a two-line `## For the orchestrator` section: the issue number and what to review." }
+      }
+    },
     "effort": {
       "type": "object",
       "additionalProperties": true,
