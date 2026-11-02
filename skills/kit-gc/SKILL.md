@@ -51,7 +51,7 @@ branch's remote** (orphan work is surfaced, never auto-deleted).
 #   scripts/lib/kit-gc.sh :: kit_gc_analyze   (also what `kit gc` + the kit-ui cockpit run)
 source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/kit-config.sh" && load_kit_config
 KIT_GC_REPO="$KIT_REPO" source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/kit-gc.sh"
-kit_gc_analyze       # worktrees / branches / stashes, each tagged PROTECTED/SAFE/ACTIVE/ORPHAN
+kit_gc_analyze       # worktrees / branches / stashes, each tagged PROTECTED/SAFE/ACTIVE/LANDED/ORPHAN
 ```
 
 Classify every branch/worktree (issue-open protection wins over everything except an explicit force):
@@ -61,9 +61,10 @@ Classify every branch/worktree (issue-open protection wins over everything excep
 | **Protected (open issue)** | `wt_protected_reason` non-empty — associated issue **#N still OPEN** | **keep** — never prune, even with no PR / merged PR |
 | **Safe to delete** | PR `MERGED`, level with its remote (no unpushed commits), **and** issue closed/absent | prune |
 | **Active** | open PR, or the base branch, or a worktree branch with an open PR | keep |
-| **Orphan** | local commits **not on the base branch's remote** and no merged PR | **surface, never auto-delete** — offer to open a recovery PR |
+| **Landed** | **no PR of its own**, but its work is already on base — either check suffices: (a) *content*: every file it changed since its merge base has the same content on `origin/<base>`; (b) *lineage*: its name (`sub/<N>…`, `effort/<N>…`) or a `[#N]` in a commit subject names an issue that is **closed with a merged PR** | prune, under the same dirty-worktree / unpushed guards as SAFE |
+| **Orphan** | fails both LANDED checks: commits whose content is **not on the base branch's remote** and no merged PR | **surface, never auto-delete** — offer to open a recovery PR |
 
-For squash-merged branches, `--is-ancestor` is unreliable — trust the **PR state**, then verify the branch is level with its remote (`git rev-list --count origin/<b>..<b>` = 0) before deleting.
+For squash-merged branches, `--is-ancestor` and `git cherry` are unreliable (a squash rewrites the patch ids) — trust the **PR state** for a branch with its own PR, and the two LANDED checks for one without: an effort's `sub/<N><letter>` (merged into `effort/<N>`, then squashed), an `effort/<N>` whose remote ref is gone, and a Claude Code Agent-tool isolation worktree (`worktree-agent-<hash>`, which no verb creates). Then verify the branch is level with its remote (`git rev-list --count origin/<b>..<b>` = 0) before deleting. The LANDED row carries its reason (`content on origin/develop`, `issue #50 closed, its PR merged`; agent worktrees are named as such).
 
 ### 2. Present the plan
 
@@ -71,17 +72,20 @@ Print a table: worktrees to remove, branches to delete (local + remote), orphans
 
 ### 3. Execute (after confirmation)
 
+Every deletion goes through the verb — the raw `git worktree remove` / `git branch -D` loop this
+section used to document is what the base-branch guard exists to prevent, and it skipped the
+recover-before-prune checks. `/kit-cleanup` prints the same plan, then acts on it:
+
 ```bash
-# Worktrees whose PR merged
-git worktree remove <path> --force && git worktree prune
-# Merged branches — local then remote
-git branch -D <branch>
-git push origin --delete <branch>
+cckit cleanup --yes      # deletes the SAFE + LANDED rows (worktree, local branch, level remote ref), prunes listed ZOMBIE metadata
 # Stale-open issues (PR already merged)
 cckit close <n> "Delivered via PR #<pr>."   # board Done + close; raw gh issue close is blocked (#364)
-# Stashes — only after showing each diff and getting an explicit OK
+# Stashes — the one step that stays by hand, only after showing each diff and getting an explicit OK
 git stash drop 'stash@{n}'   # or: git stash clear
 ```
+
+A branch that `cleanup` leaves as ORPHAN is one whose work is **not** on base by either check: do not
+reach for `git branch -D` — step 4.
 
 ### 4. Orphan handling
 
@@ -95,5 +99,6 @@ into a clean PR off the base branch (branch from `$BASE`, `git checkout <orphan>
 - **Never** delete the base branch (`main`/`develop`) or an open-PR branch/worktree.
 - **Never** remove a worktree/branch whose **associated issue is still open** (`wt_protected_reason` non-empty) — close the issue first, or pass an explicit per-item override.
 - **Never** drop a stash or delete an orphan branch without explicit per-item consent (stashes and unpushed commits are irreversible).
+- **Delete through `cckit cleanup --yes`**, never a raw `git worktree remove` / `git branch -D` — the verb is the only path that applies the recover-before-prune guards to every row it touches.
 - Verify a branch is **level with its remote** before deleting — an "ahead" branch may hold orphan work.
 - Prefer enabling GitHub **"Automatically delete head branches"** so remote pruning stops being a manual step.

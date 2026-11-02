@@ -799,6 +799,16 @@ _eo_source_metrics() {
   [ -f "$d/effort-metrics.sh" ] && . "$d/effort-metrics.sh"
 }
 
+# _eo_source_gc — lazily source kit-gc.sh so effort_close can collect the effort's `sub/<N>…`
+# worktrees + branches through the LANDED prune path (#388) — the ONE classifier, never a second
+# `git branch -D` loop here. No-op if already loaded; a missing file degrades to "no sub GC".
+_eo_source_gc() {
+  command -v kit_gc_prune >/dev/null 2>&1 && return 0
+  local d; d="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+  # shellcheck source=/dev/null
+  [ -f "$d/kit-gc.sh" ] && . "$d/kit-gc.sh"
+}
+
 # _eo_source_board — lazily source the board helpers (gh-project.sh) + captured field ids so
 # effort_close can set Status=Done from any shell, with no caller wiring (bin/cckit sources the
 # board helpers only for `effort new`). Guarded: a no-op unless Projects v2 is on; a missing
@@ -941,6 +951,16 @@ effort_close() {
   if [ -n "$root" ]; then
     git -C "$root" checkout "$base" >/dev/null 2>&1 || true
     git -C "$root" pull origin "$base" --quiet >/dev/null 2>&1 || true
+    # (f2) the effort's sub worktrees + branches (#388): the squash just put their work on base, so
+    # kit_gc_prune's LANDED path deletes them — same classifier and recover-before-prune guards as
+    # `cckit cleanup` (a dirty sub worktree, or a sub ahead of its remote, stays). Runs in a subshell
+    # from the main checkout, BEFORE this worktree is removed, with the base `origin/<base>` just
+    # pulled above. A sub that fails both LANDED checks is left as an ORPHAN for `cckit gc` to show.
+    _eo_source_gc
+    if command -v kit_gc_prune >/dev/null 2>&1; then
+      ( cd "$root" && KIT_GC_REPO="$repo" KIT_BASE_BRANCH="$base" kit_gc_prune --yes --only "^sub/${num}[a-z]-" 2>&1 \
+          | grep -E '^  (removed worktree|deleted local branch|SKIP)' | sed 's/^  /  ✓ sub gc: /' >&2 ) || true
+    fi
     if [ -n "$self_wt" ] && [ "$self_wt" != "$root" ]; then
       case "$self_wt" in "$root"/.claude/worktrees/*)
         git -C "$root" worktree remove "$self_wt" --force >/dev/null 2>&1 && echo "  ✓ removed worktree $self_wt" >&2 ;;
