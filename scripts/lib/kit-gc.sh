@@ -98,11 +98,14 @@ _kit_gc_base_ref() {
 #       change base lacks, whatever path it took there. A branch with no change at all beyond its
 #       merge base (or an ancestor of base) is landed trivially.
 #   (b) lineage — the name (`sub/<N>…`, `effort/<N>…`, any `<kind>/<N>-…`) or a `[#N]` in one of its
-#       commit subjects names an issue that is CLOSED and whose PR (head `<kind>/<N>-…`) is MERGED in
-#       the PR index. Covers a sub whose files base has since changed further.
+#       commit subjects names an issue that is CLOSED and whose PR is MERGED: either a head
+#       `<kind>/<N>-…` in the PR index, or — when the PR has scrolled out of that 200-PR window — a
+#       PR the issue itself reports as having closed it (_kit_gc_issue_merged_pr, cached per issue).
+#       Covers a sub whose files base has since changed further, and an agent branch whose `[#N]`
+#       names the effort parent while the PR was the effort's.
 # A branch failing both stays ORPHAN. Never called for a branch with a PR of its own.
 _kit_gc_landed_reason() {
-  local b="$1" pr_index="$2" repo="${3:-$KIT_GC_REPO}" base_ref mb files shape="" n state
+  local b="$1" pr_index="$2" repo="${3:-$KIT_GC_REPO}" base_ref mb files shape="" n state pr
   base_ref="$(_kit_gc_base_ref)"; [ -n "$base_ref" ] || return 0
   case "$b" in worktree-agent-*) shape="agent worktree; " ;; esac
   # (a) content
@@ -128,7 +131,44 @@ _kit_gc_landed_reason() {
   [ "$state" = closed ] || return 0
   if printf '%s\n' "$pr_index" | grep -qE "^[a-z]+/${n}-[^	]*	PR#[0-9]+ MERGED\$"; then
     printf '%sissue #%s closed, its PR merged' "$shape" "$n"
+  elif pr="$(_kit_gc_issue_merged_pr "$n" "$repo")" && [ -n "$pr" ]; then
+    # The index is a 200-PR window; on a repo with hundreds of merged PRs the effort PR that closed
+    # #N has scrolled out of it (tedos: PR#2218 closing #2165 sat at position 254). The issue itself
+    # knows which PR closed it, and that lookup is exact and not window-bound.
+    printf '%sissue #%s closed by merged PR#%s' "$shape" "$n" "$pr"
   fi
+}
+
+# Per-run cache for _kit_gc_issue_merged_pr. A file, not a shell variable: the lookup runs inside
+# `$(...)` and `| while read` subshells, where a variable written is lost on return, while `$$` is
+# the top shell's PID in every subshell of one verb run. kit_gc_analyze / kit_gc_prune reset it on
+# entry so a result never outlives the run that made it (an issue closed since would read stale).
+_KIT_GC_CACHE_DIR="${TMPDIR:-/tmp}/kit-gc-cache-$$"
+_kit_gc_cache_reset() { rm -rf "$_KIT_GC_CACHE_DIR" 2>/dev/null; mkdir -p "$_KIT_GC_CACHE_DIR" 2>/dev/null || true; }
+
+# _kit_gc_issue_merged_pr <issue> [repo] — echo the number of a MERGED PR that closed <issue>, or
+# nothing. Reads the issue's `closedByPullRequestsReferences` (exact, not bound to the 200-PR index
+# window) and confirms the state of each candidate. Cached per issue number for the run: an effort's
+# subs and agent branches all name the same N, and 21 branches must not mean 21 gh round trips.
+# A negative answer is cached too. rc 0 with empty output when nothing merged closed it.
+_kit_gc_issue_merged_pr() {
+  local n="$1" repo="${2:-$KIT_GC_REPO}" cache="" cand result=""
+  [ -n "$n" ] || return 0
+  command -v gh >/dev/null 2>&1 || return 0
+  [ -d "$_KIT_GC_CACHE_DIR" ] && cache="$_KIT_GC_CACHE_DIR/issue-$n"
+  if [ -n "$cache" ] && [ -f "$cache" ]; then cat "$cache"; return 0; fi
+  while IFS= read -r cand; do
+    [ -n "$cand" ] || continue
+    case "$cand" in *[!0-9]*) continue ;; esac
+    if [ "$(gh pr view "$cand" --repo "$repo" --json state --jq .state 2>/dev/null)" = "MERGED" ]; then
+      result="$cand"; break
+    fi
+  done <<EOF
+$(gh issue view "$n" --repo "$repo" --json closedByPullRequestsReferences \
+     --jq '.closedByPullRequestsReferences[].number' 2>/dev/null || true)
+EOF
+  [ -n "$cache" ] && printf '%s' "$result" > "$cache" 2>/dev/null
+  printf '%s' "$result"
 }
 
 # _kit_gc_classify <branch> <pr_index> [repo] — the ONE verdict for a branch, exactly as
@@ -161,6 +201,7 @@ _kit_gc_classify() {
 # to prune.
 kit_gc_analyze() {
   _kit_gc_require_deps || return 1
+  _kit_gc_cache_reset
   # `wtpath`, not `path`: under zsh `path` is tied to PATH (special array), so a bare `path` local
   # here would clobber the command search path on assignment. A namespaced name is inert.
   local repo="$KIT_GC_REPO" b ref wtpath reason
@@ -326,6 +367,7 @@ _kit_gc_prune_why() {
 # is not scoped to a branch — that stays with a full `gc --prune` / `cleanup`.
 kit_gc_prune() {
   _kit_gc_require_deps || return 1
+  _kit_gc_cache_reset
   # `wtpath`, not `path`: under zsh `path` is tied to PATH (special array), so assigning to a bare
   # `path` local would clobber the command search path. A namespaced name is inert.
   local repo="$KIT_GC_REPO" yes=0 wtpath ref b pr_index verdict why only=""

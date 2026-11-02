@@ -300,6 +300,49 @@ t   "--yes KEPT the dirty agent worktree's branch" "$(git branch --list worktree
 [ -d ../agentwt2 ] && echo "ok: --yes skipped the dirty agent worktree" || { echo "FAIL: --yes destroyed a dirty worktree"; fail=1; }
 has "cleanup said why it skipped the dirty one" "$applied" "SKIP dirty worktree"
 has "cleanup counts what it landed"            "$applied" "landed deleted"
+
+# ── lineage when the closing PR is OUTSIDE the 200-PR index window ─────────────────────────────
+# Measured on tedos: PR#2218 (closed #2165) sat at position 254 of `gh pr list --state all`, so the
+# index never carried it and 21 `worktree-agent-*` branches with `[#2165]` subjects stayed ORPHAN
+# while base had changed their files again (content check fails too). The issue itself knows which
+# PR closed it (`closedByPullRequestsReferences`), exact and not window-bound. Cached per issue: the
+# two branches below both name #60 and must cost ONE `issue view … closedBy` call.
+git checkout -q -b sub/60a-old
+echo "old sub" > old.txt; git add old.txt; git commit -qm "sub: old"
+git checkout -q "$init_branch"
+git checkout -q sub/60a-old -- old.txt; git commit -qm "feat(effort): squash of effort 60"
+echo "changed again" > old.txt; git add old.txt; git commit -qm "later change on base"
+git checkout -q -b worktree-agent-old777
+echo "agent old" > agentold.txt; git add agentold.txt; git commit -qm "feat: agent part [#60]"
+git checkout -q "$init_branch"
+git checkout -q worktree-agent-old777 -- agentold.txt; git commit -qm "squash of the agent's part"
+echo "changed again" > agentold.txt; git add agentold.txt; git commit -qm "later change on base"
+cat > "$stub/gh" <<'SH'
+#!/usr/bin/env bash
+echo "$*" >> "$GH_CALLS"
+case "$1 $2" in
+  "pr list") printf 'effort/50-thing\tPR#55 MERGED\n' ;;      # nothing for #60: scrolled out
+  "issue view")
+    case "$*" in
+      *closedByPullRequestsReferences*) for a in "$@"; do case "$a" in 60) echo 61; exit 0 ;; esac; done ;;
+      *) echo closed ;;
+    esac ;;
+  "pr view") for a in "$@"; do case "$a" in 61) echo MERGED; exit 0 ;; esac; done; echo CLOSED ;;
+  *) : ;;
+esac
+SH
+chmod +x "$stub/gh"
+: > "$GH_CALLS"
+analysis="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_analyze 2>/dev/null)"
+has "sub landed via the issue's closing PR"        "$(row sub/60a-old)"            "LANDED (issue #60 closed by merged PR#61)"
+has "agent branch with [#60] subject landed too"   "$(row worktree-agent-old777)"  "LANDED (agent worktree; issue #60 closed by merged PR#61)"
+t   "the closedBy lookup ran ONCE for #60 across both branches" \
+    "$(grep -c 'issue view 60 .*closedByPullRequestsReferences' "$GH_CALLS")" "1"
+t   "the PR state was confirmed ONCE" "$(grep -c '^pr view 61' "$GH_CALLS")" "1"
+# A fresh run must not trust the previous run's cache (the issue could have been reopened).
+: > "$GH_CALLS"
+PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_prune >/dev/null 2>&1
+t   "a new run looks the issue up again" "$(grep -c 'issue view 60 .*closedByPullRequestsReferences' "$GH_CALLS")" "1"
 unset KIT_BASE_BRANCH
 
 [ "$fail" -eq 0 ] && echo "ALL OK (kit-gc)" || echo "kit-gc: FAILURES"
