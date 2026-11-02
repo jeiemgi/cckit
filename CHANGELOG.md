@@ -5,6 +5,31 @@ All notable changes to cckit are documented here. New entries below are generate
 [Conventional Commits](https://www.conventionalcommits.org/) and land when the Release PR is
 merged to `main`. Earlier entries follow [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.8.0](https://github.com/jeiemgi/cckit/compare/v0.7.1...v0.8.0) (2026-11-02)
+
+
+### Features
+
+* **adapters:** define the shared agent contract and stop autopilot swallowing failures [[#257](https://github.com/jeiemgi/cckit/issues/257)] ([#342](https://github.com/jeiemgi/cckit/issues/342)) ([01aa73d](https://github.com/jeiemgi/cckit/commit/01aa73d8f0b140132281ad5580fc373a22527424))
+* **agents:** run agents by profile, with bounded briefs and stage receipts [[#318](https://github.com/jeiemgi/cckit/issues/318)] ([#336](https://github.com/jeiemgi/cckit/issues/336)) ([b7da73e](https://github.com/jeiemgi/cckit/commit/b7da73ebbcac83be37ffa1550d48e954d8b5b522))
+* cleanup deletes branches whose work already landed ([#389](https://github.com/jeiemgi/cckit/issues/389)) ([69e78fe](https://github.com/jeiemgi/cckit/commit/69e78fec803aecd9da30ca758f764b3953368eef))
+* **init:** refresh unmodified hooks on upgrade [[#370](https://github.com/jeiemgi/cckit/issues/370)] ([#375](https://github.com/jeiemgi/cckit/issues/375)) ([f48b2de](https://github.com/jeiemgi/cckit/commit/f48b2def4eab9f1179ebe6e8af018b1bef6427aa))
+* **lint:** gate context budget and repeat review findings [[#328](https://github.com/jeiemgi/cckit/issues/328)] ([#329](https://github.com/jeiemgi/cckit/issues/329)) ([5047a2c](https://github.com/jeiemgi/cckit/commit/5047a2c7af4d11b2bdfd3c9a41f986ddcb0c1731))
+* **orchestrate:** one writer per branch, and receipts that outlive the clone [[#318](https://github.com/jeiemgi/cckit/issues/318)] ([#343](https://github.com/jeiemgi/cckit/issues/343)) ([1256e24](https://github.com/jeiemgi/cckit/commit/1256e24a243bd3c5fedd60ad68ac8c2652db71e8))
+* **orchestrate:** run agents in Herdr as an opt-in runtime [[#317](https://github.com/jeiemgi/cckit/issues/317)] ([#327](https://github.com/jeiemgi/cckit/issues/327)) ([18c9c95](https://github.com/jeiemgi/cckit/commit/18c9c956ff4be4d34160d8065d985f7a8b1fe75b))
+* **review:** run review as a stage the captain gates on [[#344](https://github.com/jeiemgi/cckit/issues/344)] ([#351](https://github.com/jeiemgi/cckit/issues/351)) ([da155cd](https://github.com/jeiemgi/cckit/commit/da155cd8d53d86f30656262fb318d8ecb35b244c))
+* **verbs:** make the verbs the only path [[#361](https://github.com/jeiemgi/cckit/issues/361)] ([#365](https://github.com/jeiemgi/cckit/issues/365)) ([2343519](https://github.com/jeiemgi/cckit/commit/23435198be6953e4764be3436fb6376390d9305e))
+
+
+### Bug Fixes
+
+* **contribute:** run from the cckit worktree you are in [[#368](https://github.com/jeiemgi/cckit/issues/368)] ([#374](https://github.com/jeiemgi/cckit/issues/374)) ([9abf898](https://github.com/jeiemgi/cckit/commit/9abf898454ffdb7014ad13f15fcfa9272e67051f))
+* **effort:** snapshot every commit, not one, under zsh ([#341](https://github.com/jeiemgi/cckit/issues/341)) ([92af9da](https://github.com/jeiemgi/cckit/commit/92af9daa6e85116462ea7b756672df402f5d6b50)), closes [#339](https://github.com/jeiemgi/cckit/issues/339)
+* **merge:** finish the cleanup when run from the PR's worktree [[#371](https://github.com/jeiemgi/cckit/issues/371)] ([#372](https://github.com/jeiemgi/cckit/issues/372)) ([4aa7138](https://github.com/jeiemgi/cckit/commit/4aa713850b52801b29b36bcb3ad850f2fbf2d129))
+* **merge:** never act on the base branch [[#366](https://github.com/jeiemgi/cckit/issues/366)] ([#367](https://github.com/jeiemgi/cckit/issues/367)) ([2b1078d](https://github.com/jeiemgi/cckit/commit/2b1078d3ffaed39f9b44e5ffa8e67f6bb2a399af))
+* per-worktree dev ports collide — three defects let parallel lanes share a port ([#289](https://github.com/jeiemgi/cckit/issues/289)) ([99d351e](https://github.com/jeiemgi/cckit/commit/99d351e974425e970898e50fa3baab5c0428553b))
+* **security:** bump smol-toml past the malformed-TOML DoS [[#334](https://github.com/jeiemgi/cckit/issues/334)] ([#335](https://github.com/jeiemgi/cckit/issues/335)) ([9baf15d](https://github.com/jeiemgi/cckit/commit/9baf15d73c6cd98d858c75e1e379758dc062f414))
+
 ## [0.7.1](https://github.com/jeiemgi/cckit/compare/v0.7.0...v0.7.1) (2026-09-08)
 
 
