@@ -20,7 +20,7 @@
 #   kto_compose_issue_body <user-body> <plan> <blocked> <role-slug>   echo an issue body
 #   kto_closing_issue_numbers <pr-num>                echo the issue #s a merged PR closes
 #   kto_task_pr   <num> <summary> [commit-msg]        commit+push+open PR (board → In Review)
-#   kto_task_pr_merge [pr-num]                         squash-merge + close issues + switch develop + GC
+#   kto_task_pr_merge [pr-num] [--squash|--merge|--rebase]   merge (squash default) + close issues + GC + update the PR base
 #   kto_task_new  <title> <role> <kind> <prio> [ms] [plan] [blocked] <body>   create issue + board fields (ms may be empty)
 #   kto_task_close <num> <summary> [pr-num]            close issue + board → Done
 # errors: mixed — git/gh ops propagate; board + label side effects are best-effort
@@ -269,13 +269,32 @@ kto_task_pr() {
   fi
 }
 
-# kit task pr-merge — squash-merge the open PR for the current branch (rebase-fix conflicts onto
-# develop first), close its linked issues (GitHub native auto-close only fires on main), switch the
-# main checkout to develop + pull, then clean up the merged branch + worktree.
-# Args: [pr-num]   (defaults to the open PR for the current branch)
+# kit task pr-merge — merge a PR (squash by default; --merge or --rebase), rebase-fix conflicts onto
+# the PR's base first, close its linked issues (GitHub native auto-close only fires on the default
+# branch), then clean up the PR's head branch + worktree and bring the PR's base up to date.
+# Args: [<pr-num>] [--squash|--merge|--rebase]   (the PR defaults to the open PR for the current branch)
+#
+# The PR's base and head come from GitHub, never from the current checkout (#376): the base may be an
+# effort/<N> branch, and a sub PR merged from the effort worktree must not GC the effort branch.
 kto_task_pr_merge() {
-  local input_pr="${1:-}"
-  local repo branch base pr_num mergeable merge_state issues n state wt main_wt
+  local input_pr="" method="squash" a
+  for a in "$@"; do
+    case "$a" in
+      --squash) method="squash" ;;
+      --merge)  method="merge" ;;
+      --rebase) method="rebase" ;;
+      -*) echo "✗ kto_task_pr_merge: unknown flag '$a' — usage: cckit merge [<pr>] [--squash|--merge|--rebase]" >&2; return 2 ;;
+      *)
+        # Refuse anything but a PR number (#366). `gh pr merge --help` exits 0, so a flag taken as
+        # the number used to "merge", then run the cleanup on the base branch.
+        if [[ -n "$input_pr" || ! "$a" =~ ^#?[0-9]+$ ]]; then
+          echo "✗ kto_task_pr_merge: '$a' is not a PR number — usage: cckit merge [<pr>] [--squash|--merge|--rebase]" >&2; return 2
+        fi
+        input_pr="${a#\#}" ;;
+    esac
+  done
+
+  local repo branch base pr_num meta merge_state pr_base head issues n state wt main_wt base_wt common
   repo="$(kto_repo)"
   base="$(kto_base_branch)"
   branch="$(git rev-parse --abbrev-ref HEAD)"
@@ -284,44 +303,44 @@ kto_task_pr_merge() {
     echo "✗ Working tree is dirty — commit or stash changes first" >&2; return 1
   fi
 
-  # Refuse anything but a PR number. `gh pr merge --help` exits 0, so a flag taken as the number
-  # used to "merge", then run the cleanup below on the base branch (#366).
-  if [[ -n "$input_pr" && ! "$input_pr" =~ ^#?[0-9]+$ ]]; then
-    echo "✗ kto_task_pr_merge: '$input_pr' is not a PR number — usage: cckit merge [<pr>]" >&2; return 2
-  fi
-  pr_num="${input_pr#\#}"
+  pr_num="$input_pr"
   if [[ -z "$pr_num" ]]; then
     pr_num=$(gh pr list --repo "$repo" --head "$branch" --state open --json number --jq '.[0].number // empty')
     [[ -z "$pr_num" ]] && { echo "✗ No open PR found for branch $branch" >&2; return 1; }
   fi
-  echo "→ PR #$pr_num on branch $branch"
 
-  mergeable=$(gh pr view "$pr_num" --repo "$repo" --json mergeable,mergeStateStatus \
-    --jq '{mergeable:.mergeable, status:.mergeStateStatus}')
-  merge_state=$(printf '%s' "$mergeable" | jq -r .mergeable)
-  echo "  mergeable=$merge_state status=$(printf '%s' "$mergeable" | jq -r .status)"
+  meta=$(gh pr view "$pr_num" --repo "$repo" --json mergeable,mergeStateStatus,baseRefName,headRefName) || return 1
+  merge_state=$(printf '%s' "$meta" | jq -r '.mergeable // ""')
+  pr_base=$(printf '%s' "$meta" | jq -r '.baseRefName // empty'); pr_base="${pr_base:-$base}"
+  head=$(printf '%s' "$meta" | jq -r '.headRefName // empty'); head="${head:-$branch}"
+  echo "→ PR #$pr_num: $head → $pr_base ($method)"
+  echo "  mergeable=$merge_state status=$(printf '%s' "$meta" | jq -r '.mergeStateStatus // ""')"
+
+  # Branches that are never rebased, force-pushed or deleted here: the repo base, the PR's base
+  # (it may be an effort branch), and the release branches (#366).
+  _kto_protected() { case "$1" in "$base"|"$pr_base"|main|master|develop|HEAD) return 0 ;; esac; return 1; }
 
   if [[ "$merge_state" == "CONFLICTING" ]]; then
-    case "$branch" in "$base"|main|master|develop|HEAD)
-      echo "✗ PR #$pr_num conflicts — rebase it from its own worktree (never rebase $branch here)" >&2; return 1 ;;
-    esac
-    echo "→ Conflicts detected — rebasing onto $base..."
-    git fetch origin "$base"
-    if git rebase "origin/$base"; then
-      git push --force-with-lease origin "$branch"
+    if [[ "$branch" != "$head" ]] || _kto_protected "$branch"; then
+      echo "✗ PR #$pr_num conflicts — rebase $head onto $pr_base from its own worktree (not from $branch)" >&2; return 1
+    fi
+    echo "→ Conflicts detected — rebasing onto $pr_base..."
+    git fetch origin "$pr_base"
+    if git rebase "origin/$pr_base"; then
+      git push --force-with-lease origin "$head"
       echo "✓ Rebased and pushed — re-checking mergeability..."
     else
-      echo "✗ Rebase had conflicts that need manual resolution — resolve, then run pr-merge again" >&2
+      echo "✗ Rebase had conflicts that need manual resolution — resolve, then run cckit merge again" >&2
       git rebase --abort 2>/dev/null || true
       return 1
     fi
   fi
 
-  if ! gh pr merge "$pr_num" --repo "$repo" --squash 2>&1; then
+  if ! gh pr merge "$pr_num" --repo "$repo" "--$method" 2>&1; then
     echo "✗ Merge failed — check PR status: https://github.com/$repo/pull/$pr_num" >&2
     return 1
   fi
-  echo "✓ PR #$pr_num merged"
+  echo "✓ PR #$pr_num merged ($method)"
 
   # Close linked issues (replaces issue-close-on-merge.yml; native auto-close only fires on main).
   issues="$(kto_closing_issue_numbers "$pr_num")"
@@ -329,41 +348,49 @@ kto_task_pr_merge() {
     state=$(gh issue view "$n" --repo "$repo" --json state --jq .state 2>/dev/null)
     if [[ "$state" == "OPEN" ]]; then
       gh issue close "$n" --repo "$repo" \
-        --comment "Closed automatically on merge of #$pr_num to $base (kit task pr-merge; GitHub native auto-close only fires on the default branch)." \
+        --comment "Closed automatically on merge of #$pr_num to $pr_base (cckit merge; GitHub native auto-close only fires on the default branch)." \
         && echo "✓ Closed issue #$n"
     elif [[ -n "$state" ]]; then
       echo "  issue #$n already $state — skipped"
     fi
   done
 
-  # Locate the branch's worktree + the main checkout, then clean up FROM the main checkout (#371).
-  # Run from the PR's own worktree, removing that worktree deleted our cwd, and every git call after
-  # it died with "Unable to read current working directory" — leaving the local branch behind. The
-  # main checkout = the parent of the shared git dir; fall back to the first `worktree list` entry.
-  local common
-  wt=$(git worktree list --porcelain | awk -v b="refs/heads/$branch" '/^worktree /{p=$2} /^branch /{if($2==b) print p}')
+  # Clean up FROM the main checkout (#371): run from the PR's own worktree, removing it deletes our
+  # cwd. Main checkout = parent of the shared git dir; fall back to the first `worktree list` entry.
+  wt=$(git worktree list --porcelain | awk -v b="refs/heads/$head" '/^worktree /{p=$2} /^branch /{if($2==b) print p}')
+  base_wt=$(git worktree list --porcelain | awk -v b="refs/heads/$pr_base" '/^worktree /{p=$2} /^branch /{if($2==b) print p}')
   common="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"
   main_wt=""
   [[ -n "$common" && "$(basename "$common")" == ".git" ]] && main_wt="$(dirname "$common")"
   [[ -n "$main_wt" ]] || main_wt=$(git worktree list --porcelain | awk '/^worktree /{print $2; exit}')
   cd "$main_wt" || { echo "✗ cannot reach the main checkout $main_wt for cleanup" >&2; return 1; }
-  git -C "$main_wt" checkout "$base" 2>/dev/null || true
-  git -C "$main_wt" pull origin "$base" 2>/dev/null || true
 
-  if [[ -n "$wt" && "$wt" != "$main_wt" ]]; then
+  if [[ -n "$wt" && "$wt" != "$main_wt" ]] && ! _kto_protected "$head"; then
     git -C "$main_wt" worktree remove "$wt" --force && echo "✓ Removed worktree $wt"
   fi
-  # Never delete the base (or a release) branch: merging a PR from the hub leaves $branch = base.
   # -D, not -d: a squash merge leaves the branch "not fully merged" by ancestry.
-  case "$branch" in
-    "$base"|main|master|develop|HEAD)
-      echo "  (on $branch — no branch cleanup; run cckit merge from the PR's worktree to GC it)" ;;
-    *)
-      git -C "$main_wt" branch -D "$branch" 2>/dev/null && echo "✓ Deleted local branch $branch"
-      git -C "$main_wt" push origin --delete "$branch" 2>/dev/null && echo "✓ Deleted remote branch $branch" || echo "  (remote branch already gone)" ;;
-  esac
+  if _kto_protected "$head"; then
+    echo "  ($head is protected — no branch cleanup)"
+  else
+    git -C "$main_wt" branch -D "$head" 2>/dev/null && echo "✓ Deleted local branch $head"
+    git -C "$main_wt" push origin --delete "$head" 2>/dev/null && echo "✓ Deleted remote branch $head" || echo "  (remote branch already gone)"
+  fi
   git -C "$main_wt" worktree prune
-  echo "✓ On $base, up to date — merged branch + worktree cleaned"
+
+  # Bring the PR's base up to date where it lives. The repo base: the main checkout switches to it and
+  # pulls. An effort/<N> base is checked out in its own worktree (git allows one checkout per branch),
+  # so that worktree fast-forwards; with no worktree, the local ref is fast-forwarded by fetch.
+  if [[ "$pr_base" == "$base" ]]; then
+    git -C "$main_wt" checkout "$pr_base" 2>/dev/null || true
+    git -C "$main_wt" pull --ff-only origin "$pr_base" 2>/dev/null || true
+    echo "✓ On $pr_base in $main_wt, up to date — merged branch + worktree cleaned"
+  elif [[ -n "$base_wt" ]]; then
+    git -C "$base_wt" pull --ff-only origin "$pr_base" 2>/dev/null || true
+    echo "✓ $pr_base updated in $base_wt — continue there (merged branch + worktree cleaned)"
+  else
+    git -C "$main_wt" fetch origin "$pr_base:$pr_base" 2>/dev/null || git -C "$main_wt" fetch origin "$pr_base" 2>/dev/null || true
+    echo "✓ $pr_base fetched (no worktree has it checked out) — merged branch + worktree cleaned"
+  fi
 }
 
 # kit task new — create a GitHub issue with labels + milestone, add it to the board, set Role +
