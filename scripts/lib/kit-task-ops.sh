@@ -21,7 +21,7 @@
 #   kto_closing_issue_numbers <pr-num>                echo the issue #s a merged PR closes
 #   kto_task_pr   <num> <summary> [commit-msg]        commit+push+open PR (board → In Review)
 #   kto_task_pr_merge [pr-num]                         squash-merge + close issues + switch develop + GC
-#   kto_task_new  <title> <role> <kind> <prio> <ms> [plan] [blocked] <body>   create issue + board fields
+#   kto_task_new  <title> <role> <kind> <prio> [ms] [plan] [blocked] <body>   create issue + board fields (ms may be empty)
 #   kto_task_close <num> <summary> [pr-num]            close issue + board → Done
 # errors: mixed — git/gh ops propagate; board + label side effects are best-effort
 
@@ -81,6 +81,11 @@ kto_labels_kind() {
 # Network-free (covered by the self-test). Output always passes commitlint_check.
 kto_pr_title() {
   local raw="${1:-}" summary="${2:-}" labels="${3:-}" kind ctype desc
+  # pr.titleStyle = issue-title (KIT_PR_TITLE_STYLE): the PR title IS the issue title, verbatim — for
+  # repos whose convention is "PR title = exact issue title" and that run no commitlint gate.
+  if [ "${KIT_PR_TITLE_STYLE:-conventional}" = "issue-title" ] && [ -n "$raw" ]; then
+    printf '%s' "$raw"; return 0
+  fi
   # Reuse the ONE commit-lint implementation. bin/cckit sources it; if a bare caller hasn't, pull it
   # from the repo (kto_task_pr always runs in-repo). Degrades gracefully if it can't be found.
   if ! type commitlint_check >/dev/null 2>&1; then
@@ -116,10 +121,15 @@ kto_pr_title() {
   printf '%s: %s' "$ctype" "$desc"
 }
 
-# Compose a PR body from the kit-task-pr template. Args: <num> <summary> <role-slug>
+# Compose a PR body from the kit-task-pr template. Args: <num> <summary> <role-slug> [issue-title]
+# pr.orchestratorSection = true (KIT_PR_ORCHESTRATOR_SECTION) prepends a 2-line
+# `## For the orchestrator` section: the issue id + title, then what to review.
 kto_compose_pr_body() {
-  local num="$1" summary="$2" role="$3" sig=""
+  local num="$1" summary="$2" role="$3" title="${4:-}" sig=""
   if type role_signature >/dev/null 2>&1; then sig="$(role_signature "$role")"; fi
+  if [ "${KIT_PR_ORCHESTRATOR_SECTION:-false}" = "true" ]; then
+    printf '## For the orchestrator\n\n#%s%s\nReview: the summary below and the diff.\n\n' "$num" "${title:+ · $title}"
+  fi
   cat <<EOF
 ## Closes
 
@@ -197,7 +207,7 @@ _kto_role_option_for_slug() {
 kto_task_pr() {
   # Default-safe reads: callers (scripts/kit) may run under `set -u`.
   local num="${1:-}" summary="${2:-}" commit_msg="${3:-}"
-  local repo branch meta title labels milestone role author url pr_num pr_node item role_opt issue_item
+  local repo branch meta title labels milestone role author="" url pr_num pr_node item role_opt issue_item
   repo="$(kto_repo)"
   branch="$(git rev-parse --abbrev-ref HEAD)"
 
@@ -214,8 +224,14 @@ kto_task_pr() {
   local pr_title; pr_title="$(kto_pr_title "$title" "$summary" "$labels")"
   [[ -z "$commit_msg" ]] && commit_msg="$pr_title"
 
-  if [[ -n "$(git status --porcelain)" ]]; then
-    git add -A
+  # TRACKED changes only: `git add -A` would sweep an untracked .env.local (copied into every worktree)
+  # into the PR. Untracked files are listed, never committed — `git add` them yourself if they belong.
+  if [[ -n "$(git ls-files --others --exclude-standard 2>/dev/null)" ]]; then
+    echo "kto_task_pr: untracked files NOT committed (git add them first if they belong):" >&2
+    git ls-files --others --exclude-standard 2>/dev/null | sed 's/^/  /' >&2
+  fi
+  if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
+    git add -u
     if type role_git_author >/dev/null 2>&1; then author="$(role_git_author "$role")"; fi
     if [[ -n "$author" ]]; then
       git commit -m "$commit_msg" -m "Co-authored-by: ${author%%|*} <${author##*|}>"
@@ -229,7 +245,7 @@ kto_task_pr() {
   url=$(gh pr create --repo "$repo" \
     --base "$(kto_base_branch)" --head "$branch" \
     --title "$pr_title" \
-    --body "$(kto_compose_pr_body "$num" "$summary" "$role")" \
+    --body "$(kto_compose_pr_body "$num" "$summary" "$role" "$title")" \
     --label "$labels" \
     ${milestone:+--milestone "$milestone"} \
     --assignee "@me") || return 1
@@ -268,7 +284,12 @@ kto_task_pr_merge() {
     echo "✗ Working tree is dirty — commit or stash changes first" >&2; return 1
   fi
 
-  pr_num="$input_pr"
+  # Refuse anything but a PR number. `gh pr merge --help` exits 0, so a flag taken as the number
+  # used to "merge", then run the cleanup below on the base branch (#366).
+  if [[ -n "$input_pr" && ! "$input_pr" =~ ^#?[0-9]+$ ]]; then
+    echo "✗ kto_task_pr_merge: '$input_pr' is not a PR number — usage: cckit merge [<pr>]" >&2; return 2
+  fi
+  pr_num="${input_pr#\#}"
   if [[ -z "$pr_num" ]]; then
     pr_num=$(gh pr list --repo "$repo" --head "$branch" --state open --json number --jq '.[0].number // empty')
     [[ -z "$pr_num" ]] && { echo "✗ No open PR found for branch $branch" >&2; return 1; }
@@ -281,6 +302,9 @@ kto_task_pr_merge() {
   echo "  mergeable=$merge_state status=$(printf '%s' "$mergeable" | jq -r .status)"
 
   if [[ "$merge_state" == "CONFLICTING" ]]; then
+    case "$branch" in "$base"|main|master|develop|HEAD)
+      echo "✗ PR #$pr_num conflicts — rebase it from its own worktree (never rebase $branch here)" >&2; return 1 ;;
+    esac
     echo "→ Conflicts detected — rebasing onto $base..."
     git fetch origin "$base"
     if git rebase "origin/$base"; then
@@ -312,31 +336,48 @@ kto_task_pr_merge() {
     fi
   done
 
-  # Locate the branch's worktree + the main worktree, switch develop + pull, clean up.
+  # Locate the branch's worktree + the main checkout, then clean up FROM the main checkout (#371).
+  # Run from the PR's own worktree, removing that worktree deleted our cwd, and every git call after
+  # it died with "Unable to read current working directory" — leaving the local branch behind. The
+  # main checkout = the parent of the shared git dir; fall back to the first `worktree list` entry.
+  local common
   wt=$(git worktree list --porcelain | awk -v b="refs/heads/$branch" '/^worktree /{p=$2} /^branch /{if($2==b) print p}')
-  main_wt=$(git worktree list --porcelain | awk '/^worktree /{print $2; exit}')
-  git -C "$main_wt" checkout "$base" 2>/dev/null || git checkout "$base"
-  git -C "$main_wt" pull origin "$base" 2>/dev/null || git pull origin "$base"
+  common="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"
+  main_wt=""
+  [[ -n "$common" && "$(basename "$common")" == ".git" ]] && main_wt="$(dirname "$common")"
+  [[ -n "$main_wt" ]] || main_wt=$(git worktree list --porcelain | awk '/^worktree /{print $2; exit}')
+  cd "$main_wt" || { echo "✗ cannot reach the main checkout $main_wt for cleanup" >&2; return 1; }
+  git -C "$main_wt" checkout "$base" 2>/dev/null || true
+  git -C "$main_wt" pull origin "$base" 2>/dev/null || true
 
   if [[ -n "$wt" && "$wt" != "$main_wt" ]]; then
-    git worktree remove "$wt" --force && echo "✓ Removed worktree $wt"
+    git -C "$main_wt" worktree remove "$wt" --force && echo "✓ Removed worktree $wt"
   fi
-  git branch -D "$branch" 2>/dev/null && echo "✓ Deleted local branch $branch"
-  git push origin --delete "$branch" 2>/dev/null && echo "✓ Deleted remote branch $branch" || echo "  (remote branch already gone)"
-  git worktree prune
+  # Never delete the base (or a release) branch: merging a PR from the hub leaves $branch = base.
+  # -D, not -d: a squash merge leaves the branch "not fully merged" by ancestry.
+  case "$branch" in
+    "$base"|main|master|develop|HEAD)
+      echo "  (on $branch — no branch cleanup; run cckit merge from the PR's worktree to GC it)" ;;
+    *)
+      git -C "$main_wt" branch -D "$branch" 2>/dev/null && echo "✓ Deleted local branch $branch"
+      git -C "$main_wt" push origin --delete "$branch" 2>/dev/null && echo "✓ Deleted remote branch $branch" || echo "  (remote branch already gone)" ;;
+  esac
+  git -C "$main_wt" worktree prune
   echo "✓ On $base, up to date — merged branch + worktree cleaned"
 }
 
 # kit task new — create a GitHub issue with labels + milestone, add it to the board, set Role +
 # Status(Todo) + Plan Link. Inputs are passed (the caller does the AskUserQuestion). No invented
 # values; fails loudly on an unknown label family upstream (the caller validates the closed sets).
-# Args: <title> <role-display-or-slug> <kind> <priority> <milestone> [plan-link] [blocked-by] <body>
+# Args: <title> <role-display-or-slug> <kind> <priority> [milestone|""] [plan-link] [blocked-by] <body>
 kto_task_new() {
   local title="${1:-}" role="${2:-}" kind="${3:-}" prio="${4:-}" milestone="${5:-}" plan="${6:-}" blocked="${7:-}" body_user="${8:-}"
   local repo role_slug labels body url num node item role_opt
   repo="$(kto_repo)"
-  [[ -n "$title" && -n "$role" && -n "$kind" && -n "$prio" && -n "$milestone" ]] || {
-    echo "✗ kto_task_new: title, role, kind, priority, milestone are required" >&2; return 1; }
+  # Milestone is optional: a repo with no milestones (cckit itself) must still be able to file an
+  # issue through the verb, or agents fall back to raw `gh issue create` and the board drops it.
+  [[ -n "$title" && -n "$role" && -n "$kind" && -n "$prio" ]] || {
+    echo "✗ kto_task_new: title, role, kind, priority are required" >&2; return 1; }
 
   role_slug="$(printf '%s' "$role" | tr 'A-Z ' 'a-z-')"
   labels="kind:${kind},priority:${prio},role:${role_slug}"
@@ -344,14 +385,17 @@ kto_task_new() {
 
   url=$(gh issue create --repo "$repo" \
     --title "$title" --body "$body" \
-    --label "$labels" --milestone "$milestone" --assignee "@me") || return 1
+    --label "$labels" ${milestone:+--milestone "$milestone"} --assignee "@me") || return 1
   num=$(basename "$url")
   echo "✓ $url"
 
   if kto_board_enabled && type load_project_ids >/dev/null 2>&1 && load_project_ids 2>/dev/null; then
     node=$(gh api "repos/$repo/issues/$num" --jq .node_id 2>/dev/null)
+    item=""
+    [[ -n "$node" ]] && item=$(project_add_item "$node" 2>/dev/null || true)
+    # Loud, not silent: an issue missing from the board is the failure this verb exists to prevent.
+    [[ -z "$item" ]] && echo "⚠ #$num was created but NOT added to the board — add it by hand" >&2
     if [[ -n "$node" ]]; then
-      item=$(project_add_item "$node" 2>/dev/null || true)
       if [[ -n "$item" ]]; then
         role_opt="$(_kto_role_option_for_slug "$role_slug")"
         [[ -n "$role_opt" ]] && project_set_single_select "$item" "$ROLE_FIELD_ID" "$role_opt" 2>/dev/null || true

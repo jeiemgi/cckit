@@ -31,12 +31,10 @@ Ask it to output findings grouped by severity + a flat "Issues to file" list at 
 For each finding, create a GitHub issue on the project repo (`KIT_REPO` from kit.config):
 
 ```bash
-source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/kit-config.sh" && load_kit_config
-gh issue create --repo "$KIT_REPO" \
-  --title "<finding title>" \
-  --label "role:security,kind:security,priority:<critical|p1|p2|p3>" \
-  --body "<risk / evidence / fix>"
-# add --milestone "<Security milestone>" when the project has one
+cckit new --role security --kind security --priority <critical|p1|p2|p3> \
+  --body-file <finding.md> "<finding title>"
+# add --milestone "<Security milestone>" when the project has one. The verb adds the issue to the
+# board; raw gh issue create is blocked by the guard hook (#364).
 ```
 
 ### Phase 3 — Roadmap (Tech Lead)

@@ -2,6 +2,7 @@
 # Read-only board status, grouped by role. Pure gh + jq. bash 3.2 compatible.
 # Reads repo from .claude/kit.config.json. Run from project root.
 #   ./scripts/task-sync.sh [--role <Name>] [--milestone <label>]
+#   --raw-json: original issue objects for shell consumers; --llm stays TOON-first.
 set -euo pipefail
 source "$(dirname "$0")/lib/kit-config.sh" && load_kit_config
 # Pure board-view render helpers (merge queue, stale flag, not-on-board flag, Project Status).
@@ -17,12 +18,19 @@ while [[ $# -gt 0 ]]; do
     --role) ROLE_FILTER="$2"; shift 2 ;;
     --milestone) MS_FILTER="$2"; shift 2 ;;
     --llm|--output=json) CCKIT_OUTPUT=json; shift ;;
+    --raw-json) CCKIT_OUTPUT=raw-json; shift ;;
     *) echo "unknown flag: $1" >&2; exit 1 ;;
   esac
 done
 
 ISSUES=$(gh issue list --repo "$KIT_REPO" --state open --limit 200 \
   --json number,title,labels,milestone,assignees,updatedAt,body)
+
+# Keep shell consumers out of the agent-oriented TOON encoding and flattened label shape.
+if [ "${CCKIT_OUTPUT:-human}" = "raw-json" ]; then
+  printf '%s\n' "$ISSUES"
+  exit 0
+fi
 
 # Structured output for agents: emit the open board and stop (--llm / CCKIT_OUTPUT). The board is a
 # uniform list, so it goes out as TOON — far cheaper in tokens than JSON — via the shared encoder,

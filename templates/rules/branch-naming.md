@@ -81,6 +81,12 @@ Lockfiles (`pnpm-lock.yaml`, `package-lock.json`, …) and manifest config confl
 **Two agents in the same git checkout corrupt each other.** The working tree, index, and `HEAD` are a single unguarded shared resource: one agent's `mv`/`add`/`stage` is silently clobbered by another's `reset`/`checkout`/`stash`/`rebase`. Git has no locking for this.
 
 - **One agent = one git worktree** (or a separate clone). Never two agents in the same directory.
+- **`orchestrate` enforces this with a lease, not just prose.** Git refuses one branch in two
+  worktrees; it does not stop two agent processes from driving the branch cckit handed them. Every
+  branch in a wave is claimed before any pane starts (`scripts/lib/branch-owner.sh`), a branch a
+  live writer already owns refuses the launch, and the wave's other claims are released. A lease is
+  reclaimed only on positive evidence — its worktree is gone, or its process died on the host that
+  recorded it — never on a process check against another host.
 - Prefer giving local sub-agents their own worktree.
 - Remote CI agents (Auto-Dev) are isolated per runner — favor them for parallel fixes.
 - Before editing shared files, check whether another agent is active.

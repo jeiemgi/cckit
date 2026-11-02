@@ -214,7 +214,9 @@ Only stop and ping me on a genuine blocker — otherwise give me a summary of wh
 ```bash
 cckit orchestrate --dry-run 46 47 48  # resolve + print the plan; create nothing
 cckit orchestrate --cap 3 46 47 48    # launch, at most 3 concurrent; the rest queue
+cckit orchestrate --runtime herdr --agent codex --cap 3 46 47 48
 cckit autopilot --cap 3               # auto-pick unblocked issues and drive them
+cckit autopilot --runtime herdr --agent codex --cap 3
 ```
 
 ## Adopt an existing repo
@@ -273,4 +275,3 @@ cckit scan --llm          # repo stack + kit state, as JSON
 cckit plan --llm          # the session-fit wave plan, as TOON
 echo "$json" | cckit encode-context   # compact uniform arrays into TOON for sub-agents
 ```
-

@@ -40,4 +40,6 @@ The function prints `✓ <PR-URL>`.
 - Never open a PR for a branch off the `<kind>/<N>-<slug>` convention — the op aborts with instructions
 - Never invent a Summary — ask if missing (the op refuses an empty Summary) · never push to the base branch directly
 - PR mirrors issue labels · if no milestone, the op omits it (no block)
+- Commits **tracked** changes only; untracked files are listed and left alone (`git add` them first if they belong), so a copied `.env.local` never reaches a PR
+- Title and body follow `pr.titleStyle` and `pr.orchestratorSection` in the config (`config-and-permissions` docs)
 - If `gh pr create` fails because the branch hasn't diverged, the op surfaces the error verbatim (likely forgot to commit)

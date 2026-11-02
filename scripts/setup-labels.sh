@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Create the ctx:/flow:/kind:/priority:/role: label families on the repo. Idempotent.
+# Create the agent:/ctx:/flow:/kind:/priority:/role: label families on the repo. Idempotent.
 # Reads repo + roles from .claude/kit.config.json; the flow vocabulary from effort.sh (EFFORT_FLOWS).
 # These are exactly the labels `cckit effort new` / /kit-effort-new apply — provision them here so a
 # fresh repo can create a fully-labeled effort with no manual label creation. Run from project root.
@@ -14,6 +14,10 @@ ensure_label() { # name color description
 }
 
 echo "→ Labels on $KIT_REPO"
+# The one label that marks a parent AS an effort, and the one `effort_plan` queries. It was read
+# and never provisioned, so `cckit effort plan` found nothing on every repo.
+echo "effort:"
+ensure_label "effort" "5319e7" "An effort parent issue"
 echo "kinds:"
 for k in task plan adr scaffold spike; do ensure_label "kind:$k" "5319e7" "Kind: $k"; done
 echo "priorities:"
@@ -34,4 +38,20 @@ while IFS= read -r role; do
   slug=$(echo "$role" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
   ensure_label "role:$slug" "1d76db" "Role: $role"
 done <<< "$KIT_ROLES"
+
+# agent:<profile> — which agent profile a piece of work runs under (#319). Driven by the profiles
+# the project actually declares, so the family stays bounded by the config rather than growing one
+# label per issue. A project with no `agents.profiles` gets no agent: labels, which is correct:
+# nothing reads them until a profile exists to name.
+echo "agents:"
+_al_cfg=""
+if command -v kit_config_path >/dev/null 2>&1; then _al_cfg="$(kit_config_path 2>/dev/null || true)"; fi
+if [ -n "$_al_cfg" ] && [ -f "$_al_cfg" ] && command -v jq >/dev/null 2>&1; then
+  while IFS= read -r p; do
+    [ -z "$p" ] && continue
+    ensure_label "agent:$p" "5319e7" "Agent profile: $p"
+  done <<< "$(jq -r '(.agents.profiles // {}) | keys[]' "$_al_cfg" 2>/dev/null)"
+else
+  echo "  • no agents.profiles declared — skipping"
+fi
 echo "✓ done"

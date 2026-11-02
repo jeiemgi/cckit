@@ -214,7 +214,13 @@ effort_new() {
   _eff_ensure_label "$ctx" bfd4f2 "effort session weight"
   _eff_ensure_label "kind:task" d4c5f9 "kit issue kind"
   _eff_ensure_label "priority:$priority" e99695 "kit priority"
-  local labels="$ctx,kind:task,priority:$priority"
+  # `effort` is what marks the parent AS an effort, and it is the label `effort_plan` queries
+  # (`gh issue list --label effort`, effort-plan.sh). It was read and never written: the label did
+  # not exist in this repo at all, so `cckit effort plan` answered "no open efforts found" for
+  # every effort ever created here. A label something reads and nothing writes is the same defect
+  # as one something writes and nothing reads — see rules/naming-and-ids.md § Labels.
+  _eff_ensure_label "effort" 5319e7 "an effort parent issue"
+  local labels="effort,$ctx,kind:task,priority:$priority"
   if [ -n "$role" ]; then
     _eff_ensure_label "role:$role" 0e8a16 "kit role lane"
     labels="$labels,role:$role"
@@ -648,8 +654,25 @@ effort_start() {
 
 # effort_pr [<slug|N>] — open the single PR effort/<N> → base. Defaults to the current effort branch.
 effort_pr() {
+  # The ONE effort-PR implementation (#363). The kit-effort-pr skill calls this; before, the skill
+  # carried its own inline copy, so agents hand-copied the script and the copy drifted (a PR missing
+  # from the board, a mangled body). Args: [<slug|N>] [--summary S|--summary-file F]
+  # [--for-agents A|--for-agents-file F] [--message M] [--title T]. SUMMARY / FOR_AGENTS / COMMIT_MSG env are
+  # honoured as fallbacks.
   _eff_need gh || return 1
-  local raw="${1:-}" num repo base branch title name
+  local raw="" summary="${SUMMARY:-}" for_agents="${FOR_AGENTS:-}" msg="${COMMIT_MSG:-}" title_override=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --summary)          summary="${2:-}"; shift 2 ;;
+      --summary-file)     summary="$(cat "${2:-/dev/null}")"; shift 2 ;;
+      --for-agents)       for_agents="${2:-}"; shift 2 ;;
+      --for-agents-file)  for_agents="$(cat "${2:-/dev/null}")"; shift 2 ;;
+      --message|-m)       msg="${2:-}"; shift 2 ;;
+      --title)            title_override="${2:-}"; shift 2 ;;
+      *)                  [ -z "$raw" ] && raw="$1"; shift ;;
+    esac
+  done
+  local num repo base branch meta title labels milestone role role_disp name pr_title body url author
   repo="$(_eff_repo)"; base="$(_eff_base)"
   branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)"
   if [ -n "$raw" ]; then
@@ -660,16 +683,110 @@ effort_pr() {
   [ -n "$num" ] || { echo "effort_pr: not on an effort/<N>-… branch and no <slug|N> given" >&2; return 1; }
   case "$branch" in effort/"$num"-*) : ;; *) echo "effort_pr: current branch ($branch) is not effort/$num-…" >&2; return 1 ;; esac
 
-  git push -u origin "$branch" >/dev/null 2>&1 || true
-  title="$(gh issue view "$num" --repo "$repo" --json title -q .title 2>/dev/null)"
+  # Parent metadata: the PR inherits its labels + milestone, and the role names the title.
+  meta="$(gh issue view "$num" --repo "$repo" --json title,labels,milestone 2>/dev/null)"
+  title="$(printf '%s' "$meta" | jq -r '.title // ""' 2>/dev/null)"
+  labels="$(printf '%s' "$meta" | jq -r '[.labels[]?.name] | join(",")' 2>/dev/null)"
+  milestone="$(printf '%s' "$meta" | jq -r '.milestone.title // ""' 2>/dev/null)"
+  role="$(printf '%s' "$labels" | tr ',' '\n' | sed -n 's/^role://p' | head -1)"
+  role_disp=""
+  if [ -n "$role" ] && command -v role_display >/dev/null 2>&1; then
+    role_disp="$(role_display "$role" 2>/dev/null || true)"
+  fi
   name="$(printf '%s' "$title" | sed -E 's/^\[Effort\] [0-9]+ · ?//')"
-  # ONE shared composer (effort.sh) so the verb + the kit-effort-pr skill title identically, then the
-  # mandatory-[#N] check before we ever call gh — refuse rather than open an id-less PR (#121).
-  local pr_title; pr_title="$(effort_pr_title "$num" "${name:-effort}")"
+
+  # Commit pending changes. Role identity is a Co-authored-by TRAILER, never the git author (some
+  # deploy providers refuse commits whose author email matches no account). TRACKED changes only:
+  # `git add -A` here would sweep a copied .env.local into the PR. Untracked files are listed, not
+  # committed — an effort's new files land in its per-sub commits.
+  if [ -n "$(git ls-files --others --exclude-standard 2>/dev/null)" ]; then
+    echo "effort_pr: untracked files NOT committed (commit them in their sub's commit if they belong):" >&2
+    git ls-files --others --exclude-standard 2>/dev/null | sed 's/^/  /' >&2
+  fi
+  if [ -n "$(git status --porcelain --untracked-files=no 2>/dev/null)" ]; then
+    author=""
+    git add -u
+    if [ -n "$role" ] && command -v role_git_author >/dev/null 2>&1; then
+      author="$(role_git_author "$role" 2>/dev/null || true)"
+    fi
+    if [ -n "$author" ]; then
+      git commit -q -m "${msg:-$role: ${name:-effort $num}}" -m "Co-authored-by: ${author%%|*} <${author##*|}>" || return 1
+    else
+      git commit -q -m "${msg:-${role:-chore}: ${name:-effort $num}}" || return 1
+    fi
+  fi
+  git push -u origin "$branch" >/dev/null 2>&1 || echo "effort_pr: push of $branch failed — continuing (the PR may already be current)" >&2
+
+  # ONE shared composer (effort.sh) so every surface titles identically, then the mandatory-[#N]
+  # check before we ever call gh — refuse rather than open an id-less PR (#121).
+  # --title serves a repo whose PR titles follow another convention (Conventional Commits under a
+  # commitlint gate); it must still carry the [#N] id, checked below.
+  pr_title="${title_override:-$(effort_pr_title "$num" "${name:-effort}" "$role_disp")}"
   effort_pr_title_check "$pr_title" "$num" || { echo "effort_pr: refusing to open a PR without the [#$num] effort id" >&2; return 1; }
-  gh pr create --repo "$repo" --base "$base" --head "$branch" \
-    --title "$pr_title" \
-    --body "$(printf 'Closes the #%s effort.\n\n## For agents\nSee #%s for the goal, scope, and entry points.\n' "$num" "$num")"
+  body="$(_eff_pr_body "$num" "$summary" "$for_agents" "$role")"
+
+  # Four explicit forms, not ${x:+--flag "$x"}: that idiom word-splits under zsh, and this file is
+  # sourced from zsh too.
+  if [ -n "$labels" ] && [ -n "$milestone" ]; then
+    url="$(gh pr create --repo "$repo" --base "$base" --head "$branch" --title "$pr_title" --body "$body" \
+      --label "$labels" --milestone "$milestone" --assignee "@me")" || return 1
+  elif [ -n "$labels" ]; then
+    url="$(gh pr create --repo "$repo" --base "$base" --head "$branch" --title "$pr_title" --body "$body" \
+      --label "$labels" --assignee "@me")" || return 1
+  elif [ -n "$milestone" ]; then
+    url="$(gh pr create --repo "$repo" --base "$base" --head "$branch" --title "$pr_title" --body "$body" \
+      --milestone "$milestone" --assignee "@me")" || return 1
+  else
+    url="$(gh pr create --repo "$repo" --base "$base" --head "$branch" --title "$pr_title" --body "$body" \
+      --assignee "@me")" || return 1
+  fi
+  echo "✓ $url"
+  _eff_pr_board "$num" "$url" "$role"
+}
+
+# _eff_pr_body <num> <summary> <for-agents> [role] — the effort PR body: the orchestrator header,
+# `Closes #N`, a human Summary, the agent-facing For agents block, and a Verification checklist.
+# An empty section prints a visible placeholder, never nothing, so a reviewer sees what is missing.
+_eff_pr_body() {
+  local num="$1" summary="$2" for_agents="$3" role="${4:-}" sig=""
+  if [ -n "$role" ] && command -v role_signature >/dev/null 2>&1; then
+    sig="$(role_signature "$role" 2>/dev/null || true)"
+  fi
+  printf '## For the orchestrator\n\nEffort #%s — one PR for the whole effort. Review: the summary below + the diff.\n\nCloses #%s\n\n' "$num" "$num"
+  printf '## Summary\n\n%s\n\n' "${summary:-_(no summary given — pass --summary)_}"
+  printf '## For agents\n\n%s\n\n' "${for_agents:-See #$num for the goal, scope, and entry points.}"
+  printf '## Verification\n\n- [ ] Each sub-issue change is present in the diff\n- [ ] No unrelated files in the diff\n- [ ] Labels + milestone match the parent issue\n- [ ] Local lint/typecheck pass\n'
+  [ -n "$sig" ] && printf '\n%s\n' "$sig"
+  return 0
+}
+
+# _eff_pr_board <num> <pr-url> [role] — add the PR to the board at In Review (+ Role) and move the
+# parent to In Review. A no-op unless Projects v2 is on; a failed PR add is reported, never silent.
+_eff_pr_board() {
+  local num="$1" url="$2" role="${3:-}" repo pr_num node item ropt parent
+  [ "${KIT_PROJECTS_V2:-}" = "true" ] || return 0
+  _eo_source_board
+  command -v project_add_item >/dev/null 2>&1 || return 0
+  repo="$(_eff_repo)"; pr_num="${url##*/}"
+  node="$(gh api "repos/$repo/pulls/$pr_num" --jq .node_id 2>/dev/null)"
+  item=""
+  [ -n "$node" ] && item="$(project_add_item "$node" 2>/dev/null || true)"
+  if [ -z "$item" ]; then
+    echo "⚠ PR #$pr_num was opened but NOT added to the board — add it by hand" >&2
+  else
+    if [ -n "${STATUS_FIELD_ID:-}" ] && [ -n "${STATUS_OPT_IN_REVIEW:-}" ]; then
+      project_set_single_select "$item" "$STATUS_FIELD_ID" "$STATUS_OPT_IN_REVIEW" >/dev/null 2>&1 || true
+    fi
+    if [ -n "$role" ] && [ -n "${ROLE_FIELD_ID:-}" ] && command -v role_option_id >/dev/null 2>&1; then
+      ropt="$(role_option_id "$role" 2>/dev/null || true)"
+      [ -n "$ropt" ] && { project_set_single_select "$item" "$ROLE_FIELD_ID" "$ropt" >/dev/null 2>&1 || true; }
+    fi
+  fi
+  parent="$(project_find_item_by_issue "$num" 2>/dev/null || true)"
+  if [ -n "$parent" ] && [ -n "${STATUS_FIELD_ID:-}" ] && [ -n "${STATUS_OPT_IN_REVIEW:-}" ]; then
+    project_set_single_select "$parent" "$STATUS_FIELD_ID" "$STATUS_OPT_IN_REVIEW" >/dev/null 2>&1 || true
+  fi
+  return 0
 }
 
 # _eo_source_metrics — lazily source effort-metrics.sh so effort_close can call the shipped
@@ -680,6 +797,16 @@ _eo_source_metrics() {
   local d; d="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
   # shellcheck source=/dev/null
   [ -f "$d/effort-metrics.sh" ] && . "$d/effort-metrics.sh"
+}
+
+# _eo_source_gc — lazily source kit-gc.sh so effort_close can collect the effort's `sub/<N>…`
+# worktrees + branches through the LANDED prune path (#388) — the ONE classifier, never a second
+# `git branch -D` loop here. No-op if already loaded; a missing file degrades to "no sub GC".
+_eo_source_gc() {
+  command -v kit_gc_prune >/dev/null 2>&1 && return 0
+  local d; d="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+  # shellcheck source=/dev/null
+  [ -f "$d/kit-gc.sh" ] && . "$d/kit-gc.sh"
 }
 
 # _eo_source_board — lazily source the board helpers (gh-project.sh) + captured field ids so
@@ -736,7 +863,9 @@ _eo_knowledge_ingest() {
   case "$hook" in /*) : ;; *) hook="$root/$hook" ;; esac   # resolve a relative hook against the root
   [ -x "$hook" ] || { echo "effort_close: knowledge-ingest hook '$hook' not executable — skipping" >&2; return 0; }
   echo "  → knowledge-ingest hook: $hook $num" >&2
-  "$hook" "$num" "$trace" >/dev/null 2>&1 || echo "effort_close: knowledge-ingest hook failed (non-fatal)" >&2
+  # Run it from the main checkout (#371): the close has just removed the worktree it was invoked from,
+  # so the inherited cwd no longer exists and a hook's relative paths / bare git calls would fail.
+  ( cd "${root:-/}" && "$hook" "$num" "$trace" ) >/dev/null 2>&1 || echo "effort_close: knowledge-ingest hook failed (non-fatal)" >&2
 }
 
 # effort_close <N> — the SINGLE close implementation (#148): the /kit-effort-close skill is a thin
@@ -774,7 +903,10 @@ effort_close() {
 
   # (a2) refuse-squash-without-trace backstop: the squash is irreversible and collapses the per-sub
   # commits that ARE the work record. If nothing was snapshotted, refuse — unless KIT_FORCE=1.
-  if [ -z "$trace_dir" ] || ! ls "$trace_dir"/*.diff >/dev/null 2>&1; then
+  # index.jsonl is the marker, not the presence of a .diff: the snapshot moves it into place only
+  # after every record is written, so a non-empty index means a complete trace. The old `ls *.diff`
+  # test passed on the empty NN-.diff a collapsed run left behind (#339).
+  if [ -z "$trace_dir" ] || [ ! -s "$trace_dir/index.jsonl" ]; then
     if [ "${KIT_FORCE:-0}" = "1" ]; then
       echo "effort_close: no per-sub work trace captured — proceeding anyway (KIT_FORCE=1)" >&2
     else
@@ -805,10 +937,11 @@ effort_close() {
   # issue + record state are owned by this ONE op (effort-model.md) — never a separate "mark done".
   _eo_source_board
   local sub
-  for sub in $(gh api "repos/$repo/issues/$num/sub_issues" --jq '.[].number' 2>/dev/null); do
+  while IFS= read -r sub; do
+    [ -n "$sub" ] || continue
     gh issue close "$sub" --repo "$repo" --reason completed >/dev/null 2>&1 && echo "  ✓ closed sub #$sub" >&2
     _eo_board_done "$sub"
-  done
+  done < <(gh api "repos/$repo/issues/$num/sub_issues" --jq '.[].number' 2>/dev/null)
   gh issue close "$num" --repo "$repo" --reason completed >/dev/null 2>&1 && echo "  ✓ closed effort #$num" >&2
   _eo_board_done "$num"
 
@@ -818,6 +951,16 @@ effort_close() {
   if [ -n "$root" ]; then
     git -C "$root" checkout "$base" >/dev/null 2>&1 || true
     git -C "$root" pull origin "$base" --quiet >/dev/null 2>&1 || true
+    # (f2) the effort's sub worktrees + branches (#388): the squash just put their work on base, so
+    # kit_gc_prune's LANDED path deletes them — same classifier and recover-before-prune guards as
+    # `cckit cleanup` (a dirty sub worktree, or a sub ahead of its remote, stays). Runs in a subshell
+    # from the main checkout, BEFORE this worktree is removed, with the base `origin/<base>` just
+    # pulled above. A sub that fails both LANDED checks is left as an ORPHAN for `cckit gc` to show.
+    _eo_source_gc
+    if command -v kit_gc_prune >/dev/null 2>&1; then
+      ( cd "$root" && KIT_GC_REPO="$repo" KIT_BASE_BRANCH="$base" kit_gc_prune --yes --only "^sub/${num}[a-z]-" 2>&1 \
+          | grep -E '^  (removed worktree|deleted local branch|SKIP)' | sed 's/^  /  ✓ sub gc: /' >&2 ) || true
+    fi
     if [ -n "$self_wt" ] && [ "$self_wt" != "$root" ]; then
       case "$self_wt" in "$root"/.claude/worktrees/*)
         git -C "$root" worktree remove "$self_wt" --force >/dev/null 2>&1 && echo "  ✓ removed worktree $self_wt" >&2 ;;

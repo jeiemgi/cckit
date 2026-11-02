@@ -58,7 +58,20 @@ if [ -f scripts/lib/secret-guard.sh ]; then
   secret_guard_scan || fail=1
 fi
 
-# 5. Behavioral tests - run every *-test.sh through the test runner.
+# 5. Skill frontmatter context budget. `description` + `when_to_use` are concatenated into the
+# always-loaded skill listing - resident in every session whether or not the skill is invoked.
+# Ratchet, not a hard cap: today's over-budget skills are grandfathered in the baseline file and
+# only *growth* (or a new over-budget skill) fails the gate.
+note "==> skill frontmatter context budget"
+bash scripts/skill-frontmatter-lint.sh || fail=1
+
+# 6. Codified review findings. Mechanical defect classes caught in past reviews, encoded as rules
+# in scripts/review-rules.conf so the same bug cannot land twice. Per-file ratchet: today's hits are
+# grandfathered in the baseline, only new or grown hits fail. Rules needing intent stay with review.
+note "==> codified review findings"
+bash scripts/review-lint.sh || fail=1
+
+# 7. Behavioral tests - run every *-test.sh through the test runner.
 note "==> behavioral tests"
 bash scripts/test.sh || fail=1
 

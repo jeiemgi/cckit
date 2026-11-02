@@ -104,7 +104,7 @@ cckit pr 42 "what changed"    # commit, push, open the PR
 cckit sync                    # board state, what's unblocked
 cckit handoff "resume note"   # save a handoff — bare `cckit` prints it next session
 cckit gc                      # report prunable branches + worktrees (deletes nothing)
-cckit cleanup [--yes]         # act on that report: delete the SAFE rows, prune listed zombies, keep orphans/stashes
+cckit cleanup [--yes]         # act on that report: delete the SAFE + LANDED rows, prune listed zombies, keep orphans/stashes
 ```
 
 Adopting cckit in a repo that already has history? `cckit scan` detects the stack, `cckit adopt`
@@ -205,12 +205,20 @@ that gate and merge themselves. This is the part that turns one keyboard into a 
 ```bash
 cckit plan                 # the wave plan: deps-ordered, p0-first inside a wave, file-disjoint
 cckit wave                 # a Task-subagent fan-out brief Claude Code enacts (proposes the next wave)
-cckit orchestrate 12 14 17 # run N flows in parallel worktrees (--dry-run / --cap / --agent)
+cckit orchestrate 12 14 17 # run N flows in parallel worktrees (tmux by default)
+cckit orchestrate --runtime herdr --agent codex 12 14 17 # persistent, state-aware agent terminals
 cckit watch --merge        # the captain: gate open PRs, squash-merge the CLEAN ones, advance
                            #   (policy floors hold PRs touching CI, lockfiles, or secrets for review)
 cckit watch --loop         # self-pace gate/merge passes until steady state
-cckit autopilot            # unattended multi-flow: drive (or auto-pick) issues under a cap
+cckit autopilot            # select unblocked work, then call orchestrate --detach under a cap
 ```
+
+Set `review.command` in your config and the captain sends every PR it would merge to an agent
+reviewer first, records the verdict as a stage receipt, and refuses to merge on a `fail`. You name
+the command that runs the reviewer — cckit pipes it a brief on stdin and reads the report off
+stdout, so it asserts nothing about any agent's flags. A PR with **no** verdict recorded reads
+`verify`, never merges silently: absence of evidence is not a pass. Off until you configure it.
+→ [the agent review stage](https://cckit.dev/config-and-permissions/#the-agent-review-stage)
 
 ## Driven by agents
 

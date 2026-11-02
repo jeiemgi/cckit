@@ -5,7 +5,11 @@
 # errors: strict — a test runner: rc 1 on any failed assertion
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+# Sealed from the caller's KIT_*/CCKIT_*/EFFORT_* (#369): this suite builds its own fixture.
+# shellcheck source=/dev/null
+. "$ROOT/scripts/lib/test-env.sh" && test_env_seal
 LIB="$ROOT/scripts/lib"
+SCRIPTS="$ROOT/scripts"
 fail=0
 t()  { if [ "$2" = "$3" ]; then echo "ok: $1"; else echo "FAIL: $1 -> got '[$2]' want '[$3]'"; fail=1; fi; }
 tc() { if grep -qE "$2" "$1"; then echo "ok: $3"; else echo "FAIL: $3 (no /$2/ in gh log)"; fail=1; fi; }
@@ -24,7 +28,10 @@ case "$1 $2" in
   "issue create")  n=$(( $(cat "$GH_N" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$GH_N"
                    echo "https://github.com/o/r/issues/$n" ;;
   "issue edit"|"issue close"|"pr merge") exit 0 ;;
-  "issue view")    echo "[Effort] 99 · demo effort" ;;          # --json title -q .title
+  "issue view")    case "$*" in                                 # effort_pr reads title+labels+milestone
+                     *labels,milestone*) echo '{"title":"[Effort] 99 · demo effort","labels":[{"name":"role:tech-lead"},{"name":"kind:task"}],"milestone":{"title":"M1"}}' ;;
+                     *) echo "[Effort] 99 · demo effort" ;;     # --json title -q .title
+                   esac ;;
   "pr create")     echo "https://github.com/o/r/pull/7" ;;
   "pr diff")       # a merged sub PR's diff (wave-style close, #164): one kit-managed + one app file
     printf 'diff --git a/.claude/skills/demo.md b/.claude/skills/demo.md\n+kit\ndiff --git a/src/app.ts b/src/app.ts\n+app\n' ;;
@@ -92,8 +99,22 @@ t  "effort_start bootstrapped the worktree (.env.local copied)" \
 # move onto the effort branch (its worktree) for pr/close
 cd "$tmp/work/.claude/worktrees/effort+99-demo"
 : > "$GH_LOG"
-effort_pr 99 >/dev/null 2>&1
+effort_pr 99 --summary "SUMMARY-MARKER" --for-agents "AGENTS-MARKER" >/dev/null 2>&1
 tc "$GH_LOG" 'pr create .*--base main --head effort/99-demo' "effort_pr opens effort/99 → main"
+# #363: parity with the kit-effort-pr skill — the verb is the one implementation.
+tc "$GH_LOG" 'pr create .*--title \[#99\] demo effort' "effort_pr titles with the [#N] id + parent name"
+tc "$GH_LOG" '[-]-label role:tech-lead,kind:task' "effort_pr inherits the parent's labels"
+tc "$GH_LOG" '[-]-milestone M1'                 "effort_pr inherits the parent's milestone"
+tc "$GH_LOG" 'SUMMARY-MARKER'                                "effort_pr puts --summary in the body"
+tc "$GH_LOG" 'AGENTS-MARKER'                                 "effort_pr puts --for-agents in the body"
+tc "$GH_LOG" '^Closes #99$'                                  "effort_pr body closes the parent"
+t  "effort_pr never commits an untracked .env.local" "$(git ls-files .env.local)" ""
+: > "$GH_LOG"
+effort_pr 99 --title "feat(x): a conventional title" >/dev/null 2>&1 && rc=0 || rc=1
+t  "effort_pr refuses a --title without the [#N] id" "$rc" "1"
+t  "effort_pr opened nothing on a bad --title"      "$(grep -c 'pr create' "$GH_LOG")" "0"
+effort_pr 99 --title "feat(x): a conventional title [#99]" >/dev/null 2>&1
+tc "$GH_LOG" 'pr create .*--title feat\(x\): a conventional title \[#99\]' "effort_pr honours --title"
 
 # ── effort_close #120: refuse-squash-without-trace backstop ────────────────────────────────────
 # With NO commits on the effort branch, effort_snapshot_subs captures no trace → close must refuse
@@ -147,6 +168,7 @@ t  "effort_close GC deleted the local branch" \
 cat > "$stub/khook" <<'SH'
 #!/usr/bin/env bash
 printf 'ingested %s\n' "$1" > "$KHOOK_MARKER"
+pwd -P > "$KHOOK_MARKER.cwd" 2>/dev/null || echo "NO-CWD" > "$KHOOK_MARKER.cwd"
 SH
 chmod +x "$stub/khook"
 start_out="$(effort_start 88 forced 2>/dev/null)"
@@ -156,6 +178,9 @@ forced_out="$(KHOOK_MARKER="$tmp/khook.out" KIT_EFFORT_KNOWLEDGE_HOOK="$stub/kho
 cd "$tmp/work"
 tc "$GH_LOG" 'pr merge effort/88-forced .*--squash' "KIT_FORCE=1 close merges despite no trace"
 t  "knowledge-ingest hook ran with the effort number" "$(cat "$tmp/khook.out" 2>/dev/null)" "ingested 88"
+# #371: the close GCs the worktree it was run from; the hook must run in the main checkout, not in
+# that deleted directory (where every relative path and git call fails).
+t  "knowledge-ingest hook runs in the main checkout" "$(cat "$tmp/khook.out.cwd" 2>/dev/null)" "$(cd "$tmp/work" && pwd -P)"
 # #148: no kit-managed file touched → the drift check stays silent
 case "$forced_out" in *"kit-sync"*) echo "FAIL: kit-sync warning fired with no kit-managed change"; fail=1 ;; *) echo "ok: drift check silent when no kit-managed file changed" ;; esac
 
@@ -545,6 +570,21 @@ t "wip: the plain-task start path is not gated" \
   "$(grep -c '_eff_wip_gate\|effort_wip_rows' "$LIB/worktree-start.sh" | tr -d ' ')" "0"
 
 cd "$tmp/work" || exit 1
+
+# 15. the label `effort_plan` READS is a label `effort_new` WRITES.
+#     These drifted apart silently: effort-plan.sh queried `--label effort`, effort_new applied
+#     ctx/kind/priority/role/flow/par/slug and never `effort`, and setup-labels.sh never created
+#     it. `cckit effort plan` therefore answered "no open efforts found" for every effort ever
+#     made, in every repo, with no error anywhere. A static check because the failure mode is
+#     silence — there is nothing at runtime to notice.
+plan_label="$(sed -n 's/.*gh issue list [^|]*--label \([a-z][a-z-]*\).*/\1/p' "$LIB/effort-plan.sh" | head -1)"
+t "plan queries a label at all" "${plan_label:-MISSING}" "effort"
+t "effort_new applies the label plan queries" \
+  "$(grep -c "labels=\"$plan_label," "$LIB/effort-ops.sh" | tr -d ' ')" "1"
+t "effort_new ensures the label exists before using it" \
+  "$(grep -c "_eff_ensure_label \"$plan_label\"" "$LIB/effort-ops.sh" | tr -d ' ')" "1"
+t "setup-labels provisions the label plan queries" \
+  "$(grep -c "ensure_label \"$plan_label\"" "$SCRIPTS/setup-labels.sh" | tr -d ' ')" "1"
 
 [ "$fail" -eq 0 ] && echo "ALL OK (effort-ops)" || echo "effort-ops: FAILURES"
 exit "$fail"

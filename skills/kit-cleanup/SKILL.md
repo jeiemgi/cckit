@@ -1,6 +1,6 @@
 ---
 name: kit-cleanup
-description: Run the ONE guided destructive sweep over the repo — present the gc plan (SAFE / ZOMBIE / ORPHAN / PROTECTED / stashes), then delete only the SAFE rows and prune the listed ZOMBIE metadata after the user confirms. Orphan branches, open-issue branches, and stashes are surfaced and left alone.
+description: Run the ONE guided destructive sweep over the repo — present the gc plan (SAFE / LANDED / ZOMBIE / ORPHAN / PROTECTED / stashes), then delete the SAFE + LANDED rows and prune the listed ZOMBIE metadata once the user confirms. Orphan, open-issue branches and stashes are surfaced, kept.
 when_to_use: When `cckit gc` (or the SessionStart hygiene hook) reports merged branches and worktrees piling up and you want them gone in one pass. Use this instead of hand-rolling `git branch -D` + `git push origin --delete` loops. For the read-only report alone, use `/kit-gc`.
 ---
 
@@ -32,7 +32,8 @@ KIT_GC_REPO="$KIT_REPO" source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/kit-gc.sh"
 kit_gc_cleanup          # plan only — deletes no branch, worktree, remote ref or stash
 ```
 
-Or through the CLI: `cckit cleanup` (add `--llm` for JSON counts).
+Or through the CLI: `cckit cleanup` (add `--llm` for JSON counts: `safe`, `landed`, `worktrees`,
+`zombie`, `orphan`, `protected`, `stash`, `remote_failed`, `applied`).
 
 ### 2. Present it and ask
 
@@ -42,8 +43,9 @@ veto per-bucket — if they want the orphans looked at first, do that before del
 | Bucket | Rule | `--yes` does |
 | --- | --- | --- |
 | **SAFE** | PR `MERGED`, issue closed/absent, unprotected | **deletes** the worktree, the local branch, and the remote ref *if* the branch was level with it |
+| **LANDED** | **no PR of its own**, work already on base — by content (every file it changed since its merge base matches `origin/<base>`) or by lineage (`sub/<N>…`, `effort/<N>…`, or a `[#N]` commit subject names an issue closed with a merged PR). Effort subs after `effort close`, `effort/<N>` branches whose remote is gone, Claude Code Agent-tool `worktree-agent-<hash>` isolation worktrees | **deletes** exactly like SAFE — worktree, local branch, level remote ref — under the same guards: a dirty worktree or a branch ahead of its remote is skipped with a warning. The plan prints the block with each row's reason, before ORPHAN |
 | **PROTECTED** | associated issue **still OPEN** | **keeps** — close the issue first |
-| **ORPHAN** | local commits not on the base branch's remote, no merged PR | **keeps** — offer to recover into a PR (step 4) |
+| **ORPHAN** | fails both LANDED checks: commits whose content is not on the base branch's remote, no merged PR | **keeps** — offer to recover into a PR (step 4) |
 | **ZOMBIE** | worktree dir gone, admin metadata lingers | **recovers** any staged delta to a commit on its branch, **then prunes** the metadata |
 | **stashes** | any stash entry | **keeps** — irreversible; drop only after showing each diff |
 

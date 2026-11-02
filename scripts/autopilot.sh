@@ -11,6 +11,8 @@
 #   cckit autopilot 6 7 8           # drive exactly these issues
 #   cckit autopilot --cap 3         # cap concurrent flows (passed through to orchestrate)
 #   cckit autopilot --agent codex   # drive a different agent CLI
+#   cckit autopilot --profile build # drive a declared agent profile (kind + argv)
+#   cckit autopilot --runtime herdr # run the selected agents in Herdr
 #   cckit autopilot --dry-run       # print the plan, launch nothing
 set -euo pipefail
 
@@ -18,17 +20,16 @@ PASS=()        # flags forwarded to orchestrate
 ISSUES=()
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --cap|--agent) PASS+=("$1" "$2"); shift 2 ;;
-    --cap=*|--agent=*|--dry-run|--no-seed|--force|--session=*) PASS+=("$1"); shift ;;
-    -h|--help) sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --cap|--agent|--profile|--runtime) PASS+=("$1" "$2"); shift 2 ;;
+    --cap=*|--agent=*|--profile=*|--runtime=*|--dry-run|--no-seed|--force|--session=*) PASS+=("$1"); shift ;;
+    -h|--help) sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     [0-9]*) ISSUES+=("$1"); shift ;;
     *) echo "autopilot: unknown arg '$1'" >&2; exit 2 ;;
   esac
 done
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-ROOT="$(git -C "$SCRIPT_DIR" worktree list --porcelain | awk '/^worktree /{print $2; exit}')"
-[ -n "$ROOT" ] || { echo "autopilot: not in a git repo" >&2; exit 1; }
+ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # No explicit issues -> auto-select from the board: open issues, minus effort PARENTS (the
 # "[Effort] N ..." umbrella issues that decompose into subs, identified by label:effort OR the
@@ -36,13 +37,18 @@ ROOT="$(git -C "$SCRIPT_DIR" worktree list --porcelain | awk '/^worktree /{print
 # blocked_by gate at launch; this is the coarse pre-filter so the board drives the wave.
 if [ "${#ISSUES[@]}" -eq 0 ]; then
   echo "autopilot: no issues passed - auto-selecting unblocked open issues from the board"
-  board="$(bash "$ROOT/scripts/task-sync.sh" --llm)"
+  board="$(bash "$ROOT/scripts/task-sync.sh" --raw-json)" || {
+    echo "autopilot: could not read the board" >&2; exit 1;
+  }
+  # Capture the parser status before reading rows. Process substitution hides its failures.
+  selected="$(printf '%s' "$board" | jq -r '
+    if type != "array" then error("expected an issue array") else . end
+    | .[]
+    | select((any(.labels[]; .name == "effort")) or (.title | test("^\\[Effort\\] ")) | not)
+    | .number')" || { echo "autopilot: invalid board data" >&2; exit 1; }
   while IFS= read -r n; do
     [ -n "$n" ] && ISSUES+=("$n")
-  done < <(printf '%s' "$board" | jq -r '
-    .[]
-    | select((any(.labels[]; . == "effort")) or (.title | test("^\\[Effort\\] ")) | not)
-    | .number')
+  done <<< "$selected"
   [ "${#ISSUES[@]}" -ge 1 ] || { echo "autopilot: nothing open to drive" >&2; exit 0; }
 fi
 

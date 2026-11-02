@@ -71,9 +71,11 @@ tc "$GH_LOG" 'scripts/lib/effort-ops\.sh and skills' "body fills ## For agents"
 tc "$GH_LOG" 'the verb and skill produce identical'  "body fills ## Verification"
 tn "$GH_LOG" '<!--'                                  "no template placeholder left in a filled body"
 
-# Label set on the parent: ctx + kind + priority + role + flow (flow lowercased).
-tc "$GH_LOG" 'issue create .*--label ctx:[SMLX]+,kind:task,priority:p2,role:tech-lead,flow:core' \
-   "parent carries ctx/kind/priority/role/flow labels"
+# Label set on the parent: effort + ctx + kind + priority + role + flow (flow lowercased).
+# `effort` leads: it is the one `effort_plan` queries, and it was read by that verb while nothing
+# wrote it — so `cckit effort plan` answered "no open efforts found" on every repo.
+tc "$GH_LOG" 'issue create .*--label effort,ctx:[SMLX]+,kind:task,priority:p2,role:tech-lead,flow:core' \
+   "parent carries effort/ctx/kind/priority/role/flow labels"
 # Flow tag on the composed title.
 tc "$GH_LOG" 'issue edit 1 .*--title \[Effort\] 1 · \[Core\] demo parity effort' \
    "parent title carries the [Core] flow tag + injected number"
