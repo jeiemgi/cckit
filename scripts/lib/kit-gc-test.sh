@@ -302,7 +302,7 @@ has "cleanup said why it skipped the dirty one" "$applied" "SKIP dirty worktree"
 has "cleanup counts what it landed"            "$applied" "landed deleted"
 
 # ── lineage when the closing PR is OUTSIDE the 200-PR index window ─────────────────────────────
-# Measured on tedos: PR#2218 (closed #2165) sat at position 254 of `gh pr list --state all`, so the
+# Measured on a consuming repo: the effort PR that closed the issue sat at position 254 of `gh pr list --state all`, so the
 # index never carried it and 21 `worktree-agent-*` branches with `[#2165]` subjects stayed ORPHAN
 # while base had changed their files again (content check fails too). The issue itself knows which
 # PR closed it (`closedByPullRequestsReferences`), exact and not window-bound. Cached per issue: the
@@ -343,6 +343,47 @@ t   "the PR state was confirmed ONCE" "$(grep -c '^pr view 61' "$GH_CALLS")" "1"
 : > "$GH_CALLS"
 PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_prune >/dev/null 2>&1
 t   "a new run looks the issue up again" "$(grep -c 'issue view 60 .*closedByPullRequestsReferences' "$GH_CALLS")" "1"
+
+# ── `(#N)` subjects + a sub-issue closed through its parent's PR ──────────────────────────────
+# Measured on a consuming repo: agent branches whose subjects end in `(#N)` — GitHub's own trailing ref,
+# not the kit's `[#N]` — where #2077 is a sub-issue: CLOSED, no closing PR (subs close through
+# `effort close`), parent #2075 closed by merged PR 2130. One climb to the parent lands it.
+# effort/1711: closed NOT_PLANNED, no PR, no parent — must stay ORPHAN.
+git checkout -q -b worktree-agent-sub70
+echo "ontology" > onto.txt; git add onto.txt; git commit -qm "Root vocabulary: classes and predicates (#70)"
+git checkout -q "$init_branch"
+git checkout -q worktree-agent-sub70 -- onto.txt; git commit -qm "squash of the ontology effort"
+echo "changed again" > onto.txt; git add onto.txt; git commit -qm "later change on base"
+git checkout -q -b effort/80-not-planned
+echo "abandoned" > np.txt; git add np.txt; git commit -qm "[Effort 80] 1 · never landed"
+git checkout -q "$init_branch"
+cat > "$stub/gh" <<'SH'
+#!/usr/bin/env bash
+echo "$*" >> "$GH_CALLS"
+case "$1 $2" in
+  "pr list") printf 'effort/50-thing\tPR#55 MERGED\n' ;;
+  "issue view")
+    case "$*" in
+      *closedByPullRequestsReferences*) for a in "$@"; do case "$a" in 75) echo 76; exit 0 ;; esac; done ;;  # 70, 80: nothing
+      *) echo closed ;;
+    esac ;;
+  "pr view") for a in "$@"; do case "$a" in 76) echo MERGED; exit 0 ;; esac; done; echo CLOSED ;;
+  "api repos/o/r/issues/70/parent") echo 75 ;;
+  "api repos/o/r/issues/80/parent") echo "gh: Not Found (HTTP 404)" >&2; exit 1 ;;
+  *) : ;;
+esac
+SH
+chmod +x "$stub/gh"
+: > "$GH_CALLS"
+analysis="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_analyze 2>/dev/null)"
+has "(#N) subject lands through the parent's merged PR" "$(row worktree-agent-sub70)" \
+    "LANDED (agent worktree; issue #70 closed, parent #75 closed by merged PR#76)"
+has "closed NOT_PLANNED with no PR and no parent stays ORPHAN" "$(row effort/80-not-planned)" "ORPHAN"
+t   "the parent was climbed once for #70" "$(grep -c '^api repos/o/r/issues/70/parent' "$GH_CALLS")" "1"
+t   "the parent lookup for #80 ran once and was cached as a miss" "$(grep -c '^api repos/o/r/issues/80/parent' "$GH_CALLS")" "1"
+applied="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_prune --yes --only '^(worktree-agent-sub70|effort/80-)' 2>&1)"
+t   "--yes deleted the parent-landed agent branch" "$(git branch --list worktree-agent-sub70 | wc -l | tr -d ' ')" "0"
+t   "--yes KEPT the not-planned effort branch"     "$(git branch --list effort/80-not-planned | wc -l | tr -d ' ')" "1"
 unset KIT_BASE_BRANCH
 
 [ "$fail" -eq 0 ] && echo "ALL OK (kit-gc)" || echo "kit-gc: FAILURES"

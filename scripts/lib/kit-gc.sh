@@ -125,7 +125,9 @@ _kit_gc_landed_reason() {
   fi
   # (b) lineage
   n="$(wt_issue_number "$b")"
-  [ -n "$n" ] || n="$(git log --format=%s "$base_ref..$b" 2>/dev/null | grep -oE '\[#[0-9]+\]' | head -1 | tr -dc '0-9')"
+  # `[#N]` is the kit's token; `(#N)` is GitHub's own trailing ref (what a squash puts on a PR
+  # commit, and what a sub-issue's commit subject carried on a consuming repo's effort). Both name issues.
+  [ -n "$n" ] || n="$(git log --format=%s "$base_ref..$b" 2>/dev/null | grep -oE '[[(]#[0-9]+[])]' | head -1 | tr -dc '0-9')"
   [ -n "$n" ] || return 0
   state="$(wt_issue_state "$n" "$repo")"
   [ "$state" = closed ] || return 0
@@ -133,9 +135,13 @@ _kit_gc_landed_reason() {
     printf '%sissue #%s closed, its PR merged' "$shape" "$n"
   elif pr="$(_kit_gc_issue_merged_pr "$n" "$repo")" && [ -n "$pr" ]; then
     # The index is a 200-PR window; on a repo with hundreds of merged PRs the effort PR that closed
-    # #N has scrolled out of it (tedos: PR#2218 closing #2165 sat at position 254). The issue itself
-    # knows which PR closed it, and that lookup is exact and not window-bound.
-    printf '%sissue #%s closed by merged PR#%s' "$shape" "$n" "$pr"
+    # #N has scrolled out of it (measured on a consuming repo: the closing PR sat at position 254). The issue itself
+    # knows which PR closed it, and that lookup is exact and not window-bound. A sub-issue closes
+    # through `effort close`, not a PR, so the answer may come from its parent: "M via P".
+    case "$pr" in
+      *" via "*) printf '%sissue #%s closed, parent #%s closed by merged PR#%s' "$shape" "$n" "${pr#* via }" "${pr%% *}" ;;
+      *)         printf '%sissue #%s closed by merged PR#%s' "$shape" "$n" "$pr" ;;
+    esac
   fi
 }
 
@@ -146,13 +152,17 @@ _kit_gc_landed_reason() {
 _KIT_GC_CACHE_DIR="${TMPDIR:-/tmp}/kit-gc-cache-$$"
 _kit_gc_cache_reset() { rm -rf "$_KIT_GC_CACHE_DIR" 2>/dev/null; mkdir -p "$_KIT_GC_CACHE_DIR" 2>/dev/null || true; }
 
-# _kit_gc_issue_merged_pr <issue> [repo] — echo the number of a MERGED PR that closed <issue>, or
-# nothing. Reads the issue's `closedByPullRequestsReferences` (exact, not bound to the 200-PR index
-# window) and confirms the state of each candidate. Cached per issue number for the run: an effort's
-# subs and agent branches all name the same N, and 21 branches must not mean 21 gh round trips.
-# A negative answer is cached too. rc 0 with empty output when nothing merged closed it.
+# _kit_gc_issue_merged_pr <issue> [repo] [depth] — echo the number of a MERGED PR that closed
+# <issue>, or nothing. Reads the issue's `closedByPullRequestsReferences` (exact, not bound to the
+# 200-PR index window) and confirms the state of each candidate. When nothing closed <issue> — a
+# sub-issue closes through `effort close`, not a PR — climb ONCE to its parent (the sub-issues API;
+# 404 = no parent) and answer `<M> via <P>` when the parent was closed by merged PR M. Cached per
+# issue number for the run: an effort's subs and agent branches all name the same N, and 21
+# branches must not mean 21 gh round trips. A negative answer is cached too. rc 0 with empty output
+# when nothing merged closed it or its parent (measured: an effort closed NOT_PLANNED, no PR, no
+# parent — a true ORPHAN).
 _kit_gc_issue_merged_pr() {
-  local n="$1" repo="${2:-$KIT_GC_REPO}" cache="" cand result=""
+  local n="$1" repo="${2:-$KIT_GC_REPO}" depth="${3:-0}" cache="" cand result="" parent
   [ -n "$n" ] || return 0
   command -v gh >/dev/null 2>&1 || return 0
   [ -d "$_KIT_GC_CACHE_DIR" ] && cache="$_KIT_GC_CACHE_DIR/issue-$n"
@@ -167,6 +177,14 @@ _kit_gc_issue_merged_pr() {
 $(gh issue view "$n" --repo "$repo" --json closedByPullRequestsReferences \
      --jq '.closedByPullRequestsReferences[].number' 2>/dev/null || true)
 EOF
+  if [ -z "$result" ] && [ "$depth" -eq 0 ]; then
+    parent="$(gh api "repos/$repo/issues/$n/parent" --jq .number 2>/dev/null || true)"
+    case "$parent" in ''|*[!0-9]*) parent="" ;; esac
+    if [ -n "$parent" ]; then
+      result="$(_kit_gc_issue_merged_pr "$parent" "$repo" 1)"
+      [ -n "$result" ] && result="${result%% *} via $parent"
+    fi
+  fi
   [ -n "$cache" ] && printf '%s' "$result" > "$cache" 2>/dev/null
   printf '%s' "$result"
 }
