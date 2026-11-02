@@ -25,6 +25,11 @@ These floor to human review regardless of the `risk:*` label, per existing rules
   lockfile rule): one in flight at a time, human-reviewed.
 - **`risk:*` floors to the highest concern in a mixed PR** — never bury a risky change among trivial ones.
 
+**Night runs** (`kit-autopilot` § _Mode: night_). An approved night run may merge a `security/*`
+PR whose diff is prose only, by standing rule. The lockfile, auth and `security/*` code floors are
+waived only by that night's grant (`scripts/night-grant.sh`). CI workflow changes, cost and secrets
+are never waived, whatever the grant says, and a project may add its own never-waivable floors.
+
 ## The gates (what "green" means)
 
 The gates are whatever the project runs to prove a change is sound — typically:
