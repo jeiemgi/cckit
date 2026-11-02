@@ -24,8 +24,13 @@ The effort lifecycle's terminal op. Board state, issue state, and the work recor
 4. **Judge + sync** the metrics (reads the durable trace dir; no-ops when the engine is off).
 5. **Close the parent + ALL native sub-issues** and set the **board Status=Done** for each
    (guarded — a no-op when Projects v2 is off).
-6. **GC**: base branch checked out + pulled in the main checkout, effort worktree removed,
-   local branch deleted, pruned (the remote branch is deleted by the merge).
+6. **GC**: base branch checked out + pulled in the main checkout; then the effort's **`sub/<N>…`
+   worktrees and branches** are collected through `kit_gc_prune --only '^sub/<N>[a-z]-'` — the
+   squash just put their work on base, so they classify **LANDED** (no PR of their own, content or
+   lineage on base) and go under the same recover-before-prune guards as `cckit cleanup` (a dirty
+   sub worktree, or a sub ahead of its remote, stays and is reported). Then the effort worktree is
+   removed, its local branch deleted, pruned (the remote branch is deleted by the merge). A sub
+   that fails both LANDED checks is left for `cckit gc` to show as ORPHAN.
 7. **Knowledge-ingest hook** (optional, config-gated via `effort.knowledgeIngestHook`).
 8. **Kit-sync drift check** — advisory warning when the effort touched kit-managed files that
    belong upstream (/kit-contribute).
@@ -84,7 +89,7 @@ effort_close "$NUM"
 - Pre-squash trace dir (`<git-common-dir>/traces/effort-<N>/` + `index.jsonl`) + captured metrics
 - PR squash-merged; parent + all native sub-issues closed
 - Board Status=Done for parent + every sub (if Projects v2 is on)
-- Main checkout on the base branch, up to date; effort worktree + local/remote branch removed and pruned
+- Main checkout on the base branch, up to date; effort worktree + local/remote branch removed and pruned, and every LANDED `sub/<N>…` worktree + branch with them (`✓ sub gc:` lines)
 - Knowledge-ingest hook ran (if configured); a kit-sync warning if the effort touched kit-managed files
 
 ## Rules

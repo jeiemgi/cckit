@@ -39,7 +39,7 @@
 #   cckit next [--effort N]         everyday helper: the unblocked set + how to start the top issue
 #   cckit wave [--effort N]         read open efforts, propose incoming waves: fan-out + captain drive
 #   cckit msg <send|read|list>      session mail across projects: steer a live session (--steer)
-#   cckit gc [--prune [--yes]]      report (default) or prune merged branches + worktrees
+#   cckit gc [--prune [--yes]]      report (default) or prune merged + landed branches and worktrees
 #   cckit cleanup [--yes]           guided destructive sweep over the gc report (plan first)
 #   cckit status                    thin dashboard: board + worktrees + resume handoff
 #   cckit scan [--llm]              detect this repo's stack + kit state (JSON)
@@ -276,6 +276,7 @@ case "$cmd" in
       out="$(kit_gc_cleanup "$@" 2>"$cleanup_err")" || cleanup_rc=$?
       safe="$(printf '%s\n' "$out" | awk '/^  SAFE branches/{print $3}')"
       wt="$(printf '%s\n' "$out" | awk '/^  SAFE worktrees/{print $3}')"
+      landed="$(printf '%s\n' "$out" | awk '/^  LANDED branches/{print $3}')"
       orphan="$(printf '%s\n' "$out" | awk '/^  ORPHAN kept/{print $3}')"
       protected="$(printf '%s\n' "$out" | awk '/^  PROTECTED kept/{print $3}')"
       stash="$(printf '%s\n' "$out" | awk '/^  stashes kept/{print $3}')"
@@ -284,7 +285,7 @@ case "$cmd" in
       applied=no
       if [ "$cleanup_rc" -eq 0 ]; then case " $* " in *" --yes "*|*" -y "*) applied=yes ;; esac; fi
       err="$(tr '\n' ' ' < "$cleanup_err" | sed 's/[[:space:]]*$//')"; rm -f "$cleanup_err"
-      cckit_json verb cleanup safe "${safe:-0}" worktrees "${wt:-0}" orphan "${orphan:-0}" \
+      cckit_json verb cleanup safe "${safe:-0}" landed "${landed:-0}" worktrees "${wt:-0}" orphan "${orphan:-0}" \
         protected "${protected:-0}" stash "${stash:-0}" zombie "${zombie:-0}" applied "$applied" \
         remote_failed "${rfail:-0}" rc "$cleanup_rc" error "$err"
       [ "$cleanup_rc" -eq 0 ] || exit "$cleanup_rc"
@@ -299,16 +300,18 @@ case "$cmd" in
     source "$LIB/kit-gc.sh"
     case " $* " in
       *" --prune "*|*" prune "*)
-        # Remove worktrees + local branches whose PR merged. Dry-run unless --yes.
+        # Remove worktrees + local branches whose PR merged (SAFE) or whose work is already on base
+        # with no PR of their own (LANDED, #388). Dry-run unless --yes.
         kit_gc_prune "$@"
         ;;
       *)
         if cckit_is_json; then
           out="$(kit_gc_analyze 2>/dev/null || true)"
           safe="$(printf '%s\n' "$out" | grep -c '> SAFE ' || true)"
+          landed="$(printf '%s\n' "$out" | grep -c '> LANDED ' || true)"
           protected="$(printf '%s\n' "$out" | grep -c 'PROTECTED:' || true)"
           orphan="$(printf '%s\n' "$out" | grep -c 'ORPHAN' || true)"
-          cckit_json verb gc safe "$safe" protected "$protected" orphan "$orphan"
+          cckit_json verb gc safe "$safe" landed "$landed" protected "$protected" orphan "$orphan"
         else
           kit_gc_analyze "$@"
         fi

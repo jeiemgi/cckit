@@ -104,7 +104,7 @@ cckit pr 42 "what changed"    # commit, push, open the PR
 cckit sync                    # board state, what's unblocked
 cckit handoff "resume note"   # save a handoff — bare `cckit` prints it next session
 cckit gc                      # report prunable branches + worktrees (deletes nothing)
-cckit cleanup [--yes]         # act on that report: delete the SAFE rows, prune listed zombies, keep orphans/stashes
+cckit cleanup [--yes]         # act on that report: delete the SAFE + LANDED rows, prune listed zombies, keep orphans/stashes
 ```
 
 Adopting cckit in a repo that already has history? `cckit scan` detects the stack, `cckit adopt`
