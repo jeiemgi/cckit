@@ -915,6 +915,14 @@ effort_close() {
     fi
   fi
 
+  # (a2) refuse a conflicting PR before anything is written (#394). The capture below appends a
+  # records.jsonl row and consumes the effort's start marker, so a merge that fails after it leaves a
+  # row the retry duplicates with build_seconds null. UNKNOWN (GitHub still computing) proceeds.
+  if [ "$(gh pr view "$branch" --repo "$repo" --json mergeable -q .mergeable 2>/dev/null)" = "CONFLICTING" ]; then
+    echo "effort_close: the PR for $branch conflicts with $base — merge or rebase $base into it, then rerun (nothing was written)" >&2
+    return 1
+  fi
+
   # (b) capture effort metrics PRE-squash (needs the live-branch diff + commit signals).
   command -v capture_effort_metrics >/dev/null 2>&1 && capture_effort_metrics "$num" "origin/$base" || true
 
