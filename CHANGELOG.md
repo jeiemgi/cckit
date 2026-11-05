@@ -5,6 +5,16 @@ All notable changes to cckit are documented here. New entries below are generate
 [Conventional Commits](https://www.conventionalcommits.org/) and land when the Release PR is
 merged to `main`. Earlier entries follow [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.9.0](https://github.com/jeiemgi/cckit/compare/v0.8.0...v0.9.0) (2026-11-05)
+
+
+### Features
+
+* **close:** close with a reason [[#377](https://github.com/jeiemgi/cckit/issues/377)] ([#386](https://github.com/jeiemgi/cckit/issues/386)) ([92131fe](https://github.com/jeiemgi/cckit/commit/92131fee04c8c772020f38f6fdf57c416084d6cc))
+* Effort close writes metrics before a failed merge ([#395](https://github.com/jeiemgi/cckit/issues/395)) ([08da611](https://github.com/jeiemgi/cckit/commit/08da611cfb023b036d8da4e635ebad250145431a))
+* Lifecycle verbs work without GraphQL ([#397](https://github.com/jeiemgi/cckit/issues/397)) ([a105b4e](https://github.com/jeiemgi/cckit/commit/a105b4e4a7304523961ef270fa60a73e699a5a3d))
+* **merge:** add --merge and --rebase, and respect the PR's real base [[#376](https://github.com/jeiemgi/cckit/issues/376)] ([#385](https://github.com/jeiemgi/cckit/issues/385)) ([d63ec81](https://github.com/jeiemgi/cckit/commit/d63ec8112b4ebc90bf39e8b3bb695aac762e8111))
+
 ## [0.8.0](https://github.com/jeiemgi/cckit/compare/v0.7.1...v0.8.0) (2026-11-02)
 
 
