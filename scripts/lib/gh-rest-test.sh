@@ -118,5 +118,95 @@ t "the notice is printed once"                      "$(grep -c 'board step skipp
 tc "$tmp/board.err" "^cckit: board step skipped \(GraphQL unavailable; the project's built-in workflows move the card\)$" "the notice wording"
 t "no gh call is made for the board"                "$(wc -l < "$GH_LOG" | tr -d ' ')" "0"
 
+# ── the task verbs ────────────────────────────────────────────────────────────────────────────────
+git init -q --bare "$tmp/remote.git"
+git clone -q "$tmp/remote.git" "$tmp/work" 2>/dev/null
+cd "$tmp/work" || exit 1
+git config user.email t@t; git config user.name t
+git checkout -q -b develop; git commit -q --allow-empty -m init; git push -q origin develop
+# shellcheck source=/dev/null
+. "$LIB/gh-project.sh"
+# shellcheck source=/dev/null
+. "$LIB/kit-task-ops.sh"
+export KIT_PROJECTS_V2=true CCKIT_GH_TRANSPORT=rest
+
+# cckit pr
+git checkout -q -b fix/42-the-thing
+echo x > a.txt; git add a.txt; git commit -q -m wip
+: > "$GH_LOG"
+unset _CCKIT_BOARD_NOTICE_DONE; kto_task_pr 42 "Did the thing." >"$tmp/out" 2>"$tmp/err"; rc=$?
+t  "pr: rc 0 over REST"                             "$rc" "0"
+rest_only "$GH_LOG" "pr: only REST calls"
+tc "$GH_LOG" '^api repos/o/r/issues/42 '            "pr: reads the issue over REST"
+tc "$GH_LOG" '^api repos/o/r/pulls -X POST .*-f title=fix: Fix the thing -f head=fix/42-the-thing -f base=develop' "pr: opens the PR with POST pulls"
+tc "$GH_LOG" '^api repos/o/r/issues/7 -X PATCH -f labels\[\]=kind:fix -f labels\[\]=role:tech-lead -f assignees\[\]=me -F milestone=3' "pr: labels, assignee and milestone in one PATCH"
+tc "$tmp/out" 'https://github.com/o/r/pull/7'       "pr: prints the PR url"
+t  "pr: the board notice is printed once"           "$(grep -c 'board step skipped' "$tmp/err")" "1"
+
+# cckit new
+: > "$GH_LOG"
+unset _CCKIT_BOARD_NOTICE_DONE; num="$(kto_task_new "Add a thing" tech-lead task p2 M1 "" "" "Body." 2>"$tmp/err" | tail -1)"; rc=$?
+t  "new: rc 0 over REST"                            "$rc" "0"
+rest_only "$GH_LOG" "new: only REST calls"
+tc "$GH_LOG" '^api repos/o/r/issues -X POST -f title=Add a thing .*-f labels\[\]=kind:task -f labels\[\]=priority:p2 -f labels\[\]=role:tech-lead -F milestone=3' "new: POST issues with labels and the milestone number"
+tc "$GH_LOG" "^api repos/o/r/issues/$num/assignees -X POST -f assignees\[\]=me" "new: assigns the issue to its author"
+t  "new: echoes the new number"                     "$num" "50"
+t  "new: no 'NOT added to the board' warning"       "$(grep -c 'NOT added' "$tmp/err")" "0"
+t  "new: the board notice is printed once"          "$(grep -c 'board step skipped' "$tmp/err")" "1"
+
+# cckit close
+: > "$GH_LOG"
+unset _CCKIT_BOARD_NOTICE_DONE; kto_task_close 5 "Shipped." >/dev/null 2>"$tmp/err"; rc=$?
+t  "close: rc 0 over REST"                          "$rc" "0"
+rest_only "$GH_LOG" "close: only REST calls"
+tc "$GH_LOG" '^api repos/o/r/issues/5/comments -X POST -f body=Shipped\.$' "close: posts the summary"
+tc "$GH_LOG" '^api repos/o/r/issues/5 -X PATCH -f state=closed -f state_reason=completed$' "close: state_reason completed"
+: > "$GH_LOG"
+kto_task_close 6 "Not worth it." --reason not-planned >/dev/null 2>&1
+tc "$GH_LOG" '^api repos/o/r/issues/6 -X PATCH -f state=closed -f state_reason=not_planned$' "close: not-planned maps to not_planned"
+: > "$GH_LOG"
+kto_task_close 7 "Same work." --duplicate-of 4 >/dev/null 2>&1
+tc "$GH_LOG" '^api repos/o/r/issues/7 -X PATCH -f state=closed -f state_reason=duplicate$' "close: duplicate maps to state_reason duplicate"
+tc "$GH_LOG" 'issues/7/comments -X POST -f body=Same work\..*Duplicate of #4\.$' "close: the comment links the original"
+: > "$GH_LOG"; GH_CLOSED="8"
+kto_task_close 8 "x" >/dev/null 2>&1; rc=$?
+t  "close: an already-closed issue is fine"         "$rc" "0"
+t  "close: it is not closed again"                  "$(grep -c 'PATCH' "$GH_LOG")" "0"
+GH_CLOSED=""
+
+# cckit merge — from the PR's worktree, as in the default-mode suite
+git checkout -q develop
+wt="$tmp/work/.claude/worktrees/fix+9-x"
+git worktree add -q -b fix/9-x "$wt" develop
+git -C "$wt" commit -q --allow-empty -m "the fix"
+git -C "$wt" push -q origin fix/9-x
+: > "$GH_LOG"; GH_CLOSED="43"
+unset _CCKIT_BOARD_NOTICE_DONE; ( cd "$wt" && kto_task_pr_merge ) >"$tmp/out" 2>"$tmp/err"; rc=$?
+t  "merge: rc 0 over REST"                          "$rc" "0"
+rest_only "$GH_LOG" "merge: only REST calls"
+tc "$GH_LOG" '^api repos/o/r/pulls -X GET -f head=o:fix/9-x -f state=open' "merge: finds the open PR for the branch"
+tc "$GH_LOG" '^api repos/o/r/pulls/9/merge -X PUT -f merge_method=squash$' "merge: squash-merges with PUT pulls/9/merge"
+tc "$GH_LOG" '^api repos/o/r/issues/42 -X PATCH -f state=closed -f state_reason=completed$' "merge: closes the linked open issue"
+t  "merge: an already-closed linked issue is left"  "$(grep -c 'issues/43 -X PATCH' "$GH_LOG")" "0"
+t  "merge: a bare mention is not a closing ref"     "$(grep -c 'issues/44' "$GH_LOG")" "0"
+t  "merge: the worktree is removed"                 "$([ -d "$wt" ] && echo present || echo gone)" "gone"
+t  "merge: the local branch is deleted"             "$(git branch --list fix/9-x | wc -l | tr -d ' ')" "0"
+t  "merge: the remote branch is kept"               "$(git ls-remote --heads origin fix/9-x | wc -l | tr -d ' ')" "1"
+tc "$tmp/out" 'remote branch fix/9-x kept'           "merge: says why the remote branch stays"
+: > "$GH_LOG"; GH_HEAD="fix/10-x"
+kto_task_pr_merge 10 --rebase >/dev/null 2>&1
+tc "$GH_LOG" '^api repos/o/r/pulls/10/merge -X PUT -f merge_method=rebase$' "merge: --rebase reaches merge_method"
+: > "$GH_LOG"; GH_MERGEABLE="false"; GH_HEAD="fix/11-x"
+kto_task_pr_merge 11 >/dev/null 2>&1; rc=$?
+t  "merge: a conflicting PR from the base is refused" "$rc" "1"
+t  "merge: nothing merged on a conflict"            "$(grep -c '/merge' "$GH_LOG")" "0"
+GH_MERGEABLE="true"; GH_CLOSED=""; GH_HEAD="fix/9-x"
+
+# ── the default transport is unchanged ────────────────────────────────────────────────────────────
+: > "$GH_LOG"
+CLAUDE_CODE_REMOTE=true CCKIT_GH_TRANSPORT=graphql KIT_PROJECTS_V2=false kto_task_close 12 "Done." >/dev/null 2>&1
+tc "$GH_LOG" '^issue close 12 --repo o/r --reason completed --comment Done\.$' "graphql: close still uses gh issue close"
+t  "graphql: no REST close"                         "$(grep -c '^api ' "$GH_LOG")" "0"
+
 [ "$fail" -eq 0 ] && echo "gh-rest: all passed" || echo "gh-rest: FAILURES"
 exit "$fail"
