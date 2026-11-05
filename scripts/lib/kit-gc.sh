@@ -23,6 +23,15 @@
 # Portable: bash 3.2+ AND zsh.
 # errors: mixed — kit_gc_analyze is read-only and forgiving; the prune path propagates
 
+# The GitHub transport switch (#396): rest mode routes the gh calls below through gh-rest.sh.
+if ! command -v cckit_gh_rest >/dev/null 2>&1; then
+  _ghr_lib="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)/gh-rest.sh"
+  # shellcheck source=/dev/null
+  [ -f "$_ghr_lib" ] && . "$_ghr_lib"
+  unset _ghr_lib
+fi
+command -v cckit_gh_rest >/dev/null 2>&1 || cckit_gh_rest() { return 1; }
+
 KIT_GC_REPO="${KIT_GC_REPO:-${KIT_REPO:-}}"
 
 _kit_gc_root() { git worktree list --porcelain 2>/dev/null | awk '/^worktree /{print $2; exit}'; }
@@ -67,6 +76,11 @@ _kit_gc_require_deps() {
 # scaled badly exactly when gc matters most (many stale branches). #124.
 _kit_gc_pr_index() {
   local repo="${1:-$KIT_GC_REPO}"
+  if cckit_gh_rest; then
+    gh api "repos/$repo/pulls" -X GET -f state=all -f per_page=100 \
+      --jq '.[] | "\(.head.ref)\tPR#\(.number) \(if .merged_at then "MERGED" else (.state | ascii_upcase) end)"' 2>/dev/null || true
+    return 0
+  fi
   gh pr list --repo "$repo" --state all --limit 200 --json number,state,headRefName \
     --jq '.[] | "\(.headRefName)\tPR#\(.number) \(.state)"' 2>/dev/null || true
 }
@@ -170,12 +184,16 @@ _kit_gc_issue_merged_pr() {
   while IFS= read -r cand; do
     [ -n "$cand" ] || continue
     case "$cand" in *[!0-9]*) continue ;; esac
-    if [ "$(gh pr view "$cand" --repo "$repo" --json state --jq .state 2>/dev/null)" = "MERGED" ]; then
+    if cckit_gh_rest; then
+      # REST: the candidate came from a merged cross-reference that closes <n> (gh_rest_wave_rows).
+      result="$cand"; break
+    elif [ "$(gh pr view "$cand" --repo "$repo" --json state --jq .state 2>/dev/null)" = "MERGED" ]; then
       result="$cand"; break
     fi
   done <<EOF
-$(gh issue view "$n" --repo "$repo" --json closedByPullRequestsReferences \
-     --jq '.closedByPullRequestsReferences[].number' 2>/dev/null || true)
+$(if cckit_gh_rest; then gh_rest_issue_closing_prs "$repo" "$n" 2>/dev/null || true
+  else gh issue view "$n" --repo "$repo" --json closedByPullRequestsReferences \
+     --jq '.closedByPullRequestsReferences[].number' 2>/dev/null || true; fi)
 EOF
   if [ -z "$result" ] && [ "$depth" -eq 0 ]; then
     parent="$(gh api "repos/$repo/issues/$n/parent" --jq .number 2>/dev/null || true)"

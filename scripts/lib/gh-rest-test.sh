@@ -208,5 +208,63 @@ CLAUDE_CODE_REMOTE=true CCKIT_GH_TRANSPORT=graphql KIT_PROJECTS_V2=false kto_tas
 tc "$GH_LOG" '^issue close 12 --repo o/r --reason completed --comment Done\.$' "graphql: close still uses gh issue close"
 t  "graphql: no REST close"                         "$(grep -c '^api ' "$GH_LOG")" "0"
 
+# ── the effort verbs ──────────────────────────────────────────────────────────────────────────────
+# shellcheck source=/dev/null
+. "$LIB/effort.sh" 2>/dev/null
+# shellcheck source=/dev/null
+. "$LIB/effort-ops.sh"
+GH_TITLE="[Effort] 99 · demo effort"; GH_LABELS='[{"name":"role:tech-lead"},{"name":"kind:task"}]'
+export KIT_BASE_BRANCH="main"
+
+# cckit effort new
+: > "$GH_LOG"
+unset _CCKIT_BOARD_NOTICE_DONE; parent="$(effort_new --flow Core "demo effort" "first sub" "second sub" 2>"$tmp/err")"; rc=$?
+t  "effort new: rc 0 over REST"                     "$rc" "0"
+rest_only "$GH_LOG" "effort new: only REST calls"
+tc "$GH_LOG" '^api repos/o/r/labels -X POST -f name=effort '            "effort new: ensures labels over REST"
+tc "$GH_LOG" "^api repos/o/r/issues -X POST -f title=\[Effort\] · \[Core\] demo effort .*-f labels\[\]=effort" "effort new: POST issues for the parent"
+tc "$GH_LOG" "^api repos/o/r/issues/$parent -X PATCH -f title=\[Effort\] $parent · \[Core\] demo effort$" "effort new: renames the parent with its number"
+tc "$GH_LOG" "^api repos/o/r/issues/$parent/labels -X POST -f labels\[\]=slug:demo-effort$" "effort new: adds the slug label"
+t  "effort new: parent + 2 subs created"            "$(grep -c '^api repos/o/r/issues -X POST' "$GH_LOG")" "3"
+t  "effort new: 2 sub-issues linked"                "$(grep -c 'sub_issues' "$GH_LOG")" "2"
+
+# cckit effort pr + effort close
+git checkout -q -b main; git push -q origin main
+cd "$tmp/work" || exit 1
+effort_start 99 demo >/dev/null 2>&1
+ewt="$tmp/work/.claude/worktrees/effort+99-demo"
+cd "$ewt" || exit 1
+echo work > file.txt; git add file.txt; git commit -q -m "feat: do the thing (#101)"
+: > "$GH_LOG"
+unset _CCKIT_BOARD_NOTICE_DONE; effort_pr 99 --summary "SUMMARY" >"$tmp/out" 2>"$tmp/err"; rc=$?
+t  "effort pr: rc 0 over REST"                      "$rc" "0"
+rest_only "$GH_LOG" "effort pr: only REST calls"
+tc "$GH_LOG" '^api repos/o/r/pulls -X POST -f title=\[#99\] .*-f head=effort/99-demo -f base=main' "effort pr: POST pulls effort/99 → main"
+tc "$GH_LOG" '^api repos/o/r/issues/7 -X PATCH -f labels\[\]=role:tech-lead -f labels\[\]=kind:task .*-F milestone=3' "effort pr: inherits labels + milestone"
+t  "effort pr: the board notice is printed once"    "$(grep -c 'board step skipped' "$tmp/err")" "1"
+
+: > "$GH_LOG"; GH_HEAD="effort/99-demo"; GH_BASE="main"
+unset _CCKIT_BOARD_NOTICE_DONE; close_out="$(effort_close 99 2>&1)"; rc=$?
+cd "$tmp/work" || exit 1
+t  "effort close: rc 0 over REST"                   "$rc" "0"
+rest_only "$GH_LOG" "effort close: only REST calls"
+tc "$GH_LOG" '^api repos/o/r/pulls/9/merge -X PUT -f merge_method=squash$' "effort close: squash-merges over REST"
+tc "$GH_LOG" '^api repos/o/r/issues/101 -X PATCH -f state=closed -f state_reason=completed$' "effort close: closes sub #101"
+tc "$GH_LOG" '^api repos/o/r/issues/99 -X PATCH -f state=closed -f state_reason=completed$'  "effort close: closes the parent"
+case "$close_out" in *"remote branch effort/99-demo kept"*) echo "ok: effort close: says why the remote branch stays" ;; *) echo "FAIL: effort close: no remote-branch notice: $close_out"; fail=1 ;; esac
+t  "effort close: the board notice is printed once" "$(printf '%s\n' "$close_out" | grep -c 'board step skipped')" "1"
+t  "effort close: the local branch is deleted"      "$(git branch --list effort/99-demo | wc -l | tr -d ' ')" "0"
+
+# wave-style close: no effort branch, the subs shipped as their own merged PRs
+: > "$GH_LOG"
+unset _CCKIT_BOARD_NOTICE_DONE; close_out="$(effort_close 77 2>&1)"; rc=$?
+t  "wave close: rc 0 over REST"                     "$rc" "0"
+rest_only "$GH_LOG" "wave close: only REST calls"
+tc "$GH_LOG" '^api repos/o/r/issues/101/timeline '  "wave close: finds the closing PR in the sub's timeline"
+tc "$GH_LOG" '^api repos/o/r/pulls/5101 -H Accept: application/vnd.github.v3.diff$' "wave close: snapshots the closing PR's diff (not the mention)"
+tc "$GH_LOG" '^api repos/o/r/issues/77 -X PATCH -f state=closed -f state_reason=completed$' "wave close: closes the parent"
+t  "wave close: rows match the graphql shape" \
+   "$(gh_rest_wave_rows o/r 77 | head -1)" "101|CLOSED|5101|abc1234def|feat: sub 5101"
+
 [ "$fail" -eq 0 ] && echo "gh-rest: all passed" || echo "gh-rest: FAILURES"
 exit "$fail"
