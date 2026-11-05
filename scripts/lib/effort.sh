@@ -15,6 +15,15 @@
 # Requires: gh, jq, git. bash 3.2 compatible.
 # errors: strict — git mechanics: a failed link, snapshot or lint propagates
 
+# The GitHub transport switch (#396): rest mode routes the gh calls below through gh-rest.sh.
+if ! command -v cckit_gh_rest >/dev/null 2>&1; then
+  _ghr_lib="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)/gh-rest.sh"
+  # shellcheck source=/dev/null
+  [ -f "$_ghr_lib" ] && . "$_ghr_lib"
+  unset _ghr_lib
+fi
+command -v cckit_gh_rest >/dev/null 2>&1 || cckit_gh_rest() { return 1; }
+
 # Repo resolves from kit.config.json (KIT_REPO) — load it if a caller hasn't already.
 if [[ -z "${KIT_REPO:-}" ]]; then
   _eff_root="$(git rev-parse --show-toplevel 2>/dev/null)"
@@ -150,7 +159,8 @@ effort_snapshot_merged_subs() {
     seq=$((seq + 1))
     short="$(printf '%.7s' "$oid")"; [[ -n "$short" ]] || short="pr$pr"
     stub="$(printf '%02d-%s' "$seq" "$short")"
-    gh pr diff "$pr" --repo "$EFFORT_REPO" > "$dir/$stub.diff" 2>/dev/null || rm -f "$dir/$stub.diff"
+    if cckit_gh_rest; then gh_rest_pr_diff "$EFFORT_REPO" "$pr" > "$dir/$stub.diff" 2>/dev/null || rm -f "$dir/$stub.diff"
+    else gh pr diff "$pr" --repo "$EFFORT_REPO" > "$dir/$stub.diff" 2>/dev/null || rm -f "$dir/$stub.diff"; fi
     [[ -s "$dir/$stub.diff" ]] || { rm -f "$dir/$stub.diff"; seq=$((seq - 1)); continue; }
     jq -c -n --arg parent "$parent" --arg sub "${sub:-}" --arg sha "${oid:-}" \
           --arg subject "$title" --arg pr "$pr" --arg file "$stub.diff" \

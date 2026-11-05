@@ -37,6 +37,19 @@ if [[ -z "${KIT_REPO:-}" ]]; then
   unset _kto_root
 fi
 
+# The GitHub transport switch (#396): in rest mode every gh call below is `gh api repos/…`.
+if ! type cckit_gh_rest >/dev/null 2>&1; then
+  if [ -n "${BASH_SOURCE:-}" ]; then _kto_self="${BASH_SOURCE[0]}"
+  elif [ -n "${ZSH_VERSION:-}" ]; then eval '_kto_self="${(%):-%x}"'
+  else _kto_self="$0"; fi
+  _kto_self="$(cd "$(dirname "$_kto_self")" 2>/dev/null && pwd)/gh-rest.sh"
+  # shellcheck source=gh-rest.sh
+  [ -f "$_kto_self" ] && . "$_kto_self"
+  unset _kto_self
+fi
+type cckit_gh_rest >/dev/null 2>&1 || cckit_gh_rest() { return 1; }
+type cckit_board_skipped >/dev/null 2>&1 || cckit_board_skipped() { return 1; }
+
 kto_repo() {
   printf '%s' "${KIT_TASK_REPO:-${KIT_REPO:-}}"
 }
@@ -48,8 +61,11 @@ kto_base_branch() {
 
 # True (rc 0) iff board updates should run. Off when KIT_PROJECTS_V2 is explicitly "false" — keeps
 # the op portable to a project with no Projects v2 board (the plugin's KIT_PROJECTS_V2 toggle).
+# In rest mode (#396) the board is GraphQL-only: skipped with one notice, never a failure.
 kto_board_enabled() {
-  [[ "${KIT_PROJECTS_V2:-true}" != "false" ]]
+  [[ "${KIT_PROJECTS_V2:-true}" != "false" ]] || return 1
+  cckit_board_skipped && return 1
+  return 0
 }
 
 # --- pure parsers (network-free; covered by the self-test) ---------------------------------------
@@ -178,6 +194,7 @@ kto_compose_issue_body() {
 kto_closing_issue_numbers() {
   local pr="$1" repo issues body
   repo="$(kto_repo)"
+  if cckit_gh_rest; then gh_rest_pr_closing_issues "$repo" "$pr"; return 0; fi
   issues=$(gh pr view "$pr" --repo "$repo" --json closingIssuesReferences \
     --jq '.closingIssuesReferences[].number' 2>/dev/null)
   if [[ -z "$issues" ]]; then
@@ -215,7 +232,8 @@ kto_task_pr() {
   [[ -n "$num" ]] || { echo "✗ kto_task_pr: branch '$branch' doesn't match <kind>/<N>-<slug> and no issue number passed" >&2; return 1; }
   [[ -n "$summary" ]] || { echo "✗ kto_task_pr: a Summary is required (never invent one)" >&2; return 1; }
 
-  meta=$(gh issue view "$num" --repo "$repo" --json title,labels,milestone) || return 1
+  if cckit_gh_rest; then meta=$(gh_rest_issue_json "$repo" "$num") || return 1
+  else meta=$(gh issue view "$num" --repo "$repo" --json title,labels,milestone) || return 1; fi
   title=$(printf '%s' "$meta" | jq -r .title)
   labels=$(printf '%s' "$meta" | jq -r '[.labels[].name] | join(",")')
   milestone=$(printf '%s' "$meta" | jq -r '.milestone.title // ""')
@@ -242,6 +260,10 @@ kto_task_pr() {
 
   git push -u origin "$branch" || return 1
 
+  if cckit_gh_rest; then
+    url=$(gh_rest_pr_create "$repo" "$(kto_base_branch)" "$branch" "$pr_title" \
+      "$(kto_compose_pr_body "$num" "$summary" "$role" "$title")" "$labels" "$milestone") || return 1
+  else
   url=$(gh pr create --repo "$repo" \
     --base "$(kto_base_branch)" --head "$branch" \
     --title "$pr_title" \
@@ -249,6 +271,7 @@ kto_task_pr() {
     --label "$labels" \
     ${milestone:+--milestone "$milestone"} \
     --assignee "@me") || return 1
+  fi
   echo "✓ $url"
 
   # Board: add the PR (In Review) + move the issue to In Review. Best-effort — never fail the op.
@@ -305,11 +328,13 @@ kto_task_pr_merge() {
 
   pr_num="$input_pr"
   if [[ -z "$pr_num" ]]; then
-    pr_num=$(gh pr list --repo "$repo" --head "$branch" --state open --json number --jq '.[0].number // empty')
+    if cckit_gh_rest; then pr_num=$(gh_rest_pr_for_head "$repo" "$branch")
+    else pr_num=$(gh pr list --repo "$repo" --head "$branch" --state open --json number --jq '.[0].number // empty'); fi
     [[ -z "$pr_num" ]] && { echo "✗ No open PR found for branch $branch" >&2; return 1; }
   fi
 
-  meta=$(gh pr view "$pr_num" --repo "$repo" --json mergeable,mergeStateStatus,baseRefName,headRefName) || return 1
+  if cckit_gh_rest; then meta=$(gh_rest_pr_json "$repo" "$pr_num") || return 1
+  else meta=$(gh pr view "$pr_num" --repo "$repo" --json mergeable,mergeStateStatus,baseRefName,headRefName) || return 1; fi
   merge_state=$(printf '%s' "$meta" | jq -r '.mergeable // ""')
   pr_base=$(printf '%s' "$meta" | jq -r '.baseRefName // empty'); pr_base="${pr_base:-$base}"
   head=$(printf '%s' "$meta" | jq -r '.headRefName // empty'); head="${head:-$branch}"
@@ -336,7 +361,12 @@ kto_task_pr_merge() {
     fi
   fi
 
-  if ! gh pr merge "$pr_num" --repo "$repo" "--$method" 2>&1; then
+  if cckit_gh_rest; then
+    if ! gh_rest_pr_merge "$repo" "$pr_num" "$method" 2>&1; then
+      echo "✗ Merge failed — check PR status: https://github.com/$repo/pull/$pr_num" >&2
+      return 1
+    fi
+  elif ! gh pr merge "$pr_num" --repo "$repo" "--$method" 2>&1; then
     echo "✗ Merge failed — check PR status: https://github.com/$repo/pull/$pr_num" >&2
     return 1
   fi
@@ -345,8 +375,13 @@ kto_task_pr_merge() {
   # Close linked issues (replaces issue-close-on-merge.yml; native auto-close only fires on main).
   issues="$(kto_closing_issue_numbers "$pr_num")"
   for n in $issues; do
-    state=$(gh issue view "$n" --repo "$repo" --json state --jq .state 2>/dev/null)
-    if [[ "$state" == "OPEN" ]]; then
+    if cckit_gh_rest; then state=$(gh_rest_issue_state "$repo" "$n" 2>/dev/null)
+    else state=$(gh issue view "$n" --repo "$repo" --json state --jq .state 2>/dev/null); fi
+    if [[ "$state" == "OPEN" ]] && cckit_gh_rest; then
+      gh_rest_issue_close "$repo" "$n" completed \
+        "Closed automatically on merge of #$pr_num to $pr_base (cckit merge; GitHub native auto-close only fires on the default branch)." \
+        && echo "✓ Closed issue #$n"
+    elif [[ "$state" == "OPEN" ]]; then
       gh issue close "$n" --repo "$repo" \
         --comment "Closed automatically on merge of #$pr_num to $pr_base (cckit merge; GitHub native auto-close only fires on the default branch)." \
         && echo "✓ Closed issue #$n"
@@ -373,7 +408,12 @@ kto_task_pr_merge() {
     echo "  ($head is protected — no branch cleanup)"
   else
     git -C "$main_wt" branch -D "$head" 2>/dev/null && echo "✓ Deleted local branch $head"
+    if cckit_gh_rest; then
+      # The cloud proxy rejects branch deletion (#396): keep it and say so.
+      echo "  (remote branch $head kept — branch deletion is unavailable here; delete it on GitHub)"
+    else
     git -C "$main_wt" push origin --delete "$head" 2>/dev/null && echo "✓ Deleted remote branch $head" || echo "  (remote branch already gone)"
+    fi
   fi
   git -C "$main_wt" worktree prune
 
@@ -410,9 +450,13 @@ kto_task_new() {
   labels="kind:${kind},priority:${prio},role:${role_slug}"
   body="$(kto_compose_issue_body "$body_user" "$plan" "$blocked" "$role_slug")"
 
+  if cckit_gh_rest; then
+    url=$(gh_rest_issue_create "$repo" "$title" "$body" "$labels" "$milestone") || return 1
+  else
   url=$(gh issue create --repo "$repo" \
     --title "$title" --body "$body" \
     --label "$labels" ${milestone:+--milestone "$milestone"} --assignee "@me") || return 1
+  fi
   num=$(basename "$url")
   echo "✓ $url"
 
@@ -488,7 +532,8 @@ kto_task_close() {
 
   local repo issue_json state item
   repo="$(kto_repo)"
-  issue_json=$(gh issue view "$num" --repo "$repo" --json state,projectItems) || return 1
+  if cckit_gh_rest; then issue_json=$(gh_rest_issue_json "$repo" "$num") || return 1
+  else issue_json=$(gh issue view "$num" --repo "$repo" --json state,projectItems) || return 1; fi
   state=$(printf '%s' "$issue_json" | jq -r .state)
 
   if kto_board_enabled && type load_project_ids >/dev/null 2>&1 && load_project_ids 2>/dev/null; then
@@ -498,7 +543,14 @@ kto_task_close() {
       echo "✓ Board Status → Done for #$num" || true
   fi
 
-  if [[ "$state" == "OPEN" ]]; then
+  if [[ "$state" == "OPEN" ]] && cckit_gh_rest; then
+    # REST has no duplicate link (#396): state_reason duplicate, and the comment names the original.
+    if [[ -n "$dup" ]]; then
+      case "$summary" in *"#$dup"*) : ;; *) summary="$summary"$'\n\n'"Duplicate of #$dup." ;; esac
+    fi
+    gh_rest_issue_close "$repo" "$num" "$gh_reason" "$summary" || return 1
+    echo "✓ Closed issue #$num ($gh_reason${dup:+ of #$dup}${sup:+, superseded by #$sup})"
+  elif [[ "$state" == "OPEN" ]]; then
     if [[ -n "$dup" ]]; then
       gh issue close "$num" --repo "$repo" --duplicate-of "$dup" --comment "$summary" || return 1
     else
