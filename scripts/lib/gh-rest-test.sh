@@ -102,5 +102,21 @@ tc <(CCKIT_GH_TRANSPORT=soap cckit_gh_transport 2>&1 >/dev/null) "must be rest o
 t "closing refs are read from a PR body" \
   "$(printf 'Closes #42\nfixes #43 and resolves #7\nsee #44\nCloses #42\n' | gh_rest_closing_refs | tr '\n' ' ')" "7 42 43 "
 
+# ── board steps in rest mode ──────────────────────────────────────────────────────────────────────
+: > "$GH_LOG"
+out="$(CCKIT_GH_TRANSPORT=rest bash -c '
+  . "$1/gh-project.sh"
+  load_project_ids; echo "rc=$?"
+  project_add_item NODE; echo "rc=$?"
+  project_set_single_select I F O; echo "rc=$?"
+  project_set_text I F T; echo "rc=$?"
+  project_find_item_by_issue 5; echo "rc=$?"
+  project_issue_status 5; echo "rc=$?"' _ "$LIB" 2>"$tmp/board.err")"
+t "every board function returns 0 in rest mode"     "$(printf '%s' "$out" | grep -c '^rc=0$')" "6"
+t "the board functions print nothing on stdout"     "$(printf '%s' "$out" | grep -vc '^rc=')" "0"
+t "the notice is printed once"                      "$(grep -c 'board step skipped' "$tmp/board.err")" "1"
+tc "$tmp/board.err" "^cckit: board step skipped \(GraphQL unavailable; the project's built-in workflows move the card\)$" "the notice wording"
+t "no gh call is made for the board"                "$(wc -l < "$GH_LOG" | tr -d ' ')" "0"
+
 [ "$fail" -eq 0 ] && echo "gh-rest: all passed" || echo "gh-rest: FAILURES"
 exit "$fail"
