@@ -33,6 +33,7 @@ case "$1 $2" in
                      *) echo "[Effort] 99 · demo effort" ;;     # --json title -q .title
                    esac ;;
   "pr create")     echo "https://github.com/o/r/pull/7" ;;
+  "pr view")       echo "${GH_MERGEABLE:-MERGEABLE}" ;;           # --json mergeable (#394)
   "pr diff")       # a merged sub PR's diff (wave-style close, #164): one kit-managed + one app file
     printf 'diff --git a/.claude/skills/demo.md b/.claude/skills/demo.md\n+kit\ndiff --git a/src/app.ts b/src/app.ts\n+app\n' ;;
   "api "*|"api")
@@ -134,6 +135,17 @@ mkdir -p .claude/skills
 echo "kit-managed" > .claude/skills/demo.md   # a kit-managed path → the drift check must fire (#148)
 git -c user.email=t@t -c user.name=t add file.txt .claude/skills/demo.md
 git -c user.email=t@t -c user.name=t commit -q -m "feat: do the thing (#101)"
+
+# ── effort_close #394: a CONFLICTING PR is refused before the metrics capture writes a row ──────
+: > "$GH_LOG"
+close_out="$(GH_MERGEABLE=CONFLICTING effort_close 99 2>&1)"; rc=$?
+t  "effort_close refuses a conflicting PR (rc 1)" "$rc" "1"
+t  "effort_close did NOT merge a conflicting PR" "$(grep -c 'pr merge' "$GH_LOG")" "0"
+case "$close_out" in
+  *"metrics:"*) echo "FAIL: metrics captured before the conflict refusal"; fail=1 ;;
+  *"nothing was written"*) echo "ok: conflict refused before the metrics capture" ;;
+  *) echo "FAIL: conflict refusal message: $close_out"; fail=1 ;;
+esac
 
 # #148: the VERB sets board Status=Done (guarded). Stub the board helpers + captured ids in-shell —
 # _eo_source_board must see them and skip sourcing the real gh-project.sh.

@@ -28,6 +28,16 @@ if ! command -v effort_slug_resolve >/dev/null 2>&1; then
   unset _eo_dir
 fi
 
+# The GitHub transport switch (#396): in rest mode the lifecycle calls below are `gh api repos/…`.
+if ! command -v cckit_gh_rest >/dev/null 2>&1; then
+  _eo_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+  # shellcheck source=/dev/null
+  [ -f "$_eo_dir/gh-rest.sh" ] && . "$_eo_dir/gh-rest.sh"
+  unset _eo_dir
+fi
+command -v cckit_gh_rest >/dev/null 2>&1 || cckit_gh_rest() { return 1; }
+command -v cckit_board_skipped >/dev/null 2>&1 || cckit_board_skipped() { return 1; }
+
 _eff_repo()  { printf '%s' "${EFFORT_REPO:-${KIT_REPO:-}}"; }
 _eff_base()  { printf '%s' "${KIT_BASE_BRANCH:-main}"; }
 _eff_need()  { command -v "$1" >/dev/null 2>&1 || { echo "effort: $1 is required" >&2; return 1; }; }
@@ -96,6 +106,7 @@ _eff_relations_add() {
 # before `gh issue create --label` uses it (which fails hard on a missing label, #153). Idempotent:
 # creating an existing label is a silent no-op.
 _eff_ensure_label() {
+  if cckit_gh_rest; then gh_rest_label_create "$(_eff_repo)" "$1" "$2" "$3"; return 0; fi
   gh label create "$1" --repo "$(_eff_repo)" --color "$2" \
     --description "$3" >/dev/null 2>&1 || true
 }
@@ -106,6 +117,7 @@ _eff_ensure_label() {
 _eff_board_add() {
   local n="$1" role="${2:-}" repo node item ropt
   [ "${KIT_PROJECTS_V2:-}" = "true" ] || return 0
+  cckit_board_skipped && return 0
   command -v project_add_item >/dev/null 2>&1 || return 0
   repo="$(_eff_repo)"
   node="$(gh api "repos/$repo/issues/$n" --jq .node_id 2>/dev/null)" || return 0
@@ -236,15 +248,24 @@ effort_new() {
   fi
 
   local url num slug
+  if cckit_gh_rest; then
+    url="$(gh_rest_issue_create "$repo" "[Effort] · ${flow_tag}${name}" "$body" "$labels" "$milestone" 0)" \
+      || { echo "effort_new: failed to create the parent issue" >&2; return 1; }
+  else
   url="$(gh issue create --repo "$repo" --title "[Effort] · ${flow_tag}${name}" --body "$body" \
         --label "$labels" ${milestone:+--milestone "$milestone"})" \
     || { echo "effort_new: failed to create the parent issue" >&2; return 1; }
+  fi
   num="${url##*/}"
-  gh issue edit "$num" --repo "$repo" --title "[Effort] $num · ${flow_tag}${name}" >/dev/null 2>&1
+  if cckit_gh_rest; then gh_rest_issue_edit_title "$repo" "$num" "[Effort] $num · ${flow_tag}${name}" >/dev/null 2>&1
+  else gh issue edit "$num" --repo "$repo" --title "[Effort] $num · ${flow_tag}${name}" >/dev/null 2>&1; fi
   # The human handle (#93): explicit --slug if given, else derived from the title (number/flow peeled).
   if [ -n "$explicit_slug" ]; then slug="$(_eff_slug "$explicit_slug")"
   else slug="$(_eff_title_slug "[Effort] $num · ${flow_tag}${name}")"; fi
-  if [ -n "$slug" ]; then
+  if [ -n "$slug" ] && cckit_gh_rest; then
+    gh_rest_label_create "$repo" "slug:$slug" ededed "effort slug handle"
+    gh_rest_issue_add_labels "$repo" "$num" "slug:$slug" >/dev/null 2>&1 || true
+  elif [ -n "$slug" ]; then
     gh label create "slug:$slug" --repo "$repo" --color ededed \
       --description "effort slug handle" >/dev/null 2>&1 || true   # idempotent: ok if it exists
     gh issue edit "$num" --repo "$repo" --add-label "slug:$slug" >/dev/null 2>&1 || true
@@ -271,9 +292,14 @@ effort_new() {
     sub_title="[Effort $num] $i · $sub_name"
     local sub_labels="kind:task,priority:$priority"
     [ -n "$role" ] && sub_labels="$sub_labels,role:$role"
+    if cckit_gh_rest; then
+      child="$(gh_rest_issue_create "$repo" "$sub_title" \
+        "$(printf '%s\n\nSub-issue of #%s (effort).' "$sub_desc" "$num")" "$sub_labels" "$milestone" 0)" || continue
+    else
     child="$(gh issue create --repo "$repo" --title "$sub_title" \
       --body "$(printf '%s\n\nSub-issue of #%s (effort).' "$sub_desc" "$num")" \
       --label "$sub_labels" ${milestone:+--milestone "$milestone"})" || continue
+    fi
     child_num="${child##*/}"
     effort_link_sub "$num" "$child_num" || true
     _eff_board_add "$child_num" "$role" || true
@@ -289,6 +315,17 @@ _eo_source_effort() {
   local d; d="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
   # shellcheck source=/dev/null
   [ -f "$d/effort.sh" ] && . "$d/effort.sh"
+}
+
+# _eff_issue_body <repo> <n> / _eff_issue_set_body <repo> <n> <body> — read and replace an issue
+# body on the chosen transport (#396). A failed read returns non-zero, never an empty body.
+_eff_issue_body() {
+  if cckit_gh_rest; then gh api "repos/$1/issues/$2" --jq '.body // ""'
+  else gh issue view "$2" --repo "$1" --json body --jq .body; fi
+}
+_eff_issue_set_body() {
+  if cckit_gh_rest; then gh_rest_issue_set_body "$1" "$2" "$3"
+  else gh issue edit "$2" --repo "$1" --body "$3"; fi
 }
 
 # _eff_blockers <issue> — echo the issue's CURRENT blocked_by numbers, one per line. Empty when the
@@ -401,13 +438,13 @@ effort_chain() {
 
       # A FAILED read is not an empty body: writing the composed body after a failed fetch would
       # wipe the issue. Only a successful read is edited.
-      if ! body="$(gh issue view "$next" --repo "$repo" --json body --jq .body 2>/dev/null)"; then
+      if ! body="$(_eff_issue_body "$repo" "$next" 2>/dev/null)"; then
         echo "  ✗ could not read #$next's body — 'Depends on #$prev' not recorded" >&2; rc=1
       elif printf '%s\n' "$body" | grep -qE "^[[:space:]]*- Depends on #${prev}[[:space:]]*$"; then
         echo "  · #$next already records 'Depends on #$prev'" >&2
       else
         newbody="$(_eff_relations_add "$body" "$prev")"
-        gh issue edit "$next" --repo "$repo" --body "$newbody" >/dev/null 2>&1 \
+        _eff_issue_set_body "$repo" "$next" "$newbody" >/dev/null 2>&1 \
           && echo "  ✓ #$next records 'Depends on #$prev'" >&2 \
           || { echo "  ✗ could not update #$next's body" >&2; rc=1; }
       fi
@@ -620,7 +657,8 @@ effort_start() {
 
   if [ -n "$slug_override" ]; then slug="$(_eff_slug "$slug_override")"
   else
-    title="$(gh issue view "$num" --repo "$repo" --json title -q .title 2>/dev/null)"
+    if cckit_gh_rest; then title="$(gh api "repos/$repo/issues/$num" --jq .title 2>/dev/null)" || title=""
+    else title="$(gh issue view "$num" --repo "$repo" --json title -q .title 2>/dev/null)"; fi
     slug="$(_eff_title_slug "${title:-effort}")"; [ -n "$slug" ] || slug="effort"
   fi
   # Worktree dir follows the kind+N-slug convention (branch-naming.md) so kit-gc's issue-open
@@ -684,7 +722,8 @@ effort_pr() {
   case "$branch" in effort/"$num"-*) : ;; *) echo "effort_pr: current branch ($branch) is not effort/$num-…" >&2; return 1 ;; esac
 
   # Parent metadata: the PR inherits its labels + milestone, and the role names the title.
-  meta="$(gh issue view "$num" --repo "$repo" --json title,labels,milestone 2>/dev/null)"
+  if cckit_gh_rest; then meta="$(gh_rest_issue_json "$repo" "$num" 2>/dev/null)"
+  else meta="$(gh issue view "$num" --repo "$repo" --json title,labels,milestone 2>/dev/null)"; fi
   title="$(printf '%s' "$meta" | jq -r '.title // ""' 2>/dev/null)"
   labels="$(printf '%s' "$meta" | jq -r '[.labels[]?.name] | join(",")' 2>/dev/null)"
   milestone="$(printf '%s' "$meta" | jq -r '.milestone.title // ""' 2>/dev/null)"
@@ -727,7 +766,9 @@ effort_pr() {
 
   # Four explicit forms, not ${x:+--flag "$x"}: that idiom word-splits under zsh, and this file is
   # sourced from zsh too.
-  if [ -n "$labels" ] && [ -n "$milestone" ]; then
+  if cckit_gh_rest; then
+    url="$(gh_rest_pr_create "$repo" "$base" "$branch" "$pr_title" "$body" "$labels" "$milestone")" || return 1
+  elif [ -n "$labels" ] && [ -n "$milestone" ]; then
     url="$(gh pr create --repo "$repo" --base "$base" --head "$branch" --title "$pr_title" --body "$body" \
       --label "$labels" --milestone "$milestone" --assignee "@me")" || return 1
   elif [ -n "$labels" ]; then
@@ -765,6 +806,7 @@ _eff_pr_body() {
 _eff_pr_board() {
   local num="$1" url="$2" role="${3:-}" repo pr_num node item ropt parent
   [ "${KIT_PROJECTS_V2:-}" = "true" ] || return 0
+  cckit_board_skipped && return 0
   _eo_source_board
   command -v project_add_item >/dev/null 2>&1 || return 0
   repo="$(_eff_repo)"; pr_num="${url##*/}"
@@ -815,6 +857,7 @@ _eo_source_gc() {
 # gh-project.sh or ids file degrades to a no-op (the board steps below are themselves guarded).
 _eo_source_board() {
   [ "${KIT_PROJECTS_V2:-}" = "true" ] || return 0
+  cckit_board_skipped && return 0
   if ! command -v project_find_item_by_issue >/dev/null 2>&1; then
     local d; d="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
     # shellcheck source=/dev/null
@@ -826,12 +869,19 @@ _eo_source_board() {
   return 0
 }
 
+# _eo_issue_close_completed <repo> <n> — close as completed on the chosen transport (#396), quietly.
+_eo_issue_close_completed() {
+  if cckit_gh_rest; then gh_rest_issue_close "$1" "$2" completed >/dev/null 2>&1
+  else gh issue close "$2" --repo "$1" --reason completed >/dev/null 2>&1; fi
+}
+
 # _eo_board_done <issue #> — set the board Status=Done for one issue. Guarded like _eff_board_add:
 # a no-op unless Projects v2 is on AND the board helpers + field ids are loaded. Best-effort — a
 # board hiccup never fails the close (the merge already landed).
 _eo_board_done() {
   local n="$1" item
   [ "${KIT_PROJECTS_V2:-}" = "true" ] || return 0
+  cckit_board_skipped && return 0
   command -v project_find_item_by_issue >/dev/null 2>&1 || return 0
   [ -n "${STATUS_FIELD_ID:-}" ] && [ -n "${STATUS_OPT_DONE:-}" ] || return 0
   item="$(project_find_item_by_issue "$n" 2>/dev/null)" || return 0
@@ -915,6 +965,21 @@ effort_close() {
     fi
   fi
 
+  # (a2) refuse a conflicting PR before anything is written (#394). The capture below appends a
+  # records.jsonl row and consumes the effort's start marker, so a merge that fails after it leaves a
+  # row the retry duplicates with build_seconds null. UNKNOWN (GitHub still computing) proceeds.
+  local rest_pr="" mergeable
+  if cckit_gh_rest; then
+    rest_pr="$(gh_rest_pr_for_head "$repo" "$branch" 2>/dev/null)"
+    mergeable=""; [ -n "$rest_pr" ] && mergeable="$(gh_rest_pr_json "$repo" "$rest_pr" 2>/dev/null | jq -r .mergeable)"
+  else
+    mergeable="$(gh pr view "$branch" --repo "$repo" --json mergeable -q .mergeable 2>/dev/null)"
+  fi
+  if [ "$mergeable" = "CONFLICTING" ]; then
+    echo "effort_close: the PR for $branch conflicts with $base — merge or rebase $base into it, then rerun (nothing was written)" >&2
+    return 1
+  fi
+
   # (b) capture effort metrics PRE-squash (needs the live-branch diff + commit signals).
   command -v capture_effort_metrics >/dev/null 2>&1 && capture_effort_metrics "$num" "origin/$base" || true
 
@@ -923,10 +988,18 @@ effort_close() {
   kit_touched="$(git diff --name-only "origin/$base"...HEAD 2>/dev/null \
     | grep -E "$_EO_KIT_MANAGED_RE" | sort -u || true)"
 
-  # (c) squash-merge the effort PR.
+  # (c) squash-merge the effort PR. Over REST the remote branch stays: the cloud proxy rejects branch
+  # deletion (#396).
+  if cckit_gh_rest; then
+    { [ -n "$rest_pr" ] && gh_rest_pr_merge "$repo" "$rest_pr" squash >/dev/null 2>&1; } \
+      || { echo "effort_close: could not squash-merge the PR for $branch (open? mergeable?)" >&2; return 1; }
+    echo "  ✓ merged $branch" >&2
+    echo "  (remote branch $branch kept — branch deletion is unavailable here; delete it on GitHub)" >&2
+  else
   gh pr merge "$branch" --repo "$repo" --squash --delete-branch >/dev/null 2>&1 \
     || { echo "effort_close: could not squash-merge the PR for $branch (open? mergeable?)" >&2; return 1; }
   echo "  ✓ merged $branch" >&2
+  fi
 
   # (d) judge + sync the metrics (judge reads the durable trace dir; sync no-ops when the engine is off).
   command -v judge_effort_metrics >/dev/null 2>&1 && judge_effort_metrics "$num" "origin/$base" || true
@@ -939,10 +1012,10 @@ effort_close() {
   local sub
   while IFS= read -r sub; do
     [ -n "$sub" ] || continue
-    gh issue close "$sub" --repo "$repo" --reason completed >/dev/null 2>&1 && echo "  ✓ closed sub #$sub" >&2
+    _eo_issue_close_completed "$repo" "$sub" && echo "  ✓ closed sub #$sub" >&2
     _eo_board_done "$sub"
   done < <(gh api "repos/$repo/issues/$num/sub_issues" --jq '.[].number' 2>/dev/null)
-  gh issue close "$num" --repo "$repo" --reason completed >/dev/null 2>&1 && echo "  ✓ closed effort #$num" >&2
+  _eo_issue_close_completed "$repo" "$num" && echo "  ✓ closed effort #$num" >&2
   _eo_board_done "$num"
 
   # (f) GC: switch the main checkout to base, remove the effort worktree, delete the local branch,
@@ -1005,6 +1078,9 @@ _eo_close_wave() {
 
   # (a) read every sub + the merged PR that closed it, one "sub|state|pr|merge-oid|title" line each
   # (title LAST so a stray "|" in it can't shift the fields awk/read split on).
+  if cckit_gh_rest; then
+    rows="$(gh_rest_wave_rows "$repo" "$num" 2>/dev/null)"
+  else
   rows="$(gh api graphql -f query='
     query($o:String!,$r:String!,$n:Int!){ repository(owner:$o,name:$r){ issue(number:$n){
       subIssues(first:50){ nodes { number state
@@ -1013,6 +1089,7 @@ _eo_close_wave() {
       .data.repository.issue.subIssues.nodes[]
       | (((.closedByPullRequestsReferences.nodes // []) | map(select(.merged)) | .[0]) // null) as $pr
       | "\(.number)|\(.state)|\($pr.number // "")|\($pr.mergeCommit.oid // "")|\($pr.title // "")"' 2>/dev/null)"
+  fi
   [ -n "$rows" ] || { echo "effort_close: no effort/$num-… branch and no readable sub-issues — nothing to close (wave-style needs merged subs, #164)" >&2; return 1; }
 
   # (b) every sub must be CLOSED with a merged closing PR — otherwise the effort is not done.
@@ -1049,7 +1126,7 @@ _eo_close_wave() {
   for sub in $(printf '%s\n' "$rows" | cut -d'|' -f1); do
     _eo_board_done "$sub"
   done
-  gh issue close "$num" --repo "$repo" --reason completed >/dev/null 2>&1 && echo "  ✓ closed effort #$num" >&2
+  _eo_issue_close_completed "$repo" "$num" && echo "  ✓ closed effort #$num" >&2
   _eo_board_done "$num"
 
   # (g) GC: the sub branches/worktrees were GC'd by their own merges — just prune stragglers.

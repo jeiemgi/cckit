@@ -14,6 +14,15 @@
 # Self-test: bash scripts/lib/worktree-issue-test.sh  (runs the cases under bash + zsh)
 # errors: mixed — name parsing is pure; the issue-open check needs gh
 
+# The GitHub transport switch (#396): rest mode routes the gh calls below through gh-rest.sh.
+if ! command -v cckit_gh_rest >/dev/null 2>&1; then
+  _ghr_lib="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)/gh-rest.sh"
+  # shellcheck source=/dev/null
+  [ -f "$_ghr_lib" ] && . "$_ghr_lib"
+  unset _ghr_lib
+fi
+command -v cckit_gh_rest >/dev/null 2>&1 || cckit_gh_rest() { return 1; }
+
 # Echo the issue number a branch name / worktree path belongs to (empty if none, e.g. bot branches).
 # Normalize the numeric segment of a branch/dir name to an issue number.
 # Accepts "1602" and also the effort SUB form "1604a" — `sub/<N><letter>-<slug>` is the documented
@@ -70,6 +79,11 @@ wt_issue_state() {
   local n="$1" repo="${2:-}"
   [[ -z "$n" ]] && return 0
   command -v gh >/dev/null 2>&1 || return 0
+  if cckit_gh_rest; then
+    repo="${repo:-${KIT_REPO:-}}"; [[ -n "$repo" ]] || return 0
+    gh api "repos/$repo/issues/$n" --jq .state 2>/dev/null | tr '[:upper:]' '[:lower:]'
+    return 0
+  fi
   local args=(issue view "$n" --json state --jq .state)
   [[ -n "$repo" ]] && args+=(--repo "$repo")
   gh "${args[@]}" 2>/dev/null | tr '[:upper:]' '[:lower:]'

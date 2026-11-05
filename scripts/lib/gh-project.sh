@@ -24,6 +24,14 @@ if [ -f "$SCRIPT_DIR/lib/gh-log.sh" ]; then
 fi
 type gh_log >/dev/null 2>&1 || gh_log() { :; }
 
+# The transport switch (#396): Projects v2 is GraphQL-only, so in rest mode (a cloud session) every
+# board function below prints the one skip notice and returns 0 with no output.
+if ! type cckit_board_skipped >/dev/null 2>&1 && [ -f "$SCRIPT_DIR/lib/gh-rest.sh" ]; then
+  # shellcheck source=gh-rest.sh
+  . "$SCRIPT_DIR/lib/gh-rest.sh"
+fi
+type cckit_board_skipped >/dev/null 2>&1 || cckit_board_skipped() { return 1; }
+
 # Worktree-durable location for the captured project IDs (#532). The legacy
 # scripts/.project-ids.env is gitignored + untracked, so it is ABSENT in every worktree —
 # load_project_ids then no-ops and board updates silently fail (root cause of board drift).
@@ -39,6 +47,7 @@ PROJECT_ENV="$(_ghp_shared_env || printf '%s/.project-ids.env' "$SCRIPT_DIR")"
 PROJECT_ENV_LEGACY="$SCRIPT_DIR/.project-ids.env"  # pre-#532 per-checkout path
 
 load_project_ids() {
+  cckit_board_skipped && return 0
   # First run in a checkout that still has the legacy file: migrate it to the shared path.
   if [[ ! -f "$PROJECT_ENV" && -f "$PROJECT_ENV_LEGACY" ]]; then
     cp "$PROJECT_ENV_LEGACY" "$PROJECT_ENV" 2>/dev/null || PROJECT_ENV="$PROJECT_ENV_LEGACY"
@@ -53,6 +62,7 @@ load_project_ids() {
 
 # Add an issue/PR (by node ID) to the project. Echoes the new item ID.
 project_add_item() {
+  cckit_board_skipped && return 0
   gh_log graphql mutation "project_add_item" "gh-project"
   gh api graphql \
     -f query='mutation($project:ID!, $content:ID!) {
@@ -64,6 +74,7 @@ project_add_item() {
 
 # Set a single-select field. Args: <item_id> <field_id> <option_id>
 project_set_single_select() {
+  cckit_board_skipped && return 0
   gh_log graphql mutation "project_set_single_select" "gh-project"
   gh api graphql \
     -f query='mutation($project:ID!, $item:ID!, $field:ID!, $option:String!) {
@@ -77,6 +88,7 @@ project_set_single_select() {
 
 # Set a text field. Args: <item_id> <field_id> <text>
 project_set_text() {
+  cckit_board_skipped && return 0
   gh_log graphql mutation "project_set_text" "gh-project"
   gh api graphql \
     -f query='mutation($project:ID!, $item:ID!, $field:ID!, $text:String!) {
@@ -181,6 +193,7 @@ _ghp_resolve_repo() {
 # an issue's cards cheaply (O(1) per issue) whether the board is user- or org-owned, so this finder
 # never paginates. An issue belongs to few projects, so first:20 covers it without a loop.
 project_find_item_by_issue() {
+  cckit_board_skipped && return 0
   local issue_num="$1"
   local pnum="${2:-$(_ghp_resolve_pnum)}"
   local repo owner name resp item_id
@@ -216,6 +229,7 @@ project_find_item_by_issue() {
 # The cheap issue.projectItems lookup, same as project_find_item_by_issue. A claim precheck reads this
 # before starting an issue so it can warn on a collision (another session already In Progress). #124.
 project_issue_status() {
+  cckit_board_skipped && return 0
   local issue_num="$1" pnum="${2:-$(_ghp_resolve_pnum)}" repo owner name resp
   repo="$(_ghp_resolve_repo)"; owner="${repo%%/*}"; name="${repo##*/}"
   [ -n "$owner" ] && [ -n "$name" ] && [ -n "$pnum" ] || return 1

@@ -20,9 +20,9 @@
 #   kto_compose_issue_body <user-body> <plan> <blocked> <role-slug>   echo an issue body
 #   kto_closing_issue_numbers <pr-num>                echo the issue #s a merged PR closes
 #   kto_task_pr   <num> <summary> [commit-msg]        commit+push+open PR (board → In Review)
-#   kto_task_pr_merge [pr-num]                         squash-merge + close issues + switch develop + GC
+#   kto_task_pr_merge [pr-num] [--squash|--merge|--rebase]   merge (squash default) + close issues + GC + update the PR base
 #   kto_task_new  <title> <role> <kind> <prio> [ms] [plan] [blocked] <body>   create issue + board fields (ms may be empty)
-#   kto_task_close <num> <summary> [pr-num]            close issue + board → Done
+#   kto_task_close <num> <summary> [pr-num] [--reason R] [--duplicate-of N] [--superseded-by N]   close + reason + board → Done
 # errors: mixed — git/gh ops propagate; board + label side effects are best-effort
 
 # --- repo resolution -----------------------------------------------------------------------------
@@ -37,6 +37,19 @@ if [[ -z "${KIT_REPO:-}" ]]; then
   unset _kto_root
 fi
 
+# The GitHub transport switch (#396): in rest mode every gh call below is `gh api repos/…`.
+if ! type cckit_gh_rest >/dev/null 2>&1; then
+  if [ -n "${BASH_SOURCE:-}" ]; then _kto_self="${BASH_SOURCE[0]}"
+  elif [ -n "${ZSH_VERSION:-}" ]; then eval '_kto_self="${(%):-%x}"'
+  else _kto_self="$0"; fi
+  _kto_self="$(cd "$(dirname "$_kto_self")" 2>/dev/null && pwd)/gh-rest.sh"
+  # shellcheck source=gh-rest.sh
+  [ -f "$_kto_self" ] && . "$_kto_self"
+  unset _kto_self
+fi
+type cckit_gh_rest >/dev/null 2>&1 || cckit_gh_rest() { return 1; }
+type cckit_board_skipped >/dev/null 2>&1 || cckit_board_skipped() { return 1; }
+
 kto_repo() {
   printf '%s' "${KIT_TASK_REPO:-${KIT_REPO:-}}"
 }
@@ -48,8 +61,11 @@ kto_base_branch() {
 
 # True (rc 0) iff board updates should run. Off when KIT_PROJECTS_V2 is explicitly "false" — keeps
 # the op portable to a project with no Projects v2 board (the plugin's KIT_PROJECTS_V2 toggle).
+# In rest mode (#396) the board is GraphQL-only: skipped with one notice, never a failure.
 kto_board_enabled() {
-  [[ "${KIT_PROJECTS_V2:-true}" != "false" ]]
+  [[ "${KIT_PROJECTS_V2:-true}" != "false" ]] || return 1
+  cckit_board_skipped && return 1
+  return 0
 }
 
 # --- pure parsers (network-free; covered by the self-test) ---------------------------------------
@@ -178,6 +194,7 @@ kto_compose_issue_body() {
 kto_closing_issue_numbers() {
   local pr="$1" repo issues body
   repo="$(kto_repo)"
+  if cckit_gh_rest; then gh_rest_pr_closing_issues "$repo" "$pr"; return 0; fi
   issues=$(gh pr view "$pr" --repo "$repo" --json closingIssuesReferences \
     --jq '.closingIssuesReferences[].number' 2>/dev/null)
   if [[ -z "$issues" ]]; then
@@ -215,7 +232,8 @@ kto_task_pr() {
   [[ -n "$num" ]] || { echo "✗ kto_task_pr: branch '$branch' doesn't match <kind>/<N>-<slug> and no issue number passed" >&2; return 1; }
   [[ -n "$summary" ]] || { echo "✗ kto_task_pr: a Summary is required (never invent one)" >&2; return 1; }
 
-  meta=$(gh issue view "$num" --repo "$repo" --json title,labels,milestone) || return 1
+  if cckit_gh_rest; then meta=$(gh_rest_issue_json "$repo" "$num") || return 1
+  else meta=$(gh issue view "$num" --repo "$repo" --json title,labels,milestone) || return 1; fi
   title=$(printf '%s' "$meta" | jq -r .title)
   labels=$(printf '%s' "$meta" | jq -r '[.labels[].name] | join(",")')
   milestone=$(printf '%s' "$meta" | jq -r '.milestone.title // ""')
@@ -242,6 +260,10 @@ kto_task_pr() {
 
   git push -u origin "$branch" || return 1
 
+  if cckit_gh_rest; then
+    url=$(gh_rest_pr_create "$repo" "$(kto_base_branch)" "$branch" "$pr_title" \
+      "$(kto_compose_pr_body "$num" "$summary" "$role" "$title")" "$labels" "$milestone") || return 1
+  else
   url=$(gh pr create --repo "$repo" \
     --base "$(kto_base_branch)" --head "$branch" \
     --title "$pr_title" \
@@ -249,6 +271,7 @@ kto_task_pr() {
     --label "$labels" \
     ${milestone:+--milestone "$milestone"} \
     --assignee "@me") || return 1
+  fi
   echo "✓ $url"
 
   # Board: add the PR (In Review) + move the issue to In Review. Best-effort — never fail the op.
@@ -269,13 +292,32 @@ kto_task_pr() {
   fi
 }
 
-# kit task pr-merge — squash-merge the open PR for the current branch (rebase-fix conflicts onto
-# develop first), close its linked issues (GitHub native auto-close only fires on main), switch the
-# main checkout to develop + pull, then clean up the merged branch + worktree.
-# Args: [pr-num]   (defaults to the open PR for the current branch)
+# kit task pr-merge — merge a PR (squash by default; --merge or --rebase), rebase-fix conflicts onto
+# the PR's base first, close its linked issues (GitHub native auto-close only fires on the default
+# branch), then clean up the PR's head branch + worktree and bring the PR's base up to date.
+# Args: [<pr-num>] [--squash|--merge|--rebase]   (the PR defaults to the open PR for the current branch)
+#
+# The PR's base and head come from GitHub, never from the current checkout (#376): the base may be an
+# effort/<N> branch, and a sub PR merged from the effort worktree must not GC the effort branch.
 kto_task_pr_merge() {
-  local input_pr="${1:-}"
-  local repo branch base pr_num mergeable merge_state issues n state wt main_wt
+  local input_pr="" method="squash" a
+  for a in "$@"; do
+    case "$a" in
+      --squash) method="squash" ;;
+      --merge)  method="merge" ;;
+      --rebase) method="rebase" ;;
+      -*) echo "✗ kto_task_pr_merge: unknown flag '$a' — usage: cckit merge [<pr>] [--squash|--merge|--rebase]" >&2; return 2 ;;
+      *)
+        # Refuse anything but a PR number (#366). `gh pr merge --help` exits 0, so a flag taken as
+        # the number used to "merge", then run the cleanup on the base branch.
+        if [[ -n "$input_pr" || ! "$a" =~ ^#?[0-9]+$ ]]; then
+          echo "✗ kto_task_pr_merge: '$a' is not a PR number — usage: cckit merge [<pr>] [--squash|--merge|--rebase]" >&2; return 2
+        fi
+        input_pr="${a#\#}" ;;
+    esac
+  done
+
+  local repo branch base pr_num meta merge_state pr_base head issues n state wt main_wt base_wt common
   repo="$(kto_repo)"
   base="$(kto_base_branch)"
   branch="$(git rev-parse --abbrev-ref HEAD)"
@@ -284,86 +326,111 @@ kto_task_pr_merge() {
     echo "✗ Working tree is dirty — commit or stash changes first" >&2; return 1
   fi
 
-  # Refuse anything but a PR number. `gh pr merge --help` exits 0, so a flag taken as the number
-  # used to "merge", then run the cleanup below on the base branch (#366).
-  if [[ -n "$input_pr" && ! "$input_pr" =~ ^#?[0-9]+$ ]]; then
-    echo "✗ kto_task_pr_merge: '$input_pr' is not a PR number — usage: cckit merge [<pr>]" >&2; return 2
-  fi
-  pr_num="${input_pr#\#}"
+  pr_num="$input_pr"
   if [[ -z "$pr_num" ]]; then
-    pr_num=$(gh pr list --repo "$repo" --head "$branch" --state open --json number --jq '.[0].number // empty')
+    if cckit_gh_rest; then pr_num=$(gh_rest_pr_for_head "$repo" "$branch")
+    else pr_num=$(gh pr list --repo "$repo" --head "$branch" --state open --json number --jq '.[0].number // empty'); fi
     [[ -z "$pr_num" ]] && { echo "✗ No open PR found for branch $branch" >&2; return 1; }
   fi
-  echo "→ PR #$pr_num on branch $branch"
 
-  mergeable=$(gh pr view "$pr_num" --repo "$repo" --json mergeable,mergeStateStatus \
-    --jq '{mergeable:.mergeable, status:.mergeStateStatus}')
-  merge_state=$(printf '%s' "$mergeable" | jq -r .mergeable)
-  echo "  mergeable=$merge_state status=$(printf '%s' "$mergeable" | jq -r .status)"
+  if cckit_gh_rest; then meta=$(gh_rest_pr_json "$repo" "$pr_num") || return 1
+  else meta=$(gh pr view "$pr_num" --repo "$repo" --json mergeable,mergeStateStatus,baseRefName,headRefName) || return 1; fi
+  merge_state=$(printf '%s' "$meta" | jq -r '.mergeable // ""')
+  pr_base=$(printf '%s' "$meta" | jq -r '.baseRefName // empty'); pr_base="${pr_base:-$base}"
+  head=$(printf '%s' "$meta" | jq -r '.headRefName // empty'); head="${head:-$branch}"
+  echo "→ PR #$pr_num: $head → $pr_base ($method)"
+  echo "  mergeable=$merge_state status=$(printf '%s' "$meta" | jq -r '.mergeStateStatus // ""')"
+
+  # Branches that are never rebased, force-pushed or deleted here: the repo base, the PR's base
+  # (it may be an effort branch), and the release branches (#366).
+  _kto_protected() { case "$1" in "$base"|"$pr_base"|main|master|develop|HEAD) return 0 ;; esac; return 1; }
 
   if [[ "$merge_state" == "CONFLICTING" ]]; then
-    case "$branch" in "$base"|main|master|develop|HEAD)
-      echo "✗ PR #$pr_num conflicts — rebase it from its own worktree (never rebase $branch here)" >&2; return 1 ;;
-    esac
-    echo "→ Conflicts detected — rebasing onto $base..."
-    git fetch origin "$base"
-    if git rebase "origin/$base"; then
-      git push --force-with-lease origin "$branch"
+    if [[ "$branch" != "$head" ]] || _kto_protected "$branch"; then
+      echo "✗ PR #$pr_num conflicts — rebase $head onto $pr_base from its own worktree (not from $branch)" >&2; return 1
+    fi
+    echo "→ Conflicts detected — rebasing onto $pr_base..."
+    git fetch origin "$pr_base"
+    if git rebase "origin/$pr_base"; then
+      git push --force-with-lease origin "$head"
       echo "✓ Rebased and pushed — re-checking mergeability..."
     else
-      echo "✗ Rebase had conflicts that need manual resolution — resolve, then run pr-merge again" >&2
+      echo "✗ Rebase had conflicts that need manual resolution — resolve, then run cckit merge again" >&2
       git rebase --abort 2>/dev/null || true
       return 1
     fi
   fi
 
-  if ! gh pr merge "$pr_num" --repo "$repo" --squash 2>&1; then
+  if cckit_gh_rest; then
+    if ! gh_rest_pr_merge "$repo" "$pr_num" "$method" 2>&1; then
+      echo "✗ Merge failed — check PR status: https://github.com/$repo/pull/$pr_num" >&2
+      return 1
+    fi
+  elif ! gh pr merge "$pr_num" --repo "$repo" "--$method" 2>&1; then
     echo "✗ Merge failed — check PR status: https://github.com/$repo/pull/$pr_num" >&2
     return 1
   fi
-  echo "✓ PR #$pr_num merged"
+  echo "✓ PR #$pr_num merged ($method)"
 
   # Close linked issues (replaces issue-close-on-merge.yml; native auto-close only fires on main).
   issues="$(kto_closing_issue_numbers "$pr_num")"
   for n in $issues; do
-    state=$(gh issue view "$n" --repo "$repo" --json state --jq .state 2>/dev/null)
-    if [[ "$state" == "OPEN" ]]; then
+    if cckit_gh_rest; then state=$(gh_rest_issue_state "$repo" "$n" 2>/dev/null)
+    else state=$(gh issue view "$n" --repo "$repo" --json state --jq .state 2>/dev/null); fi
+    if [[ "$state" == "OPEN" ]] && cckit_gh_rest; then
+      gh_rest_issue_close "$repo" "$n" completed \
+        "Closed automatically on merge of #$pr_num to $pr_base (cckit merge; GitHub native auto-close only fires on the default branch)." \
+        && echo "✓ Closed issue #$n"
+    elif [[ "$state" == "OPEN" ]]; then
       gh issue close "$n" --repo "$repo" \
-        --comment "Closed automatically on merge of #$pr_num to $base (kit task pr-merge; GitHub native auto-close only fires on the default branch)." \
+        --comment "Closed automatically on merge of #$pr_num to $pr_base (cckit merge; GitHub native auto-close only fires on the default branch)." \
         && echo "✓ Closed issue #$n"
     elif [[ -n "$state" ]]; then
       echo "  issue #$n already $state — skipped"
     fi
   done
 
-  # Locate the branch's worktree + the main checkout, then clean up FROM the main checkout (#371).
-  # Run from the PR's own worktree, removing that worktree deleted our cwd, and every git call after
-  # it died with "Unable to read current working directory" — leaving the local branch behind. The
-  # main checkout = the parent of the shared git dir; fall back to the first `worktree list` entry.
-  local common
-  wt=$(git worktree list --porcelain | awk -v b="refs/heads/$branch" '/^worktree /{p=$2} /^branch /{if($2==b) print p}')
+  # Clean up FROM the main checkout (#371): run from the PR's own worktree, removing it deletes our
+  # cwd. Main checkout = parent of the shared git dir; fall back to the first `worktree list` entry.
+  wt=$(git worktree list --porcelain | awk -v b="refs/heads/$head" '/^worktree /{p=$2} /^branch /{if($2==b) print p}')
+  base_wt=$(git worktree list --porcelain | awk -v b="refs/heads/$pr_base" '/^worktree /{p=$2} /^branch /{if($2==b) print p}')
   common="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"
   main_wt=""
   [[ -n "$common" && "$(basename "$common")" == ".git" ]] && main_wt="$(dirname "$common")"
   [[ -n "$main_wt" ]] || main_wt=$(git worktree list --porcelain | awk '/^worktree /{print $2; exit}')
   cd "$main_wt" || { echo "✗ cannot reach the main checkout $main_wt for cleanup" >&2; return 1; }
-  git -C "$main_wt" checkout "$base" 2>/dev/null || true
-  git -C "$main_wt" pull origin "$base" 2>/dev/null || true
 
-  if [[ -n "$wt" && "$wt" != "$main_wt" ]]; then
+  if [[ -n "$wt" && "$wt" != "$main_wt" ]] && ! _kto_protected "$head"; then
     git -C "$main_wt" worktree remove "$wt" --force && echo "✓ Removed worktree $wt"
   fi
-  # Never delete the base (or a release) branch: merging a PR from the hub leaves $branch = base.
   # -D, not -d: a squash merge leaves the branch "not fully merged" by ancestry.
-  case "$branch" in
-    "$base"|main|master|develop|HEAD)
-      echo "  (on $branch — no branch cleanup; run cckit merge from the PR's worktree to GC it)" ;;
-    *)
-      git -C "$main_wt" branch -D "$branch" 2>/dev/null && echo "✓ Deleted local branch $branch"
-      git -C "$main_wt" push origin --delete "$branch" 2>/dev/null && echo "✓ Deleted remote branch $branch" || echo "  (remote branch already gone)" ;;
-  esac
+  if _kto_protected "$head"; then
+    echo "  ($head is protected — no branch cleanup)"
+  else
+    git -C "$main_wt" branch -D "$head" 2>/dev/null && echo "✓ Deleted local branch $head"
+    if cckit_gh_rest; then
+      # The cloud proxy rejects branch deletion (#396): keep it and say so.
+      echo "  (remote branch $head kept — branch deletion is unavailable here; delete it on GitHub)"
+    else
+    git -C "$main_wt" push origin --delete "$head" 2>/dev/null && echo "✓ Deleted remote branch $head" || echo "  (remote branch already gone)"
+    fi
+  fi
   git -C "$main_wt" worktree prune
-  echo "✓ On $base, up to date — merged branch + worktree cleaned"
+
+  # Bring the PR's base up to date where it lives. The repo base: the main checkout switches to it and
+  # pulls. An effort/<N> base is checked out in its own worktree (git allows one checkout per branch),
+  # so that worktree fast-forwards; with no worktree, the local ref is fast-forwarded by fetch.
+  if [[ "$pr_base" == "$base" ]]; then
+    git -C "$main_wt" checkout "$pr_base" 2>/dev/null || true
+    git -C "$main_wt" pull --ff-only origin "$pr_base" 2>/dev/null || true
+    echo "✓ On $pr_base in $main_wt, up to date — merged branch + worktree cleaned"
+  elif [[ -n "$base_wt" ]]; then
+    git -C "$base_wt" pull --ff-only origin "$pr_base" 2>/dev/null || true
+    echo "✓ $pr_base updated in $base_wt — continue there (merged branch + worktree cleaned)"
+  else
+    git -C "$main_wt" fetch origin "$pr_base:$pr_base" 2>/dev/null || git -C "$main_wt" fetch origin "$pr_base" 2>/dev/null || true
+    echo "✓ $pr_base fetched (no worktree has it checked out) — merged branch + worktree cleaned"
+  fi
 }
 
 # kit task new — create a GitHub issue with labels + milestone, add it to the board, set Role +
@@ -383,9 +450,13 @@ kto_task_new() {
   labels="kind:${kind},priority:${prio},role:${role_slug}"
   body="$(kto_compose_issue_body "$body_user" "$plan" "$blocked" "$role_slug")"
 
+  if cckit_gh_rest; then
+    url=$(gh_rest_issue_create "$repo" "$title" "$body" "$labels" "$milestone") || return 1
+  else
   url=$(gh issue create --repo "$repo" \
     --title "$title" --body "$body" \
     --label "$labels" ${milestone:+--milestone "$milestone"} --assignee "@me") || return 1
+  fi
   num=$(basename "$url")
   echo "✓ $url"
 
@@ -407,16 +478,62 @@ kto_task_new() {
   printf '%s' "$num"
 }
 
-# kit task close — set the board Status to Done and close the issue (with a summary comment).
-# Plan-badge flip stays in the skill (it edits a repo file → needs a worktree/PR). Args: <num> <summary> [pr-num]
+# kit task close — set the board Status to Done and close the issue with a summary comment and a
+# close reason (#377). Plan-badge flip stays in the skill (it edits a repo file → needs a worktree/PR).
+# Args: <num> <summary> [pr-num] [--reason completed|not-planned|duplicate] [--duplicate-of <N>]
+#       [--superseded-by <N>]
+#   --duplicate-of N   GitHub state_reason duplicate, linked to #N (implies --reason duplicate)
+#   --superseded-by N  state_reason not planned + "Superseded by #N" in the comment
+# The summary may be omitted with --duplicate-of / --superseded-by: it defaults to "Duplicate of #N."
+# / "Superseded by #N.". Flags may come anywhere; the closed set is the close-reason vocabulary.
 kto_task_close() {
-  local num="${1:-}" summary="${2:-}"
-  local repo issue_json state item
-  repo="$(kto_repo)"
+  local num="" summary="" reason="" dup="" sup="" a pos=0
+  while [[ $# -gt 0 ]]; do
+    a="$1"
+    case "$a" in
+      --reason)        reason="${2:-}"; shift 2 ;;
+      --reason=*)      reason="${a#--reason=}"; shift ;;
+      --duplicate-of)  dup="${2:-}"; shift 2 ;;
+      --superseded-by) sup="${2:-}"; shift 2 ;;
+      -*) echo "✗ kto_task_close: unknown flag '$a' — usage: cckit close <issue> [\"<summary>\"] [--reason completed|not-planned|duplicate] [--duplicate-of N] [--superseded-by N]" >&2; return 2 ;;
+      *)
+        pos=$((pos+1))
+        case "$pos" in 1) num="$a" ;; 2) summary="$a" ;; *) : ;; esac   # 3rd positional = legacy pr-num
+        shift ;;
+    esac
+  done
+  dup="${dup#\#}"; sup="${sup#\#}"
   [[ -n "$num" ]] || { echo "✗ kto_task_close: issue number required" >&2; return 1; }
+  [[ -z "$dup" || "$dup" =~ ^[0-9]+$ ]] || { echo "✗ kto_task_close: --duplicate-of needs an issue number" >&2; return 2; }
+  [[ -z "$sup" || "$sup" =~ ^[0-9]+$ ]] || { echo "✗ kto_task_close: --superseded-by needs an issue number" >&2; return 2; }
+  [[ -n "$dup" && -n "$sup" ]] && { echo "✗ kto_task_close: --duplicate-of and --superseded-by are exclusive" >&2; return 2; }
+
+  # The close-reason set (completed · not planned · duplicate · superseded) → GitHub's state_reason.
+  local gh_reason
+  case "$reason" in
+    ""|completed)          gh_reason="completed" ;;
+    not-planned|"not planned"|not_planned) gh_reason="not planned" ;;
+    duplicate)             gh_reason="duplicate" ;;
+    *) echo "✗ kto_task_close: --reason must be completed, not-planned or duplicate (got '$reason')" >&2; return 2 ;;
+  esac
+  if [[ -n "$dup" ]]; then
+    [[ -z "$reason" || "$gh_reason" == "duplicate" ]] || { echo "✗ kto_task_close: --duplicate-of implies --reason duplicate" >&2; return 2; }
+    gh_reason="duplicate"; summary="${summary:-Duplicate of #$dup.}"
+  fi
+  if [[ -n "$sup" ]]; then
+    [[ -z "$reason" || "$gh_reason" == "not planned" ]] || { echo "✗ kto_task_close: --superseded-by implies --reason not-planned" >&2; return 2; }
+    gh_reason="not planned"
+    if [[ -z "$summary" ]]; then summary="Superseded by #$sup."
+    else case "$summary" in *"#$sup"*) : ;; *) summary="$summary"$'\n\n'"Superseded by #$sup." ;; esac
+    fi
+  fi
+  [[ "$gh_reason" == "duplicate" && -z "$dup" ]] && { echo "✗ kto_task_close: --reason duplicate needs --duplicate-of <N>" >&2; return 2; }
   [[ -n "$summary" ]] || { echo "✗ kto_task_close: a summary is required" >&2; return 1; }
 
-  issue_json=$(gh issue view "$num" --repo "$repo" --json state,projectItems) || return 1
+  local repo issue_json state item
+  repo="$(kto_repo)"
+  if cckit_gh_rest; then issue_json=$(gh_rest_issue_json "$repo" "$num") || return 1
+  else issue_json=$(gh issue view "$num" --repo "$repo" --json state,projectItems) || return 1; fi
   state=$(printf '%s' "$issue_json" | jq -r .state)
 
   if kto_board_enabled && type load_project_ids >/dev/null 2>&1 && load_project_ids 2>/dev/null; then
@@ -426,8 +543,20 @@ kto_task_close() {
       echo "✓ Board Status → Done for #$num" || true
   fi
 
-  if [[ "$state" == "OPEN" ]]; then
-    gh issue close "$num" --repo "$repo" --comment "$summary" && echo "✓ Closed issue #$num"
+  if [[ "$state" == "OPEN" ]] && cckit_gh_rest; then
+    # REST has no duplicate link (#396): state_reason duplicate, and the comment names the original.
+    if [[ -n "$dup" ]]; then
+      case "$summary" in *"#$dup"*) : ;; *) summary="$summary"$'\n\n'"Duplicate of #$dup." ;; esac
+    fi
+    gh_rest_issue_close "$repo" "$num" "$gh_reason" "$summary" || return 1
+    echo "✓ Closed issue #$num ($gh_reason${dup:+ of #$dup}${sup:+, superseded by #$sup})"
+  elif [[ "$state" == "OPEN" ]]; then
+    if [[ -n "$dup" ]]; then
+      gh issue close "$num" --repo "$repo" --duplicate-of "$dup" --comment "$summary" || return 1
+    else
+      gh issue close "$num" --repo "$repo" --reason "$gh_reason" --comment "$summary" || return 1
+    fi
+    echo "✓ Closed issue #$num ($gh_reason${dup:+ of #$dup}${sup:+, superseded by #$sup})"
   else
     echo "  issue #$num already $state — board status updated only"
   fi
