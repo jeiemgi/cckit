@@ -237,6 +237,20 @@ transcript, pipe-safe everywhere. Every human-facing verb (`sync`, `plan`, `next
 one rendering seam, so board tables, wave plans, and the status dashboard read the same in every
 surface and never leak escape codes down a pipe (`cckit render` exposes the seam for any script).
 
+### Cloud sessions
+
+Claude Code cloud sessions reach GitHub through a proxy that refuses GraphQL, and `gh pr` /
+`gh issue` use GraphQL. There cckit switches to REST (`gh api repos/<owner>/<repo>/…`):
+
+- **Works:** `cckit pr`, `merge`, `close`, `new`, `effort new`, `effort pr`, `effort close`, plus
+  the issue reads behind `start` and `effort start`.
+- **Skipped:** board (Projects v2) steps, with one line on stderr: `cckit: board step skipped …`.
+  Turn on the board's built-in workflows (item closed → Done, PR merged → Done, auto-add) and the
+  card still moves. Remote branch deletion is skipped too: the proxy rejects it. Delete merged
+  branches on GitHub.
+- **Switch:** `CCKIT_GH_TRANSPORT=rest|graphql` forces a transport. Unset, it is `rest` when
+  `CLAUDE_CODE_REMOTE=true` and the `gh` subcommands otherwise.
+
 ## cckit builds cckit
 
 None of this is theoretical. cckit is developed *with* cckit — every feature, fix, and tutorial went
