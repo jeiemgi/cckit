@@ -94,21 +94,30 @@ _ghr_array_args() {
   done
 }
 
+# `gh api …` for a read. On failure gh prints the error JSON to stdout and skips --jq, so the output
+# is kept only on rc 0: a failed read is no data (rc 1), never an error body taken as a value.
+_ghr_read() {
+  local out
+  out="$(gh api "$@")" || return 1
+  [ -n "$out" ] && printf '%s\n' "$out"
+  return 0
+}
+
 # --- issues --------------------------------------------------------------------------------------
 
 gh_rest_issue_json() {
-  gh api "repos/$1/issues/$2" --jq '{number, title, body: (.body // ""), state: (.state | ascii_upcase),
+  _ghr_read "repos/$1/issues/$2" --jq '{number, title, body: (.body // ""), state: (.state | ascii_upcase),
     labels: [.labels[]? | {name}],
     milestone: (if .milestone then {title: .milestone.title, number: .milestone.number} else null end)}'
 }
 
 gh_rest_issue_state() {
-  gh api "repos/$1/issues/$2" --jq '.state | ascii_upcase'
+  _ghr_read "repos/$1/issues/$2" --jq '.state | ascii_upcase'
 }
 
 gh_rest_milestone_number() {
   local tab n t; tab="$(printf '\t')"
-  gh api "repos/$1/milestones" -X GET -f state=all -f per_page=100 \
+  _ghr_read "repos/$1/milestones" -X GET -f state=all -f per_page=100 \
     --jq '.[] | "\(.number)\t\(.title)"' 2>/dev/null \
     | while IFS="$tab" read -r n t; do [ "$t" = "$2" ] && { printf '%s' "$n"; break; }; done
 }
@@ -176,16 +185,16 @@ gh_rest_label_create() {
 }
 
 gh_rest_sub_issue_numbers() {
-  gh api "repos/$1/issues/$2/sub_issues" -X GET -f per_page=100 --jq '.[].number'
+  _ghr_read "repos/$1/issues/$2/sub_issues" -X GET -f per_page=100 --jq '.[].number'
 }
 
 gh_rest_issue_numbers_by_label() {
-  gh api "repos/$1/issues" -X GET -f state=open -f "labels=$2" -f per_page=100 \
+  _ghr_read "repos/$1/issues" -X GET -f state=open -f "labels=$2" -f per_page=100 \
     --jq '.[] | select(.pull_request | not) | .number'
 }
 
 gh_rest_open_issue_titles() {
-  gh api "repos/$1/issues" -X GET -f state=open -f per_page=100 --paginate \
+  _ghr_read "repos/$1/issues" -X GET -f state=open -f per_page=100 --paginate \
     --jq '.[] | select(.pull_request | not) | "\(.number)\t\(.title)"'
 }
 
@@ -220,13 +229,13 @@ EOF
 }
 
 gh_rest_pr_for_head() {
-  gh api "repos/$1/pulls" -X GET -f "head=${1%%/*}:$2" -f state=open --jq '.[0].number // empty'
+  _ghr_read "repos/$1/pulls" -X GET -f "head=${1%%/*}:$2" -f state=open --jq '.[0].number // empty'
 }
 
 # The fields the merge path reads, in the graphql vocabulary: mergeable MERGEABLE|CONFLICTING|UNKNOWN
 # (REST true|false|null — null while GitHub computes it), mergeStateStatus = REST mergeable_state.
 gh_rest_pr_json() {
-  gh api "repos/$1/pulls/$2" --jq '{
+  _ghr_read "repos/$1/pulls/$2" --jq '{
     mergeable: (if .mergeable == true then "MERGEABLE" elif .mergeable == false then "CONFLICTING" else "UNKNOWN" end),
     mergeStateStatus: ((.mergeable_state // "unknown") | ascii_upcase),
     baseRefName: .base.ref, headRefName: .head.ref, body: (.body // ""),
@@ -238,11 +247,11 @@ gh_rest_pr_merge() {
 }
 
 gh_rest_pr_closing_issues() {
-  gh api "repos/$1/pulls/$2" --jq '.body // ""' 2>/dev/null | gh_rest_closing_refs
+  _ghr_read "repos/$1/pulls/$2" --jq '.body // ""' 2>/dev/null | gh_rest_closing_refs
 }
 
 gh_rest_pr_diff() {
-  gh api "repos/$1/pulls/$2" -H 'Accept: application/vnd.github.v3.diff'
+  _ghr_read "repos/$1/pulls/$2" -H 'Accept: application/vnd.github.v3.diff'
 }
 
 # The merged PRs that close issue <n> (graphql: closedByPullRequestsReferences, merged only). REST has
@@ -250,7 +259,7 @@ gh_rest_pr_diff() {
 # and close it by keyword. One number per line, timeline order.
 gh_rest_issue_closing_prs() {
   local repo="$1" n="$2"
-  gh api "repos/$repo/issues/$n/timeline" -X GET -f per_page=100 --jq "
+  _ghr_read "repos/$repo/issues/$n/timeline" -X GET -f per_page=100 --jq "
     .[] | select(.event == \"cross-referenced\") | .source.issue // empty
     | select(.pull_request.merged_at != null)
     | select((.repository_url // \"\") | endswith(\"/repos/$repo\"))
@@ -259,11 +268,12 @@ gh_rest_issue_closing_prs() {
 }
 
 # The wave close's per-sub read (graphql: subIssues + closedByPullRequestsReferences): each sub from
-# sub_issues, its first merged closing PR, then that PR's merge commit and title.
+# sub_issues, its first merged closing PR, then that PR's merge commit and title. A failed read leaves
+# the field empty, so the close refuses (fails closed, as the graphql path does).
 gh_rest_wave_rows() {
   local repo="$1" parent="$2" tab sub state pr oid title
   tab="$(printf '\t')"
-  gh api "repos/$repo/issues/$parent/sub_issues" -X GET -f per_page=100 \
+  _ghr_read "repos/$repo/issues/$parent/sub_issues" -X GET -f per_page=100 \
     --jq '.[] | "\(.number)\t\(.state | ascii_upcase)"' 2>/dev/null \
   | while IFS="$tab" read -r sub state; do
       [ -n "$sub" ] || continue
@@ -271,7 +281,7 @@ gh_rest_wave_rows() {
       pr="$(gh_rest_issue_closing_prs "$repo" "$sub" 2>/dev/null | head -1)"
       if [ -n "$pr" ]; then
         IFS="$tab" read -r oid title <<EOF
-$(gh api "repos/$repo/pulls/$pr" --jq '"\(.merge_commit_sha // "")\t\(.title // "")"' 2>/dev/null)
+$(_ghr_read "repos/$repo/pulls/$pr" --jq '"\(.merge_commit_sha // "")\t\(.title // "")"' 2>/dev/null)
 EOF
       fi
       printf '%s|%s|%s|%s|%s\n' "$sub" "$state" "$pr" "$oid" "$title"

@@ -58,6 +58,12 @@ while [ $# -gt 0 ]; do
   esac
 done
 [ -n "$method" ] || { [ -n "$fields" ] && method=POST || method=GET; }
+# GH_FAIL_EP=<glob>: that endpoint fails the way real gh does — the error JSON on stdout (--jq is
+# not applied), a message on stderr, rc 1.
+case "$ep" in ${GH_FAIL_EP:-//never//})
+  printf '{"message":"Not Found","documentation_url":"https://docs.github.com/rest","status":"404"}'
+  echo "gh: Not Found (HTTP 404)" >&2; exit 1 ;;
+esac
 next() { n=$(( $(cat "$GH_N" 2>/dev/null || echo 49) + 1 )); echo "$n" > "$GH_N"; echo "$n"; }
 state_of() { case " $GH_CLOSED " in *" $1 "*) echo closed ;; *) echo open ;; esac; }
 json='{}'
@@ -265,6 +271,31 @@ tc "$GH_LOG" '^api repos/o/r/pulls/5101 -H Accept: application/vnd.github.v3.dif
 tc "$GH_LOG" '^api repos/o/r/issues/77 -X PATCH -f state=closed -f state_reason=completed$' "wave close: closes the parent"
 t  "wave close: rows match the graphql shape" \
    "$(gh_rest_wave_rows o/r 77 | head -1)" "101|CLOSED|5101|abc1234def|feat: sub 5101"
+
+# ── a failed REST read is no data, never the error body ───────────────────────────────────────────
+export GH_FAIL_EP="repos/o/r/issues/404"
+t  "failed read: issue state is empty"              "$(gh_rest_issue_state o/r 404 2>/dev/null)" ""
+gh_rest_issue_state o/r 404 >/dev/null 2>&1; rc=$?
+t  "failed read: issue state returns non-zero"      "$rc" "1"
+t  "failed read: issue json is empty"               "$(gh_rest_issue_json o/r 404 2>/dev/null)" ""
+export GH_FAIL_EP="repos/o/r/issues/404/timeline"
+t  "failed read: closing PRs are empty"             "$(gh_rest_issue_closing_prs o/r 404 2>/dev/null)" ""
+export GH_FAIL_EP="repos/o/r/pulls"
+t  "failed read: no PR for the head"                "$(gh_rest_pr_for_head o/r fix/1-x 2>/dev/null)" ""
+export GH_FAIL_EP="repos/o/r/issues/*/sub_issues"
+t  "failed read: no sub-issue numbers"              "$(gh_rest_sub_issue_numbers o/r 1 2>/dev/null)" ""
+export GH_FAIL_EP="repos/o/r/issues/102/timeline"
+t  "failed read: a sub whose timeline fails has no PR" \
+   "$(gh_rest_wave_rows o/r 77 2>/dev/null | sed -n 2p)" "102|CLOSED|||"
+: > "$GH_LOG"
+effort_close 77 >/dev/null 2>&1; rc=$?
+t  "failed read: wave close refuses"                "$rc" "1"
+t  "failed read: wave close leaves the parent open" "$(grep -c 'issues/77 -X PATCH' "$GH_LOG")" "0"
+export GH_FAIL_EP="repos/o/r/issues/88"
+effort_start 88 >/dev/null 2>&1
+t  "failed read: effort start falls back to the effort slug" \
+   "$(git branch --list 'effort/88-*' | tr -d ' *+')" "effort/88-effort"
+unset GH_FAIL_EP
 
 [ "$fail" -eq 0 ] && echo "gh-rest: all passed" || echo "gh-rest: FAILURES"
 exit "$fail"

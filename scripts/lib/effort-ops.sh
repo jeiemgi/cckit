@@ -657,7 +657,7 @@ effort_start() {
 
   if [ -n "$slug_override" ]; then slug="$(_eff_slug "$slug_override")"
   else
-    if cckit_gh_rest; then title="$(gh api "repos/$repo/issues/$num" --jq .title 2>/dev/null)"
+    if cckit_gh_rest; then title="$(gh api "repos/$repo/issues/$num" --jq .title 2>/dev/null)" || title=""
     else title="$(gh issue view "$num" --repo "$repo" --json title -q .title 2>/dev/null)"; fi
     slug="$(_eff_title_slug "${title:-effort}")"; [ -n "$slug" ] || slug="effort"
   fi
