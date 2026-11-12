@@ -125,8 +125,8 @@ _eff_board_add() {
   [ -n "$item" ] || return 0
   [ -n "${STATUS_FIELD_ID:-}" ] && [ -n "${STATUS_OPT_TODO:-}" ] \
     && project_set_single_select "$item" "$STATUS_FIELD_ID" "$STATUS_OPT_TODO" 2>/dev/null || true
-  if [ -n "$role" ] && command -v role_option_id >/dev/null 2>&1; then
-    ropt="$(role_option_id "$role" 2>/dev/null || echo "")"
+  if [ -n "$role" ] && [ -n "${ROLE_FIELD_ID:-}" ] && command -v role_option_id >/dev/null 2>&1; then
+    ropt="$(role_option_id "$role" || echo "")"
     [ -n "$ropt" ] && [ -n "${ROLE_FIELD_ID:-}" ] \
       && project_set_single_select "$item" "$ROLE_FIELD_ID" "$ropt" 2>/dev/null || true
   fi
@@ -820,7 +820,7 @@ _eff_pr_board() {
       project_set_single_select "$item" "$STATUS_FIELD_ID" "$STATUS_OPT_IN_REVIEW" >/dev/null 2>&1 || true
     fi
     if [ -n "$role" ] && [ -n "${ROLE_FIELD_ID:-}" ] && command -v role_option_id >/dev/null 2>&1; then
-      ropt="$(role_option_id "$role" 2>/dev/null || true)"
+      ropt="$(role_option_id "$role" || true)"
       [ -n "$ropt" ] && { project_set_single_select "$item" "$ROLE_FIELD_ID" "$ropt" >/dev/null 2>&1 || true; }
     fi
   fi

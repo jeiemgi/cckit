@@ -209,11 +209,13 @@ kto_closing_issue_numbers() {
 # --- the four ops (network; not exercised by the self-test) --------------------------------------
 
 # Map a role slug to the board's Role single-select option id (uses gh-project's role_option_id,
-# which takes a display name — translate slug -> display via role_display).
+# which takes a display name — translate slug -> display via role_display). A slug role_display
+# does not list is passed as-is (#378): role_option_id normalizes it to the same ROLE_OPT_<NAME>.
 _kto_role_option_for_slug() {
   local slug="$1" disp=""
+  [[ -z "$slug" ]] && return 0
   if type role_display >/dev/null 2>&1; then disp="$(role_display "$slug")"; fi
-  [[ -z "$disp" ]] && return 0
+  [[ -z "$disp" ]] && disp="$slug"
   if type role_option_id >/dev/null 2>&1; then role_option_id "$disp"; fi
 }
 

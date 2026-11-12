@@ -87,6 +87,17 @@ if [ -n "${KTO_TEST_INNER:-}" ]; then
   ib2="$(kto_compose_issue_body 'Only body' '' '' 'frontend')"
   case "$ib2" in *"**Plan:**"*) echo "FAIL($KTO_TEST_INNER): issue body has Plan line when none given"; fail=1 ;; *) ;; esac
 
+  # _kto_role_option_for_slug (#378): a slug role_display does not list still reaches the board
+  # lookup (role_display is stubbed to print nothing here, so EVERY slug is "unlisted").
+  role_option_id() { printf 'opt<%s>' "$1"; }
+  eq "role option: unlisted slug falls back to the slug" "$(_kto_role_option_for_slug data-eng)" "opt<data-eng>"
+  eq "role option: empty slug asks nothing"              "$(_kto_role_option_for_slug '')"       ""
+  role_display() { case "$1" in tech-lead) echo "Tech Lead" ;; esac; }
+  eq "role option: listed slug uses its display name"    "$(_kto_role_option_for_slug tech-lead)" "opt<Tech Lead>"
+  eq "role option: slug the display map lacks"           "$(_kto_role_option_for_slug backend)"   "opt<backend>"
+  role_display() { :; }
+  unset -f role_option_id
+
   if [ "$fail" -eq 0 ]; then echo "PASS($KTO_TEST_INNER): kit-task-ops helpers"; fi
   exit "$fail"
 fi
