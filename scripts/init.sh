@@ -764,6 +764,9 @@ safe_copy "$KIT_ROOT/scripts/lib/engine-adapter.sh" "$TARGET/scripts/lib/engine-
 safe_copy "$KIT_ROOT/scripts/lib/effort-metrics.sh" "$TARGET/scripts/lib/effort-metrics.sh"
 safe_copy "$KIT_ROOT/scripts/lib/gh-log.sh"         "$TARGET/scripts/lib/gh-log.sh"
 safe_copy "$KIT_ROOT/scripts/lib/kit-events.sh"     "$TARGET/scripts/lib/kit-events.sh"
+# task-sync.sh sources board-view.sh unguarded (set -e) and effort-plan.sh for `--plan`.
+safe_copy "$KIT_ROOT/scripts/lib/board-view.sh"     "$TARGET/scripts/lib/board-view.sh"
+safe_copy "$KIT_ROOT/scripts/lib/effort-plan.sh"    "$TARGET/scripts/lib/effort-plan.sh"
 safe_copy "$KIT_ROOT/scripts/lib/worktree-start.sh" "$TARGET/scripts/lib/worktree-start.sh"
 safe_copy "$KIT_ROOT/scripts/kit-version-check.sh"  "$TARGET/scripts/kit-version-check.sh" exec
 for sc in setup-labels.sh setup-milestones.sh capture-project-ids.sh task-sync.sh knowledge-lint.sh \

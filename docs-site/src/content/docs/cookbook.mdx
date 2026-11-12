@@ -94,6 +94,18 @@ cckit gc --prune --yes           # remove the merged branch + worktree
 
 `cckit sync --llm` at any point gives the agent the board state and what's unblocked.
 
+### Feed a statusline or TUI from the board cache
+
+Poll the cache, not GitHub. `--cached` makes no `gh` call while the cache is inside its TTL:
+
+```bash
+cckit sync --watch 30 &                                   # one refresher: rewrites the cache every 30s
+cckit sync --cached 60 | jq -r '"\(.open) open · \(.mergeQueue | length) PRs · \(.stale.issues | length) stale"'
+```
+
+A failed fetch never replaces the cache, so the reader keeps the last good board; `generatedAt` says
+how old it is. Field reference: [Board cache and watch mode](/cli-reference/#board-cache-and-watch-mode).
+
 
 ## Plan and run a multi-part effort
 

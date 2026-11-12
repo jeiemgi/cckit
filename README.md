@@ -108,6 +108,8 @@ cckit hotfix 268              # cherry-pick merged PR 268 (or a commit sha) onto
                               #   push, PR titled after the source with `Cherry-pick of #268`;
                               #   a rebase-merged PR is carried commit by commit
 cckit sync                    # board state, what's unblocked
+cckit sync --cached 60        # the board as one JSON document, from a cache at most 60s old
+                              #   (--json / --write / --watch [secs] / --plan — for a TUI or statusline)
 cckit handoff "resume note"   # save a handoff — bare `cckit` prints it next session
 cckit gc                      # report prunable branches + worktrees, detached worktrees included (deletes nothing); a failed GitHub read shows as UNKNOWN, kept
 cckit cleanup [--yes]         # act on that report: delete the SAFE + LANDED rows, prune listed zombies, keep orphans/stashes

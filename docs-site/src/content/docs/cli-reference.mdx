@@ -42,6 +42,7 @@ One issue becomes one branch, one worktree, one PR. These verbs walk that path.
 | `cckit new --role R "<title>"` | File one issue: labels, board add, Role and Status fields. Milestone optional. A label the repo does not have is left off with a warning that names it; the issue is still created, and the verb exits non-zero only when the issue itself is not. `R` matches any option of the board's Role field by name, ignoring case and treating spaces and hyphens alike (`backend`, `Tech Lead`, `tech-lead`); a role the board has no option for leaves Role unset and prints a warning on stderr naming the missing `ROLE_OPT_<NAME>`. |
 | `cckit merge [<pr>] [--merge\|--rebase]` | Merge the PR (squash by default), close its linked issues, clean the branch and worktree, and update the PR's base, which may be an `effort/<N>` branch. Refuses a PR whose **head** is `effort/*` and names `cckit effort close <N>`; `KIT_FORCE=1` merges anyway, with a warning. |
 | `cckit sync` | Board state: issues by role with Project Status, a merge-ordered open-PR queue, and blocked / not-on-board / stale (>14d) flags. |
+| `cckit sync --json \| --write \| --cached [TTL] \| --watch [SECS] \| --plan` | The same board as one cached JSON document for a TUI or statusline — see [Board cache and watch mode](#board-cache-and-watch-mode). |
 | `cckit status` | "Where are we?" in three buckets — local undone work, open PRs waiting on a human, cleanup available (local + remote) — plus the board and the resume handoff. Read-only. |
 | `cckit handoff "<note>"` | Save a resume-here note for the next session. |
 
@@ -224,6 +225,57 @@ cckit brief 226           # the brief for issue #226
 ```
 
 Reading the issue is the verb's one hard dependency: a `gh` failure propagates rather than yielding a brief with an empty issue in it.
+
+## Board cache and watch mode
+
+A dashboard that polls the board — a TUI, a statusline — reads one JSON document instead of running its own `gh` queries:
+
+```bash
+cckit sync --json          # print the document (one JSON object)
+cckit sync --write         # fetch, then write it to <git-common-dir>/kit-sync-cache.json
+cckit sync --cached 60     # print the cache if it is under 60s old (no gh call), else refresh it
+cckit sync --watch 30      # refresh the cache every 30s until interrupted
+cckit sync --plan          # the human board plus an inline `effort plan`
+```
+
+| Flag | Behavior |
+| --- | --- |
+| `--json` | One JSON object on stdout. `--llm` and `--output=json` are unchanged: they still return the issue list as TOON. |
+| `--write` | Writes the document to `<git-common-dir>/kit-sync-cache.json` — one file shared by every worktree. The write goes to a temp file that is validated and then renamed, so a reader sees the old document or the new one. A failed or partial fetch (issues, the PR list, or the Projects v2 board when it is on) exits `1` and leaves the file untouched. Prints nothing on stdout unless `--json` is also given. |
+| `--cached [TTL]` | Prints the cache with no `gh` call when it is younger than `TTL` seconds (default `60`); otherwise refreshes, writes and prints it. A failed refresh exits `1` and leaves the cache as it was. |
+| `--watch [SECS]` | Refreshes and writes every `SECS` seconds (default `30`). A failed refresh logs `kept the last good cache` on stderr and the loop continues. `KIT_SYNC_WATCH_MAX=<n>` stops after `n` refreshes, exiting `1` if the last one failed. With `--json` each refreshed document is also printed, one per line. |
+| `--plan` | Adds `effort plan` output: an `### Effort plan` section on the human board, a `plan` string in the document. |
+
+`--write`, `--cached` and `--watch` refuse `--role` / `--milestone` (exit `2`): the cache is one file every reader shares, so it only ever holds the whole board.
+
+The document:
+
+```json
+{
+  "schema": 1,
+  "repo": "owner/repo",
+  "generatedAt": "2026-11-11T10:00:00Z",
+  "generatedEpoch": 1794391200,
+  "open": 3,
+  "roles": [
+    { "role": "Tech Lead", "slug": "tech-lead",
+      "issues": [ { "number": 1, "title": "…", "status": "—", "priority": "p1", "milestone": "v1", "blocked": false } ] }
+  ],
+  "unassigned": [],
+  "blocked": [2],
+  "notOnBoard": null,
+  "stale": { "days": 14, "issues": [ { "number": 2, "days": 20 } ] },
+  "mergeQueue": [
+    { "number": 14, "title": "…", "risk": "low", "size": "S", "state": "ready",
+      "blocked": false, "draft": false, "agent": false, "conflict": false, "approved": true }
+  ]
+}
+```
+
+- `roles` follows the config's role order; `unassigned` holds open issues with none of those `role:` labels.
+- `notOnBoard` is `null` when no Projects v2 board is configured, otherwise the issue numbers missing from it.
+- `mergeQueue` is in merge order — ready, then draft, then blocked; within a tier `risk:low` first, then smaller size. `state` is `ready`, `needs-review`, `conflict`, `draft` or `blocked`. It is the same ordering the human table prints.
+- Every fetch appends `op.start` and `op.done` (op `sync`, `payload.ok` true or false) to `<git-common-dir>/kit-events.jsonl`. A `--cached` hit makes no fetch and emits nothing.
 
 ## Structured output for agents
 
