@@ -262,8 +262,11 @@ The board is both the plan and the proof.
 cckit also runs on the rules and skills it ships. `templates/` is what `cckit init` writes into a
 project; `.claude/skills/` and `.claude/rules/` here are the subset cckit applies to its own work —
 `concrete` (the anti-slop catalogue every commit and PR body goes through) and
-`karpathy-guidelines`, plus the rules that govern this repo's branches, efforts, PR titles and
-delegation. It is a subset on purpose: several templates target stacks cckit does not have.
+`karpathy-guidelines`, plus the rules that govern this repo's branches, efforts, PR titles,
+delegation and issue lifecycle (`issue-lifecycle.md`: deliverables are native sub-issues, an
+approved plan is executed without re-confirming each merge, and a close op — not `Closes #N` —
+closes the issue). Every shipped rule is listed in [Rules cckit ships](https://cckit.dev/rules/).
+It is a subset on purpose: several templates target stacks cckit does not have.
 `scripts/self-install-test.sh` holds the manifest, the reason for every skip, and the assertion that
 the installed copies have not drifted from their templates.
 

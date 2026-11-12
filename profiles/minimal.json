@@ -12,6 +12,7 @@
   ],
   "rules": [
     "communication-style",
+    "issue-lifecycle",
     "task-management",
     "mempalace",
     "branch-naming"

@@ -34,6 +34,7 @@ INSTALLED_RULES='branch-naming verbatim
 communication-style rendered
 delegation-brief sections
 effort-model rendered
+issue-lifecycle rendered
 naming-and-ids verbatim'
 
 # The kit-owned sections of delegation-brief.md — the transferable instruction `cckit brief` lifts.

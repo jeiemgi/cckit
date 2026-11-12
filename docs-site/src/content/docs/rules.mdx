@@ -1,0 +1,66 @@
+---
+title: Rules cckit ships
+description: The rule files cckit init writes into .claude/rules/ — what each one governs, which profiles carry it, and where the newer ones came from.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+A rule is a markdown file under `.claude/rules/` that Claude Code loads into every session in the
+project. `cckit init` copies them from the kit's `templates/rules/`, picks the set your profile
+lists, and fills in your project's values (the base branch, the owner, the language).
+
+To see the exact list for your project before anything is written:
+
+```bash
+cckit init --dry-run
+```
+
+## The rules
+
+| Rule | Governs | Profiles |
+| --- | --- | --- |
+| `branch-naming` | branch name format, merge order, the lockfile rule, one worktree per agent | all five |
+| `communication-style` | how the agent writes to you, and the `concrete` pass on durable prose | all five |
+| `task-management` | GitHub issues as the source of truth, and the task loop | all five |
+| [`issue-lifecycle`](#issue-lifecycle) | deliverables as native sub-issues, approved-plan autonomy, explicit closes | all five |
+| `mempalace` | the persistent-memory protocol — written only when memory is on | all five |
+| `knowledge-base` | frontmatter and the index for the project's knowledge docs | software, content, research, automation |
+| `plan-output-format` | a plan is a file with a `## Deliverables` table | software, content, research, automation |
+| `design-routing` | which agent answers a design question | software, content |
+| `effort-model` | the effort as the unit of work: parent issue, sub-issues, one PR | software |
+| `delegation-brief` | what every delegated agent is handed up front | software |
+| `skill-gaps` | proposing a skill when the same gap shows up twice | software |
+| `naming-and-ids` | the `E241` / `E241.2` / `#209` / `PR 268` tokens | none — copy it in |
+| `risk-tiered-review` | which PRs need a human read | none — copy it in |
+| `plan-next` | the forward-planning verb's output | none — copy it in |
+| `react-annotate` | the UI annotation loop | none — written by the annotation setup |
+
+The five profiles are `software`, `content`, `research`, `automation` and `minimal`; each lists its
+rules under `rules` in `profiles/<name>.json`.
+
+<Aside type="note" title="They are yours once written">
+`cckit init --upgrade` preserves every rule file that already exists and adds only the missing
+ones, so an edit you make survives an upgrade.
+</Aside>
+
+## Rules that came from a correction
+
+Some rules restate nothing the kit already did by default: each records a correction that had to
+be repeated across projects before it was written down. Those rules name their origin, the rule
+they complement, and which one wins when two disagree.
+
+### issue-lifecycle
+
+`templates/rules/issue-lifecycle.md` — three conventions about when an issue is open, who merges,
+and what closes it.
+
+| Convention | Where it came from | Wins against |
+| --- | --- | --- |
+| A deliverable is a native sub-issue, never a body checkbox | issues closed with boxes still unchecked took the unfinished work out of every open-issue view | `plan-output-format` — the Deliverables table is an index; the issue state wins |
+| An approved plan is executed, not re-confirmed: the captain merges each wave and pings only on a genuine blocker | an approved plan stalled on "merge or review?" for a routine planned merge | `risk-tiered-review` for a merge the plan covers; that rule's always-human list still wins for a change the plan did not imply |
+| `Closes #N` links the PR; a close op closes the issue | GitHub auto-closes only on a merge into the default branch, so projects integrating elsewhere kept finished issues open | `task-management` — keep writing `Closes #N`, but the close is an explicit op |
+
+The third one depends on your setup. `cckit merge` and `cckit effort close` close the linked issues
+themselves, so it bites only on a merge the kit did not perform — the GitHub UI, or a raw
+`gh pr merge`. `cckit doctor` warns when `github.baseBranch` differs from the GitHub default
+branch; after such a merge, run `cckit close <N> "<summary>"`.

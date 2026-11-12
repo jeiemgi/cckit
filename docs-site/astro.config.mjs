@@ -185,6 +185,7 @@ export default defineConfig({
           { label: 'CLI reference', slug: 'cli-reference' },
           { label: 'Documentation benchmark', slug: 'benchmark' },
           { label: 'Skills cckit ships', slug: 'skills' },
+          { label: 'Rules cckit ships', slug: 'rules' },
           { label: 'Tags directory', slug: 'tags' },
           { label: 'Config & permissions', slug: 'config-and-permissions' },
           { label: 'Releasing', slug: 'releasing' },
