@@ -47,6 +47,10 @@ if [ -n "${ADAPTER_TEST_INNER:-}" ]; then
   adapter_managed .claude/settings.local.json;        t "settings.local is NOT managed"   "$?" "1"
   adapter_managed scripts/task-sync.sh;               t "shared script is NOT adapter-managed" "$?" "1"
   adapter_managed .agents/product-marketing.md;       t "user file under .agents is NOT managed" "$?" "1"
+  t "codex hook is tier B"  "$(adapter_tier .codex/hooks/kit-mail-check.sh)"  "B"
+  adapter_managed .codex/hooks/kit-mail-check.sh;     t "codex hook script is managed"    "$?" "0"
+  adapter_managed .codex/hooks.json;                  t "codex hooks.json is managed"     "$?" "0"
+  adapter_managed .codex/config.toml;                 t "codex config.toml is NOT managed" "$?" "1"
 
   # --- stored selection --------------------------------------------------------------------
   printf '{"kitVersion":"1"}' > "$tmp/old.json"

@@ -47,7 +47,7 @@ the same commit.
 
 | Verb | Purpose | LLM mode |
 | --- | --- | --- |
-| `cckit init [--adapter <claude\|codex\|both>]` | scaffold config + the selected adapter(s), default `claude`. `claude` writes `CLAUDE.md` + `.claude/`; `codex` writes `AGENTS.md` + `.agents/{skills,rules}` and, when it is the only adapter, keeps the config at the root `cckit.config.json` and the ownership manifest at `.cckit/kit.manifest.json` — no `.claude/` tree. The selection is stored as `adapters` in the config; `--upgrade` keeps it, and `--upgrade --adapter <name>` adds an adapter without rewriting the other's files. Codex gets instructions, skills and rules only: no hooks, guards or specialist agents | — |
+| `cckit init [--adapter <claude\|codex\|both>]` | scaffold config + the selected adapter(s), default `claude`. `claude` writes `CLAUDE.md` + `.claude/`; `codex` writes `AGENTS.md` + `.agents/{skills,rules}` and, when it is the only adapter, keeps the config at the root `cckit.config.json` and the ownership manifest at `.cckit/kit.manifest.json` — no `.claude/` tree. The selection is stored as `adapters` in the config; `--upgrade` keeps it, and `--upgrade --adapter <name>` adds an adapter without rewriting the other's files. Both adapters get the same hook scripts — base-branch commit guard, raw-git guard, session mail, session-start checks: Claude in `.claude/hooks/` (mail wired in the tracked `.claude/settings.json`), Codex in `.codex/hooks/`, registered in `.codex/hooks.json` by a merge that keeps the entries already there and uses no absolute path. Codex runs a project hook only after it is trusted (`/hooks`). Not installed for Codex: memory hooks (they read Claude Code transcripts) and specialist agents | — |
 | `cckit sync` | board state / what's unblocked | `--llm` → TOON |
 | `cckit next` | the next unblocked issue + how to start it | `--llm` → TOON |
 | `cckit plan` | wave plan: deps-ordered, priority-sorted within a wave, file-disjoint, session-fit | `--llm` → TOON |
@@ -89,7 +89,7 @@ Every operation an unattended run needs is reachable through the one CLI:
 | Verb | Purpose |
 | --- | --- |
 | `cckit scan` | detect the repo's stack + kit state (emits JSON) |
-| `cckit doctor [--fix]` | onboarding preflight (deps, gh auth); asks before installing on a TTY, `--fix` skips the prompt. Reports the CLI of each selected adapter (`claude`, `codex`) present or absent; `cckit doctor --agents` prints only those rows, makes no network call, and exits 1 when one is absent |
+| `cckit doctor [--fix]` | onboarding preflight (deps, gh auth); asks before installing on a TTY, `--fix` skips the prompt. Reports the CLI of each selected adapter (`claude`, `codex`) present or absent; `cckit doctor --agents` prints only those rows, makes no network call, and exits 1 when one is absent. With `codex` selected it also reports whether the hooks are registered in `.codex/hooks.json` (a warning when not; whether Codex trusts them is not readable) |
 | `cckit update` | report whether the project is behind the installed cckit |
 | `cckit migrate` | reshuffle an old kit layout to the current one |
 | `cckit digest` | summarize recent activity |

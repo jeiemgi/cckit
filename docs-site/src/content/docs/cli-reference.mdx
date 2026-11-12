@@ -22,9 +22,9 @@ The tables are grouped by job: setup, the daily lifecycle, planning a wave, runn
 | Verb | Purpose |
 | --- | --- |
 | `cckit install [bin-dir]` | Symlink `cckit` onto your PATH. |
-| `cckit init --profile <p>` | Scaffold `cckit.config.json` + `.claude/` for this repo. `--adapter <claude\|codex\|both>` selects the agent (default `claude`): `codex` writes `AGENTS.md` + `.agents/{skills,rules}` and, alone, no `.claude/` tree. `--upgrade` keeps the stored selection; `--upgrade --adapter <name>` adds one. See [Adapters](/adapters/#choosing-adapters-at-install). |
+| `cckit init --profile <p>` | Scaffold `cckit.config.json` + `.claude/` for this repo. `--adapter <claude\|codex\|both>` selects the agent (default `claude`): `codex` writes `AGENTS.md` + `.agents/{skills,rules}` and, alone, no `.claude/` tree. `--upgrade` keeps the stored selection; `--upgrade --adapter <name>` adds one. Both adapters get the guard and session-mail hooks; for Codex they are merged into `.codex/hooks.json` and run once trusted (`/hooks`). See [Adapters](/adapters/#choosing-adapters-at-install) and [Hooks](/hooks/#codex). |
 | `cckit scan` | Detect this repo's stack + kit state (JSON). |
-| `cckit doctor` | Onboarding preflight: deps present, `gh` authenticated, and (when enabled) the MemPalace CLI + per-wing wake-up header. Asks before installing; `--fix` installs and seeds without the prompt. Also reports the CLI of each selected adapter present or absent; `--agents` prints only those rows, offline, and exits 1 when one is absent. |
+| `cckit doctor` | Onboarding preflight: deps present, `gh` authenticated, and (when enabled) the MemPalace CLI + per-wing wake-up header. Asks before installing; `--fix` installs and seeds without the prompt. Also reports the CLI of each selected adapter present or absent; `--agents` prints only those rows, offline, and exits 1 when one is absent. With `codex` selected it adds a row for the hooks registered in `.codex/hooks.json`. |
 | `cckit adopt` | Record kit-shaped files a repo already has. |
 | `cckit migrate` | Reshuffle an old kit layout to the current one. |
 

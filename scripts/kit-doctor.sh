@@ -15,7 +15,8 @@
 #   Tier 0  Homebrew (macOS bootstrap — requires sudo password)
 #   Tier 1  git, gh, jq, perl           — hard deps, auto-install via brew
 #   Tier 2  node + pnpm, vercel, turbo  — project-specific, auto-install if applicable
-#   Agents  the runtime binary of each adapter the project selected (`adapters` in the config)
+#   Agents  the runtime binary of each adapter the project selected (`adapters` in the config),
+#           plus whether the Codex hooks are registered in .codex/hooks.json when codex is selected
 #   Local   mlx-lm via uv tool install + mlx_lm.server auto-start (when .local.enabled)
 #   Auth    gh auth status + scope:project, git config name/email
 #   SSH     optional guided flow (ed25519, pbcopy, link to github settings)
@@ -164,6 +165,24 @@ doctor_agents() {
   done <<EOF_AGENTS
 $(adapter_runtime_report "$_sel")
 EOF_AGENTS
+  # Codex runs a project's hooks from .codex/hooks.json, and only after the user trusted them. The
+  # registration is checkable; the trust is Codex's own per-machine state and is not readable here,
+  # so a registered row says so instead of claiming the hooks run (E257.5).
+  if adapter_has "$_sel" codex; then
+    local _root
+    command -v codex_hooks_registered >/dev/null 2>&1 || . "$_d/lib/codex-hooks.sh"
+    _root="$(git -C "${TARGET:-$PWD}" rev-parse --show-toplevel 2>/dev/null)"
+    [[ -n "$_root" ]] || _root="${TARGET:-$PWD}"
+    if codex_hooks_registered "$_root/.codex/hooks.json" guard-base-branch-commit.sh \
+       && codex_hooks_registered "$_root/.codex/hooks.json" kit-mail-check.sh; then
+      row "$MARK_OK" "codex hooks" "registered in .codex/hooks.json — Codex runs them once trusted (/hooks in Codex; trust is not readable from here)"
+      CHECKS_OK=$((CHECKS_OK + 1))
+    else
+      row "$MARK_WARN" "codex hooks" "not registered in .codex/hooks.json — the commit guard and session mail do not run in Codex"
+      CHECKS_WARN=$((CHECKS_WARN + 1))
+      ACTIONS_NEEDED+=("Run cckit init --upgrade to register the Codex hooks in .codex/hooks.json")
+    fi
+  fi
 }
 
 # ---- --agents: only the runtime rows, then exit (no installs, no network) ----

@@ -76,22 +76,26 @@ adapter_instructions() {
   esac
 }
 
-# Statusline shim, settings, hooks and the sigil lib only do anything inside the Claude Code CLI
-# (tier B); instruction files, skills, rules and agents are plain markdown (tier A).
+# Statusline shim, settings, hooks and the sigil lib only do anything inside an agent CLI (tier B):
+# Claude Code for .claude/, Codex for .codex/. Instruction files, skills, rules and agents are plain
+# markdown (tier A).
 adapter_tier() {
   case "${1:-}" in
-    .claude/statusline.sh|.claude/settings.json|.claude/hooks/*|.claude/lib/*) printf 'B\n' ;;
+    .claude/statusline.sh|.claude/settings.json|.claude/hooks/*|.claude/lib/*|.codex/hooks.json|.codex/hooks/*) printf 'B\n' ;;
     *) printf 'A\n' ;;
   esac
 }
 
 # The adapter files init records in the ownership manifest. NOT the project config and NOT
 # settings.local.json: the first is the project's own record, the second is per-checkout and
-# gitignored, and neither is something `cckit remove` should treat as a kit artifact.
+# gitignored, and neither is something `cckit remove` should treat as a kit artifact. Under .codex/
+# only the hook scripts and hooks.json are cckit's (E257.5); config.toml and the rest is the user's
+# Codex setup. init records hooks.json only when it created the file or the manifest still proves it
+# unmodified.
 adapter_managed() {
   case "${1:-}" in
     .claude/kit.config.json|.claude/kit.manifest.json|.claude/settings.local.json) return 1 ;;
-    CLAUDE.md|AGENTS.md|.claude/*|.agents/skills/*|.agents/rules/*) return 0 ;;
+    CLAUDE.md|AGENTS.md|.claude/*|.agents/skills/*|.agents/rules/*|.codex/hooks.json|.codex/hooks/*) return 0 ;;
   esac
   return 1
 }

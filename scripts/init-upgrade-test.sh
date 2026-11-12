@@ -287,6 +287,91 @@ rm -f "$fx/bin/claude"
 doc="$(cd "$fx/own" && PATH="$fx/bin:/usr/bin:/bin" KIT_ASCII=1 NO_COLOR=1 bash "$PLUGIN_DIR/scripts/kit-doctor.sh" --agents 2>&1)"; doc_rc=$?
 t "doctor: unselected runtime not checked" "$doc_rc$(printf '%s\n' "$doc" | grep -c 'claude')" "00"
 
+# --- E257.5: hooks and session mail on both adapters ------------------------------------
+# shellcheck disable=SC2016
+MAILCMD='bash "$CLAUDE_PROJECT_DIR/.claude/hooks/kit-mail-check.sh"'
+CXMAIL='bash "$(git rev-parse --show-toplevel)/.codex/hooks/kit-mail-check.sh"'
+mail_events() {  # mail_events <file> <command> -> the events that run <command>, sorted
+  jq -r --arg c "$2" '[(.hooks // {}) | to_entries[] | select([.value[].hooks[].command] | index($c)) | .key] | sort | join(" ")' "$1" 2>/dev/null
+}
+
+# 15. the Claude adapter installs AND wires the mail hook (it shipped as a template only before)
+fresh hc claude || { echo "FAIL: fresh claude init (hooks) exited non-zero"; fail=1; }
+t "claude: mail hook installed"          "$([ -x "$fx/hc/.claude/hooks/kit-mail-check.sh" ] && echo yes || echo no)" "yes"
+t "claude: mail wired on four events"    "$(mail_events "$fx/hc/.claude/settings.json" "$MAILCMD")" "PostToolUse SessionStart Stop UserPromptSubmit"
+t "claude: mail hook recorded as owned"  "$(jq '.entries | has(".claude/hooks/kit-mail-check.sh")' "$fx/hc/.claude/kit.manifest.json")" "true"
+t "claude: no .codex tree"               "$(has_path hc .codex)" "no"
+settle hc "scaffold claude with mail"
+# a user-tuned registration survives the upgrade, and nothing is registered twice
+jq --arg c "$MAILCMD" '(.hooks.Stop[] | select(.hooks[0].command == $c) | .hooks[0].timeout) = 45' \
+  "$fx/hc/.claude/settings.json" > "$fx/hc/s.tmp" && mv "$fx/hc/s.tmp" "$fx/hc/.claude/settings.json"
+setver hc .claude/kit.config.json 0.0.1; settle hc "tune the Stop timeout"
+upgrade hc || { echo "FAIL: claude upgrade (hooks) exited non-zero"; fail=1; }
+t "claude upgrade: tuned timeout kept"   "$(jq --arg c "$MAILCMD" '[.hooks.Stop[].hooks[] | select(.command == $c) | .timeout] | join(",")' "$fx/hc/.claude/settings.json")" '"45"'
+t "claude upgrade: one mail handler per event" "$(jq --arg c "$MAILCMD" '[.hooks[][].hooks[] | select(.command == $c)] | length' "$fx/hc/.claude/settings.json")" "4"
+t "claude upgrade: only the config changed" "$(git -C "$fx/hc" status --porcelain | awk '{print $2}' | tr '\n' ' ' | sed 's/ $//')" ".claude/kit.config.json"
+
+# 16. a Codex-only project gets the hook scripts and a hooks.json with no machine path
+fresh hx codex || { echo "FAIL: fresh codex init (hooks) exited non-zero"; fail=1; }
+t "codex: hook scripts installed"        "$(ls "$fx/hx/.codex/hooks" 2>/dev/null | LC_ALL=C sort | tr '\n' ' ')" "guard-base-branch-commit.sh guard-raw-git-ops.sh kit-mail-check.sh kit_version_check.sh repo-hygiene.sh "
+t "codex: hook scripts are executable"   "$(find "$fx/hx/.codex/hooks" -type f ! -perm -u+x | wc -l | tr -d ' ')" "0"
+t "codex: mail on four events"           "$(mail_events "$fx/hx/.codex/hooks.json" "$CXMAIL")" "PostToolUse SessionStart Stop UserPromptSubmit"
+t "codex: hooks carry no machine path"   "$(grep -rlF "$fx" "$fx/hx/.codex" 2>/dev/null | wc -l | tr -d ' ')" "0"
+t "codex: no memory hook installed"      "$(ls "$fx/hx/.codex/hooks" | grep -c mempal)" "0"
+t "codex: still no .claude tree"         "$(has_path hx .claude)" "no"
+t "codex: hooks recorded as owned"       "$(jq -r '[.entries | keys[] | select(startswith(".codex/"))] | length' "$fx/hx/.cckit/kit.manifest.json")" "6"
+settle hx "scaffold codex with hooks"
+hx_before="$(tree_hash hx .codex)"
+setver hx cckit.config.json 0.0.1; settle hx "reset version"
+upgrade hx || { echo "FAIL: codex upgrade (hooks) exited non-zero"; fail=1; }
+t "codex upgrade: .codex byte-identical (hook trust kept)" "$(tree_hash hx .codex)" "$hx_before"
+t "codex upgrade: only the config changed" "$(git -C "$fx/hx" status --porcelain | awk '{print $2}' | tr '\n' ' ' | sed 's/ $//')" "cckit.config.json"
+
+# 17. a project that already keeps its own .codex/ — entries, a script, config.toml — keeps all of it
+mkdir -p "$fx/hu/.codex/hooks"
+cat > "$fx/hu/.codex/hooks.json" <<'JSON'
+{ "hooks": { "PreToolUse": [ { "matcher": "Bash", "hooks": [ { "type": "command", "command": "python3 my_policy.py", "timeout": 30 } ] } ],
+             "SubagentStop": [ { "hooks": [ { "type": "command", "command": "echo mine" } ] } ] } }
+JSON
+printf '#!/bin/sh\n# my own mail hook\n' > "$fx/hu/.codex/hooks/kit-mail-check.sh"
+printf '[mcp_servers.mine]\ncommand = "npx"\n' > "$fx/hu/.codex/config.toml"
+fresh hu codex || { echo "FAIL: fresh codex init over an existing .codex exited non-zero"; fail=1; }
+t "merge: the user's guard entry is kept, first" "$(jq -r '.hooks.PreToolUse[0].hooks[0].command' "$fx/hu/.codex/hooks.json")" "python3 my_policy.py"
+t "merge: the user's other event is kept"  "$(jq -r '.hooks.SubagentStop[0].hooks[0].command' "$fx/hu/.codex/hooks.json")" "echo mine"
+t "merge: cckit's guards were added"       "$(jq '.hooks.PreToolUse | length' "$fx/hu/.codex/hooks.json")" "3"
+t "merge: cckit's mail was added"          "$(mail_events "$fx/hu/.codex/hooks.json" "$CXMAIL")" "PostToolUse SessionStart Stop UserPromptSubmit"
+t "merge: no machine path"                 "$(grep -cF "$fx" "$fx/hu/.codex/hooks.json")" "0"
+t "merge: the user's hooks.json is not claimed as owned" "$(jq '.entries | has(".codex/hooks.json")' "$fx/hu/.cckit/kit.manifest.json")" "false"
+t "merge: the user's own hook script is kept" "$(sed -n 2p "$fx/hu/.codex/hooks/kit-mail-check.sh")" "# my own mail hook"
+t "merge: the kept script is not claimed"  "$(jq '.entries | has(".codex/hooks/kit-mail-check.sh")' "$fx/hu/.cckit/kit.manifest.json")" "false"
+t "merge: config.toml untouched"           "$(cat "$fx/hu/.codex/config.toml")" "$(printf '[mcp_servers.mine]\ncommand = "npx"')"
+settle hu "scaffold over my own .codex"
+hu_before="$(tree_hash hu .codex)"
+setver hu cckit.config.json 0.0.1; settle hu "reset version"
+upgrade hu || { echo "FAIL: upgrade over a user-edited hooks.json exited non-zero"; fail=1; }
+t "merge: upgrade leaves .codex byte-identical" "$(tree_hash hu .codex)" "$hu_before"
+
+# 18. an unparseable hooks.json is left alone, reported, and repairable at the same version
+mkdir -p "$fx/hb/.codex" && printf '{ not json\n' > "$fx/hb/.codex/hooks.json"
+fresh hb codex; t "bad hooks.json: init still completes (rc)" "$?" "0"
+t "bad hooks.json: file untouched"         "$(cat "$fx/hb/.codex/hooks.json")" "{ not json"
+doc="$(cd "$fx/hb" && PATH="$fx/bin:$PATH" KIT_ASCII=1 NO_COLOR=1 bash "$PLUGIN_DIR/scripts/kit-doctor.sh" --agents 2>&1)"
+t "doctor: unregistered codex hooks reported" "$(printf '%s\n' "$doc" | grep -c 'codex hooks .*not registered')" "1"
+printf '{}\n' > "$fx/hb/.codex/hooks.json"; settle hb "fix hooks.json"
+upgrade hb; t "repair: same-version upgrade runs (rc)" "$?" "0"
+t "repair: hooks now registered"           "$(mail_events "$fx/hb/.codex/hooks.json" "$CXMAIL")" "PostToolUse SessionStart Stop UserPromptSubmit"
+doc="$(cd "$fx/hb" && PATH="$fx/bin:$PATH" KIT_ASCII=1 NO_COLOR=1 bash "$PLUGIN_DIR/scripts/kit-doctor.sh" --agents 2>&1)"
+t "doctor: registered codex hooks reported" "$(printf '%s\n' "$doc" | grep -c 'codex hooks .*registered in .codex/hooks.json')" "1"
+t "doctor: says trust is not readable"     "$(printf '%s\n' "$doc" | grep -c 'trust is not readable')" "1"
+
+# 19. enabling Codex on a Claude project adds the Codex hooks and leaves the Claude ones alone
+settle hc "settle before enabling codex"
+hc_before="$(tree_hash hc .claude/hooks .claude/settings.json .claude/settings.local.json)"
+upgrade hc --adapter codex || { echo "FAIL: enabling codex (hooks) exited non-zero"; fail=1; }
+t "add codex: claude hooks byte-identical" "$(tree_hash hc .claude/hooks .claude/settings.json .claude/settings.local.json)" "$hc_before"
+t "add codex: codex hooks registered"    "$(mail_events "$fx/hc/.codex/hooks.json" "$CXMAIL")" "PostToolUse SessionStart Stop UserPromptSubmit"
+t "add codex: one mail script, same bytes" "$(cmp -s "$fx/hc/.claude/hooks/kit-mail-check.sh" "$fx/hc/.codex/hooks/kit-mail-check.sh" && echo same || echo differs)" "same"
+
 echo ""
-[ "$fail" -eq 0 ] && echo "PASS: init.sh --upgrade honors the preserve/exclude contract (#334, #149) and adapter selection (E257.3)" || echo "FAILED"
+[ "$fail" -eq 0 ] && echo "PASS: init.sh --upgrade honors the preserve/exclude contract (#334, #149), adapter selection (E257.3) and hook registration (E257.5)" || echo "FAILED"
 exit "$fail"

@@ -72,7 +72,9 @@ is being implemented; shell access alone does not establish behavioral parity.
 | Skills | `.claude/skills/<name>/SKILL.md` | `.agents/skills/<name>/SKILL.md` |
 | Rules | `.claude/rules/*.md` | `.agents/rules/*.md`, listed by path in `AGENTS.md` |
 | Specialist agents | `.claude/agents/` | not installed |
-| Hooks, guards, statusline, settings | `.claude/hooks/`, `.claude/settings*.json` | not installed |
+| Hooks and guards | `.claude/hooks/`, registered in `.claude/settings*.json` | `.codex/hooks/`, registered in `.codex/hooks.json` ([details](/hooks/#codex)) |
+| Memory hooks | `.claude/hooks/mempal_*.sh` (with `--memory on`) | not installed |
+| Statusline, settings | `.claude/statusline.sh`, `.claude/settings*.json` | not installed |
 | Config (when it is the only adapter) | `.claude/kit.config.json` | `cckit.config.json` |
 | Ownership manifest (when it is the only adapter) | `.claude/kit.manifest.json` | `.cckit/kit.manifest.json` |
 
@@ -93,9 +95,11 @@ is being implemented; shell access alone does not establish behavioral parity.
 
 Limits of the Codex adapter today:
 
-- No hook, guard or specialist agent is installed, so nothing blocks a commit to the base branch in
-  a Codex session. `AGENTS.md` says so. Hooks are [#262](https://github.com/jeiemgi/cckit/issues/262),
-  specialists [#263](https://github.com/jeiemgi/cckit/issues/263).
+- The guards and session mail are installed and fixture-tested against the event JSON Codex
+  documents, but no live Codex session has fired them, and Codex runs a project hook only after you
+  trust it (`/hooks`). Until that is verified, treat a Codex guard as unproven. No specialist agent
+  is installed ([#263](https://github.com/jeiemgi/cckit/issues/263)), and no memory hook: those
+  read Claude Code transcripts.
 - `.agents/rules/` is a cckit location, not one Codex loads on its own. `AGENTS.md` lists each rule
   file so the agent reads the one that applies.
 - Shared rules still describe Claude-only mechanics in prose — `mempalace.md` names the hooks in

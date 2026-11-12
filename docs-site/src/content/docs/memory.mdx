@@ -54,6 +54,17 @@ Memory isn't a bolt-on — cckit treats it as **first-class in the lifecycle**. 
 
 </Steps>
 
+## Codex
+
+The automatic half of memory is Claude Code only. The `Stop` and `PreCompact` hooks run
+`mempalace mine ~/.claude/projects/<project>/ --mode convos`, which reads Claude Code's transcript
+store; a Codex session writes nothing there, and no Codex transcript format has been validated
+against `mempalace mine`. So `cckit init --adapter codex` installs no memory hook, even with
+`--memory on`, and says so in its output and in the generated `AGENTS.md`.
+
+What still works in Codex: a MemPalace MCP server you configure yourself, called explicitly. With
+`--adapter both`, Claude Code sessions keep all four hooks.
+
 <Aside type="tip" title="Built on MemPalace — credit where it's due">
 The memory engine, palace format, and MCP server are all the work of the open-source **[MemPalace](https://github.com/MemPalace/mempalace)** project (maintainer [@milla-jovovich](https://github.com/MemPalace)) — *"give your AI a memory: mine projects and conversations into a searchable palace. No API key required."* cckit only scaffolds the hooks and the per-wing header; MemPalace does the remembering. If it's useful, **star the repo, file issues, and follow along** at [github.com/MemPalace/mempalace](https://github.com/MemPalace/mempalace).
 

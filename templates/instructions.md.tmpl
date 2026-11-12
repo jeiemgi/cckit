@@ -26,11 +26,14 @@ Agent definitions: `.claude/agents/<name>/AGENT.md`.
 
 This project runs on [cckit](https://cckit.dev). Every operation is a `cckit` verb you run in the
 shell — read state with `cckit sync --llm` before acting, and append `--llm` to any verb for
-machine-readable output. `cckit` installs no hooks, guards or specialist agents for Codex: nothing
-blocks a commit to the base branch here, so the rules below are yours to follow.
+machine-readable output. `cckit init` registers hooks in `.codex/hooks.json`: a guard that blocks a
+commit to the base branch, a guard that blocks raw `gh`/`git` operations a `cckit` verb owns, session
+mail (`cckit msg`), and two session-start checks. Codex runs them only after they are trusted
+(`/hooks`), and a hook is fast feedback, not enforcement — the rules below apply whether or not one
+fires. No specialist agents are installed for Codex.
 <!-- IF:MEMORY -->
-Memory hooks are not installed for Codex. If a MemPalace MCP server is configured, call its tools
-explicitly (wing `{{WING}}`).
+Memory hooks are not installed for Codex: they read Claude Code transcripts. If a MemPalace MCP
+server is configured, call its tools explicitly (wing `{{WING}}`).
 <!-- /IF:MEMORY --><!-- /IF:ADAPTER_CODEX -->
 
 ## Skills

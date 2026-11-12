@@ -318,8 +318,16 @@ if [[ $UPGRADE -eq 1 ]]; then
   # confusing re-scan + any stray re-add). A genuinely-behind consumer (kitVersion < plugin)
   # still upgrades normally.
   _have_kv="$(jq -r '.kitVersion // "0.0.0"' "$UP_CFG" 2>/dev/null || echo 0.0.0)"
-  # ...unless this run enables a second adapter: that is new work at the same version.
-  if [[ "$_have_kv" == "$PLUGIN_VERSION" && $ADAPTER_ADDED -eq 0 ]]; then
+  # ...unless this run enables a second adapter: that is new work at the same version. So is a
+  # Codex project whose hooks are not registered (a hooks.json that was unparseable at init, or a
+  # project scaffolded before E257.5): `cckit doctor` sends the user here to repair exactly that.
+  _cx_unregistered=0
+  if adapter_has "$ADAPTERS" codex; then
+    # shellcheck source=/dev/null
+    . "$KIT_ROOT/scripts/lib/codex-hooks.sh"
+    codex_hooks_registered "$UP_TARGET/.codex/hooks.json" guard-base-branch-commit.sh || _cx_unregistered=1
+  fi
+  if [[ "$_have_kv" == "$PLUGIN_VERSION" && $ADAPTER_ADDED -eq 0 && $_cx_unregistered -eq 0 ]]; then
     echo "x already at $PLUGIN_VERSION -- nothing to upgrade. (To pull a newer release, refresh the plugin cache: claude plugin update.)"
     exit 0
   fi
@@ -657,6 +665,7 @@ if [[ $DRY_RUN -eq 1 ]]; then
   echo "    .claude/hooks/guard-base-branch-commit.sh (PreToolUse Bash: block commits to base branch)"
   echo "    .claude/hooks/guard-raw-git-ops.sh   (PreToolUse Bash, tracked settings.json: raw gh/git -> cckit verb)"
   echo "    .claude/hooks/kit_version_check.sh   (SessionStart: update check)"
+  echo "    .claude/hooks/kit-mail-check.sh      (session mail, tracked settings.json: PostToolUse / UserPromptSubmit / SessionStart / Stop)"
   for a in $AGENTS; do
     [[ -f "$KIT_ROOT/templates/agents/$a.md" ]] && echo "    .claude/agents/$a/AGENT.md"
   done
@@ -674,7 +683,11 @@ if [[ $DRY_RUN -eq 1 ]]; then
       [[ -d "$KIT_ROOT/templates/skills/$s/references" ]] && echo "    $_add/skills/$_dn/references/"
     done
   done
-  adapter_has "$ADAPTERS" codex && echo "    (Codex adapter: instructions + skills + rules only — no hooks, guards or specialist agents)"
+  if adapter_has "$ADAPTERS" codex; then
+  echo "    .codex/hooks/ (repo-hygiene.sh, kit_version_check.sh, kit-mail-check.sh, guard-base-branch-commit.sh, guard-raw-git-ops.sh$([[ "$PREPUSH_ENABLED" == "true" ]] && echo ", prepush_gate.sh")$([[ "$LOCAL_ON" == "true" ]] && echo ", kit-local-status.sh"))"
+  echo "    .codex/hooks.json                         (merged: cckit's registrations are added, yours are kept; trust them in Codex with /hooks)"
+  echo "    (Codex adapter: no specialist agents; no memory hooks — they read Claude Code transcripts)"
+  fi
   echo "    scripts/ (kit-config.sh, gh-project.sh, kit-version-check.sh, setup-labels.sh, setup-milestones.sh, capture-project-ids.sh, task-sync.sh, knowledge-lint.sh, review-lint.sh + review-rules.conf, skill-frontmatter-lint.sh)"
   echo "    knowledge/INDEX.md                        (knowledge-base manifest — rules/knowledge-base.md)"
   if adapter_has "$ADAPTERS" claude; then
@@ -1014,6 +1027,24 @@ jq --arg g '$CLAUDE_PROJECT_DIR/.claude/hooks/guard-raw-git-ops.sh' \
   "$_TRACKED" > "$_TRACKED.tmp" && mv "$_TRACKED.tmp" "$_TRACKED"
 echo "  + .claude/hooks/guard-raw-git-ops.sh (PreToolUse Bash, wired in tracked settings.json: raw gh/git -> cckit verb)"
 
+# ---- session-mail hook (all projects; init AND --upgrade; idempotent) ----
+# One script on four events delivers `cckit msg` mail to a running session (E257.5). Wired in the
+# TRACKED settings.json for the same reason as the raw-git guard: mail has to reach worktrees. A
+# registration that is already there is left as it is (its timeout or position may be the user's),
+# and a project that listed the hook in `upgrade.removed` is not re-wired.
+if ! _upgrade_excluded ".claude/hooks/kit-mail-check.sh"; then
+  hook_write "$KIT_ROOT/templates/hooks/kit-mail-check.sh.tmpl" "$TARGET/.claude/hooks/kit-mail-check.sh"
+  chmod +x "$TARGET/.claude/hooks/kit-mail-check.sh" 2>/dev/null || true
+  # shellcheck disable=SC2016  # $CLAUDE_PROJECT_DIR is expanded by Claude Code at hook time
+  jq --arg m 'bash "$CLAUDE_PROJECT_DIR/.claude/hooks/kit-mail-check.sh"' '
+    reduce (["PostToolUse","*"], ["UserPromptSubmit",""], ["SessionStart",""], ["Stop",""]) as [$e, $mt] (.;
+      if ([ (.hooks[$e] // [])[] | (.hooks // [])[] | .command ] | index($m)) != null then .
+      else .hooks[$e] = ((.hooks[$e] // [])
+        + [ (if $mt == "" then {} else {matcher: $mt} end) + {hooks: [{type: "command", command: $m, timeout: 10}]} ])
+      end)' "$_TRACKED" > "$_TRACKED.tmp" && mv "$_TRACKED.tmp" "$_TRACKED"
+  echo "  + .claude/hooks/kit-mail-check.sh (session mail, wired in tracked settings.json on 4 events)"
+fi
+
 # ---- version-check SessionStart hook (all projects; idempotent) ---------
 mkdir -p "$TARGET/.claude/hooks"
 hook_write "$KIT_ROOT/templates/hooks/kit_version_check.sh.tmpl" "$TARGET/.claude/hooks/kit_version_check.sh"
@@ -1024,8 +1055,74 @@ HOOK_NOTE="$HOOK_NOTE + version-check"
 
 echo "  + .claude/settings.local.json${HOOK_NOTE:+ (}${HOOK_NOTE# + }${HOOK_NOTE:+)}"
 else
-  echo "  · Codex adapter only: no .claude/ tree, no hooks or guards (Codex hook registration is not shipped yet)"
+  echo "  · Codex adapter only: no .claude/ tree"
 fi   # ==== end Claude adapter only ====
+
+# ==== Codex adapter: hook scripts + their registration in .codex/hooks.json (E257.5) ====
+# The SAME hook templates as the Claude adapter, rendered into .codex/hooks/: Codex sends the event
+# fields they read (hook_event_name, cwd, tool_input.command) and honours the same answers (exit 2 +
+# stderr blocks a tool, decision:block continues a Stop, additionalContext injects text).
+# Not installed: the MemPalace hooks. mempal_save / mempal_precompact mine ~/.claude/projects/, the
+# Claude Code transcript store, and no Codex transcript format has been validated against
+# `mempalace mine` — see agent-compatibility.mdx.
+CODEX_HOOKS_CHANGED=0
+if adapter_has "$ADAPTERS" codex; then
+# shellcheck source=/dev/null
+. "$KIT_ROOT/scripts/lib/codex-hooks.sh"
+# shellcheck source=/dev/null
+. "$KIT_ROOT/scripts/lib/kit-manifest.sh"
+mkdir -p "$TARGET/.codex/hooks"
+_CX_SRC="$(mktemp)"
+cp "$KIT_ROOT/templates/codex/hooks.json.tmpl" "$_CX_SRC"
+_CX_HOOKS="repo-hygiene.sh kit_version_check.sh kit-mail-check.sh guard-base-branch-commit.sh guard-raw-git-ops.sh"
+_cx_optional() {  # <event> <matcher> <script> <timeout> — an opt-in hook joins the set to register
+  local frag; frag="$(mktemp)"
+  codex_hooks_fragment "$1" "$2" "$3" "$4" > "$frag" && codex_hooks_merge "$_CX_SRC" "$frag" >/dev/null
+  rm -f "$frag"
+  _CX_HOOKS="$_CX_HOOKS $3"
+}
+[[ "$PREPUSH_ENABLED" == "true" ]] && _cx_optional PreToolUse Bash prepush_gate.sh 120
+[[ "$LOCAL_ON"        == "true" ]] && _cx_optional SessionStart "" kit-local-status.sh 10
+for _h in $_CX_HOOKS; do
+  _cx_dst="$TARGET/.codex/hooks/$_h"
+  _cx_n=$(( ${#WRITTEN[@]} + ${#UPGRADE_REFRESHED[@]} ))
+  if [[ $UPGRADE -eq 0 && $FORCE -eq 0 && -e "$_cx_dst" ]]; then
+    # A fresh init over a .codex/hooks/ the user already keeps: their file wins, as AGENTS.md does.
+    echo "  = .codex/hooks/$_h (already there — kept; --force replaces it)"
+  else
+    hook_write "$KIT_ROOT/templates/hooks/$_h.tmpl" "$_cx_dst"
+    chmod +x "$_cx_dst" 2>/dev/null || true
+  fi
+  [[ $(( ${#WRITTEN[@]} + ${#UPGRADE_REFRESHED[@]} )) -gt $_cx_n ]] && CODEX_HOOKS_CHANGED=1
+done
+echo "  + .codex/hooks/ ($(printf '%s' "$_CX_HOOKS" | sed 's/ /, /g'))"
+# hooks.json is the project's file. cckit's handlers are merged in (a handler already registered for
+# the event is skipped, everything else in the file is kept) and a merge that changes nothing does
+# not rewrite it. It is recorded as kit-owned only when cckit created it or the manifest still
+# proves it unmodified — a hooks.json holding the user's own entries is never claimed.
+_CX_JSON="$TARGET/.codex/hooks.json"; _cx_own=0
+if [[ ! -e "$_CX_JSON" ]]; then _cx_own=1
+elif [[ "$( cd "$TARGET" && KIT_MANIFEST="$MANIFEST_REL" kit_manifest_verify .codex/hooks.json 2>/dev/null )" == "intact" ]]; then _cx_own=1
+fi
+if _upgrade_excluded ".codex/hooks.json"; then
+  UPGRADE_SKIPPED+=(".codex/hooks.json")
+elif _cx_state="$(codex_hooks_merge "$_CX_JSON" "$_CX_SRC")"; then
+  case "$_cx_state" in
+    created) echo "  + .codex/hooks.json (SessionStart / PreToolUse Bash / PostToolUse / UserPromptSubmit / Stop)"
+             [[ $UPGRADE -eq 1 ]] && UPGRADE_ADDED+=(".codex/hooks.json") ;;
+    merged)  echo "  ~ .codex/hooks.json (cckit's hooks added; the entries already there are kept)" ;;
+    *)       [[ $UPGRADE -eq 1 ]] && UPGRADE_PRESERVED+=(".codex/hooks.json") ;;
+  esac
+  if [[ "$_cx_state" != "unchanged" ]]; then
+    CODEX_HOOKS_CHANGED=1
+    [[ $_cx_own -eq 1 ]] && WRITTEN+=(".codex/hooks.json")
+  fi
+else
+  echo "  ! .codex/hooks.json was left untouched — cckit's Codex hooks are NOT registered. Fix the file, then run: cckit init --upgrade" >&2
+fi
+rm -f "$_CX_SRC"
+[[ "$MEMORY_BOOL" == "true" ]] && echo "  · Codex adapter: no memory hooks — the transcript sweep reads Claude Code's ~/.claude/projects/ only"
+fi   # ==== end Codex adapter hooks ====
 
 # ---- recommended .gitignore entries (idempotent) ------------------------
 # kit.manifest.json is kit-managed bookkeeping (content hashes + timestamps, re-stamped on every
@@ -1087,6 +1184,7 @@ if [[ $UPGRADE -eq 1 ]]; then
   if [[ ${#UPGRADE_SKIPPED[@]}   -gt 0 ]]; then echo "  Skipped (removed/renamed via kit.config upgrade):"; printf '    - %s\n' "${UPGRADE_SKIPPED[@]}"; fi
   if [[ ${#UPGRADE_REFRESHED[@]} -gt 0 ]]; then echo "  Refreshed (unmodified hook, now the current template):"; printf '    ~ %s\n' "${UPGRADE_REFRESHED[@]}"; fi
   if [[ ${#UPGRADE_DRIFTED[@]}   -gt 0 ]]; then echo "  Drifted (customized hook, kept — diff it against templates/hooks/ by hand):"; printf '    ! %s\n' "${UPGRADE_DRIFTED[@]}"; fi
+  [[ $CODEX_HOOKS_CHANGED -eq 1 ]] && echo "  Codex hooks changed: Codex skips a new or changed hook until you trust it — run /hooks in Codex."
 else
   echo ""
   echo "Next steps:"
@@ -1094,6 +1192,7 @@ else
   echo "  2. ./scripts/setup-labels.sh && ./scripts/setup-milestones.sh   # seed the repo"
   [[ "$PROJECTS_V2" == "true" ]] && echo "  3. ./scripts/capture-project-ids.sh   # cache Projects v2 field IDs"
   [[ "$LOCAL_ON" == "true" ]] && echo "  4. /kit-doctor   # local model layer: installs mlx-lm (uv tool install) + starts mlx_lm.server"
+  adapter_has "$ADAPTERS" codex && echo "  · Codex: commit .codex/, then run /hooks in Codex and trust the project hooks — Codex skips them until you do."
 fi
 
 exit 0

@@ -90,7 +90,9 @@ cckit doctor                  # onboarding preflight: deps, gh auth
 cckit init --profile software # scaffold cckit.config.json + .claude/ for this repo
                               #   profiles: software · content · research · automation · minimal
                               #   --adapter claude|codex|both picks the agent (default claude);
-                              #   codex writes AGENTS.md + .agents/ and no .claude/ tree
+                              #   codex writes AGENTS.md + .agents/ and no .claude/ tree;
+                              #   both get the commit guards + session-mail hooks (Codex: in
+                              #   .codex/hooks.json, merged with yours — trust them with /hooks)
 cckit plan-next               # propose what to build next, grounded in current capabilities
 cckit status                  # where are we: local undone work, PRs to attend, cleanup available
 cckit next                    # the next unblocked issue + how to start it

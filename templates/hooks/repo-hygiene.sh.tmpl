@@ -29,7 +29,7 @@ if [[ "$branch" == "main" || "$branch" == "develop" ]]; then
 # 2. Non-conventional branch name (not <kind>/<issue>-<slug> and not a bot branch)?
 elif [[ ! "$branch" =~ ^(feat|fix|task|chore|security|scaffold|ci|adr|spike|plan)/[0-9]+- ]] \
    && [[ ! "$branch" =~ ^(agent|claude)/ ]]; then
-  WARN+=("• Branch '$branch' doesn't match <kind>/<issue>-<slug> — see .claude/rules/branch-naming.md.")
+  WARN+=("• Branch '$branch' doesn't match <kind>/<issue>-<slug> — see the branch-naming rule.")
 fi
 
 # 3. Stale base — commits behind the base branch (uses last fetch; no network here)
