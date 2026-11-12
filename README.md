@@ -90,8 +90,8 @@ cckit doctor                  # onboarding preflight: deps, gh auth
 cckit init --profile software # scaffold cckit.config.json + .claude/ for this repo
                               #   profiles: software · content · research · automation · minimal
 cckit plan-next               # propose what to build next, grounded in current capabilities
-cckit status                  # where are we: local undone work, PRs to attend, cleanup available
-cckit next                    # the next unblocked issue + how to start it
+cckit status                  # where are we: next effort per flow, local undone work, PRs to attend, cleanup available
+cckit next                    # the next unblocked issue + how to start it + the weekly cadence
 cckit start 42                # isolated worktree + branch for issue #42, bootstrapped:
                               #   env files copied, dev port assigned, deps installed at the
                               #   selected targets — worktree.installPaths if set (those dirs

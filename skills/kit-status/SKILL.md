@@ -42,8 +42,9 @@ mistake this skill exists to prevent.
 ## Execution
 
 ```bash
-cckit status          # the three buckets as markdown
-cckit status --llm    # the same verdicts as JSON, for an agent
+cckit status          # the board, the next effort per flow, the three buckets — as markdown
+cckit status --llm    # the same verdicts as JSON, for an agent: local_undone, worktrees, prs,
+                      # cleanup, next_efforts
 ```
 
 Read-only. It writes nothing, deletes nothing, and pushes nothing.
@@ -55,6 +56,19 @@ Read-only. It writes nothing, deletes nothing, and pushes nothing.
 | 1 | **Local undone work** | What exists only on this machine: worktrees with uncommitted changes, branches holding commits reachable from **no** remote ref, and effort subs not yet merged into their effort branch. Plus the worktree inventory — a clean worktree on an issue branch is still work in progress. |
 | 2 | **PRs waiting on a human** | Every open PR with the ONE thing it needs: `conflict`, `checks`, `draft`, `wait`, `threads`, `ai-review`, `review`, or `ready`. |
 | 3 | **Cleanup available** | Branches and worktrees that can go — **local and remote** — plus what is deliberately kept (orphan work, open-issue branches). |
+
+## Next effort per flow
+
+Before the buckets the report prints one row per flow that has an open effort (an open issue with
+the `effort` label): the effort that can start now — no open blocker, most urgent `priority:pN`
+first, then the lowest number — and how many of the flow's efforts still wait on an open blocker.
+Any open `blocked_by` issue blocks, in the same flow or another; a closed one does not. A flow where
+nothing can start keeps its row and says so. In `--llm` output these rows are `next_efforts`
+(`{flow, number, ctx, title, waiting}`; `number` is `null` for a blocked flow, and the whole key is
+`null` when the efforts could not be read).
+
+The line under the table is the weekly cadence, the same line `cckit next` prints: Monday
+`cckit plan`, daily `cckit next`, Friday `cckit gc`. Relay it when the owner asks what to do next.
 
 ## Reading bucket 2
 

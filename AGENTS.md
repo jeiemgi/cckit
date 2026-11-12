@@ -49,10 +49,10 @@ the same commit.
 | --- | --- | --- |
 | `cckit init` | scaffold config + `.claude/` | — |
 | `cckit sync` | board state / what's unblocked | `--llm` → TOON |
-| `cckit next` | the next unblocked issue + how to start it | `--llm` → TOON |
+| `cckit next` | the next unblocked issue + how to start it. Human output ends with the weekly cadence line (Monday `cckit plan` · daily `cckit next` · Friday `cckit gc`); the TOON rows stay `{number,ctx,title}` | `--llm` → TOON |
 | `cckit plan` | wave plan: deps-ordered, priority-sorted within a wave, file-disjoint, session-fit | `--llm` → TOON |
 | `cckit plan-next` | forward plan: inventory current skills/verbs/rules/docs → propose what to build next | `--llm` → TOON |
-| `cckit status` | where are we: local undone work, open PRs waiting on a human, cleanup available (local + remote) | `--llm` → JSON |
+| `cckit status` | where are we: the next effort that can start in each flow (no open blocker; p0 → p3, then lowest number), local undone work, open PRs waiting on a human, cleanup available (local + remote) | `--llm` → JSON (`next_efforts` is one row per flow; `null` when the efforts could not be read) |
 | `cckit brief <issue>` | the delegation brief for an issue, from real state: worktree, seed freshness, owned files, the helpers they sit on, standing gotchas | — |
 | `cckit wave` | read open efforts, propose incoming waves: fan-out brief + captain drive | `--llm` → TOON |
 | `cckit watch [--merge] [--loop]` | captain: gate open PRs, squash-merge CLEAN, advance the wave | — |
