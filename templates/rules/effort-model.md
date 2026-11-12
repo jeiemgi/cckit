@@ -104,7 +104,12 @@ how much of one working session it consumes before the context window fills. Der
 `effort_ctx_bucket` (`scripts/lib/effort-metrics.sh`) from difficulty + sub count: S=1 · M=2 · L=4 ·
 XL=8 weight. **`kit effort plan`** (`scripts/lib/effort-plan.sh`) reads the open efforts, groups by
 flow, orders each flow by the `blocked_by` edges, and packs them into **session-sized batches** under
-a budget (`KIT_SESSION_BUDGET`, default 4). L/XL efforts are flagged **"→ delegate subs"**:
+a budget (`KIT_SESSION_BUDGET`, default 4). Rows come from GitHub unless `effort.planSource` names
+an executable: it is called as `<source> <owner/repo>` from the project root and prints
+`number<TAB>flow<TAB>ctx<TAB>title[<TAB>blockers]` rows, plus an optional `# age: <text>` line. A
+source that is not executable, exits non-zero or prints no rows falls back to GitHub. The plan's
+`source:` line names the source used, its age when reported, and any fallback — a plan built from a
+snapshot says so. L/XL efforts are flagged **"→ delegate subs"**:
 delegating an effort's sub-issues to **sub-agents in their own worktrees** keeps the main session
 light (a sub-agent reads/writes in its own context; only a summary returns) — the lever that lets
 more efforts fit one session (`rules/agent-execution-routing.md`).
@@ -122,7 +127,7 @@ The parent carries the rich narrative; the **PR** carries the human-facing revie
 | `effort-start [--force] <slug\|N>` | `effort/<N>` branch + worktree; board → In Progress. **WIP-limited** — see below |
 | orchestrate | sub-issues in own worktrees (file-disjoint) → merge into `effort/<N>`; each closes + board Done as it lands |
 | `effort-pr <slug\|N>` | ONE PR `effort/<N>` → {{BASE_BRANCH}} (rich body + `## For agents`) |
-| `effort-close <slug\|N>` | **snapshot sub-diffs pre-squash** → merge → close parent + subs → board Done(all) → GC prune → kit-sync drift check |
+| `effort-close <slug\|N>` | **snapshot sub-diffs pre-squash** → re-target open PRs based on the effort branch (refuses if one fails) → merge → close parent + subs → board Done(all) → GC prune → kit-sync drift check |
 
 Board + record state are correct **by construction** — the close op owns them. Never rely on a
 separate, skippable "mark done" step.

@@ -79,5 +79,24 @@ bash "$HERE/report.sh" --dry --out "$FIX/RESULTS.md" >/dev/null 2>&1
 t "report wrote RESULTS.md" "$([ -s "$FIX/RESULTS.md" ] && echo yes)" "yes"
 grep -q "Documentation benchmark" "$FIX/RESULTS.md"; t "report has heading" "$?" "0"
 
+# ---- 10. live report keeps every number on one line (#252) -------------------
+# run.sh exits 1 on this fixture (1 pass / 2 fail, section 5). report.sh used to append a second
+# JSON document on that exit, so each number it read came back as two lines ("33\n0%").
+rm -f "$FIX/RESULTS.md"
+rep_out="$(BENCH_BACKEND=mock bash "$HERE/report.sh" --out "$FIX/RESULTS.md" 2>/dev/null)"
+grep -q 'Retrieval score: 33%\*\* — of 3 questions' "$FIX/RESULTS.md"; t "live report: score + total on one line" "$?" "0"
+grep -q '\*\*1\*\* times' "$FIX/RESULTS.md";                          t "live report: pass count on one line" "$?" "0"
+grep -qE '^0(%|\*\*| questions)' "$FIX/RESULTS.md";                    t "live report: no number split over a newline" "$?" "1"
+t "live report: stdout summary is one line" "$(printf '%s\n' "$rep_out" | wc -l | tr -d ' ')" "1"
+case "$rep_out" in *"retrieval 33%"*) rc=0 ;; *) rc=1 ;; esac;        t "live report: stdout carries 33%" "$rc" "0"
+
+# ---- 11. a tier that prints nothing still reports zeros, not a crash ---------
+# No quality set on disk: run-quality.sh exits non-zero with no JSON; the report falls back to {}.
+mv "$FIX/bench/quality.jsonl" "$FIX/bench/quality.jsonl.off"
+BENCH_BACKEND=mock bash "$HERE/report.sh" --out "$FIX/RESULTS.md" >/dev/null 2>&1; t "report without quality set exits 0" "$?" "0"
+grep -q 'Retrieval score: 33%\*\* — of 3 questions' "$FIX/RESULTS.md"; t "report without quality set keeps headline" "$?" "0"
+grep -q 'Answer quality' "$FIX/RESULTS.md";                            t "report without quality set omits quality line" "$?" "1"
+mv "$FIX/bench/quality.jsonl.off" "$FIX/bench/quality.jsonl"
+
 [ "$fail" -eq 0 ] && echo "ALL OK" || echo "SOME FAILED"
 exit "$fail"

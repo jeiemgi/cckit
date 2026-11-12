@@ -248,13 +248,13 @@ has "installed effort-model targets this repo's base"          "$(cat .claude/ru
 has "the task-management template parameterizes its base too"  "$(cat templates/rules/task-management.md)" '{{BASE_BRANCH}}'
 
 # ── 6. #218: every installed rule is a template basename ───────────────────────────────────────
-# effort_close's kit-sync drift check (_EO_KIT_MANAGED_RE) matches the whole .claude/rules/ dir, so
-# it flags project-OWNED rules as kit-managed. That false positive cannot arise here: every file in
-# this repo's .claude/rules/ IS a kit template, so the warning is accurate for cckit even before
-# #218 narrows the regex. This assertion is what keeps that true.
+# effort_close's kit-sync drift check (_EO_KIT_MANAGED_RE) matches .claude/rules/ by template
+# basename since #218, so a project-OWNED rule is not flagged as kit-managed. Every file in this
+# repo's .claude/rules/ IS a kit template, so here the warning names all of them. This assertion
+# keeps that true: a rule with no template would be a file cckit ships to nobody.
 find .claude/rules -maxdepth 1 -type f -name '*.md' 2>/dev/null | while IFS= read -r f; do
   b="$(basename "$f")"
-  [ -f "templates/rules/$b" ] || echo "FAIL: $f has no templates/rules/$b — a project-owned rule here would trip the #218 drift false positive"
+  [ -f "templates/rules/$b" ] || echo "FAIL: $f has no templates/rules/$b — cckit's own rules are all kit templates; add the template or drop the rule"
 done | grep . && fail=1
 
 if [ "$fail" -eq 0 ]; then echo "PASS: cckit self-install matches its manifest"; fi

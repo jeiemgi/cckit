@@ -65,10 +65,17 @@ fi
 note "==> skill frontmatter context budget"
 bash scripts/skill-frontmatter-lint.sh || fail=1
 
-# 5b. Agent templates name only skills that exist. A `skills:` entry that resolves to nothing fails
-# silently at runtime — the agent loads with fewer skills than its frontmatter claims (#208).
-note "==> agent templates name real skills"
+# 5b. Agent templates carry a `name:` equal to their file name and a non-empty `description:` —
+# Codex refuses a custom agent without either (#263). Skill references are step 7's.
+note "==> agent template name + description"
 bash scripts/agent-template-lint.sh || fail=1
+
+# 5c. Instruction-file budget. CLAUDE.md and every `.claude/rules/*.md` without a `paths:`
+# frontmatter load into every session; Claude Code warns once they pass 150k characters combined.
+# Same ratchet: an over-long file or an over-limit total is grandfathered in the baseline, and only
+# growth (or a new offender) fails the gate.
+note "==> instruction-file budget"
+bash scripts/instruction-budget-lint.sh || fail=1
 
 # 6. Codified review findings. Mechanical defect classes caught in past reviews, encoded as rules
 # in scripts/review-rules.conf so the same bug cannot land twice. Per-file ratchet: today's hits are
@@ -76,7 +83,14 @@ bash scripts/agent-template-lint.sh || fail=1
 note "==> codified review findings"
 bash scripts/review-lint.sh || fail=1
 
-# 7. Behavioral tests - run every *-test.sh through the test runner.
+# 7. Agent skill references. Every `skills:` entry in templates/agents/*.md must resolve to a skill
+# the kit ships or scaffolds, a `plugin:skill` reference, or a name declared third-party in
+# scripts/agent-skills-external.txt. An unresolved entry fails silently at runtime: the agent loads
+# with fewer skills than its frontmatter lists.
+note "==> agent skill references"
+bash scripts/agent-skills-lint.sh || fail=1
+
+# 8. Behavioral tests - run every *-test.sh through the test runner.
 note "==> behavioral tests"
 bash scripts/test.sh || fail=1
 

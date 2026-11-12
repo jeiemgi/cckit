@@ -50,6 +50,20 @@ t "scaffold added morning-briefing skill" "$([ -f .claude/skills/morning-briefin
 t "scaffold added speckit skill"         "$([ -d .claude/skills/speckit ] && echo yes || echo no)"           "yes"
 t "scaffold added task-management rule"  "$([ -f .claude/rules/task-management.md ] && echo yes || echo no)" "yes"
 t "scaffold copied task-sync.sh"         "$([ -f scripts/task-sync.sh ] && echo yes || echo no)"             "yes"
+# task-sync.sh sources board-view.sh under `set -e` and effort-plan.sh for --plan (#383).
+t "scaffold copied board-view.sh"        "$([ -f scripts/lib/board-view.sh ] && echo yes || echo no)"        "yes"
+t "scaffold copied effort-plan.sh"       "$([ -f scripts/lib/effort-plan.sh ] && echo yes || echo no)"       "yes"
+
+
+# #357: the instruction-budget lint ships with the scaffold, its baseline is seeded once, and the
+# scaffold starts green — the two shipped rules over 200 lines are grandfathered, not failures.
+t "scaffold copied instruction-budget-lint.sh" "$([ -x scripts/instruction-budget-lint.sh ] && echo yes || echo no)" "yes"
+IB_BASELINE="$(bash scripts/instruction-budget-lint.sh --baseline-path 2>/dev/null)"
+t "instruction-budget baseline seeded"   "$([ -f "$IB_BASELINE" ] && echo yes || echo no)" "yes"
+t "seeded baseline grandfathers effort-model.md" "$(grep -c '^\.claude/rules/effort-model\.md [0-9]*$' "$IB_BASELINE")" "1"
+t "scaffolded project passes the instruction-budget lint" "$(bash scripts/instruction-budget-lint.sh >/dev/null 2>&1; echo $?)" "0"
+IB_MARKER="# LOCAL-BASELINE-MARKER-#357 (a second init run must not rewrite the baseline)"
+printf '%s\n' "$IB_MARKER" >> "$IB_BASELINE"
 
 git add -A && git commit -q -m "scaffold"
 
@@ -83,6 +97,8 @@ t "renamed target still present"         "$([ -d .claude/skills/kit-morning-brie
 
 # 2. kit-owned script PRESERVED (not downgraded — marker survives)
 t "script not downgraded (marker kept)"  "$(grep -cF "$MARKER" scripts/task-sync.sh)" "1"
+
+t "instruction-budget baseline not rewritten (marker kept)" "$(grep -cF "$IB_MARKER" "$IB_BASELINE")" "1"
 
 # 3. net effect = ONLY the kitVersion bump
 changed="$(git status --porcelain | awk '{print $2}' | sort | tr '\n' ' ' | sed 's/ $//')"

@@ -54,6 +54,30 @@ These are scaffolded for every project.
 
 </div>
 
+## `KIT_PR_BASE` in a git pre-push hook
+
+`prepush_gate.sh` is a Claude Code `PreToolUse` hook: it sees a `git push` the agent types, not one a
+cckit verb runs. A push made by `cckit pr` or `cckit hotfix` reaches only a real git hook
+(`.git/hooks/pre-push`, or whatever `core.hooksPath` names), and both verbs export the branch the PR
+targets to it as `KIT_PR_BASE`:
+
+| Verb | `KIT_PR_BASE` |
+| --- | --- |
+| `cckit pr <issue> "<summary>"` | the integration branch (`.github.baseBranch`) |
+| `cckit pr <issue> "<summary>" --base main` | `main` |
+| `cckit hotfix <pr\|sha> [--base B]` | `B`, `main` by default |
+
+A gate that diffs the branch against a base should read it, and fall back to its own default when
+the push did not come from cckit:
+
+```sh
+base="${KIT_PR_BASE:-develop}"
+git diff --quiet "origin/$base...HEAD" -- src/ || run_checks
+```
+
+A gate that hard-codes the integration branch fails a branch cut from `main`, because it compares
+that branch against `develop`.
+
 ## Where they live
 
 Hooks are plain scripts under `.claude/hooks/` in your project, registered in

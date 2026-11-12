@@ -76,7 +76,7 @@ t "version is the install version, not the project's" "$got_ver" "$(jq -r '.kitV
 # `lib` belongs here rather than in SKIP: it is read-only and calls no gh, so the assertion below
 # is the guard that keeps it that way — and running it from the fixture also proves the host-project
 # degradation (a project with no scripts/lib of its own falls back to the cckit install, no crash).
-EXERCISE="sync status next plan plan-next wave gc cleanup scan doctor lib"
+EXERCISE="sync status next plan plan-next wave gc cleanup scan doctor lib claims"
 for v in $EXERCISE; do
   : > "$GH_REPO_LOG"
   ( cd "$fix" && PATH="$stub:$PATH" GH_REPO_LOG="$GH_REPO_LOG" "$CCKIT" "$v" --llm >/dev/null 2>&1 )
@@ -116,7 +116,7 @@ fi
 # A new verb that is neither exercised nor listed here fails the harness — forcing a coverage
 # decision. SKIP holds verbs that mutate, need args, read stdin, are interactive, or act on the
 # install itself (not the invoking project's board) — deliberately not driven here.
-SKIP="adopt autopilot bench brief close commands completions contribute copilot debug digest effort encode-context handoff help init install merge migrate msg new orchestrate pr receipt release render resume start ui update version watch"
+SKIP="adopt autopilot bench brief close commands completions contribute copilot debug digest effort encode-context handoff help hotfix init install merge migrate msg new orchestrate pr receipt release render resume start ui update version watch"
 classified() { case " $EXERCISE $SKIP " in *" $1 "*) return 0 ;; *) return 1 ;; esac; }
 for v in $("$CCKIT" commands); do
   classified "$v" || { echo "FAIL: verb '$v' is unclassified — add it to EXERCISE (read-only, assert no own-repo leak) or SKIP in portable-test.sh"; fail=1; }

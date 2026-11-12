@@ -127,6 +127,8 @@ Every issue lands on `main` through a Pull Request. No direct commits to `main`.
 
 <!-- /IF:ADAPTER_CODEX -->- Keep this file tight — point to files, don't duplicate content.
 - Bullets and tables preferred. No long intros.
+- A rule about one kind of file opens with a `paths:` frontmatter (a list of globs) so it loads only when a matching file is read. A rule without it loads into every session.
+- A long rule splits in two: a short rule here, the full reference in `knowledge/`. `scripts/instruction-budget-lint.sh --report` shows what every session pays.
 - Communication style → `{{ADAPTER_DIR}}/rules/communication-style.md`
 <!-- IF:DESIGN -->
 - All design + adjustment questions → Designer agent (`{{ADAPTER_DIR}}/rules/design-routing.md`)

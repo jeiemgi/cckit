@@ -50,7 +50,8 @@ job is execution-to-PR, not decision-making.
    Then read the AGENT.md of every surface your change will touch — not just the issue's role.
    If the issue implies touching UI, ALSO read the frontend agent + the UI-convention rules,
    regardless of the `role:` label.
-2. **Branch** — Derive `kind` from the `kind:` label (default `task`). Then branch from the
+2. **Branch** — Derive `kind` from the `kind:` label (default `task`; also `task` when the label is
+   not one of feat, fix, task, chore, security, scaffold, ci, adr, spike, plan). Then branch from the
    integration branch: `git checkout -B "<kind>/<issue#>-<slug>" origin/<integration-branch>`
    (slug = short kebab title, strip `[Role]`, ≤40 chars).
 3. **Implement** — Only what the issue asks. Match surrounding style, naming, comment density.

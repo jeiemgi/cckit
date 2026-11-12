@@ -76,6 +76,11 @@ Run `cckit scan` before `init` — it reports the repo's stack and whether any k
 values. They become **yours** once written: `cckit init --upgrade` preserves every file that already
 exists and only adds genuinely missing ones, so your edits survive an upgrade. Run `cckit init --dry-run`
 to see the exact list before anything is written.
+
+A rule with no `paths:` frontmatter loads into every session. When you add a rule that covers one
+kind of file, open it with `paths:` (a list of globs) so it loads only when a matching file is read;
+`scripts/instruction-budget-lint.sh`, scaffolded with the rules, fails the gate when the resident
+set passes 150k or a rule grows past 200 lines. See [Codified review gates](/review-gates/).
 </Aside>
 
 ## 2 · No issues yet? Have Claude find your first one

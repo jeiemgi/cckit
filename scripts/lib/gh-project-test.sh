@@ -92,5 +92,39 @@ t "project_issue_status returns the board Status for our project" "$st" "In Prog
 PATH="$tmp/bin2:$PATH" KIT_REPO="" KIT_PROJECT_NUMBER="" bash -c "source '$LIB/gh-project.sh'; project_issue_status 42" >/dev/null 2>&1
 t "project_issue_status fails (rc 1) with unresolved repo/number" "$?" "1"
 
+# ── role_option_id: any board Role option resolves, not a fixed list (#378) ─────────────────────
+# capture-project-ids.sh writes ROLE_OPT_<NAME> for every option the board has; the lookup reads
+# that variable by normalized name. Run under bash AND zsh — these libs are sourced into both, and
+# bash-only ${!var} indirection dies in zsh with "bad substitution".
+for rsh in bash zsh; do
+  command -v "$rsh" >/dev/null 2>&1 || continue
+  rq() {  # <role> -> stdout of role_option_id (stderr to $tmp/rerr)
+    ROLE_OPT_BACKEND=x ROLE_OPT_TECH_LEAD=tl ROLE_OPT_DATA_ENG=de KIT_CONFIG=/nonexistent \
+      "$rsh" -c "source '$LIB/gh-project.sh'; role_option_id \"\$1\"" _ "$1" 2>"$tmp/rerr"
+  }
+  t "[$rsh] role_option_id backend"   "$(rq backend)"     "x"
+  t "[$rsh] role_option_id Backend"   "$(rq Backend)"     "x"
+  t "[$rsh] role_option_id Tech Lead" "$(rq 'Tech Lead')" "tl"
+  t "[$rsh] role_option_id data-eng"  "$(rq data-eng)"    "de"
+  t "[$rsh] known role is silent"     "$(rq backend >/dev/null; cat "$tmp/rerr")" ""
+  t "[$rsh] unknown role -> empty stdout" "$(rq astronaut)" ""
+  rq astronaut >/dev/null
+  has "[$rsh] unknown role warns on stderr"   "$(cat "$tmp/rerr")" "ROLE_OPT_ASTRONAUT"
+  has "[$rsh] the warning names the role"     "$(cat "$tmp/rerr")" "astronaut"
+  t "[$rsh] empty role -> empty, no warning"  "$(rq ''; cat "$tmp/rerr")" ""
+  # A name outside ^[A-Z0-9_]+$ must never reach the variable expansion.
+  rm -f "$tmp/pwned"
+  for evil in "x\$(touch $tmp/pwned)" "x;touch $tmp/pwned" "x\`touch $tmp/pwned\`" "BACKEND
+\$(touch $tmp/pwned)" 'a}b' 'é'; do
+    t "[$rsh] unsafe role name -> empty stdout" "$(rq "$evil")" ""
+    rq "$evil" >/dev/null
+    has "[$rsh] unsafe role name warns" "$(cat "$tmp/rerr")" "role"
+    case "$(cat "$tmp/rerr")" in *"bad substitution"*|*"parse error"*|*"syntax error"*)
+      echo "FAIL: [$rsh] unsafe role name reached the shell: $(cat "$tmp/rerr")"; fail=1 ;; esac
+  done
+  [ -e "$tmp/pwned" ] && { echo "FAIL: [$rsh] role_option_id evaluated its argument"; fail=1; } \
+    || echo "ok: [$rsh] role_option_id evaluates nothing from its argument"
+done
+
 [ "$fail" -eq 0 ] && echo "ALL OK (gh-project)" || echo "gh-project: FAILURES"
 exit "$fail"

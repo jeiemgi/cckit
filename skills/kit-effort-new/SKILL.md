@@ -31,6 +31,7 @@ truth — the parent issue IS the plan (no separate plan file).
 | Sub-issues   | ✓        | List of `name :: one-line desc` — one per concern (the skill numbers + prefixes them)        |
 | Depends on   | optional | `#N` list → native GitHub `blocked_by` edge + a `## Relations` line (the visible chain)      |
 | Priority     | optional | `p0`–`p3` → `priority:<p>` label (default `p1`)                                             |
+| Kind         | optional | `--kind`: feat / fix / task / chore / security / scaffold / ci / adr / spike / plan → `kind:<k>` on the parent and every sub (default `task`) |
 | Milestone    | optional | Inherited onto the parent (sub-issues inherit it too)                                       |
 
 ## Execution

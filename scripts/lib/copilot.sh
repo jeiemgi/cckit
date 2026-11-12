@@ -121,10 +121,10 @@ copilot_brief() {
   # shellcheck source=/dev/null
   . "$here/render.sh"
   local n0 esfx nums ad; n0="$(printf '%s\n' "$wave0" | grep -c .)"
-  # Not `esfx="$([ -n "$effort" ] && echo …)"`: with no --effort that substitution returns 1, and
-  # bin/cckit runs under `set -e`, so the assignment ended the verb before a line was printed —
-  # the human brief was empty for every un-scoped `cckit wave`.
-  esfx=""; [ -z "$effort" ] || esfx=" --effort $effort"
+  # Not `esfx="$([ -n "$effort" ] && echo …)"`: with no --effort the substitution ends on the failed
+  # test, the assignment returns 1, and the dispatcher's `set -e` exits before the brief (#316).
+  esfx=""
+  if [ -n "$effort" ]; then esfx=" --effort $effort"; fi
   nums="$(printf '%s\n' "$wave0" | awk -F'\t' '$3 != "" { printf "%s%s", sep, $3; sep = " " }')"
   {
     printf '# cckit wave — %s%s\n' "$repo" "$([ -n "$effort" ] && echo " · effort #$effort")"

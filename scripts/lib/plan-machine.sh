@@ -36,7 +36,20 @@
 
 PLAN_REPO="${PLAN_REPO:-${KIT_REPO:-}}"
 
-_pm_weight() { case "$1" in S) echo 1 ;; M) echo 2 ;; L) echo 4 ;; XL) echo 8 ;; *) echo 2 ;; esac; }
+# _pm_weight <ctx> [issue] — session weight of a ctx: value. Anything outside S|M|L|XL weighs
+# PM_UNSIZED_WEIGHT (2), and never silently: `?` (no ctx: label at all — the plan shows `?` in the
+# ctx column, not a made-up `M`) is explained by the legend under the plan title, and any other
+# value (ctx:XXL, ctx:xl) warns on stderr naming the value and issue. Twin of _ep_weight
+# (effort-plan.sh); the fallback used to be a bare `*) echo 2` reported as `M`.
+PM_UNSIZED_WEIGHT=2
+_pm_weight() {
+  case "$1" in
+    S) echo 1 ;; M) echo 2 ;; L) echo 4 ;; XL) echo 8 ;;
+    '?'|'') echo "$PM_UNSIZED_WEIGHT" ;;
+    *) echo "⚠ plan: ${2:+#$2 }carries ctx:$1, which is not S|M|L|XL — weighed $PM_UNSIZED_WEIGHT" >&2
+       echo "$PM_UNSIZED_WEIGHT" ;;
+  esac
+}
 
 # pm_prio_rank — `priority:pN` label value -> sort rank (lower runs earlier). Anything unrecognized
 # or absent ranks 9, so an unlabeled issue sorts after every labeled priority and never jumps ahead
@@ -130,7 +143,7 @@ pm_batches() {
   local n="${#N[@]}" batch=0 load=0 batchfiles=" " i w f ff need
   i=0
   while [ "$i" -lt "$n" ]; do
-    w="$(_pm_weight "${C[$i]}")"
+    w="$(_pm_weight "${C[$i]}" "${N[$i]}")"
     need=0
     [ $((load + w)) -gt "$budget" ] && need=1
     ff="${F[$i]}"
@@ -199,12 +212,12 @@ plan_machine() {
     nums+=("$n"); titles+=("$t")
     # one label read serves both ctx: (session weight) and priority: (intra-wave order).
     lab="$(gh issue view "$n" --repo "$repo" --json labels --jq \
-      '[ ([.labels[].name|select(startswith("ctx:"))|ltrimstr("ctx:")]|first // "M"),
+      '[ ([.labels[].name|select(startswith("ctx:"))|ltrimstr("ctx:")]|first // "?"),
          ([.labels[].name|select(startswith("priority:"))|ltrimstr("priority:")]|first // "") ]|@tsv' 2>/dev/null)"
     ctxlab="${lab%%"$labtab"*}"
     priolab="${lab#*"$labtab"}"
     [ "$priolab" = "$lab" ] && priolab=""
-    ctxs+=("${ctxlab:-M}")
+    ctxs+=("${ctxlab:-?}")
     prios+=("$priolab")
     files+=("$(_pm_files "$body")")
     # only OPEN blockers gate execution; closed ones are already satisfied.
@@ -289,7 +302,7 @@ EOF2
   . "$here/render.sh"
   {
     printf '# cckit plan — %s\n\n' "$repo"
-    printf '_session budget %s · ctx S=1 M=2 L=4 XL=8 · each wave runs in parallel, p0 first_\n' "$budget"
+    printf '_session budget %s · ctx S=1 M=2 L=4 XL=8 · ? = no ctx: label, weighed %s · each wave runs in parallel, p0 first_\n' "$budget" "$PM_UNSIZED_WEIGHT"
     emit_rows | awk -F'\t' '
       BEGIN { lw="" }
       {
