@@ -928,7 +928,7 @@ _eo_board_done() {
 # .claude/rules/ is matched by BASENAME, not as a directory (#218): init.sh writes a rule only from
 # templates/rules/<name>.md, so any other file there is the project's own and no /kit-update can
 # touch it. The list is the templates/rules basenames; effort-ops-test.sh fails when they differ.
-_EO_KIT_MANAGED_RE='^(scripts/(lib/|kit$|kit-)|\.claude/(skills|hooks|lib|agents)/|\.claude/rules/(branch-naming|communication-style|delegation-brief|design-routing|effort-model|knowledge-base|mempalace|naming-and-ids|plan-next|plan-output-format|react-annotate|risk-tiered-review|skill-gaps|task-management)\.md$)'
+_EO_KIT_MANAGED_RE='^(scripts/(lib/|kit$|kit-)|\.claude/(skills|hooks|lib|agents)/|\.claude/rules/(authoring|branch-naming|communication-style|delegation-brief|design-routing|effort-model|gate-and-review|issue-lifecycle|knowledge-base|mempalace|merge-safety|naming-and-ids|plan-next|plan-output-format|react-annotate|risk-tiered-review|shared-checkout|skill-gaps|task-management)\.md$)'
 
 # _eo_knowledge_ingest <num> <trace_dir> <root> — optional post-close knowledge-ingest hook. Runs a
 # project-configured command (github/effort.knowledgeIngestHook, or KIT_EFFORT_KNOWLEDGE_HOOK) with
