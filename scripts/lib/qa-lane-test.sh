@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # qa-lane-test.sh — launched and usable are different facts (#295); the review route comes from
-# the work (#297).
+# the work (#297); a stop leaves the ports with no listener (#298).
 #
 # Hermetic: `curl` is a stub on PATH that answers from a table, the "stack" is a `sleep`, and every
-# file lands in a scratch repo. Nothing listens on a port. `open`, `xdg-open` and `gh` are stubs
-# too: no browser starts and no network is touched.
+# file lands in a scratch repo. `open`, `xdg-open` and `gh` are stubs too: no browser starts and no
+# network is touched. Only the stop sections listen on a port — a loopback port the kernel picked —
+# and they skip with a printed reason when perl, or both lsof and ss, are absent.
 #
 # Run:  bash scripts/lib/qa-lane-test.sh
 # errors: strict — a test runner: rc 1 on any failed assertion
@@ -294,10 +295,142 @@ qa_cli ready --lane 21 --timeout 1 >/dev/null 2>&1; t "ready on a lane never lau
 qa_cli nope >/dev/null 2>&1;                        t "an unknown subcommand is rc 2" "$?" "2"
 qa_cli up --wat >/dev/null 2>&1;                    t "an unknown argument is rc 2" "$?" "2"
 
+# ── stop: the ports are free afterwards, and the report is what actually stopped (#298) ────────
+# These sections run REAL processes: a supervisor shell that respawns a perl listener on a port
+# the kernel just handed out. The curl stub still answers the readiness probes.
+free_port() { perl -MIO::Socket::INET -e 'my $s = IO::Socket::INET->new(Listen => 1, LocalAddr => "127.0.0.1", LocalPort => 0) or exit 1; print $s->sockport' 2>/dev/null; }
+listening() { [ -n "$(qa_port_pids "$1")" ] && echo yes || echo no; }
+wait_listen() { local i=0; while [ "$(listening "$1")" = no ] && [ "$i" -lt 100 ]; do sleep 0.1; i=$((i+1)); done; }
+running() { _qa_alive "$1" && echo yes || echo no; }
+# The supervisor: respawn the listener for as long as this shell lives.
+cat > "$TMP/listen.pl" <<'PL'
+use IO::Socket::INET;
+my $s = IO::Socket::INET->new(Listen => 5, LocalAddr => "127.0.0.1", LocalPort => $ENV{WEB_PORT}, ReuseAddr => 1) or exit 1;
+sleep 600;
+PL
+SUPERVISE="while :; do perl '$TMP/listen.pl'; sleep 0.1; done"
+
+if ! command -v perl >/dev/null 2>&1; then
+  echo "skip: stop — perl is absent, so the fixture cannot open a listener"
+elif ! qa_port_tool >/dev/null 2>&1; then
+  echo "skip: stop — neither lsof nor ss is installed, so a port's holder cannot be resolved"
+else
+  # (1) through the verb: launch a respawning stack, stop it, and the port has no listener.
+  slot30="$(wt_port_slot "$P" 30 "$P")"
+  port30="$(free_port)"
+  write_cfg "$SUPERVISE" "[{\"env\":\"WEB_PORT\",\"base\":$(( port30 - slot30 * 10 ))}]" '[{"env":"WEB_PORT","path":"/"}]'
+  answers ":$port30 200"
+  qa_cli up --lane 30 --timeout 5 >/dev/null 2>&1; t "the respawning fixture stack comes up" "$?" "0"
+  sup30="$(cat "$KIT_STATE_DIR/qa/30/pid" 2>/dev/null)"; PIDS="$PIDS $sup30"
+  t "the lane was launched on the free port" "$(sed -n 's/^WEB_PORT=//p' "$KIT_STATE_DIR/qa/30/ports")" "$port30"
+  wait_listen "$port30"
+  lis30="$(qa_port_pids "$port30" | head -n 1)"
+  t "the fixture listener holds the port" "$(listening "$port30")" "yes"
+  # The supervisor really respawns: kill the listener alone and the port is held again.
+  kill "$lis30" 2>/dev/null; sleep 0.5; wait_listen "$port30"
+  t "killing the listener alone does not free the port" "$(listening "$port30")" "yes"
+  no "the respawned listener is a new process" " $(qa_port_pids "$port30" | tr '\n' ' ')" " $lis30 "
+  lis30="$(qa_port_pids "$port30" | head -n 1)"
+
+  stops="$(events qa.stop)"
+  err="$(qa_cli stop --lane 30 2>&1 >/dev/null)"; rc=$?
+  t "stop returns 0 once the port is free" "$rc" "0"
+  sleep 0.5
+  t "the port has no listener after stop" "$(listening "$port30")" "no"
+  t "the supervisor pid is gone" "$(running "$sup30")" "no"
+  t "the listener pid is gone" "$(running "$lis30")" "no"
+  yes "stop reports the supervisor it stopped" "$err" "$sup30"
+  yes "stop reports the listener it stopped" "$err" "$lis30"
+  yes "stop says the ports are free" "$err" "ports free: $port30"
+  t "stop appended one event" "$(events qa.stop)" "$(( stops + 1 ))"
+  t "the stop event says the ports were freed" "$(grep '"op":"qa.stop"' "$EVENTS" | tail -n 1 | jq -r '"\(.payload.lane) \(.payload.freed) \(.payload.held | length)"')" "30 true 0"
+  t "a stopped lane keeps no pid or ports record" "$([ -e "$KIT_STATE_DIR/qa/30/pid" ] || [ -e "$KIT_STATE_DIR/qa/30/ports" ] && echo yes || echo no)" "no"
+
+  # A second stop on the already-stopped lane: nothing stopped, rc 0.
+  err="$(qa_cli stop --lane 30 2>&1 >/dev/null)"; rc=$?
+  t "a second stop returns 0" "$rc" "0"
+  yes "a second stop reports nothing stopped" "$err" "nothing stopped"
+  no "a second stop claims no process" "$err" "stopped 1"
+  t "a second stop appends no event" "$(events qa.stop)" "$(( stops + 1 ))"
+  t "--llm on a stopped lane is an empty stop" "$(CCKIT_OUTPUT=json qa_cli stop --lane 30 2>/dev/null | jq -c '.stopped')" "[]"
+  qa_cli ready --lane 30 --timeout 1 >/dev/null 2>&1; t "ready on a stopped lane is a refusal" "$?" "2"
+  qa_cli stop --lane 30 --timeout 5 >/dev/null 2>&1;  t "--timeout on stop is rc 2" "$?" "2"
+
+  # (2) the recorded pid is dead but its supervisor lives on: the port's holder names it.
+  port31="$(free_port)"
+  ( WEB_PORT="$port31" exec sh -c "$SUPERVISE" ) >/dev/null 2>&1 &
+  sup31=$!; PIDS="$PIDS $sup31"
+  ( exit 0 ) & gone=$!; wait "$gone" 2>/dev/null
+  mkdir -p "$KIT_STATE_DIR/qa/31"
+  printf '%s\n' "$gone" > "$KIT_STATE_DIR/qa/31/pid"
+  printf 'WEB_PORT=%s\n' "$port31" > "$KIT_STATE_DIR/qa/31/ports"
+  wait_listen "$port31"
+  t "the orphaned stack holds its port" "$(listening "$port31")" "yes"
+  j="$(CCKIT_OUTPUT=json qa_cli stop --lane 31 2>/dev/null)"; rc=$?
+  t "stop finds a stack through its port when the recorded pid is dead" "$rc" "0"
+  sleep 0.5
+  t "that port has no listener after stop" "$(listening "$port31")" "no"
+  t "the supervisor behind the listener is gone" "$(running "$sup31")" "no"
+  t "--llm lists the supervisor among the stopped pids" "$(printf '%s' "$j" | jq -r --argjson p "$sup31" '"\(.freed) \(.stopped | index($p) != null)"')" "true true"
+  t "this shell survived the ancestor climb" "$(running "$$")" "yes"
+
+  # (3) a recycled pid is not the lane's stack: a start time that does not match is left alone.
+  sleep 60 & stranger=$!; PIDS="$PIDS $stranger"
+  mkdir -p "$KIT_STATE_DIR/qa/32"
+  printf '%s\n' "$stranger" > "$KIT_STATE_DIR/qa/32/pid"
+  printf 'Thu Jan  1 00:00:00 1970\n' > "$KIT_STATE_DIR/qa/32/started"
+  printf 'WEB_PORT=%s\n' "$(free_port)" > "$KIT_STATE_DIR/qa/32/ports"
+  err="$(qa_cli stop --lane 32 2>&1 >/dev/null)"; rc=$?
+  t "a recorded pid with another start time is not stopped" "$(running "$stranger")" "yes"
+  yes "that stop reports nothing stopped" "$err" "nothing stopped"
+  t "that stop still returns 0: the port is free" "$rc" "0"
+  kill "$stranger" 2>/dev/null
+
+  # (4) with no holder lookup the recorded tree is still stopped, and the ports are not called free.
+  ( exec sh -c 'sleep 60 & wait' ) >/dev/null 2>&1 &
+  sup33=$!; PIDS="$PIDS $sup33"
+  mkdir -p "$KIT_STATE_DIR/qa/33"
+  printf '%s\n' "$sup33" > "$KIT_STATE_DIR/qa/33/pid"
+  printf 'WEB_PORT=%s\n' "$(free_port)" > "$KIT_STATE_DIR/qa/33/ports"
+  err="$(QA_PORT_TOOL=none qa_cli stop --lane 33 2>&1 >/dev/null)"; rc=$?
+  t "without lsof or ss the recorded tree is still stopped" "$(running "$sup33")" "no"
+  t "without lsof or ss a clean stop is rc 0" "$rc" "0"
+  yes "without lsof or ss the ports are reported as not checked" "$err" "ports NOT checked"
+  no "without lsof or ss the ports are not called free" "$err" "ports free"
+
+  # (5) the same stop under zsh, where an unquoted list does not word-split.
+  if command -v zsh >/dev/null 2>&1; then
+    port35="$(free_port)"
+    ( WEB_PORT="$port35" exec sh -c "$SUPERVISE" ) >/dev/null 2>&1 &
+    sup35=$!; PIDS="$PIDS $sup35"
+    mkdir -p "$KIT_STATE_DIR/qa/35"
+    printf '%s\n' "$sup35" > "$KIT_STATE_DIR/qa/35/pid"
+    printf 'WEB_PORT=%s\n' "$port35" > "$KIT_STATE_DIR/qa/35/ports"
+    wait_listen "$port35"
+    lis35="$(qa_port_pids "$port35" | head -n 1)"
+    err="$(zsh -c "cd '$P'; . '$ROOT/scripts/lib/qa-lane.sh'; qa_stop 35" 2>&1 >/dev/null)"; rc=$?
+    t "zsh: stop returns 0" "$rc" "0"
+    sleep 0.5
+    t "zsh: the port has no listener after stop" "$(listening "$port35")" "no"
+    t "zsh: the supervisor pid is gone" "$(running "$sup35")" "no"
+    yes "zsh: stop reports both processes" "$err" "stopped 2 process(es): "
+    yes "zsh: the listener is in the report" "$err" "$lis35"
+    err="$(zsh -c "cd '$P'; . '$ROOT/scripts/lib/qa-lane.sh'; qa_stop 35" 2>&1 >/dev/null)"; rc=$?
+    t "zsh: a second stop returns 0" "$rc" "0"
+    yes "zsh: a second stop reports nothing stopped" "$err" "nothing stopped"
+  else
+    echo "ok: zsh absent — skipping the zsh stop pass (dependency-light gate)"
+  fi
+  write_cfg 'exec sleep 60'
+fi
+QA_PORT_TOOL=none qa_port_tool >/dev/null 2>&1; t "QA_PORT_TOOL=none means no holder lookup" "$?" "1"
+qa_cli stop --lane 34 >/dev/null 2>&1;            t "stop on a lane never launched is rc 0" "$?" "0"
+
 # ── the verb is wired ──────────────────────────────────────────────────────────────────────────
 yes "cckit commands lists qa" " $("$ROOT/bin/cckit" commands) " " qa "
 answers ":3 200" ":4 200"
 "$ROOT/bin/cckit" qa ready --lane 7 --timeout 5 >/dev/null 2>&1; t "cckit qa ready dispatches to the lib" "$?" "0"
+yes "cckit qa stop dispatches to the lib" "$("$ROOT/bin/cckit" qa stop --lane 34 2>&1)" "nothing stopped"
 t "cckit qa open dispatches to the lib" "$("$ROOT/bin/cckit" qa open --lane 7 --route /wired --print 2>/dev/null)" "http://localhost:$web7/wired"
 
 [ "$fail" -eq 0 ] && echo "ALL OK (qa-lane)" || echo "qa-lane: FAILURES"
