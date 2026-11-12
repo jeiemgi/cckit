@@ -38,8 +38,13 @@ adapter one) — is described in [the Adapters page](docs-site/src/content/docs/
 
 `templates/` is what `cckit init` writes into a consuming project. `.claude/skills/` and
 `.claude/rules/` in this repo are the subset cckit applies to its **own** work — `concrete`,
-`karpathy-guidelines`, and the rules for branches, efforts, PR titles, delegation and communication
-style. No agents are installed: this file plus `cckit brief` is the delegation contract here.
+`karpathy-guidelines`, and the rules for branches, efforts, PR titles, delegation, communication
+style and issue lifecycle (`issue-lifecycle.md`: sub-issues not checkboxes, approved-plan autonomy,
+explicit closes) and merge safety (`merge-safety.md`: current base before merging, a coupled chain as
+one PR, the gate re-run on the integration branch) and authoring (`authoring.md`: docs in the same change,
+no issue numbers in pasted prompts, summaries without machine flags) and the shared checkout
+(`shared-checkout.md`: never move the primary checkout by hand, work in a worktree, call a freshly merged verb from a
+current worktree's `bin/cckit`). No agents are installed: this file plus `cckit brief` is the delegation contract here.
 
 The manifest and the reason for every skipped template are in `scripts/self-install-test.sh`, which
 also fails if an installed copy drifts from its template. Edit a template and its installed copy in

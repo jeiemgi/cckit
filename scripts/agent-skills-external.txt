@@ -1,0 +1,45 @@
+# agent-skills-external.txt — bare skill names templates/agents/*.md may list that the kit does
+# NOT ship. Read by scripts/agent-skills-lint.sh.
+#
+# A name here is OPTIONAL for the agent that lists it: it comes from a third-party skill pack or
+# from the harness, and an agent scaffolded into a project without it runs without that skill.
+# A bare name that is neither here nor under skills/ or templates/skills/ fails the lint, so a
+# renamed kit skill cannot linger in an agent template (pm.md listed task-sync / task-new /
+# task-close long after they became kit-task-*).
+#
+# `plugin:skill` entries (agent-skills:context7, chrome-devtools-mcp:a11y-debugging) need no line
+# here: the namespace already says another plugin provides them.
+#
+# One name per line; blank lines and #-comments ignored. Remove a name once the kit ships it —
+# the lint fails on a name that is both here and shipped.
+
+# harness / first-party
+claude-api
+deep-research
+
+# design
+emil-design-eng
+impeccable
+web-design-guidelines
+
+# frontend
+opentui
+vercel-composition-patterns
+vercel-react-best-practices
+gsap-core
+gsap-performance
+gsap-plugins
+gsap-scrolltrigger
+gsap-timeline
+
+# qa
+playwright-best-practices
+
+# n8n
+n8n-code-javascript
+n8n-code-python
+n8n-expression-syntax
+n8n-mcp-tools-expert
+n8n-node-configuration
+n8n-validation-expert
+n8n-workflow-patterns

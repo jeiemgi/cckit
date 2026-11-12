@@ -141,6 +141,7 @@ works out of the box in any configured repo (an explicit `EFFORT_FLOWS` env var 
 `cckit effort close` is likewise the **single close implementation** (the `/kit-effort-close` skill is a thin caller
 of the same function): pre-squash work-record snapshot + metrics, squash-merge, close parent + subs, board
 Status=Done, worktree/branch GC, an optional knowledge-ingest hook, and an advisory kit-sync drift check.
+The drift check flags `.claude/rules/` files only when the kit ships a rule of that name; a project's own rules are not flagged.
 The metrics judge reads its hosted endpoint from `CCKIT_MODEL_URL` / `CCKIT_MODEL` / `CCKIT_MODEL_TOKEN`; a project
 with its own variables names them in the config (`model.urlEnv` / `model.modelEnv` / `model.tokenEnv` — env var
 names, never values).
@@ -342,8 +343,12 @@ The board is both the plan and the proof.
 cckit also runs on the rules and skills it ships. `templates/` is what `cckit init` writes into a
 project; `.claude/skills/` and `.claude/rules/` here are the subset cckit applies to its own work —
 `concrete` (the anti-slop catalogue every commit and PR body goes through) and
-`karpathy-guidelines`, plus the rules that govern this repo's branches, efforts, PR titles and
-delegation. It is a subset on purpose: several templates target stacks cckit does not have.
+`karpathy-guidelines`, plus the rules that govern this repo's branches, efforts, PR titles,
+delegation and issue lifecycle (`issue-lifecycle.md`: deliverables are native sub-issues, an
+approved plan is executed without re-confirming each merge, and a close op — not `Closes #N` —
+closes the issue) and merge safety (`merge-safety.md`: bring a branch onto the current base before
+merging, ship a coupled chain as one PR, re-run the gate on the integration branch) and authoring (`authoring.md`: docs and README change with the behaviour, a pasted prompt carries no issue number, a summary names the work and drops machine flags) and the shared checkout (`shared-checkout.md`: the primary checkout is never moved by hand, all work happens in a worktree, a freshly merged verb is called from a current worktree — see [Multi-session safety](https://cckit.dev/multi-session/) and the [install & update matrix](https://cckit.dev/install-matrix/)). Every shipped rule is listed in [Rules cckit ships](https://cckit.dev/rules/) — `gate-and-review.md` (the gate blocks the push and its output goes on the PR; every AI-reviewer finding is fixed or rebutted before the merge) ships to projects and is skipped here.
+It is a subset on purpose: several templates target stacks cckit does not have.
 `scripts/self-install-test.sh` holds the manifest, the reason for every skip, and the assertion that
 the installed copies have not drifted from their templates.
 
@@ -375,6 +380,11 @@ cckit/
                          #   the manifest + every skip reason: scripts/self-install-test.sh
   cckit.config.json      # project configuration (no hardcoded org/repo)
 ```
+
+Every `skills:` entry in `templates/agents/*.md` has to resolve: `scripts/agent-skills-lint.sh` (a
+step of `bash scripts/check.sh`) fails on a name that is not under `skills/` or `templates/skills/`,
+not a `plugin:skill` reference, and not declared third-party in `scripts/agent-skills-external.txt`.
+See [Codified review gates](https://cckit.dev/review-gates/).
 
 `cckit init` also scaffolds `benchmarks/` — a per-project **documentation benchmark** that scores how
 well an agent finds and uses your own canonical docs (retrieval / adversarial / abstain / quality

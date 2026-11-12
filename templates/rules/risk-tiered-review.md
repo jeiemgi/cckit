@@ -41,6 +41,10 @@ The gates are whatever the project runs to prove a change is sound — typically
 A `risk:low` auto-pass is valid **only** when the project's gates are green. A red gate = not eligible,
 no exceptions.
 
+`gate-and-review.md` is the stricter form where it is installed: the gate blocks the push and its
+output is attached to the PR, and an AI reviewer's findings are each fixed or rebutted before any
+merge — an auto-pass included. On those two points it wins over this rule.
+
 ## Why
 
 - An agent-driven swarm produces more PRs than a human can hand-review; uniform review is the bottleneck.

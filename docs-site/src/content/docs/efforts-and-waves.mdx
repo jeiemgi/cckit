@@ -97,7 +97,10 @@ The slug is a *derived* convenience, not a second source of truth. `--slug` only
   closes the parent and every sub and sets the board **Status=Done** for each, garbage-collects the
   worktree/branch, runs an optional, config-gated knowledge-ingest hook
   (`effort.knowledgeIngestHook`), and finishes with an advisory **kit-sync drift check** that flags
-  any kit-managed files the effort touched (they belong upstream via `/kit-contribute`).
+  any kit-managed files the effort touched (they belong upstream via `/kit-contribute`). Kit-managed
+  means `scripts/lib/`, `scripts/kit*`, `.claude/{skills,hooks,lib,agents}/`, and the rule files the
+  kit ships under `.claude/rules/`. A rule the project wrote itself is not flagged: `cckit init`
+  and `/kit-update` only write rules that have a template, so they cannot overwrite it.
 - **`cckit merge` refuses an effort PR.** A PR whose head is an `effort/*` branch is refused before
   anything is rebased or merged, and the message names `cckit effort close <N>`: a plain squash
   would destroy the per-sub commits without the snapshot above. `KIT_FORCE=1 cckit merge <pr>`
