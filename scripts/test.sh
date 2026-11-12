@@ -27,9 +27,18 @@ if [ "${#tests[@]}" -eq 0 ]; then
 fi
 
 note "==> cckit tests — ${#tests[@]} file(s)${PATTERN:+ (filter: $PATTERN)}"
+# Seal every test from the caller's kit environment (#369): a shell that ran load_kit_config, or set
+# KIT_CONFIG, exports KIT_*/CCKIT_*/EFFORT_* that would point a test at the developer's project
+# instead of its own fixture. Each test still sets whatever it needs itself.
+# shellcheck source=/dev/null
+. scripts/lib/test-env.sh
+seal=()
+while IFS= read -r a; do [ -n "$a" ] && seal+=("$a"); done < <(test_env_unset_args)
+[ "${#seal[@]}" -eq 0 ] || note "==> sealed $(( ${#seal[@]} / 2 )) inherited KIT_*/CCKIT_*/EFFORT_* variable(s)"
+
 pass=0; failn=0; failed=""
 for t in "${tests[@]}"; do
-  out="$(bash "$t" 2>&1)"; rc=$?
+  out="$(env ${seal[@]+"${seal[@]}"} bash "$t" 2>&1)"; rc=$?
   if [ "$rc" -eq 0 ]; then
     pass=$((pass+1)); note "  ok   $t"
   else

@@ -5,6 +5,9 @@
 set -u
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+# Sealed from the caller's KIT_*/CCKIT_*/EFFORT_* (#369): this suite builds its own fixture.
+# shellcheck source=/dev/null
+. "$ROOT/scripts/lib/test-env.sh" && test_env_seal
 # shellcheck source=/dev/null
 source "$ROOT/scripts/lib/orchestration-runtime.sh"
 

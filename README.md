@@ -104,7 +104,7 @@ cckit pr 42 "what changed"    # commit, push, open the PR
 cckit sync                    # board state, what's unblocked
 cckit handoff "resume note"   # save a handoff — bare `cckit` prints it next session
 cckit gc                      # report prunable branches + worktrees (deletes nothing)
-cckit cleanup [--yes]         # act on that report: delete the SAFE rows, prune listed zombies, keep orphans/stashes
+cckit cleanup [--yes]         # act on that report: delete the SAFE + LANDED rows, prune listed zombies, keep orphans/stashes
 ```
 
 Adopting cckit in a repo that already has history? `cckit scan` detects the stack, `cckit adopt`
@@ -236,6 +236,20 @@ Human output renders as markdown — rich via `glow` in a terminal, native in th
 transcript, pipe-safe everywhere. Every human-facing verb (`sync`, `plan`, `next`, `status`) shares
 one rendering seam, so board tables, wave plans, and the status dashboard read the same in every
 surface and never leak escape codes down a pipe (`cckit render` exposes the seam for any script).
+
+### Cloud sessions
+
+Claude Code cloud sessions reach GitHub through a proxy that refuses GraphQL, and `gh pr` /
+`gh issue` use GraphQL. There cckit switches to REST (`gh api repos/<owner>/<repo>/…`):
+
+- **Works:** `cckit pr`, `merge`, `close`, `new`, `effort new`, `effort pr`, `effort close`, plus
+  the issue reads behind `start` and `effort start`.
+- **Skipped:** board (Projects v2) steps, with one line on stderr: `cckit: board step skipped …`.
+  Turn on the board's built-in workflows (item closed → Done, PR merged → Done, auto-add) and the
+  card still moves. Remote branch deletion is skipped too: the proxy rejects it. Delete merged
+  branches on GitHub.
+- **Switch:** `CCKIT_GH_TRANSPORT=rest|graphql` forces a transport. Unset, it is `rest` when
+  `CLAUDE_CODE_REMOTE=true` and the `gh` subcommands otherwise.
 
 ## cckit builds cckit
 

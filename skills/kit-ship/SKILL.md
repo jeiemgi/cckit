@@ -29,7 +29,7 @@ resolve from `${CLAUDE_PLUGIN_ROOT}`.
 | 5 | **PR** | `/kit-task-pr <N>` — commit, push, open PR to the base branch, mirror labels/milestone, add to board, move issue **In Review**. |
 | 6 | **Wait for CI** | If the project has a required check, poll until it's not pending (background `until` loop). **Pending ≠ failing — wait; never force-merge.** |
 | 7 | **Merge** | `/kit-task-pr-merge` once green — squash to the base, switch to base, pull, delete local+remote branch + worktree. |
-| 8 | **Close** | `gh issue close <N>` + set board **Done**. **Required** when `Closes #N` does NOT auto-fire (PRs that merge to a non-default branch don't trigger GitHub auto-close). |
+| 8 | **Close** | `cckit close <N> "<summary>"` — closes the issue and sets board **Done**. **Required** when `Closes #N` does NOT auto-fire (PRs that merge to a non-default branch don't trigger GitHub auto-close). |
 | 9 | **Update kit (only if the change touched the plugin source)** | bump version (`/kit-dev ship`) + `/plugin update`. |
 
 Report at the end: issue state, PR number + merged status, branch cleaned, board reflects Done.

@@ -107,7 +107,10 @@ t   "kit_gc_prune refuses without worktree-issue.sh (rc)"    "$rc" "1"
 # commits and no PR is ORPHAN. Only the first may ever be deleted, and never without --yes.
 git branch task/40-merged  >/dev/null 2>&1
 git branch task/41-open    >/dev/null 2>&1
-git branch task/42-orphan  >/dev/null 2>&1
+# The orphan carries ONE commit base never received — a branch level with base would be LANDED (#388).
+git checkout -q -b task/42-orphan
+echo "only here" > orphan.txt; git add orphan.txt; git commit -qm "orphan work"
+git checkout -q "$init_branch"
 cat > "$stub/gh" <<'SH'
 #!/usr/bin/env bash
 echo "$*" >> "$GH_CALLS"
@@ -208,6 +211,180 @@ chmod +x "$stub/gh"
 out="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_prune --yes 2>&1)"
 t   "merged-but-ahead branch survives prune --yes" "$(git branch --list task/43-ahead | wc -l | tr -d ' ')" "1"
 has "prune says why it skipped it"                 "$out" "unpushed commits"
+
+# ── #388: LANDED — no PR of its own, work already on base ──────────────────────────────────────
+# A squash merge rewrites the patch ids, so neither `git cherry` nor `--is-ancestor` can see that
+# a sub branch's work reached base. gc must classify these rows LANDED (not ORPHAN), the plan must
+# list them as their own block, and --yes must delete them — worktree included — while a true
+# orphan (one commit whose content base never received) stays untouched.
+export KIT_BASE_BRANCH="$init_branch"
+# Earlier fixtures that are level with base read as LANDED now (ancestor of base); drop them so the
+# counts below are this section's alone (task/41-open stays PROTECTED, the others ORPHAN).
+git branch -D task/44-behind feat/30-x feat/31-y feat/32-z >/dev/null 2>&1
+git update-ref -d refs/remotes/origin/task/44-behind 2>/dev/null
+# (1) an effort sub, squash-landed: sub/50a commits sub.txt; "the effort PR" lands the same content
+#     on base as ONE new commit — check (a), content.
+git checkout -q -b sub/50a-part
+echo "sub work" > sub.txt; git add sub.txt; git commit -qm "sub: part"
+git checkout -q "$init_branch"
+git checkout -q sub/50a-part -- sub.txt; git commit -qm "feat(effort): squash of effort 50"
+# (2) a Claude Code Agent-tool isolation worktree (`worktree-agent-<hash>`), squash-landed too.
+git worktree add -q ../agentwt -b worktree-agent-abc123 >/dev/null 2>&1
+echo "agent work" > ../agentwt/agent.txt; git -C ../agentwt add agent.txt; git -C ../agentwt commit -qm "agent: part"
+git checkout -q worktree-agent-abc123 -- agent.txt; git commit -qm "feat: squash of the agent's work"
+# (3) a second sub whose file base has since CHANGED — content check fails, so only lineage (check
+#     b: issue #50 closed + effort/50 PR merged) can land it.
+git checkout -q -b sub/50b-other
+echo "v1" > other.txt; git add other.txt; git commit -qm "sub: other"
+git checkout -q "$init_branch"
+git checkout -q sub/50b-other -- other.txt; git commit -qm "feat(effort): squash of sub 50b"
+echo "v2" > other.txt; git add other.txt; git commit -qm "later change on base"
+# (4) a true orphan: issue #51 is closed but nothing with its content ever reached base.
+git checkout -q -b task/51-orphan
+echo "never landed" > lost.txt; git add lost.txt; git commit -qm "orphan"
+git checkout -q "$init_branch"
+# (5) an agent worktree whose work landed but whose tree is DIRTY — recover-before-prune keeps it.
+git worktree add -q ../agentwt2 -b worktree-agent-def456 >/dev/null 2>&1
+echo "agent two" > ../agentwt2/agent2.txt; git -C ../agentwt2 add agent2.txt; git -C ../agentwt2 commit -qm "agent: two"
+git checkout -q worktree-agent-def456 -- agent2.txt; git commit -qm "feat: squash of agent two"
+echo "uncommitted" > ../agentwt2/scratch.txt
+
+cat > "$stub/gh" <<'SH'
+#!/usr/bin/env bash
+case "$1 $2" in
+  "pr list")    printf 'effort/50-thing\tPR#55 MERGED\n' ;;
+  "issue view")
+    for a in "$@"; do case "$a" in 41) echo open; exit 0 ;; esac; done
+    echo closed ;;
+  *) : ;;
+esac
+SH
+chmod +x "$stub/gh"
+
+analysis="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_analyze 2>/dev/null)"
+row() { printf '%s\n' "$analysis" | awk -v b="$1" '$1==b && $2=="->"{sub(/^  [^ ]+ -> /, ""); print; exit}'; }
+has "squash-landed sub is LANDED by content"       "$(row sub/50a-part)"           "LANDED (content on $init_branch)"
+has "agent worktree branch is LANDED and named"    "$(row worktree-agent-abc123)"  "LANDED (agent worktree; content on $init_branch)"
+has "sub with later base change is LANDED by lineage" "$(row sub/50b-other)"      "LANDED (issue #50 closed, its PR merged)"
+has "true orphan stays ORPHAN"                     "$(row task/51-orphan)"         "ORPHAN"
+has "dirty agent worktree's branch is still LANDED" "$(row worktree-agent-def456)" "LANDED"
+t   "has_prunable sees a LANDED row"               "$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_has_prunable && echo yes || echo no)" "yes"
+
+plan="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_cleanup 2>&1)"
+has "plan has a LANDED block"                      "$plan" "LANDED branches"
+t   "plan counts the four LANDED rows" \
+    "$(printf '%s\n' "$plan" | awk '/^  LANDED branches/{print $3}')" "4"
+has "plan names the sub with its reason"           "$plan" "sub/50a-part (content on $init_branch)"
+has "plan names the agent worktree as a worktree"  "$plan" "agentwt [worktree-agent-abc123]"
+has "plan flags the dirty agent worktree"          "$plan" "agentwt2 [worktree-agent-def456] (DIRTY"
+has "plan keeps the orphan"                        "$plan" "task/51-orphan"
+# The LANDED block prints BEFORE the ORPHAN block.
+t   "LANDED block precedes ORPHAN block" \
+    "$(printf '%s\n' "$plan" | awk '/^  LANDED branches/{l=NR} /^  ORPHAN kept/{o=NR} END{print (l<o)?"yes":"no"}')" "yes"
+t   "plan-only kept the sub branch"      "$(git branch --list sub/50a-part | wc -l | tr -d ' ')" "1"
+[ -d ../agentwt ] && echo "ok: plan-only kept the agent worktree" || { echo "FAIL: plan-only removed the agent worktree"; fail=1; }
+
+# kit_gc_prune --only: the scope effort_close uses to collect ONE effort's subs (#388) — the agent
+# branch is also LANDED but outside the glob, so it must survive this pass.
+out="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_prune --yes --only '^sub/50[a-z]-' 2>&1)"
+t   "--only deleted the content-landed sub"   "$(git branch --list sub/50a-part  | wc -l | tr -d ' ')" "0"
+t   "--only deleted the lineage-landed sub"   "$(git branch --list sub/50b-other | wc -l | tr -d ' ')" "0"
+t   "--only left the agent branch alone"      "$(git branch --list worktree-agent-abc123 | wc -l | tr -d ' ')" "1"
+has "prune says why the sub went"             "$out" "deleted local branch sub/50a-part (LANDED"
+
+applied="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_cleanup --yes 2>&1)"
+t   "--yes deleted the agent branch"          "$(git branch --list worktree-agent-abc123 | wc -l | tr -d ' ')" "0"
+[ -d ../agentwt ] && { echo "FAIL: --yes left the agent worktree dir"; fail=1; } || echo "ok: --yes removed the agent worktree"
+t   "--yes KEPT the true orphan"              "$(git branch --list task/51-orphan | wc -l | tr -d ' ')" "1"
+t   "--yes KEPT the dirty agent worktree's branch" "$(git branch --list worktree-agent-def456 | wc -l | tr -d ' ')" "1"
+[ -d ../agentwt2 ] && echo "ok: --yes skipped the dirty agent worktree" || { echo "FAIL: --yes destroyed a dirty worktree"; fail=1; }
+has "cleanup said why it skipped the dirty one" "$applied" "SKIP dirty worktree"
+has "cleanup counts what it landed"            "$applied" "landed deleted"
+
+# ── lineage when the closing PR is OUTSIDE the 200-PR index window ─────────────────────────────
+# Measured on a consuming repo: the effort PR that closed the issue sat at position 254 of `gh pr list --state all`, so the
+# index never carried it and 21 `worktree-agent-*` branches with `[#2165]` subjects stayed ORPHAN
+# while base had changed their files again (content check fails too). The issue itself knows which
+# PR closed it (`closedByPullRequestsReferences`), exact and not window-bound. Cached per issue: the
+# two branches below both name #60 and must cost ONE `issue view … closedBy` call.
+git checkout -q -b sub/60a-old
+echo "old sub" > old.txt; git add old.txt; git commit -qm "sub: old"
+git checkout -q "$init_branch"
+git checkout -q sub/60a-old -- old.txt; git commit -qm "feat(effort): squash of effort 60"
+echo "changed again" > old.txt; git add old.txt; git commit -qm "later change on base"
+git checkout -q -b worktree-agent-old777
+echo "agent old" > agentold.txt; git add agentold.txt; git commit -qm "feat: agent part [#60]"
+git checkout -q "$init_branch"
+git checkout -q worktree-agent-old777 -- agentold.txt; git commit -qm "squash of the agent's part"
+echo "changed again" > agentold.txt; git add agentold.txt; git commit -qm "later change on base"
+cat > "$stub/gh" <<'SH'
+#!/usr/bin/env bash
+echo "$*" >> "$GH_CALLS"
+case "$1 $2" in
+  "pr list") printf 'effort/50-thing\tPR#55 MERGED\n' ;;      # nothing for #60: scrolled out
+  "issue view")
+    case "$*" in
+      *closedByPullRequestsReferences*) for a in "$@"; do case "$a" in 60) echo 61; exit 0 ;; esac; done ;;
+      *) echo closed ;;
+    esac ;;
+  "pr view") for a in "$@"; do case "$a" in 61) echo MERGED; exit 0 ;; esac; done; echo CLOSED ;;
+  *) : ;;
+esac
+SH
+chmod +x "$stub/gh"
+: > "$GH_CALLS"
+analysis="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_analyze 2>/dev/null)"
+has "sub landed via the issue's closing PR"        "$(row sub/60a-old)"            "LANDED (issue #60 closed by merged PR#61)"
+has "agent branch with [#60] subject landed too"   "$(row worktree-agent-old777)"  "LANDED (agent worktree; issue #60 closed by merged PR#61)"
+t   "the closedBy lookup ran ONCE for #60 across both branches" \
+    "$(grep -c 'issue view 60 .*closedByPullRequestsReferences' "$GH_CALLS")" "1"
+t   "the PR state was confirmed ONCE" "$(grep -c '^pr view 61' "$GH_CALLS")" "1"
+# A fresh run must not trust the previous run's cache (the issue could have been reopened).
+: > "$GH_CALLS"
+PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_prune >/dev/null 2>&1
+t   "a new run looks the issue up again" "$(grep -c 'issue view 60 .*closedByPullRequestsReferences' "$GH_CALLS")" "1"
+
+# ── `(#N)` subjects + a sub-issue closed through its parent's PR ──────────────────────────────
+# Measured on a consuming repo: agent branches whose subjects end in `(#N)` — GitHub's own trailing ref,
+# not the kit's `[#N]` — where #2077 is a sub-issue: CLOSED, no closing PR (subs close through
+# `effort close`), parent #2075 closed by merged PR 2130. One climb to the parent lands it.
+# effort/1711: closed NOT_PLANNED, no PR, no parent — must stay ORPHAN.
+git checkout -q -b worktree-agent-sub70
+echo "ontology" > onto.txt; git add onto.txt; git commit -qm "Root vocabulary: classes and predicates (#70)"
+git checkout -q "$init_branch"
+git checkout -q worktree-agent-sub70 -- onto.txt; git commit -qm "squash of the ontology effort"
+echo "changed again" > onto.txt; git add onto.txt; git commit -qm "later change on base"
+git checkout -q -b effort/80-not-planned
+echo "abandoned" > np.txt; git add np.txt; git commit -qm "[Effort 80] 1 · never landed"
+git checkout -q "$init_branch"
+cat > "$stub/gh" <<'SH'
+#!/usr/bin/env bash
+echo "$*" >> "$GH_CALLS"
+case "$1 $2" in
+  "pr list") printf 'effort/50-thing\tPR#55 MERGED\n' ;;
+  "issue view")
+    case "$*" in
+      *closedByPullRequestsReferences*) for a in "$@"; do case "$a" in 75) echo 76; exit 0 ;; esac; done ;;  # 70, 80: nothing
+      *) echo closed ;;
+    esac ;;
+  "pr view") for a in "$@"; do case "$a" in 76) echo MERGED; exit 0 ;; esac; done; echo CLOSED ;;
+  "api repos/o/r/issues/70/parent") echo 75 ;;
+  "api repos/o/r/issues/80/parent") echo "gh: Not Found (HTTP 404)" >&2; exit 1 ;;
+  *) : ;;
+esac
+SH
+chmod +x "$stub/gh"
+: > "$GH_CALLS"
+analysis="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_analyze 2>/dev/null)"
+has "(#N) subject lands through the parent's merged PR" "$(row worktree-agent-sub70)" \
+    "LANDED (agent worktree; issue #70 closed, parent #75 closed by merged PR#76)"
+has "closed NOT_PLANNED with no PR and no parent stays ORPHAN" "$(row effort/80-not-planned)" "ORPHAN"
+t   "the parent was climbed once for #70" "$(grep -c '^api repos/o/r/issues/70/parent' "$GH_CALLS")" "1"
+t   "the parent lookup for #80 ran once and was cached as a miss" "$(grep -c '^api repos/o/r/issues/80/parent' "$GH_CALLS")" "1"
+applied="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_prune --yes --only '^(worktree-agent-sub70|effort/80-)' 2>&1)"
+t   "--yes deleted the parent-landed agent branch" "$(git branch --list worktree-agent-sub70 | wc -l | tr -d ' ')" "0"
+t   "--yes KEPT the not-planned effort branch"     "$(git branch --list effort/80-not-planned | wc -l | tr -d ' ')" "1"
+unset KIT_BASE_BRANCH
 
 [ "$fail" -eq 0 ] && echo "ALL OK (kit-gc)" || echo "kit-gc: FAILURES"
 exit "$fail"

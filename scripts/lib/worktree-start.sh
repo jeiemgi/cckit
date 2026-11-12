@@ -12,6 +12,15 @@
 # Requires: gh, jq, git, scripts/lib/gh-project.sh (board update). bash 3.2 compatible.
 # errors: strict — rc 1 on failure; a half-made worktree is never reported as ready
 
+# The GitHub transport switch (#396): rest mode routes the gh calls below through gh-rest.sh.
+if ! command -v cckit_gh_rest >/dev/null 2>&1; then
+  _ghr_lib="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)/gh-rest.sh"
+  # shellcheck source=/dev/null
+  [ -f "$_ghr_lib" ] && . "$_ghr_lib"
+  unset _ghr_lib
+fi
+command -v cckit_gh_rest >/dev/null 2>&1 || cckit_gh_rest() { return 1; }
+
 WT_START_REPO="${WT_START_REPO:-${KIT_REPO:-}}"
 
 # _wt_set_port <app-env-file> <port> <issue-num> — append a per-worktree dev PORT to an app's
@@ -523,8 +532,12 @@ wt_start() {
   # The board's Status is set server-side by built-in automations (Item closed→Done, PR
   # merged→Done) — wt_start no longer writes In Progress, so no board helpers are loaded here.
 
+  if cckit_gh_rest; then
+    meta="$(gh_rest_issue_json "$WT_START_REPO" "$num" 2>/dev/null)" || { echo "[#$num] issue not found" >&2; return 1; }
+  else
   meta="$(gh issue view "$num" --repo "$WT_START_REPO" --json title,labels 2>/dev/null)" \
     || { echo "[#$num] issue not found" >&2; return 1; }
+  fi
   title="$(echo "$meta" | jq -r '.title')"
   kind="$(echo "$meta" | jq -r '([.labels[].name | select(startswith("kind:"))][0] // "kind:task") | sub("^kind:";"")')"
   if [[ -n "$slug_override" ]]; then
@@ -578,7 +591,9 @@ wt_start() {
   # transitions server-side (Item added→Todo, PR linked→In Review, closed/merged→Done) — but GitHub
   # has no "branch started" trigger, so the kit owns In Progress. Cheap now: an O(1) issue.projectItems
   # lookup on the org board, not a full-board scan. Best-effort — a board hiccup never fails the start.
-  if source "$root/scripts/lib/gh-project.sh" 2>/dev/null; then
+  if cckit_gh_rest; then
+    command -v cckit_board_skipped >/dev/null 2>&1 && cckit_board_skipped
+  elif source "$root/scripts/lib/gh-project.sh" 2>/dev/null; then
     [[ -n "${STATUS_FIELD_ID:-}" ]] || load_project_ids >/dev/null 2>&1 || true
     # Claim precheck (#124): if the issue is ALREADY In Progress on the board, another session may
     # already own it — warn (never block; the start still proceeds) so two agents don't collide.

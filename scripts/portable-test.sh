@@ -8,6 +8,9 @@
 # Hermetic: stubs `gh` (no network/auth). Run: bash scripts/portable-test.sh
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# Sealed from the caller's KIT_*/CCKIT_*/EFFORT_* (#369): this suite builds its own fixture.
+# shellcheck source=/dev/null
+. "$ROOT/scripts/lib/test-env.sh" && test_env_seal
 CCKIT="$ROOT/bin/cckit"
 fail=0
 t()   { if [ "$2" = "$3" ]; then echo "ok: $1"; else echo "FAIL: $1 -> got '[$2]' want '[$3]'"; fail=1; fi; }
@@ -113,7 +116,7 @@ fi
 # A new verb that is neither exercised nor listed here fails the harness — forcing a coverage
 # decision. SKIP holds verbs that mutate, need args, read stdin, are interactive, or act on the
 # install itself (not the invoking project's board) — deliberately not driven here.
-SKIP="adopt autopilot bench brief close commands completions contribute copilot debug digest effort encode-context handoff help init install migrate msg orchestrate pr receipt release render resume start ui update version watch"
+SKIP="adopt autopilot bench brief close commands completions contribute copilot debug digest effort encode-context handoff help init install merge migrate msg new orchestrate pr receipt release render resume start ui update version watch"
 classified() { case " $EXERCISE $SKIP " in *" $1 "*) return 0 ;; *) return 1 ;; esac; }
 for v in $("$CCKIT" commands); do
   classified "$v" || { echo "FAIL: verb '$v' is unclassified — add it to EXERCISE (read-only, assert no own-repo leak) or SKIP in portable-test.sh"; fail=1; }

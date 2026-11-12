@@ -113,11 +113,12 @@ Check permission: `gh repo view OWNER/REPO --json viewerPermission -q .viewerPer
 
 **This is public + outward-facing — confirm with the user before opening it.**
 
-- Artifact PR: `gh pr create --repo OWNER/REPO --base main` — from a fork the head is
-  `<your-login>:<branch>`. Title summarizes the contribution; body states **what it adds, why, and how
-  it was tested/linted**.
-- Pure request, no artifact: `gh issue create --repo OWNER/REPO` with the **Problem · Proposal · Scope
-  · Why** body instead.
+- Artifact PR: `cckit contribute "<summary>"` — runs `scripts/check.sh`, pushes, opens the PR.
+  From a fork to another owner's repo, `KIT_ALLOW_RAW=1 gh pr create --repo OWNER/REPO --base main`
+  (the head is `<your-login>:<branch>`); the guard hook records the bypass. Title summarizes the
+  contribution; body states **what it adds, why, and how it was tested/linted**.
+- Pure request, no artifact, to another repo: `KIT_ALLOW_RAW=1 gh issue create --repo OWNER/REPO`
+  with the **Problem · Proposal · Scope · Why** body instead.
 - Print the resulting URL.
 
 ## 7. Report

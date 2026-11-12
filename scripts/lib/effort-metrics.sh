@@ -14,6 +14,15 @@
 # access here) → cost_source="list-price". bash 3.2 compatible. Requires: git, jq.
 # errors: best-effort — local telemetry must never break the op it measures
 
+# The GitHub transport switch (#396): rest mode routes the gh calls below through gh-rest.sh.
+if ! command -v cckit_gh_rest >/dev/null 2>&1; then
+  _ghr_lib="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)/gh-rest.sh"
+  # shellcheck source=/dev/null
+  [ -f "$_ghr_lib" ] && . "$_ghr_lib"
+  unset _ghr_lib
+fi
+command -v cckit_gh_rest >/dev/null 2>&1 || cckit_gh_rest() { return 1; }
+
 # Opus 4.8 list price, USD per 1M tokens (correct as of 2026-06; update when prices change).
 _EM_PRICE_IN=5.00; _EM_PRICE_OUT=25.00; _EM_PRICE_CACHE_READ=0.50; _EM_PRICE_CACHE_WRITE=6.25
 
@@ -43,8 +52,11 @@ estimate_effort() {
   command -v jq >/dev/null 2>&1 || return 0
 
   repo="${EFFORT_REPO:-${KIT_REPO:-}}"
+  if cckit_gh_rest; then subs="$(gh_rest_sub_issue_numbers "$repo" "$num" 2>/dev/null | grep -c .)"
+  else
   subs="$(gh api graphql -f query='query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){issue(number:$n){subIssues(first:50){totalCount}}}}' \
         -F o="${repo%/*}" -F r="${repo#*/}" -F n="$num" --jq '.data.repository.issue.subIssues.totalCount' 2>/dev/null)"
+  fi
   [[ "$subs" =~ ^[0-9]+$ ]] || subs=1; [[ "$subs" -lt 1 ]] && subs=1
 
   cpl="$(jq -r '.model.cost_per_changed_line_usd // .model.cost_per_changed_line // 0.21' "$est")"
@@ -247,7 +259,8 @@ _em_judge_goal() {
   local num="$1" repo body
   command -v gh >/dev/null 2>&1 || { printf ''; return 0; }
   repo="${EFFORT_REPO:-${KIT_REPO:-}}"
-  body="$(gh issue view "$num" --repo "$repo" --json body --jq '.body' 2>/dev/null)" || { printf ''; return 0; }
+  if cckit_gh_rest; then body="$(gh api "repos/$repo/issues/$num" --jq '.body // ""' 2>/dev/null)" || { printf ''; return 0; }
+  else body="$(gh issue view "$num" --repo "$repo" --json body --jq '.body' 2>/dev/null)" || { printf ''; return 0; }; fi
   [[ -n "$body" ]] || { printf ''; return 0; }
   # Extract the lines after "## Goal" up to the next "## " heading.
   printf '%s\n' "$body" | awk '

@@ -329,6 +329,24 @@ The kit carries no project's layout. Both keys are config, and the fallback is a
 *your* `package.json` — so a repo with real root dependencies still gets its install, unchanged.
 </Aside>
 
+## PR conventions
+
+`cckit pr` follows the repo's PR convention, set under `pr` in the config file:
+
+```json
+{
+  "pr": {
+    "titleStyle": "issue-title",
+    "orchestratorSection": true
+  }
+}
+```
+
+| Key | Default | What it does |
+| --- | --- | --- |
+| `pr.titleStyle` | `conventional` | `conventional`: a Conventional Commits title derived from the issue's kind label, which release-please and a commitlint gate read. `issue-title`: the issue title, verbatim. |
+| `pr.orchestratorSection` | `false` | `true` opens the PR body with a two-line `## For the orchestrator` section: the issue number and what to review. |
+
 ## Effort WIP limit
 
 `cckit effort start` refuses to start a **new** effort once too many are already in progress. The

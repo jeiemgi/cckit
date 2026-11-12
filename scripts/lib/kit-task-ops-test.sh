@@ -55,9 +55,24 @@ if [ -n "${KTO_TEST_INNER:-}" ]; then
   eq "conventional summary wins over derivation" \
      "$(kto_pr_title '[Effort 182] 2 · Publish to npm' 'ci: publish via OIDC' 'kind:task')" \
      "ci: publish via OIDC"
+  eq "titleStyle issue-title → the issue title verbatim" \
+     "$(KIT_PR_TITLE_STYLE=issue-title kto_pr_title '[Effort 182] 1 · Enforce it' 'ci: x' 'kind:task')" \
+     "[Effort 182] 1 · Enforce it"
+  eq "titleStyle conventional (explicit) → derive" \
+     "$(KIT_PR_TITLE_STYLE=conventional kto_pr_title 'mail hook goes silent' '' 'bug')" \
+     "fix: mail hook goes silent"
   eq "non-conventional summary ignored → derive" \
      "$(kto_pr_title 'Benchmark harness' 'ported a harness' 'kind:feat')" \
      "feat: Benchmark harness"
+
+  # pr.orchestratorSection: off by default, a 2-line section first when on
+  ob="$(kto_compose_pr_body 42 'S.' 'tech-lead' 'Fix the thing')"
+  case "$ob" in *"For the orchestrator"*) echo "FAIL($KTO_TEST_INNER): orchestrator section present by default"; fail=1 ;; *) ;; esac
+  ob="$(KIT_PR_ORCHESTRATOR_SECTION=true kto_compose_pr_body 42 'S.' 'tech-lead' 'Fix the thing')"
+  eq "orchestrator section opens the body" "$(printf '%s\n' "$ob" | sed -n 1p)" "## For the orchestrator"
+  eq "orchestrator line 1 = id + title"   "$(printf '%s\n' "$ob" | sed -n 3p)" "#42 · Fix the thing"
+  eq "orchestrator line 2 = what to review" "$(printf '%s\n' "$ob" | sed -n 4p)" "Review: the summary below and the diff."
+  case "$ob" in *"Closes #42"*) ;; *) echo "FAIL($KTO_TEST_INNER): Closes line lost with the section on"; fail=1 ;; esac
 
   # kto_compose_pr_body must carry Closes #N and the Summary
   body="$(kto_compose_pr_body 42 'Did the thing.' 'tech-lead')"
