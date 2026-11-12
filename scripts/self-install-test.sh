@@ -35,6 +35,7 @@ communication-style rendered
 delegation-brief sections
 effort-model rendered
 issue-lifecycle rendered
+merge-safety rendered
 naming-and-ids verbatim'
 
 # The kit-owned sections of delegation-brief.md — the transferable instruction `cckit brief` lifts.

@@ -22,6 +22,7 @@
     "delegation-brief",
     "skill-gaps",
     "issue-lifecycle",
+    "merge-safety",
     "task-management"
   ],
   "roles": ["PM", "Tech Lead", "Designer", "DevOps", "Backend", "Frontend", "QA", "Security"],

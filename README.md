@@ -265,7 +265,8 @@ project; `.claude/skills/` and `.claude/rules/` here are the subset cckit applie
 `karpathy-guidelines`, plus the rules that govern this repo's branches, efforts, PR titles,
 delegation and issue lifecycle (`issue-lifecycle.md`: deliverables are native sub-issues, an
 approved plan is executed without re-confirming each merge, and a close op — not `Closes #N` —
-closes the issue). Every shipped rule is listed in [Rules cckit ships](https://cckit.dev/rules/).
+closes the issue) and merge safety (`merge-safety.md`: bring a branch onto the current base before
+merging, ship a coupled chain as one PR, re-run the gate on the integration branch). Every shipped rule is listed in [Rules cckit ships](https://cckit.dev/rules/).
 It is a subset on purpose: several templates target stacks cckit does not have.
 `scripts/self-install-test.sh` holds the manifest, the reason for every skip, and the assertion that
 the installed copies have not drifted from their templates.

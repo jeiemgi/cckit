@@ -13,6 +13,7 @@
   "rules": [
     "communication-style",
     "issue-lifecycle",
+    "merge-safety",
     "task-management",
     "mempalace",
     "branch-naming"

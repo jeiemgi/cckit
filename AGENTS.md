@@ -38,7 +38,8 @@ adapter one) — is described in [the Adapters page](docs-site/src/content/docs/
 `.claude/rules/` in this repo are the subset cckit applies to its **own** work — `concrete`,
 `karpathy-guidelines`, and the rules for branches, efforts, PR titles, delegation, communication
 style and issue lifecycle (`issue-lifecycle.md`: sub-issues not checkboxes, approved-plan autonomy,
-explicit closes). No agents are installed: this file plus `cckit brief` is the delegation contract here.
+explicit closes) and merge safety (`merge-safety.md`: current base before merging, a coupled chain as
+one PR, the gate re-run on the integration branch). No agents are installed: this file plus `cckit brief` is the delegation contract here.
 
 The manifest and the reason for every skipped template are in `scripts/self-install-test.sh`, which
 also fails if an installed copy drifts from its template. Edit a template and its installed copy in

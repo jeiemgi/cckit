@@ -23,6 +23,7 @@ cckit init --dry-run
 | `communication-style` | how the agent writes to you, and the `concrete` pass on durable prose | all five |
 | `task-management` | GitHub issues as the source of truth, and the task loop | all five |
 | [`issue-lifecycle`](#issue-lifecycle) | deliverables as native sub-issues, approved-plan autonomy, explicit closes | all five |
+| [`merge-safety`](#merge-safety) | rebase onto the current base before merging, a coupled chain as one PR, the gate re-run on the integration branch | all five |
 | `mempalace` | the persistent-memory protocol — written only when memory is on | all five |
 | `knowledge-base` | frontmatter and the index for the project's knowledge docs | software, content, research, automation |
 | `plan-output-format` | a plan is a file with a `## Deliverables` table | software, content, research, automation |
@@ -64,3 +65,33 @@ The third one depends on your setup. `cckit merge` and `cckit effort close` clos
 themselves, so it bites only on a merge the kit did not perform — the GitHub UI, or a raw
 `gh pr merge`. `cckit doctor` warns when `github.baseBranch` differs from the GitHub default
 branch; after such a merge, run `cckit close <N> "<summary>"`.
+
+### merge-safety
+
+`templates/rules/merge-safety.md` — three conventions about what a branch must pass before it lands.
+
+| Convention | Where it came from | Wins against |
+| --- | --- | --- |
+| `MERGEABLE` is not safe: bring the branch onto the current base and pass the gate there before merging | a PR cut from a base that had since moved merged clean and reverted a sibling — 7,285 lines removed, no conflict, no failing check | `branch-naming` § *Merge order* decides the order and this rule decides what each PR passes first; it extends that section's lockfile "rebase the others" to every PR |
+| A coupled chain ships as ONE PR | the PRs of a chain are siblings cut from one base, each stale once the one before it lands; a single PR has no sibling to revert | `task-management`'s one-PR-per-issue line — its migration/DDL exception becomes any coupled chain — and `branch-naming`'s size guidance, for a chain only |
+| Re-run the gate on the integration branch after the subs merge | the gate had been run on each sub and not again on the branch they merged into | `effort-model` § *Lifecycle*, which lists no gate step between merging the subs and opening the PR |
+
+The first one is a rule for whoever merges, because neither merge op makes a stale, conflict-free
+branch current:
+
+| Op | What it merges | What it rebases |
+| --- | --- | --- |
+| `cckit watch --merge` | a PR classified `CLEAN`: `MERGEABLE` with a merge state of `CLEAN`, `UNSTABLE` or `HAS_HOOKS`, no failing or pending check, no failing review, no policy floor | nothing — a `BEHIND` PR is classified `BLOCKED` and skipped |
+| `cckit merge` | the PR as GitHub has it | only a `CONFLICTING` PR, from its own head branch, then `git push --force-with-lease` |
+
+GitHub reports `BEHIND` only when the base branch's protection requires branches to be up to date
+before merging. Turn that setting on for your base branch and the captain stops merging stale PRs;
+with it off, a stale branch reads `CLEAN`. To bring a branch current by hand:
+
+```bash
+git fetch origin <base>
+git rebase origin/<base>
+git diff --stat origin/<base>...HEAD   # a deletion the issue never asked for is the revert
+```
+
+Then run your gate and push.
