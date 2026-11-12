@@ -121,6 +121,12 @@ cckit shells out to whatever agent invokes it; it does not embed a model. For ve
 text (digests, ingest), the model endpoint is configurable via environment — see the docs site (
 [cckit.dev](https://cckit.dev).
 
+The effort-close judge reads an OpenAI-compatible endpoint from `CCKIT_MODEL_URL` (base URL; it
+POSTs to `<value>/chat/completions`), `CCKIT_MODEL` (model name) and `CCKIT_MODEL_TOKEN` (bearer
+token). A project with its own variables names them in the config instead — `model.urlEnv`,
+`model.modelEnv`, `model.tokenEnv` hold env var **names**, never values. See
+[Model endpoint for the effort judge](https://cckit.dev/config-and-permissions/#model-endpoint-for-the-effort-judge).
+
 **Agent profiles** (`agents.profiles` in the config) carry a spend `tier`, a permission policy and
 extra CLI argv. **cckit never names a model** — you spell your own flags in `args`, and the
 cheapest-tier profile runs when `agents.default` is unset, so the inexpensive path is the default
