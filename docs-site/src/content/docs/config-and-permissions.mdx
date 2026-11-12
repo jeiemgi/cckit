@@ -426,6 +426,35 @@ install the list shows only the modules. `cckit add software` is the module form
 and writes this directory's `.claude/kit.config.json`. In Claude Code the `kit-add` skill drives
 the same verb; the typed-only `/kit-add` command it replaces is gone.
 
+### Installing one: the shared runner
+
+`scripts/lib/integration-install.sh` is the one place an integration is installed from. It runs
+only commands the descriptor names, and applies four rules in this order:
+
+| Rule | What happens |
+| --- | --- |
+| The descriptor's `detect.run` exits 0 | Status `present`. Nothing runs, so a second run is a no-op. |
+| `KIT_DRY_RUN=1` | Status `dry-run`. The plan is printed: each candidate in order, whether its manager is on `PATH`, whether consent is recorded, and the wire command. Nothing runs. |
+| No consent recorded for this integration | Status `no-consent`, exit 0. Nothing runs. `KIT_ASSUME_YES` is not consent. |
+| Otherwise | The `install` candidates are tried in the order written. One whose `manager` is not on `PATH` is skipped. The first whose command exits 0 **and** leaves the tool detectable wins (`installed <manager>`); later candidates never run. If none does: `failed`, exit 1. |
+
+Consent is one `install:<id>` line in `.cckit/consent`, the gitignored state file shared by every
+worktree of the repo. `bash scripts/lib/integration-install.sh --consent <id>` records it;
+no cckit verb writes it yet.
+
+`uv` and `pipx` put binaries in `~/.local/bin`, which is often not on `PATH` in the session that
+ran the install. Every detect, install and wire command therefore runs with `$HOME/.local/bin`
+appended to `PATH`, so a tool installed there is found without opening a new shell.
+
+A descriptor's optional `wire` step runs in the project directory under the same dry-run and
+consent rules. Each key of `wire.declined` is appended to `wire.run` as a flag; the values are
+the reasons and never reach the command line. A candidate marked `"resident": false` (an `npx`
+form that leaves no binary) is judged by its exit code alone.
+
+`--plan <id> [dir]`, `--install <id> [dir]`, `--wire <id> [dir]` and `--wire-command <id>` are the
+script's CLI forms. `cckit doctor` does not call the runner yet: its two built-in installers move
+onto it in a later change.
+
 ## Agent profiles
 
 A **profile** is a named agent configuration: which CLI to run, roughly what it costs, under which
