@@ -15,7 +15,9 @@ adapter one) — is described in [the Adapters page](docs-site/src/content/docs/
   `effort/<N>` branch = 1 PR* covering **N sub-issues**. Sequential sub-issues commit straight onto
   `effort/<N>` (one commit per sub-issue — that commit's diff is the sub's patch); parallel ones get
   their own file-disjoint `sub/<N><letter>` worktree and merge back into `effort/<N>`. Either way
-  exactly one PR opens, from `effort/<N>` — never one per sub-issue. Full spec:
+  exactly one PR opens, from `effort/<N>` — never one per sub-issue. That PR merges with
+  `cckit effort close <N>`: `cckit merge` refuses an `effort/*` head, because its squash skips the
+  per-sub trace snapshot (`KIT_FORCE=1` merges anyway, with a warning). Full spec:
   `.claude/rules/effort-model.md`.
 - **Structured output, TOON-first.** Append `--llm` to any verb for machine-readable output. List
   reads (sync, next, plan, wave) come back as **TOON** (token-cheap); single-result action verbs
