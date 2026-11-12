@@ -31,6 +31,22 @@ it protects any branch whose issue is still open. One trailing letter only — `
 is not an issue number and gets no protection. (The parser honors the suffix for any kind, not
 just `sub` — it errs toward protection rather than risk deleting a misnamed live branch.)
 
+### Hotfix branches (created by `cckit hotfix`, not by hand)
+
+`cckit hotfix <pr|sha> [--base <branch>]` cherry-picks one merged change onto the release branch and
+names its branch after the **source PR**, not an issue — a cherry-pick has no issue of its own:
+
+| Pattern | When | `N` |
+| --- | --- | --- |
+| `fix/<N>-hotfix-<base>` | the source is a PR, or a commit whose subject names one | the **source PR's** number |
+| `fix/hotfix-<sha7>-<base>` | the source commit names no PR | none |
+
+`<base>` is the target branch, lowercased with every non-alphanumeric run turned into `-`
+(`release/1.x` → `release-1-x`), so the same PR can be carried to two release branches. `N` parses
+as an issue number, and a merged PR reads as closed, so `gc` treats the branch like any other whose
+issue is closed: prunable once its own PR merges. Do not run `cckit pr` in a hotfix worktree — it
+would read the source PR number as the issue to close.
+
 ### Closed set of kinds
 
 | Kind       | For                                                | Typical risk |

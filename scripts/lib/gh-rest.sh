@@ -28,7 +28,7 @@
 #   gh_rest_milestone_number <repo> <title>
 #   gh_rest_pr_create <repo> <base> <head> <title> <body> <labels-csv> [milestone-title]   → html_url
 #   gh_rest_pr_for_head <repo> <branch>   the open PR number for a head branch
-#   gh_rest_pr_json <repo> <pr>           {mergeable,mergeStateStatus,baseRefName,headRefName,body,state}
+#   gh_rest_pr_json <repo> <pr>           {mergeable,mergeStateStatus,baseRefName,headRefName,body,title,mergeCommit,state}
 #   gh_rest_pr_merge <repo> <pr> <squash|merge|rebase>
 #   gh_rest_pr_closing_issues <repo> <pr>
 #   gh_rest_pr_diff <repo> <pr>
@@ -234,11 +234,15 @@ gh_rest_pr_for_head() {
 
 # The fields the merge path reads, in the graphql vocabulary: mergeable MERGEABLE|CONFLICTING|UNKNOWN
 # (REST true|false|null — null while GitHub computes it), mergeStateStatus = REST mergeable_state.
+# mergeCommit is {oid} only once MERGED: REST fills merge_commit_sha on an open PR too, with the
+# test-merge commit, which is not a commit anyone merged (#360).
 gh_rest_pr_json() {
   _ghr_read "repos/$1/pulls/$2" --jq '{
     mergeable: (if .mergeable == true then "MERGEABLE" elif .mergeable == false then "CONFLICTING" else "UNKNOWN" end),
     mergeStateStatus: ((.mergeable_state // "unknown") | ascii_upcase),
     baseRefName: .base.ref, headRefName: .head.ref, body: (.body // ""),
+    title: (.title // ""),
+    mergeCommit: (if .merged_at then {oid: .merge_commit_sha} else null end),
     state: (if .merged_at then "MERGED" else (.state | ascii_upcase) end)}'
 }
 

@@ -55,5 +55,38 @@ KIT_PR_TITLE_STYLE=conventional kto_task_pr 43 "Other." >/dev/null 2>&1
 tc "$GH_LOG" 'pr create .*--title fix: Fix the thing' "conventional (default): a Conventional Commits title"
 grep -q 'For the orchestrator' "$GH_LOG" && { echo "FAIL: section present with the switch off"; fail=1; } || echo "ok: no section with the switch off"
 
+# --base (#360): the flag wins over the configured integration branch, and the PR's target reaches a
+# git pre-push hook as KIT_PR_BASE.
+cat > .git/hooks/pre-push <<SH
+#!/usr/bin/env bash
+echo "KIT_PR_BASE=\${KIT_PR_BASE:-}" >> "$tmp/prepush.log"
+SH
+chmod +x .git/hooks/pre-push
+export KIT_BASE_BRANCH="develop"            # what load_kit_config exported from the config
+: > "$GH_LOG"; : > "$tmp/prepush.log"; git checkout -q -b fix/44-hot
+echo three > tracked.txt
+kto_task_pr 44 "Hot." --base main >/dev/null 2>&1
+t  "--base: kto_task_pr succeeds"            "$?" "0"
+tc "$GH_LOG" 'pr create .*--base main( |$)'  "--base main: the PR targets main, not the configured develop"
+t  "--base main: the pre-push hook sees it"  "$(cat "$tmp/prepush.log")" "KIT_PR_BASE=main"
+t  "--base is not taken as the commit msg"   "$(git log -1 --format=%s)" "fix: Fix the thing"
+
+: > "$GH_LOG"; : > "$tmp/prepush.log"; git checkout -q -b fix/45-eq
+echo four > tracked.txt
+kto_task_pr --base=main 45 "Eq." "fix: custom msg" >/dev/null 2>&1
+tc "$GH_LOG" 'pr create .*--base main( |$)'  "--base=main before the positionals works too"
+t  "the commit message positional survives"  "$(git log -1 --format=%s)" "fix: custom msg"
+
+: > "$GH_LOG"; : > "$tmp/prepush.log"; git checkout -q -b fix/46-default
+echo five > tracked.txt
+kto_task_pr 46 "Default." >/dev/null 2>&1
+tc "$GH_LOG" 'pr create .*--base develop( |$)' "no --base: the configured integration branch"
+t  "no --base: the hook gets the integration branch" "$(cat "$tmp/prepush.log")" "KIT_PR_BASE=develop"
+
+: > "$GH_LOG"; git checkout -q -b fix/47-bad
+kto_task_pr 47 "Bad." --base >/dev/null 2>"$tmp/err"
+t  "--base with no value is refused"         "$?" "2"
+t  "…before any gh call"                     "$(wc -l < "$GH_LOG" | tr -d ' ')" "0"
+
 [ "$fail" -eq 0 ] && echo "kto-task-pr: all passed" || echo "kto-task-pr: FAILURES"
 exit "$fail"

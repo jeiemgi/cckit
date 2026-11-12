@@ -9,7 +9,9 @@ when_to_use: When work on an issue branch is ready for review. Replaces ad-hoc `
 Plugin-direct skill — thin caller over the ONE canonical home
 `${CLAUDE_PLUGIN_ROOT}/scripts/lib/kit-task-ops.sh` (`kto_task_pr`). The verb logic lives there,
 never inline here (kit-engine-boundary #1/#2). The op respects `KIT_BASE_BRANCH` (default `develop`)
-and the `KIT_PROJECTS_V2` board toggle, so the same code serves any project.
+and the `KIT_PROJECTS_V2` board toggle, so the same code serves any project. `--base <branch>`
+targets another branch for one PR — a hotfix to `main` — and the push exports the target to a git
+pre-push hook as `KIT_PR_BASE`.
 
 ## Inputs
 
@@ -18,6 +20,7 @@ and the `KIT_PROJECTS_V2` board toggle, so the same code serves any project.
 | Issue number   | ✓        | Derived from branch name `<kind>/<N>-<slug>` if not passed |
 | Summary        | ✓        | 1–3 bullets — the PR body's `## Summary`                   |
 | Commit message | optional | Defaults to `<role>: <issue title>`                        |
+| `--base <branch>` | optional | PR target for this PR only; default is `KIT_BASE_BRANCH`. To cherry-pick an already-merged PR onto `main`, use `cckit hotfix <pr>` instead |
 
 Ask via `AskUserQuestion` when the Summary is missing — never invent it.
 
@@ -31,6 +34,7 @@ source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/kit-task-ops.sh"
 
 kto_task_pr "" "$SUMMARY"            # issue # parsed from the branch
 # kto_task_pr 173 "$SUMMARY" "tech-lead: admin Clerk sign-in"   # explicit
+# kto_task_pr 173 "$SUMMARY" --base main                         # target main, not the integration branch
 ```
 
 The function prints `✓ <PR-URL>`.

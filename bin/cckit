@@ -9,7 +9,10 @@
 #   cckit install [bin-dir]         symlink cckit onto your PATH (global install)
 #   cckit init --profile <p>        scaffold cckit.config.json + .claude/ (--profile required)
 #   cckit start <issue> [slug]      isolated worktree + branch for an issue
-#   cckit pr <issue> <summary>      commit + push + open the PR
+#   cckit pr <issue> <summary> [--base B]   commit + push + open the PR (--base: target B, not the
+#                                   integration branch; the push exports it as KIT_PR_BASE)
+#   cckit hotfix <pr|sha> [--base B]   cherry-pick a merged PR or commit onto B (default main):
+#                                   worktree from origin/B, cherry-pick -x, push, PR `Cherry-pick of #N`
 #   cckit close <issue> <summary> [--reason completed|not-planned|duplicate] [--duplicate-of N]
 #               [--superseded-by N]  close the issue with a reason + summary comment; board Done
 #   cckit new [--role R --kind K --priority P --milestone M --blocked-by "#1" --body B|--body-file F] "<title>"
@@ -197,6 +200,23 @@ case "$cmd" in
       pr)    kto_task_pr    "$@" ;;
       close) kto_task_close "$@" ;;
     esac
+    ;;
+  hotfix)
+    # Carry ONE merged change to the release branch (#360): its own PR path, because a cherry-pick
+    # has no issue for `cckit pr` to read or close.
+    # shellcheck source=/dev/null
+    source "$LIB/kit-config.sh" && load_kit_config
+    # shellcheck source=/dev/null
+    source "$LIB/worktree-start.sh"; source "$LIB/kit-hotfix.sh"
+    if cckit_is_json; then
+      out="$(kto_hotfix "$@" 2>&1)"; rc=$?
+      url="$(printf '%s' "$out" | grep -oE 'https://[^ ]+/pull/[0-9]+' | tail -1)"
+      cckit_json verb hotfix source "${1:-}" ok "$([ "$rc" -eq 0 ] && echo true || echo false)" \
+        url "$url" worktree "$(printf '%s\n' "$out" | sed -n 's/^worktree: //p' | tail -1)" \
+        detail "$(printf '%s' "$out" | tail -1)"
+      exit "$rc"
+    fi
+    kto_hotfix "$@"
     ;;
   new)
     # File ONE issue through kto_task_new (labels + board add + Role/Status fields). This verb is why
