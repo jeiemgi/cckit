@@ -502,6 +502,46 @@ descriptor. `cckit init` runs the doctor with `--yes`, so setup keeps installing
 Before this, a doctor run with no terminal and no flag installed the MemPalace CLI and mlx-lm
 without asking. It now reports them missing; pass `--fix` in automation that relied on the install.
 
+### The monthly recipe check
+
+A descriptor hardcodes upstream facts: a package name, an installer's flags, a binary's name. The
+gate (`scripts/check.sh`) never installs anything, so it cannot see one of them drift.
+`.github/workflows/integrations-check.yml` does: at 06:17 UTC on the 1st of every month, and on a
+manual `gh workflow run integrations-check.yml`, it runs `bash scripts/integrations-check.sh --yes`
+on two clean runners, `ubuntu-latest` and `macos-15` (arm64, the one platform
+`integrations/mlx-lm.json` applies to).
+
+The script holds no recipe. Every command comes from the descriptor and runs through the shared
+runner, in a scratch git repo that also holds the consent for the run.
+
+| Step | What runs | A failure means |
+| --- | --- | --- |
+| `validate` | The descriptor against `integrations/integration.schema.json` | The descriptor is malformed |
+| `platform` | `appliesWhen.platform` against `uname` | Nothing: a mismatch is a `skip` line, exit code unchanged |
+| `install` | The runner's candidate walk | No candidate left the tool detectable |
+| `detect` | `detect.run` | The tool installed under another name |
+| `verify` | `verify.run` | The binary no longer loads, or its flag changed |
+| `wire` | `wire.run` plus the `wire.declined` flags, when the descriptor has a wire step | A flag was renamed or the tool refuses the repo |
+
+The first failing step ends that descriptor and prints `FAIL <id>: <step>: <detail>` followed by
+the step's captured output. The script exits 1 when any descriptor failed. The workflow then opens
+an issue titled `Integration recipe check failed on <runner>` carrying the last 120 log lines and
+the run URL; while that issue is open, a later failing run comments on it.
+
+Without `--yes` the script installs nothing: it validates each descriptor, prints its install
+plan and exits 0. `bash scripts/integrations-check.sh --yes graft` checks one descriptor. Pass
+`--yes` on a throwaway machine only, because the tools install onto the machine that runs it.
+
+What the check does not exercise:
+
+- Install candidates after the one that worked. The runner stops at the first.
+- A `bootstrap` command, on a machine that already holds one of the managers.
+- `uninstall` and `build.deep`.
+- The install recipe of a tool already on the machine: the line reads
+  `skip <id>: install: already on this machine`, and `detect`, `verify` and `wire` still run.
+- An `appliesWhen.anyExtension` predicate. The scratch repo is seeded with one file of the first
+  listed extension, because the recipe is under test and no repo is.
+
 ### Code-graph retrieval: Graft
 
 `cckit add graft` sets `codeGraph.provider` to `graft` and writes `.claude/rules/code-retrieval.md`.

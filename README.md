@@ -295,6 +295,9 @@ cckit/
                          #   (mempalace.json, mlx-lm.json, graft.json). `cckit doctor` installs each one the
                          #   config switches on through scripts/lib/integration-install.sh, only
                          #   with consent recorded in .cckit/consent (`--fix`, or yes at the prompt)
+                         #   scripts/integrations-check.sh installs each one for real and names the
+                         #   step that broke; .github/workflows/integrations-check.yml runs it on
+                         #   the 1st of every month and opens an issue on a failure
   docs-site/             # documentation source — Astro/Starlight (deployed to cckit.dev)
   .claude/skills/        # the subset of templates/skills/ cckit installs for ITSELF
   .claude/rules/         # the subset of templates/rules/ cckit installs for ITSELF
