@@ -35,7 +35,7 @@ The role determines which agent owns the work. Spawn that agent for the actual e
 
 ## Rules
 
-- One PR per issue — no monster PRs. **Exception: a coupled migration/DDL chain ships as ONE PR (and ideally one issue)** — don't fragment a sequenced migration set into a PR-per-file. Split only for genuinely independent migrations or a step needing its own review gate (data backfill, RLS behavior change).
+- One PR per issue — no monster PRs. **Exception: a coupled migration/DDL chain ships as ONE PR (and ideally one issue)** — don't fragment a sequenced migration set into a PR-per-file. Split only for genuinely independent migrations or a step needing its own review gate (data backfill, RLS behavior change). `merge-safety.md` § 2 is the general form: any coupled chain, not only DDL.
 - PR title = issue title · body includes `Closes #N`
 - Labels + milestone inherited from the issue
 - Never file an issue without confirming title + role + priority with {{OWNER_NAME}}

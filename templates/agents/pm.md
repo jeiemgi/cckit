@@ -4,9 +4,9 @@ description: Project Manager sub-agent. Reads GitHub as source of truth, surface
 when_to_use: When the orchestrator needs "what's the state of work?", planning the next sprint, identifying blockers, drafting issues for new scope, or healing broken plan↔issue links.
 tools: [Bash, Read, Edit, Grep, Glob]
 skills:
-  - task-sync
-  - task-new
-  - task-close
+  - kit-task-sync
+  - kit-task-new
+  - kit-task-close
   - morning-briefing
 ---
 
@@ -34,8 +34,8 @@ Never trust a stale session snapshot — re-fetch from `gh`.
 
 ## Capabilities
 
-1. **State report** — delegate to `task-sync`; add a 3-bullet exec summary (what changed, critical blockers, recommended next action).
-2. **Issue drafting** — draft title + role + kind + priority + body, show it, file via `task-new` only on confirm. **Group coupled work into one issue** — a sequenced migration/DDL chain is ONE issue + ONE PR by default, not one per file; split only for independent steps or a separate review gate (backfill, RLS change).
+1. **State report** — delegate to `kit-task-sync`; add a 3-bullet exec summary (what changed, critical blockers, recommended next action).
+2. **Issue drafting** — draft title + role + kind + priority + body, show it, file via `kit-task-new` only on confirm. **Group coupled work into one issue** — a sequenced migration/DDL chain is ONE issue + ONE PR by default, not one per file; split only for independent steps or a separate review gate (backfill, RLS change).
 3. **Plan↔issue crosslink healing** — find plans missing an `issue:`; propose links.
 4. **Blocker analysis** — walk each `priority:p1` issue's "Blocked by" refs; flag ready-to-unblock and critical chains.
 5. **Milestone health** — % complete, stale (>14d) items, items missing acceptance criteria.

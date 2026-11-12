@@ -923,8 +923,12 @@ _eo_board_done() {
 
 # Kit-managed paths (the kit ⇄ project sync surface): a change here that is not contributed
 # upstream (/kit-contribute) is a latent regression the next /kit-update can clobber. One place —
-# effort_close's drift check greps against this (was inlined in the kit-effort-close skill, #148).
-_EO_KIT_MANAGED_RE='^(scripts/(lib/|kit$|kit-)|\.claude/(skills|rules|hooks|lib|agents)/)'
+# effort_close's drift check greps against this (was inlined in the kit-effort-close skill, #148),
+# and so does the task-merge drift check in the kit-task-pr-merge skill.
+# .claude/rules/ is matched by BASENAME, not as a directory (#218): init.sh writes a rule only from
+# templates/rules/<name>.md, so any other file there is the project's own and no /kit-update can
+# touch it. The list is the templates/rules basenames; effort-ops-test.sh fails when they differ.
+_EO_KIT_MANAGED_RE='^(scripts/(lib/|kit$|kit-)|\.claude/(skills|hooks|lib|agents)/|\.claude/rules/(authoring|branch-naming|communication-style|delegation-brief|design-routing|effort-model|gate-and-review|issue-lifecycle|knowledge-base|mempalace|merge-safety|naming-and-ids|plan-next|plan-output-format|react-annotate|risk-tiered-review|shared-checkout|skill-gaps|task-management)\.md$)'
 
 # _eo_knowledge_ingest <num> <trace_dir> <root> — optional post-close knowledge-ingest hook. Runs a
 # project-configured command (github/effort.knowledgeIngestHook, or KIT_EFFORT_KNOWLEDGE_HOOK) with

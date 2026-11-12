@@ -30,11 +30,15 @@ bad() { echo "FAIL: $*"; fail=1; }
 INSTALLED_SKILLS='concrete verbatim
 karpathy-guidelines verbatim'
 
-INSTALLED_RULES='branch-naming verbatim
+INSTALLED_RULES='authoring verbatim
+branch-naming verbatim
 communication-style rendered
 delegation-brief sections
 effort-model rendered
-naming-and-ids verbatim'
+issue-lifecycle rendered
+merge-safety rendered
+naming-and-ids verbatim
+shared-checkout rendered'
 
 # The kit-owned sections of delegation-brief.md — the transferable instruction `cckit brief` lifts.
 # Project-specific sections ("Project specifics", "Gate commands") are filled in for cckit and are
@@ -51,6 +55,7 @@ speckit :: the software profile ships it with defaults.speckit = "off", so init 
 supabase-patterns :: cckit has no Supabase; the only matches for "supabase" in the repo are the kit machinery that scaffolds this skill'
 
 SKIPPED_RULES='design-routing :: routes every design question to .claude/agents/designer/AGENT.md; cckit installs no agents, so the rule would dereference a path that does not exist
+gate-and-review :: both enforcement surfaces it names are off here — prePush is null in cckit.config.json and templates/hooks/prepush_gate.sh.tmpl reads .claude/kit.config.json, a file this repo does not have; review.command is unset. The gate for cckit is stated in delegation-brief.md § Gate commands
 knowledge-base :: governs a knowledge/ dir with status/owner/updated frontmatter and a knowledge/INDEX.md manifest; cckit knowledge.dir is docs-site/src/content/docs, Starlight title/description frontmatter, no INDEX.md
 mempalace :: memory.enabled is false in cckit.config.json, so init.sh own rules loop skips this rule for this config
 plan-next :: not in profiles/software.json; it describes the cckit plan-next verb rather than governing work, and its See-also links point at plan-output-format.md, which cckit does not install
@@ -229,13 +234,13 @@ has "installed effort-model targets this repo's base"          "$(cat .claude/ru
 has "the task-management template parameterizes its base too"  "$(cat templates/rules/task-management.md)" '{{BASE_BRANCH}}'
 
 # ── 6. #218: every installed rule is a template basename ───────────────────────────────────────
-# effort_close's kit-sync drift check (_EO_KIT_MANAGED_RE) matches the whole .claude/rules/ dir, so
-# it flags project-OWNED rules as kit-managed. That false positive cannot arise here: every file in
-# this repo's .claude/rules/ IS a kit template, so the warning is accurate for cckit even before
-# #218 narrows the regex. This assertion is what keeps that true.
+# effort_close's kit-sync drift check (_EO_KIT_MANAGED_RE) matches .claude/rules/ by template
+# basename since #218, so a project-OWNED rule is not flagged as kit-managed. Every file in this
+# repo's .claude/rules/ IS a kit template, so here the warning names all of them. This assertion
+# keeps that true: a rule with no template would be a file cckit ships to nobody.
 find .claude/rules -maxdepth 1 -type f -name '*.md' 2>/dev/null | while IFS= read -r f; do
   b="$(basename "$f")"
-  [ -f "templates/rules/$b" ] || echo "FAIL: $f has no templates/rules/$b — a project-owned rule here would trip the #218 drift false positive"
+  [ -f "templates/rules/$b" ] || echo "FAIL: $f has no templates/rules/$b — cckit's own rules are all kit templates; add the template or drop the rule"
 done | grep . && fail=1
 
 if [ "$fail" -eq 0 ]; then echo "PASS: cckit self-install matches its manifest"; fi

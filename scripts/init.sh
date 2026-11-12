@@ -768,6 +768,9 @@ safe_copy "$KIT_ROOT/scripts/lib/kit-events.sh"     "$TARGET/scripts/lib/kit-eve
 safe_copy "$KIT_ROOT/scripts/lib/board-view.sh"     "$TARGET/scripts/lib/board-view.sh"
 safe_copy "$KIT_ROOT/scripts/lib/effort-plan.sh"    "$TARGET/scripts/lib/effort-plan.sh"
 safe_copy "$KIT_ROOT/scripts/lib/worktree-start.sh" "$TARGET/scripts/lib/worktree-start.sh"
+# pr-evidence.sh is the helper rules/gate-and-review.md tells a project to source; without this copy
+# `cckit lib` resolves to the project's own scripts/lib, where the helper would be missing.
+safe_copy "$KIT_ROOT/scripts/lib/pr-evidence.sh"    "$TARGET/scripts/lib/pr-evidence.sh"
 safe_copy "$KIT_ROOT/scripts/lib/session-registry.sh" "$TARGET/scripts/lib/session-registry.sh"
 safe_copy "$KIT_ROOT/scripts/lib/kinds.sh"          "$TARGET/scripts/lib/kinds.sh"
 safe_copy "$KIT_ROOT/scripts/kit-version-check.sh"  "$TARGET/scripts/kit-version-check.sh" exec
