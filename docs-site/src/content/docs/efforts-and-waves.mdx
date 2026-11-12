@@ -83,6 +83,11 @@ The slug is a *derived* convenience, not a second source of truth. `--slug` only
   worktree/branch, runs an optional, config-gated knowledge-ingest hook
   (`effort.knowledgeIngestHook`), and finishes with an advisory **kit-sync drift check** that flags
   any kit-managed files the effort touched (they belong upstream via `/kit-contribute`).
+- **`cckit merge` refuses an effort PR.** A PR whose head is an `effort/*` branch is refused before
+  anything is rebased or merged, and the message names `cckit effort close <N>`: a plain squash
+  would destroy the per-sub commits without the snapshot above. `KIT_FORCE=1 cckit merge <pr>`
+  merges anyway and warns that no trace was taken. A sub PR whose **base** is `effort/<N>` still
+  merges with `cckit merge`.
 - **The work trace is a directory, and `index.jsonl` says it is complete.** The snapshot writes
   `<git-common-dir>/traces/effort-<N>/<seq>-<shortsha>.{diff,meta}` — one pair per commit — plus an
   `index.jsonl` holding one JSON record per line pairing each commit to its sub-issue. The index is
@@ -267,4 +272,22 @@ A worktree also holds its own port block, so a reviewer can run the app from it 
 with another worktree's stack. `cckit qa up` launches the review stack the project declared,
 on that worktree's ports, and `cckit qa verdict` records the result against the reviewed commit — see the
 [QA lane](/qa-lane/).
+
+### A sub-issue starts from its effort branch
+
+A sub-issue builds on what its effort has already landed, and those commits are on
+`effort/<N>-<slug>`, not on the base branch yet. Name the effort branch as the base when you
+orchestrate a sub:
+
+```bash
+KIT_BASE_BRANCH=effort/42-auth cckit orchestrate 44 45
+```
+
+Without it the sub's worktree is cut from the base branch and is missing the effort's earlier
+commits. Nothing fails; the agent works against older code. `orchestrate` prints the base it used
+and, when it came from the environment, a second line saying so. Each agent pane is started with
+the same override, whether or not a tmux or Herdr server was already running, so the `cckit pr` the
+agent runs opens the sub's PR against the effort branch. Push the effort branch first: the
+base is fetched from origin. Details:
+[overriding the base branch](/config-and-permissions/#overriding-the-base-branch-for-one-command).
 

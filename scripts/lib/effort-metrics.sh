@@ -14,9 +14,18 @@
 # access here) → cost_source="list-price". bash 3.2 compatible. Requires: git, jq.
 # errors: best-effort — local telemetry must never break the op it measures
 
+# This file's own directory, resolved ONCE at load time (#381) — the only point where both shells
+# agree. `BASH_SOURCE` is bash-only; inside a zsh *function* it is unset and `$0` is the function
+# name, so a per-call `dirname "${BASH_SOURCE[0]:-$0}"` resolved to the CALLER's directory:
+# engine-adapter.sh and kit-local.sh were never found and the sync buffered without saying why. At
+# FILE scope zsh sets `$0` to the sourced file's path, so one expansion covers both shells. Same
+# resolution as kit-gc.sh's `_KIT_GC_LIB_DIR`, whose comment explains why zsh prompt expansion
+# (`${(%):-%x}`) is avoided and why `cd`'s stdout is discarded.
+_EM_LIB_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" >/dev/null 2>&1 && pwd)"
+
 # The GitHub transport switch (#396): rest mode routes the gh calls below through gh-rest.sh.
 if ! command -v cckit_gh_rest >/dev/null 2>&1; then
-  _ghr_lib="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)/gh-rest.sh"
+  _ghr_lib="$_EM_LIB_DIR/gh-rest.sh"
   # shellcheck source=/dev/null
   [ -f "$_ghr_lib" ] && . "$_ghr_lib"
   unset _ghr_lib
@@ -269,23 +278,61 @@ _em_judge_goal() {
     grab { print }' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | grep -v '^$' | head -20
 }
 
-# _em_judge_call <system> <user> — try CCKIT_MODEL (hosted, OpenAI-compat) then the local model.
+# _em_model_env <config-key> <default-name> — the VALUE of the env var the hosted judge reads for
+# one setting (#381). The config may NAME the variable (`model.urlEnv` / `model.modelEnv` /
+# `model.tokenEnv`) so a project that already exports its own model variables needs no fork; unset,
+# the built-in name is used. Names only, never values — the same contract as `engine.token_env`.
+# The name is expanded through `eval` (the one indirection bash 3.2 and zsh share), so anything
+# that is not a plain shell identifier is refused with a warning and the default name is used.
+_em_model_env() {
+  local key="$1" name="$2" cfg="" named=""
+  if ! command -v kit_config_path >/dev/null 2>&1 && [[ -f "$_EM_LIB_DIR/config-path.sh" ]]; then
+    # shellcheck source=/dev/null
+    source "$_EM_LIB_DIR/config-path.sh"
+  fi
+  command -v kit_config_path >/dev/null 2>&1 && cfg="$(kit_config_path 2>/dev/null || true)"
+  if [[ -n "$cfg" && -f "$cfg" ]]; then
+    named="$(jq -r --arg k "$key" '.model[$k] // empty | strings' "$cfg" 2>/dev/null)" || named=""
+  fi
+  if [[ -n "$named" ]]; then
+    if printf '%s' "$named" | grep -qE '^[A-Za-z_][A-Za-z0-9_]*$' && [[ "$named" != *$'\n'* ]]; then
+      name="$named"
+    else
+      echo "effort-metrics: model.$key is not an env var name — using $name" >&2
+    fi
+  fi
+  eval "printf '%s' \"\${$name:-}\""
+}
+
+# _em_judge_call <system> <user> — try the hosted model (OpenAI-compat) then the local model.
+# The hosted endpoint, model name and token come from CCKIT_MODEL_URL / CCKIT_MODEL /
+# CCKIT_MODEL_TOKEN, or from the env vars the config names (see _em_model_env).
 # Echoes "<model_id>\t<reply>" on success; non-zero + nothing on total failure. The model_id is the
 # hosted model name or the local tag, so the schema's model_id column records who judged.
 _em_judge_call() {
-  local system="$1" user="$2" url payload reply model
+  local system="$1" user="$2" url payload reply model base token
 
-  # PRIMARY: hosted CCKIT_MODEL (OpenAI-compatible chat completions).
-  if [[ -n "${CCKIT_MODEL_URL:-}" ]] && command -v curl >/dev/null 2>&1; then
-    url="${CCKIT_MODEL_URL%/}/chat/completions"
-    model="${CCKIT_MODEL:-default}"
+  # PRIMARY: hosted model (OpenAI-compatible chat completions).
+  base="$(_em_model_env urlEnv CCKIT_MODEL_URL)"
+  if [[ -n "$base" ]] && command -v curl >/dev/null 2>&1; then
+    url="${base%/}/chat/completions"
+    model="$(_em_model_env modelEnv CCKIT_MODEL)"; [[ -n "$model" ]] || model="default"
+    token="$(_em_model_env tokenEnv CCKIT_MODEL_TOKEN)"
     payload="$(jq -n --arg m "$model" --arg s "$system" --arg p "$user" \
       '{model:$m, messages:[{role:"system",content:$s},{role:"user",content:$p}], max_tokens:512, temperature:0.1}')" || payload=""
     if [[ -n "$payload" ]]; then
-      reply="$(curl -sf -m "${EM_JUDGE_TIMEOUT:-60}" "$url" \
-        -H 'Content-Type: application/json' \
-        ${CCKIT_MODEL_TOKEN:+-H "Authorization: Bearer $CCKIT_MODEL_TOKEN"} \
-        -d "$payload" 2>/dev/null | jq -r '.choices[0].message.content // empty' 2>/dev/null)" || reply=""
+      # Two explicit calls, not `${token:+-H "…"}`: zsh does not word-split that expansion, so the
+      # flag and its value reached curl as ONE argument and the token was never sent.
+      if [[ -n "$token" ]]; then
+        reply="$(curl -sf -m "${EM_JUDGE_TIMEOUT:-60}" "$url" \
+          -H 'Content-Type: application/json' \
+          -H "Authorization: Bearer $token" \
+          -d "$payload" 2>/dev/null | jq -r '.choices[0].message.content // empty' 2>/dev/null)" || reply=""
+      else
+        reply="$(curl -sf -m "${EM_JUDGE_TIMEOUT:-60}" "$url" \
+          -H 'Content-Type: application/json' \
+          -d "$payload" 2>/dev/null | jq -r '.choices[0].message.content // empty' 2>/dev/null)" || reply=""
+      fi
       if [[ -n "$reply" ]]; then
         printf '%s\t%s' "$model" "$reply"
         return 0
@@ -295,8 +342,8 @@ _em_judge_call() {
 
   # FALLBACK: local model via kit-local.sh.
   if ! declare -f kit_local_chat >/dev/null 2>&1; then
-    local _ldir; _ldir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
-    [[ -f "$_ldir/kit-local.sh" ]] && source "$_ldir/kit-local.sh"
+    # shellcheck source=/dev/null
+    [[ -f "$_EM_LIB_DIR/kit-local.sh" ]] && source "$_EM_LIB_DIR/kit-local.sh"
   fi
   if declare -f kit_local_chat >/dev/null 2>&1 && kit_local_alive 2>/dev/null; then
     reply="$(kit_local_chat "$system" "$user" 512 2>/dev/null)" || reply=""
@@ -417,8 +464,8 @@ ${diff}${truncated_note}"
 sync_effort_metrics() {
   command -v jq >/dev/null 2>&1 || return 0
   if ! declare -f engine_call >/dev/null 2>&1; then
-    local _adir; _adir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
-    [[ -f "$_adir/engine-adapter.sh" ]] && source "$_adir/engine-adapter.sh"
+    # shellcheck source=/dev/null
+    [[ -f "$_EM_LIB_DIR/engine-adapter.sh" ]] && source "$_EM_LIB_DIR/engine-adapter.sh"
   fi
   declare -f engine_enabled >/dev/null 2>&1 || { echo "effort-metrics: engine adapter unavailable — buffered locally" >&2; return 0; }
   engine_enabled || { echo "effort-metrics: engine off — metrics stay in the local buffer" >&2; return 0; }

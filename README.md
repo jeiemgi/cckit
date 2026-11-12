@@ -123,6 +123,11 @@ works out of the box in any configured repo (an explicit `EFFORT_FLOWS` env var 
 `cckit effort close` is likewise the **single close implementation** (the `/kit-effort-close` skill is a thin caller
 of the same function): pre-squash work-record snapshot + metrics, squash-merge, close parent + subs, board
 Status=Done, worktree/branch GC, an optional knowledge-ingest hook, and an advisory kit-sync drift check.
+The metrics judge reads its hosted endpoint from `CCKIT_MODEL_URL` / `CCKIT_MODEL` / `CCKIT_MODEL_TOKEN`; a project
+with its own variables names them in the config (`model.urlEnv` / `model.modelEnv` / `model.tokenEnv` — env var
+names, never values).
+`cckit merge` refuses a PR whose head is an `effort/*` branch and names `cckit effort close <N>`: its squash would
+skip that snapshot. `KIT_FORCE=1 cckit merge <pr>` merges anyway, with a warning.
 
 The GitHub issue **number** stays the canonical key, but every effort also has a memorable **slug** handle (the one
 already in its `effort/<N>-<slug>` branch). Effort commands take the slug *or* the number interchangeably:
@@ -211,7 +216,12 @@ cckit watch --merge        # the captain: gate open PRs, squash-merge the CLEAN 
                            #   (policy floors hold PRs touching CI, lockfiles, or secrets for review)
 cckit watch --loop         # self-pace gate/merge passes until steady state
 cckit autopilot            # select unblocked work, then call orchestrate --detach under a cap
+KIT_BASE_BRANCH=effort/42-auth cckit orchestrate 44   # cut an effort's sub from the effort branch
 ```
+
+`KIT_BASE_BRANCH` in the environment overrides `github.baseBranch` for that one invocation, so a
+sub-issue starts with the commits its effort has already landed. The branch has to exist on origin,
+and `orchestrate` prints a line naming the override and the config value it replaced.
 
 Set `review.command` in your config and the captain sends every PR it would merge to an agent
 reviewer first, records the verdict as a stage receipt, and refuses to merge on a `fail`. You name

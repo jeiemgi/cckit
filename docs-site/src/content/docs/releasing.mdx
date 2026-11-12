@@ -94,6 +94,20 @@ cckit release X.Y.Z              # DRY RUN — prints the full plan, changes not
 cckit release X.Y.Z --publish    # tag + GitHub release + Homebrew formula + npm (needs tokens)
 ```
 
+## The docs site follows the release
+
+cckit.dev is the `docs-site/` package, deployed by Vercel from `main`. The Release PR bumps
+`docs-site/package.json` along with the other version files, so merging it changes `docs-site/` and
+Vercel builds the site; the header badge reads its version from that file.
+
+`docs-site/vercel.json` skips a build when a commit leaves `docs-site/` untouched. Vercel runs that
+check from inside `docs-site/`, so its pathspec is `.`. `scripts/docs-deploy-ignore-test.sh` runs
+the configured command against a fixture repo and fails if a commit that touches `docs-site/` would
+be skipped.
+
+After a release, confirm the badge on cckit.dev shows the new version. If it does not, deploy by
+hand from the repo root: `vercel --prod --archive=tgz`.
+
 ## Commit message rules (the contract)
 
 - **Every PR title** uses a Conventional Commit subject: `type(scope): summary`. PRs are **squash-merged**, so the PR title becomes the single commit on the base branch — the exact line release-please reads to pick the next version.

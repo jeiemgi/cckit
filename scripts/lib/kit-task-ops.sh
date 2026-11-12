@@ -20,7 +20,7 @@
 #   kto_compose_issue_body <user-body> <plan> <blocked> <role-slug>   echo an issue body
 #   kto_closing_issue_numbers <pr-num>                echo the issue #s a merged PR closes
 #   kto_task_pr   <num> <summary> [commit-msg]        commit+push+open PR (board → In Review)
-#   kto_task_pr_merge [pr-num] [--squash|--merge|--rebase]   merge (squash default) + close issues + GC + update the PR base
+#   kto_task_pr_merge [pr-num] [--squash|--merge|--rebase]   merge (squash default) + close issues + GC + update the PR base; refuses an effort/* head
 #   kto_task_new  <title> <role> <kind> <prio> [ms] [plan] [blocked] <body>   create issue + board fields (ms may be empty)
 #   kto_task_close <num> <summary> [pr-num] [--reason R] [--duplicate-of N] [--superseded-by N]   close + reason + board → Done
 # errors: mixed — git/gh ops propagate; board + label side effects are best-effort
@@ -317,7 +317,7 @@ kto_task_pr_merge() {
     esac
   done
 
-  local repo branch base pr_num meta merge_state pr_base head issues n state wt main_wt base_wt common
+  local repo branch base pr_num meta merge_state pr_base head issues n state wt main_wt base_wt common effort_n
   repo="$(kto_repo)"
   base="$(kto_base_branch)"
   branch="$(git rev-parse --abbrev-ref HEAD)"
@@ -340,6 +340,20 @@ kto_task_pr_merge() {
   head=$(printf '%s' "$meta" | jq -r '.headRefName // empty'); head="${head:-$branch}"
   echo "→ PR #$pr_num: $head → $pr_base ($method)"
   echo "  mergeable=$merge_state status=$(printf '%s' "$meta" | jq -r '.mergeStateStatus // ""')"
+
+  # An effort's PR merges with `cckit effort close` (#379): that op snapshots each sub-issue's diff
+  # before the squash destroys the per-sub commits. Refused before the rebase and the merge, so a
+  # refusal writes nothing. KIT_FORCE=1 merges anyway.
+  if [[ "$head" == effort/* ]]; then
+    effort_n="${head#effort/}"; effort_n="${effort_n%%-*}"
+    if [[ "${KIT_FORCE:-0}" == "1" ]]; then
+      echo "⚠ KIT_FORCE=1: merging effort branch $head with cckit merge — no per-sub trace snapshot is taken (cckit effort close $effort_n takes it)" >&2
+    else
+      echo "✗ PR #$pr_num is an effort branch ($head) — merge it with: cckit effort close $effort_n" >&2
+      echo "  cckit merge would skip the per-sub trace snapshot effort close takes before the squash. KIT_FORCE=1 merges anyway." >&2
+      return 1
+    fi
+  fi
 
   # Branches that are never rebased, force-pushed or deleted here: the repo base, the PR's base
   # (it may be an effort branch), and the release branches (#366).
@@ -374,7 +388,10 @@ kto_task_pr_merge() {
 
   # Close linked issues (replaces issue-close-on-merge.yml; native auto-close only fires on main).
   issues="$(kto_closing_issue_numbers "$pr_num")"
-  for n in $issues; do
+  # Read line by line on fd 3, not `for n in $issues` (#379): word-splitting follows the caller's
+  # IFS, and a NUL-polluted IFS passed "1020\n1021" to gh as one issue number.
+  while IFS= read -r n <&3; do
+    [[ "$n" =~ ^[0-9]+$ ]] || continue
     if cckit_gh_rest; then state=$(gh_rest_issue_state "$repo" "$n" 2>/dev/null)
     else state=$(gh issue view "$n" --repo "$repo" --json state --jq .state 2>/dev/null); fi
     if [[ "$state" == "OPEN" ]] && cckit_gh_rest; then
@@ -388,7 +405,9 @@ kto_task_pr_merge() {
     elif [[ -n "$state" ]]; then
       echo "  issue #$n already $state — skipped"
     fi
-  done
+  done 3<<EOF
+$issues
+EOF
 
   # Clean up FROM the main checkout (#371): run from the PR's own worktree, removing it deletes our
   # cwd. Main checkout = parent of the shared git dir; fall back to the first `worktree list` entry.

@@ -138,6 +138,11 @@ open_blockers() {
 # Partition the requested issues into eligible / blocked / (later) queued.
 ELIGIBLE=()
 echo "orchestrate: repo $REPO (base ${KIT_BASE_BRANCH:-main}), cap $CAP, runtime '$RUNTIME', agent '$AGENT'"
+# Say when the base is not the config's (#352). A KIT_BASE_BRANCH from the environment overrides the
+# config and every flow below is cut from it; printed as a bare name it reads like the default.
+if [ -n "${KIT_BASE_BRANCH_CONFIG:-}" ] && [ "${KIT_BASE_BRANCH:-}" != "$KIT_BASE_BRANCH_CONFIG" ]; then
+  echo "orchestrate: base '$KIT_BASE_BRANCH' comes from KIT_BASE_BRANCH in the environment (the config says '$KIT_BASE_BRANCH_CONFIG')"
+fi
 for num in "${ISSUES[@]}"; do
   blockers="$(open_blockers "$num")"
   if [ -n "$blockers" ] && [ "$FORCE" -eq 0 ]; then
@@ -231,14 +236,14 @@ fi
 # The profile's argv on the tmux path. Herdr got it as an argv array above; tmux types a command
 # LINE into the pane's shell, so the quoting lives in or_tmux_agent_cmd beside the Herdr launcher —
 # both runtimes answer the same question and neither may drop the args the resolution line promised.
-AGENT_CMD="$(or_tmux_agent_cmd "$AGENT" "$AGENT_ARGS_NL")"
+AGENT_CMD="$(or_tmux_agent_cmd "$AGENT" "$AGENT_ARGS_NL" "$(or_base_override)")"
 
 tmux kill-session -t "$SESSION" 2>/dev/null || true
 first=1
 for entry in "${ENTRIES[@]}"; do
   wt="${entry%%|*}"; rest="${entry#*|}"; branch="${rest%%|*}"; num="${rest##*|}"
   if [ "$first" -eq 1 ]; then
-    tmux new-session -d -s "$SESSION" -n flows -c "$wt"
+    or_tmux_new_session "$SESSION" flows "$wt"
     pane="$(tmux display -p -t "$SESSION:flows" '#{pane_id}')"
     first=0
   else

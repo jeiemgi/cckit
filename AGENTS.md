@@ -15,7 +15,9 @@ adapter one) — is described in [the Adapters page](docs-site/src/content/docs/
   `effort/<N>` branch = 1 PR* covering **N sub-issues**. Sequential sub-issues commit straight onto
   `effort/<N>` (one commit per sub-issue — that commit's diff is the sub's patch); parallel ones get
   their own file-disjoint `sub/<N><letter>` worktree and merge back into `effort/<N>`. Either way
-  exactly one PR opens, from `effort/<N>` — never one per sub-issue. Full spec:
+  exactly one PR opens, from `effort/<N>` — never one per sub-issue. That PR merges with
+  `cckit effort close <N>`: `cckit merge` refuses an `effort/*` head, because its squash skips the
+  per-sub trace snapshot (`KIT_FORCE=1` merges anyway, with a warning). Full spec:
   `.claude/rules/effort-model.md`.
 - **Structured output, TOON-first.** Append `--llm` to any verb for machine-readable output. List
   reads (sync, next, plan, wave) come back as **TOON** (token-cheap); single-result action verbs
@@ -108,6 +110,17 @@ Every operation an unattended run needs is reachable through the one CLI:
 | `--force` | launch even if an issue is `blocked_by` an OPEN issue (the gate is on by default) |
 | `--no-seed` | start the agent without an auto-prompt |
 
+**Base branch override.** `KIT_BASE_BRANCH` in the environment wins over `github.baseBranch` in the
+config for that invocation: `KIT_BASE_BRANCH=effort/<N>-<slug> cckit orchestrate <sub>` cuts the
+sub's worktree from the effort branch instead of the base. `orchestrate` then prints
+`base '<branch>' comes from KIT_BASE_BRANCH in the environment (the config says '<base>')`. The
+branch must exist on origin (`wt_start` fetches it). Every verb that loads the config reads the same
+variable — `cckit start` cuts from it and `cckit pr` targets it — so set it per command, not with a
+shell-wide `export`. `orchestrate` passes an override on to each agent pane (tmux: `env KIT_BASE_BRANCH=…`
+on the agent's command line; Herdr: `--env`), so `cckit pr` in the pane targets the branch the
+worktree was cut from. The base cckit resolved from a config is not an override in a child process:
+a `cckit` run in another project reads its own config.
+
 ## The agent loop (reference)
 
 1. `cckit sync --llm` → pick an unblocked issue.
@@ -121,6 +134,12 @@ Every operation an unattended run needs is reachable through the one CLI:
 cckit shells out to whatever agent invokes it; it does not embed a model. For verbs that synthesize
 text (digests, ingest), the model endpoint is configurable via environment — see the docs site (
 [cckit.dev](https://cckit.dev).
+
+The effort-close judge reads an OpenAI-compatible endpoint from `CCKIT_MODEL_URL` (base URL; it
+POSTs to `<value>/chat/completions`), `CCKIT_MODEL` (model name) and `CCKIT_MODEL_TOKEN` (bearer
+token). A project with its own variables names them in the config instead — `model.urlEnv`,
+`model.modelEnv`, `model.tokenEnv` hold env var **names**, never values. See
+[Model endpoint for the effort judge](https://cckit.dev/config-and-permissions/#model-endpoint-for-the-effort-judge).
 
 **Agent profiles** (`agents.profiles` in the config) carry a spend `tier`, a permission policy and
 extra CLI argv. **cckit never names a model** — you spell your own flags in `args`, and the
