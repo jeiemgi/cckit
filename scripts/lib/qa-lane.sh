@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 # qa-lane.sh — one review stack per lane: launch the command the project declared, then say
-# whether the stack is USABLE (#295).
+# whether the stack is USABLE (#295), then open the screen the change touched (#297).
 #
 # Launched and usable are different facts. A dev server answers on its port seconds before the
 # app behind it can serve a page, and a web process that is up while its API is down renders an
@@ -37,14 +37,28 @@
 #   qa_probe <url>                          rc 0 when the url answers 2xx/3xx; echoes the status
 #   qa_launch <lane> [<worktree>]           start the declared command with the lane's ports
 #   qa_ready <lane> [<timeout-seconds>]     poll every probe until all answer; rc 1 on timeout
-#   qa_cli <up|ready> [--lane N] [--timeout S]   the `cckit qa` verb
+#   qa_route_declared                       stdin is a PR body; echo the route its `QA route:` line names
+#   qa_route <lane> [<pr>]                  `declared<TAB>route` from the lane's PR, else `configured<TAB>route`
+#   qa_usable <lane>                        ONE probe round, no waiting, no event: rc 0 usable · rc 1 not
+#   qa_open <lane> [<pr>] [<route>] [<print-only>] [<port-env>]   hand the reviewer the changed screen
+#   qa_cli <up|ready|open> [--lane N] …     the `cckit qa` verb
+#
+# The review route comes from the WORK, not from a smoke list: the builder writes one
+# `QA route: /path` line in the PR body (`cckit brief` asks for it when a `qa` block exists) and
+# `qa open` lands there. cckit hardcodes no project layout, so it never derives a route from
+# changed file paths. With no declared line the configured `qa.route` is the fallback. The URL is
+# always `http://<QA_HOST>:<lane port><route>`: the route is appended to a host and port cckit
+# chose, so a PR body can pick the screen and nothing else. The port is the FIRST variable in
+# `qa.ports` (the one a browser opens) unless `--port-env` names another.
 #
 # Events (kit-events.jsonl, through emit_event): `op.start qa.launch` when the command starts,
 # `op.done qa.ready` when the lane becomes usable, `op.done qa.timeout` when the wait runs out,
-# `op.done qa.exited` when the command died before the lane became usable.
+# `op.done qa.exited` when the command died before the lane became usable, `op.done qa.open` when
+# a usable lane's URL is handed over (payload: lane, url, route, source, opened).
 #
 # Tunables: QA_READY_TIMEOUT (seconds, default 120) · QA_READY_INTERVAL (seconds between rounds,
-# default 2) · QA_PROBE_TIMEOUT (seconds per request, default 5) · QA_HOST (default localhost).
+# default 2) · QA_PROBE_TIMEOUT (seconds per request, default 5) · QA_HOST (default localhost) ·
+# QA_OPENER (the command that opens a URL; default `open`, else `xdg-open`).
 #
 # errors: strict — rc 2 on a usage or config refusal (nothing launched), rc 3 without jq or curl,
 # rc 1 when the lane is not usable; every rc-1 message names the launch log to read.
@@ -65,6 +79,9 @@ command -v wt_port_slot    >/dev/null 2>&1 || . "$_qa_dir/worktree-start.sh"
 unset _qa_dir
 
 _QA_NAME_RE='^[A-Za-z_][A-Za-z0-9_]*$'
+# A route is a path: a leading slash, then URL path/query/fragment characters. No whitespace, no
+# quotes, no backticks — it is read out of a PR body and handed to a browser opener as one argument.
+_QA_ROUTE_RE='^/[A-Za-z0-9._~%/?#&=:@+,;!*-]*$'
 
 _qa_need() {
   command -v jq   >/dev/null 2>&1 || { echo "cckit qa: jq is required" >&2; return 3; }
@@ -300,24 +317,192 @@ EOF
   done
 }
 
+# ── the route: declared by the work, else configured (#297) ────────────────────────────────────
+
+# qa_route_valid <route> — rc 0 when <route> is one line matching _QA_ROUTE_RE.
+qa_route_valid() {
+  case "${1:-}" in *'
+'*) return 1 ;; esac
+  printf '%s\n' "${1:-}" | grep -qE "$_QA_ROUTE_RE"
+}
+
+# qa_route_declared — stdin is a PR body; echo the route its first usable `QA route:` line names.
+# Tolerates the shapes people write: a list bullet, bold markers, backticks around the value, any
+# letter case. A line whose value is not a route (a template's `QA route: <path>` placeholder) is
+# skipped, so an unfilled template reads as "none declared". rc 1 when there is none. Pure.
+qa_route_declared() {
+  local r=""
+  r="$(tr -d '\r' \
+        | sed -nE 's/^[[:space:]]*([-*][[:space:]]+)?\**[Qq][Aa] [Rr][Oo][Uu][Tt][Ee]\**:\**[[:space:]]*`?([^`[:space:]]*).*$/\2/p' \
+        | grep -E "$_QA_ROUTE_RE" | head -n 1)"
+  [ -n "$r" ] || return 1
+  printf '%s\n' "$r"
+}
+
+# _qa_lane_branch <lane> — the local branch whose issue number is <lane>: the current branch when
+# it matches, else the first local head that does. Echoes nothing when there is none.
+_qa_lane_branch() {
+  local lane="$1" b=""
+  b="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)" || b=""
+  if [ -n "$b" ] && [ "$(wt_issue_number "$b" 2>/dev/null)" = "$lane" ]; then
+    printf '%s\n' "$b"; return 0
+  fi
+  git for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null | while IFS= read -r b; do
+    [ "$(wt_issue_number "$b" 2>/dev/null)" = "$lane" ] || continue
+    printf '%s\n' "$b"; break
+  done
+}
+
+# qa_route <lane> [<pr>] — echo `<source>\t<route>`: `declared` when the lane's PR body carries a
+# `QA route:` line, else `configured` with `qa.route` (`/` when the config has none). The PR is
+# <pr> when given, else the one open from the lane's branch. Reading the PR is best-effort — no
+# gh, no PR yet, or an unreadable body all fall back to the configured route. rc 2 only when the
+# CONFIGURED route is not a route, since then there is nothing valid to fall back to.
+qa_route() {
+  local lane="$1" pr="${2:-}" cfg="" ref="" body="" route="" tab
+  tab="$(printf '\t')"
+  ref="$pr"
+  [ -n "$ref" ] || ref="$(_qa_lane_branch "$lane")"
+  if [ -n "$ref" ] && command -v gh >/dev/null 2>&1; then
+    body="$(gh pr view "$ref" --json body --jq '.body // ""' 2>/dev/null)" || body=""
+    if [ -n "$body" ] && route="$(printf '%s\n' "$body" | qa_route_declared)"; then
+      printf 'declared%s%s\n' "$tab" "$route"
+      return 0
+    fi
+  fi
+  cfg="$(qa_cfg)" || { echo "cckit qa: no kit config found" >&2; return 2; }
+  route="$(jq -r '.qa.route // "/"' "$cfg" 2>/dev/null)"
+  [ -n "$route" ] || route="/"
+  if ! qa_route_valid "$route"; then
+    echo "cckit qa: qa.route in $cfg is not a route — it must start with / and hold no spaces" >&2
+    return 2
+  fi
+  printf 'configured%s%s\n' "$tab" "$route"
+}
+
+# qa_usable <lane> — ONE probe round against a launched lane: rc 0 when every readiness probe
+# answers now, rc 1 (the probes still failing on stderr) when one does not, rc 2 when the lane was
+# never launched. Unlike qa_ready it does not wait and emits no event — it is a question, not a wait.
+qa_usable() {
+  local lane="$1" cfg="" d="" urls="" name="" url="" code="" pending="" tab
+  tab="$(printf '\t')"
+  cfg="$(qa_cfg)" || { echo "cckit qa: no kit config found" >&2; return 2; }
+  d="$(qa_lane_dir "$lane")"
+  if [ ! -f "$d/ports" ]; then
+    echo "cckit qa: lane $lane was never launched (no $d/ports) — run cckit qa up" >&2
+    return 2
+  fi
+  urls="$(qa_probe_urls "$cfg" "$d/ports")" || return $?
+  while IFS="$tab" read -r name url; do
+    [ -n "$name" ] || continue
+    code="$(qa_probe "$url")" || pending="$pending $name $url -> $code;"
+  done <<EOF
+$urls
+EOF
+  [ -z "$pending" ] && return 0
+  echo "  not answering:${pending%;}" >&2
+  return 1
+}
+
+# qa_open <lane> [<pr>] [<route>] [<print-only>] [<port-env>] — hand the reviewer the screen the
+# change touched: `http://<host>:<lane port><route>` on stdout, and opened in a browser unless
+# <print-only> is 1. An explicit <route> wins over the PR's declared one.
+#
+# Refuses a lane that is not usable RIGHT NOW (one probe round): a browser on a stack that is
+# still booting shows a connection error the reviewer reads as a broken change. rc 1 not usable ·
+# rc 2 never launched or a bad route/port variable. With no opener on the machine the URL is still
+# printed and the rc is 0 — the URL is the hand-over, the browser is a convenience.
+qa_open() {
+  local lane="$1" pr="${2:-}" route="${3:-}" only="${4:-0}" penv="${5:-}"
+  local d="" row="" src="" port="" url="" opener="" opened=false why="" rc=0 tab
+  tab="$(printf '\t')"
+  _qa_need || return $?
+  d="$(qa_lane_dir "$lane")"
+  # qa_usable writes only to stderr, so its whole output is the reason.
+  why="$(qa_usable "$lane" 2>&1)" || rc=$?
+  if [ "$rc" -eq 1 ]; then
+    echo "cckit qa: lane $lane is NOT usable — refusing to open a browser on it." >&2
+    [ -z "$why" ] || printf '%s\n' "$why" >&2
+    echo "  wait for it with: cckit qa ready --lane $lane · launch log: $d/launch.log" >&2
+    return 1
+  elif [ "$rc" -ne 0 ]; then
+    [ -z "$why" ] || printf '%s\n' "$why" >&2
+    return "$rc"
+  fi
+
+  if [ -n "$route" ]; then
+    qa_route_valid "$route" || { echo "cckit qa: --route '$route' is not a route — it must start with / and hold no spaces" >&2; return 2; }
+    src="flag"
+  else
+    row="$(qa_route "$lane" "$pr")" || return $?
+    src="${row%%"$tab"*}"; route="${row#*"$tab"}"
+  fi
+
+  if [ -n "$penv" ]; then
+    port="$(awk -F= -v n="$penv" '$1 == n { print $2; exit }' "$d/ports" 2>/dev/null)"
+  else
+    port="$(awk -F= 'NF > 1 { print $2; exit }' "$d/ports" 2>/dev/null)"
+  fi
+  case "$port" in
+    ''|*[!0-9]*)
+      echo "cckit qa: lane $lane has no port for '${penv:-the first qa.ports variable}' — its variables: $(cut -d= -f1 "$d/ports" | tr '\n' ' ')" >&2
+      return 2 ;;
+  esac
+  url="http://${QA_HOST:-localhost}:$port$route"
+
+  if [ "$only" != 1 ]; then
+    opener="${QA_OPENER:-}"
+    if [ -z "$opener" ]; then
+      if command -v open >/dev/null 2>&1; then opener=open
+      elif command -v xdg-open >/dev/null 2>&1; then opener=xdg-open
+      fi
+    fi
+    if [ -z "$opener" ]; then
+      echo "[qa $lane] no browser opener here (open, xdg-open, or QA_OPENER) — open the URL by hand" >&2
+    elif "$opener" "$url" >/dev/null 2>&1; then
+      opened=true
+    else
+      echo "[qa $lane] '$opener' could not open the URL — open it by hand" >&2
+    fi
+  fi
+
+  emit_event op.done qa.open "$(jq -cn --arg lane "$lane" --arg url "$url" --arg route "$route" \
+    --arg source "$src" --argjson opened "$opened" \
+    '{lane: $lane, url: $url, route: $route, source: $source, opened: $opened}' 2>/dev/null)"
+  echo "[qa $lane] $src route $route" >&2
+  if [ "${CCKIT_OUTPUT:-human}" = json ]; then
+    jq -cn --arg lane "$lane" --arg url "$url" --arg route "$route" --arg source "$src" \
+      --argjson opened "$opened" '{lane: $lane, url: $url, route: $route, source: $source, opened: $opened}'
+  else
+    printf '%s\n' "$url"
+  fi
+}
+
 # qa_cli <args> — the `cckit qa` verb.
 qa_cli() {
   # Every local gets a value: bin/cckit runs under `set -u`, and a bare `local x` is UNSET.
-  local sub="${1:-}" lane="" limit="" pid="" d="" rc=0
+  local sub="${1:-}" lane="" limit="" pid="" d="" rc=0 pr="" route="" only=0 penv=""
   case "$sub" in
-    up|ready) shift ;;
+    up|ready|open) shift ;;
     ''|-h|--help|help)
       cat >&2 <<'EOF'
 cckit qa up    [--lane <n>] [--timeout <s>]   launch the declared stack command with this lane's
                                               ports, then wait until every readiness probe answers
 cckit qa ready [--lane <n>] [--timeout <s>]   wait on a lane that is already launched
+cckit qa open  [--lane <n>] [--pr <n>] [--route </path>] [--port-env <NAME>] [--print]
+                                              open the screen the change touched on a usable lane
 
 The lane is the issue number in the current branch, or --lane. Exit 0 only when the stack is
 USABLE: every qa.readiness probe answered 2xx/3xx in one round (a redirect to sign-in is up).
 Exit 1 names the launch log. Reads the `qa` block recorded by kit-add.sh qa.
+
+open lands on http://localhost:<lane port><route>. The route is the `QA route: /path` line in the
+lane's PR body (--pr picks another PR), else the configured qa.route; --route overrides both. The
+port is the first qa.ports variable, or --port-env. A lane that is not usable right now is refused
+(exit 1). --print prints the URL without opening a browser.
 EOF
       return 2 ;;
-    *) echo "cckit qa: unknown subcommand '$sub' — cckit qa <up|ready>" >&2; return 2 ;;
+    *) echo "cckit qa: unknown subcommand '$sub' — cckit qa <up|ready|open>" >&2; return 2 ;;
   esac
   while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -325,10 +510,27 @@ EOF
       --lane=*)    lane="${1#*=}"; shift ;;
       --timeout)   limit="${2:-}"; shift; [ "$#" -gt 0 ] && shift ;;
       --timeout=*) limit="${1#*=}"; shift ;;
+      --pr|--route|--port-env|--print|--pr=*|--route=*|--port-env=*)
+        [ "$sub" = open ] || { echo "cckit qa $sub: '${1%%=*}' belongs to cckit qa open" >&2; return 2; }
+        case "$1" in
+          --print)      only=1; shift ;;
+          --pr)         pr="${2:-}"; shift; [ "$#" -gt 0 ] && shift ;;
+          --pr=*)       pr="${1#*=}"; shift ;;
+          --route)      route="${2:-}"; shift; [ "$#" -gt 0 ] && shift ;;
+          --route=*)    route="${1#*=}"; shift ;;
+          --port-env)   penv="${2:-}"; shift; [ "$#" -gt 0 ] && shift ;;
+          --port-env=*) penv="${1#*=}"; shift ;;
+        esac ;;
       *) echo "cckit qa $sub: unknown argument '$1'" >&2; return 2 ;;
     esac
   done
   lane="$(qa_lane_id "$lane")" || return $?
+  if [ "$sub" = open ]; then
+    [ -z "$limit" ] || { echo "cckit qa open: --timeout belongs to up and ready — open does not wait" >&2; return 2; }
+    case "$pr" in *[!0-9]*) echo "cckit qa open: --pr takes a pull request number, got '$pr'" >&2; return 2 ;; esac
+    qa_open "$lane" "$pr" "$route" "$only" "$penv"
+    return $?
+  fi
   [ -n "$limit" ] || limit="${QA_READY_TIMEOUT:-120}"
 
   if [ "$sub" = up ]; then

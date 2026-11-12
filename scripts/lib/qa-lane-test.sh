@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# qa-lane-test.sh — launched and usable are different facts (#295).
+# qa-lane-test.sh — launched and usable are different facts (#295); the review route comes from
+# the work (#297).
 #
 # Hermetic: `curl` is a stub on PATH that answers from a table, the "stack" is a `sleep`, and every
-# file lands in a scratch repo. Nothing listens on a port.
+# file lands in a scratch repo. Nothing listens on a port. `open`, `xdg-open` and `gh` are stubs
+# too: no browser starts and no network is touched.
 #
 # Run:  bash scripts/lib/qa-lane-test.sh
 # errors: strict — a test runner: rc 1 on any failed assertion
@@ -40,6 +42,25 @@ done < "$CURL_TABLE"
 printf '000'; exit 7
 SH
 chmod +x "$STUB/curl"
+# ── the browser openers and gh: each logs its arguments; gh answers a PR body from a file ──────
+OPEN_LOG="$TMP/open.log"; export OPEN_LOG; : > "$OPEN_LOG"
+for o in open xdg-open; do
+  cat > "$STUB/$o" <<'SH'
+#!/usr/bin/env bash
+printf '%s %s\n' "${0##*/}" "$*" >> "$OPEN_LOG"
+SH
+  chmod +x "$STUB/$o"
+done
+GH_LOG="$TMP/gh.log"; export GH_LOG; : > "$GH_LOG"
+PR_BODY="$TMP/pr.body"; export PR_BODY
+cat > "$STUB/gh" <<'SH'
+#!/usr/bin/env bash
+# stub: `gh pr view <ref> --json body --jq …` prints the body file; no file means no PR (rc 1).
+printf '%s\n' "$*" >> "$GH_LOG"
+[ -f "$PR_BODY" ] || { echo "no pull requests found" >&2; exit 1; }
+cat "$PR_BODY"
+SH
+chmod +x "$STUB/gh"
 PATH="$STUB:$PATH"; export PATH
 answers() { printf '%s\n' "$@" > "$CURL_TABLE"; }
 
@@ -146,6 +167,92 @@ t "--llm on a timeout still exits 1" "$rc" "1"
 t "--llm on a timeout says usable false and names the log" \
   "$(printf '%s' "$j" | jq -r '"\(.usable) \(.log)"')" "false $KIT_STATE_DIR/qa/7/launch.log"
 
+# ── the route line: what counts as declared (#297) ─────────────────────────────────────────────
+decl() { printf '%s\n' "$1" | qa_route_declared; }
+t "a plain QA route line"          "$(decl 'QA route: /settings/billing')" "/settings/billing"
+t "a bulleted, backticked line"    "$(decl '- QA route: `/orders/42?tab=items`')" "/orders/42?tab=items"
+t "a bold label, any letter case"  "$(decl '**qa Route:** /a')" "/a"
+t "the first usable line wins"     "$(decl "$(printf 'intro\nQA route: /one\nQA route: /two')")" "/one"
+t "CRLF bodies are read"           "$(printf 'QA route: /crlf\r\n' | qa_route_declared)" "/crlf"
+t "an unfilled template placeholder is skipped" "$(decl "$(printf 'QA route: <path>\nQA route: /real')")" "/real"
+decl 'QA route: settings' >/dev/null;             t "a value with no leading slash is not a route" "$?" "1"
+decl 'QA route: https://evil.example/x' >/dev/null; t "a full URL is not a route" "$?" "1"
+decl 'the QA route: /x is mentioned mid-sentence' >/dev/null; t "a mid-sentence mention is not a declaration" "$?" "1"
+decl 'no route here' >/dev/null;                  t "a body with no line declares nothing" "$?" "1"
+qa_route_valid '/ok/path';   t "a path is a valid route" "$?" "0"
+qa_route_valid '/a b';       t "a route with a space is refused" "$?" "1"
+qa_route_valid '/a";rm';     t "a route with a quote is refused" "$?" "1"
+
+# ── open: the screen the change touched, on the lane's own port ────────────────────────────────
+write_cfg 'exec sleep 60'
+jq '.qa.route = "/dashboard"' "$P/cckit.config.json" > "$TMP/cfg.tmp" && mv "$TMP/cfg.tmp" "$P/cckit.config.json"
+answers ":3 200" ":4 200"
+printf 'Summary of the change.\n\nQA route: /settings/billing\n' > "$PR_BODY"
+: > "$OPEN_LOG"; : > "$GH_LOG"
+url="$(qa_cli open 2>"$TMP/open.err")"; rc=$?
+t "open on a usable lane returns 0" "$rc" "0"
+t "a declared route opens on the lane's first port" "$url" "http://localhost:$web7/settings/billing"
+t "the opener got exactly that URL, once" "$(cat "$OPEN_LOG")" "open http://localhost:$web7/settings/billing"
+yes "the PR is looked up by the lane's branch" "$(cat "$GH_LOG")" "pr view task/7-review-stack"
+yes "open says where the route came from" "$(cat "$TMP/open.err")" "declared route /settings/billing"
+t "open appended one event" "$(events qa.open)" "1"
+t "the open event carries the url and the source" \
+  "$(grep '"op":"qa.open"' "$EVENTS" | jq -r '"\(.type) \(.payload.source) \(.payload.opened) \(.payload.url)"')" \
+  "op.done declared true http://localhost:$web7/settings/billing"
+
+# No declared line: the configured route is the fallback.
+printf 'Summary only, no route line.\n' > "$PR_BODY"
+: > "$OPEN_LOG"
+t "with no declared route the configured one is used" "$(qa_cli open 2>/dev/null)" "http://localhost:$web7/dashboard"
+t "the opener got the configured route" "$(cat "$OPEN_LOG")" "open http://localhost:$web7/dashboard"
+# No PR at all (gh fails) reads the same as no declared line.
+rm -f "$PR_BODY"
+t "with no PR the configured route is used" "$(qa_cli open --print 2>/dev/null)" "http://localhost:$web7/dashboard"
+
+# --pr reads another PR; --route overrides both; --port-env picks the port; --print opens nothing.
+printf 'QA route: /from-pr-31\n' > "$PR_BODY"
+: > "$GH_LOG"; : > "$OPEN_LOG"
+t "--pr reads the named PR" "$(qa_cli open --pr 31 --print 2>/dev/null)" "http://localhost:$web7/from-pr-31"
+yes "--pr is what gh was asked for" "$(cat "$GH_LOG")" "pr view 31"
+t "--route overrides the declared route" "$(qa_cli open --route /override --print 2>/dev/null)" "http://localhost:$web7/override"
+t "--port-env picks another port variable" "$(qa_cli open --port-env API_PORT --print 2>/dev/null)" "http://localhost:$api7/from-pr-31"
+t "--print opens no browser" "$(cat "$OPEN_LOG")" ""
+j="$(CCKIT_OUTPUT=json qa_cli open --print 2>/dev/null)"
+t "--llm reports the url, the source and opened" \
+  "$(printf '%s' "$j" | jq -r '"\(.url) \(.source) \(.opened)"')" "http://localhost:$web7/from-pr-31 declared false"
+# Another lane opens on ITS port.
+web8="$(sed -n 's/^WEB_PORT=//p' "$KIT_STATE_DIR/qa/8/ports")"
+t "another lane opens on its own port" "$(qa_cli open --lane 8 --route /x --print 2>/dev/null)" "http://localhost:$web8/x"
+# QA_OPENER replaces the default opener.
+: > "$OPEN_LOG"
+QA_OPENER=xdg-open qa_cli open --route /via-env >/dev/null 2>&1
+t "QA_OPENER names the opener" "$(cat "$OPEN_LOG")" "xdg-open http://localhost:$web7/via-env"
+
+# ── open refuses a lane that is not ready ──────────────────────────────────────────────────────
+opens="$(events qa.open)"
+answers ":3 200" ":4 503"
+: > "$OPEN_LOG"
+err="$(qa_cli open 2>&1 >/dev/null)"; rc=$?
+t "open on a lane that is not usable returns 1" "$rc" "1"
+yes "the refusal says the lane is not usable" "$err" "NOT usable — refusing to open"
+yes "the refusal names the probe that failed" "$err" "API_PORT http://localhost:$api7/health -> 503"
+yes "the refusal names the launch log" "$err" "$KIT_STATE_DIR/qa/7/launch.log"
+t "a refused open starts no browser" "$(cat "$OPEN_LOG")" ""
+t "a refused open emits no open event" "$(events qa.open)" "$opens"
+qa_cli open --lane 21 >/dev/null 2>&1;             t "open on a lane never launched is rc 2" "$?" "2"
+answers ":3 200" ":4 200"
+qa_cli open --route 'no-slash' >/dev/null 2>&1;    t "a --route that is not a route is rc 2" "$?" "2"
+qa_cli open --port-env NOPE_PORT >/dev/null 2>&1;  t "a --port-env the lane does not hold is rc 2" "$?" "2"
+qa_cli open --pr abc >/dev/null 2>&1;              t "a non-numeric --pr is rc 2" "$?" "2"
+qa_cli open --timeout 5 >/dev/null 2>&1;           t "--timeout on open is rc 2" "$?" "2"
+qa_cli up --route /x >/dev/null 2>&1;              t "--route on up is rc 2" "$?" "2"
+jq '.qa.route = "bad route"' "$P/cckit.config.json" > "$TMP/cfg.tmp" && mv "$TMP/cfg.tmp" "$P/cckit.config.json"
+rm -f "$PR_BODY"
+err="$(qa_cli open --print 2>&1 >/dev/null)"; rc=$?
+t "a configured route that is not a route is rc 2" "$rc" "2"
+yes "that refusal names qa.route" "$err" "qa.route"
+t "no refused open was recorded" "$(events qa.open)" "$opens"
+
 # ── a command that exits is reported at once, not at the timeout ───────────────────────────────
 write_cfg 'echo "boot failed: missing DATABASE_URL"; exit 3'
 answers "nothing 200"
@@ -191,6 +298,7 @@ qa_cli up --wat >/dev/null 2>&1;                    t "an unknown argument is rc
 yes "cckit commands lists qa" " $("$ROOT/bin/cckit" commands) " " qa "
 answers ":3 200" ":4 200"
 "$ROOT/bin/cckit" qa ready --lane 7 --timeout 5 >/dev/null 2>&1; t "cckit qa ready dispatches to the lib" "$?" "0"
+t "cckit qa open dispatches to the lib" "$("$ROOT/bin/cckit" qa open --lane 7 --route /wired --print 2>/dev/null)" "http://localhost:$web7/wired"
 
 [ "$fail" -eq 0 ] && echo "ALL OK (qa-lane)" || echo "qa-lane: FAILURES"
 exit "$fail"

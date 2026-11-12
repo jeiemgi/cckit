@@ -91,6 +91,12 @@ printf '%s' '{"qa":{"readiness":[{"env":"WEB_PORT","path":"/"},{"env":"API_PORT"
 printf 'WEB_PORT=3010\nAPI_PORT=4010\n' > "$qa_tmp/ports"
 run_zsh "qa-lane.sh :: siblings load and one probe row per service" \
   "cd '$ROOT'; unset -f kit_state_dir wt_port_slot emit_event wt_issue_number 2>/dev/null; source scripts/lib/qa-lane.sh; command -v wt_port_slot >/dev/null 2>&1 && command -v kit_state_dir >/dev/null 2>&1 && command -v emit_event >/dev/null 2>&1 && [ \"\$(qa_probe_urls '$qa_tmp/cfg.json' '$qa_tmp/ports' | cut -f2 | tr '\n' ' ')\" = 'http://localhost:3010/ http://localhost:4010/health ' ]"
+# The route parser (#297) is a sed -E + grep -E pipeline with the pattern held in a variable. It
+# must read a declared line, and skip a template placeholder, the same way under zsh.
+printf '%s\n' 'intro' '- **QA route:** `/orders/42?tab=items`' > "$qa_tmp/body.md"
+printf '%s\n' 'QA route: <path>' > "$qa_tmp/blank.md"
+run_zsh "qa-lane.sh :: a declared QA route line parses under zsh" \
+  "cd '$ROOT'; source scripts/lib/qa-lane.sh; [ \"\$(qa_route_declared < '$qa_tmp/body.md')\" = '/orders/42?tab=items' ] && ! qa_route_declared < '$qa_tmp/blank.md' >/dev/null && qa_route_valid /a/b && ! qa_route_valid 'a b'"
 rm -rf "$qa_tmp"
 
 # effort.sh :: effort_snapshot_subs — the work-record collapse (#339). `for sha in $shas` relied on
