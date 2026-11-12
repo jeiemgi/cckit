@@ -24,6 +24,7 @@
     "issue-lifecycle",
     "merge-safety",
     "gate-and-review",
+    "authoring",
     "task-management"
   ],
   "roles": ["PM", "Tech Lead", "Designer", "DevOps", "Backend", "Frontend", "QA", "Security"],

@@ -266,7 +266,7 @@ project; `.claude/skills/` and `.claude/rules/` here are the subset cckit applie
 delegation and issue lifecycle (`issue-lifecycle.md`: deliverables are native sub-issues, an
 approved plan is executed without re-confirming each merge, and a close op — not `Closes #N` —
 closes the issue) and merge safety (`merge-safety.md`: bring a branch onto the current base before
-merging, ship a coupled chain as one PR, re-run the gate on the integration branch). Every shipped rule is listed in [Rules cckit ships](https://cckit.dev/rules/) — `gate-and-review.md` (the gate blocks the push and its output goes on the PR; every AI-reviewer finding is fixed or rebutted before the merge) ships to projects and is skipped here.
+merging, ship a coupled chain as one PR, re-run the gate on the integration branch) and authoring (`authoring.md`: docs and README change with the behaviour, a pasted prompt carries no issue number, a summary names the work and drops machine flags). Every shipped rule is listed in [Rules cckit ships](https://cckit.dev/rules/) — `gate-and-review.md` (the gate blocks the push and its output goes on the PR; every AI-reviewer finding is fixed or rebutted before the merge) ships to projects and is skipped here.
 It is a subset on purpose: several templates target stacks cckit does not have.
 `scripts/self-install-test.sh` holds the manifest, the reason for every skip, and the assertion that
 the installed copies have not drifted from their templates.

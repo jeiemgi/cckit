@@ -30,7 +30,8 @@ bad() { echo "FAIL: $*"; fail=1; }
 INSTALLED_SKILLS='concrete verbatim
 karpathy-guidelines verbatim'
 
-INSTALLED_RULES='branch-naming verbatim
+INSTALLED_RULES='authoring verbatim
+branch-naming verbatim
 communication-style rendered
 delegation-brief sections
 effort-model rendered

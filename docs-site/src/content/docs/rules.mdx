@@ -25,6 +25,7 @@ cckit init --dry-run
 | [`issue-lifecycle`](#issue-lifecycle) | deliverables as native sub-issues, approved-plan autonomy, explicit closes | all five |
 | [`merge-safety`](#merge-safety) | rebase onto the current base before merging, a coupled chain as one PR, the gate re-run on the integration branch | all five |
 | [`gate-and-review`](#gate-and-review) | the gate blocks the push and its output goes on the PR; every AI-reviewer finding is fixed or rebutted before the merge | all five |
+| [`authoring`](#authoring) | docs and README updated in the same change, no issue numbers in pasted prompts, summaries that name the work without machine flags | all five |
 | `mempalace` | the persistent-memory protocol — written only when memory is on | all five |
 | `knowledge-base` | frontmatter and the index for the project's knowledge docs | software, content, research, automation |
 | `plan-output-format` | a plan is a file with a `## Deliverables` table | software, content, research, automation |
@@ -135,3 +136,25 @@ pr_attach_evidence <pr-number> gate.log "gate"
 See [Captain merge policy](/config-and-permissions/#captain-merge-policy),
 [the agent review stage](/config-and-permissions/#the-agent-review-stage) and
 [Codified review gates](/review-gates/) for the lint that turns a recurring finding into a gate.
+
+### authoring
+
+`templates/rules/authoring.md` — three conventions about what gets written alongside the work: the
+docs, the prompts in those docs, and the summary handed back to a person.
+
+| Convention | Where it came from | Wins against |
+| --- | --- | --- |
+| Docs and README are acceptance criteria of every unit of work, updated in the same change, never a follow-up | a stated rule: the maintainer made the docs and README update mandatory for every unit, small changes included. It was written down only for `plan-next` output, a rule no profile ships | `plan-next` on where a sub-issue's own docs go — in that sub's commit, not deferred to the plan's docs sub-issue, which stays for what no single sub owns |
+| A prompt meant to be pasted carries no issue number: it tells the agent to read the board and lets you pick | tutorial prompts shipped with literal numbers (`cckit orchestrate 46 47 48`) that were the author's issues, not the reader's | `naming-and-ids`, for a prompt only: that rule says how to write a reference, this one says a prompt has none |
+| A summary for a person names the work as `slug #N` and attaches no output-mode flag to a verb it only mentions | recaps carried `cckit … --llm` beside each verb; the maintainer's response was that the tags said nothing | `naming-and-ids` wins on the identifier where it is installed (`E241`, `PR 268`); this rule wins on the name always accompanying it |
+
+What each one asks for in practice:
+
+- **Docs.** Search for the verb, flag, config key or path your change touches. Every match the diff
+  leaves stale is unfinished work. A change with no visible behaviour owes no doc edit; say so in
+  the PR body in one line.
+- **Prompts.** Write *sync the board, show me what is ready, and I will pick*. In a command line use
+  a placeholder (`cckit start <issue>`) or a form that selects for itself (`cckit next`). A commit,
+  a PR body or a changelog still cites the real number: those describe one repository's history.
+- **Summaries.** A command belongs in a summary when you are going to run it next, written exactly
+  as typed. A flag that is evidence in a PR body — the command that ran and its exit code — stays.
