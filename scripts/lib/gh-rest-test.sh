@@ -151,6 +151,11 @@ tc "$GH_LOG" '^api repos/o/r/issues/7 -X PATCH -f labels\[\]=kind:fix -f labels\
 tc "$tmp/out" 'https://github.com/o/r/pull/7'       "pr: prints the PR url"
 t  "pr: the board notice is printed once"           "$(grep -c 'board step skipped' "$tmp/err")" "1"
 
+: > "$GH_LOG"
+kto_task_pr 42 "Did the thing." --base main >/dev/null 2>&1; rc=$?
+t  "pr --base: rc 0 over REST"                      "$rc" "0"
+tc "$GH_LOG" '^api repos/o/r/pulls -X POST .*-f head=fix/42-the-thing -f base=main' "pr --base: the explicit base is sent in POST pulls"
+
 # cckit new
 : > "$GH_LOG"
 unset _CCKIT_BOARD_NOTICE_DONE; num="$(kto_task_new "Add a thing" tech-lead task p2 M1 "" "" "Body." 2>"$tmp/err" | tail -1)"; rc=$?

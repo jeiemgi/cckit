@@ -55,5 +55,42 @@ KIT_PR_TITLE_STYLE=conventional kto_task_pr 43 "Other." >/dev/null 2>&1
 tc "$GH_LOG" 'pr create .*--title fix: Fix the thing' "conventional (default): a Conventional Commits title"
 grep -q 'For the orchestrator' "$GH_LOG" && { echo "FAIL: section present with the switch off"; fail=1; } || echo "ok: no section with the switch off"
 
+# --base (#391): an explicit base wins over the configured one; the flag is never a positional.
+: > "$GH_LOG"; git checkout -q -b task/44-release
+echo three > tracked.txt
+kto_task_pr 44 "Release." --base release >/dev/null 2>&1
+t  "--base: rc 0"                            "$?" "0"
+tc "$GH_LOG" 'pr create .*--base release --head task/44-release' "--base: the PR targets the given base"
+t  "--base is not taken as the commit message" "$(git log -1 --format=%s)" "fix: Fix the thing"
+: > "$GH_LOG"
+kto_task_pr 44 "Release." >/dev/null 2>&1
+tc "$GH_LOG" 'pr create .*--base main --head task/44-release' "no --base: the PR targets the configured base"
+: > "$GH_LOG"
+kto_task_pr --base=release 44 "Release." >/dev/null 2>&1
+tc "$GH_LOG" 'pr create .*--base release --head task/44-release' "--base=<branch> before the positionals"
+: > "$GH_LOG"
+kto_task_pr 44 "Release." "custom subject" --base release >/dev/null 2>&1
+tc "$GH_LOG" 'pr create .*--base release ' "--base after an explicit commit message"
+
+: > "$GH_LOG"; git checkout -q -b task/45-no-value
+echo four > tracked.txt
+kto_task_pr 45 "No value." --base >/dev/null 2>"$tmp/err"
+t  "--base with no value: rc 2"              "$?" "2"
+tc "$tmp/err" '[-]-base needs a branch'      "--base with no value: says what is missing"
+t  "--base with no value: no gh call"        "$(wc -l < "$GH_LOG" | tr -d ' ')" "0"
+t  "--base with no value: nothing pushed"    "$(git ls-remote --heads origin task/45-no-value | wc -l | tr -d ' ')" "0"
+t  "--base with no value: nothing committed" "$(git status --porcelain --untracked-files=no | wc -l | tr -d ' ')" "1"
+kto_task_pr 45 "No value." --base= >/dev/null 2>&1
+t  "--base= (empty): rc 2"                   "$?" "2"
+
+# the dispatcher: `cckit pr --help` prints the usage and reaches neither gh nor the remote.
+: > "$GH_LOG"
+out="$("$LIB/../../bin/cckit" pr --help 2>/dev/null)"
+t  "cckit pr --help: rc 0"                   "$?" "0"
+case "$out" in *'[--base <branch>]'*) echo "ok: cckit pr --help shows --base" ;; *) echo "FAIL: cckit pr --help -> '$out'"; fail=1 ;; esac
+t  "cckit pr --help: no gh call"             "$(wc -l < "$GH_LOG" | tr -d ' ')" "0"
+grep -qE '^#   cckit pr <issue> <summary> \[--base <branch>\]' "$LIB/../../bin/cckit" \
+  && echo "ok: the usage header shows --base" || { echo "FAIL: usage header lacks --base"; fail=1; }
+
 [ "$fail" -eq 0 ] && echo "kto-task-pr: all passed" || echo "kto-task-pr: FAILURES"
 exit "$fail"
