@@ -34,7 +34,7 @@ One issue becomes one branch, one worktree, one PR. These verbs walk that path.
 
 | Verb | Purpose |
 | --- | --- |
-| `cckit next [--effort N]` | The unblocked set + how to start the top issue. |
+| `cckit next [--effort N]` | The unblocked set + how to start the top issue. Human output ends with the weekly cadence line: Monday `cckit plan`, daily `cckit next`, Friday `cckit gc`. `--llm` rows stay `{number,ctx,title}`. |
 | `cckit start <issue> [slug]` | Create an isolated worktree + branch for an issue, [bootstrapped](/config-and-permissions/#worktree-bootstrap) — env files copied, dev port assigned, deps installed at the selected targets (`worktree.installPaths` if set — those dirs regardless of their manifests — else a root that declares dependencies or is a workspace root with members, else nothing). [Claim-checked](#session-claims): refused when another live session already holds the issue, unless `--force` / `KIT_FORCE=1`. |
 | `cckit claims` | List the live [session claims](#session-claims) — issue, session pid, start time, branch, worktree. Read-only. `--llm` returns a JSON array. |
 | `cckit pr <issue> <summary> [--base <branch>]` | Commit, push, and open the PR. `--base <branch>` opens it against a branch other than the configured base — a release PR from `develop` to `main`, or a hotfix to the release branch — with the same labels, milestone and board steps. The push exports the target as `KIT_PR_BASE`, so a git pre-push hook can compare against the branch the PR targets. |
@@ -44,7 +44,7 @@ One issue becomes one branch, one worktree, one PR. These verbs walk that path.
 | `cckit merge [<pr>] [--merge\|--rebase]` | Merge the PR (squash by default), close its linked issues, clean the branch and worktree, and update the PR's base, which may be an `effort/<N>` branch. Refuses a PR whose **head** is `effort/*` and names `cckit effort close <N>`; `KIT_FORCE=1` merges anyway, with a warning. |
 | `cckit sync` | Board state: issues by role with Project Status, a merge-ordered open-PR queue, and blocked / not-on-board / stale (>14d) flags. |
 | `cckit sync --json \| --write \| --cached [TTL] \| --watch [SECS] \| --plan` | The same board as one cached JSON document for a TUI or statusline — see [Board cache and watch mode](#board-cache-and-watch-mode). |
-| `cckit status` | "Where are we?" in three buckets — local undone work, open PRs waiting on a human, cleanup available (local + remote) — plus the board and the resume handoff, and one line with the resident instruction-file total. Read-only. |
+| `cckit status` | "Where are we?" in three buckets — local undone work, open PRs waiting on a human, cleanup available (local + remote) — plus the board, the next effort that can start in each flow, and the resume handoff, and one line with the resident instruction-file total. Read-only. |
 | `cckit handoff "<note>"` | Save a resume-here note for the next session. |
 
 
@@ -102,9 +102,28 @@ In Claude Code the same report is `/kit-status`, and it answers the question in 
 The `ai-review` verdict only appears when the repo evidently uses an AI reviewer — a reviewer config file, or an AI review already present on another open PR. In a repo with none, it never fires.
 
 ```bash
-cckit status          # the three buckets
-cckit status --llm    # the same verdicts as JSON: local_undone, worktrees, prs, cleanup
+cckit status          # the board, the next effort per flow, the three buckets
+cckit status --llm    # the same verdicts as JSON: local_undone, worktrees, prs, cleanup, next_efforts
 ```
+
+### Next effort per flow
+
+Between the board and the three buckets, `cckit status` prints one row per flow that has an open effort: the effort that can start now. It reads the open issues carrying the `effort` label (the label `cckit effort new` applies), groups them by their `flow:` label, and in each flow picks:
+
+1. only efforts with **no open blocker** — any open `blocked_by` issue blocks, whether it is an effort in the same flow, an effort in another flow, or a plain issue. A closed blocker does not.
+2. among those, the most urgent `priority:pN` (p0 → p3, unlabelled last), then the lowest issue number.
+
+The last column counts the flow's efforts still waiting on an open blocker. A flow where every effort is blocked keeps its row and says none can start. The section also states its own emptiness: when no open issue carries the `effort` label it says so, and when the efforts could not be read (gh or jq absent, unauthenticated, offline) it says that instead — the two never look alike. The read costs one `gh issue list` plus one `gh api` call per open effort.
+
+In `--llm` output the same rows are the `next_efforts` array:
+
+```json
+{ "flow": "core", "number": 241, "ctx": "L", "title": "steady progress order and cadence", "waiting": 1 }
+```
+
+`number`, `ctx` and `title` are `null` for a flow where nothing can start. `next_efforts` itself is `null` — not `[]` — when the efforts could not be read. That alone does not change the exit status, which still follows `prs_read`.
+
+Below the table both `cckit status` and `cckit next` print the same weekly cadence line: Monday `cckit plan` orders the week, `cckit next` daily picks up one issue, Friday `cckit gc` reports what can be pruned.
 
 ## Verb ↔ skill map
 
