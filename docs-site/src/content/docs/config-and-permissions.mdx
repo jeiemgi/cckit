@@ -379,6 +379,33 @@ origin, and a `<slug>` argument was resolved before it, which can run `gh issue 
 `cckit start <issue>` (a plain task worktree) has no WIP limit. Full behaviour:
 [Only so many efforts at once](/efforts-and-waves/#only-so-many-efforts-at-once).
 
+## Effort close hooks
+
+`cckit effort close` runs two optional project hooks. Both are paths to an executable; a relative
+path resolves against the main checkout. cckit ships neither.
+
+```json
+{
+  "effort": {
+    "preCloseHook": "scripts/pre-close.sh",
+    "knowledgeIngestHook": "scripts/ingest-effort.sh"
+  }
+}
+```
+
+| Key | Called as | When | On failure | Env override |
+| --- | --- | --- | --- | --- |
+| `effort.preCloseHook` | `<hook> <effort#> <sub#…>`, cwd = the effort worktree | Before the snapshot and the merge | A non-zero exit refuses the close; the hook's output is printed and nothing is written. A configured hook that is missing or not executable refuses too. | `KIT_EFFORT_PRE_CLOSE_HOOK` |
+| `effort.knowledgeIngestHook` | `<hook> <effort#> <trace-dir>`, cwd = the main checkout | After the merge, the closes and the worktree cleanup | Non-fatal: the close has already landed. A missing or non-executable hook is skipped with a notice. | `KIT_EFFORT_KNOWLEDGE_HOOK` |
+
+`KIT_FORCE=1` skips the pre-close hook — it is not run — and prints
+`pre-close hook '<path>' skipped (KIT_FORCE=1)` on stderr. The same variable overrides the
+no-work-trace refusal, so a forced close bypasses both gates.
+
+The sub numbers are the effort's native sub-issues. On a wave-style close (no `effort/<N>` branch
+anywhere) there is no effort worktree: the pre-close hook runs from the checkout the close was
+invoked in, after every sub is verified closed with a merged PR and before the trace is written.
+
 ## Agent profiles
 
 A **profile** is a named agent configuration: which CLI to run, roughly what it costs, under which

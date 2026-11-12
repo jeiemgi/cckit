@@ -123,6 +123,8 @@ works out of the box in any configured repo (an explicit `EFFORT_FLOWS` env var 
 `cckit effort close` is likewise the **single close implementation** (the `/kit-effort-close` skill is a thin caller
 of the same function): pre-squash work-record snapshot + metrics, squash-merge, close parent + subs, board
 Status=Done, worktree/branch GC, an optional knowledge-ingest hook, and an advisory kit-sync drift check.
+A project gate goes in `effort.preCloseHook`: it runs as `<hook> <effort#> <sub#…>` from the effort worktree
+before the snapshot and the merge, a non-zero exit refuses the close, and `KIT_FORCE=1` skips it with a notice.
 
 The GitHub issue **number** stays the canonical key, but every effort also has a memorable **slug** handle (the one
 already in its `effort/<N>-<slug>` branch). Effort commands take the slug *or* the number interchangeably:

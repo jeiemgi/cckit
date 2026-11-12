@@ -918,6 +918,42 @@ _eo_knowledge_ingest() {
   ( cd "${root:-/}" && "$hook" "$num" "$trace" ) >/dev/null 2>&1 || echo "effort_close: knowledge-ingest hook failed (non-fatal)" >&2
 }
 
+# _eo_pre_close_hook <num> <repo> <root> <cwd> [<subs>] — optional project gate that runs BEFORE the
+# close writes anything (#380). Runs a project-configured command (effort.preCloseHook, or
+# KIT_EFFORT_PRE_CLOSE_HOOK) as `<hook> <effort#> <sub#…>` with cwd = <cwd> (the effort worktree; the
+# checkout the close was run from on the wave path). <subs> is a newline-separated sub list; when
+# omitted the native sub-issues are read from GitHub. Returns 1 — the caller refuses the close —
+# when the hook exits non-zero, or is configured but not executable: a gate that cannot run must not
+# pass. The hook's stdout + stderr go to stderr. KIT_FORCE=1 skips the hook and says so. A NO-OP
+# (rc 0, no GitHub read) when no hook is configured — the kit ships no default hook.
+_eo_pre_close_hook() {
+  local num="$1" repo="$2" root="$3" cwd="$4" subs="${5:-}" hook="" cfg sub rc
+  hook="${KIT_EFFORT_PRE_CLOSE_HOOK:-}"
+  if [ -z "$hook" ]; then
+    cfg="${KIT_CONFIG:-}"; [ -n "$cfg" ] || { [ -f "$root/cckit.config.json" ] && cfg="$root/cckit.config.json" || cfg="$root/.claude/kit.config.json"; }
+    [ -f "$cfg" ] && command -v jq >/dev/null 2>&1 \
+      && hook="$(jq -r '.effort.preCloseHook // empty' "$cfg" 2>/dev/null)"
+  fi
+  [ -n "$hook" ] || return 0
+  case "$hook" in /*) : ;; *) hook="$root/$hook" ;; esac   # resolve a relative hook against the root
+  if [ "${KIT_FORCE:-0}" = "1" ]; then
+    echo "effort_close: pre-close hook '$hook' skipped (KIT_FORCE=1)" >&2; return 0
+  fi
+  [ -x "$hook" ] || { echo "effort_close: pre-close hook '$hook' is configured but not executable — refusing to close #$num (nothing was written). Fix effort.preCloseHook, or set KIT_FORCE=1 to skip it." >&2; return 1; }
+  [ "$#" -ge 5 ] || subs="$(gh api "repos/$repo/issues/$num/sub_issues" --jq '.[].number' 2>/dev/null)"
+  set -- "$num"
+  while IFS= read -r sub; do
+    [ -n "$sub" ] && set -- "$@" "$sub"
+  done <<EOF_SUBS
+$subs
+EOF_SUBS
+  echo "  → pre-close hook: $hook $*" >&2
+  ( cd "${cwd:-.}" && "$hook" "$@" ) 1>&2; rc=$?
+  [ "$rc" -eq 0 ] && return 0
+  echo "effort_close: pre-close hook exited $rc — refusing to close #$num (nothing was written). Fix what it reports, or set KIT_FORCE=1 to skip it." >&2
+  return 1
+}
+
 # effort_close <N> — the SINGLE close implementation (#148): the /kit-effort-close skill is a thin
 # caller of this function, never a second close. Snapshot per-sub diffs + capture metrics BEFORE the
 # squash (the squash erases the per-sub history), REFUSE to squash if no work trace was captured
@@ -947,6 +983,10 @@ effort_close() {
   root="$(git worktree list --porcelain 2>/dev/null | awk '/^worktree /{print $2; exit}')"
   self_wt="$(git rev-parse --show-toplevel 2>/dev/null)"
   _eo_source_metrics
+
+  # (pre) optional project gate (effort.preCloseHook, #380) — before the snapshot, so a refusal
+  # writes nothing: no trace, no metrics row, no merge.
+  _eo_pre_close_hook "$num" "$repo" "$root" "$self_wt" || return 1
 
   # (a) snapshot the per-sub-issue diffs while the unsquashed history still exists (echoes the trace dir).
   trace_dir="$(effort_snapshot_subs "$num" "origin/$base" 2>/dev/null)"
@@ -1100,6 +1140,11 @@ _eo_close_wave() {
     printf '%s\n' "$bad" >&2
     return 1
   fi
+
+  # (pre) the same optional project gate as the branch path (#380), before the trace is written.
+  # There is no effort worktree here, so it runs from the checkout the close was invoked in.
+  _eo_pre_close_hook "$num" "$repo" "$root" "$(git rev-parse --show-toplevel 2>/dev/null)" \
+    "$(printf '%s\n' "$rows" | cut -d'|' -f1)" || return 1
 
   # (c) the work trace, from the merged sub PR diffs (the record the per-sub squashes left behind).
   # Same refuse-without-trace backstop as the branch path (#120) — KIT_FORCE=1 overrides.

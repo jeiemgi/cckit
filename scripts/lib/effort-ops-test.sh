@@ -136,6 +136,36 @@ echo "kit-managed" > .claude/skills/demo.md   # a kit-managed path → the drift
 git -c user.email=t@t -c user.name=t add file.txt .claude/skills/demo.md
 git -c user.email=t@t -c user.name=t commit -q -m "feat: do the thing (#101)"
 
+# ── effort_close #380: effort.preCloseHook — a project gate that runs BEFORE the snapshot + merge ──
+# The hook is called as `<hook> <effort#> <sub#…>` from the effort worktree. Non-zero refuses the
+# close with nothing written; KIT_FORCE=1 skips it and says so. Subs 101 + 102 come from the stub.
+cat > "$stub/prehook" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" > "$PREHOOK_MARKER"
+pwd -P > "$PREHOOK_MARKER.cwd"
+echo "PREHOOK-SAYS: gate output"
+exit "${PREHOOK_RC:-0}"
+SH
+chmod +x "$stub/prehook"
+export PREHOOK_MARKER="$tmp/prehook.out"
+# (1) a failing hook, configured through effort.preCloseHook in the config: refuse, write nothing.
+printf '{"effort":{"preCloseHook":"%s"}}\n' "$stub/prehook" > "$tmp/prehook-config.json"
+: > "$GH_LOG"
+close_out="$(PREHOOK_RC=1 KIT_CONFIG="$tmp/prehook-config.json" effort_close 99 2>&1)"; rc=$?
+t  "pre-close hook: a failing hook refuses the close (rc 1)" "$rc" "1"
+case "$close_out" in *"PREHOOK-SAYS: gate output"*) echo "ok: pre-close hook: the hook's output is printed" ;; *) echo "FAIL: pre-close hook output missing: $close_out"; fail=1 ;; esac
+case "$close_out" in *"pre-close hook"*"refus"*) echo "ok: pre-close hook: the refusal names the hook" ;; *) echo "FAIL: pre-close refusal message: $close_out"; fail=1 ;; esac
+t  "pre-close hook: a failing hook merges nothing" "$(grep -c 'pr merge' "$GH_LOG")" "0"
+t  "pre-close hook: a failing hook writes no trace" \
+   "$(ls "$(git rev-parse --git-common-dir)/traces/effort-99" 2>/dev/null | grep -cE '(\.diff|\.meta|index\.jsonl)$')" "0"
+# a configured hook that is missing is a gate that cannot run — refuse rather than skip it
+: > "$GH_LOG"
+close_out="$(KIT_EFFORT_PRE_CLOSE_HOOK="$stub/no-such-hook" effort_close 99 2>&1)"; rc=$?
+t  "pre-close hook: a missing hook refuses the close (rc 1)" "$rc" "1"
+t  "pre-close hook: a missing hook merges nothing" "$(grep -c 'pr merge' "$GH_LOG")" "0"
+rm -f "$PREHOOK_MARKER" "$PREHOOK_MARKER.cwd"
+PREHOOK_WT="$(pwd -P)"
+
 # ── effort_close #394: a CONFLICTING PR is refused before the metrics capture writes a row ──────
 : > "$GH_LOG"
 close_out="$(GH_MERGEABLE=CONFLICTING effort_close 99 2>&1)"; rc=$?
@@ -155,10 +185,13 @@ project_set_single_select()  { echo "$*" >> "$BOARD_LOG"; }
 export KIT_PROJECTS_V2="true" STATUS_FIELD_ID="SF1" STATUS_OPT_DONE="OPT_DONE"
 
 : > "$GH_LOG"
-close_out="$(effort_close 99 2>&1)"; rc=$?
+# (#380 case 2) a passing pre-close hook rides this happy path: called with effort + subs, close proceeds.
+close_out="$(KIT_EFFORT_PRE_CLOSE_HOOK="$stub/prehook" effort_close 99 2>&1)"; rc=$?
 export KIT_PROJECTS_V2="false"
 cd "$tmp/work"   # our cwd (the effort worktree) is GC'd by the close — step to the main checkout
 t  "effort_close succeeds with a trace (rc 0)" "$rc" "0"
+t  "pre-close hook: called as <hook> <effort#> <sub#…>" "$(cat "$PREHOOK_MARKER" 2>/dev/null)" "99 101 102"
+t  "pre-close hook: runs from the effort worktree" "$(cat "$PREHOOK_MARKER.cwd" 2>/dev/null)" "$PREHOOK_WT"
 tc "$GH_LOG" 'pr merge effort/99-demo .*--squash' "effort_close squash-merges the PR"
 tc "$GH_LOG" 'issue close 101'  "effort_close closes sub #101"
 tc "$GH_LOG" 'issue close 99 '  "effort_close closes the parent"
@@ -186,8 +219,12 @@ chmod +x "$stub/khook"
 start_out="$(effort_start 88 forced 2>/dev/null)"
 cd "$tmp/work/.claude/worktrees/effort+88-forced"
 : > "$GH_LOG"
-forced_out="$(KHOOK_MARKER="$tmp/khook.out" KIT_EFFORT_KNOWLEDGE_HOOK="$stub/khook" KIT_FORCE=1 effort_close 88 2>&1)"
+# (#380 case 3) the same KIT_FORCE=1 skips a failing pre-close hook — it is never run — and says so.
+rm -f "$PREHOOK_MARKER"
+forced_out="$(PREHOOK_RC=1 KIT_EFFORT_PRE_CLOSE_HOOK="$stub/prehook" KHOOK_MARKER="$tmp/khook.out" KIT_EFFORT_KNOWLEDGE_HOOK="$stub/khook" KIT_FORCE=1 effort_close 88 2>&1)"
 cd "$tmp/work"
+case "$forced_out" in *"pre-close hook"*"skipped (KIT_FORCE=1)"*) echo "ok: pre-close hook: KIT_FORCE=1 says the hook was skipped" ;; *) echo "FAIL: no pre-close skip notice: $forced_out"; fail=1 ;; esac
+t  "pre-close hook: KIT_FORCE=1 does not run the hook" "$([ -e "$PREHOOK_MARKER" ] && echo ran || echo skipped)" "skipped"
 tc "$GH_LOG" 'pr merge effort/88-forced .*--squash' "KIT_FORCE=1 close merges despite no trace"
 t  "knowledge-ingest hook ran with the effort number" "$(cat "$tmp/khook.out" 2>/dev/null)" "ingested 88"
 # #371: the close GCs the worktree it was run from; the hook must run in the main checkout, not in
@@ -206,6 +243,13 @@ close_out="$(effort_close 78 2>&1)"; rc=$?
 t  "wave close refuses while a sub is open (rc 1)" "$rc" "1"
 case "$close_out" in *"not done"*"#202"*) echo "ok: wave refuse lists the straggler sub" ;; *) echo "FAIL: wave refuse output: $close_out"; fail=1 ;; esac
 t  "wave refuse closes nothing" "$(grep -c 'issue close' "$GH_LOG")" "0"
+
+# #380: the wave path has no effort worktree; the hook runs from the checkout the close was run in.
+: > "$GH_LOG"; rm -f "$PREHOOK_MARKER"
+close_out="$(PREHOOK_RC=1 KIT_EFFORT_PRE_CLOSE_HOOK="$stub/prehook" effort_close 77 2>&1)"; rc=$?
+t  "pre-close hook: a failing hook refuses a wave close (rc 1)" "$rc" "1"
+t  "pre-close hook: wave hook gets the effort + its subs" "$(cat "$PREHOOK_MARKER" 2>/dev/null)" "77 301 302"
+t  "pre-close hook: a refused wave close closes nothing" "$(grep -c 'issue close' "$GH_LOG")" "0"
 
 # happy: every sub CLOSED with a merged PR → trace from the PR diffs → parent closed, board Done
 # for parent + subs, drift check fires off the union of the merged PR diffs
