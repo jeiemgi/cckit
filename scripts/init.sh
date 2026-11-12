@@ -463,6 +463,14 @@ case "$LOCAL_LAYER" in on|true|yes) LOCAL_ON="true";; *) LOCAL_ON="false";; esac
 # stack-gated build skills present in this profile?
 if echo "$SKILLS" | grep -qE '^(feature-build-refine|supabase-patterns)$'; then STACK_SKILLS_ON="true"; else STACK_SKILLS_ON="false"; fi
 
+# code graph (an integration, switched on by `cckit add <id>` — never by an init flag). A fresh
+# scaffold therefore has it off; only --upgrade can find it on, in the project's existing config.
+CODEGRAPH_ON="false"
+if [[ $UPGRADE -eq 1 ]]; then
+  _cg="$(jq -r '.codeGraph.provider // ""' "$UP_CFG" 2>/dev/null || true)"
+  [[ -n "$_cg" && "$_cg" != "none" ]] && CODEGRAPH_ON="true"
+fi
+
 # FLAGS_ON drives <!-- IF:X --> resolution
 FLAGS_ON=""
 [[ "$MEMORY_BOOL" == "true" ]]  && FLAGS_ON="${FLAGS_ON}MEMORY,"
@@ -471,6 +479,7 @@ FLAGS_ON=""
 [[ "$DESIGN_ON" == "true" ]]        && FLAGS_ON="${FLAGS_ON}DESIGN,"
 [[ "$SPECKIT_ON" == "true" ]]       && FLAGS_ON="${FLAGS_ON}SPECKIT,"
 [[ "$STACK_SKILLS_ON" == "true" ]]  && FLAGS_ON="${FLAGS_ON}STACK_SKILLS,"
+[[ "$CODEGRAPH_ON" == "true" ]]     && FLAGS_ON="${FLAGS_ON}CODEGRAPH,"
 
 # ---- build agent/skill tables -------------------------------------------
 short_desc() { sed -n 's/^description: //p' "$1" | head -1 | cut -c1-92; }
@@ -605,6 +614,7 @@ if [[ $DRY_RUN -eq 1 ]]; then
     esac
     [[ -f "$KIT_ROOT/templates/rules/$r.md" ]] && echo "    .claude/rules/$r.md"
   done
+  [[ "$CODEGRAPH_ON" == "true" ]] && echo "    .claude/rules/code-retrieval.md           (codeGraph.provider is set)"
   for a in $AGENTS; do
     [[ -f "$KIT_ROOT/templates/agents/$a.md" ]] && echo "    .claude/agents/$a/AGENT.md"
   done
@@ -713,6 +723,12 @@ for r in $RULES; do
   safe_write "$src" "$TARGET/.claude/rules/$r.md"
   echo "  + .claude/rules/$r.md"
 done
+# code-retrieval is in no profile: `cckit add <id>` writes it when a code-graph integration is
+# switched on. An upgrade re-adds it only for a project whose config already has one on.
+if [[ "$CODEGRAPH_ON" == "true" ]]; then
+  safe_write "$KIT_ROOT/templates/rules/code-retrieval.md" "$TARGET/.claude/rules/code-retrieval.md"
+  echo "  + .claude/rules/code-retrieval.md"
+fi
 
 # ---- agents --------------------------------------------------------------
 for a in $AGENTS; do
@@ -984,7 +1000,7 @@ else
   echo "  1. Review CLAUDE.md and .claude/kit.config.json"
   echo "  2. ./scripts/setup-labels.sh && ./scripts/setup-milestones.sh   # seed the repo"
   [[ "$PROJECTS_V2" == "true" ]] && echo "  3. ./scripts/capture-project-ids.sh   # cache Projects v2 field IDs"
-  [[ "$LOCAL_ON" == "true" ]] && echo "  4. /kit-doctor   # local model layer: installs mlx-lm (uv tool install) + starts mlx_lm.server"
+  [[ "$LOCAL_ON" == "true" ]] && echo "  4. /kit-doctor   # local model layer: installs mlx-lm (recipe: integrations/mlx-lm.json) + starts mlx_lm.server"
 fi
 
 exit 0

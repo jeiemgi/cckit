@@ -1,0 +1,205 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://cckit.dev/integration.schema.json",
+  "title": "cckit integration descriptor",
+  "description": "One optional third-party tool cckit can offer, install and verify. One file per tool: integrations/<id>.json. Checked by integration_validate (scripts/lib/integrations.sh), which implements exactly these keywords: type, required, properties, additionalProperties:false, items, minItems, minLength, pattern, enum. A keyword outside that list is NOT enforced — extend the validator before using one here.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "label", "summary", "config", "detect", "install", "verify", "docs", "attribution"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+      "description": "The handle typed after `cckit add`. Must equal the file name without `.json`."
+    },
+    "label": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human name shown in lists and prompts."
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1,
+      "description": "One line: what the tool does for the project."
+    },
+    "why": {
+      "type": "string",
+      "description": "Optional: what it costs and what it replaces."
+    },
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key"],
+      "description": "The project-config key that turns the integration on. Naming rule: the key names a CAPABILITY, never the vendor — `<capability>.provider` whose value names the tool (the `deploy.target` / `ci.provider` precedent in modules/software.json), or `<capability>.enabled` for a boolean switch that already exists (`memory.enabled`, `local.enabled`). A key containing the descriptor's own id is refused. Every key used here needs a property in kit.config.schema.json.",
+      "properties": {
+        "key": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9]*(\\.[A-Za-z][A-Za-z0-9]*)+$",
+          "description": "Dotted path into the project config, e.g. `codeGraph.provider`."
+        },
+        "value": {
+          "description": "The value at `key` that means ON. Omitted = boolean true."
+        }
+      }
+    },
+    "appliesWhen": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Where the tool can work. Omitted = any repo on any machine. Two kinds of condition, and every one present must hold: `anyExtension` judges the repo, `platform` judges the machine. An integration that does not apply is not offered and not installed.",
+      "properties": {
+        "anyExtension": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "pattern": "^\\.[A-Za-z0-9_+-]+$" },
+          "description": "Applies when at least one file in the repo ends in one of these extensions. Case-sensitive, leading dot. The repo's files are git's tracked + unignored list inside a work tree, otherwise every file outside .git/ and node_modules/."
+        },
+        "platform": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "The machine the tool needs. Each field present is compared to `uname` output verbatim.",
+          "properties": {
+            "os": { "type": "string", "enum": ["Darwin", "Linux"], "description": "`uname -s`." },
+            "arch": { "type": "string", "enum": ["arm64", "aarch64", "x86_64"], "description": "`uname -m`. Apple silicon reports arm64; 64-bit ARM Linux reports aarch64." }
+          }
+        },
+        "note": {
+          "type": "string",
+          "description": "Where the list was verified, and what happens to a file outside it."
+        }
+      }
+    },
+    "detect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["run"],
+      "description": "How to tell the tool is already installed.",
+      "properties": {
+        "run": { "type": "string", "minLength": 1, "description": "Command that exits 0 when the tool is present." },
+        "bin": { "type": "string", "minLength": 1, "description": "The tool's binary name, when it is not the first word of `run` (a `command -v <bin>` probe, for a tool whose own flags are slow to answer)." }
+      }
+    },
+    "install": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Install candidates, tried IN THIS ORDER; the first that works wins.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["manager", "run"],
+        "properties": {
+          "manager": {
+            "type": "string",
+            "enum": ["brew", "pipx", "uv", "npm", "pnpm", "npx", "curl"],
+            "description": "The tool that must be on the machine for this candidate to be tried."
+          },
+          "run": { "type": "string", "minLength": 1, "description": "The install command." },
+          "resident": { "type": "boolean", "description": "false when the candidate leaves no binary behind (npx). Default true." },
+          "bootstrap": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["manager", "run"],
+            "description": "How to get this candidate's `manager` when the machine has none of the descriptor's managers. Run only then: a machine that already holds any listed manager is never bootstrapped.",
+            "properties": {
+              "manager": { "type": "string", "enum": ["brew", "pipx", "uv", "npm", "pnpm", "npx", "curl"], "description": "The tool that must be on the machine for the bootstrap to be tried." },
+              "run": { "type": "string", "minLength": 1, "description": "The command that installs the candidate's manager." }
+            }
+          },
+          "note": { "type": "string" }
+        }
+      }
+    },
+    "wire": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["run"],
+      "description": "Optional per-repo step after install, for a tool that writes into the project.",
+      "properties": {
+        "run": { "type": "string", "minLength": 1, "description": "The wire command, without the declined flags." },
+        "dryRun": { "type": "string", "description": "A form of the command that prints what it would write." },
+        "writes": { "type": "array", "items": { "type": "string" }, "description": "Paths the wire step creates or edits." },
+        "declined": {
+          "type": "object",
+          "description": "Flags cckit passes to turn a tool feature OFF, each mapped to the reason. Keys are the flags, values the reasons."
+        },
+        "kept": {
+          "type": "object",
+          "description": "Tool features cckit leaves ON although it could decline them, each mapped to the evidence for that decision. Keys name the feature, values the test that was run. Never reaches the command line."
+        }
+      }
+    },
+    "build": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["run"],
+      "description": "Optional step that produces the tool's own data (an index, a graph).",
+      "properties": {
+        "run": { "type": "string", "minLength": 1 },
+        "cost": { "type": "string", "description": "What the step spends: time, network, API calls." },
+        "deep": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["run"],
+          "description": "A costlier variant of the build. cckit runs it only when `auto` is true.",
+          "properties": {
+            "run": { "type": "string", "minLength": 1 },
+            "cost": { "type": "string" },
+            "auto": { "type": "boolean", "description": "Default false: recorded for the user, never run by cckit." }
+          }
+        }
+      }
+    },
+    "verify": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["run"],
+      "description": "How to tell the installed tool works.",
+      "properties": {
+        "run": { "type": "string", "minLength": 1, "description": "Command that exits 0 when the tool is healthy." },
+        "failsOn": { "type": "string", "description": "What a non-zero exit means." },
+        "json": { "type": "string", "description": "A form of the command with machine-readable output." }
+      }
+    },
+    "rules": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$" },
+      "description": "Optional: rule templates (templates/rules/<name>.md) that `cckit add <id>` writes into the project's .claude/rules/ when the integration is switched on. A rule file already in the project is kept, never overwritten."
+    },
+    "afterInstall": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Optional: the one step cckit leaves to the user after a successful install, shown once in the install report."
+    },
+    "uninstall": {
+      "type": "string",
+      "description": "Optional command that removes what install + wire added."
+    },
+    "recheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Optional: what the scheduled recipe check should watch.",
+      "properties": {
+        "cadence": { "type": "string", "enum": ["monthly"] },
+        "drifts": { "type": "array", "items": { "type": "string" }, "description": "The parts of the recipe that go stale: package names, flag names, lists." }
+      }
+    },
+    "docs": {
+      "type": "string",
+      "pattern": "^https://",
+      "description": "The tool's own documentation."
+    },
+    "attribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["author", "homepage", "affiliated", "notice"],
+      "description": "Credit for a tool cckit did not write. Held as fields so the next integration cannot ship without them.",
+      "properties": {
+        "author": { "type": "string", "minLength": 1 },
+        "license": { "type": "string" },
+        "homepage": { "type": "string", "pattern": "^https://" },
+        "affiliated": { "type": "boolean", "description": "false when cckit has no relationship with the author." },
+        "notice": { "type": "string", "minLength": 1, "description": "The sentence shown to the user: who makes the tool and whether cckit is affiliated." },
+        "telemetry": { "type": "string", "description": "What the tool reports home, and what cckit does about it." }
+      }
+    }
+  }
+}

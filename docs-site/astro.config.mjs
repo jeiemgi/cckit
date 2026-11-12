@@ -181,6 +181,7 @@ export default defineConfig({
           { label: 'Wave', slug: 'wave' },
           { label: 'QA lane', slug: 'qa-lane' },
           { label: 'Driving cckit from agents', slug: 'agents' },
+          { label: 'Integrations', slug: 'integrations' },
           { label: 'Cookbook', slug: 'cookbook' },
           { label: 'Browser debug', slug: 'debug' },
         ]},

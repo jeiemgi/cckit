@@ -76,7 +76,10 @@ t "version is the install version, not the project's" "$got_ver" "$(jq -r '.kitV
 # `lib` belongs here rather than in SKIP: it is read-only and calls no gh, so the assertion below
 # is the guard that keeps it that way — and running it from the fixture also proves the host-project
 # degradation (a project with no scripts/lib of its own falls back to the cckit install, no crash).
-EXERCISE="sync status next plan plan-next wave gc cleanup scan doctor lib claims"
+# `add` is here for its no-argument form, the only one this loop can drive: it lists the
+# integrations and modules and writes nothing. `add <name>` mutates the project config and is
+# covered by scripts/kit-add-test.sh.
+EXERCISE="sync status next plan plan-next wave gc cleanup scan doctor lib add claims"
 for v in $EXERCISE; do
   : > "$GH_REPO_LOG"
   ( cd "$fix" && PATH="$stub:$PATH" GH_REPO_LOG="$GH_REPO_LOG" "$CCKIT" "$v" --llm >/dev/null 2>&1 )

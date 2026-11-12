@@ -5,7 +5,9 @@
 # portable to Cowork/claude.ai). The DERIVING is pure data and lives here, so it is unit-testable
 # under bash AND zsh with zero interactivity:
 #   - catalog : the question set per tier (global | project | software | qa), loaded from interview/*.json
-#               and modules/*.json — data, reviewable, not buried in bash.
+#               and modules/*.json — data, reviewable, not buried in bash. A tier that names an
+#               integration descriptor (integrations/<id>.json) gets a one-question catalog DERIVED
+#               from that descriptor, so `cckit add <integration>` runs through this same engine.
 #   - context : profile + repo detection, used to PRE-FILL per-project / wizard defaults.
 #   - render  : the catalog with every `default` resolved from context (what the skill renders).
 #   - apply   : answers {key:value} + a base config  ->  merged config JSON (no side effects).
@@ -25,6 +27,8 @@ _kit_iv_dir="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
 . "$_kit_iv_dir/kit-cli.sh"      # kit_is_main, kit_say/warn/die
 # shellcheck source=/dev/null
 . "$_kit_iv_dir/kit-profile.sh"  # kit_profile_read
+# shellcheck source=/dev/null
+. "$_kit_iv_dir/integrations.sh" # integration_file — the descriptor behind an integration tier
 
 # Plugin root = two levels up from scripts/lib/. Override with KIT_PLUGIN_ROOT (tests).
 kit_iv_plugin_root() {
@@ -45,11 +49,48 @@ kit_interview_catalog_file() {
   esac
 }
 
-# kit_interview_catalog <tier> -> the catalog JSON (verbatim)
+# kit_interview_integration_catalog <descriptor> -> a catalog JSON derived from one integration
+# descriptor: ONE select question, `enable`. `yes` sets the descriptor's `config.key` to its ON
+# value (`config.value`, or boolean true when the descriptor names none); `no` carries no `set`,
+# so declining writes nothing. The shape is the one modules/*.json uses, which is why render and
+# apply need no integration-specific branch.
+kit_interview_integration_catalog() {
+  _kit_iv_require || return 1
+  local f="${1:-}"
+  [ -f "$f" ] || { kit_warn "kit-interview: no integration descriptor at '$f'"; return 1; }
+  jq '
+    (.config) as $c
+    | (if ($c | has("value")) then $c.value else true end) as $on
+    | ($on | type) as $t
+    | { integration: .id, tier: .id, label: .label, description: .summary, title: .label,
+        intro: ([(.why // empty), .attribution.notice] | join(" ")),
+        docs: .docs,
+        questions: [
+          { key: "enable", header: (.label | .[0:12]), question: "Use \(.label) in this project?",
+            type: "select", default: "yes",
+            options: [
+              { label: "Yes", value: "yes", description: .summary,
+                set: [ { path: $c.key,
+                         value: (if $t == "string" then $on else ($on | tojson) end),
+                         valtype: (if $t == "string" then "string" elif $t == "boolean" then "bool"
+                                   elif $t == "number" then "number" else "json" end) } ] },
+              { label: "No", value: "no", description: "Leave it off. Nothing is written." }
+            ] }
+        ] }' "$f" 2>/dev/null || { kit_warn "kit-interview: cannot read integration descriptor $f"; return 1; }
+}
+
+# kit_interview_catalog <tier> -> the catalog JSON (verbatim for interview/ and modules/; derived
+# for a tier that names an integration). A module wins a name it shares with an integration.
 kit_interview_catalog() {
   _kit_iv_require || return 1
-  local f; f="$(kit_interview_catalog_file "$1")"
-  [ -f "$f" ] || { kit_warn "kit-interview: no catalog for tier '$1' ($f)"; return 1; }
+  local f ig; f="$(kit_interview_catalog_file "$1")"
+  if [ ! -f "$f" ]; then
+    case "$1" in
+      global|project) ;;
+      *) if ig="$(integration_file "$1")"; then kit_interview_integration_catalog "$ig"; return $?; fi ;;
+    esac
+    kit_warn "kit-interview: no catalog for tier '$1' ($f)"; return 1
+  fi
   jq -e . "$f" >/dev/null 2>&1 || { kit_warn "kit-interview: invalid JSON in $f"; return 1; }
   cat "$f"
 }

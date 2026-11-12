@@ -210,6 +210,25 @@
         "claudeProjectSlug": { "type": "string" }
       }
     },
+    "local": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Local model layer: natural-language chores run on this machine through mlx_lm.server. Off when absent. `enabled` is the config key of the integration descriptor integrations/mlx-lm.json.",
+      "properties": {
+        "enabled": { "type": "boolean", "description": "true = `cckit doctor` installs the runtime (with consent) and starts the server." },
+        "port": { "type": "integer", "description": "Port mlx_lm.server listens on. Default 8080." },
+        "model": { "type": "string", "description": "Model the server loads. Default mlx-community/Qwen3-8B-4bit." },
+        "dismissed": { "type": "string", "description": "kitVersion at which the \"local layer down\" session notice was dismissed (`cckit doctor --dismiss-local`)." }
+      }
+    },
+    "codeGraph": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Code-graph retrieval: agents query an index of the code instead of grepping the tree. Off when absent. Turned on by an integration descriptor (integrations/<id>.json) whose `config.key` is `codeGraph.provider`.",
+      "properties": {
+        "provider": { "type": "string", "description": "Which integration provides the code graph, as the descriptor's `config.value` names it. Absent or \"none\" = no code graph; every path that would use one skips." }
+      }
+    },
     "routines": {
       "type": "array",
       "description": "Opt-in scheduled routines accepted by the user (briefing, board sweep, gc, ...). The kit SUGGESTS; the user accepts; nothing is created without opt-in.",
