@@ -75,6 +75,14 @@ The slug is a *derived* convenience, not a second source of truth. `--slug` only
   **WIP-limited** — see [Only so many efforts at once](#only-so-many-efforts-at-once) below.
 - **`cckit effort pr`** and the `/kit-effort-pr` skill compose the PR title from **one shared
   composer**, and both refuse to open a PR whose title lacks the mandatory `[#N]` effort id.
+  The composed title is a Conventional Commit subject carrying that id —
+  `feat(core): adoption hardening [#115]` — because the PR is squash-merged and the title becomes
+  the commit release-please and the commitlint gate read. The scope is the effort's `flow:` label
+  (else the `[Flow]` tag in its title); the type is `--type <type>` when you pass it, else the
+  `kind:` label (`kind:task` → `feat`, a `bug` label → `fix`). A title that fails the commitlint
+  check — a bad `--type`, or a non-conventional `--title` — is refused before any PR is opened.
+  With [`pr.titleStyle: issue-title`](/config-and-permissions/) the title is `[Role] [#N] <name>`
+  and the commitlint check is skipped.
 - **`cckit effort close`** is the single close implementation — the `/kit-effort-close` skill is a
   thin caller of the same function, so the two can never drift apart. It snapshots each sub-issue's
   diff and captures effort metrics **before** the squash, **refuses to squash-merge when no work

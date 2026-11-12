@@ -245,7 +245,7 @@ echo work > file.txt; git add file.txt; git commit -q -m "feat: do the thing (#1
 unset _CCKIT_BOARD_NOTICE_DONE; effort_pr 99 --summary "SUMMARY" >"$tmp/out" 2>"$tmp/err"; rc=$?
 t  "effort pr: rc 0 over REST"                      "$rc" "0"
 rest_only "$GH_LOG" "effort pr: only REST calls"
-tc "$GH_LOG" '^api repos/o/r/pulls -X POST -f title=\[#99\] .*-f head=effort/99-demo -f base=main' "effort pr: POST pulls effort/99 → main"
+tc "$GH_LOG" '^api repos/o/r/pulls -X POST -f title=feat: demo effort \[#99\] .*-f head=effort/99-demo -f base=main' "effort pr: POST pulls effort/99 → main"
 tc "$GH_LOG" '^api repos/o/r/issues/7 -X PATCH -f labels\[\]=role:tech-lead -f labels\[\]=kind:task .*-F milestone=3' "effort pr: inherits labels + milestone"
 t  "effort pr: the board notice is printed once"    "$(grep -c 'board step skipped' "$tmp/err")" "1"
 

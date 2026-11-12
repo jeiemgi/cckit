@@ -103,7 +103,7 @@ cd "$tmp/work/.claude/worktrees/effort+99-demo"
 effort_pr 99 --summary "SUMMARY-MARKER" --for-agents "AGENTS-MARKER" >/dev/null 2>&1
 tc "$GH_LOG" 'pr create .*--base main --head effort/99-demo' "effort_pr opens effort/99 → main"
 # #363: parity with the kit-effort-pr skill — the verb is the one implementation.
-tc "$GH_LOG" 'pr create .*--title \[#99\] demo effort' "effort_pr titles with the [#N] id + parent name"
+tc "$GH_LOG" 'pr create .*--title feat: demo effort \[#99\]' "effort_pr titles with a conventional subject + the [#N] id"
 tc "$GH_LOG" '[-]-label role:tech-lead,kind:task' "effort_pr inherits the parent's labels"
 tc "$GH_LOG" '[-]-milestone M1'                 "effort_pr inherits the parent's milestone"
 tc "$GH_LOG" 'SUMMARY-MARKER'                                "effort_pr puts --summary in the body"
@@ -116,6 +116,21 @@ t  "effort_pr refuses a --title without the [#N] id" "$rc" "1"
 t  "effort_pr opened nothing on a bad --title"      "$(grep -c 'pr create' "$GH_LOG")" "0"
 effort_pr 99 --title "feat(x): a conventional title [#99]" >/dev/null 2>&1
 tc "$GH_LOG" 'pr create .*--title feat\(x\): a conventional title \[#99\]' "effort_pr honours --title"
+# #237: a title the commitlint gate would reject never reaches gh — built or passed in.
+: > "$GH_LOG"
+effort_pr 99 --type bogus >/dev/null 2>&1 && rc=0 || rc=1
+t  "effort_pr refuses a built title that fails commitlint" "$rc" "1"
+t  "effort_pr opened nothing on a non-conventional built title" "$(grep -c 'pr create' "$GH_LOG")" "0"
+: > "$GH_LOG"
+effort_pr 99 --title "[Tech Lead] [#99] demo effort" >/dev/null 2>&1 && rc=0 || rc=1
+t  "effort_pr refuses a non-conventional --title"   "$rc" "1"
+t  "effort_pr opened nothing on a non-conventional --title" "$(grep -c 'pr create' "$GH_LOG")" "0"
+: > "$GH_LOG"
+effort_pr 99 --type fix >/dev/null 2>&1
+tc "$GH_LOG" 'pr create .*--title fix: demo effort \[#99\]' "effort_pr --type sets the conventional type"
+: > "$GH_LOG"
+KIT_PR_TITLE_STYLE=issue-title effort_pr 99 >/dev/null 2>&1
+tc "$GH_LOG" 'pr create .*--title \[#99\] demo effort' "effort_pr issue-title style keeps the [#N] name form, no commitlint refusal"
 
 # ── effort_close #120: refuse-squash-without-trace backstop ────────────────────────────────────
 # With NO commits on the effort branch, effort_snapshot_subs captures no trace → close must refuse
