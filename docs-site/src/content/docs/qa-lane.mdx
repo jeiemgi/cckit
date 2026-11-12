@@ -103,6 +103,15 @@ waits. `ready` only waits.
 port-slot ledger `cckit start` uses, so a lane running in an issue's own worktree lands on the
 port block that worktree already holds. The stride is `worktree.devPortStride` (default `10`).
 
+**A port already in use refuses the launch.** Slot 0 is the bases themselves (`3000` and `4000`
+with the interview's defaults), which is where a dev server in the main checkout usually listens.
+Before it writes the lane's record, `up` asks `lsof` (else `ss`) who listens on each lane port. If
+anything does, `up` exits `2`, names the port and the pid, and launches nothing: the declared
+command could not bind that port, and the process already there would answer the readiness probes.
+Stop that process, or run `cckit qa stop` if it is this lane's earlier stack. With neither tool
+installed the ports are not checked, and `up` says so. A process that takes the port between the
+check and the command's own bind is not caught.
+
 **Usable is not the same as launched.** A lane is usable only when **every** `qa.readiness` probe
 answers in the same polling round:
 
@@ -192,7 +201,7 @@ commit no longer matches the head.
 ## Stop the lane — `cckit qa stop`
 
 ```sh
-cckit qa stop [--lane <n>]
+cckit qa stop [--lane <n>] [--force]
 ```
 
 The process holding a port is rarely the one that was launched: `pnpm dev` starts a runner that
@@ -200,13 +209,20 @@ starts a watcher that starts the server. Stopping the listener alone frees the p
 supervisor respawns it. So `stop`:
 
 1. Stops the supervisors, parents before children.
-2. Stops whatever listens on the lane's recorded ports (`lsof`, else `ss`).
+2. Stops the lane's own listeners on its recorded ports (`lsof`, else `ss`).
 3. Resolves the port holders again, to catch a respawn.
+
+**`stop` only signals what the lane launched**: the descendants of the recorded pid and the
+members of the lane's process group. A listener on a lane port that is in neither set is left
+running; `stop` names its pid and exits `1`. `--force` stops it as well, with its parent processes
+for as long as they share its process group — never pid 1, the calling shell or that shell's
+ancestors. Use it when the listener is this lane's stack and the record no longer ties them
+together: the root died and `up` ran without `perl`, so no process group was recorded.
 
 | Exit | Meaning |
 | --- | --- |
 | `0` | No listener is left on the lane's ports. An already-stopped lane reports "nothing stopped" and also exits `0`. |
-| `1` | A port is still held, or a process outlived `KILL`. The message names the pid. |
+| `1` | A port is still held — by a process that outlived `KILL`, or by one the lane did not launch and `--force` was not given. The message names the pid. |
 
 - Only pids that are actually gone are reported as stopped.
 - With neither `lsof` nor `ss` installed, the launched process tree is still stopped and the

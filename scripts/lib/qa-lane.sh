@@ -48,11 +48,12 @@
 #   qa_open <lane> [<pr>] [<route>] [<print-only>] [<port-env>]   hand the reviewer the changed screen
 #   qa_port_tool                            `lsof` or `ss`: what can name a port's holder; rc 1 for neither
 #   qa_port_pids <port> [<tool>]            the pids LISTENING on <port>, one per line
-#   qa_stop <lane>                          stop the lane's supervisors, then its listeners; rc 1 if a port stays held
+#   qa_port_held <port> [<tool>]            rc 0 when something listens on <port>, pid known or not
+#   qa_stop <lane> [<force>]                stop the lane's supervisors, then its listeners; rc 1 if a port stays held
 #   qa_verdict_state <lane> [<head>]        `pass` · `fail` · `stale` · `none` for the lane's verdict; rc 0 only for pass
 #   qa_verdict <lane> <pass|fail> [<pr>] [<head>] [<notes>] [<to>] [<shots>]   record it, post it, mail a fail
 #   qa_verdict_show <lane> [<pr>] [<head>]  print that state against the lane's head now
-#   qa_cli <up|ready|open|stop|verdict> [--lane N] …   the `cckit qa` verb
+#   qa_cli <up|ready|open|stop|verdict> [--lane N] …   the `cckit qa` verb (`stop --force`)
 #
 # The review route comes from the WORK, not from a smoke list: the builder writes one
 # `QA route: /path` line in the PR body (`cckit brief` asks for it when a `qa` block exists) and
@@ -77,7 +78,8 @@
 # the port holders are re-resolved to catch a respawn, default 5) · QA_PORT_TOOL (`lsof`, `ss` or
 # `none`: force the holder lookup; default is whichever exists).
 #
-# errors: strict — rc 2 on a usage or config refusal (nothing launched), rc 3 without jq or curl,
+# errors: strict — rc 2 on a usage or config refusal, or a lane port already in use (nothing
+# launched, no record written), rc 3 without jq or curl,
 # rc 1 when the lane is not usable; every rc-1 message names the launch log to read. For
 # `verdict`: rc 2 refuses before any write, rc 1 after a recorded fail whose notes reached no
 # mailbox, and reading a verdict is rc 0 only for a pass on the lane's current head.
@@ -230,6 +232,34 @@ _qa_ports_json() {
     < "$1" 2>/dev/null || printf '{}'
 }
 
+# _qa_ports_free <lane> <ports> — rc 0 when no listener holds any `NAME=port` line of <ports>;
+# rc 1 after naming every held port and its listener on stderr. With neither lsof nor ss the ports
+# cannot be checked: that is said on stderr and the launch goes on. The check and the command's
+# own bind are two moments, so a listener that arrives between them is not caught here — `qa stop`
+# leaves such a stranger running unless it is forced.
+_qa_ports_free() {
+  local lane="$1" ports="$2" tool="" line="" port="" who="" busy=""
+  tool="$(qa_port_tool)" || {
+    echo "[qa $lane] ports NOT checked before launch — neither lsof nor ss is installed" >&2
+    return 0
+  }
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    port="${line#*=}"
+    qa_port_held "$port" "$tool" || continue
+    who="$(qa_port_pids "$port" "$tool" | tr '\n' ' ')"; who="${who% }"
+    busy="$busy
+  $line is already listened on by ${who:+pid }${who:-a process this user cannot name}"
+  done <<EOF
+$ports
+EOF
+  [ -z "$busy" ] && return 0
+  echo "cckit qa: lane $lane NOT launched — a port of this lane is already in use:$busy" >&2
+  echo "  the declared command could not bind it, and that listener would answer the readiness probes." >&2
+  echo "  Stop that process, or run cckit qa stop --lane $lane if it is this lane's earlier stack." >&2
+  return 1
+}
+
 # qa_launch <lane> [<worktree>] — start the declared command in <worktree> (default: the current
 # checkout) with every declared port variable set to this lane's port. Echoes the pid.
 #
@@ -260,6 +290,10 @@ qa_launch() {
   slot="$(wt_port_slot "$wt" "$lane" "$wt")"
   case "$slot" in ''|*[!0-9]*) echo "cckit qa: could not allocate a port slot for lane $lane" >&2; return 1 ;; esac
   ports="$(qa_lane_ports "$cfg" "$slot" "$stride")"
+  # A port somebody already listens on is refused BEFORE the record exists. The declared command
+  # could not bind it, yet that listener would answer the readiness probes: the lane would read
+  # usable and `qa open` would show another app.
+  _qa_ports_free "$lane" "$ports" || return 2
   # Probe wiring is a config fact — refuse a stack nothing could ever call usable BEFORE starting it.
   mkdir -p "$d" 2>/dev/null || { echo "cckit qa: cannot create $d" >&2; return 1; }
   printf '%s\n' "$ports" > "$d/ports"
@@ -526,16 +560,19 @@ qa_open() {
 #   owned     every descendant of the recorded pid, plus every member of the lane's process group
 #             (`qa/<lane>/pgid`) — the group still names them after the root died and its children
 #             were reparented to pid 1.
-#   holders   whoever LISTENS on each recorded port right now (lsof, else ss), and each holder's
-#             ancestors for as long as they share the holder's process group.
+#   holders   whoever LISTENS on each recorded port right now (lsof, else ss).
 #
 # Everything that is not a holder is a supervisor and is stopped first, parents before children;
 # the holders go last. The holders are then resolved again, because only a port with no listener
 # proves the stack is down — a listener that came back names a supervisor the first round missed.
 #
-# The ancestor climb is bounded on purpose: it never reaches pid 1, this shell, or any ancestor of
-# this shell, and it stops at a process-group boundary, so a stranger's server on the lane's port
-# costs that server and its own job, not the terminal it was started from.
+# A holder is stopped only when it is OWNED. A listener on the lane's port that is neither in the
+# launched tree nor in the lane's group is somebody else's server (a dev server that took the port
+# after the launch-time check, or a stack whose root died with no group on record): `stop` names
+# it, leaves it running and exits 1. `--force` stops it too, with its ancestors for as long as they
+# share its process group. That climb is bounded on purpose: it never reaches pid 1, this shell, or
+# any ancestor of this shell, and it stops at a process-group boundary, so a forced stop costs that
+# server and its own job, not the terminal it was started from.
 
 # _qa_pid_started <pid> — the process start time as ps prints it; identifies a pid across reuse.
 _qa_pid_started() {
@@ -583,6 +620,19 @@ qa_port_pids() {
   return 0
 }
 
+# qa_port_held <port> [<tool>] — rc 0 when something LISTENS on TCP <port>, whether or not its pid
+# can be named: ss lists another user's listening socket without a pid, so "no pid" is not "free".
+# lsof without root shows only the caller's own sockets; there the two answers are the same.
+qa_port_held() {
+  local port="$1" tool="${2:-}"
+  case "$port" in ''|*[!0-9]*) return 1 ;; esac
+  [ -n "$tool" ] || tool="$(qa_port_tool)" || return 1
+  case "$tool" in
+    ss) [ -n "$(ss -H -ltn "sport = :$port" 2>/dev/null)" ] ;;
+    *)  [ -n "$(qa_port_pids "$port" "$tool")" ] ;;
+  esac
+}
+
 # _qa_lane_holders <ports-file> <tool> — the pids listening on any recorded port, one per line.
 _qa_lane_holders() {
   local pfile="$1" tool="$2" port=""
@@ -592,12 +642,14 @@ _qa_lane_holders() {
   done | sort -un
 }
 
-# _qa_stop_plan <root> <group> <holders> — the ordered stop list, one `sup <pid>` or `lis <pid>`
-# line each: supervisors parents-first, then the holders. <root> and <group> may be empty;
-# <holders> is whitespace-separated pids. Reads one process snapshot; zombies are left out.
+# _qa_stop_plan <root> <group> <holders> [<force>] — the ordered stop list, one `sup <pid>` or
+# `lis <pid>` line each: supervisors parents-first, then the holders. <root> and <group> may be
+# empty; <holders> is whitespace-separated pids. Reads one process snapshot; zombies are left out.
+# A holder outside the owned tree and group is planned only when <force> is 1, and only then are
+# its ancestors climbed: an owned holder's supervisors are already in the tree or the group.
 _qa_stop_plan() {
   # shellcheck disable=SC2009  # the whole table is the input — pgrep cannot give ppid and pgid
-  ps -A -o pid= -o ppid= -o pgid= -o stat= 2>/dev/null | awk -v root="$1" -v grp="$2" -v holders="$3" -v self="$$" '
+  ps -A -o pid= -o ppid= -o pgid= -o stat= 2>/dev/null | awk -v root="$1" -v grp="$2" -v holders="$3" -v force="${4:-0}" -v self="$$" '
     $4 !~ /Z/ { pp[$1] = $2; pg[$1] = $3 }
     END {
       mine[1] = 1
@@ -613,6 +665,8 @@ _qa_stop_plan() {
       for (i = 1; i <= nh; i++) {
         h = hs[i]
         if (h == "" || !(h in pp) || (h in mine)) continue
+        if (h in own) { lis[h] = 1; continue }
+        if (force != 1) continue
         own[h] = 1; lis[h] = 1
         n = 0
         for (a = pp[h]; (a in pp) && a > 1 && !(a in mine) && pg[a] == pg[h] && n < 200; a = pp[a]) { own[a] = 1; n++ }
@@ -674,18 +728,21 @@ EOF
   return 0
 }
 
-# qa_stop <lane> — stop the lane's stack and say what actually stopped.
+# qa_stop <lane> [<force>] — stop the lane's stack and say what actually stopped. <force> = 1 also
+# stops a listener on the lane's ports that the lane did not launch.
 #
 # rc 0 when the lane is down: every recorded port has no listener and nothing signalled survived.
 # That includes a lane that was already down (or never launched) — "nothing stopped" is a true
 # report, not an error, so the op is safe to re-run. rc 1 when a port is still held or a process
 # outlived KILL (another user's process, typically); the record is kept so a retry can find it.
+# A port held by a process outside the launched tree and group is rc 1 as well: it is left running
+# and named, and only <force> stops it.
 #
 # With neither lsof nor ss the holders cannot be resolved: the recorded tree and group are still
 # stopped, and the report says the ports were NOT checked rather than calling them free.
 qa_stop() {
-  local lane="$1" d="" pid="" root="" grp="" tool="" holders="" plan="" sups="" liss="" tried="" got=""
-  local stopped="" alive="" held="" p="" round=0 rounds="${QA_STOP_ROUNDS:-5}" freed="null" n=0 rc=0
+  local lane="$1" force="${2:-0}" d="" pid="" root="" grp="" tool="" holders="" plan="" sups="" liss="" tried="" got=""
+  local stopped="" alive="" held="" foreign="" p="" round=0 rounds="${QA_STOP_ROUNDS:-5}" freed="null" n=0 rc=0
   d="$(qa_lane_dir "$lane")"
   if [ ! -f "$d/ports" ] && [ ! -f "$d/pid" ]; then
     echo "[qa $lane] nothing stopped — the lane has no running stack on record" >&2
@@ -712,7 +769,7 @@ qa_stop() {
   while [ "$round" -lt "$rounds" ]; do
     round=$(( round + 1 ))
     holders="$(_qa_lane_holders "$d/ports" "$tool" | tr '\n' ' ')"
-    plan="$(_qa_stop_plan "$root" "$grp" "$holders")"
+    plan="$(_qa_stop_plan "$root" "$grp" "$holders" "$force")"
     [ -n "$plan" ] || break
     sups="$(printf '%s\n' "$plan" | awk '$1 == "sup" { print $2 }')"
     liss="$(printf '%s\n' "$plan" | awk '$1 == "lis" { print $2 }')"
@@ -751,6 +808,13 @@ EOF
   fi
   if [ -n "$held" ]; then
     echo "cckit qa: lane $lane is NOT down — still listening on its ports ($(cut -d= -f2 "$d/ports" 2>/dev/null | tr '\n' ' ')): pid $held" >&2
+    foreign=""
+    for p in $(printf '%s\n' "$held"); do
+      printf '%s' "$tried" | grep -qx "$p" || foreign="$foreign $p"
+    done
+    if [ "$force" != 1 ] && [ -n "$foreign" ]; then
+      echo "  this lane did not launch pid${foreign}, so it was left running. Stop it yourself, or run cckit qa stop --lane $lane --force to stop whatever listens there." >&2
+    fi
   elif [ -z "$tool" ]; then
     echo "[qa $lane] ports NOT checked — neither lsof nor ss is installed, so a listener outside the launched tree would go unseen" >&2
   else
@@ -990,19 +1054,21 @@ qa_verdict_show() {
 # qa_cli <args> — the `cckit qa` verb.
 qa_cli() {
   # Every local gets a value: bin/cckit runs under `set -u`, and a bare `local x` is UNSET.
-  local sub="${1:-}" lane="" limit="" pid="" d="" rc=0 pr="" route="" only=0 penv=""
+  local sub="${1:-}" lane="" limit="" pid="" d="" rc=0 pr="" route="" only=0 penv="" force=0
   local verdict="" head="" notes="" nfile="" to="" shots=""
   case "$sub" in
     up|ready|open|stop|verdict) shift ;;
     ''|-h|--help|help)
       cat >&2 <<'EOF'
 cckit qa up    [--lane <n>] [--timeout <s>]   launch the declared stack command with this lane's
-                                              ports, then wait until every readiness probe answers
+                                              ports, then wait until every readiness probe answers;
+                                              refuses (exit 2) when a lane port is already in use
 cckit qa ready [--lane <n>] [--timeout <s>]   wait on a lane that is already launched
 cckit qa open  [--lane <n>] [--pr <n>] [--route </path>] [--port-env <NAME>] [--print]
                                               open the screen the change touched on a usable lane
-cckit qa stop  [--lane <n>]                   stop the lane's stack: supervisors first, then
-                                              whatever still listens on the lane's ports
+cckit qa stop  [--lane <n>] [--force]         stop the lane's stack: supervisors first, then its
+                                              listeners. A listener the lane did not launch is
+                                              left running (exit 1) unless --force
 cckit qa verdict <pass|fail> [--lane <n>] [--pr <n>] [--head <sha>] [--note <text>]
                  [--notes-file <file>] [--shot <file>]… [--to <branch>]
                                               record the verdict against the reviewed commit
@@ -1038,6 +1104,9 @@ EOF
     case "$1" in
       --lane)      lane="${2:-}"; shift; [ "$#" -gt 0 ] && shift ;;
       --lane=*)    lane="${1#*=}"; shift ;;
+      --force)
+        [ "$sub" = stop ] || { echo "cckit qa $sub: '--force' belongs to cckit qa stop" >&2; return 2; }
+        force=1; shift ;;
       --timeout)   limit="${2:-}"; shift; [ "$#" -gt 0 ] && shift ;;
       --timeout=*) limit="${1#*=}"; shift ;;
       pass|fail)
@@ -1081,7 +1150,7 @@ EOF
   if [ "$sub" = stop ]; then
     [ -z "$limit" ] || { echo "cckit qa stop: --timeout belongs to up and ready — the stop grace is QA_STOP_GRACE" >&2; return 2; }
     command -v jq >/dev/null 2>&1 || { echo "cckit qa: jq is required" >&2; return 3; }
-    qa_stop "$lane"
+    qa_stop "$lane" "$force"
     return $?
   fi
   if [ "$sub" = verdict ]; then

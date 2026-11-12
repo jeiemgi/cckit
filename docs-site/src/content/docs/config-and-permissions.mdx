@@ -325,6 +325,9 @@ does not guess a boot command and does not write a boot script. The walkthrough 
 
 - Two `qa.ports` bases that differ by a multiple of the stride, fewer than 40 strides apart, are
   refused before anything launches — two lanes would share a port.
+- A lane port that another process already listens on refuses `cckit qa up` with exit `2`. The
+  first lane's ports are the bases themselves, so pick bases no dev server of yours uses.
+  `cckit qa stop` leaves a listener the lane did not launch running unless it is given `--force`.
 - `captain.mergePolicy.requireQa` is the one other key the lane uses; see
   [Holding merges for a QA pass](#holding-merges-for-a-qa-pass).
 - `qa` is a receipt stage, not an agent stage: it is in the [stage receipt](#stage-receipts)

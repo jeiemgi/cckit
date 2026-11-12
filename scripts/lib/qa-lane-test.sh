@@ -110,6 +110,11 @@ cd "$P" || exit 1
 # shellcheck source=/dev/null
 . "$ROOT/scripts/lib/qa-lane.sh"
 
+# The sections that launch on the default bases (3000, 4000) answer their probes from the curl stub
+# and bind nothing. `up` refuses a lane port somebody already listens on, and this machine may run
+# a dev server there, so the holder lookup is off until the stop sections, which pick free ports.
+QA_PORT_TOOL=none; export QA_PORT_TOOL
+
 # ── one probe: what counts as up ───────────────────────────────────────────────────────────────
 answers "/ok 200" "/login-wall 302" "/missing 404" "/broken 503"
 qa_probe "http://localhost:1/ok" >/dev/null;         t "a 200 is up" "$?" "0"
@@ -329,6 +334,7 @@ sleep 600;
 PL
 SUPERVISE="while :; do perl '$TMP/listen.pl'; sleep 0.1; done"
 
+unset QA_PORT_TOOL
 if ! command -v perl >/dev/null 2>&1; then
   echo "skip: stop — perl is absent, so the fixture cannot open a listener"
 elif ! qa_port_tool >/dev/null 2>&1; then
@@ -385,8 +391,16 @@ else
   printf 'WEB_PORT=%s\n' "$port31" > "$KIT_STATE_DIR/qa/31/ports"
   wait_listen "$port31"
   t "the orphaned stack holds its port" "$(listening "$port31")" "yes"
-  j="$(CCKIT_OUTPUT=json qa_cli stop --lane 31 2>/dev/null)"; rc=$?
-  t "stop finds a stack through its port when the recorded pid is dead" "$rc" "0"
+  # Nothing ties that listener to the lane: the recorded pid is dead and there is no group on
+  # record. An unforced stop leaves it running and says how to stop it.
+  err="$(qa_cli stop --lane 31 2>&1 >/dev/null)"; rc=$?
+  t "an unforced stop does not call a lane with a held port down" "$rc" "1"
+  t "an unforced stop leaves a listener it cannot tie to the lane" "$(running "$sup31")" "yes"
+  yes "an unforced stop names --force" "$err" "stop --lane 31 --force"
+  t "an unforced stop keeps the record for the retry" "$([ -f "$KIT_STATE_DIR/qa/31/ports" ] && echo yes || echo no)" "yes"
+  qa_cli up --lane 31 --force >/dev/null 2>&1; t "--force belongs to stop only" "$?" "2"
+  j="$(CCKIT_OUTPUT=json qa_cli stop --lane 31 --force 2>/dev/null)"; rc=$?
+  t "a forced stop finds a stack through its port when the recorded pid is dead" "$rc" "0"
   sleep 0.5
   t "that port has no listener after stop" "$(listening "$port31")" "no"
   t "the supervisor behind the listener is gone" "$(running "$sup31")" "no"
@@ -440,8 +454,53 @@ else
   else
     echo "ok: zsh absent — skipping the zsh stop pass (dependency-light gate)"
   fi
+
+  # (6) a port somebody already listens on refuses the launch, before any record is written. The
+  # curl stub answers 200 on that port, so without the refusal the stranger makes the lane "usable".
+  slot36="$(wt_port_slot "$P" 36 "$P")"
+  port36="$(free_port)"
+  ( WEB_PORT="$port36" exec perl "$TMP/listen.pl" ) >/dev/null 2>&1 &
+  squat36=$!; PIDS="$PIDS $squat36"
+  wait_listen "$port36"
+  write_cfg 'exec sleep 60' "[{\"env\":\"WEB_PORT\",\"base\":$(( port36 - slot36 * 10 ))}]" '[{"env":"WEB_PORT","path":"/"}]'
+  answers ":$port36 200"
+  launches="$(events qa.launch)"
+  err="$(qa_cli up --lane 36 --timeout 5 2>&1 >/dev/null)"; rc=$?
+  t "up refuses a lane whose port is already in use" "$rc" "2"
+  yes "the refusal names the port" "$err" "WEB_PORT=$port36"
+  yes "the refusal names the listener" "$err" "pid $squat36"
+  t "a refused launch writes no ports or pid record" "$([ -e "$KIT_STATE_DIR/qa/36/ports" ] || [ -e "$KIT_STATE_DIR/qa/36/pid" ] && echo yes || echo no)" "no"
+  t "a refused launch emits no launch event" "$(events qa.launch)" "$launches"
+  qa_cli open --lane 36 --print >/dev/null 2>&1; t "open on the refused lane is a refusal" "$?" "2"
+  qa_cli stop --lane 36 >/dev/null 2>&1
+  t "the listener that was there first is still running" "$(running "$squat36")" "yes"
+  t "qa_port_held sees that listener" "$(qa_port_held "$port36" && echo yes || echo no)" "yes"
+  kill "$squat36" 2>/dev/null
+
+  # (7) a listener that takes the lane's port AFTER the launch is not the lane's: stop ends the
+  # launched command, leaves the stranger, and exits 1; --force stops the stranger too.
+  slot37="$(wt_port_slot "$P" 37 "$P")"
+  port37="$(free_port)"
+  write_cfg 'exec sleep 60' "[{\"env\":\"WEB_PORT\",\"base\":$(( port37 - slot37 * 10 ))}]" '[{"env":"WEB_PORT","path":"/"}]'
+  answers ":$port37 200"
+  qa_cli up --lane 37 --timeout 5 >/dev/null 2>&1; t "a lane on a free port comes up" "$?" "0"
+  own37="$(cat "$KIT_STATE_DIR/qa/37/pid" 2>/dev/null)"; PIDS="$PIDS $own37"
+  ( WEB_PORT="$port37" exec perl "$TMP/listen.pl" ) >/dev/null 2>&1 &
+  squat37=$!; PIDS="$PIDS $squat37"
+  wait_listen "$port37"
+  err="$(qa_cli stop --lane 37 2>&1 >/dev/null)"; rc=$?
+  t "stop ends the command the lane launched" "$(running "$own37")" "no"
+  t "stop leaves a listener the lane did not launch" "$(running "$squat37")" "yes"
+  t "stop is rc 1 while that listener holds the port" "$rc" "1"
+  yes "stop names the listener it left" "$err" "did not launch pid $squat37"
+  no "stop does not report the stranger as stopped" "$(printf '%s\n' "$err" | grep 'stopped ')" "$squat37"
+  err="$(qa_cli stop --lane 37 --force 2>&1 >/dev/null)"; rc=$?
+  t "stop --force stops that listener" "$(running "$squat37")" "no"
+  t "stop --force returns 0 once the port is free" "$rc" "0"
+  t "a forced stop clears the record" "$([ -e "$KIT_STATE_DIR/qa/37/ports" ] && echo yes || echo no)" "no"
   write_cfg 'exec sleep 60'
 fi
+QA_PORT_TOOL=none; export QA_PORT_TOOL
 QA_PORT_TOOL=none qa_port_tool >/dev/null 2>&1; t "QA_PORT_TOOL=none means no holder lookup" "$?" "1"
 qa_cli stop --lane 34 >/dev/null 2>&1;            t "stop on a lane never launched is rc 0" "$?" "0"
 
