@@ -123,6 +123,9 @@ works out of the box in any configured repo (an explicit `EFFORT_FLOWS` env var 
 `cckit effort close` is likewise the **single close implementation** (the `/kit-effort-close` skill is a thin caller
 of the same function): pre-squash work-record snapshot + metrics, squash-merge, close parent + subs, board
 Status=Done, worktree/branch GC, an optional knowledge-ingest hook, and an advisory kit-sync drift check.
+The metrics judge reads its hosted endpoint from `CCKIT_MODEL_URL` / `CCKIT_MODEL` / `CCKIT_MODEL_TOKEN`; a project
+with its own variables names them in the config (`model.urlEnv` / `model.modelEnv` / `model.tokenEnv` — env var
+names, never values).
 
 The GitHub issue **number** stays the canonical key, but every effort also has a memorable **slug** handle (the one
 already in its `effort/<N>-<slug>` branch). Effort commands take the slug *or* the number interchangeably:

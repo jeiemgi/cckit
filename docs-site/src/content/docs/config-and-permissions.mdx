@@ -379,6 +379,34 @@ origin, and a `<slug>` argument was resolved before it, which can run `gh issue 
 `cckit start <issue>` (a plain task worktree) has no WIP limit. Full behaviour:
 [Only so many efforts at once](/efforts-and-waves/#only-so-many-efforts-at-once).
 
+## Model endpoint for the effort judge
+
+`cckit effort close` asks a model to grade the closed effort (a difficulty and a score written into
+the local metrics record). The hosted path is an OpenAI-compatible endpoint read from three
+environment variables. cckit stores none of the values; the config can only **name** the variables,
+so a project that already exports its own does not have to rename them:
+
+```json
+{
+  "model": {
+    "urlEnv": "ACME_LLM_URL",
+    "modelEnv": "ACME_LLM_NAME",
+    "tokenEnv": "ACME_LLM_KEY"
+  }
+}
+```
+
+| Key | Default env var | What the variable holds | When it is empty |
+| --- | --- | --- | --- |
+| `model.urlEnv` | `CCKIT_MODEL_URL` | Base URL. The judge POSTs to `<value>/chat/completions`. | The hosted judge is skipped; the local model is tried if it is enabled. |
+| `model.modelEnv` | `CCKIT_MODEL` | Model name sent in the request and recorded as the judge's model id. | The literal `default` is sent. |
+| `model.tokenEnv` | `CCKIT_MODEL_TOKEN` | Bearer token. | No `Authorization` header is sent. |
+
+Each key is independent: name one and the other two keep their defaults. A named variable replaces
+the default one — with `model.urlEnv` set, `CCKIT_MODEL_URL` is not read. A value that is not a
+shell identifier (letters, digits and `_`, not starting with a digit) is ignored with a warning on
+stderr and the default name is used.
+
 ## Agent profiles
 
 A **profile** is a named agent configuration: which CLI to run, roughly what it costs, under which
