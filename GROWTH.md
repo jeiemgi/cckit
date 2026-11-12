@@ -22,10 +22,10 @@ JSON-LD on every tutorial (`TutorialSchema.astro`). `/social/*` export pages are
 **Left as-is (already correct):** sitemap filtering, robots.txt, canonical tags, OG images,
 tutorial JSON-LD, redirect map for renamed pages. No action needed.
 
-**Done:** `cckit.dev` is now the production domain. Keep a permanent redirect from
-`cckit.vercel.app` → `cckit.dev` (Vercel domain redirect, not a client-side one) so backlinks and
-any accumulated ranking carry over instead of starting from zero on the new domain. `cckit.dev`
-stays as the preview URL for non-production deploys.
+**Done:** `cckit.dev` is the production domain. `cckit.vercel.app` and `www.cckit.dev` both answer
+with a permanent 308 redirect to `cckit.dev`, path preserved (a Vercel domain redirect, not a
+client-side one), so old backlinks land on the same page. Preview deploys get their own
+per-deployment `*.vercel.app` address; no fixed preview URL exists.
 
 ## 2. Analytics — zero-cost setup (you need to do this part)
 
