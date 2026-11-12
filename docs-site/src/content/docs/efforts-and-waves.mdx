@@ -78,7 +78,11 @@ The slug is a *derived* convenience, not a second source of truth. `--slug` only
 - **`cckit effort close`** is the single close implementation — the `/kit-effort-close` skill is a
   thin caller of the same function, so the two can never drift apart. It snapshots each sub-issue's
   diff and captures effort metrics **before** the squash, **refuses to squash-merge when no work
-  trace was captured** (the squash is irreversible — override with `KIT_FORCE=1`), squash-merges,
+  trace was captured** (the squash is irreversible — override with `KIT_FORCE=1`), **re-targets
+  every open PR based on the effort branch to the base branch** before the squash deletes that
+  branch (GitHub closes a PR, unmerged, when its base branch is deleted; one `↻ PR <n> re-targeted
+  to develop` line each — if a re-target fails, or those PRs cannot be listed, the close refuses,
+  names the PR and merges nothing), squash-merges,
   closes the parent and every sub and sets the board **Status=Done** for each, garbage-collects the
   worktree/branch, runs an optional, config-gated knowledge-ingest hook
   (`effort.knowledgeIngestHook`), and finishes with an advisory **kit-sync drift check** that flags

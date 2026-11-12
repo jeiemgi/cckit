@@ -34,6 +34,8 @@ case "$1 $2" in
                    esac ;;
   "pr create")     echo "https://github.com/o/r/pull/7" ;;
   "pr view")       echo "${GH_MERGEABLE:-MERGEABLE}" ;;           # --json mergeable (#394)
+  "pr list")       echo "${GH_DEP_PRS:-[]}" ;;                    # open PRs based on the effort branch (#358)
+  "pr edit")       exit "${GH_PR_EDIT_RC:-0}" ;;                  # re-target a dependent PR (#358)
   "pr diff")       # a merged sub PR's diff (wave-style close, #164): one kit-managed + one app file
     printf 'diff --git a/.claude/skills/demo.md b/.claude/skills/demo.md\n+kit\ndiff --git a/src/app.ts b/src/app.ts\n+app\n' ;;
   "api "*|"api")
@@ -147,6 +149,34 @@ case "$close_out" in
   *) echo "FAIL: conflict refusal message: $close_out"; fail=1 ;;
 esac
 
+# ── effort_close #358: open PRs based on the effort branch are re-targeted before it is deleted ──
+# The selector is pure: `gh pr list --json number,baseRefName` in, the PR numbers on <branch> out.
+DEPS='[{"number":41,"baseRefName":"effort/99-demo"},{"number":42,"baseRefName":"main"},{"number":43,"baseRefName":"effort/99-demo"}]'
+t  "_eo_dependent_prs keeps only the PRs based on the branch" \
+   "$(printf '%s' "$DEPS" | _eo_dependent_prs effort/99-demo | tr '\n' ' ')" "41 43 "
+t  "_eo_dependent_prs: no dependents → no output" "$(printf '[]' | _eo_dependent_prs effort/99-demo)" ""
+t  "_eo_dependent_prs: empty input → no output"   "$(printf '' | _eo_dependent_prs effort/99-demo)" ""
+t  "_eo_dependent_prs: a prefix-sharing branch is not a match" \
+   "$(printf '[{"number":9,"baseRefName":"effort/99-demo-two"}]' | _eo_dependent_prs effort/99-demo)" ""
+# A failed re-target refuses the close: no merge (so no branch delete) and no metrics row.
+records="$(git rev-parse --git-common-dir)/effort-metrics/records.jsonl"
+rows_before="$(cat "$records" 2>/dev/null | wc -l | tr -d ' ')"
+: > "$GH_LOG"
+close_out="$(GH_DEP_PRS="$DEPS" GH_PR_EDIT_RC=1 effort_close 99 2>&1)"; rc=$?
+t  "effort_close refuses when a dependent PR cannot be re-targeted (rc 1)" "$rc" "1"
+t  "effort_close did NOT merge after a failed re-target" "$(grep -c 'pr merge' "$GH_LOG")" "0"
+t  "effort_close appended no metrics row on that refusal" "$(cat "$records" 2>/dev/null | wc -l | tr -d ' ')" "$rows_before"
+case "$close_out" in
+  *"metrics:"*) echo "FAIL: metrics captured before the re-target refusal"; fail=1 ;;
+  *"PR 41"*"nothing was merged"*) echo "ok: re-target refusal names the PR" ;;
+  *) echo "FAIL: re-target refusal message: $close_out"; fail=1 ;;
+esac
+# `gh pr list` failing is not "no dependents": the close refuses instead of deleting blind.
+: > "$GH_LOG"
+close_out="$(GH_DEP_PRS='not json' effort_close 99 2>&1)"; rc=$?
+t  "effort_close refuses when the dependent-PR list is unreadable (rc 1)" "$rc" "1"
+t  "effort_close did NOT merge on an unreadable list" "$(grep -c 'pr merge' "$GH_LOG")" "0"
+
 # #148: the VERB sets board Status=Done (guarded). Stub the board helpers + captured ids in-shell —
 # _eo_source_board must see them and skip sourcing the real gh-project.sh.
 BOARD_LOG="$tmp/board.log"; : > "$BOARD_LOG"
@@ -155,11 +185,19 @@ project_set_single_select()  { echo "$*" >> "$BOARD_LOG"; }
 export KIT_PROJECTS_V2="true" STATUS_FIELD_ID="SF1" STATUS_OPT_DONE="OPT_DONE"
 
 : > "$GH_LOG"
-close_out="$(effort_close 99 2>&1)"; rc=$?
+close_out="$(GH_DEP_PRS="$DEPS" effort_close 99 2>&1)"; rc=$?
 export KIT_PROJECTS_V2="false"
 cd "$tmp/work"   # our cwd (the effort worktree) is GC'd by the close — step to the main checkout
 t  "effort_close succeeds with a trace (rc 0)" "$rc" "0"
 tc "$GH_LOG" 'pr merge effort/99-demo .*--squash' "effort_close squash-merges the PR"
+# #358: both dependents re-targeted to the base, and before the merge that deletes the branch
+tc "$GH_LOG" 'pr list .*--base effort/99-demo .*--state open' "effort_close lists open PRs based on the effort branch"
+tc "$GH_LOG" 'pr edit 41 .*--base main' "effort_close re-targets dependent PR 41 to the base"
+tc "$GH_LOG" 'pr edit 43 .*--base main' "effort_close re-targets dependent PR 43 to the base"
+t  "effort_close leaves a PR on another base alone" "$(grep -c 'pr edit 42' "$GH_LOG")" "0"
+t  "effort_close re-targets before the merge deletes the branch" \
+   "$(grep -nE 'pr edit 43|pr merge' "$GH_LOG" | sed -E 's/^[0-9]+:(pr [a-z]+).*/\1/' | tr '\n' ' ')" "pr edit pr merge "
+case "$close_out" in *"PR 41 re-targeted to main"*) echo "ok: close output carries the re-targeted line" ;; *) echo "FAIL: no re-targeted line in close output"; fail=1 ;; esac
 tc "$GH_LOG" 'issue close 101'  "effort_close closes sub #101"
 tc "$GH_LOG" 'issue close 99 '  "effort_close closes the parent"
 case "$close_out" in *"metrics:"*) echo "ok: capture_effort_metrics composed into close" ;; *) echo "FAIL: no metrics capture in close"; fail=1 ;; esac

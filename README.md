@@ -123,6 +123,9 @@ works out of the box in any configured repo (an explicit `EFFORT_FLOWS` env var 
 `cckit effort close` is likewise the **single close implementation** (the `/kit-effort-close` skill is a thin caller
 of the same function): pre-squash work-record snapshot + metrics, squash-merge, close parent + subs, board
 Status=Done, worktree/branch GC, an optional knowledge-ingest hook, and an advisory kit-sync drift check.
+Before the squash deletes `effort/<N>-…` it re-targets every open PR based on that branch to the base branch
+(`↻ PR <n> re-targeted to develop`) — GitHub closes a PR, unmerged, when its base branch is deleted. If a
+re-target fails, or the list of those PRs cannot be read, the close refuses, names the PR, and merges nothing.
 
 The GitHub issue **number** stays the canonical key, but every effort also has a memorable **slug** handle (the one
 already in its `effort/<N>-<slug>` branch). Effort commands take the slug *or* the number interchangeably:
