@@ -793,6 +793,33 @@ if [[ -f "$_kit_target/CLAUDE.md" && -f "$_export_script" ]]; then
 fi
 
 # ============================================================================
+# INSTRUCTION FILES (resident context budget, #357)
+# ============================================================================
+# CLAUDE.md and every .claude/rules/*.md without a `paths:` frontmatter load into every session;
+# Claude Code warns at startup once they pass 150k characters combined. Show the number and the
+# three largest files here so it is seen before that warning is. Read-only, and the same
+# measurement the gate uses (instruction-budget-lint.sh --summary). Absent when the project has no
+# instruction files.
+_budget_lint="$_export_dir_doctor/instruction-budget-lint.sh"
+if [[ -f "$_budget_lint" ]]; then
+  _budget_line="$(INSTRUCTION_BUDGET_ROOT="$_kit_target" bash "$_budget_lint" --summary 2>/dev/null || true)"
+  if [[ -n "$_budget_line" ]]; then
+    printf '  %s%sInstruction files (loaded into every session)%s\n' "$C_BOLD" "" "$C_RESET"
+    _budget_resident="$(printf '%s' "$_budget_line" | awk '{print $3}')"
+    _budget_limit="$(printf '%s' "$_budget_line" | awk '{print $5}')"
+    if [[ "$_budget_resident" =~ ^[0-9]+$ && "$_budget_limit" =~ ^[0-9]+$ && "$_budget_resident" -gt "$_budget_limit" ]]; then
+      row "$MARK_WARN" "resident budget" "$_budget_line"
+      CHECKS_WARN=$((CHECKS_WARN + 1))
+      ACTIONS_NEEDED+=("Trim resident instruction files: scripts/instruction-budget-lint.sh --report (scope a rule with paths:, or split it into a short rule + a knowledge doc)")
+    else
+      row "$MARK_OK" "resident budget" "$_budget_line"
+      CHECKS_OK=$((CHECKS_OK + 1))
+    fi
+    printf '\n'
+  fi
+fi
+
+# ============================================================================
 # SUMMARY
 # ============================================================================
 printf '  %s%sSummary%s\n' "$C_BOLD" "" "$C_RESET"

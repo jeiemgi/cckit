@@ -99,27 +99,34 @@ project_set_text() {
     -f project="$PROJECT_ID" -f item="$1" -f field="$2" -f text="$3" >/dev/null
 }
 
-# Resolve an option ID from a human name via explicit case lookup (#307).
+# Resolve an option ID from a human name.
 # Names are normalized: uppercased, spaces/hyphens -> underscores.
 #   role_option_id "Tech Lead"  -> $ROLE_OPT_TECH_LEAD
 #   status_option_id "In Review" -> $STATUS_OPT_IN_REVIEW
 # No ${!var} indirection: these libs are sourced into zsh sessions too, where
-# bash-only indirection dies with "bad substitution". Unknown names echo empty.
+# bash-only indirection dies with "bad substitution" (#307).
 _norm() { echo "$1" | tr '[:lower:]' '[:upper:]' | tr ' -' '__'; }
+# role_option_id <name> — ANY board Role option, not a fixed list (#378): capture-project-ids.sh
+# writes ROLE_OPT_<NAME> for every option the board has, so the lookup reads that variable by
+# name. The name is expanded through eval (portable to bash and zsh), and only after it matches
+# ^[A-Z0-9_]+$ byte-for-byte — anything else is refused before the eval, so the argument can never
+# run as code. No option for the role: empty stdout plus a warning on stderr, so a Role field left
+# unset is reported instead of silent. An empty name asks nothing and prints nothing.
 role_option_id() {
-  case "$(_norm "$1")" in
-    DESIGNER)  echo "${ROLE_OPT_DESIGNER:-}" ;;
-    DEVOPS)    echo "${ROLE_OPT_DEVOPS:-}" ;;
-    PM)        echo "${ROLE_OPT_PM:-}" ;;
-    FRONTEND)  echo "${ROLE_OPT_FRONTEND:-}" ;;
-    TAURI)     echo "${ROLE_OPT_TAURI:-}" ;;
-    AI_ENG)    echo "${ROLE_OPT_AI_ENG:-}" ;;
-    SECURITY)  echo "${ROLE_OPT_SECURITY:-}" ;;
-    QA)        echo "${ROLE_OPT_QA:-}" ;;
-    TECH_LEAD) echo "${ROLE_OPT_TECH_LEAD:-}" ;;
-    RESEARCH)  echo "${ROLE_OPT_RESEARCH:-}" ;;
-    *)         echo "" ;;
+  local LC_ALL=C _roi_name="" _roi_val=""
+  [ -n "${1:-}" ] || return 0
+  _roi_name="$(_norm "$1")"
+  case "$_roi_name" in
+    ''|*[!A-Z0-9_]*)
+      echo "⚠ board Role not set: role '$1' is not a usable option name (letters, digits, spaces, hyphens, underscores only)" >&2
+      echo ""
+      return 0 ;;
   esac
+  eval "_roi_val=\"\${ROLE_OPT_${_roi_name}:-}\""
+  if [ -z "$_roi_val" ]; then
+    echo "⚠ board Role not set: no Role option for '$1' (ROLE_OPT_${_roi_name} is not captured) — add the option to the board's Role field, then re-run scripts/capture-project-ids.sh" >&2
+  fi
+  echo "$_roi_val"
 }
 status_option_id() {
   case "$(_norm "$1")" in

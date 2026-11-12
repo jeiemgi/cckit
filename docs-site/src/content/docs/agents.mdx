@@ -65,7 +65,7 @@ object — there's nothing to tabulate.
 | Get the wave plan | `cckit plan --llm` | **TOON** |
 | Get the fan-out brief | `cckit wave --llm` | **TOON** |
 | Start an issue | `cckit start <issue>` | JSON (one object) |
-| Open the PR | `cckit pr <issue> "<summary>"` | JSON (one object) |
+| Open the PR | `cckit pr <issue> "<summary>" [--base <branch>]` | JSON (one object) |
 | Close the issue | `cckit close <issue> "<summary>"` | JSON (one object) |
 | Render markdown to a terminal | `cckit render` | — |
 
@@ -77,6 +77,12 @@ human output or re-fetching JSON would cost.
 ## Model endpoint
 
 cckit shells out to whatever agent invokes it; it does not embed a model. For the few verbs that synthesize text (digests, ingest), the model endpoint is set through environment variables.
+
+The effort-close judge reads an OpenAI-compatible endpoint from `CCKIT_MODEL_URL` (base URL; it
+POSTs to `<value>/chat/completions`), `CCKIT_MODEL` (model name) and `CCKIT_MODEL_TOKEN` (bearer
+token). A project with its own variables names them in the config instead — `model.urlEnv`,
+`model.modelEnv`, `model.tokenEnv` hold env var **names**, never values. See
+[Model endpoint for the effort judge](/config-and-permissions/#model-endpoint-for-the-effort-judge).
 
 Nothing in cckit picks a model — not `ctx:S|M|L|XL` (which estimates session size), not `role:*`
 (which records responsibility), and not the config schema. An **agent profile** declares a spend

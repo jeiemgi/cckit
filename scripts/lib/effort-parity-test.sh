@@ -98,26 +98,55 @@ tc "$GH_LOG" '## Verification' "bare call still emits ## Verification"
 tc "$GH_LOG" '<!--'            "bare call leaves the template placeholders (nothing to fill)"
 
 # ── #121: the ONE shared effort-PR title composer + the mandatory-[#N] check ─────────────────────
-t  "effort_pr_title composes [#N] name"        "$(effort_pr_title 115 'adoption hardening')"             "[#115] adoption hardening"
-t  "effort_pr_title with a role prefix"        "$(effort_pr_title 115 'adoption hardening' 'Tech Lead')" "[Tech Lead] [#115] adoption hardening"
-t  "effort_pr_title peels an [Effort] prefix"  "$(effort_pr_title 115 '[Effort] 115 · [Core] adoption hardening')" "[#115] [Core] adoption hardening"
-t  "effort_pr_title tolerates a #-prefixed num" "$(effort_pr_title '#42' 'x')"                           "[#42] x"
+# #237: the composed title is a Conventional Commit subject carrying [#N] — the form the
+# commitlint gate accepts — so `effort pr` never opens a PR its own CI rejects.
+# shellcheck source=/dev/null
+source "$LIB/commitlint.sh"
+unset KIT_PR_TITLE_STYLE
+t  "effort_pr_title composes type: name [#N]"  "$(effort_pr_title 115 'adoption hardening')"             "feat: adoption hardening [#115]"
+t  "effort_pr_title takes the scope from flow:" "$(effort_pr_title 115 'adoption hardening' 'role:tech-lead,kind:task,flow:core')" "feat(core): adoption hardening [#115]"
+t  "effort_pr_title peels [Effort] + uses [Flow] as scope" "$(effort_pr_title 115 '[Effort] 115 · [Core] adoption hardening')" "feat(core): adoption hardening [#115]"
+t  "effort_pr_title flow: label wins over the [Flow] tag" "$(effort_pr_title 115 '[Effort] 115 · [Core] adoption hardening' 'flow:docs')" "feat(docs): adoption hardening [#115]"
+t  "effort_pr_title drops a tag that is no valid scope" "$(effort_pr_title 115 '[¡Hola!] adoption hardening')" "feat: adoption hardening [#115]"
+t  "effort_pr_title tolerates a #-prefixed num" "$(effort_pr_title '#42' 'x')"                           "feat: x [#42]"
+t  "effort_pr_title derives the type from kind:" "$(effort_pr_title 115 'x' 'kind:chore,flow:core')"     "chore(core): x [#115]"
+t  "effort_pr_title maps a bug label to fix"   "$(effort_pr_title 115 'x' 'bug,kind:task')"              "fix: x [#115]"
+t  "effort_pr_title explicit type wins"        "$(effort_pr_title 115 'x' 'kind:chore' fix)"             "fix: x [#115]"
+t  "effort_pr_title issue-title style keeps [Role] [#N] name" "$(KIT_PR_TITLE_STYLE=issue-title effort_pr_title 115 '[Effort] 115 · [Core] adoption hardening' 'flow:core' '' 'Tech Lead')" "[Tech Lead] [#115] [Core] adoption hardening"
+t  "effort_pr_title issue-title style without a role" "$(KIT_PR_TITLE_STYLE=issue-title effort_pr_title 115 'adoption hardening')" "[#115] adoption hardening"
+_t237="$(effort_pr_title 220 '[Effort] 220 · [Core] agents cannot see what cckit provides' 'flow:core,kind:task,role:tech-lead')"
+t  "the #237 reproduction composes the conventional form" "$_t237" "feat(core): agents cannot see what cckit provides [#220]"
+commitlint_check "$_t237" 2>/dev/null; t "the generated title passes commitlint_check" "$?" "0"
+effort_pr_title_check "$_t237" 220 2>/dev/null; t "the generated title carries the [#N] id" "$?" "0"
 effort_pr_title_check "[Tech Lead] [#115] adoption hardening" 115; t "check accepts a title carrying [#N]" "$?" "0"
 effort_pr_title_check "[Effort] 115 · adoption hardening" 115 2>/dev/null; t "check refuses a title lacking [#N]" "$?" "1"
 effort_pr_title_check "[#7] anything" 2>/dev/null; t "check accepts any [#N] when no num given" "$?" "0"
 
-# ── #121: --par applies a par:<value> label on the parent; bad values are rejected up front ───────
+# ── #277: --kind picks the kind: label (parent + subs) from the closed set; --par is gone ──────────
 : > "$GH_LOG"; printf '0' > "$GH_N"
-effort_new --flow Core --par wide "parallel wide effort" "a :: x" "b :: y" >/dev/null 2>&1
-tc "$GH_LOG" 'issue create .*--label [^ ]*,par:wide' "--par wide adds a par:wide label to the parent"
-tc "$GH_LOG" 'label create par:wide'                 "--par creates the par:wide label idempotently"
+effort_new --flow Core --kind fix "kind fix effort" "a :: x" >/dev/null 2>&1
+tc "$GH_LOG" 'issue create .*--title \[Effort\] · .*--label effort,ctx:[SMLX]+,kind:fix,' "--kind fix labels the parent kind:fix"
+tc "$GH_LOG" 'issue create .*--title \[Effort 1\] 1 · a.*--label kind:fix,'              "--kind fix labels every sub kind:fix"
+tc "$GH_LOG" 'label create kind:fix'                                                      "--kind ensures the kind label exists"
+tn "$GH_LOG" 'kind:task'                                                                  "--kind fix leaves no kind:task behind"
 : > "$GH_LOG"; printf '0' > "$GH_N"
-effort_new --par 3 "parallel three effort" >/dev/null 2>&1
-tc "$GH_LOG" 'issue create .*--label [^ ]*,par:3'    "--par 3 adds a par:3 label"
+effort_new --kind=chore "kind chore effort" >/dev/null 2>&1
+tc "$GH_LOG" 'issue create .*--label effort,ctx:[SMLX]+,kind:chore,' "--kind=chore (equals form) is accepted"
+for k in $KIT_KINDS; do
+  : > "$GH_LOG"; printf '0' > "$GH_N"
+  effort_new --kind "$k" "kind vocabulary effort" >/dev/null 2>&1 && rc=0 || rc=1
+  t "--kind $k is accepted" "$rc" "0"
+done
 : > "$GH_LOG"; printf '0' > "$GH_N"
-effort_new --par nonsense "bad par effort" >/dev/null 2>&1 && rc=0 || rc=1
-t  "--par rejects a non seq/wide/int value"          "$rc" "1"
-t  "--par creates nothing on a bad value"            "$(grep -c 'issue create' "$GH_LOG")" "0"
+err="$(effort_new --kind bug "bad kind effort" 2>&1 >/dev/null)" && rc=0 || rc=1
+t  "--kind rejects a value outside the closed set"   "$rc" "1"
+t  "--kind creates nothing on a bad value"           "$(grep -c 'issue create' "$GH_LOG")" "0"
+t  "the refusal lists the accepted set"              "$(printf '%s' "$err" | grep -c "must be one of: $KIT_KINDS")" "1"
+: > "$GH_LOG"; printf '0' > "$GH_N"
+effort_new --par wide "parallel wide effort" >/dev/null 2>&1 && rc=0 || rc=1
+t  "--par is no longer a flag (rc 1)"                "$rc" "1"
+t  "--par creates nothing"                           "$(grep -c . "$GH_LOG")" "0"
+t  "nothing in effort-ops.sh writes a par: label"    "$(grep -c 'par:' "$LIB/effort-ops.sh" | tr -d ' ')" "0"
 
 # ── #121: flags are position-INDEPENDENT — trailing --flow/--role no longer become junk sub-issues ─
 : > "$GH_LOG"; printf '0' > "$GH_N"

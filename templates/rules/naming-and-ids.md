@@ -91,6 +91,9 @@ chore(security): update docs-site deps to clear Dependabot alerts [#249]
 **Enforced now:** `effort_pr_title_check` (`scripts/lib/effort.sh`) requires a `[#<num>]` token —
 the exact `[#num]` when given a number, otherwise any `[#digits]` — and `effort_pr` refuses to open
 a PR without it. That check runs on **effort PRs only**; standalone task PRs are unchecked.
+`effort_pr_title` generates the conventional form above, `type(scope): <name> [#<num>]`, and under
+`pr.titleStyle: conventional` (the default) `effort_pr` also refuses, before calling `gh`, a title
+that `commitlint_check` (`scripts/lib/commitlint.sh`) rejects.
 
 **This rule targets** `[E<n>]` / `[E<n>.<step>]` on effort and sub PRs, and the check extended to
 every PR. Until that ships, `[#<num>]` is correct and `effort_pr` will keep generating it.
@@ -161,22 +164,26 @@ nobody consumes.
 | Prefix | Values | Read by | Purpose |
 | --- | --- | --- | --- |
 | `priority:` | `p0` `p1` `p2` `p3` | `pm_prio_sort` (wave ordering) | urgency within a wave |
-| `ctx:` | `S` `M` `L` `XL` | `_ep_weight` (session budget) | how much of a session it costs |
+| `ctx:` | `S` `M` `L` `XL` | `_ep_weight`, `_pm_weight` (session budget) | how much of a session it costs |
 | `flow:` | `core` `docs` … | effort dispatch | which flow owns it |
 | `role:` | `tech-lead` `docs` … | delegation brief | who it is written for |
-| `kind:` | must discriminate | board grouping | what sort of work it is |
+| `kind:` | `feat` `fix` `task` `chore` `security` `scaffold` `ci` `adr` `spike` `plan` | `wt_start` (branch prefix), `kto_pr_title` (commit type) | what sort of work it is |
 | `agent:` | one per declared profile | `ap_profile_from_labels` | which agent profile runs the work |
 | `slug:` | one per effort | `effort_slug_resolve` | resolve a name to an effort |
 
 ### Rules
 
-- **A label must vary.** `kind:task` on every issue in the repo's history tells you nothing.
-  Either give `kind:` real values or drop it.
+- **A label must vary.** `kind:task` on every issue tells you nothing. `kind:` is a closed set
+  (`KIT_KINDS`, `scripts/lib/kinds.sh`), the same one `rules/branch-naming.md` allows as a branch
+  prefix, because `cckit start` cuts `<kind>/<N>-<slug>` from the label. Set it with
+  `cckit new --kind` or `cckit effort new --kind`; a label outside the set starts on `task/`.
 - **A label must be read.** If nothing consumes it, delete the label *and* the code that writes
-  it. `par:seq|wide|<n>` was written by `effort_new` and read by nothing.
-- **Every value in a scale needs a label.** `_ep_weight` scores `XL=8` and falls back to `2` for
-  anything unknown, so an `XL` effort with no `ctx:XL` label silently weighs the same as an `M`.
-  A scale the code knows but the board cannot express is a scale that quietly misreports.
+  it. `par:seq|wide|<n>` was written by `effort_new` and read by nothing, so both were removed.
+- **Every value in a scale needs a label.** `scripts/setup-labels.sh` provisions all four `ctx:`
+  values. A scale the code knows but the board cannot express quietly misreports: `ctx:XL` weighs 8
+  and had no label, so an `XL` effort was planned at the fallback weight of 2, the same as an `M`.
+  The fallback is still 2, and it is now named: an issue with no `ctx:` label shows `?` in the
+  plan, and a value outside the scale warns on stderr.
 - **Do not create per-item labels beyond `slug:`.** They grow without bound and match one issue
   each, which makes them useless as a board axis. `agent:<profile>` is not one of these: it is
   bounded by the profiles the config declares, and `scripts/setup-labels.sh` provisions exactly

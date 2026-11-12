@@ -15,7 +15,9 @@ adapter one) — is described in [the Adapters page](docs-site/src/content/docs/
   `effort/<N>` branch = 1 PR* covering **N sub-issues**. Sequential sub-issues commit straight onto
   `effort/<N>` (one commit per sub-issue — that commit's diff is the sub's patch); parallel ones get
   their own file-disjoint `sub/<N><letter>` worktree and merge back into `effort/<N>`. Either way
-  exactly one PR opens, from `effort/<N>` — never one per sub-issue. Full spec:
+  exactly one PR opens, from `effort/<N>` — never one per sub-issue. That PR merges with
+  `cckit effort close <N>`: `cckit merge` refuses an `effort/*` head, because its squash skips the
+  per-sub trace snapshot (`KIT_FORCE=1` merges anyway, with a warning). Full spec:
   `.claude/rules/effort-model.md`.
 - **Structured output, TOON-first.** Append `--llm` to any verb for machine-readable output. List
   reads (sync, next, plan, wave) come back as **TOON** (token-cheap); single-result action verbs
@@ -49,24 +51,28 @@ the same commit.
 | --- | --- | --- |
 | `cckit init` | scaffold config + `.claude/` | — |
 | `cckit sync` | board state / what's unblocked | `--llm` → TOON |
+| `cckit sync --json` | the board as ONE JSON object for a dashboard: per-role issues, `unassigned`, `blocked`, `stale`, `mergeQueue` (merge order). `--write` saves it atomically to `<git-common-dir>/kit-sync-cache.json` and never overwrites it with a failed or partial fetch; `--cached [TTL]` prints that cache with no `gh` call while it is younger than TTL seconds (default 60), else refreshes it; `--watch [SECS]` refreshes every SECS (default 30) and keeps the last good cache when a fetch fails; `--plan` inlines `effort plan`. Each fetch emits `op.start` / `op.done` (op `sync`) to `kit-events.jsonl`. `--write` / `--cached` / `--watch` refuse `--role` / `--milestone` (exit 2) | `--json` → JSON (`--llm` / `--output=json` stay TOON) |
 | `cckit next` | the next unblocked issue + how to start it | `--llm` → TOON |
 | `cckit plan` | wave plan: deps-ordered, priority-sorted within a wave, file-disjoint, session-fit | `--llm` → TOON |
 | `cckit plan-next` | forward plan: inventory current skills/verbs/rules/docs → propose what to build next | `--llm` → TOON |
-| `cckit status` | where are we: local undone work, open PRs waiting on a human, cleanup available (local + remote) | `--llm` → JSON |
+| `cckit status` | where are we: local undone work, open PRs waiting on a human, cleanup available (local + remote), then one line with the resident instruction-file bytes (`CLAUDE.md` + rules without `paths:`) against the 150k limit and the three largest files | `--llm` → JSON (`instruction_budget`, `null` when nothing was measured) |
 | `cckit brief <issue>` | the delegation brief for an issue, from real state: worktree, seed freshness, owned files, the helpers they sit on, standing gotchas | — |
 | `cckit wave` | read open efforts, propose incoming waves: fan-out brief + captain drive | `--llm` → TOON |
 | `cckit watch [--merge] [--loop]` | captain: gate open PRs, squash-merge CLEAN, advance the wave | — |
-| `cckit start <issue> [slug]` | isolated worktree + branch, bootstrapped: env files copied, per-worktree dev PORT, deps installed at the selected targets. Precedence: **`worktree.installPaths` if set** (those dirs only, installed whether or not each declares dependencies — `[]` installs nothing, and the root/workspace checks are skipped entirely), **else** the root *only when* its manifest declares dependencies or it is a workspace root **with at least one member** (a non-empty `packages:` list, or a non-empty `workspaces` / `workspaces.packages` array), **else nothing** — so a dependency-free root never gets a stray empty `pnpm-lock.yaml`. `installPaths` entries that escape the worktree are refused. `KIT_WT_INSTALL=0` skips the install | `--llm` |
-| `cckit pr <issue> <summary>` | commit + push + open PR | `--llm` |
+| `cckit start <issue> [slug]` | isolated worktree + branch, bootstrapped: env files copied, per-worktree dev PORT, deps installed at the selected targets. Precedence: **`worktree.installPaths` if set** (those dirs only, installed whether or not each declares dependencies — `[]` installs nothing, and the root/workspace checks are skipped entirely), **else** the root *only when* its manifest declares dependencies or it is a workspace root **with at least one member** (a non-empty `packages:` list, or a non-empty `workspaces` / `workspaces.packages` array), **else nothing** — so a dependency-free root never gets a stray empty `pnpm-lock.yaml`. `installPaths` entries that escape the worktree are refused. `KIT_WT_INSTALL=0` skips the install. **Claim-checked:** `cckit start [--force] <issue>` refuses (rc 1) when another live session already holds the issue's claim in `<git-common-dir>/kit-sessions/` — before the issue read, the fetch and `git worktree add`, so a refusal makes no branch and no worktree. `--force` / `KIT_FORCE=1` starts anyway and takes the claim; a claim whose session pid is dead is reaped; re-running from the same session or from inside the claimed worktree is the usual no-op. A board Status of In Progress or In Review only warns | `--llm` |
+| `cckit pr <issue> <summary> [--base <branch>]` | commit + push + open PR. `--base` targets a branch other than the configured base (`.github.baseBranch`) — a release PR `develop` → `main`, or a hotfix to the release branch; labels, milestone, board and `Closes #N` are unchanged. The push exports the target as `KIT_PR_BASE` (set with or without `--base`), so a git pre-push hook can compare against the branch the PR targets. `--base` with no value exits 2 before the commit and the push | `--llm` |
+| `cckit hotfix <pr\|sha> [--base <branch>]` | carry ONE merged change to the release branch (`main` unless `--base` or `KIT_HOTFIX_BASE`): worktree `fix/<N>-hotfix-<base>` from `origin/<base>`, `git cherry-pick -x` (`-m 1` for a merge commit; every commit of a rebase-merged PR, oldest first), push with `KIT_PR_BASE=<base>`, PR titled after the source with `Cherry-pick of #N` in the body and no `Closes`. A digits-only source is a PR number and must be MERGED; anything else is a commit, whose PR number is read from a `(#N)` suffix or `Merge pull request #N`. Re-runnable: a picked commit is not picked twice and an open PR is reported, not re-created. A conflict stops before the push — resolve, `git cherry-pick --continue`, re-run | `--llm` → JSON (`ok`, `url`, `worktree`, `detail`; a refusal is `ok:false` with the reason in `detail`) |
 | `cckit close <issue> <summary>` | close issue + mark done | `--llm` |
-| `cckit effort new "<name>" ["sub :: desc" …]` | parent (4-section body + ctx/kind/priority/role/flow labels) + linted native sub-issues — identical to `/kit-effort-new` (one shared core); `start`/`pr`/`close` take `<slug\|N>` | flags: `--flow/--role/--priority/--goal/--scope/--for-agents/--verification/--depends-on/--milestone`, `--slug` |
+| `cckit claims` | list the live session claims `cckit start` wrote: issue, session pid, start time, branch, worktree. Read-only — a dead session's claim is hidden here and reaped by the next `cckit start` on that issue | `--llm` → JSON array |
+| `cckit effort new "<name>" ["sub :: desc" …]` | parent (4-section body + ctx/kind/priority/role/flow labels) + linted native sub-issues — identical to `/kit-effort-new` (one shared core); `start`/`pr`/`close` take `<slug\|N>` | flags: `--flow/--role/--kind/--priority/--goal/--scope/--for-agents/--verification/--depends-on/--milestone`, `--slug`. `--kind` is one of `feat fix task chore security scaffold ci adr spike plan` (default `task`); any other value is refused before anything is created |
 | `cckit effort chain <a> <b> [<c> …]` | wire 2+ issues into a linear order: `b` `blocked_by` `a`, `c` `blocked_by` `b`, plus a `- Depends on #<predecessor>` line in each successor's `## Relations` section. These are the edges `cckit plan` layers into waves. Idempotent (an edge or line already there is skipped); pre-existing blockers are kept, never replaced. Validates everything first — fewer than two numbers, a non-numeric arg, an issue that does not exist, a repeated number, or an edge that would close a cycle refuses the whole chain and writes nothing | — |
-| `cckit effort start [--force] <slug\|N> [slug]` | effort branch + bootstrapped worktree, **WIP-limited**: refuses a NEW effort once `effort.wipLimit` (default 2) are already in progress. In progress = an `effort/<N>-<slug>` branch exists as a local head **or** on origin, read with `git ls-remote` rather than the cached `refs/remotes` (which is wrong both ways: it misses a branch pushed since the last fetch and keeps one deleted on origin until a prune). At the limit refuses; only strictly under it starts. Re-starting an effort that is already in progress is never gated. The check runs before the fetch/branch/worktree/bootstrap, so a refusal makes no branch, no worktree and no board change — it is not read-free (it queries origin, and a `<slug>` arg was resolved first, which can run `gh issue list`). `0` refuses every ordinary start; `--force` still starts. A non-integer value is ignored with a warning and the default 2 is used; `EFFORT_WIP_LIMIT` overrides the config per invocation. `EFFORT_WIP_REMOTE=0` — or an unreachable origin, which warns and proceeds — counts the cached refs instead. Does **not** gate `cckit start <issue>` | `--force`, or `KIT_FORCE=1` |
-| `cckit effort plan` | session-fit effort plan | `--llm` → JSON |
+| `cckit effort start [--force] <slug\|N> [slug]` | effort branch + bootstrapped worktree, **WIP-limited**: refuses a NEW effort once `effort.wipLimit` (default 2) are already in progress. In progress = an `effort/<N>-<slug>` branch exists as a local head **or** on origin, read with `git ls-remote` rather than the cached `refs/remotes` (which is wrong both ways: it misses a branch pushed since the last fetch and keeps one deleted on origin until a prune). At the limit refuses; only strictly under it starts. Re-starting an effort that is already in progress is never gated. The check runs before the fetch/branch/worktree/bootstrap, so a refusal makes no branch, no worktree and no board change — it is not read-free (it queries origin, and a `<slug>` arg was resolved first, which can run `gh issue list`). `0` refuses every ordinary start; `--force` still starts. A non-integer value is ignored with a warning and the default 2 is used; `EFFORT_WIP_LIMIT` overrides the config per invocation. `EFFORT_WIP_REMOTE=0` — or an unreachable origin, which warns and proceeds — counts the cached refs instead. With no `[slug]`, a failed read of the issue title warns on stderr and the start continues with the effort's existing branch slug, or `effort`. Does **not** gate `cckit start <issue>` | `--force`, or `KIT_FORCE=1` |
+| `cckit effort pr [<slug\|N>]` | the ONE effort PR, titled as a Conventional Commit subject carrying the effort id: `type(scope): name [#N]` (scope = the `flow:` label, else the title's `[Flow]` tag; type = `--type`, else the `kind:` label, default `feat`). Refuses before any `gh` call when the title lacks `[#N]` or fails `commitlint_check`. `pr.titleStyle: issue-title` gives `[Role] [#N] name` with no commitlint check | flags: `--summary[-file]`, `--for-agents[-file]`, `--title`, `--type` |
+| `cckit effort plan` | session-fit effort plan. Rows come from GitHub (one listing + one `blocked_by` call per effort), or from the executable named by `effort.planSource` (`EFFORT_PLAN_SOURCE` overrides), called as `<source> <owner/repo>` from the project root and printing `number<TAB>flow<TAB>ctx<TAB>title[<TAB>blockers]` rows plus an optional `# age: <text>` line. A source that is not executable, exits non-zero or prints no rows falls back to GitHub. The `source:` line under the header names the source used, its age when reported, and any fallback | `--llm` → JSON |
 | `cckit orchestrate <a> <b> …` | run N flows in parallel worktrees, in tmux or Herdr | — (use `--dry-run`) |
 | `cckit autopilot [<a> …]` | select work, then call `orchestrate --detach` under a cap | — (use `--dry-run`) |
-| `cckit gc` | report prunable branches + worktrees — SAFE (own PR merged) and LANDED (no PR of its own, work already on base: effort subs, `worktree-agent-*` isolation worktrees) — never one whose issue is still open; aborts if the protection helper is missing | `--llm` → JSON counts (`safe`, `landed`, `protected`, `orphan`) |
-| `cckit cleanup [--yes]` | the guided destructive sweep over that report: plan first, delete only the SAFE + LANDED rows and prune the listed ZOMBIE metadata (staged work recovered to its branch first); ORPHAN / PROTECTED / stashes are never deletable | `--llm` → JSON counts + `applied` |
+| `cckit gc` | report prunable branches + worktrees — SAFE (own PR merged) and LANDED (no PR of its own, work already on base: effort subs, `worktree-agent-*` isolation worktrees) — never one whose issue is still open; aborts if the protection helper is missing. A branch whose PR or issue state could not be read (a failed `gh` call) is reported UNKNOWN ("could not determine") and kept, never "no PR". A worktree with a detached HEAD gets its own row: LANDED when it is clean and its HEAD is on the base branch or `main`, ORPHAN otherwise | `--llm` → JSON counts (`safe`, `landed`, `protected`, `orphan`, `unknown`) |
+| `cckit cleanup [--yes]` | the guided destructive sweep over that report: plan first, delete only the SAFE + LANDED rows and prune the listed ZOMBIE metadata (staged work recovered to its branch first); ORPHAN / PROTECTED / UNKNOWN / stashes are never deletable. A LANDED detached worktree is removed; an ORPHAN one, and a detached zombie still holding staged work, are kept | `--llm` → JSON counts + `applied` |
 | `cckit render` | stdin markdown → rich (glow on a TTY; verbatim when piped) | — |
 | `cckit version` | the installed cckit version | `--llm` |
 
@@ -89,7 +95,7 @@ Every operation an unattended run needs is reachable through the one CLI:
 | Verb | Purpose |
 | --- | --- |
 | `cckit scan` | detect the repo's stack + kit state (emits JSON) |
-| `cckit doctor [--fix]` | onboarding preflight (deps, gh auth); asks before installing on a TTY, `--fix` skips the prompt. One row per `integrations/` descriptor whose config key is on, installed by the shared runner; an integration installs only after `--fix` or a yes at the prompt (recorded as `install:<id>` in `.cckit/consent`) — a run with no TTY and no `--fix` reports it missing, installs nothing and exits 1 |
+| `cckit doctor [--fix]` | onboarding preflight (deps, gh auth); asks before installing on a TTY, `--fix` skips the prompt. One row per `integrations/` descriptor whose config key is on, installed by the shared runner; an integration installs only after `--fix` or a yes at the prompt (recorded as `install:<id>` in `.cckit/consent`) — a run with no TTY and no `--fix` reports it missing, installs nothing and exits 1. Also prints the resident instruction-file line `cckit status` prints, and warns when it is over the 150k limit |
 | `cckit add [<name>] [--set k=v] [--answers FILE] [--dir DIR]` | no name: list every integration descriptor in `integrations/` plus the modules, exit 0 (`--llm` → one JSON object with `enabled` and `applies` per integration). With an integration: set the one config key its descriptor names, in the config `kit_config_path` resolves — no other key changes, and nothing is installed. A descriptor that lists `rules` (`graft` → `code-retrieval`) also gets each one copied into `.claude/rules/`; an existing rule file is kept. Declines (exit 0, nothing written) on a repo with no file the integration can work on; exits 1 with no project config or an invalid descriptor. With a module (`software`): write this directory's `.claude/kit.config.json`. `KIT_DRY_RUN=1` writes nothing, and for an integration prints the install candidates in order plus the wire command. The tools, the consent line and the install order: [Integrations](https://cckit.dev/integrations/) |
 | `cckit update` | report whether the project is behind the installed cckit |
 | `cckit migrate` | reshuffle an old kit layout to the current one |
@@ -108,6 +114,35 @@ Every operation an unattended run needs is reachable through the one CLI:
 | `--force` | launch even if an issue is `blocked_by` an OPEN issue (the gate is on by default) |
 | `--no-seed` | start the agent without an auto-prompt |
 
+**Base branch override.** `KIT_BASE_BRANCH` in the environment wins over `github.baseBranch` in the
+config for that invocation: `KIT_BASE_BRANCH=effort/<N>-<slug> cckit orchestrate <sub>` cuts the
+sub's worktree from the effort branch instead of the base. `orchestrate` then prints
+`base '<branch>' comes from KIT_BASE_BRANCH in the environment (the config says '<base>')`. The
+branch must exist on origin (`wt_start` fetches it). Every verb that loads the config reads the same
+variable — `cckit start` cuts from it and `cckit pr` targets it — so set it per command, not with a
+shell-wide `export`. `orchestrate` passes an override on to each agent pane (tmux: `env KIT_BASE_BRANCH=…`
+on the agent's command line; Herdr: `--env`), so `cckit pr` in the pane targets the branch the
+worktree was cut from. The base cckit resolved from a config is not an override in a child process:
+a `cckit` run in another project reads its own config.
+
+### Night mode (no verb: `/kit-autopilot` + two scripts)
+
+Night mode has no `cckit` verb. The `kit-autopilot` skill reads the owner's night grant with
+`scripts/night-grant.sh read <parent>` and launches the Workflow script `scripts/night-run.mjs`
+with the args that prints. In a consuming project both live under `${CLAUDE_PLUGIN_ROOT}/scripts/`.
+
+| Rule | What the scripts enforce |
+| --- | --- |
+| Who may grant | a `<!-- night-grant -->` comment counts only from an author GitHub reports as `OWNER`, from `github.owner`, or from a login in `night.grantors`; any other author's is ignored |
+| Approval | the grant's `waves` list; no label or body section on the effort is required |
+| Width | `effort.wipLimit` efforts at once (default 2), never more than 4; executors never pass `--force` |
+| Wave order | a wave that did not fully merge ends the run `blocked`; no later wave starts |
+| Final check | the gate on the base branch, even when the grant sets a `stopCommand` |
+| Waivers | each must equal one floor name; `workflows`, `cost`, `secret` and `night.neverWaivable` are never waivable |
+
+Config: `night.floors`, `night.neverWaivable`, `night.gate`, `night.grantors`, `night.refuseLabels`
+— see [Night mode](https://cckit.dev/config-and-permissions/#night-mode).
+
 ## The agent loop (reference)
 
 1. `cckit sync --llm` → pick an unblocked issue.
@@ -121,6 +156,12 @@ Every operation an unattended run needs is reachable through the one CLI:
 cckit shells out to whatever agent invokes it; it does not embed a model. For verbs that synthesize
 text (digests, ingest), the model endpoint is configurable via environment — see the docs site (
 [cckit.dev](https://cckit.dev).
+
+The effort-close judge reads an OpenAI-compatible endpoint from `CCKIT_MODEL_URL` (base URL; it
+POSTs to `<value>/chat/completions`), `CCKIT_MODEL` (model name) and `CCKIT_MODEL_TOKEN` (bearer
+token). A project with its own variables names them in the config instead — `model.urlEnv`,
+`model.modelEnv`, `model.tokenEnv` hold env var **names**, never values. See
+[Model endpoint for the effort judge](https://cckit.dev/config-and-permissions/#model-endpoint-for-the-effort-judge).
 
 **Agent profiles** (`agents.profiles` in the config) carry a spend `tier`, a permission policy and
 extra CLI argv. **cckit never names a model** — you spell your own flags in `args`, and the

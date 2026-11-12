@@ -185,10 +185,32 @@ if [ -n "${KS_TEST_INNER:-}" ]; then
     eq  "one row per worktree, detached included" \
         "$(printf '%s\n' "$wts" | grep -c . | tr -d ' ')" "3"
 
-    # status_cleanup_counts must return four integers even with no classifier loaded.
+    # #390: a detached worktree gc rates LANDED (clean, HEAD on the base branch) is not work in
+    # progress, so the "In progress" list leaves it out; the inventory above still carries it. One
+    # with a commit on no branch stays listed. gh is stubbed out: the report must not reach GitHub.
+    ( cd "$repo" && git worktree add -q --detach "$tmp/detwork" HEAD \
+      && cd "$tmp/detwork" && echo w > w.txt && git add w.txt && git commit -q -m "detached work" ) >/dev/null 2>&1
+    nogh="$tmp/noghbin"; mkdir -p "$nogh"; printf '#!/bin/sh\nexit 1\n' > "$nogh/gh"; chmod +x "$nogh/gh"
+    # `inprog gc` loads the classifier in its own subshell, so the assertions after this block still
+    # run without it, as they did before.
+    inprog() { ( if [ "${1:-}" = gc ]; then . "$dir/kit-gc.sh"; fi
+                 cd "$repo" && PATH="$nogh:$PATH" KIT_BASE_BRANCH=trunk KIT_REPO="" status_buckets_md "$repo" 2>/dev/null ) \
+                 | awk '/^\*\*In progress\*\*/{s=1} /^## 2/{s=0} s'; }
+    # Without the gc classifier loaded there is no verdict, so nothing is dropped.
+    has "no classifier: the detached worktree stays listed" "$(inprog)" '`det`'
+    md="$(inprog gc)"
+    no  "a LANDED detached worktree is not in progress"   "$md" '`det`'
+    has "a detached worktree with its own commit still is" "$md" '`detwork`'
+    has "attached worktrees are still in progress"        "$md" '`wt`'
+    has "the list counts what it shows"                   "$md" '3 worktree(s) checked out'
+    has "the report says what it left out"                "$md" '1 detached worktree(s)'
+    wts="$(cd "$repo" && status_worktree_rows)"
+    has "the inventory still carries the LANDED detached worktree" "$wts" "$tmp/det	"
+
+    # status_cleanup_counts must return five integers even with no classifier loaded.
     counts="$(cd "$clean" && status_cleanup_counts)"
-    eq "cleanup counts are four fields" \
-       "$(printf '%s' "$counts" | awk -F'\t' '{print NF}')" "4"
+    eq "cleanup counts are five fields" \
+       "$(printf '%s' "$counts" | awk -F'\t' '{print NF}')" "5"
     case "$counts" in
       *[!0-9$(printf '\t')]*) echo "FAIL($KS_TEST_INNER): cleanup counts must be integers -> '$counts'"; fail=1 ;;
       *) : ;;
@@ -205,19 +227,64 @@ if [ -n "${KS_TEST_INNER:-}" ]; then
     eq "JSON carries worktrees"           "$(printf '%s' "$js" | jq -r '.worktrees | type')" "array"
     eq "JSON carries prs"                 "$(printf '%s' "$js" | jq -r '.prs | type')" "array"
     eq "JSON carries the cleanup counts"  "$(printf '%s' "$js" | jq -r '.cleanup | keys | join(",")')" \
-       "orphan,protected,remote_stale,safe"
+       "orphan,protected,remote_stale,safe,unknown"
     eq "an empty bucket is [] not null"   "$(printf '%s' "$js" | jq -r '.local_undone | length')" "0"
     eq "ai_review_expected is a boolean"  "$(printf '%s' "$js" | jq -r '.ai_review_expected | type')" "boolean"
     # A PR bucket that could NOT be read must be distinguishable from an empty one, in the JSON and
     # in the exit status — otherwise an agent treats "could not look" as "nothing to do".
     eq "JSON reports whether the PRs were read" "$(printf '%s' "$js" | jq -r '.prs_read | type')" "boolean"
     eq "JSON carries the dependency state"      "$(printf '%s' "$js" | jq -r '.deps | keys | join(",")')" "gh,git,jq"
+    eq "no instruction files: instruction_budget is null" \
+       "$(printf '%s' "$js" | jq -r '.instruction_budget')" "null"
     stub="$tmp/nogh"; mkdir -p "$stub"
     for c in git jq; do p_="$(command -v $c)"; [ -n "$p_" ] && ln -sf "$p_" "$stub/$c"; done
     js2="$(cd "$clean" && PATH="$stub" KIT_BASE_BRANCH=trunk KIT_REPO="o/r" status_buckets_json "$clean" 2>/dev/null)"; jrc=$?
     eq "no gh: prs_read is false"  "$(printf '%s' "$js2" | jq -r '.prs_read')" "false"
     eq "no gh: deps.gh is false"   "$(printf '%s' "$js2" | jq -r '.deps.gh')" "false"
     eq "no gh: the rc is non-zero" "$([ "$jrc" -ne 0 ] && echo yes || echo no)" "yes"
+
+    # #330: with the gc classifier loaded and gh FAILING, the branches gc cannot classify are
+    # counted as `unknown` — the JSON stays valid and never reads as "0 orphan, nothing to clean".
+    fstub="$tmp/failgh"; mkdir -p "$fstub"
+    printf '#!/bin/sh\necho "GraphQL: API rate limit exceeded" >&2\nexit 1\n' > "$fstub/gh"; chmod +x "$fstub/gh"
+    js3="$(cd "$clean" && git branch -q task/41-fresh && . "$dir/kit-gc.sh" \
+           && PATH="$fstub:$PATH" CCKIT_GH_TRANSPORT=graphql KIT_BASE_BRANCH=trunk KIT_REPO="o/r" KIT_GC_REPO="o/r" \
+              status_buckets_json "$clean" 2>/dev/null)"
+    eq "gh failing: the JSON is still an object"   "$(printf '%s' "$js3" | jq -r 'type' 2>/dev/null)" "object"
+    eq "gh failing: unclassified branches are counted" \
+       "$([ "$(printf '%s' "$js3" | jq -r '.cleanup.unknown' 2>/dev/null)" -ge 1 ] 2>/dev/null && echo yes || echo no)" "yes"
+    eq "gh failing: none of them is reported orphan" "$(printf '%s' "$js3" | jq -r '.cleanup.orphan' 2>/dev/null)" "0"
+    md3="$(cd "$clean" && . "$dir/kit-gc.sh" \
+           && PATH="$fstub:$PATH" CCKIT_GH_TRANSPORT=graphql KIT_BASE_BRANCH=trunk KIT_REPO="o/r" KIT_GC_REPO="o/r" \
+              status_buckets_md "$clean" 2>/dev/null)"
+    has "gh failing: the markdown says so" "$md3" "could not be classified"
+  fi
+
+  # ── the resident instruction-file line (#357) ───────────────────────────────────────────────
+  # One rule with no `paths:` is resident; one with `paths:` is not. The line must count the first
+  # and leave the second out, in the markdown and in the JSON, or it reports a cost nobody pays.
+  if command -v git >/dev/null 2>&1; then
+    ib="$tmp/ib"; mkdir -p "$ib/.claude/rules"
+    ( cd "$ib" && git init -q . ) >/dev/null 2>&1
+    printf '%s\n' "12345" > "$ib/CLAUDE.md"                                   # 6 bytes
+    printf '%s\n' "123456789" > "$ib/.claude/rules/always.md"                 # 10 bytes
+    printf '%s\n' "---" "paths:" '  - "src/**"' "---" "scoped body" > "$ib/.claude/rules/scoped.md"
+    lint="$dir/../instruction-budget-lint.sh"
+    line="$(cd "$ib" && KIT_INSTRUCTION_LINT="$lint" status_instruction_budget "$ib")"
+    has "the line carries the resident total against the limit" "$line" \
+        "instruction files: 16 of 150000 bytes resident"
+    has "the line names the largest files" "$line" "largest: .claude/rules/always.md (10), CLAUDE.md (6)"
+    no  "a path-scoped rule is not in the line" "$line" "scoped.md"
+    eq  "no lint available: the line is empty, not an error" \
+        "$(cd "$ib" && KIT_INSTRUCTION_LINT="$tmp/absent.sh" status_instruction_budget "$ib")" ""
+    md="$(cd "$ib" && KIT_INSTRUCTION_LINT="$lint" KIT_BASE_BRANCH=trunk KIT_REPO="" status_buckets_md "$ib" 2>/dev/null)"
+    has "the markdown report carries the resident line" "$md" \
+        "- instruction files: 16 of 150000 bytes resident"
+    if command -v jq >/dev/null 2>&1; then
+      jsb="$(cd "$ib" && KIT_INSTRUCTION_LINT="$lint" KIT_BASE_BRANCH=trunk KIT_REPO="" status_buckets_json "$ib" 2>/dev/null)"
+      eq "JSON carries the resident bytes" "$(printf '%s' "$jsb" | jq -r '.instruction_budget.resident_bytes')" "16"
+      eq "JSON carries the limit"          "$(printf '%s' "$jsb" | jq -r '.instruction_budget.limit_bytes')" "150000"
+    fi
   fi
 
   rm -rf "$tmp"

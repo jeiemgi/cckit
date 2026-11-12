@@ -112,6 +112,78 @@ t "the pane shell sees one arg per declared arg" \
 t "a single quote survives instead of terminating the quoting" \
   "$(argv "$(printf -- "it's odd")")" "[claude][it's odd]"
 
+# ── #352 · a base override reaches the agent pane whatever the terminal server's state ─────────
+# The pane is started by the tmux / Herdr SERVER, not by orchestrate. With a server already running
+# the pane never saw `KIT_BASE_BRANCH=effort/9-x cckit orchestrate …`, so the worktree was cut from
+# the effort branch while `cckit pr` in the pane targeted the config's base; with no server running
+# the same command targeted the effort branch. The override travels on the command line instead.
+t "no override: the config base is not an override" \
+  "$(KIT_BASE_BRANCH=develop KIT_BASE_BRANCH_CONFIG=develop or_base_override)" ""
+t "an override is reported" \
+  "$(KIT_BASE_BRANCH=effort/9-x KIT_BASE_BRANCH_CONFIG=develop or_base_override)" "effort/9-x"
+t "no config loaded means no override to carry" "$(KIT_BASE_BRANCH=effort/9-x or_base_override)" ""
+t "the override is typed onto the pane's command line" \
+  "$(or_tmux_agent_cmd claude '' effort/9-x)" "env KIT_BASE_BRANCH='effort/9-x' claude"
+t "no override leaves the command line as it was" "$(or_tmux_agent_cmd claude '' '')" "claude"
+t "override and profile args compose" \
+  "$(or_tmux_agent_cmd claude "$(printf -- '--model\nsome model')" effort/9-x)" \
+  "env KIT_BASE_BRANCH='effort/9-x' claude '--model' 'some model'"
+# The round trip: a pane with NO KIT_BASE_BRANCH (a tmux server that was already running) evals the
+# line; the agent then loads a config whose base is develop, as `cckit pr` does inside the pane.
+pane="$(mktemp -d)"
+printf '%s' '{"github":{"baseBranch":"develop"}}' > "$pane/cckit.config.json"
+cat > "$pane/claude" <<SH
+#!/usr/bin/env bash
+source "$ROOT/scripts/lib/kit-config.sh"; load_kit_config 2>/dev/null
+printf '%s|%s' "\$KIT_BASE_BRANCH" "\$KIT_BASE_BRANCH_CONFIG"
+SH
+chmod +x "$pane/claude"
+in_pane() { ( unset KIT_BASE_BRANCH KIT_BASE_BRANCH_DEFAULTED; export KIT_CONFIG="$pane/cckit.config.json" PATH="$pane:$PATH"; eval "$1" ); }
+t "a pane without the variable resolves the override from its command line" \
+  "$(in_pane "$(or_tmux_agent_cmd claude '' effort/9-x)")" "effort/9-x|develop"
+t "a pane without an override resolves the config base" \
+  "$(in_pane "$(or_tmux_agent_cmd claude '' '')")" "develop|develop"
+
+# The tmux server keeps the environment of the client that started it and hands it to every later
+# pane, in any repo. new-session must not start the server with the base branch in it, and must
+# drop one an earlier cckit left there.
+export TMUX_TEST_LOG="$stub/tmux.log"; : > "$TMUX_TEST_LOG"
+cat > "$stub/tmux" <<'SH'
+#!/usr/bin/env bash
+printf '%s [KIT_BASE_BRANCH=%s] [DEFAULTED=%s]\n' "$*" "${KIT_BASE_BRANCH-<unset>}" "${KIT_BASE_BRANCH_DEFAULTED-<unset>}" >> "$TMUX_TEST_LOG"
+SH
+chmod +x "$stub/tmux"
+( export KIT_BASE_BRANCH=develop KIT_BASE_BRANCH_DEFAULTED=develop; or_tmux_new_session sweep flows /tmp/wt1 )
+log="$(cat "$TMUX_TEST_LOG")"
+yes "new-session starts without the base branch in its environment" "$log" \
+  "new-session -d -s sweep -n flows -c /tmp/wt1 [KIT_BASE_BRANCH=<unset>] [DEFAULTED=<unset>]"
+yes "a base branch left in a running server is dropped" "$log" "set-environment -g -u KIT_BASE_BRANCH "
+yes "the defaulted record is dropped with it" "$log" "set-environment -g -u KIT_BASE_BRANCH_DEFAULTED "
+rm -f "$stub/tmux"
+# Against a real tmux on a private socket, when one is installed: the server orchestrate starts
+# carries no KIT_BASE_BRANCH, so a later session's pane cannot inherit one.
+if command -v tmux >/dev/null 2>&1; then
+  sock="$(mktemp -d)"
+  got="$( unset TMUX; export TMUX_TMPDIR="$sock" KIT_BASE_BRANCH=develop KIT_BASE_BRANCH_DEFAULTED=develop
+          or_tmux_new_session sweep flows "$sock" >/dev/null 2>&1 || echo 'new-session failed'
+          tmux show-environment -g 2>/dev/null | grep -E '^KIT_BASE_BRANCH' || true
+          tmux kill-server >/dev/null 2>&1 || true )"
+  t "a real tmux server is started without the base branch" "$got" ""
+  rm -rf "$sock"
+fi
+
+# Herdr: the pane's process is started by the Herdr server, so the override goes in with --env.
+: > "$HERDR_TEST_LOG"
+( export KIT_BASE_BRANCH=effort/9-x KIT_BASE_BRANCH_CONFIG=develop
+  or_herdr_launch sweep codex 0 1 demo "" "/tmp/wt1|task/41-one|41" "/tmp/wt2|task/42-two|42" >/dev/null )
+log="$(cat "$HERDR_TEST_LOG")"
+yes "Herdr workspace carries the override" "$log" "workspace|create|--cwd|/tmp/wt1|--label|cckit:demo:sweep|--env|KIT_BASE_BRANCH=effort/9-x|--no-focus"
+yes "Herdr tab carries the override" "$log" "--label|issue-42|--env|KIT_BASE_BRANCH=effort/9-x|--no-focus"
+: > "$HERDR_TEST_LOG"
+( export KIT_BASE_BRANCH=develop KIT_BASE_BRANCH_CONFIG=develop
+  or_herdr_launch sweep codex 0 1 demo "" "/tmp/wt1|task/41-one|41" >/dev/null )
+no "no override passes no --env" "$(cat "$HERDR_TEST_LOG")" "--env"
+
 PATH="/usr/bin:/bin"
 missing="$(or_runtime_preflight herdr codex 0 2>&1)"; rc=$?
 t "missing Herdr fails before worktree creation" "$rc" "1"

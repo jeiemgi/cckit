@@ -623,7 +623,7 @@ if [[ $DRY_RUN -eq 1 ]]; then
     [[ -f "$KIT_ROOT/templates/skills/$s/SKILL.md" ]] && echo "    .claude/skills/$_dn/SKILL.md"
     [[ -d "$KIT_ROOT/templates/skills/$s/references" ]] && echo "    .claude/skills/$_dn/references/"
   done
-  echo "    scripts/ (kit-config.sh, gh-project.sh, kit-version-check.sh, setup-labels.sh, setup-milestones.sh, capture-project-ids.sh, task-sync.sh, knowledge-lint.sh, review-lint.sh + review-rules.conf, skill-frontmatter-lint.sh)"
+  echo "    scripts/ (kit-config.sh, gh-project.sh, kit-version-check.sh, setup-labels.sh, setup-milestones.sh, capture-project-ids.sh, task-sync.sh, knowledge-lint.sh, review-lint.sh + review-rules.conf, skill-frontmatter-lint.sh, instruction-budget-lint.sh)"
   echo "    knowledge/INDEX.md                        (knowledge-base manifest — rules/knowledge-base.md)"
   echo "    .claude/lib/kit-sigil.sh                  (claude-kit attribution sigil helper, sourced by task-* footers)"
   [[ "$MEMORY_BOOL"     == "true" ]] && echo "    .claude/hooks/mempal_session_start.sh + mempal_save.sh + mempal_precompact.sh + mempal_followup.sh   (SessionStart / Stop / PreCompact / SessionEnd)"
@@ -780,15 +780,20 @@ safe_copy "$KIT_ROOT/scripts/lib/engine-adapter.sh" "$TARGET/scripts/lib/engine-
 safe_copy "$KIT_ROOT/scripts/lib/effort-metrics.sh" "$TARGET/scripts/lib/effort-metrics.sh"
 safe_copy "$KIT_ROOT/scripts/lib/gh-log.sh"         "$TARGET/scripts/lib/gh-log.sh"
 safe_copy "$KIT_ROOT/scripts/lib/kit-events.sh"     "$TARGET/scripts/lib/kit-events.sh"
+# task-sync.sh sources board-view.sh unguarded (set -e) and effort-plan.sh for `--plan`.
+safe_copy "$KIT_ROOT/scripts/lib/board-view.sh"     "$TARGET/scripts/lib/board-view.sh"
+safe_copy "$KIT_ROOT/scripts/lib/effort-plan.sh"    "$TARGET/scripts/lib/effort-plan.sh"
 safe_copy "$KIT_ROOT/scripts/lib/worktree-start.sh" "$TARGET/scripts/lib/worktree-start.sh"
+safe_copy "$KIT_ROOT/scripts/lib/session-registry.sh" "$TARGET/scripts/lib/session-registry.sh"
+safe_copy "$KIT_ROOT/scripts/lib/kinds.sh"          "$TARGET/scripts/lib/kinds.sh"
 safe_copy "$KIT_ROOT/scripts/kit-version-check.sh"  "$TARGET/scripts/kit-version-check.sh" exec
 for sc in setup-labels.sh setup-milestones.sh capture-project-ids.sh task-sync.sh knowledge-lint.sh \
-          review-lint.sh skill-frontmatter-lint.sh; do
+          review-lint.sh skill-frontmatter-lint.sh instruction-budget-lint.sh; do
   safe_copy "$KIT_ROOT/scripts/$sc" "$TARGET/scripts/$sc" exec
 done
 # review-lint is table-driven: the engine is useless without a rule table, so the starter table
-# travels with it. Both lints self-disable when they do not apply (no rule table / no skills dir),
-# so shipping them to every project is safe.
+# travels with it. Every lint self-disables when it does not apply (no rule table / no skills dir /
+# no CLAUDE.md and no rules dir), so shipping them to every project is safe.
 safe_copy "$KIT_ROOT/scripts/review-rules.conf" "$TARGET/scripts/review-rules.conf"
 # Seed each baseline ONCE so a fresh project starts green and only *new* defects fail. Never
 # regenerate an existing baseline - that would silently re-grandfather drift on upgrade.
@@ -802,14 +807,14 @@ safe_copy "$KIT_ROOT/scripts/review-rules.conf" "$TARGET/scripts/review-rules.co
 # that already has commits, where `git ls-files` is non-empty and the untracked kit files are
 # invisible to it; the baseline would come out empty and the gate would go red on the user's first
 # commit of the scaffold.
-for _lint in review-lint skill-frontmatter-lint; do
+for _lint in review-lint skill-frontmatter-lint instruction-budget-lint; do
   [[ -f "$TARGET/scripts/$_lint.sh" ]] || continue
   _baseline="$( cd "$TARGET" && bash "scripts/$_lint.sh" --baseline-path 2>/dev/null )"
   [[ -n "$_baseline" ]] || continue
   [[ -e "$TARGET/$_baseline" ]] && continue
   ( cd "$TARGET" && KIT_LINT_WALK=1 bash "scripts/$_lint.sh" --update ) >/dev/null 2>&1 || true
 done
-echo "  + scripts/ (libs + setup + task-sync + version-check + knowledge-lint + review-lint + skill-frontmatter-lint)"
+echo "  + scripts/ (libs + setup + task-sync + version-check + knowledge-lint + review-lint + skill-frontmatter-lint + instruction-budget-lint)"
 
 # ---- benchmark harness (generic machinery; kit-owned) + example dataset ----
 # The harness measures how well THIS project's own canonical docs can be found + used by a cold

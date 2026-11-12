@@ -21,6 +21,7 @@ command -v git >/dev/null 2>&1 || { echo "gh-rest-test: git required" >&2; exit 
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 export GH_LOG="$tmp/gh.log" GH_N="$tmp/n" GH_CLOSED="" GH_HEAD="fix/9-x" GH_BASE="develop" GH_MERGEABLE="true"
 export GH_TITLE="Fix the thing" GH_LABELS='[{"name":"kind:fix"},{"name":"role:tech-lead"}]'
+export GH_REPO_LABELS='[{"name":"kind:task"},{"name":"priority:p2"},{"name":"role:tech-lead"}]'
 : > "$GH_LOG"
 
 # rest_only <log> <label> — every gh call in <log> is `gh api` on a repos/ endpoint; none is graphql,
@@ -68,6 +69,7 @@ next() { n=$(( $(cat "$GH_N" 2>/dev/null || echo 49) + 1 )); echo "$n" > "$GH_N"
 state_of() { case " $GH_CLOSED " in *" $1 "*) echo closed ;; *) echo open ;; esac; }
 json='{}'
 case "$method $ep" in
+  "GET repos/o/r/labels")     json="$GH_REPO_LABELS" ;;
   "GET repos/o/r/milestones") json='[{"number":2,"title":"M0"},{"number":3,"title":"M1"}]' ;;
   "POST repos/o/r/issues")    n="$(next)"; json="{\"number\":$n,\"html_url\":\"https://github.com/o/r/issues/$n\",\"user\":{\"login\":\"me\"}}" ;;
   "GET repos/o/r/issues")     json='[{"number":99,"title":"[Effort] 99 · demo effort"},{"number":5,"title":"PR","pull_request":{}}]' ;;
@@ -107,6 +109,11 @@ tc <(CCKIT_GH_TRANSPORT=soap cckit_gh_transport 2>&1 >/dev/null) "must be rest o
 # ── pure helpers ──────────────────────────────────────────────────────────────────────────────────
 t "closing refs are read from a PR body" \
   "$(printf 'Closes #42\nfixes #43 and resolves #7\nsee #44\nCloses #42\n' | gh_rest_closing_refs | tr '\n' ' ')" "7 42 43 "
+
+# The PR read carries what `cckit hotfix <pr>` needs (#360): the title, and a merge commit only once
+# MERGED — the fixture PR is open, and its merge_commit_sha is GitHub's test merge, not a real one.
+t "pr json carries the title"                       "$(gh_rest_pr_json o/r 9 | jq -r .title)" "feat: sub 9"
+t "an open PR has no merge commit"                  "$(gh_rest_pr_json o/r 9 | jq -r '.mergeCommit.oid // "none"')" "none"
 
 # ── board steps in rest mode ──────────────────────────────────────────────────────────────────────
 : > "$GH_LOG"
@@ -149,6 +156,11 @@ tc "$GH_LOG" '^api repos/o/r/issues/7 -X PATCH -f labels\[\]=kind:fix -f labels\
 tc "$tmp/out" 'https://github.com/o/r/pull/7'       "pr: prints the PR url"
 t  "pr: the board notice is printed once"           "$(grep -c 'board step skipped' "$tmp/err")" "1"
 
+: > "$GH_LOG"
+kto_task_pr 42 "Did the thing." --base main >/dev/null 2>&1; rc=$?
+t  "pr --base: rc 0 over REST"                      "$rc" "0"
+tc "$GH_LOG" '^api repos/o/r/pulls -X POST .*-f head=fix/42-the-thing -f base=main' "pr --base: the explicit base is sent in POST pulls"
+
 # cckit new
 : > "$GH_LOG"
 unset _CCKIT_BOARD_NOTICE_DONE; num="$(kto_task_new "Add a thing" tech-lead task p2 M1 "" "" "Body." 2>"$tmp/err" | tail -1)"; rc=$?
@@ -159,6 +171,23 @@ tc "$GH_LOG" "^api repos/o/r/issues/$num/assignees -X POST -f assignees\[\]=me" 
 t  "new: echoes the new number"                     "$num" "50"
 t  "new: no 'NOT added to the board' warning"       "$(grep -c 'NOT added' "$tmp/err")" "0"
 t  "new: the board notice is printed once"          "$(grep -c 'board step skipped' "$tmp/err")" "1"
+
+# cckit new, a label the repo does not have (#387): a warning, the issue is still created, and the
+# label is not sent — POST issues would create it.
+: > "$GH_LOG"
+unset _CCKIT_BOARD_NOTICE_DONE; kto_task_new "Add a thing" tech-lead feat p2 "" "" "" "Body." >"$tmp/out" 2>"$tmp/err"; rc=$?
+t  "new, missing label: rc 0 over REST"             "$rc" "0"
+rest_only "$GH_LOG" "new, missing label: only REST calls"
+tc "$GH_LOG" '^api repos/o/r/labels -X GET '        "new, missing label: reads the repo's labels over REST"
+tc "$GH_LOG" '^api repos/o/r/issues -X POST -f title=Add a thing .*-f labels\[\]=priority:p2 -f labels\[\]=role:tech-lead --jq' "new, missing label: POST issues with the existing labels only"
+t  "new, missing label: kind:feat is not sent"      "$(grep -c 'kind:feat' "$GH_LOG")" "0"
+tc "$tmp/out" '^✓ https://github.com/o/r/issues/[0-9]+$' "new, missing label: prints the issue url"
+tc "$tmp/err" "label 'kind:feat' not found"         "new, missing label: the warning names kind:feat"
+# The label list cannot be read: every label is sent, as before.
+: > "$GH_LOG"
+GH_FAIL_EP="repos/o/r/labels" kto_task_new "Add a thing" tech-lead feat p2 "" "" "" "Body." >"$tmp/out" 2>"$tmp/err"; rc=$?
+t  "new, unreadable label list: rc 0"               "$rc" "0"
+tc "$GH_LOG" '^api repos/o/r/issues -X POST .*-f labels\[\]=kind:feat -f labels\[\]=priority:p2 -f labels\[\]=role:tech-lead' "new, unreadable label list: every label is sent"
 
 # cckit close
 : > "$GH_LOG"
@@ -245,7 +274,7 @@ echo work > file.txt; git add file.txt; git commit -q -m "feat: do the thing (#1
 unset _CCKIT_BOARD_NOTICE_DONE; effort_pr 99 --summary "SUMMARY" >"$tmp/out" 2>"$tmp/err"; rc=$?
 t  "effort pr: rc 0 over REST"                      "$rc" "0"
 rest_only "$GH_LOG" "effort pr: only REST calls"
-tc "$GH_LOG" '^api repos/o/r/pulls -X POST -f title=\[#99\] .*-f head=effort/99-demo -f base=main' "effort pr: POST pulls effort/99 → main"
+tc "$GH_LOG" '^api repos/o/r/pulls -X POST -f title=feat: demo effort \[#99\] .*-f head=effort/99-demo -f base=main' "effort pr: POST pulls effort/99 → main"
 tc "$GH_LOG" '^api repos/o/r/issues/7 -X PATCH -f labels\[\]=role:tech-lead -f labels\[\]=kind:task .*-F milestone=3' "effort pr: inherits labels + milestone"
 t  "effort pr: the board notice is printed once"    "$(grep -c 'board step skipped' "$tmp/err")" "1"
 

@@ -60,9 +60,12 @@ The slug is a *derived* convenience, not a second source of truth. `--slug` only
 
 ## The lifecycle: start → pr → close
 
-- **`cckit effort new`** — flags (`--flow`, `--role`, `--priority`, `--par`, …) may appear in **any
-  position**, before or after the name and sub specs. `--par seq | wide | <N>` records how the
-  effort's subs are meant to run as a `par:` label on the parent. The `--flow` values (the `[Flow]`
+- **`cckit effort new`** — flags (`--flow`, `--role`, `--priority`, `--kind`, …) may appear in **any
+  position**, before or after the name and sub specs. `--kind` sets the `kind:` label on the parent
+  and every sub: one of `feat fix task chore security scaffold ci adr spike plan` (default `task`).
+  That is the closed set `cckit start` uses as the branch prefix (`<kind>/<N>-<slug>`), so a value
+  outside it is refused before anything is created; an issue that already carries such a label
+  starts on a `task/` branch, with a warning. The `--flow` values (the `[Flow]`
   title tags) come from a controlled vocabulary your project sets once as `effort.flows` in
   `cckit.config.json` / `.claude/kit.config.json` — e.g. `"effort": { "flows": ["Growth", "Checkout"] }`.
   Unset, it defaults to `Core UI API Docs Infra Auth Data Web App`; an explicit `EFFORT_FLOWS` env
@@ -75,14 +78,38 @@ The slug is a *derived* convenience, not a second source of truth. `--slug` only
   **WIP-limited** — see [Only so many efforts at once](#only-so-many-efforts-at-once) below.
 - **`cckit effort pr`** and the `/kit-effort-pr` skill compose the PR title from **one shared
   composer**, and both refuse to open a PR whose title lacks the mandatory `[#N]` effort id.
+  The composed title is a Conventional Commit subject carrying that id —
+  `feat(core): adoption hardening [#115]` — because the PR is squash-merged and the title becomes
+  the commit release-please and the commitlint gate read. The scope is the effort's `flow:` label
+  (else the `[Flow]` tag in its title); the type is `--type <type>` when you pass it, else the
+  `kind:` label (`kind:task` → `feat`, a `bug` label → `fix`). A title that fails the commitlint
+  check — a bad `--type`, or a non-conventional `--title` — is refused before any PR is opened.
+  With [`pr.titleStyle: issue-title`](/config-and-permissions/) the title is `[Role] [#N] <name>`
+  and the commitlint check is skipped.
 - **`cckit effort close`** is the single close implementation — the `/kit-effort-close` skill is a
   thin caller of the same function, so the two can never drift apart. It snapshots each sub-issue's
   diff and captures effort metrics **before** the squash, **refuses to squash-merge when no work
-  trace was captured** (the squash is irreversible — override with `KIT_FORCE=1`), squash-merges,
+  trace was captured** (the squash is irreversible — override with `KIT_FORCE=1`), **re-targets
+  every open PR based on the effort branch to the base branch** before the squash deletes that
+  branch (GitHub closes a PR, unmerged, when its base branch is deleted; one `↻ PR <n> re-targeted
+  to develop` line each — if a re-target fails, or those PRs cannot be listed, the close refuses,
+  names the PR and merges nothing), squash-merges,
   closes the parent and every sub and sets the board **Status=Done** for each, garbage-collects the
   worktree/branch, runs an optional, config-gated knowledge-ingest hook
   (`effort.knowledgeIngestHook`), and finishes with an advisory **kit-sync drift check** that flags
   any kit-managed files the effort touched (they belong upstream via `/kit-contribute`).
+- **`cckit merge` refuses an effort PR.** A PR whose head is an `effort/*` branch is refused before
+  anything is rebased or merged, and the message names `cckit effort close <N>`: a plain squash
+  would destroy the per-sub commits without the snapshot above. `KIT_FORCE=1 cckit merge <pr>`
+  merges anyway and warns that no trace was taken. A sub PR whose **base** is `effort/<N>` still
+  merges with `cckit merge`.
+- **A project can gate the close.** Set `effort.preCloseHook` to an executable and `cckit effort
+  close` calls it as `<hook> <effort#> <sub#…>` from the effort worktree **before** the snapshot and
+  the merge. A non-zero exit refuses the close: the hook's output is printed and no trace, metrics
+  row or merge is written. A configured hook that is missing or not executable refuses too.
+  `KIT_FORCE=1` skips the hook and says so on stderr. A wave-style close runs the same hook from the
+  checkout the close was invoked in, after the subs are verified. See
+  [Effort close hooks](/config-and-permissions/#effort-close-hooks).
 - **The work trace is a directory, and `index.jsonl` says it is complete.** The snapshot writes
   `<git-common-dir>/traces/effort-<N>/<seq>-<shortsha>.{diff,meta}` — one pair per commit — plus an
   `index.jsonl` holding one JSON record per line pairing each commit to its sub-issue. The index is
@@ -186,6 +213,35 @@ What it never does is fail for want of a network: `cckit effort start` degrades 
 than erroring out.
 </Aside>
 
+## Planning sessions from a local snapshot
+
+`cckit effort plan` groups the open efforts by flow, orders each flow by its `blocked_by` edges and
+packs them into session-sized batches. It reads those efforts from GitHub — one listing, then one
+call per effort for its blockers.
+
+If your project already keeps that data locally, set `effort.planSource` to an executable that
+prints one `number<TAB>flow<TAB>ctx<TAB>title[<TAB>blockers]` line per open effort, and the plan
+reads it instead. The source may also print `# age: <text>` to say how old its data is.
+
+```console
+$ cckit effort plan
+
+  kit effort plan — session budget 4  (ctx S=1 M=2 L=4 XL=8 · L/XL → delegate subs)
+  source: planSource tools/effort-rows.sh · age 2h
+
+  Flow: Core
+    Session 1:
+      #241  [M ] order and cadence
+    Session 2:
+      #257  [L ] release gates   (after #241)   → delegate subs
+```
+
+The `source:` line is on every plan. When the source is not executable, exits non-zero or prints no
+rows, the plan falls back to GitHub and the line says why:
+`source: GitHub (acme/shop) — planSource tools/effort-rows.sh failed (exit 3), fell back`.
+The row format and the override are in
+[Effort plan source](/config-and-permissions/#effort-plan-source).
+
 ## Waves
 
 Some sub-issues depend on others: sub #4 can't start until sub #1 is merged. cckit reads those
@@ -262,4 +318,22 @@ different files, they merge cleanly.
 <Aside type="tip" title="One command">
 `cckit start <issue>` makes the branch and the worktree for you. You don't manage worktrees by hand.
 </Aside>
+
+### A sub-issue starts from its effort branch
+
+A sub-issue builds on what its effort has already landed, and those commits are on
+`effort/<N>-<slug>`, not on the base branch yet. Name the effort branch as the base when you
+orchestrate a sub:
+
+```bash
+KIT_BASE_BRANCH=effort/42-auth cckit orchestrate 44 45
+```
+
+Without it the sub's worktree is cut from the base branch and is missing the effort's earlier
+commits. Nothing fails; the agent works against older code. `orchestrate` prints the base it used
+and, when it came from the environment, a second line saying so. Each agent pane is started with
+the same override, whether or not a tmux or Herdr server was already running, so the `cckit pr` the
+agent runs opens the sub's PR against the effort branch. Push the effort branch first: the
+base is fetched from origin. Details:
+[overriding the base branch](/config-and-permissions/#overriding-the-base-branch-for-one-command).
 

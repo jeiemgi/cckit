@@ -23,9 +23,13 @@ here (kit-engine-boundary #1/#2 — same single-implementation principle as the 
   workspace root *with at least one member*; **else nothing**. A dependency-free root is skipped so
   pnpm can't plant an empty `pnpm-lock.yaml` the captain then holds the PR on. `installPaths`
   entries that point outside the worktree are refused. `KIT_WT_INSTALL=0` opts out entirely
-- the **claim precheck** (#124): warns when the issue is already In Progress on the board —
-  another session may own it
-- the live-session **collision guard**: never disturbs a worktree a live session is sitting in
+- the **session claim** (#384): refuses the start (rc 1, nothing created) when another live session
+  already claims the issue in `<git-common-dir>/kit-sessions/`. `cckit start --force <N>` or
+  `KIT_FORCE=1` starts anyway; `cckit claims` lists the live claims. Re-running from the claiming
+  session, or from inside the claimed worktree, is not a collision
+- the **board precheck** (#124): warns — never refuses — when the issue is already In Progress or
+  In Review on the board; another session may own it
+- the pool **collision guard**: a pooled worktree a live session claims is never recycled
 - the board update: issue → In Progress (when Projects v2 is enabled)
 
 ## Inputs
