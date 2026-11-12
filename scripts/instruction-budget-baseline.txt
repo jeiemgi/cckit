@@ -4,5 +4,5 @@
 # `paths:`, or split it into a short rule + a knowledge doc, then re-run --update to tighten.
 #
 # <path> <lines>   |   @resident <bytes>
-.claude/rules/effort-model.md 205
-.claude/rules/naming-and-ids.md 202
+.claude/rules/effort-model.md 210
+.claude/rules/naming-and-ids.md 209
