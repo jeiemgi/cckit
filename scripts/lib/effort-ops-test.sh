@@ -34,6 +34,8 @@ case "$1 $2" in
                    esac ;;
   "pr create")     echo "https://github.com/o/r/pull/7" ;;
   "pr view")       echo "${GH_MERGEABLE:-MERGEABLE}" ;;           # --json mergeable (#394)
+  "pr list")       echo "${GH_DEP_PRS:-[]}" ;;                    # open PRs based on the effort branch (#358)
+  "pr edit")       exit "${GH_PR_EDIT_RC:-0}" ;;                  # re-target a dependent PR (#358)
   "pr diff")       # a merged sub PR's diff (wave-style close, #164): one kit-managed + one app file
     printf 'diff --git a/.claude/skills/demo.md b/.claude/skills/demo.md\n+kit\ndiff --git a/src/app.ts b/src/app.ts\n+app\n' ;;
   "api "*|"api")
@@ -103,7 +105,7 @@ cd "$tmp/work/.claude/worktrees/effort+99-demo"
 effort_pr 99 --summary "SUMMARY-MARKER" --for-agents "AGENTS-MARKER" >/dev/null 2>&1
 tc "$GH_LOG" 'pr create .*--base main --head effort/99-demo' "effort_pr opens effort/99 → main"
 # #363: parity with the kit-effort-pr skill — the verb is the one implementation.
-tc "$GH_LOG" 'pr create .*--title \[#99\] demo effort' "effort_pr titles with the [#N] id + parent name"
+tc "$GH_LOG" 'pr create .*--title feat: demo effort \[#99\]' "effort_pr titles with a conventional subject + the [#N] id"
 tc "$GH_LOG" '[-]-label role:tech-lead,kind:task' "effort_pr inherits the parent's labels"
 tc "$GH_LOG" '[-]-milestone M1'                 "effort_pr inherits the parent's milestone"
 tc "$GH_LOG" 'SUMMARY-MARKER'                                "effort_pr puts --summary in the body"
@@ -116,6 +118,21 @@ t  "effort_pr refuses a --title without the [#N] id" "$rc" "1"
 t  "effort_pr opened nothing on a bad --title"      "$(grep -c 'pr create' "$GH_LOG")" "0"
 effort_pr 99 --title "feat(x): a conventional title [#99]" >/dev/null 2>&1
 tc "$GH_LOG" 'pr create .*--title feat\(x\): a conventional title \[#99\]' "effort_pr honours --title"
+# #237: a title the commitlint gate would reject never reaches gh — built or passed in.
+: > "$GH_LOG"
+effort_pr 99 --type bogus >/dev/null 2>&1 && rc=0 || rc=1
+t  "effort_pr refuses a built title that fails commitlint" "$rc" "1"
+t  "effort_pr opened nothing on a non-conventional built title" "$(grep -c 'pr create' "$GH_LOG")" "0"
+: > "$GH_LOG"
+effort_pr 99 --title "[Tech Lead] [#99] demo effort" >/dev/null 2>&1 && rc=0 || rc=1
+t  "effort_pr refuses a non-conventional --title"   "$rc" "1"
+t  "effort_pr opened nothing on a non-conventional --title" "$(grep -c 'pr create' "$GH_LOG")" "0"
+: > "$GH_LOG"
+effort_pr 99 --type fix >/dev/null 2>&1
+tc "$GH_LOG" 'pr create .*--title fix: demo effort \[#99\]' "effort_pr --type sets the conventional type"
+: > "$GH_LOG"
+KIT_PR_TITLE_STYLE=issue-title effort_pr 99 >/dev/null 2>&1
+tc "$GH_LOG" 'pr create .*--title \[#99\] demo effort' "effort_pr issue-title style keeps the [#N] name form, no commitlint refusal"
 
 # ── effort_close #120: refuse-squash-without-trace backstop ────────────────────────────────────
 # With NO commits on the effort branch, effort_snapshot_subs captures no trace → close must refuse
@@ -136,6 +153,36 @@ echo "kit-managed" > .claude/skills/demo.md   # a kit-managed path → the drift
 git -c user.email=t@t -c user.name=t add file.txt .claude/skills/demo.md
 git -c user.email=t@t -c user.name=t commit -q -m "feat: do the thing (#101)"
 
+# ── effort_close #380: effort.preCloseHook — a project gate that runs BEFORE the snapshot + merge ──
+# The hook is called as `<hook> <effort#> <sub#…>` from the effort worktree. Non-zero refuses the
+# close with nothing written; KIT_FORCE=1 skips it and says so. Subs 101 + 102 come from the stub.
+cat > "$stub/prehook" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" > "$PREHOOK_MARKER"
+pwd -P > "$PREHOOK_MARKER.cwd"
+echo "PREHOOK-SAYS: gate output"
+exit "${PREHOOK_RC:-0}"
+SH
+chmod +x "$stub/prehook"
+export PREHOOK_MARKER="$tmp/prehook.out"
+# (1) a failing hook, configured through effort.preCloseHook in the config: refuse, write nothing.
+printf '{"effort":{"preCloseHook":"%s"}}\n' "$stub/prehook" > "$tmp/prehook-config.json"
+: > "$GH_LOG"
+close_out="$(PREHOOK_RC=1 KIT_CONFIG="$tmp/prehook-config.json" effort_close 99 2>&1)"; rc=$?
+t  "pre-close hook: a failing hook refuses the close (rc 1)" "$rc" "1"
+case "$close_out" in *"PREHOOK-SAYS: gate output"*) echo "ok: pre-close hook: the hook's output is printed" ;; *) echo "FAIL: pre-close hook output missing: $close_out"; fail=1 ;; esac
+case "$close_out" in *"pre-close hook"*"refus"*) echo "ok: pre-close hook: the refusal names the hook" ;; *) echo "FAIL: pre-close refusal message: $close_out"; fail=1 ;; esac
+t  "pre-close hook: a failing hook merges nothing" "$(grep -c 'pr merge' "$GH_LOG")" "0"
+t  "pre-close hook: a failing hook writes no trace" \
+   "$(ls "$(git rev-parse --git-common-dir)/traces/effort-99" 2>/dev/null | grep -cE '(\.diff|\.meta|index\.jsonl)$')" "0"
+# a configured hook that is missing is a gate that cannot run — refuse rather than skip it
+: > "$GH_LOG"
+close_out="$(KIT_EFFORT_PRE_CLOSE_HOOK="$stub/no-such-hook" effort_close 99 2>&1)"; rc=$?
+t  "pre-close hook: a missing hook refuses the close (rc 1)" "$rc" "1"
+t  "pre-close hook: a missing hook merges nothing" "$(grep -c 'pr merge' "$GH_LOG")" "0"
+rm -f "$PREHOOK_MARKER" "$PREHOOK_MARKER.cwd"
+PREHOOK_WT="$(pwd -P)"
+
 # ── effort_close #394: a CONFLICTING PR is refused before the metrics capture writes a row ──────
 : > "$GH_LOG"
 close_out="$(GH_MERGEABLE=CONFLICTING effort_close 99 2>&1)"; rc=$?
@@ -147,6 +194,34 @@ case "$close_out" in
   *) echo "FAIL: conflict refusal message: $close_out"; fail=1 ;;
 esac
 
+# ── effort_close #358: open PRs based on the effort branch are re-targeted before it is deleted ──
+# The selector is pure: `gh pr list --json number,baseRefName` in, the PR numbers on <branch> out.
+DEPS='[{"number":41,"baseRefName":"effort/99-demo"},{"number":42,"baseRefName":"main"},{"number":43,"baseRefName":"effort/99-demo"}]'
+t  "_eo_dependent_prs keeps only the PRs based on the branch" \
+   "$(printf '%s' "$DEPS" | _eo_dependent_prs effort/99-demo | tr '\n' ' ')" "41 43 "
+t  "_eo_dependent_prs: no dependents → no output" "$(printf '[]' | _eo_dependent_prs effort/99-demo)" ""
+t  "_eo_dependent_prs: empty input → no output"   "$(printf '' | _eo_dependent_prs effort/99-demo)" ""
+t  "_eo_dependent_prs: a prefix-sharing branch is not a match" \
+   "$(printf '[{"number":9,"baseRefName":"effort/99-demo-two"}]' | _eo_dependent_prs effort/99-demo)" ""
+# A failed re-target refuses the close: no merge (so no branch delete) and no metrics row.
+records="$(git rev-parse --git-common-dir)/effort-metrics/records.jsonl"
+rows_before="$(cat "$records" 2>/dev/null | wc -l | tr -d ' ')"
+: > "$GH_LOG"
+close_out="$(GH_DEP_PRS="$DEPS" GH_PR_EDIT_RC=1 effort_close 99 2>&1)"; rc=$?
+t  "effort_close refuses when a dependent PR cannot be re-targeted (rc 1)" "$rc" "1"
+t  "effort_close did NOT merge after a failed re-target" "$(grep -c 'pr merge' "$GH_LOG")" "0"
+t  "effort_close appended no metrics row on that refusal" "$(cat "$records" 2>/dev/null | wc -l | tr -d ' ')" "$rows_before"
+case "$close_out" in
+  *"metrics:"*) echo "FAIL: metrics captured before the re-target refusal"; fail=1 ;;
+  *"PR 41"*"nothing was merged"*) echo "ok: re-target refusal names the PR" ;;
+  *) echo "FAIL: re-target refusal message: $close_out"; fail=1 ;;
+esac
+# `gh pr list` failing is not "no dependents": the close refuses instead of deleting blind.
+: > "$GH_LOG"
+close_out="$(GH_DEP_PRS='not json' effort_close 99 2>&1)"; rc=$?
+t  "effort_close refuses when the dependent-PR list is unreadable (rc 1)" "$rc" "1"
+t  "effort_close did NOT merge on an unreadable list" "$(grep -c 'pr merge' "$GH_LOG")" "0"
+
 # #148: the VERB sets board Status=Done (guarded). Stub the board helpers + captured ids in-shell —
 # _eo_source_board must see them and skip sourcing the real gh-project.sh.
 BOARD_LOG="$tmp/board.log"; : > "$BOARD_LOG"
@@ -155,11 +230,22 @@ project_set_single_select()  { echo "$*" >> "$BOARD_LOG"; }
 export KIT_PROJECTS_V2="true" STATUS_FIELD_ID="SF1" STATUS_OPT_DONE="OPT_DONE"
 
 : > "$GH_LOG"
-close_out="$(effort_close 99 2>&1)"; rc=$?
+# (#380 case 2) a passing pre-close hook rides this happy path: called with effort + subs, close proceeds.
+close_out="$(GH_DEP_PRS="$DEPS" KIT_EFFORT_PRE_CLOSE_HOOK="$stub/prehook" effort_close 99 2>&1)"; rc=$?
 export KIT_PROJECTS_V2="false"
 cd "$tmp/work"   # our cwd (the effort worktree) is GC'd by the close — step to the main checkout
 t  "effort_close succeeds with a trace (rc 0)" "$rc" "0"
+t  "pre-close hook: called as <hook> <effort#> <sub#…>" "$(cat "$PREHOOK_MARKER" 2>/dev/null)" "99 101 102"
+t  "pre-close hook: runs from the effort worktree" "$(cat "$PREHOOK_MARKER.cwd" 2>/dev/null)" "$PREHOOK_WT"
 tc "$GH_LOG" 'pr merge effort/99-demo .*--squash' "effort_close squash-merges the PR"
+# #358: both dependents re-targeted to the base, and before the merge that deletes the branch
+tc "$GH_LOG" 'pr list .*--base effort/99-demo .*--state open' "effort_close lists open PRs based on the effort branch"
+tc "$GH_LOG" 'pr edit 41 .*--base main' "effort_close re-targets dependent PR 41 to the base"
+tc "$GH_LOG" 'pr edit 43 .*--base main' "effort_close re-targets dependent PR 43 to the base"
+t  "effort_close leaves a PR on another base alone" "$(grep -c 'pr edit 42' "$GH_LOG")" "0"
+t  "effort_close re-targets before the merge deletes the branch" \
+   "$(grep -nE 'pr edit 43|pr merge' "$GH_LOG" | sed -E 's/^[0-9]+:(pr [a-z]+).*/\1/' | tr '\n' ' ')" "pr edit pr merge "
+case "$close_out" in *"PR 41 re-targeted to main"*) echo "ok: close output carries the re-targeted line" ;; *) echo "FAIL: no re-targeted line in close output"; fail=1 ;; esac
 tc "$GH_LOG" 'issue close 101'  "effort_close closes sub #101"
 tc "$GH_LOG" 'issue close 99 '  "effort_close closes the parent"
 case "$close_out" in *"metrics:"*) echo "ok: capture_effort_metrics composed into close" ;; *) echo "FAIL: no metrics capture in close"; fail=1 ;; esac
@@ -186,8 +272,12 @@ chmod +x "$stub/khook"
 start_out="$(effort_start 88 forced 2>/dev/null)"
 cd "$tmp/work/.claude/worktrees/effort+88-forced"
 : > "$GH_LOG"
-forced_out="$(KHOOK_MARKER="$tmp/khook.out" KIT_EFFORT_KNOWLEDGE_HOOK="$stub/khook" KIT_FORCE=1 effort_close 88 2>&1)"
+# (#380 case 3) the same KIT_FORCE=1 skips a failing pre-close hook — it is never run — and says so.
+rm -f "$PREHOOK_MARKER"
+forced_out="$(PREHOOK_RC=1 KIT_EFFORT_PRE_CLOSE_HOOK="$stub/prehook" KHOOK_MARKER="$tmp/khook.out" KIT_EFFORT_KNOWLEDGE_HOOK="$stub/khook" KIT_FORCE=1 effort_close 88 2>&1)"
 cd "$tmp/work"
+case "$forced_out" in *"pre-close hook"*"skipped (KIT_FORCE=1)"*) echo "ok: pre-close hook: KIT_FORCE=1 says the hook was skipped" ;; *) echo "FAIL: no pre-close skip notice: $forced_out"; fail=1 ;; esac
+t  "pre-close hook: KIT_FORCE=1 does not run the hook" "$([ -e "$PREHOOK_MARKER" ] && echo ran || echo skipped)" "skipped"
 tc "$GH_LOG" 'pr merge effort/88-forced .*--squash' "KIT_FORCE=1 close merges despite no trace"
 t  "knowledge-ingest hook ran with the effort number" "$(cat "$tmp/khook.out" 2>/dev/null)" "ingested 88"
 # #371: the close GCs the worktree it was run from; the hook must run in the main checkout, not in
@@ -206,6 +296,13 @@ close_out="$(effort_close 78 2>&1)"; rc=$?
 t  "wave close refuses while a sub is open (rc 1)" "$rc" "1"
 case "$close_out" in *"not done"*"#202"*) echo "ok: wave refuse lists the straggler sub" ;; *) echo "FAIL: wave refuse output: $close_out"; fail=1 ;; esac
 t  "wave refuse closes nothing" "$(grep -c 'issue close' "$GH_LOG")" "0"
+
+# #380: the wave path has no effort worktree; the hook runs from the checkout the close was run in.
+: > "$GH_LOG"; rm -f "$PREHOOK_MARKER"
+close_out="$(PREHOOK_RC=1 KIT_EFFORT_PRE_CLOSE_HOOK="$stub/prehook" effort_close 77 2>&1)"; rc=$?
+t  "pre-close hook: a failing hook refuses a wave close (rc 1)" "$rc" "1"
+t  "pre-close hook: wave hook gets the effort + its subs" "$(cat "$PREHOOK_MARKER" 2>/dev/null)" "77 301 302"
+t  "pre-close hook: a refused wave close closes nothing" "$(grep -c 'issue close' "$GH_LOG")" "0"
 
 # happy: every sub CLOSED with a merged PR → trace from the PR diffs → parent closed, board Done
 # for parent + subs, drift check fires off the union of the merged PR diffs
@@ -585,7 +682,7 @@ cd "$tmp/work" || exit 1
 
 # 15. the label `effort_plan` READS is a label `effort_new` WRITES.
 #     These drifted apart silently: effort-plan.sh queried `--label effort`, effort_new applied
-#     ctx/kind/priority/role/flow/par/slug and never `effort`, and setup-labels.sh never created
+#     ctx/kind/priority/role/flow/slug and never `effort`, and setup-labels.sh never created
 #     it. `cckit effort plan` therefore answered "no open efforts found" for every effort ever
 #     made, in every repo, with no error anywhere. A static check because the failure mode is
 #     silence — there is nothing at runtime to notice.
@@ -597,6 +694,42 @@ t "effort_new ensures the label exists before using it" \
   "$(grep -c "_eff_ensure_label \"$plan_label\"" "$LIB/effort-ops.sh" | tr -d ' ')" "1"
 t "setup-labels provisions the label plan queries" \
   "$(grep -c "ensure_label \"$plan_label\"" "$SCRIPTS/setup-labels.sh" | tr -d ' ')" "1"
+
+# 16. #330 — a failed gh read is said, never a silent rc 1. With GraphQL failing, the bare
+#     `title="$(gh issue view …)"` assignment ended effort_start under `set -e` with no output at all.
+fstub="$tmp/failbin"; mkdir -p "$fstub"
+printf '#!/usr/bin/env bash\necho "GraphQL: API rate limit exceeded" >&2\nexit 1\n' > "$fstub/gh"
+chmod +x "$fstub/gh"
+wip_reset
+out="$( set -e; PATH="$fstub:$PATH"; CCKIT_GH_TRANSPORT=graphql EFFORT_WIP_REMOTE=0 effort_start --force 801 2>&1 )"; rc=$?
+t "#330: effort_start survives a failed title read (rc 0)" "$rc" "0"
+case "$out" in *"could not read the title of issue #801"*) echo "ok: #330: the failed title read is named on stderr" ;;
+  *) echo "FAIL: #330: no message for the failed title read -> '$out'"; fail=1 ;; esac
+t "#330: the fallback slug made the branch" "$(git show-ref --verify --quiet refs/heads/effort/801-effort && echo yes)" "yes"
+# A re-start during the outage lands on the effort's existing branch, not on a second one.
+git branch -q effort/802-real-slug
+out="$( set -e; PATH="$fstub:$PATH"; CCKIT_GH_TRANSPORT=graphql EFFORT_WIP_REMOTE=0 effort_start --force 802 2>&1 )"; rc=$?
+t "#330: a re-start with gh failing keeps rc 0" "$rc" "0"
+t "#330: a re-start with gh failing cuts no fallback branch" \
+  "$(git show-ref --verify --quiet refs/heads/effort/802-effort && echo yes || echo no)" "no"
+# effort_close: a failed PR read refuses by name instead of dying on the bare assignment.
+out="$( set -e; cd "$(git worktree list --porcelain | awk -v b=refs/heads/effort/801-effort '/^worktree /{w=$2} $2==b{print w}')" \
+        && PATH="$fstub:$PATH" && CCKIT_GH_TRANSPORT=graphql KIT_FORCE=1 effort_close 801 2>&1 )"; rc=$?
+t "#330: effort_close refuses when the PR cannot be read (rc 1)" "$rc" "1"
+case "$out" in *"could not read the PR for effort/801-effort"*) echo "ok: #330: effort_close names the failed PR read" ;;
+  *) echo "FAIL: #330: effort_close gave no reason -> '$out'"; fail=1 ;; esac
+# The REST twin. REST is the transport in use when GraphQL is unavailable, and there the failed read
+# was swallowed: the capture wrote a records.jsonl row and consumed the start marker, then the merge
+# failed — the write-then-fail #394 exists to prevent.
+out="$( set -e; cd "$(git worktree list --porcelain | awk -v b=refs/heads/effort/801-effort '/^worktree /{w=$2} $2==b{print w}')" \
+        && echo work > rest-twin.txt && git add rest-twin.txt \
+        && git -c user.email=t@t -c user.name=t commit -q -m "feat: work (#801)" \
+        && PATH="$fstub:$PATH" && CCKIT_GH_TRANSPORT=rest KIT_FORCE=1 effort_close 801 2>&1 )"; rc=$?
+t "#330: rest: effort_close refuses when the PR cannot be read (rc 1)" "$rc" "1"
+case "$out" in
+  *"metrics:"*) echo "FAIL: #330: rest: metrics captured before the failed PR read was refused -> '$out'"; fail=1 ;;
+  *"could not read the PR for effort/801-effort"*"nothing was written"*) echo "ok: #330: rest: effort_close names the failed PR read" ;;
+  *) echo "FAIL: #330: rest: effort_close gave no reason -> '$out'"; fail=1 ;; esac
 
 [ "$fail" -eq 0 ] && echo "ALL OK (effort-ops)" || echo "effort-ops: FAILURES"
 exit "$fail"

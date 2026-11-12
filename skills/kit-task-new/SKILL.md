@@ -21,14 +21,14 @@ One flow → creates a GitHub issue **and** (if Projects v2 is enabled) adds it 
 | ---------- | -------- | --------------------------------------------- |
 | Title      | ✓        | Format: `[<role>] <imperative summary>`       |
 | Role       | ✓        | One of the project's `roles` (see kit.config) |
-| Kind       | ✓        | task / plan / adr / scaffold / spike          |
+| Kind       | ✓        | feat / fix / task / chore / security / scaffold / ci / adr / spike / plan — the closed set; it becomes the branch prefix |
 | Priority   | ✓        | p1 / p2 / p3                                  |
 | Milestone  | ✓        | One of the project's `milestones`             |
 | Plan link  | optional | Path under the project's plans dir            |
 | Blocked by | optional | `#N, #M`                                      |
 | Body       | ✓        | Context + DoD checklist + acceptance          |
 
-Validate Kind/Priority/Role against the project's closed sets before dispatching — the op does not invent label families.
+Validate Kind/Priority/Role against the project's closed sets before dispatching — the op does not invent label families. A `kind:` / `priority:` / `role:` label the repo does not have is dropped with a `⚠ label '<name>' not found` warning on stderr and the issue is still created; the op fails only when the issue itself is not created.
 
 ## Execution
 
@@ -46,6 +46,6 @@ The function prints `✓ <issue-URL>` and echoes the new issue number.
 ## Rules
 
 - Never file without confirming title + role + priority with the owner
-- Never create new label families on the fly — validate against the project's closed sets; fail loudly if a kind/priority/role is unknown
+- Never create new label families on the fly — validate against the project's closed sets. The op creates no label: one the repo lacks is left off the issue with a warning that names it, so relay that warning to the owner (`scripts/setup-labels.sh` provisions the kit's labels)
 - If the milestone doesn't exist, ask before creating it
 - Always assign `@me` — the op does this

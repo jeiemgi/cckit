@@ -44,7 +44,36 @@ if [ -n "${WT_TEST_INNER:-}" ]; then
   # willing to delete a misnamed live branch — the failure mode this whole lib exists to prevent.
   check "feat/1604a-parser"                        "1604"  # non-sub kind, suffix still protects
   check "feat+1604a-parser"                        "1604"  # same, worktree dirname form
-  [ "$fail" -eq 0 ] && echo "OK($WT_TEST_INNER): 21 cases"
+  # wt_issue_state (#330): failed is not empty. A gh that exits non-zero answers `unknown`; a gh
+  # that says "no such issue" answers empty; only open/closed pass through.
+  tmp=$(mktemp -d)
+  mkdir "$tmp/bin" "$tmp/nogh"
+  for c in tr grep head; do p_=$(command -v "$c"); [ -n "$p_" ] && ln -sf "$p_" "$tmp/nogh/$c"; done
+  state() {   # state <label> <want> <gh script body> [transport]
+    printf '#!/bin/sh\n%s\n' "$3" > "$tmp/bin/gh"; chmod +x "$tmp/bin/gh"
+    got=$(PATH="$tmp/bin:$PATH" CCKIT_GH_TRANSPORT="${4:-graphql}" KIT_REPO=o/r wt_issue_state 41 o/r)
+    if [ "$got" != "$2" ]; then
+      echo "FAIL($WT_TEST_INNER): wt_issue_state $1 -> '[$got]', want '[$2]'"
+      fail=1
+    fi
+  }
+  state "open (graphql)"        "open"    'echo OPEN'
+  state "closed (rest)"         "closed"  'echo closed' rest
+  state "gh fails (graphql)"    "unknown" 'echo "GraphQL: API rate limit exceeded" >&2; exit 1'
+  state "gh fails (rest)"       "unknown" 'echo "gh: Server Error (HTTP 502)" >&2; exit 1' rest
+  state "no such issue (gql)"   ""        'echo "GraphQL: Could not resolve to an Issue with the number of 41." >&2; exit 1'
+  state "no such issue (rest)"  ""        'echo "gh: Not Found (HTTP 404)" >&2; exit 1' rest
+  state "empty success"         ""        'exit 0'
+  got=$(PATH="$tmp/nogh" wt_issue_state 41 o/r)
+  [ "$got" = "unknown" ] || { echo "FAIL($WT_TEST_INNER): wt_issue_state with no gh -> '[$got]', want '[unknown]'"; fail=1; }
+  got=$(PATH="$tmp/bin:$PATH" wt_issue_state "" o/r)
+  [ -z "$got" ] || { echo "FAIL($WT_TEST_INNER): wt_issue_state with no number -> '[$got]', want '[]'"; fail=1; }
+  # An unknown state is not a protection claim — gc reports it as UNKNOWN itself.
+  printf '#!/bin/sh\nexit 1\n' > "$tmp/bin/gh"
+  got=$(PATH="$tmp/bin:$PATH" CCKIT_GH_TRANSPORT=graphql wt_protected_reason task/41-x o/r)
+  [ -z "$got" ] || { echo "FAIL($WT_TEST_INNER): wt_protected_reason on a failed read -> '[$got]', want '[]'"; fail=1; }
+  rm -rf "$tmp"
+  [ "$fail" -eq 0 ] && echo "OK($WT_TEST_INNER): 31 cases"
   exit "$fail"
 fi
 

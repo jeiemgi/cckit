@@ -17,6 +17,10 @@ requested limit. If it cannot, report the unsupported limit and do not start tha
 A prompt asking an agent to stay under a token budget does not enforce that budget.
 Implementation and cross-runtime verification are tracked in cckit effort #257, sub-issue #264.
 
+**Exception — night mode.** The Workflow runtime does enforce a token budget, so an approved plan
+can run unattended through `${CLAUDE_PLUGIN_ROOT}/scripts/night-run.mjs` (see _Mode: night_ below). The CLI flags above
+are still unimplemented.
+
 One skill, two modes — both delegate work that runs **autonomously to a verifiable stop, under hard
 caps**. It is a **thin wrapper**: it composes the built-in `/loop` and the kit's `orchestrate`
 scripts; it never reimplements looping or orchestration.
@@ -98,14 +102,111 @@ kit autopilot --plan            # read the plan and launch the planned set
 ```
 
 1. **Read the plan** — `kit effort plan` groups open efforts by `flow:`, orders each flow by its
-   `blocked_by` edges, sizes each by `ctx:*`, and declares fan-out per effort via `par:*`. That
+   `blocked_by` edges, and sizes each by `ctx:*`. That
    output IS the launch plan — the set, the order, and the budget are read from it, not chosen.
 2. **Launch** — `orchestrate.sh <issueA> <issueB> ...` (one worktree per effort, file-disjoint;
-   respect `par:*`/`blocked_by` so blocked efforts wait). Use `--notify`.
+   respect `blocked_by` so blocked efforts wait). Use `--notify`.
 3. **Babysit** — `orchestrate-watch.sh` (launched by `--notify`) signals PR open / conflict / failing
    checks / merged, and GCs each worktree + branch on merge.
 4. **Decide + advance** — as each wave's gates go green, **merge it** (established-plan autonomy
    above) and advance any effort that was `blocked_by` it. Surface to the human only a genuine blocker.
+
+## Mode: night (an approved plan, unattended, through a Workflow)
+
+The one mode whose caps a runtime enforces. `${CLAUDE_PLUGIN_ROOT}/scripts/night-run.mjs` is a
+Workflow script: the Workflow runtime throws once the `+N` budget is spent, and the script holds the
+rest of the caps in code. Both night scripts ship in the plugin, so every path below starts at
+`${CLAUDE_PLUGIN_ROOT}` — a consuming project has no copy of them in its own checkout.
+
+**Before the owner leaves** — the owner posts the night grant: ONE comment on the plan parent
+issue. **The grant is the approval**: an effort runs tonight because the owner named its number in
+`waves`. Nothing else marks an effort approved — no label, no body section.
+
+**Only the owner's grant counts.** A grant sets the budget, the waivers and a shell `stopCommand`,
+so `night-grant.sh read` keeps a marker comment only when GitHub reports its `author_association`
+as `OWNER`, or its author is `github.owner` or a login in `night.grantors` (kit config). The latest
+of those wins. A marker comment from anyone else is ignored and its author is named on stderr; when
+no owner grant exists the read exits 1 and nothing launches. On an organization repo no commenter
+is `OWNER` and `github.owner` is the org, so list the people who may grant in `night.grantors`.
+
+````markdown
+<!-- night-grant -->
+Tonight: run the two approved waves. I accept the lockfile floor.
+
+```json
+{ "budget": "+2000k", "waves": [[12], [15]], "waivers": ["lockfile"], "stopCommand": null }
+```
+````
+
+**Launch** — from anywhere inside the project (the kit config is found by `kit_config_path`:
+`$KIT_CONFIG`, else a walk up from the current directory):
+
+1. `bash "${CLAUDE_PLUGIN_ROOT}/scripts/night-grant.sh" preflight` — exit 1 names the allowlist
+   entries an unattended run lacks in the tracked `.claude/settings.json` (merge, push, issue
+   comment/edit/close, `gh api`). Stop and tell the owner; it never edits the file.
+2. `bash "${CLAUDE_PLUGIN_ROOT}/scripts/night-grant.sh" read <parent>` — prints the engine args
+   (line 1) and `budget=+N` (line 2), or refuses: no grant by the owner, a malformed grant, a
+   waiver that is not exactly one floor name, a never-waivable waiver, or a WIP limit of 0.
+3. Launch the Workflow script `${CLAUDE_PLUGIN_ROOT}/scripts/night-run.mjs` with line 1 as `args`
+   and the budget as the `+N` directive. The runtime counts the **whole turn**, the captain's own
+   output included, so size `+N` with headroom.
+
+| Cap | Value | Enforced by |
+| --- | --- | --- |
+| Token budget | the grant's `+N` | the Workflow runtime (`budget.total`); no budget = refused |
+| Concurrency | `effort.wipLimit` efforts at once (default 2), never more than 4 | the script |
+| Wave reserve | 150k tokens left, or the next wave does not start | the script |
+| Wave order | a wave that did not fully merge ends the run `blocked`; no later wave starts | the script |
+| Stop | `stopCommand` exits 0 after a wave, or every wave merged + the gate green on the base branch | the script |
+
+**Concurrency and the WIP limit.** Each executor runs `cckit effort start`, which refuses a new
+effort once `effort.wipLimit` effort branches exist (default 2, `EFFORT_WIP_LIMIT` overrides).
+`night-grant.sh` puts that limit in the args as `wipLimit` and the engine runs no wider. Three
+consequences:
+
+- A wave of 4 under the default limit runs 2 + 2, not 4 at once. Raise `effort.wipLimit` to widen it.
+- An effort that parked keeps its branch, so it takes a slot from the rest of its wave; when the
+  parked efforts of a wave fill the limit, the wave's remaining efforts are reported `skipped`.
+- Efforts already in progress **before** the night count against the same limit, and the engine
+  cannot see them. An executor whose start is refused reports that refusal as its blocker and the
+  effort parks. Executors are told never to pass `--force` or set `KIT_FORCE` / `EFFORT_WIP_LIMIT`.
+  Close or finish in-progress efforts before granting, or the night has fewer slots than the limit.
+
+**Wave order.** Waves are dependency-ordered: wave N+1 builds on wave N. `cckit effort start` does
+not check `blocked_by`, so the engine does: when any effort of a wave ends parked, refused or
+skipped, the run returns `blocked` naming them, and no later wave starts.
+
+**The final check is the gate.** After the last wave merges, the engine runs the gate on the base
+branch and reports `done` or `blocked` on that result. `stopCommand` is a separate check that runs
+after each wave and ends the night early when it exits 0; it never stands in for the gate.
+
+**Floors.** Base floors: `lockfile`, `auth`, `security-code`, `security-prose`, `workflows`, `cost`,
+`secret`. `security-prose` (a `security/*` diff that is prose only) is waived by standing rule;
+`workflows`, `cost` and `secret` are never waived. A project adds its own floors, its own
+never-waivable list and its gate command under `night` in the kit config (schema:
+`kit.config.schema.json` § `night`):
+
+```json
+"night": { "floors": { "auth-dep": "the auth library version" },
+           "neverWaivable": ["auth-dep"], "gate": "pnpm typecheck && pnpm lint",
+           "grantors": ["a-maintainer"], "refuseLabels": ["hold"] }
+```
+
+A waiver must equal one floor name exactly. `"lockfile auth"` and `"*"` are refused when the grant
+is read, not parked at night.
+
+**Refused and parked.** A closed issue, an issue without the `effort` label, or an effort carrying
+a label listed in `night.refuseLabels` (none by default) is refused. A red gate or a floor the grant
+did not waive parks the effort for the owner. Either one ends the run after that wave.
+
+**When it returns `usage-limit`** — an agent came back empty mid-wave. Do not relaunch. Sleep with
+`ScheduleWakeup` until the window resets, then resume **one** workflow with `resumeFromRunId`.
+Finished agents replay from cache; a sub whose commit already landed is never rebuilt.
+
+**Every other stop** (`done`, `budget`, `blocked`, `refused`) — write the wake report from the
+returned `efforts` (status, reason, bare PR URL each), update the one status comment on the plan
+parent, and stop. A night never plans and executes the same work: only efforts the owner already
+named in the grant run.
 
 ## On wake / on a pause (the report — always)
 

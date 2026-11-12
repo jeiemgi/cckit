@@ -19,7 +19,7 @@
 #   kto_compose_pr_body <num> <summary> <role-slug>   echo a PR body from the template
 #   kto_compose_issue_body <user-body> <plan> <blocked> <role-slug>   echo an issue body
 #   kto_closing_issue_numbers <pr-num>                echo the issue #s a merged PR closes
-#   kto_task_pr   <num> <summary> [commit-msg]        commit+push+open PR (board → In Review)
+#   kto_task_pr   <num> <summary> [commit-msg] [--base <branch>]   commit+push+open PR (board → In Review)
 #   kto_task_pr_merge [pr-num] [--squash|--merge|--rebase]   merge (squash default) + close issues + GC + update the PR base; refuses an effort/* head
 #   kto_task_new  <title> <role> <kind> <prio> [ms] [plan] [blocked] <body>   create issue + board fields (ms may be empty)
 #   kto_task_close <num> <summary> [pr-num] [--reason R] [--duplicate-of N] [--superseded-by N]   close + reason + board → Done
@@ -55,7 +55,9 @@ kto_repo() {
 }
 
 # The base branch a PR targets / pr-merge returns to (portable: KIT_BASE_BRANCH, default develop).
+# Args: [override] — a non-empty override wins over the configured base (#391: `cckit pr --base`).
 kto_base_branch() {
+  if [[ -n "${1:-}" ]]; then printf '%s' "$1"; return 0; fi
   printf '%s' "${KIT_BASE_BRANCH:-main}"
 }
 
@@ -209,21 +211,50 @@ kto_closing_issue_numbers() {
 # --- the four ops (network; not exercised by the self-test) --------------------------------------
 
 # Map a role slug to the board's Role single-select option id (uses gh-project's role_option_id,
-# which takes a display name — translate slug -> display via role_display).
+# which takes a display name — translate slug -> display via role_display). A slug role_display
+# does not list is passed as-is (#378): role_option_id normalizes it to the same ROLE_OPT_<NAME>.
 _kto_role_option_for_slug() {
   local slug="$1" disp=""
+  [[ -z "$slug" ]] && return 0
   if type role_display >/dev/null 2>&1; then disp="$(role_display "$slug")"; fi
-  [[ -z "$disp" ]] && return 0
+  [[ -z "$disp" ]] && disp="$slug"
   if type role_option_id >/dev/null 2>&1; then role_option_id "$disp"; fi
 }
 
 # kit task pr — commit current changes (role identity in a Co-authored-by TRAILER, never the
 # author field — Vercel rejects unknown author emails), push, open the PR with the issue's
 # labels/milestone, add it to the board In Review, and move the issue to In Review.
-# Args: <issue-num> <summary> [commit-msg]
+# Args: <issue-num> <summary> [commit-msg] [--base <branch>]
+#
+# --base (#391) targets a branch other than the configured base — a release PR develop -> main.
+# load_kit_config re-exports KIT_BASE_BRANCH from the config, so an env override cannot do this.
+# The flag is parsed out before the positionals are read, anywhere on the line, and a missing value
+# returns 2 before the commit and the push. The target is exported to the push as KIT_PR_BASE (set
+# with or without the flag), so a project's git pre-push hook can compare against the branch the PR
+# targets (#360).
 kto_task_pr() {
   # Default-safe reads: callers (scripts/kit) may run under `set -u`.
-  local num="${1:-}" summary="${2:-}" commit_msg="${3:-}"
+  local num="" summary="" commit_msg="" base_override="" _pos=0
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --base)
+        if [ "$#" -lt 2 ] || [ -z "$2" ]; then
+          echo "✗ kto_task_pr: --base needs a branch — usage: cckit pr <issue> \"<summary>\" [--base <branch>]" >&2; return 2
+        fi
+        base_override="$2"; shift 2 ;;
+      --base=*)
+        base_override="${1#--base=}"
+        if [ -z "$base_override" ]; then
+          echo "✗ kto_task_pr: --base needs a branch — usage: cckit pr <issue> \"<summary>\" [--base <branch>]" >&2; return 2
+        fi
+        shift ;;
+      *)
+        _pos=$((_pos + 1))
+        case "$_pos" in 1) num="$1" ;; 2) summary="$1" ;; 3) commit_msg="$1" ;; esac
+        shift ;;
+    esac
+  done
+  local base; base="$(kto_base_branch "$base_override")"
   local repo branch meta title labels milestone role author="" url pr_num pr_node item role_opt issue_item
   repo="$(kto_repo)"
   branch="$(git rev-parse --abbrev-ref HEAD)"
@@ -258,14 +289,14 @@ kto_task_pr() {
     fi
   fi
 
-  git push -u origin "$branch" || return 1
+  KIT_PR_BASE="$base" git push -u origin "$branch" || return 1
 
   if cckit_gh_rest; then
-    url=$(gh_rest_pr_create "$repo" "$(kto_base_branch)" "$branch" "$pr_title" \
+    url=$(gh_rest_pr_create "$repo" "$base" "$branch" "$pr_title" \
       "$(kto_compose_pr_body "$num" "$summary" "$role" "$title")" "$labels" "$milestone") || return 1
   else
   url=$(gh pr create --repo "$repo" \
-    --base "$(kto_base_branch)" --head "$branch" \
+    --base "$base" --head "$branch" \
     --title "$pr_title" \
     --body "$(kto_compose_pr_body "$num" "$summary" "$role" "$title")" \
     --label "$labels" \
@@ -452,9 +483,36 @@ EOF
   fi
 }
 
+# _kto_existing_labels <repo> <comma-labels> — the subset of <comma-labels> the repo has, comma-joined
+# on stdout; each one it lacks is named in a warning on stderr (#387). `gh issue create --label`
+# aborts on an unknown label before any issue exists, and the REST endpoint creates the label
+# instead, so both transports are filtered here: the issue is filed, no label is invented. Names
+# match case-insensitively, as GitHub's do. A label list that cannot be read filters nothing.
+_kto_existing_labels() {
+  local repo="$1" want="$2" have l keep=""
+  if cckit_gh_rest; then
+    have="$(gh_rest_label_names "$repo")" || { printf '%s' "$want"; return 0; }
+  else
+    have="$(gh label list --repo "$repo" --limit 1000 --json name --jq '.[].name' 2>/dev/null)" \
+      || { printf '%s' "$want"; return 0; }
+  fi
+  while IFS= read -r l; do
+    [[ -n "$l" ]] || continue
+    if printf '%s\n' "$have" | grep -qixF -- "$l"; then
+      keep="${keep:+$keep,}$l"
+    else
+      echo "⚠ label '$l' not found in $repo — issue created without it (scripts/setup-labels.sh provisions the kit's labels)" >&2
+    fi
+  done <<EOF
+$(printf '%s\n' "$want" | tr ',' '\n')
+EOF
+  printf '%s' "$keep"
+}
+
 # kit task new — create a GitHub issue with labels + milestone, add it to the board, set Role +
 # Status(Todo) + Plan Link. Inputs are passed (the caller does the AskUserQuestion). No invented
-# values; fails loudly on an unknown label family upstream (the caller validates the closed sets).
+# values: a label the repo does not have is dropped with a warning, never created, and the issue is
+# still filed (#387). Non-zero only when the issue itself was not created.
 # Args: <title> <role-display-or-slug> <kind> <priority> [milestone|""] [plan-link] [blocked-by] <body>
 kto_task_new() {
   local title="${1:-}" role="${2:-}" kind="${3:-}" prio="${4:-}" milestone="${5:-}" plan="${6:-}" blocked="${7:-}" body_user="${8:-}"
@@ -468,13 +526,14 @@ kto_task_new() {
   role_slug="$(printf '%s' "$role" | tr 'A-Z ' 'a-z-')"
   labels="kind:${kind},priority:${prio},role:${role_slug}"
   body="$(kto_compose_issue_body "$body_user" "$plan" "$blocked" "$role_slug")"
+  labels="$(_kto_existing_labels "$repo" "$labels")"
 
   if cckit_gh_rest; then
     url=$(gh_rest_issue_create "$repo" "$title" "$body" "$labels" "$milestone") || return 1
   else
   url=$(gh issue create --repo "$repo" \
     --title "$title" --body "$body" \
-    --label "$labels" ${milestone:+--milestone "$milestone"} --assignee "@me") || return 1
+    ${labels:+--label} ${labels:+"$labels"} ${milestone:+--milestone "$milestone"} --assignee "@me") || return 1
   fi
   num=$(basename "$url")
   echo "✓ $url"

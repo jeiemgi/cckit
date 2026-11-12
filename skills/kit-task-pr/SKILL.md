@@ -9,7 +9,9 @@ when_to_use: When work on an issue branch is ready for review. Replaces ad-hoc `
 Plugin-direct skill — thin caller over the ONE canonical home
 `${CLAUDE_PLUGIN_ROOT}/scripts/lib/kit-task-ops.sh` (`kto_task_pr`). The verb logic lives there,
 never inline here (kit-engine-boundary #1/#2). The op respects `KIT_BASE_BRANCH` (default `develop`)
-and the `KIT_PROJECTS_V2` board toggle, so the same code serves any project.
+and the `KIT_PROJECTS_V2` board toggle, so the same code serves any project. `--base <branch>`
+targets another branch for one PR — a hotfix to `main` — and the push exports the target to a git
+pre-push hook as `KIT_PR_BASE`.
 
 ## Inputs
 
@@ -18,6 +20,7 @@ and the `KIT_PROJECTS_V2` board toggle, so the same code serves any project.
 | Issue number   | ✓        | Derived from branch name `<kind>/<N>-<slug>` if not passed |
 | Summary        | ✓        | 1–3 bullets — the PR body's `## Summary`                   |
 | Commit message | optional | Defaults to `<role>: <issue title>`                        |
+| `--base <branch>` | optional | Open this PR against this branch, not the configured base (`KIT_BASE_BRANCH`) — a release PR `develop` → `main`. To cherry-pick an already-merged PR onto `main`, use `cckit hotfix <pr>` instead |
 
 Ask via `AskUserQuestion` when the Summary is missing — never invent it.
 
@@ -31,6 +34,7 @@ source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/kit-task-ops.sh"
 
 kto_task_pr "" "$SUMMARY"            # issue # parsed from the branch
 # kto_task_pr 173 "$SUMMARY" "tech-lead: admin Clerk sign-in"   # explicit
+# kto_task_pr 173 "$SUMMARY" --base main                         # a release PR: base main, not the config's
 ```
 
 The function prints `✓ <PR-URL>`.
@@ -39,6 +43,7 @@ The function prints `✓ <PR-URL>`.
 
 - Never open a PR for a branch off the `<kind>/<N>-<slug>` convention — the op aborts with instructions
 - Never invent a Summary — ask if missing (the op refuses an empty Summary) · never push to the base branch directly
+- `--base <branch>` wins over the configured base; exporting `KIT_BASE_BRANCH` does not (`load_kit_config` re-reads it from the config). `--base` with no value exits 2 before the commit and the push
 - PR mirrors issue labels · if no milestone, the op omits it (no block)
 - Commits **tracked** changes only; untracked files are listed and left alone (`git add` them first if they belong), so a copied `.env.local` never reaches a PR
 - Title and body follow `pr.titleStyle` and `pr.orchestratorSection` in the config (`config-and-permissions` docs)

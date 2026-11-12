@@ -18,7 +18,20 @@ if [ -n "${PM_TEST_INNER:-}" ]; then
   # _pm_weight
   eq "weight S"  "$(_pm_weight S)"  "1"
   eq "weight XL" "$(_pm_weight XL)" "8"
-  eq "weight ?"  "$(_pm_weight '')" "2"
+  eq "weight M"  "$(_pm_weight M)"  "2"
+  eq "weight L"  "$(_pm_weight L)"  "4"
+  # outside the scale: still weighs 2, but never silently. `?` (no ctx: label) is explained by the
+  # plan's legend; any other value warns on stderr naming the value, the issue and the weight used.
+  eq "weight ? (unlabeled)"   "$(_pm_weight '?' 2>/dev/null)" "2"
+  eq "weight ? is quiet"      "$(_pm_weight '?' 2>&1 >/dev/null)" ""
+  eq "weight empty"           "$(_pm_weight '' 2>/dev/null)" "2"
+  eq "weight XXL falls back"  "$(_pm_weight XXL 2>/dev/null)" "2"
+  eq "weight XXL warns" "$(_pm_weight XXL 41 2>&1 >/dev/null)" \
+     "⚠ plan: #41 carries ctx:XXL, which is not S|M|L|XL — weighed 2"
+  eq "known weights are quiet" "$(for c in S M L XL; do _pm_weight "$c" 2>&1 >/dev/null; done)" ""
+  # an XL issue takes a batch of its own under budget 4; the unlabeled one after it opens batch 1.
+  xl="$(printf '1\tXL\t\n2\t?\t\n3\tS\t\n' | pm_batches 4 2>/dev/null)"
+  eq "XL fills its batch" "$(printf '%s\n' "$xl" | awk -F"$TAB" '{printf "%s:%s ", $1, $2}')" "1:0 2:1 3:1 "
 
   # pm_waves: linear chain 3<-2<-1 (1 blocks 2 blocks 3) -> waves 0,1,2.
   chain="$(printf '1\t\n2\t1\n3\t2\n' | pm_waves)"
