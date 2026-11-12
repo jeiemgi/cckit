@@ -598,5 +598,29 @@ t "effort_new ensures the label exists before using it" \
 t "setup-labels provisions the label plan queries" \
   "$(grep -c "ensure_label \"$plan_label\"" "$SCRIPTS/setup-labels.sh" | tr -d ' ')" "1"
 
+# 16. #330 — a failed gh read is said, never a silent rc 1. With GraphQL failing, the bare
+#     `title="$(gh issue view …)"` assignment ended effort_start under `set -e` with no output at all.
+fstub="$tmp/failbin"; mkdir -p "$fstub"
+printf '#!/usr/bin/env bash\necho "GraphQL: API rate limit exceeded" >&2\nexit 1\n' > "$fstub/gh"
+chmod +x "$fstub/gh"
+wip_reset
+out="$( set -e; PATH="$fstub:$PATH"; CCKIT_GH_TRANSPORT=graphql EFFORT_WIP_REMOTE=0 effort_start --force 801 2>&1 )"; rc=$?
+t "#330: effort_start survives a failed title read (rc 0)" "$rc" "0"
+case "$out" in *"could not read the title of issue #801"*) echo "ok: #330: the failed title read is named on stderr" ;;
+  *) echo "FAIL: #330: no message for the failed title read -> '$out'"; fail=1 ;; esac
+t "#330: the fallback slug made the branch" "$(git show-ref --verify --quiet refs/heads/effort/801-effort && echo yes)" "yes"
+# A re-start during the outage lands on the effort's existing branch, not on a second one.
+git branch -q effort/802-real-slug
+out="$( set -e; PATH="$fstub:$PATH"; CCKIT_GH_TRANSPORT=graphql EFFORT_WIP_REMOTE=0 effort_start --force 802 2>&1 )"; rc=$?
+t "#330: a re-start with gh failing keeps rc 0" "$rc" "0"
+t "#330: a re-start with gh failing cuts no fallback branch" \
+  "$(git show-ref --verify --quiet refs/heads/effort/802-effort && echo yes || echo no)" "no"
+# effort_close: a failed PR read refuses by name instead of dying on the bare assignment.
+out="$( set -e; cd "$(git worktree list --porcelain | awk -v b=refs/heads/effort/801-effort '/^worktree /{w=$2} $2==b{print w}')" \
+        && PATH="$fstub:$PATH" && CCKIT_GH_TRANSPORT=graphql KIT_FORCE=1 effort_close 801 2>&1 )"; rc=$?
+t "#330: effort_close refuses when the PR cannot be read (rc 1)" "$rc" "1"
+case "$out" in *"could not read the PR for effort/801-effort"*) echo "ok: #330: effort_close names the failed PR read" ;;
+  *) echo "FAIL: #330: effort_close gave no reason -> '$out'"; fail=1 ;; esac
+
 [ "$fail" -eq 0 ] && echo "ALL OK (effort-ops)" || echo "effort-ops: FAILURES"
 exit "$fail"

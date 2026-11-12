@@ -73,20 +73,37 @@ wt_issue_number() {
   return 0
 }
 
-# Echo the issue state ("open" / "closed") for an issue number, lowercased. Empty when unknown
-# (no number, no gh, or lookup failed) — callers must treat empty as "don't assume safe to delete".
+# Echo the issue state for an issue number, lowercased. Three answers, and they are not the same
+# thing (#330):
+#   open / closed   GitHub answered.
+#   (empty)         there is nothing to ask about: no number, or GitHub says no such issue (404).
+#   unknown         the read FAILED — no gh, no repo to ask in rest mode, or gh exited non-zero
+#                   (rate limit, outage, auth). The issue may well be open.
+# A failed read used to be echoed as empty, which made an outage indistinguishable from "no issue"
+# and let gc treat an open issue's branch as unprotected. Callers must treat `unknown` as "do not
+# assume safe to delete". rc 0 always, so a bare `state="$(wt_issue_state …)"` survives `set -e`.
 wt_issue_state() {
-  local n="$1" repo="${2:-}"
+  local n="$1" repo="${2:-}" out
   [[ -z "$n" ]] && return 0
-  command -v gh >/dev/null 2>&1 || return 0
+  command -v gh >/dev/null 2>&1 || { printf 'unknown\n'; return 0; }
   if cckit_gh_rest; then
-    repo="${repo:-${KIT_REPO:-}}"; [[ -n "$repo" ]] || return 0
-    gh api "repos/$repo/issues/$n" --jq .state 2>/dev/null | tr '[:upper:]' '[:lower:]'
-    return 0
+    repo="${repo:-${KIT_REPO:-}}"; [[ -n "$repo" ]] || { printf 'unknown\n'; return 0; }
+    out="$(gh api "repos/$repo/issues/$n" --jq .state 2>&1)" || { _wt_issue_state_failed "$out"; return 0; }
+  else
+    local args=(issue view "$n" --json state --jq .state)
+    [[ -n "$repo" ]] && args+=(--repo "$repo")
+    out="$(gh "${args[@]}" 2>&1)" || { _wt_issue_state_failed "$out"; return 0; }
   fi
-  local args=(issue view "$n" --json state --jq .state)
-  [[ -n "$repo" ]] && args+=(--repo "$repo")
-  gh "${args[@]}" 2>/dev/null | tr '[:upper:]' '[:lower:]'
+  printf '%s\n' "$out" | tr '[:upper:]' '[:lower:]' | grep -E -x 'open|closed' | head -1
+  return 0
+}
+
+# _wt_issue_state_failed <gh output> — what a FAILED state read means. gh's own "no such issue"
+# answer (REST 404, GraphQL "Could not resolve to an Issue") is a definite absence and stays empty;
+# every other failure is `unknown`.
+_wt_issue_state_failed() {
+  if printf '%s' "$1" | grep -qiE 'HTTP 404|Could not resolve to an? (Issue|PullRequest)'; then return 0; fi
+  printf 'unknown\n'
 }
 
 # Echo a protection reason if a branch/ref must NOT be garbage-collected because its issue

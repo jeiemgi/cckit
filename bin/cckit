@@ -283,6 +283,7 @@ case "$cmd" in
       landed="$(printf '%s\n' "$out" | awk '/^  LANDED branches/{print $3}')"
       orphan="$(printf '%s\n' "$out" | awk '/^  ORPHAN kept/{print $3}')"
       protected="$(printf '%s\n' "$out" | awk '/^  PROTECTED kept/{print $3}')"
+      unknown="$(printf '%s\n' "$out" | awk '/^  UNKNOWN kept/{print $3}')"
       stash="$(printf '%s\n' "$out" | awk '/^  stashes kept/{print $3}')"
       zombie="$(printf '%s\n' "$out" | awk '/^  ZOMBIE worktrees/{print $3}')"
       rfail="$(printf '%s\n' "$out" | awk '/^  remote deletes failed/{print $4}')"
@@ -290,7 +291,7 @@ case "$cmd" in
       if [ "$cleanup_rc" -eq 0 ]; then case " $* " in *" --yes "*|*" -y "*) applied=yes ;; esac; fi
       err="$(tr '\n' ' ' < "$cleanup_err" | sed 's/[[:space:]]*$//')"; rm -f "$cleanup_err"
       cckit_json verb cleanup safe "${safe:-0}" landed "${landed:-0}" worktrees "${wt:-0}" orphan "${orphan:-0}" \
-        protected "${protected:-0}" stash "${stash:-0}" zombie "${zombie:-0}" applied "$applied" \
+        protected "${protected:-0}" unknown "${unknown:-0}" stash "${stash:-0}" zombie "${zombie:-0}" applied "$applied" \
         remote_failed "${rfail:-0}" rc "$cleanup_rc" error "$err"
       [ "$cleanup_rc" -eq 0 ] || exit "$cleanup_rc"
     else
@@ -315,7 +316,8 @@ case "$cmd" in
           landed="$(printf '%s\n' "$out" | grep -c '> LANDED ' || true)"
           protected="$(printf '%s\n' "$out" | grep -c 'PROTECTED:' || true)"
           orphan="$(printf '%s\n' "$out" | grep -c 'ORPHAN' || true)"
-          cckit_json verb gc safe "$safe" landed "$landed" protected "$protected" orphan "$orphan"
+          unknown="$(printf '%s\n' "$out" | grep -c '> UNKNOWN ' || true)"
+          cckit_json verb gc safe "$safe" landed "$landed" protected "$protected" orphan "$orphan" unknown "$unknown"
         else
           kit_gc_analyze "$@"
         fi

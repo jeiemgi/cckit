@@ -185,10 +185,10 @@ if [ -n "${KS_TEST_INNER:-}" ]; then
     eq  "one row per worktree, detached included" \
         "$(printf '%s\n' "$wts" | grep -c . | tr -d ' ')" "3"
 
-    # status_cleanup_counts must return four integers even with no classifier loaded.
+    # status_cleanup_counts must return five integers even with no classifier loaded.
     counts="$(cd "$clean" && status_cleanup_counts)"
-    eq "cleanup counts are four fields" \
-       "$(printf '%s' "$counts" | awk -F'\t' '{print NF}')" "4"
+    eq "cleanup counts are five fields" \
+       "$(printf '%s' "$counts" | awk -F'\t' '{print NF}')" "5"
     case "$counts" in
       *[!0-9$(printf '\t')]*) echo "FAIL($KS_TEST_INNER): cleanup counts must be integers -> '$counts'"; fail=1 ;;
       *) : ;;
@@ -205,7 +205,7 @@ if [ -n "${KS_TEST_INNER:-}" ]; then
     eq "JSON carries worktrees"           "$(printf '%s' "$js" | jq -r '.worktrees | type')" "array"
     eq "JSON carries prs"                 "$(printf '%s' "$js" | jq -r '.prs | type')" "array"
     eq "JSON carries the cleanup counts"  "$(printf '%s' "$js" | jq -r '.cleanup | keys | join(",")')" \
-       "orphan,protected,remote_stale,safe"
+       "orphan,protected,remote_stale,safe,unknown"
     eq "an empty bucket is [] not null"   "$(printf '%s' "$js" | jq -r '.local_undone | length')" "0"
     eq "ai_review_expected is a boolean"  "$(printf '%s' "$js" | jq -r '.ai_review_expected | type')" "boolean"
     # A PR bucket that could NOT be read must be distinguishable from an empty one, in the JSON and
@@ -218,6 +218,22 @@ if [ -n "${KS_TEST_INNER:-}" ]; then
     eq "no gh: prs_read is false"  "$(printf '%s' "$js2" | jq -r '.prs_read')" "false"
     eq "no gh: deps.gh is false"   "$(printf '%s' "$js2" | jq -r '.deps.gh')" "false"
     eq "no gh: the rc is non-zero" "$([ "$jrc" -ne 0 ] && echo yes || echo no)" "yes"
+
+    # #330: with the gc classifier loaded and gh FAILING, the branches gc cannot classify are
+    # counted as `unknown` — the JSON stays valid and never reads as "0 orphan, nothing to clean".
+    fstub="$tmp/failgh"; mkdir -p "$fstub"
+    printf '#!/bin/sh\necho "GraphQL: API rate limit exceeded" >&2\nexit 1\n' > "$fstub/gh"; chmod +x "$fstub/gh"
+    js3="$(cd "$clean" && git branch -q task/41-fresh && . "$dir/kit-gc.sh" \
+           && PATH="$fstub:$PATH" CCKIT_GH_TRANSPORT=graphql KIT_BASE_BRANCH=trunk KIT_REPO="o/r" KIT_GC_REPO="o/r" \
+              status_buckets_json "$clean" 2>/dev/null)"
+    eq "gh failing: the JSON is still an object"   "$(printf '%s' "$js3" | jq -r 'type' 2>/dev/null)" "object"
+    eq "gh failing: unclassified branches are counted" \
+       "$([ "$(printf '%s' "$js3" | jq -r '.cleanup.unknown' 2>/dev/null)" -ge 1 ] 2>/dev/null && echo yes || echo no)" "yes"
+    eq "gh failing: none of them is reported orphan" "$(printf '%s' "$js3" | jq -r '.cleanup.orphan' 2>/dev/null)" "0"
+    md3="$(cd "$clean" && . "$dir/kit-gc.sh" \
+           && PATH="$fstub:$PATH" CCKIT_GH_TRANSPORT=graphql KIT_BASE_BRANCH=trunk KIT_REPO="o/r" KIT_GC_REPO="o/r" \
+              status_buckets_md "$clean" 2>/dev/null)"
+    has "gh failing: the markdown says so" "$md3" "could not be classified"
   fi
 
   rm -rf "$tmp"

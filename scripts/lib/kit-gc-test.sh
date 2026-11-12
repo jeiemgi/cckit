@@ -386,5 +386,89 @@ t   "--yes deleted the parent-landed agent branch" "$(git branch --list worktree
 t   "--yes KEPT the not-planned effort branch"     "$(git branch --list effort/80-not-planned | wc -l | tr -d ' ')" "1"
 unset KIT_BASE_BRANCH
 
+# ── #330: a FAILED gh read is "could not determine" — never "no PR", never deletable ────────────
+# Two branches in a fresh repo. task/41-fresh has no commit beyond base, so the content check calls
+# it LANDED without asking gh anything — the deletable verdict an OPEN issue #41 must block.
+# task/42-work has a commit of its own and a PR the failing gh cannot list.
+lacks(){ case "$2" in *"$3"*) echo "FAIL: $1 -> '$2' contains '$3'"; fail=1 ;; *) echo "ok: $1" ;; esac; }
+mkdir "$tmp/outage"; cd "$tmp/outage" || exit 1
+git init -q .; git config user.email t@t; git config user.name t
+git symbolic-ref HEAD refs/heads/main   # `cckit gc` below resolves the base from config: main
+echo base > base.txt; git add base.txt; git commit -q -m init
+export KIT_BASE_BRANCH=main
+git branch task/41-fresh
+git checkout -q -b task/42-work; echo w > w.txt; git add w.txt; git commit -q -m "work"; git checkout -q "$KIT_BASE_BRANCH"
+ghfail() {   # ghfail <case-arms> — a gh that answers the given arms and FAILS everything else
+  cat > "$stub/gh" <<SH
+#!/usr/bin/env bash
+case "\$1 \$2" in
+$1
+  *) echo "GraphQL: API rate limit exceeded" >&2; exit 1 ;;
+esac
+SH
+  chmod +x "$stub/gh"
+}
+for transport in graphql rest; do
+  export CCKIT_GH_TRANSPORT="$transport"
+  # (b) the PR list read fails; the issue-state read answers `closed`.
+  ghfail '  "issue view"|"api repos/o/r/issues/41"|"api repos/o/r/issues/42") echo closed ;;'
+  analysis="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_analyze 2>"$tmp/outage.err")"
+  has   "$transport: PR list failed -> could not determine" "$(row task/42-work)" "UNKNOWN (could not determine"
+  lacks "$transport: PR list failed -> never 'no PR'"       "$(row task/42-work)" "no PR"
+  lacks "$transport: PR list failed -> not ORPHAN"          "$(row task/42-work)" "ORPHAN"
+  has   "$transport: PR list failed -> an ancestor of base is not LANDED" "$(row task/41-fresh)" "UNKNOWN (could not determine"
+  has   "$transport: PR list failure is said on stderr" "$(cat "$tmp/outage.err")" "could not read the PR list"
+
+  # (c) every read fails: the open issue #41 cannot be seen, and its branch must still be kept.
+  ghfail ''
+  analysis="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_analyze 2>/dev/null)"
+  has   "$transport: all reads failed -> 41 names the failed issue read" "$(row task/41-fresh)" "state read for issue #41 failed"
+  lacks "$transport: all reads failed -> 41 is not LANDED"  "$(row task/41-fresh)" "LANDED"
+  lacks "$transport: all reads failed -> 42 never 'no PR'"  "$(row task/42-work)"  "no PR"
+  t     "$transport: all reads failed -> nothing is prunable" \
+        "$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_has_prunable && echo yes || echo no)" "no"
+  out="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_prune 2>&1)"
+  lacks "$transport: all reads failed -> dry-run prune lists no delete" "$out" "would delete"
+  PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_prune --yes >/dev/null 2>&1
+  t     "$transport: all reads failed -> --yes KEPT task/41-fresh" "$(git branch --list task/41-fresh | wc -l | tr -d ' ')" "1"
+  t     "$transport: all reads failed -> --yes KEPT task/42-work"  "$(git branch --list task/42-work | wc -l | tr -d ' ')" "1"
+  plan="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_cleanup 2>/dev/null)"
+  t     "$transport: cleanup plan counts both as UNKNOWN kept" "$(printf '%s\n' "$plan" | awk '/^  UNKNOWN kept/{print $3}')" "2"
+  t     "$transport: cleanup plan counts no ORPHAN"            "$(printf '%s\n' "$plan" | awk '/^  ORPHAN kept/{print $3}')" "0"
+  t     "$transport: cleanup plan counts no LANDED"            "$(printf '%s\n' "$plan" | awk '/^  LANDED branches/{print $3}')" "0"
+
+  # (e) only the issue-state read fails; the PR list answers, and it is empty.
+  ghfail '  "pr list"|"api repos/o/r/pulls") : ;;'
+  analysis="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_analyze 2>/dev/null)"
+  has   "$transport: issue read failed, PR list ok -> 41 is UNKNOWN" "$(row task/41-fresh)" "state read for issue #41 failed"
+
+  # (d) the verbs' JSON stays valid JSON with the failing gh, and carries the count.
+  if command -v jq >/dev/null 2>&1; then
+    ghfail ''
+    js="$(PATH="$stub:$PATH" KIT_REPO="o/r" KIT_GC_REPO="o/r" "$ROOT/bin/cckit" gc --llm 2>/dev/null)"
+    t "$transport: cckit gc --llm is valid JSON with gh failing" "$(printf '%s' "$js" | jq -r 'type' 2>/dev/null)" "object"
+    t "$transport: cckit gc --llm counts the unknown rows"       "$(printf '%s' "$js" | jq -r '.unknown' 2>/dev/null)" "2"
+    t "$transport: cckit gc --llm reports no orphan"             "$(printf '%s' "$js" | jq -r '.orphan' 2>/dev/null)" "0"
+    js="$(PATH="$stub:$PATH" KIT_REPO="o/r" KIT_GC_REPO="o/r" "$ROOT/bin/cckit" cleanup --llm 2>/dev/null)"
+    t "$transport: cckit cleanup --llm counts the unknown rows"  "$(printf '%s' "$js" | jq -r '.unknown' 2>/dev/null)" "2"
+  fi
+done
+unset CCKIT_GH_TRANSPORT
+
+# A definite answer still classifies as before: gh says "no such issue" for #41 (404 / GraphQL
+# not-found) and returns an empty PR list — the branch is LANDED by content, not UNKNOWN.
+cat > "$stub/gh" <<'SH'
+#!/usr/bin/env bash
+case "$1 $2" in
+  "pr list") : ;;
+  "issue view") echo "GraphQL: Could not resolve to an Issue with the number of 41. (repository.issue)" >&2; exit 1 ;;
+  *) exit 1 ;;
+esac
+SH
+chmod +x "$stub/gh"
+analysis="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" CCKIT_GH_TRANSPORT=graphql kit_gc_analyze 2>/dev/null)"
+has "an absent issue is not a failed read: 41 is LANDED" "$(row task/41-fresh)" "LANDED (ancestor of"
+unset KIT_BASE_BRANCH
+
 [ "$fail" -eq 0 ] && echo "ALL OK (kit-gc)" || echo "kit-gc: FAILURES"
 exit "$fail"

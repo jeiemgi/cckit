@@ -238,18 +238,21 @@ status_ai_expected() {
 
 # ── bucket 3: cleanup available ────────────────────────────────────────────────────────────────
 
-# status_cleanup_counts — echo `safe<TAB>orphan<TAB>protected<TAB>remote_stale` for the current repo.
+# status_cleanup_counts — echo `safe<TAB>orphan<TAB>protected<TAB>remote_stale<TAB>unknown` for the
+# current repo. `unknown` (#330) counts the branches gc could not classify because a gh read failed:
+# without it a GitHub outage reads as "0 orphan / 0 protected", i.e. as a clean repo.
 # The local three come from kit_gc_analyze (the ONE classifier, so status and gc can never disagree);
 # `remote_stale` counts remote branches whose PR is merged and which are therefore deletable — the
 # half `gc --prune` does not touch and a plain `git branch` view never shows.
 # best-effort: an unavailable classifier yields zeros, never a broken bucket.
 status_cleanup_counts() {
-  local out safe=0 orphan=0 prot=0 rstale=0 r b st
+  local out safe=0 orphan=0 prot=0 rstale=0 unknown=0 r b st
   if command -v kit_gc_analyze >/dev/null 2>&1; then
     out="$(kit_gc_analyze 2>/dev/null || true)"
     safe="$(printf '%s\n'   "$out" | grep -c -- '> SAFE '      || true)"
     orphan="$(printf '%s\n' "$out" | grep -c -- '> ORPHAN'     || true)"
     prot="$(printf '%s\n'   "$out" | grep -c -- '> PROTECTED:' || true)"
+    unknown="$(printf '%s\n' "$out" | grep -c -- '> UNKNOWN '  || true)"
   fi
   if command -v git >/dev/null 2>&1 && command -v gh >/dev/null 2>&1; then
     local base="${KIT_BASE_BRANCH:-main}" idx
@@ -258,7 +261,8 @@ status_cleanup_counts() {
     # `while IFS= read -r`, not `for … in $(…)`: an ambient IFS carrying a NUL breaks word
     # splitting on a bare `for` (a bug this repo has already been bitten by).
     if command -v _kit_gc_pr_index >/dev/null 2>&1; then
-      idx="$(_kit_gc_pr_index "${KIT_GC_REPO:-${KIT_REPO:-}}")"
+      # 2>/dev/null: a failed read already shows as `unknown` rows from kit_gc_analyze above.
+      idx="$(_kit_gc_pr_index "${KIT_GC_REPO:-${KIT_REPO:-}}" 2>/dev/null || true)"
     else
       idx="$(gh pr list --repo "${KIT_REPO:-}" --state all --limit 200 \
                --json number,state,headRefName \
@@ -274,7 +278,7 @@ status_cleanup_counts() {
 $(git branch -r --format='%(refname:short)' 2>/dev/null | grep -v HEAD || true)
 EOT
   fi
-  printf '%s\t%s\t%s\t%s\n' "${safe:-0}" "${orphan:-0}" "${prot:-0}" "${rstale:-0}"
+  printf '%s\t%s\t%s\t%s\t%s\n' "${safe:-0}" "${orphan:-0}" "${prot:-0}" "${rstale:-0}" "${unknown:-0}"
 }
 
 # ── the three-bucket report ────────────────────────────────────────────────────────────────────
@@ -283,7 +287,7 @@ EOT
 # emptiness explicitly ("nothing local-only", "no open PRs"), because a silently missing bucket is
 # indistinguishable from a clean one and this report is read to decide what to do next.
 status_buckets_md() {
-  local root="${1:-.}" base="${KIT_BASE_BRANCH:-main}" rows prs ai prrows counts safe orphan prot rstale
+  local root="${1:-.}" base="${KIT_BASE_BRANCH:-main}" rows prs ai prrows counts safe orphan prot rstale unknown
   local kind name detail verdict num title n_local
 
   echo "## 1 · Local undone work"
@@ -355,7 +359,8 @@ EOF
   counts="$(status_cleanup_counts)"
   safe="${counts%%	*}"; counts="${counts#*	}"
   orphan="${counts%%	*}"; counts="${counts#*	}"
-  prot="${counts%%	*}"; rstale="${counts##*	}"
+  prot="${counts%%	*}"; counts="${counts#*	}"
+  rstale="${counts%%	*}"; unknown="${counts##*	}"
   if [ "${safe:-0}" -gt 0 ] || [ "${rstale:-0}" -gt 0 ]; then
     printf -- '- **%s** local branch(es) SAFE to delete — merged PR, issue closed\n' "${safe:-0}"
     printf -- '- **%s** remote branch(es) whose PR merged\n' "${rstale:-0}"
@@ -367,12 +372,16 @@ EOF
     printf -- '_Nothing to clean. %s orphan / %s protected branch(es) are kept by design._\n' \
       "${orphan:-0}" "${prot:-0}"
   fi
+  if [ "${unknown:-0}" -gt 0 ]; then
+    echo ""
+    printf -- '- **%s** branch(es) could not be classified — a GitHub read failed. They are kept; the counts above are incomplete until `cckit gc` can read GitHub.\n' "${unknown:-0}"
+  fi
 }
 
 # status_buckets_json [root] — the same three buckets as one JSON object, for an agent. Same
 # classifiers as the markdown path, so the two can never disagree about a verdict.
 status_buckets_json() {
-  local root="${1:-.}" base="${KIT_BASE_BRANCH:-main}" rows prs ai prrows counts safe orphan prot rstale
+  local root="${1:-.}" base="${KIT_BASE_BRANCH:-main}" rows prs ai prrows counts safe orphan prot rstale unknown
   # No jq means no JSON at all. Emitting `{}` with rc 0 would hand an agent an empty report that
   # reads as "nothing to do" — the exact confusion the markdown path is careful to avoid.
   command -v jq >/dev/null 2>&1 || {
@@ -388,7 +397,8 @@ status_buckets_json() {
   counts="$(status_cleanup_counts)"
   safe="${counts%%	*}"; counts="${counts#*	}"
   orphan="${counts%%	*}"; counts="${counts#*	}"
-  prot="${counts%%	*}"; rstale="${counts##*	}"
+  prot="${counts%%	*}"; counts="${counts#*	}"
+  rstale="${counts%%	*}"; unknown="${counts##*	}"
 
   jq -n \
     --arg local_rows "$rows" \
@@ -396,6 +406,7 @@ status_buckets_json() {
     --arg pr_rows "$prrows" \
     --argjson safe "${safe:-0}" --argjson orphan "${orphan:-0}" \
     --argjson protected "${prot:-0}" --argjson remote_stale "${rstale:-0}" \
+    --argjson unknown "${unknown:-0}" \
     --argjson ai_expected "${ai:-0}" \
     --argjson prs_read "$([ "$pr_rc" -eq 0 ] && echo true || echo false)" \
     --argjson has_gh "$has_gh" --argjson has_git "$has_git" '
@@ -403,7 +414,8 @@ status_buckets_json() {
     { local_undone: (rows($local_rows) | map({kind: .[0], name: .[1], detail: .[2]})),
       worktrees:    (rows($wt_rows)    | map({path: .[0], branch: .[1]})),
       prs:          (rows($pr_rows)    | map({verdict: .[0], number: (.[1]|tonumber?), title: .[2], detail: .[3]})),
-      cleanup:      { safe: $safe, orphan: $orphan, protected: $protected, remote_stale: $remote_stale },
+      # `unknown` > 0 means a GitHub read failed and those branches are unclassified, not clean (#330).
+      cleanup:      { safe: $safe, orphan: $orphan, protected: $protected, remote_stale: $remote_stale, unknown: $unknown },
       ai_review_expected: ($ai_expected == 1),
       # `prs_read: false` means the PR bucket is UNKNOWN, not empty — never treat its `[]` as "none".
       prs_read: $prs_read,

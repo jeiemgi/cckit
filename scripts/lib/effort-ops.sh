@@ -657,9 +657,22 @@ effort_start() {
 
   if [ -n "$slug_override" ]; then slug="$(_eff_slug "$slug_override")"
   else
-    if cckit_gh_rest; then title="$(gh api "repos/$repo/issues/$num" --jq .title 2>/dev/null)" || title=""
-    else title="$(gh issue view "$num" --repo "$repo" --json title -q .title 2>/dev/null)"; fi
-    slug="$(_eff_title_slug "${title:-effort}")"; [ -n "$slug" ] || slug="effort"
+    # A soft read (#330): the slug has a fallback, so a failed gh must not end the op — and under
+    # `set -e` a bare failed assignment did exactly that, rc 1 with no output. Failed is told apart
+    # from empty by gh's exit code, and said on stderr.
+    local title_rc=0
+    if cckit_gh_rest; then title="$(gh api "repos/$repo/issues/$num" --jq .title 2>/dev/null)" || title_rc=$?
+    else title="$(gh issue view "$num" --repo "$repo" --json title -q .title 2>/dev/null)" || title_rc=$?; fi
+    slug=""
+    if [ "$title_rc" -ne 0 ]; then
+      title=""
+      # An effort already started keeps its branch: a re-start during an outage must land on
+      # effort/<N>-<its slug>, not cut a second branch named after the fallback.
+      slug="$(git -C "$root" for-each-ref --format='%(refname:short)' "refs/heads/effort/$num-*" 2>/dev/null | head -1)"
+      slug="${slug#effort/"$num"-}"
+      echo "effort_start: could not read the title of issue #$num from GitHub (gh exited $title_rc) — continuing with the slug '${slug:-effort}'. To choose the slug: effort start $num <slug>" >&2
+    fi
+    [ -n "$slug" ] || slug="$(_eff_title_slug "${title:-effort}")"; [ -n "$slug" ] || slug="effort"
   fi
   # Worktree dir follows the kind+N-slug convention (branch-naming.md) so kit-gc's issue-open
   # protection recognizes it by DIRECTORY name too — matching the kit-effort-start skill (#119).
@@ -810,7 +823,7 @@ _eff_pr_board() {
   _eo_source_board
   command -v project_add_item >/dev/null 2>&1 || return 0
   repo="$(_eff_repo)"; pr_num="${url##*/}"
-  node="$(gh api "repos/$repo/pulls/$pr_num" --jq .node_id 2>/dev/null)"
+  node="$(gh api "repos/$repo/pulls/$pr_num" --jq .node_id 2>/dev/null)" || node=""
   item=""
   [ -n "$node" ] && item="$(project_add_item "$node" 2>/dev/null || true)"
   if [ -z "$item" ]; then
@@ -970,10 +983,15 @@ effort_close() {
   # row the retry duplicates with build_seconds null. UNKNOWN (GitHub still computing) proceeds.
   local rest_pr="" mergeable
   if cckit_gh_rest; then
-    rest_pr="$(gh_rest_pr_for_head "$repo" "$branch" 2>/dev/null)"
+    rest_pr="$(gh_rest_pr_for_head "$repo" "$branch" 2>/dev/null)" || rest_pr=""
     mergeable=""; [ -n "$rest_pr" ] && mergeable="$(gh_rest_pr_json "$repo" "$rest_pr" 2>/dev/null | jq -r .mergeable)"
   else
-    mergeable="$(gh pr view "$branch" --repo "$repo" --json mergeable -q .mergeable 2>/dev/null)"
+    # A failed read is not "mergeable" (#330). Under `set -e` this bare assignment ended the close
+    # with rc 1 and no output; refusing by name keeps the nothing-written guarantee this step is for.
+    mergeable="$(gh pr view "$branch" --repo "$repo" --json mergeable -q .mergeable 2>/dev/null)" || {
+      echo "effort_close: could not read the PR for $branch from GitHub (gh failed: no PR, or the API is unavailable) — rerun when it answers (nothing was written)" >&2
+      return 1
+    }
   fi
   if [ "$mergeable" = "CONFLICTING" ]; then
     echo "effort_close: the PR for $branch conflicts with $base — merge or rebase $base into it, then rerun (nothing was written)" >&2
