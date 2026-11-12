@@ -122,7 +122,7 @@ The parent carries the rich narrative; the **PR** carries the human-facing revie
 | `effort-start [--force] <slug\|N>` | `effort/<N>` branch + worktree; board → In Progress. **WIP-limited** — see below |
 | orchestrate | sub-issues in own worktrees (file-disjoint) → merge into `effort/<N>`; each closes + board Done as it lands |
 | `effort-pr <slug\|N>` | ONE PR `effort/<N>` → {{BASE_BRANCH}} (rich body + `## For agents`) |
-| `effort-close <slug\|N>` | **snapshot sub-diffs pre-squash** → merge → close parent + subs → board Done(all) → GC prune → kit-sync drift check |
+| `effort-close <slug\|N>` | **snapshot sub-diffs pre-squash** → re-target open PRs based on the effort branch (refuses if one fails) → merge → close parent + subs → board Done(all) → GC prune → kit-sync drift check |
 
 Board + record state are correct **by construction** — the close op owns them. Never rely on a
 separate, skippable "mark done" step.

@@ -128,6 +128,9 @@ with its own variables names them in the config (`model.urlEnv` / `model.modelEn
 names, never values).
 `cckit merge` refuses a PR whose head is an `effort/*` branch and names `cckit effort close <N>`: its squash would
 skip that snapshot. `KIT_FORCE=1 cckit merge <pr>` merges anyway, with a warning.
+Before the squash deletes `effort/<N>-…` it re-targets every open PR based on that branch to the base branch
+(`↻ PR <n> re-targeted to develop`) — GitHub closes a PR, unmerged, when its base branch is deleted. If a
+re-target fails, or the list of those PRs cannot be read, the close refuses, names the PR, and merges nothing.
 
 The GitHub issue **number** stays the canonical key, but every effort also has a memorable **slug** handle (the one
 already in its `effort/<N>-<slug>` branch). Effort commands take the slug *or* the number interchangeably:

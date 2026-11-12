@@ -933,6 +933,32 @@ _eo_knowledge_ingest() {
   ( cd "${root:-/}" && "$hook" "$num" "$trace" ) >/dev/null 2>&1 || echo "effort_close: knowledge-ingest hook failed (non-fatal)" >&2
 }
 
+# _eo_dependent_prs <branch> — pure selector (#358): `gh pr list --json number,baseRefName` on stdin,
+# the numbers of the PRs whose base is exactly <branch> on stdout, one per line. Empty stdin prints
+# nothing; input that is not a JSON array is rc 1, so the caller can tell "none" from "unreadable".
+_eo_dependent_prs() {
+  jq -r --arg b "$1" 'if type == "array" then .[] | select(.baseRefName == $b) | .number else error("not a list") end' 2>/dev/null
+}
+
+# _eo_retarget_dependents <repo> <branch> <base> — re-target every open PR based on <branch> to
+# <base> (#358). GitHub closes a PR, unmerged, the moment its base branch is deleted, and the squash
+# below deletes <branch>. rc 1 when the list cannot be read or an edit fails: the caller refuses the
+# close, because either one means a PR would be closed by the delete.
+_eo_retarget_dependents() {
+  local repo="$1" branch="$2" base="$3" json deps dep
+  json="$(gh pr list --repo "$repo" --base "$branch" --state open --limit 200 --json number,baseRefName 2>/dev/null)" \
+    && deps="$(printf '%s' "$json" | _eo_dependent_prs "$branch")" \
+    || { echo "effort_close: could not list the open PRs based on $branch — deleting it would close any that exist. Rerun when 'gh pr list --base $branch' works (nothing was merged)" >&2; return 1; }
+  while IFS= read -r dep; do
+    [ -n "$dep" ] || continue
+    gh pr edit "$dep" --repo "$repo" --base "$base" >/dev/null 2>&1 \
+      || { echo "effort_close: PR $dep is based on $branch and could not be re-targeted to $base — deleting the branch would close it. Run 'gh pr edit $dep --base $base', then rerun (nothing was merged)" >&2; return 1; }
+    echo "  ↻ PR $dep re-targeted to $base" >&2
+  done <<EOF_DEPS
+$deps
+EOF_DEPS
+}
+
 # effort_close <N> — the SINGLE close implementation (#148): the /kit-effort-close skill is a thin
 # caller of this function, never a second close. Snapshot per-sub diffs + capture metrics BEFORE the
 # squash (the squash erases the per-sub history), REFUSE to squash if no work trace was captured
@@ -993,6 +1019,13 @@ effort_close() {
   if [ "$mergeable" = "CONFLICTING" ]; then
     echo "effort_close: the PR for $branch conflicts with $base — merge or rebase $base into it, then rerun (nothing was written)" >&2
     return 1
+  fi
+
+  # (a3) re-target the open PRs based on this branch before the squash deletes it (#358). Here, not
+  # next to the merge, for the same reason as the conflict check: a refusal after the capture leaves
+  # a records.jsonl row the retry duplicates. Skipped over REST, where the remote branch is kept.
+  if ! cckit_gh_rest; then
+    _eo_retarget_dependents "$repo" "$branch" "$base" || return 1
   fi
 
   # (b) capture effort metrics PRE-squash (needs the live-branch diff + commit signals).
