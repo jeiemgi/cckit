@@ -195,7 +195,7 @@ Constitution Check checkboxes to the actual Core Principles, so every plan start
 ## 7. Stack Interview (run before authoring the constitution + overrides)
 
 Skip any question answered by inspecting the repo (`package.json`, lockfiles, config, and
-`.claude/kit.config.json`). Ask the rest:
+`{{CONFIG_REL}}`). Ask the rest:
 
 **A. Runtime & framework** — language+version; framework+rendering model; monorepo/single + package manager.
 **B. Data & backend** — database + access layer; auth model + role hierarchy; hard domain invariants / common traps.

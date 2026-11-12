@@ -8,6 +8,7 @@
 #   cckit handoff "<note>"          save a resume-here note for the next session
 #   cckit install [bin-dir]         symlink cckit onto your PATH (global install)
 #   cckit init --profile <p>        scaffold cckit.config.json + .claude/ (--profile required)
+#                                   --adapter <claude|codex|both> selects the agent (default claude)
 #   cckit start <issue> [slug]      isolated worktree + branch for an issue
 #   cckit pr <issue> <summary> [--base <branch>]   commit + push + open the PR (--base: target <branch>, not the
 #                                   integration branch; the push exports it as KIT_PR_BASE)
@@ -46,7 +47,9 @@
 #         label, type = --type or the kind: label, default feat); refused before gh when it fails
 #         commitlint. pr.titleStyle = issue-title keeps `[Role] [#N] name`, unchecked.
 #   cckit orchestrate <a> <b> …     run N flows in parallel worktrees (--runtime tmux|herdr)
+#   cckit orchestrate --results     how each worker ended: success | failure | interrupted
 #   cckit autopilot [<a> …]         unattended multi-flow: drive (or auto-pick) issues under a cap
+#   cckit autopilot run [<issue>] --objective "<text>"   ONE bounded headless objective on this branch
 #   cckit watch [--merge] [--loop]  captain: gate open PRs, squash-merge CLEAN, advance the wave
 #   cckit next [--effort N]         everyday helper: the unblocked set + how to start the top issue
 #                                   + the weekly cadence (plan Monday, next daily, gc Friday)
@@ -61,7 +64,7 @@
 #   cckit debug [--check] <args>    optional browser-debug via chrome-devtools-axi (auto-detected)
 #   cckit encode-context            stdin JSON -> compact TOON (uniform arrays; JSON fallback)
 #   cckit render                    stdin markdown -> rich (glow on a TTY; verbatim when piped)
-#   cckit doctor                    onboarding preflight (deps, gh auth)
+#   cckit doctor                    onboarding preflight (deps, gh auth, selected agent CLIs)
 #   cckit add [<name>] [--set k=v]  list integrations + modules; with a name, switch one on in the config
 #   cckit update                    check whether this project is behind the installed cckit
 #   cckit migrate                   reshuffle an old kit layout to the current one

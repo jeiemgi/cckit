@@ -4,11 +4,12 @@
 #   - only acts on Bash commands containing 'git push'
 #   - passes (continue:true) if prePush is disabled or no command is configured
 #   - blocks (continue:false) only when the configured check command exits non-zero
-# Config lives in .claude/kit.config.json -> .prePush { enabled, command }.
+# Config: .prePush { enabled, command } in .claude/kit.config.json, or in the root
+# cckit.config.json of a project with no .claude/ tree (a Codex-only install).
 set -uo pipefail
 
 INPUT="$(cat)"
-CMD="$(printf '%s' "$INPUT" | jq -r '.tool_input.command // ""' 2>/dev/null)"
+CMD="$(printf '%s' "$INPUT" | jq -r '.tool_input.command // "" | if type == "array" then (if length > 2 and (.[1] | test("^-[a-z]*c$")) then .[2:] else . end | join(" ")) else . end' 2>/dev/null)"
 
 # Not a push? let it through.
 case "$CMD" in
@@ -17,6 +18,7 @@ case "$CMD" in
 esac
 
 CFG=".claude/kit.config.json"
+[[ -f "$CFG" ]] || CFG="cckit.config.json"
 ENABLED="$(jq -r '.prePush.enabled // false' "$CFG" 2>/dev/null)"
 CHECK="$(jq -r '.prePush.command // ""'      "$CFG" 2>/dev/null)"
 

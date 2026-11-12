@@ -62,6 +62,65 @@ release checks for Claude Code and Codex. The [compatibility inventory](/agent-c
 records current gaps and the acceptance scenarios each adapter must pass. Native Codex support
 is being implemented; shell access alone does not establish behavioral parity.
 
+### Choosing adapters at install
+
+`cckit init --adapter <claude|codex|both>` selects what is installed. The default is `claude`.
+
+| | `claude` | `codex` |
+| --- | --- | --- |
+| Instruction file | `CLAUDE.md` | `AGENTS.md` |
+| Skills | `.claude/skills/<name>/SKILL.md` | `.agents/skills/<name>/SKILL.md` |
+| Rules | `.claude/rules/*.md` | `.agents/rules/*.md`, listed by path in `AGENTS.md` |
+| Specialist agents | `.claude/agents/<role>/AGENT.md` | `.codex/agents/<role>.toml` |
+| Hooks and guards | `.claude/hooks/`, registered in `.claude/settings*.json` | `.codex/hooks/`, registered in `.codex/hooks.json` ([details](/hooks/#codex)) |
+| Memory hooks | `.claude/hooks/mempal_*.sh` (with `--memory on`) | not installed |
+| Statusline, settings | `.claude/statusline.sh`, `.claude/settings*.json` | not installed |
+| Config (when it is the only adapter) | `.claude/kit.config.json` | `cckit.config.json` |
+| Ownership manifest (when it is the only adapter) | `.claude/kit.manifest.json` | `.cckit/kit.manifest.json` |
+
+- **One source.** Both instruction files render from `templates/instructions.md.tmpl`, and both
+  skill and rule trees from `templates/skills/` and `templates/rules/`. The adapter decides the
+  destination directory and which `<!-- IF:ADAPTER_CLAUDE -->` / `<!-- IF:ADAPTER_CODEX -->` blocks
+  survive. There is no second copy of an instruction to keep in step.
+- **One role source.** A specialist is written once, in `templates/agents/<role>.md`. Claude Code
+  gets that file as `AGENT.md`. Codex gets the same rendered role translated to a custom-agent
+  TOML file with `name`, `description` (the role's `description` plus `when_to_use`) and
+  `developer_instructions` (the role body). `scripts/lib/agent-def.sh` is the one translation, and
+  `scripts/init-upgrade-test.sh` asserts the two definitions carry the same description and body.
+- **Stored selection.** The config's `adapters` array records the choice. `cckit init --upgrade`
+  reads it and never drops an adapter; `--upgrade --adapter codex` adds one, and the adapter already
+  installed keeps its files byte for byte. Config and manifest stay where the first install put them.
+- **Ownership.** Every adapter file init writes is recorded in the manifest with its hash. An edited
+  file reads as modified and is preserved by an upgrade and kept by `cckit remove`.
+- **Portable Codex output.** A Codex-only config carries no absolute path, and no generated file
+  under `.agents/` or `AGENTS.md` references `CLAUDE_PLUGIN_ROOT`. `scripts/init-upgrade-test.sh`
+  asserts both on the `minimal` profile.
+- **Doctor.** `cckit doctor` reports the CLI of each selected adapter present or absent;
+  `cckit doctor --agents` prints only that, offline, and exits 1 when one is absent.
+
+Limits of the Codex adapter today:
+
+- The guards and session mail are installed and fixture-tested against the event JSON Codex
+  documents, but no live Codex session has fired them, and Codex runs a project hook only after you
+  trust it (`/hooks`). Until that is verified, treat a Codex guard as unproven. No memory hook is
+  installed: those read Claude Code transcripts.
+- A Codex agent file is generated and parses as TOML, but no live Codex session has spawned one.
+  Three things do not translate, and each is written into the TOML as a comment or a note instead
+  of being dropped: the Claude `tools:` allowlist (Codex has no per-agent tool list — its sandbox
+  and approval policy govern the agent), the Claude `model:` alias, and `kit-*` skill names, which
+  are Claude Code plugin skills (in Codex, run the `cckit` verb they wrap). The Codex `name` uses
+  an underscore where the role has a hyphen (`tech-lead` → `tech_lead`), matching the names in the
+  Codex documentation; whether Codex accepts a hyphen is not verified.
+- `.agents/rules/` is a cckit location, not one Codex loads on its own. `AGENTS.md` lists each rule
+  file so the agent reads the one that applies.
+- Shared rules still describe Claude-only mechanics in prose — `mempalace.md` names the hooks in
+  `.claude/settings.local.json`, `branch-naming.md` the SessionStart hygiene hook, `design-routing.md`
+  the Designer agent. Those passages describe things a Codex-only project does not have.
+- Whether a fresh Codex session discovers the installed skills is not verified here; that is the live
+  run in [#261](https://github.com/jeiemgi/cckit/issues/261). `.agents/skills` is the directory name
+  present in the `codex-cli 0.154.0` binary.
+- A fresh init keeps a pre-existing `AGENTS.md` unless `--force` is passed.
+
 ## Other adapters
 
 Any other agent (Copilot, Antigravity, a custom model) is a future adapter over the same core. An adapter is whatever that agent needs to discover and call the verbs — at minimum, the agent reads `AGENTS.md` and shells out with `--llm`.

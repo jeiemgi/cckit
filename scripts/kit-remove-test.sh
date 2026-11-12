@@ -46,6 +46,25 @@ if [ -n "${KIT_REMOVE_TEST_INNER:-}" ]; then
   t "dry-run keeps file"          "$([ -f .claude/f.sh ] && echo yes || echo no)" "yes"
   t "dry-run keeps manifest"      "$([ -f .claude/kit.manifest.json ] && echo yes || echo no)" "yes"
 
+  # Codex-only project (E257.3): the manifest lives at .cckit/kit.manifest.json and removal walks
+  # it the same way — intact adapter files go, an edited one and the project's own files stay.
+  proj3="$(mktemp -d)"; cd "$proj3"
+  mkdir -p .agents/skills/concrete .agents/rules .cckit
+  printf '{"schema":1,"entries":{}}\n' > .cckit/kit.manifest.json
+  printf 's\n' > .agents/skills/concrete/SKILL.md; kit_manifest_record .agents/skills/concrete/SKILL.md A init 1 2026-01-01T00:00:00Z
+  printf 'r\n' > .agents/rules/branch-naming.md;   kit_manifest_record .agents/rules/branch-naming.md A init 1 2026-01-01T00:00:00Z
+  printf 'i\n' > AGENTS.md;                        kit_manifest_record AGENTS.md A init 1 2026-01-01T00:00:00Z
+  printf 'EDITED\n' > AGENTS.md
+  printf 'mine\n' > .agents/product-marketing.md
+  t "codex: record did not create .claude" "$([ -e .claude ] && echo yes || echo no)" "no"
+  printf 'n\n' | kit_remove_all >/dev/null 2>&1
+  t "codex: intact skill deleted"     "$([ -f .agents/skills/concrete/SKILL.md ] && echo yes || echo no)" "no"
+  t "codex: intact rule deleted"      "$([ -f .agents/rules/branch-naming.md ] && echo yes || echo no)" "no"
+  t "codex: edited AGENTS.md KEPT"    "$(cat AGENTS.md)" "EDITED"
+  t "codex: user file under .agents SAFE" "$([ -f .agents/product-marketing.md ] && echo yes || echo no)" "yes"
+  t "codex: only the edited entry left" "$(kit_manifest_list | tr '\n' ',')" "AGENTS.md,"
+  cd "$proj"; rm -rf "$proj2" "$proj3"
+
   [ "$fail" -eq 0 ] && echo "ALL OK($KIT_REMOVE_TEST_INNER)"
   exit "$fail"
 fi

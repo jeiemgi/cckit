@@ -8,14 +8,22 @@ when_to_use: When delegating work to run unattended — a single capped objectiv
 
 ## Current implementation limit
 
-The current `cckit autopilot` CLI launches issue flows through `orchestrate.sh`. It accepts
-issue numbers, `--cap`, `--agent`, `--dry-run`, `--no-seed`, `--force`, and `--session`.
-The objective, `--plan`, `--max-tokens`, `--max-iters`, `--until`, and `--notify` examples below
-are workflow requirements, not implemented CLI flags. Do not invoke them as working commands.
-Before accepting an unattended objective, verify that the selected runtime actually enforces each
-requested limit. If it cannot, report the unsupported limit and do not start that bounded run.
-A prompt asking an agent to stay under a token budget does not enforce that budget.
-Implementation and cross-runtime verification are tracked in cckit effort #257, sub-issue #264.
+`cckit autopilot [<issue> …]` launches issue flows through `orchestrate.sh`. It accepts issue
+numbers, `--cap`, `--agent`, `--dry-run`, `--no-seed`, `--force`, and `--session`.
+
+`cckit autopilot run [<issue>] --objective "<text>"` runs ONE objective headlessly on the current
+branch (`claude -p` or `codex exec`) and enforces these in code: `--max-iters`, `--max-seconds`,
+`--round-seconds`, `--until "<cmd>"`, `--check "<cmd>"`, and a stop on a round that changed
+nothing. `--max-tokens` is checked between rounds only, from the usage the runtime prints, and a
+round that prints none stops the run. `--notify` and `--plan` are refused: nothing implements them.
+A run never merges. The stop reason and the resume command are in `.cckit/autopilot/<branch>.json`;
+`cckit autopilot run --resume` continues with the counters carried over.
+
+The `/kit-autopilot "<objective>"` examples below that pass `--plan` or `--notify` are workflow
+requirements, not working commands. If a requested limit is not in the enforced list above, report
+it as unsupported and do not start that bounded run. A prompt asking an agent to stay under a
+token budget does not enforce that budget. The full table, including what no live run has
+confirmed, is in the docs site's agent-compatibility page under "Unattended run limits".
 
 **Exception — night mode.** The Workflow runtime does enforce a token budget, so an approved plan
 can run unattended through `${CLAUDE_PLUGIN_ROOT}/scripts/night-run.mjs` (see _Mode: night_ below). The CLI flags above

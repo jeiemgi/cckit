@@ -48,16 +48,16 @@ agent run. “Unverified” requires evidence before a support claim. Paths are 
 | --- | --- | --- | --- |
 | Project and board discovery | `bin/cckit`, `scripts/task-sync.sh`, `scripts/lib/config-path.sh`, `AGENTS.md` | Shared CLI is callable; fresh-session automatic discovery is unverified. Preserve TOON for agent reads and explicit data formats for shell consumers. | A02, A03 |
 | Issue and effort lifecycle | `scripts/lib/worktree-start.sh`, `scripts/lib/effort-ops.sh`, `scripts/lib/kit-task-ops.sh` | Reuse existing operations. Preserve the effort exception: sequential subs share the effort branch and one effort PR. | A03 |
-| Skills and project rules | `skills/`, `commands/`, `templates/rules/`, `templates/skills/` | Claude paths and plugin variables occur in instructions. Add Codex discovery without copying common instructions into separately maintained files. | A02 |
-| Install and upgrade | `scripts/init.sh`, `profiles/`, `templates/settings/` | Installer targets Claude configuration. Add explicit adapter selection and managed-file ownership for either or both agents. Local hand-written Codex files are not distribution evidence. | A01 |
-| Specialist agents | `templates/agents/` contains Claude tool names and skill references | Translate runtime definitions while sharing role responsibilities. `scripts/agent-skills-lint.sh` already fails the gate on a `skills:` entry that resolves to nothing; the translated definitions must stay under it. | A06 |
-| Startup and command guards | `templates/hooks/`, including base-branch and pre-push guards | Port registration and verify event inputs, command working directories, and blocking semantics. Shell hooks are fast feedback, not complete enforcement of all Git actions. | A04 |
-| Session mail | `scripts/lib/kit-msg.sh`, `templates/hooks/kit-mail-check.sh.tmpl` | Mailbox logic is shared. Verify runtime delivery and stop continuation; test combined installs for duplicate delivery. | A05 |
+| Skills and project rules | `skills/`, `commands/`, `templates/rules/`, `templates/skills/`, `templates/instructions.md.tmpl` | #260 renders `CLAUDE.md` and `AGENTS.md` from one template and the same skill and rule templates into `.claude/` or `.agents/`. Plugin-level `skills/` and `commands/` still use Claude paths and plugin variables and have no Codex form. Some shared rules describe Claude-only hooks and agents in prose. Fresh-session discovery is unverified. | A02 |
+| Install and upgrade | `scripts/init.sh`, `scripts/lib/adapter-select.sh`, `profiles/`, `templates/settings/` | Implemented in #260: `cckit init --adapter <claude\|codex\|both>` installs the selected adapters, stores the selection, records every adapter file in the ownership manifest and preserves both on `--upgrade` (fixture-tested in `scripts/init-upgrade-test.sh`). Codex gets instructions, skills, rules and (from #262) hooks; specialists are not installed. No live Codex session has run against the output. | A01 |
+| Specialist agents | `templates/agents/<role>.md` is the one role source; `scripts/lib/agent-def.sh` translates it | Implemented in #263: Claude gets `.claude/agents/<role>/AGENT.md`, Codex gets `.codex/agents/<role>.toml` with `name`, `description` and `developer_instructions` from the same rendered role (fixture-tested in `scripts/init-upgrade-test.sh`). The Claude `tools:` allowlist and `model:` alias are not translated and are written as TOML comments. `scripts/agent-skills-lint.sh` fails the gate on a `skills:` entry that resolves to nothing, and `scripts/agent-template-lint.sh` on a `name:` that is not the file name or an empty `description:`. Unverified: a live Codex session spawning a generated agent. | A06 |
+| Startup and command guards | `templates/hooks/`, `templates/codex/hooks.json.tmpl`, `scripts/lib/codex-hooks.sh` | Implemented in #262: the same scripts install to `.codex/hooks/` and are merged into `.codex/hooks.json` with checkout-relative commands; a user's entries are kept. Fixture-tested with both runtimes' documented event JSON (`scripts/hook-adapter-test.sh`): base commit blocked with a reason, worktree commit and `git -C <worktree>` pass, pre-push gate reads either config location. **Unverified:** whether `codex-cli 0.154.0` fires them, honours exit 2 as a block, or runs them under `codex exec` without an interactive trust step — a limitation until a live run says otherwise. Shell hooks are fast feedback, not complete enforcement of all Git actions. | A04 |
+| Session mail | `scripts/lib/kit-msg.sh`, `templates/hooks/kit-mail-check.sh.tmpl` | Mailbox logic is shared, and #262 wires the hook for both adapters on four events (`cckit init` did not wire it for Claude before). Fixture-tested: ordinary mail never blocks `Stop`, steer mail blocks it once and never twice, and in a combined install a message is delivered once whichever runtime asks first (it is consumed on delivery). **Unverified:** delivery and `Stop` continuation in a live Codex session. A worktree of a repo with no `origin` remote resolves a different mailbox than its main checkout. | A05 |
 | Handoff and resume | `scripts/lib/handoff.sh`, bare `cckit` | Reuse durable handoff; confirm the next session reads it in the correct worktree/project. | A05 |
-| Optional memory | `templates/hooks/mempal_save.sh.tmpl`, `mempal_precompact.sh.tmpl` mine Claude transcript paths | A renamed hook cannot ingest Codex transcripts. Validate a compatible input format or report automatic ingestion unavailable; explicit supported memory-tool calls remain a separate capability. | A09 |
-| Waves and captain | `scripts/lib/copilot.sh`, `scripts/orchestrate.sh`, captain helpers | Wave prose names Claude Task isolation and `/loop`. Emit shared work data and dispatch through each runtime. cckit must create the worker worktrees before dispatch. | A06, A07 |
-| Unattended launch | `scripts/autopilot.sh` forwards to tmux orchestration | `--agent codex` only changes the executable. Add non-interactive execution, terminal states, restart handling, and bounded progress checks. | A07 |
-| Budgets and accounting | `skills/kit-autopilot/SKILL.md` promises caps; `scripts/lib/effort-metrics.sh` contains Claude pricing assumptions | The CLI does not accept the skill's objective budget flags at this baseline. Enforce supported limits in code; identify provider/model/source for usage and cost, using unknown rather than invented cost. | A07, A09 |
+| Optional memory | `templates/hooks/mempal_save.sh.tmpl`, `mempal_precompact.sh.tmpl` mine Claude transcript paths | **Limitation (#262): automatic transcript ingestion is unavailable in Codex.** The hooks run `mempalace mine ~/.claude/projects/<project>/ --mode convos`; a Codex session writes nothing there and no Codex transcript format has been validated against `mempalace mine`, so no memory hook is installed for Codex, even with `--memory on`. Explicit calls to a MemPalace MCP server the user configures remain a separate capability. | A09 |
+| Waves and captain | `scripts/lib/copilot.sh`, `scripts/orchestrate.sh`, `scripts/lib/wave-result.sh`, `scripts/wave-worker.sh`, captain helpers | Implemented in #263: `cckit wave` emits one set of wave data and per-adapter dispatch wording (`--adapter`); `--llm` is identical for both. The Codex dispatch is `cckit orchestrate --agent codex`, so cckit creates the worktrees. `orchestrate` records each tmux worker's result and `--results` reads `success` / `failure` / `interrupted`. A06 passes as a fixture with a stub agent under both launch kinds (`scripts/orchestrate-test.sh`). Unverified: a live run of either agent, and Codex subagent isolation. On Herdr a result is `untracked`. The captain's `/loop` hint remains Claude-only. | A06, A07 |
+| Unattended launch | `scripts/autopilot.sh`, `scripts/autopilot-run.sh`, `scripts/lib/agent-launch.sh` | Implemented in #264: `cckit autopilot run` starts the agent with no terminal (`claude -p`, `codex exec -`) one round at a time, and code decides after each round whether the run continues. A07 passes as a fixture with stub `claude` and `codex` binaries (`scripts/autopilot-run-test.sh`): a failing gate, a no-progress round, a kill mid-run and each configured limit stop the run with a distinct reason and a state file, and a resume opens no second PR. **Unverified:** a live run of either agent. The non-interactive forms are read from each CLI's `--help` (Claude Code 2.1.322, codex-cli 0.154.0), not from a session. `cckit autopilot` without `run` still launches interactive panes. A run never merges. | A07 |
+| Budgets and accounting | `scripts/lib/agent-launch.sh` (`al_usage`), `scripts/autopilot-run.sh`; `scripts/lib/effort-metrics.sh` prices Claude transcripts only | Implemented in #264 for `cckit autopilot run`: token counts are read from the runtime's own JSON output and are `unknown` when it prints none; cost is the figure Claude prints (`total_cost_usd`) and `unknown` for Codex, which prints none. No list price is applied to a headless run. See [Unattended run limits](#unattended-run-limits) for what is enforced and what is not. Effort-close metrics still read Claude transcripts under `~/.claude/projects` and price them at a Claude list price; a Codex session leaves nothing there, so its effort record carries no token or cost figure. | A07, A09 |
 | Optional annotations | `skills/kit-annotate/SKILL.md`, `templates/rules/react-annotate.md` explicitly scope their instructions to Claude | Verify the annotation tool's Codex connection and feedback loop or document the limitation. Do not claim a shared MCP protocol alone proves the workflow. | A09 |
 | Optional routines | `scripts/kit-routines.sh`, `routines/catalogue.json` use OS cron and Claude-layout config paths | Preserve explicit opt-in and one scheduled job per project/routine in a combined install. Resolve the actual project config; do not create duplicate desktop and cron schedules. | A09 |
 | Packaging and releases | `package.json`, `.claude-plugin/plugin.json`, `release-please-config.json`, `.github/workflows/release-please.yml` | Add the Codex package to release/version checks and verify installed artifacts, not only source folders. | A01, A08 |
@@ -88,6 +88,46 @@ prove data handling; it cannot stand in for live skill discovery or a trusted ho
 The evidence schema and release gate are delivered by #265. Until then, this table specifies the
 checks to implement; it is not a list of passing tests.
 
+## Unattended run limits
+
+`cckit autopilot run` is the only place cckit enforces a limit on an agent. Each row is a limit the
+`kit-autopilot` skill names, and what code does about it. "Enforced" means a test in
+`scripts/autopilot-run-test.sh` stops a stub agent on it; no row has been run against a live agent.
+
+| Limit | Status | How |
+| --- | --- | --- |
+| `--max-iters <n>` | Enforced | Checked before every round. Default 5. The count survives `--resume`, so resuming under the same limit starts no round. |
+| `--max-seconds <s>` / `--round-seconds <s>` | Enforced | Wall clock. A round is bounded by the smaller of the per-round limit and the time left; on expiry the agent's process group gets SIGTERM, then SIGKILL after 10s. Defaults 3600 and 900. |
+| `--until "<cmd>"` | Enforced | Run after every round; exit 0 ends the run. Without it the run ends when the agent exits 0 after a round that changed something. |
+| `--check "<cmd>"` | Enforced | The publication gate, run once the work is complete. A failure stops the run with `check-failed` and no PR is opened. |
+| No progress | Enforced | A round that changes neither `HEAD` nor the working tree stops the run. The agent's own claim of progress is not read. |
+| `--max-tokens <n>` | **Partly enforced** | Checked **between** rounds against the usage the runtime printed. A round in flight is not cut off by tokens, so one round can overshoot the ceiling by its own size. A round that prints no usage stops the run with `usage-unknown` rather than letting an unreadable ceiling pass. That includes a round cut short by a signal or by the runner being killed: its tokens are recorded as `unknown`, not as zero, so a `--resume` under `--max-tokens` stops with `usage-unknown` before another round starts. |
+| A hard token ceiling inside a round | **Unsupported** | Neither CLI's `--help` offers a token cap cckit can pass. Bound the round with `--round-seconds`. Claude's `--max-budget-usd` is a dollar cap you may pass yourself with `--agent-arg`; cckit does not set it. |
+| Cost limit | **Unsupported** | Codex prints no cost, and cckit applies no price list. Claude's printed cost is recorded, not limited. |
+| `--notify` | **Unsupported** | No code delivers a notification. The flag is refused, not ignored. |
+| `--plan` (drive a planned set headlessly) | **Unsupported** | `run` drives one objective on one branch. A planned set still goes through `cckit orchestrate`, which launches interactive panes. |
+| Merging inside an unattended run | **Out of scope** | A run never merges and never closes an issue. Unattended merge support waits on the owner review checkpoint and fresh #228 gate evidence. |
+
+Stop reasons are written to `.cckit/autopilot/<branch>.json` with the round count, elapsed seconds,
+usage and the resume command: `done` (exit 0), `agent-failed` (3), `limit-iters`, `limit-seconds`,
+`limit-tokens`, `usage-unknown` (4), `no-progress` (5), `check-failed` (6), `publish-failed` (7),
+`interrupted` (130).
+
+A runner that is killed outright (`kill -9`, power loss) writes no stop reason: the record still
+says `status: running` with `round_open: true`. Two things keep that from leaving two agents on one
+branch. With `perl` on PATH the agent runs under a watchdog that notices the runner is gone and
+stops the agent's process group (SIGTERM, then SIGKILL after 10s). And the running agent's pid is
+recorded in `.cckit/autopilot/<branch>.agent.pid`; a later `--resume`, `--fresh` or new run that
+finds that pid alive is refused with exit 2 and prints the `kill` command that stops it. Without
+`perl` there is no watchdog, so that refusal is the only guard. `--resume` then counts the open
+round from the output file it left before it checks any limit.
+
+Three things the fixture cannot show, each a limitation until a live run says otherwise: that
+`claude -p` and `codex exec` accept the prompt on stdin as their `--help` describes, that their
+JSON output carries usage in the fields `al_usage` reads (a different shape degrades to `unknown`,
+never to a wrong number), and that an agent started this way can edit files — cckit passes no
+permission flag, so a run that must write names its own with `--agent-arg` or a profile's `args`.
+
 ## Known prerequisites and ownership
 
 - #259 repairs autopilot's board parsing: `task-sync.sh --llm` emits TOON with flattened labels,
@@ -106,8 +146,11 @@ checks to implement; it is not a list of passing tests.
 Codex documents local [skill discovery](https://learn.chatgpt.com/docs/build-skills),
 [custom agents](https://learn.chatgpt.com/docs/agent-configuration/subagents), and
 [lifecycle hooks](https://learn.chatgpt.com/docs/hooks). Its hook sources include project
-`.codex/hooks.json`; non-managed hooks require trust. These are candidate building blocks,
-not proof that cckit's existing scripts work unchanged.
+`.codex/hooks.json`; non-managed hooks require trust, and trust is tied to the hook's definition,
+so a new or changed hook is skipped until it is trusted again. These are candidate building blocks,
+not proof that cckit's existing scripts work unchanged. #262 built on that page as read on
+2026-11-11: its event fields, the exit-2 and `decision: block` answers, and the
+`$(git rev-parse --show-toplevel)` command form.
 
 Compare event behavior with the [Claude Code hook reference](https://code.claude.com/docs/en/hooks).
 Keep the lifecycle requirements shared while translating each runtime's configuration and events.

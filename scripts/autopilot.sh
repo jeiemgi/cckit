@@ -14,7 +14,16 @@
 #   cckit autopilot --profile build # drive a declared agent profile (kind + argv)
 #   cckit autopilot --runtime herdr # run the selected agents in Herdr
 #   cckit autopilot --dry-run       # print the plan, launch nothing
+#   cckit autopilot run [<issue>] --objective "<text>" [--until "<cmd>"] [--max-iters N] ...
+#                                   # ONE bounded headless objective on the current branch
+#                                   # (claude -p / codex exec); see `cckit autopilot run --help`
 set -euo pipefail
+
+# `run` is the headless, bounded objective - a different engine from the pane launcher below.
+if [ "${1:-}" = "run" ]; then
+  shift
+  exec bash "$(cd "$(dirname "$0")" && pwd)/autopilot-run.sh" "$@"
+fi
 
 PASS=()        # flags forwarded to orchestrate
 ISSUES=()
@@ -22,7 +31,7 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     --cap|--agent|--profile|--runtime) PASS+=("$1" "$2"); shift 2 ;;
     --cap=*|--agent=*|--profile=*|--runtime=*|--dry-run|--no-seed|--force|--session=*) PASS+=("$1"); shift ;;
-    -h|--help) sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     [0-9]*) ISSUES+=("$1"); shift ;;
     *) echo "autopilot: unknown arg '$1'" >&2; exit 2 ;;
   esac

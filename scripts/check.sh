@@ -65,7 +65,12 @@ fi
 note "==> skill frontmatter context budget"
 bash scripts/skill-frontmatter-lint.sh || fail=1
 
-# 5b. Instruction-file budget. CLAUDE.md and every `.claude/rules/*.md` without a `paths:`
+# 5b. Agent templates carry a `name:` equal to their file name and a non-empty `description:` —
+# Codex refuses a custom agent without either (#263). Skill references are step 7's.
+note "==> agent template name + description"
+bash scripts/agent-template-lint.sh || fail=1
+
+# 5c. Instruction-file budget. CLAUDE.md and every `.claude/rules/*.md` without a `paths:`
 # frontmatter load into every session; Claude Code warns once they pass 150k characters combined.
 # Same ratchet: an over-long file or an over-limit total is grandfathered in the baseline, and only
 # growth (or a new offender) fails the gate.

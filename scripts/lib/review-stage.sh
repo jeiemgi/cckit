@@ -7,13 +7,14 @@
 # dispatch half; the merge gate that reads the verdict is separate on purpose (#348), so the gate
 # stays testable against a receipt that this file never produced.
 #
-# WHO STARTS THE AGENT. cckit does not know. Every launcher it has is interactive —
-# `or_herdr_launch` focuses a pane, `or_tmux_agent_cmd` writes a line into a pane's shell — and the
-# captain runs with no pane and nobody watching. Non-interactive execution is an open gap owned by
-# #257 (agent-compatibility.mdx, scenario A07), so this file does not invent one: the project names
-# the command in `review.command` and cckit pipes a brief to its stdin and reads the report off its
-# stdout. That is the same shape sr_record already takes, and it means cckit asserts nothing about
-# any agent's flags. No `review.command` configured is the off switch, and it is the default.
+# WHO STARTS THE AGENT. The shared headless launcher (agent-launch.sh, E257.7): cckit pipes a brief
+# to the command's stdin, bounds it, and reads the report off its stdout — the same shape sr_record
+# already takes. Two ways to name the command, and neither is on by default:
+#   review.command        the project's own command line. It wins when set, so a project that
+#                         wraps its reviewer keeps doing so.
+#   review.headless true  cckit builds the line from the resolved profile's kind and args:
+#                         `claude -p` or `codex exec -`. A kind with no headless form is refused.
+# With neither set the stage is off.
 #
 # THE REVIEWER DOES NOT OWN THE BRANCH. A review profile must not write to the branch it reviews:
 # ap_profile_writes defaults to false and branch-owner.sh already refuses a second writer. Nothing
@@ -33,6 +34,8 @@ _rs_dir="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" >/dev/null 2>
 command -v ap_resolve_pr >/dev/null 2>&1 || . "$_rs_dir/agent-resolve.sh"
 # shellcheck source=/dev/null
 command -v sr_record >/dev/null 2>&1 || . "$_rs_dir/stage-receipt.sh"
+# shellcheck source=/dev/null
+command -v al_run >/dev/null 2>&1 || . "$_rs_dir/agent-launch.sh"
 
 # rs_command <cfg> — the command the project configured to run a reviewer. Empty when unset, which
 # is what keeps the stage off in every project that has not opted in.
@@ -42,8 +45,16 @@ rs_command() {
   jq -r '.review.command // ""' "$cfg" 2>/dev/null || true
 }
 
-# rs_enabled <cfg> — rc 0 when a review command is configured.
-rs_enabled() { [ -n "$(rs_command "${1:-}")" ]; }
+# rs_headless <cfg> — rc 0 when `review.headless` is true: cckit builds the reviewer's command from
+# the resolved profile instead of reading one from `review.command`.
+rs_headless() {
+  local cfg="${1:-}"
+  [ -n "$cfg" ] && [ -f "$cfg" ] || return 1
+  [ "$(jq -r '.review.headless // false' "$cfg" 2>/dev/null)" = "true" ]
+}
+
+# rs_enabled <cfg> — rc 0 when the stage is on: a review command is configured, or review.headless.
+rs_enabled() { [ -n "$(rs_command "${1:-}")" ] || rs_headless "${1:-}"; }
 
 # rs_needs_dispatch <state> <action> <have-receipt> — rc 0 when this PR should get a reviewer now.
 # Pure.
@@ -144,59 +155,18 @@ rs_timeout() {
   esac
 }
 
-# _rs_run <seconds> <command> — run the command on stdin under a wall-clock bound, rc 124 on expiry.
-#
-# `timeout(1)` when it is there, a poll loop when it is not. The fallback is not a nicety: macOS
-# ships no timeout, so on the platform this is most often run from, "use timeout or go unbounded"
-# means unbounded — and an unbounded reviewer hangs the whole captain pass, every other PR in it
-# included, with nobody watching.
-#
-# The loop is safe because a background child that has exited is reaped before `kill -0` is asked
-# about it, in both bash and zsh, so the poll terminates rather than spinning on a zombie. SIGTERM
-# first, then SIGKILL, because an agent that traps TERM to clean up should get the chance and one
-# that ignores it should not get to stay.
-_rs_run() {
-  local secs="${1:-900}" cmd="${2:-}" t="" out rc=0 pid waited=0
-  if command -v timeout >/dev/null 2>&1; then t=timeout
-  elif command -v gtimeout >/dev/null 2>&1; then t=gtimeout
-  fi
-  if [ -n "$t" ]; then
-    "$t" --kill-after=10s "${secs}s" sh -c "$cmd" 2>/dev/null
-    return $?
-  fi
-
-  out="$(mktemp 2>/dev/null)" || { sh -c "$cmd" 2>/dev/null; return $?; }
-  sh -c "$cmd" > "$out" 2>/dev/null &
-  pid=$!
-  while kill -0 "$pid" 2>/dev/null; do
-    if [ "$waited" -ge "$secs" ]; then
-      kill -TERM "$pid" 2>/dev/null
-      # A short grace period, then SIGKILL. Not `sleep 10`: the captain is already waiting on this.
-      local grace=0
-      while [ "$grace" -lt 10 ] && kill -0 "$pid" 2>/dev/null; do sleep 1; grace=$((grace + 1)); done
-      kill -KILL "$pid" 2>/dev/null
-      wait "$pid" 2>/dev/null
-      rm -f "$out"
-      return 124
-    fi
-    sleep 1; waited=$((waited + 1))
-  done
-  wait "$pid" 2>/dev/null; rc=$?
-  cat "$out"; rm -f "$out"
-  return "$rc"
-}
-
 # rs_dispatch <cfg> <repo> <pr> <issue> [<head-sha>] — resolve a reviewer, run it, record its
 # verdict. <head-sha> is the PR head the review applies to; it is stored on the receipt so a
 # later commit cannot inherit this verdict (#351 review).
-# Echoes the receipt path. The configured command receives the brief on stdin; its stdout is the
-# report sr_record parses.
+# Echoes the receipt path. The command receives the brief on stdin; its stdout is the report
+# sr_record parses. The command is `review.command`, or the profile's headless form under
+# `review.headless`; al_run (agent-launch.sh) bounds either.
 rs_dispatch() {
   local cfg="${1:-}" repo="${2:-}" pr="${3:-}" num="${4:-}" head="${5:-}"
   local cmd prof tier src kind args ctx il pl report attempt path secs rc_=0
   [ -n "$num" ] || { echo "review: PR #${pr:-?} has no linked issue — nothing to record a receipt against" >&2; return 2; }
   cmd="$(rs_command "$cfg")"
-  [ -n "$cmd" ] || return 4
+  [ -n "$cmd" ] || rs_headless "$cfg" || return 4
 
   # ONE context fetch, not two. ap_resolve_pr fetches it internally and a second call for
   # ap_resolve_source would fetch again — two round trips whose answers can disagree, since every
@@ -226,20 +196,29 @@ rs_dispatch() {
   kind="$(ap_profile_field "$cfg" "$prof" kind)"
   args="$(ap_profile_args "$cfg" "$prof")"
 
+  # No review.command: build the reviewer's line from the profile. Text mode, because the reply IS
+  # the report sr_record parses. A kind with no headless form is refused here — a receipt recorded
+  # from a command cckit guessed at would be a verdict nobody asked that agent for.
+  if [ -z "$cmd" ]; then
+    cmd="$(al_headless_cmd "$kind" text "$args")" || {
+      echo "review: review.headless is on but profile '$prof' is kind '${kind:-?}' — set review.command for it" >&2
+      return 2
+    }
+  fi
+
   # Bound the run. The captain is unattended and single-threaded: a reviewer that never returns
-  # blocks the whole pass, every other PR in it included, with no human to notice. `timeout` is not
-  # on every system (macOS has none by default), so its absence is a warning, not a refusal —
-  # degrading to today's unbounded behaviour beats refusing to review at all.
+  # blocks the whole pass, every other PR in it included, with no human to notice. al_run needs no
+  # timeout(1), so the bound holds on macOS too.
   secs="$(rs_timeout "$cfg")"
   report="$(rs_brief "$repo" "$pr" "$num" \
     | CCKIT_REVIEW_PROFILE="$prof" CCKIT_REVIEW_KIND="$kind" CCKIT_REVIEW_ARGS="$args" \
       CCKIT_REVIEW_PR="$pr" CCKIT_REVIEW_ISSUE="$num" CCKIT_REVIEW_REPO="$repo" \
-      _rs_run "$secs" "$cmd")" || {
+      al_run "$secs" "$cmd" 2>/dev/null)" || {
     rc_=$?
     if [ "$rc_" = "124" ]; then
-      echo "review: review.command exceeded ${secs}s for PR #$pr — killed, no receipt written" >&2
+      echo "review: the reviewer exceeded ${secs}s for PR #$pr — killed, no receipt written" >&2
     else
-      echo "review: the configured review.command failed for PR #$pr — no receipt written" >&2
+      echo "review: the reviewer command failed for PR #$pr — no receipt written" >&2
     fi
     return 3
   }

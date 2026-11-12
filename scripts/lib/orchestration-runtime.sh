@@ -145,6 +145,17 @@ EOF
   printf '%s\n' "$cmd"
 }
 
+# or_tmux_worker_cmd <wave-worker-path> <session> <issue> — the prefix that puts the agent command
+# under the result-recording wrapper: `'<path>' '<session>' <issue> --`. Quoted the same way and for
+# the same reason as the argv above — tmux types this into a shell, and an install path or a session
+# name containing a space would otherwise be re-split there.
+or_tmux_worker_cmd() {
+  local w="${1:-}" s="${2:-}" n="${3:-}" ew es
+  ew=${w//\'/\'\\\'\'}
+  es=${s//\'/\'\\\'\'}
+  printf "'%s' '%s' %s --\n" "$ew" "$es" "$n"
+}
+
 # or_herdr_launch <session> <kind> <seed?> <detach?> <project> <agent-args-nl> <entry>...
 #
 # <agent-args-nl> is the profile's extra CLI argv, ONE PER LINE (empty for none). They are handed to

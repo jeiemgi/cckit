@@ -354,6 +354,12 @@ different files, they merge cleanly.
 `cckit start <issue>` makes the branch and the worktree for you. You don't manage worktrees by hand.
 </Aside>
 
+For a whole wave, `cckit orchestrate <issues…>` does the same per issue and then starts one agent
+in each worktree. It skips an issue whose blocker is still open, launches at most `--cap` workers,
+and records how each one ended — `cckit orchestrate --results` reads `success`, `failure` or
+`interrupted` per issue, whichever agent ran. See
+[Collecting results](/wave/#collecting-results).
+
 A worktree also holds its own port block, so a reviewer can run the app from it without colliding
 with another worktree's stack. `cckit qa up` launches the review stack the project declared,
 on that worktree's ports, and `cckit qa verdict` records the result against the reviewed commit — see the

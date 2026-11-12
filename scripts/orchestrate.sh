@@ -19,6 +19,15 @@
 #                  (override with --force)
 #   set -euo pipefail + explicit pipe handling throughout
 #
+# Results: every launched worker gets a record (scripts/lib/wave-result.sh). On tmux the pane runs
+# the agent under scripts/wave-worker.sh, which records how the process ended; `--results` reads it.
+#   --results      print each worker's collected result for --session and exit: success, failure or
+#                  interrupted (terminal), launched or running (not finished), untracked (Herdr
+#                  owns the agent process, so there is no exit status to collect).
+#                  rc 0 all success · 1 any failure/interrupted, or no records · 3 none failed but
+#                  some are not finished
+#   --wait <secs>  with --results: poll until no worker is launched/running, at most <secs>
+#
 # Usage:
 #   cckit orchestrate <issueA> <issueB> [<issueC> ...]
 #   cckit orchestrate --dry-run 6 7 8
@@ -28,6 +37,7 @@
 #   cckit orchestrate --force 7              # launch even if blocked_by an open issue
 #   cckit orchestrate --session=sweep 1 2    # custom tmux session name
 #   cckit orchestrate --detach 6 7           # build the session, don't attach (testing/headless)
+#   cckit orchestrate --results --wait 600   # collect the wave's results (add --llm for JSON)
 set -euo pipefail
 
 SESSION="orchestrate"
@@ -41,9 +51,11 @@ RUNTIME="${CCKIT_RUNTIME:-tmux}"
 PROFILE="${CCKIT_PROFILE:-}"
 AGENT_ARGS_NL=""
 AGENT_EXPLICIT=0
+RESULTS=0
+WAIT=0
 ISSUES=()
 
-usage() { sed -n '2,28p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,40p' "$0" | sed 's/^# \{0,1\}//'; }
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -60,19 +72,59 @@ while [ "$#" -gt 0 ]; do
     --runtime)   RUNTIME="$2"; shift 2 ;;
     --runtime=*) RUNTIME="${1#*=}"; shift ;;
     --session=*) SESSION="${1#*=}"; shift ;;
+    --results)   RESULTS=1; shift ;;
+    --wait)      WAIT="${2:-}"; shift 2 ;;
+    --wait=*)    WAIT="${1#*=}"; shift ;;
     -h|--help)   usage; exit 0 ;;
     [0-9]*)      ISSUES+=("$1"); shift ;;
     *)           echo "orchestrate: unknown arg '$1'" >&2; exit 2 ;;
   esac
 done
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"   # cckit INSTALL root — for sourcing libs (works on brew/npm installs)
+# shellcheck source=/dev/null
+source "$ROOT/scripts/lib/wave-result.sh"
+
+# ── --results: read the wave's collected results and exit ───────────────────────────────────────
+# A pure read of the record directory: no gh, no config, no worktree, no pane. It runs before every
+# launch precondition so a captain can collect from any checkout of the repo.
+if [ "$RESULTS" -eq 1 ]; then
+  case "$WAIT" in ''|*[!0-9]*) echo "orchestrate: --wait needs a number of seconds (got '$WAIT')" >&2; exit 2 ;; esac
+  git -C "$PWD" rev-parse --show-toplevel >/dev/null 2>&1 || { echo "orchestrate: not in a git repo" >&2; exit 1; }
+  waited=0
+  while [ "$waited" -lt "$WAIT" ] && [ "$(wr_pending "$SESSION")" -gt 0 ]; do
+    sleep 1; waited=$((waited + 1))
+  done
+  rows="$(wr_rows "$SESSION")"
+  if [ -z "$rows" ]; then
+    if [ "${CCKIT_OUTPUT:-human}" = "json" ]; then echo "[]"; fi
+    echo "orchestrate: no results recorded for session '$SESSION'" >&2
+    exit 1
+  fi
+  if [ "${CCKIT_OUTPUT:-human}" = "json" ]; then
+    command -v jq >/dev/null 2>&1 || { echo "orchestrate: jq is required for --llm results" >&2; exit 1; }
+    printf '%s\n' "$rows" | jq -R -s --arg session "$SESSION" '
+      [ split("\n")[] | select(length > 0) | split("\t")
+        | { session: $session, issue: (.[0] | tonumber? // .[0]), result: .[1],
+            rc: (if (.[2] // "") == "" then null else (.[2] | tonumber? // null) end),
+            agent: .[3], runtime: .[4], branch: .[5], worktree: .[6] } ]'
+  else
+    echo "orchestrate: results for session '$SESSION'"
+    printf '%s\n' "$rows" | while IFS="$(printf '\t')" read -r r_num r_state r_rc r_agent r_runtime r_branch _r_wt; do
+      printf '  #%-6s %-12s rc %-4s %s/%s  %s\n' "$r_num" "$r_state" "${r_rc:--}" "$r_runtime" "$r_agent" "$r_branch"
+    done
+  fi
+  if printf '%s\n' "$rows" | awk -F'\t' '$2 == "failure" || $2 == "interrupted" { f = 1 } END { exit f ? 0 : 1 }'; then exit 1; fi
+  if printf '%s\n' "$rows" | awk -F'\t' '$2 != "success" { f = 1 } END { exit f ? 0 : 1 }'; then exit 3; fi
+  exit 0
+fi
+
 [ "${#ISSUES[@]}" -ge 1 ] || { echo "orchestrate: pass at least one issue number" >&2; usage; exit 2; }
 case "$CAP" in ''|*[!0-9]*) echo "orchestrate: --cap needs a positive number (got '$CAP')" >&2; exit 2 ;; esac
 [ "$CAP" -gt 0 ] || { echo "orchestrate: --cap must be greater than zero" >&2; exit 2; }
 
-# Resolve the main worktree root + load config (repo + base branch drive everything).
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"   # cckit INSTALL root — for sourcing libs (works on brew/npm installs)
+# Load the runtime adapters; config (repo + base branch) follows the profile resolution below.
 # shellcheck source=/dev/null
 source "$ROOT/scripts/lib/orchestration-runtime.sh"
 
@@ -228,6 +280,19 @@ done
 # The lease outlives this process on purpose: the pane keeps writing after orchestrate returns, and
 # the ledger reclaims it on positive evidence (the worktree is gone, or the pid died on this host).
 
+# ── one result record per worker ────────────────────────────────────────────────────────────────
+# Written before any pane starts, so `--results` can name every worker of the wave from the first
+# second. A relaunch of the same session starts from a clean record directory. On tmux the pane's
+# wave-worker.sh takes the record from `launched` to a terminal state; Herdr starts the agent
+# process itself, so there is no exit status for cckit to collect and the record says `untracked`.
+wr_clear "$SESSION"
+for entry in "${ENTRIES[@]}"; do
+  wt="${entry%%|*}"; rest="${entry#*|}"; branch="${rest%%|*}"; num="${rest##*|}"
+  wr_set "$SESSION" "$num" "issue=$num" "state=$([ "$RUNTIME" = "herdr" ] && echo untracked || echo launched)" \
+    "agent=$AGENT" "runtime=$RUNTIME" "branch=$branch" "worktree=$wt" \
+    || echo "orchestrate: could not record the launch of #$num — its result will be missing" >&2
+done
+
 if [ "$RUNTIME" = "herdr" ]; then
   or_herdr_launch "$SESSION" "$AGENT" "$SEED" "$DETACH" "${KIT_PROJECT_SLUG:-project}" "$AGENT_ARGS_NL" "${ENTRIES[@]}"
   exit $?
@@ -258,9 +323,9 @@ for entry in "${ENTRIES[@]}"; do
     # so the agent never launched. Escape any single quotes for safe single-quote wrapping.
     seed="$(seed_for "$num" "$branch" "$wt")"
     esc=${seed//\'/\'\\\'\'}
-    tmux send-keys -t "$pane" "$AGENT_CMD '$esc'" C-m
+    tmux send-keys -t "$pane" "$(or_tmux_worker_cmd "$ROOT/scripts/wave-worker.sh" "$SESSION" "$num") $AGENT_CMD '$esc'" C-m
   else
-    tmux send-keys -t "$pane" "$AGENT_CMD" C-m
+    tmux send-keys -t "$pane" "$(or_tmux_worker_cmd "$ROOT/scripts/wave-worker.sh" "$SESSION" "$num") $AGENT_CMD" C-m
   fi
 done
 tmux select-layout -t "$SESSION:flows" tiled >/dev/null
@@ -268,6 +333,7 @@ tmux set -t "$SESSION" mouse on
 tmux select-window -t "$SESSION:flows" 2>/dev/null || true
 
 hint="tabs/panes: click to focus, or Ctrl-b <number> - Ctrl-b d detaches"
+echo "orchestrate: collect results with: cckit orchestrate --results --session=$SESSION"
 if [ "$DETACH" -eq 1 ]; then
   echo "orchestrate: session '$SESSION' built ($hint). Attach: tmux attach -t $SESSION"
 else

@@ -24,6 +24,8 @@
 #   --local <on|off>          local model layer (mlx_lm.server) for NL chores at $0 API cost
 #                             (config + SessionStart status hook)  (default: off)
 #   --lang <str>              working language                     (default: English)
+#   --adapter <claude|codex|both>  which agent adapter(s) to install  (default: claude; with
+#                             --upgrade: the stored selection, and a named adapter is ADDED to it)
 #   --upgrade                 merge new kit features into an existing .claude/ (preserves your edits)
 #   --dry-run                 print the scaffold plan and exit, writing nothing
 #   --force                   overwrite without prompting
@@ -228,6 +230,9 @@ KIT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 _DOCTOR="$KIT_ROOT/scripts/kit-doctor.sh"
 _INIT_SKIP_PREFLIGHT=0
 for _ia in "$@"; do [[ "$_ia" == "--upgrade" || "$_ia" == "--dry-run" ]] && _INIT_SKIP_PREFLIGHT=1; done
+# KIT_INIT_PREFLIGHT=0 skips it too: the fixture tests drive a FRESH init, and the doctor installs
+# packages and checks gh auth — neither belongs in a network-free test.
+[[ "${KIT_INIT_PREFLIGHT:-1}" == "0" ]] && _INIT_SKIP_PREFLIGHT=1
 
 if [[ $_INIT_SKIP_PREFLIGHT -eq 0 && -x "$_DOCTOR" ]]; then
   # --yes: init's preflight installs Tier-1 deps non-interactively (no approval prompt here; the
@@ -247,6 +252,7 @@ fi
 PROFILE=""; TARGET="$PWD"; NAME=""; SLUG=""; REPO=""; GH_OWNER=""; OWNER_NAME=""
 PROJECT_NUMBER=""; PLANS_FORMAT=""; PLANS_DIR=""; MEMORY=""; LANG_PREF="English"; FORCE=0
 SPECKIT=""; PREPUSH_CMD=""; LOCAL_LAYER=""; LOCAL_EXPLICIT=0; DRY_RUN=0; UPGRADE=0
+ADAPTER_ARG=""    # --adapter as typed; resolved to ADAPTERS below (stored selection wins on upgrade)
 SKILL_PREFIX=""   # namespace applied to kit-namespaced skill templates (from kit.config .skillPrefix on upgrade)
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -268,10 +274,22 @@ while [[ $# -gt 0 ]]; do
     --force) FORCE=1; shift ;;
     --upgrade) UPGRADE=1; shift ;;
     --dry-run) DRY_RUN=1; shift ;;
+    --adapter) ADAPTER_ARG="$2"; shift 2 ;;
     -h|--help) sed -n '2,31p' "$0"; exit 0 ;;
     *) echo "x unknown flag: $1" >&2; exit 1 ;;
   esac
 done
+
+# ---- adapter selection (E257.3) -------------------------------------------
+# Validated here, before anything is written: an unknown adapter name refuses the whole run.
+# shellcheck source=/dev/null
+. "$KIT_ROOT/scripts/lib/adapter-select.sh"
+ADAPTERS_NEW=""
+if [[ -n "$ADAPTER_ARG" ]]; then
+  ADAPTERS_NEW="$(adapter_normalize "$ADAPTER_ARG")" || { echo "x --adapter takes claude, codex or both (got '$ADAPTER_ARG')" >&2; exit 1; }
+fi
+ADAPTERS="${ADAPTERS_NEW:-claude}"   # fresh init; --upgrade replaces this with the stored selection
+ADAPTER_ADDED=0
 
 # Installed plugin version -> recorded into kit.config as kitVersion (drives /kit-update checks).
 PLUGIN_VERSION="$(jq -r '.version // "0.0.0"' "$KIT_ROOT/.claude-plugin/plugin.json" 2>/dev/null || echo "0.0.0")"
@@ -279,8 +297,13 @@ PLUGIN_VERSION="$(jq -r '.version // "0.0.0"' "$KIT_ROOT/.claude-plugin/plugin.j
 # ---- upgrade mode: backfill inputs from the project's existing config ----
 if [[ $UPGRADE -eq 1 ]]; then
   UP_TARGET="$(cd "${TARGET:-$PWD}" && pwd)"
-  UP_CFG="$UP_TARGET/.claude/kit.config.json"
-  [[ -f "$UP_CFG" ]] || { echo "x --upgrade needs $UP_CFG (run /kit-init first)."; exit 1; }
+  UP_CFG="$(adapter_config_existing "$UP_TARGET" || true)"
+  [[ -n "$UP_CFG" && -f "$UP_CFG" ]] || { echo "x --upgrade needs $UP_TARGET/.claude/kit.config.json (run /kit-init first)."; exit 1; }
+  # The stored selection is the truth on upgrade. --adapter only ever ADDS to it: dropping an
+  # adapter is an uninstall of its files, which is `cckit remove`'s job, not an upgrade side effect.
+  ADAPTERS_HAVE="$(adapter_list_from_config "$UP_CFG")" || { echo "x $UP_CFG has an invalid 'adapters' value (expected claude and/or codex)." >&2; exit 1; }
+  ADAPTERS="$(adapter_union "$ADAPTERS_HAVE" "$ADAPTERS_NEW")"
+  [[ "$ADAPTERS" != "$ADAPTERS_HAVE" ]] && ADAPTER_ADDED=1
 
   # ---- guard: never apply the kit over its OWN home, or downgrade ----------
   # The kit is DEVELOPED in-tree in its home repo (packages/claude-kit-plugin/). Running
@@ -295,7 +318,16 @@ if [[ $UPGRADE -eq 1 ]]; then
   # confusing re-scan + any stray re-add). A genuinely-behind consumer (kitVersion < plugin)
   # still upgrades normally.
   _have_kv="$(jq -r '.kitVersion // "0.0.0"' "$UP_CFG" 2>/dev/null || echo 0.0.0)"
-  if [[ "$_have_kv" == "$PLUGIN_VERSION" ]]; then
+  # ...unless this run enables a second adapter: that is new work at the same version. So is a
+  # Codex project whose hooks are not registered (a hooks.json that was unparseable at init, or a
+  # project scaffolded before E257.5): `cckit doctor` sends the user here to repair exactly that.
+  _cx_unregistered=0
+  if adapter_has "$ADAPTERS" codex; then
+    # shellcheck source=/dev/null
+    . "$KIT_ROOT/scripts/lib/codex-hooks.sh"
+    codex_hooks_registered "$UP_TARGET/.codex/hooks.json" guard-base-branch-commit.sh || _cx_unregistered=1
+  fi
+  if [[ "$_have_kv" == "$PLUGIN_VERSION" && $ADAPTER_ADDED -eq 0 && $_cx_unregistered -eq 0 ]]; then
     echo "x already at $PLUGIN_VERSION -- nothing to upgrade. (To pull a newer release, refresh the plugin cache: claude plugin update.)"
     exit 0
   fi
@@ -508,15 +540,52 @@ export PLANS_DIR PLANS_FORMAT KNOWLEDGE_DIR="knowledge" WING="$SLUG" CLAUDE_PROJ
 export MILESTONES_HUMAN ROLES_HUMAN AGENT_TABLE SKILL_TABLE
 export KIT_FLAGS_ON="$FLAGS_ON"
 
+# ---- per-adapter layout --------------------------------------------------
+# One template set renders for both adapters. What differs is where the files land ({{ADAPTER_DIR}}),
+# which IF:ADAPTER_* blocks survive, and the instruction file name — nothing else.
+KITCFG="$(adapter_config_existing "$TARGET" || true)"
+[[ -n "$KITCFG" ]] || KITCFG="$(adapter_config_default "$TARGET" "$ADAPTERS")"
+CONFIG_REL="${KITCFG#"$TARGET"/}"
+MANIFEST_REL="$(adapter_manifest_rel "$TARGET" "$ADAPTERS")"
+export CONFIG_REL
+_rule_enabled() {  # <rule> -> 0 unless its feature is off for this project
+  case "$1" in
+    mempalace)          [[ "$MEMORY_BOOL" == "true" ]] || return 1 ;;
+    design-routing)     [[ "$DESIGN_ON"   == "true" ]] || return 1 ;;
+    plan-output-format) [[ "$PLANS_ON"    == "true" ]] || return 1 ;;
+  esac
+  return 0
+}
+RULE_LIST=""
+for r in $RULES; do
+  _rule_enabled "$r" && [[ -f "$KIT_ROOT/templates/rules/$r.md" ]] || continue
+  RULE_LIST="${RULE_LIST:+$RULE_LIST
+}- \`.agents/rules/$r.md\`"
+done
+export RULE_LIST
+use_adapter() {  # <claude|codex> — point emit at that adapter's dir + IF blocks
+  ADAPTER_DIR="$(adapter_dir "$1")"
+  KIT_FLAGS_ON="${FLAGS_ON}ADAPTER_$(printf '%s' "$1" | tr '[:lower:]' '[:upper:]'),"
+  ADAPTER_INSTRUCTIONS="$(adapter_instructions "$1")"
+  export ADAPTER_DIR KIT_FLAGS_ON ADAPTER_INSTRUCTIONS
+}
+# Shared (adapter-neutral) files that name a rules path point at the first selected adapter's copy.
+use_adapter "${ADAPTERS%% *}"
+
 # emit: resolve IF blocks, then substitute {{VARS}}
-emit() {  # <src> <dest>
-  mkdir -p "$(dirname "$2")"
+render_tpl() {  # <src> -> stdout
   perl -0777 -pe '
     my %on = map { $_=>1 } grep { length } split /,/, ($ENV{KIT_FLAGS_ON}//"");
     1 while s{<!-- IF:(\w+) -->(.*?)<!-- /IF:\1 -->}{ $on{$1} ? $2 : "" }gse;
     s/\{\{(\w+)\}\}/ exists $ENV{$1} ? $ENV{$1} : "{{$1}}" /ge;
-  ' "$1" > "$2"
+  ' "$1"
 }
+emit() {  # <src> <dest>
+  mkdir -p "$(dirname "$2")"
+  render_tpl "$1" > "$2"
+  WRITTEN+=("${2#"$TARGET"/}")
+}
+WRITTEN=()   # every path this run wrote (not preserved) — the adapter-managed ones go in the manifest
 
 # _upgrade_excluded: true when <rel> was removed/renamed by the project on purpose
 # (registered in kit.config.json `upgrade.removed[]` / `upgrade.renamed{}`). Matches an
@@ -563,6 +632,7 @@ safe_copy() {  # <src> <dest> [exec]
   fi
   mkdir -p "$(dirname "$2")"
   cp "$1" "$2"
+  WRITTEN+=("$rel")
   [[ "${3:-}" == "exec" ]] && chmod +x "$2" 2>/dev/null
   [[ $UPGRADE -eq 1 ]] && UPGRADE_ADDED+=("$rel")
   return 0
@@ -575,7 +645,7 @@ safe_copy() {  # <src> <dest> [exec]
 hook_write() {  # <src> <dest>
   local rel="${2#"$TARGET"/}" state
   if [[ $UPGRADE -ne 1 || ! -e "$2" ]] || _upgrade_excluded "$rel"; then safe_write "$1" "$2"; return 0; fi
-  state="$(hook_refresh_state "$2" "$1" "$KIT_ROOT" "$TARGET/.claude/kit.manifest.json" "$rel")"
+  state="$(hook_refresh_state "$2" "$1" "$KIT_ROOT" "$TARGET/$MANIFEST_REL" "$rel")"
   case "$state" in
     refresh) emit "$1" "$2"; UPGRADE_REFRESHED+=("$rel") ;;
     drifted) UPGRADE_DRIFTED+=("$rel") ;;
@@ -594,42 +664,56 @@ if [[ $DRY_RUN -eq 1 ]]; then
   echo "  Project : $NAME ($SLUG)"
   echo "  Repo    : $REPO"
   echo "  Base    : $BASE_BRANCH   (rules that name the integration branch render this)"
+  echo "  Adapters: $ADAPTERS$([[ $ADAPTER_ADDED -eq 1 ]] && echo "   (adding to stored: $ADAPTERS_HAVE)")"
   echo "  Board   : $([[ "$PROJECTS_V2" == "true" ]] && echo "Projects v2 #$PROJECT_NUMBER" || echo "off (gh issues only)")"
   echo "  Memory  : $MEMORY_BOOL   Plans: $PLANS_FORMAT   Lang: $LANG_PREF"
   echo "  Spec Kit: $SPECKIT_ON   Pre-push gate: $PREPUSH_ENABLED   Local model: $LOCAL_ON   kitVersion: $PLUGIN_VERSION"
   echo ""
   echo "  Would write:"
-  echo "    CLAUDE.md"
-  echo "    .claude/kit.config.json"
+  echo "    $CONFIG_REL"
+  echo "    $MANIFEST_REL   (ownership manifest, gitignored)"
+  if adapter_has "$ADAPTERS" claude; then
   echo "    .claude/settings.local.json"
   echo "    .claude/hooks/repo-hygiene.sh             (SessionStart: read-only repo-hygiene report)"
   echo "    .claude/hooks/guard-base-branch-commit.sh (PreToolUse Bash: block commits to base branch)"
   echo "    .claude/hooks/guard-raw-git-ops.sh   (PreToolUse Bash, tracked settings.json: raw gh/git -> cckit verb)"
   echo "    .claude/hooks/kit_version_check.sh   (SessionStart: update check)"
-  for r in $RULES; do
-    case "$r" in
-      mempalace)          [[ "$MEMORY_BOOL" == "true" ]] || continue ;;
-      design-routing)     [[ "$DESIGN_ON"   == "true" ]] || continue ;;
-      plan-output-format) [[ "$PLANS_ON"    == "true" ]] || continue ;;
-    esac
-    [[ -f "$KIT_ROOT/templates/rules/$r.md" ]] && echo "    .claude/rules/$r.md"
-  done
-  [[ "$CODEGRAPH_ON" == "true" ]] && echo "    .claude/rules/code-retrieval.md           (codeGraph.provider is set)"
+  echo "    .claude/hooks/kit-mail-check.sh      (session mail, tracked settings.json: PostToolUse / UserPromptSubmit / SessionStart / Stop)"
   for a in $AGENTS; do
     [[ -f "$KIT_ROOT/templates/agents/$a.md" ]] && echo "    .claude/agents/$a/AGENT.md"
   done
-  for s in $SKILLS; do
-    _dn="$s"; { [[ -n "$SKILL_PREFIX" ]] && _is_namespaced "$s"; } && _dn="${SKILL_PREFIX}${s}"
-    [[ -f "$KIT_ROOT/templates/skills/$s/SKILL.md" ]] && echo "    .claude/skills/$_dn/SKILL.md"
-    [[ -d "$KIT_ROOT/templates/skills/$s/references" ]] && echo "    .claude/skills/$_dn/references/"
+  fi
+  for _ad in $ADAPTERS; do
+    _add="$(adapter_dir "$_ad")"
+    echo "    $(adapter_instructions "$_ad")"
+    for r in $RULES; do
+      _rule_enabled "$r" || continue
+      [[ -f "$KIT_ROOT/templates/rules/$r.md" ]] && echo "    $_add/rules/$r.md"
+    done
+    [[ "$CODEGRAPH_ON" == "true" ]] && echo "    $_add/rules/code-retrieval.md           (codeGraph.provider is set)"
+    for s in $SKILLS; do
+      _dn="$s"; { [[ -n "$SKILL_PREFIX" ]] && _is_namespaced "$s"; } && _dn="${SKILL_PREFIX}${s}"
+      [[ -f "$KIT_ROOT/templates/skills/$s/SKILL.md" ]] && echo "    $_add/skills/$_dn/SKILL.md"
+      [[ -d "$KIT_ROOT/templates/skills/$s/references" ]] && echo "    $_add/skills/$_dn/references/"
+    done
   done
+  if adapter_has "$ADAPTERS" codex; then
+  echo "    .codex/hooks/ (repo-hygiene.sh, kit_version_check.sh, kit-mail-check.sh, guard-base-branch-commit.sh, guard-raw-git-ops.sh$([[ "$PREPUSH_ENABLED" == "true" ]] && echo ", prepush_gate.sh")$([[ "$LOCAL_ON" == "true" ]] && echo ", kit-local-status.sh"))"
+  echo "    .codex/hooks.json                         (merged: cckit's registrations are added, yours are kept; trust them in Codex with /hooks)"
+  for a in $AGENTS; do
+    [[ -f "$KIT_ROOT/templates/agents/$a.md" ]] && echo "    .codex/agents/$a.toml"
+  done
+  echo "    (Codex adapter: no memory hooks — they read Claude Code transcripts)"
+  fi
   echo "    scripts/ (kit-config.sh, gh-project.sh, kit-version-check.sh, setup-labels.sh, setup-milestones.sh, capture-project-ids.sh, task-sync.sh, knowledge-lint.sh, review-lint.sh + review-rules.conf, skill-frontmatter-lint.sh, instruction-budget-lint.sh)"
   echo "    knowledge/INDEX.md                        (knowledge-base manifest — rules/knowledge-base.md)"
+  if adapter_has "$ADAPTERS" claude; then
   echo "    .claude/lib/kit-sigil.sh                  (claude-kit attribution sigil helper, sourced by task-* footers)"
   [[ "$MEMORY_BOOL"     == "true" ]] && echo "    .claude/hooks/mempal_session_start.sh + mempal_save.sh + mempal_precompact.sh + mempal_followup.sh   (SessionStart / Stop / PreCompact / SessionEnd)"
   [[ "$MEMORY_BOOL"     == "true" ]] && echo "    .claude/mempal-identity.$SLUG.txt              (per-wing wake-up header — edit the Stack line)"
   [[ "$PREPUSH_ENABLED" == "true" ]] && echo "    .claude/hooks/prepush_gate.sh   (PreToolUse Bash gate: $PREPUSH_CMD)"
   [[ "$LOCAL_ON"        == "true" ]] && echo "    .claude/hooks/kit-local-status.sh   (SessionStart: announce local model layer when alive)"
+  fi
   echo ""
   echo "  Onboarding would offer (opt-in): gh auth$([[ "$MEMORY_BOOL" == "true" ]] && echo " · MemPalace (mempalace-mcp)") · gws (if you use Google Workspace) · local model layer (--local on: NL chores at \$0 via mlx_lm.server)"
   echo ""
@@ -638,8 +722,8 @@ if [[ $DRY_RUN -eq 1 ]]; then
 fi
 
 # ---- guard ---------------------------------------------------------------
-if [[ -e "$TARGET/.claude/kit.config.json" && $FORCE -eq 0 && $UPGRADE -eq 0 ]]; then
-  echo "  $TARGET/.claude already initialized. Re-run with --upgrade to merge in new features (preserves your edits), or --force to overwrite generated files."
+if [[ -e "$KITCFG" && $FORCE -eq 0 && $UPGRADE -eq 0 ]]; then
+  echo "  $TARGET already initialized ($CONFIG_REL). Re-run with --upgrade to merge in new features (preserves your edits), or --force to overwrite generated files."
   exit 1
 fi
 
@@ -652,11 +736,14 @@ fi
 
 UPGRADE_ADDED=(); UPGRADE_PRESERVED=(); UPGRADE_SKIPPED=(); UPGRADE_REFRESHED=(); UPGRADE_DRIFTED=()
 echo "-> $([[ $UPGRADE -eq 1 ]] && echo Upgrading || echo Scaffolding) $PROFILE profile $([[ $UPGRADE -eq 1 ]] && echo in || echo into) $TARGET"
-mkdir -p "$TARGET/.claude/agents" "$TARGET/.claude/skills" "$TARGET/.claude/rules" "$TARGET/scripts/lib"
+mkdir -p "$TARGET/scripts/lib" "$(dirname "$KITCFG")"
+adapter_has "$ADAPTERS" claude && mkdir -p "$TARGET/.claude/agents" "$TARGET/.claude/skills" "$TARGET/.claude/rules"
 
 # ---- kit.config.json (built with jq for correctness) --------------------
-KITCFG="$TARGET/.claude/kit.config.json"
+# Location: .claude/kit.config.json when the Claude adapter is selected (the layout every existing
+# project has); the root cckit.config.json for a Codex-only project, which gets no .claude/ tree.
 jq -n \
+  --argjson adapters "$(adapter_json "$ADAPTERS")" \
   --arg kitver "$PLUGIN_VERSION" \
   --arg name "$NAME" --arg slug "$SLUG" --arg owner "$OWNER_NAME" --arg lang "$LANG_PREF" --arg path "$TARGET" \
   --arg profile "$PROFILE" --argjson roles "$ROLES_JSON" \
@@ -670,6 +757,7 @@ jq -n \
   --argjson ppen "$PREPUSH_ENABLED" --arg ppcmd "$PREPUSH_CMD" \
   --argjson localon "$LOCAL_ON" \
   '{kitVersion:$kitver,
+    adapters:$adapters,
     project:{name:$name,slug:$slug,owner:$owner,language:$lang,path:$path},
     profile:$profile, roles:$roles,
     github:{repo:$repo,owner:$ghowner,baseBranch:$base,projectsV2:$pv2,projectNumber:$pnum,projectTitle:$ptitle},
@@ -679,17 +767,20 @@ jq -n \
     specKit:{enabled:$speckit},
     prePush:{enabled:$ppen,command:$ppcmd},
     local:{enabled:$localon,port:8080,model:"mlx-community/Qwen3-8B-4bit"},
-    memory:{enabled:$mem,provider:"mempalace",wing:$wing,claudeProjectSlug:$cps}}' \
+    memory:{enabled:$mem,provider:"mempalace",wing:$wing,claudeProjectSlug:$cps}}
+   # A Codex-only config is the tracked root file, so it carries no absolute machine path.
+   | if ($adapters | index("claude")) then . else del(.project.path) end' \
   > "$KITCFG.kit-new"
 if [[ $UPGRADE -eq 1 && -f "$KITCFG" ]]; then
   # deep-merge: existing values win (preserve user choices), new REQUIRED keys added, version
   # bumped. FEATURE blocks (plans/specKit/prePush/local/memory) are additive only when the
   # project's config ALREADY has them — a missing feature key is a deliberate absence, and an
-  # upgrade must never inject profile defaults over it (#149).
+  # upgrade must never inject profile defaults over it (#149). `adapters` follows the same rule: a
+  # config without the key means Claude, and an upgrade that changes nothing must not write it.
   jq -s --arg kitver "$PLUGIN_VERSION" '
     .[1] as $have
     | (.[0] | with_entries(.key as $k | select(
-        (["plans","specKit","prePush","local","memory"] | index($k)) == null
+        (["plans","specKit","prePush","local","memory","adapters"] | index($k)) == null
         or ($have | has($k))))) as $tmpl
     | $tmpl * $have | .kitVersion = $kitver' "$KITCFG.kit-new" "$KITCFG" \
     > "$KITCFG.merged" && mv "$KITCFG.merged" "$KITCFG"
@@ -700,43 +791,91 @@ if [[ $UPGRADE -eq 1 && -f "$KITCFG" ]]; then
     jq --argjson v "$LOCAL_ON" '.local = ((.local // {port:8080,model:"mlx-community/Qwen3-8B-4bit"}) | .enabled = $v)' \
       "$KITCFG" > "$KITCFG.tmp" && mv "$KITCFG.tmp" "$KITCFG"
   fi
-  echo "  + .claude/kit.config.json (merged · kitVersion -> $PLUGIN_VERSION)"
+  # An explicit --adapter is a decision made now, so it is written even where the key was absent.
+  if [[ -n "$ADAPTERS_NEW" ]]; then
+    jq --argjson v "$(adapter_json "$ADAPTERS")" '.adapters = $v' "$KITCFG" > "$KITCFG.tmp" && mv "$KITCFG.tmp" "$KITCFG"
+  fi
+  echo "  + $CONFIG_REL (merged · kitVersion -> $PLUGIN_VERSION)"
 else
   mv "$KITCFG.kit-new" "$KITCFG"
-  echo "  + .claude/kit.config.json"
+  echo "  + $CONFIG_REL"
 fi
 
-# ---- CLAUDE.md -----------------------------------------------------------
-safe_write "$KIT_ROOT/templates/CLAUDE.md.tmpl" "$TARGET/CLAUDE.md"
-echo "  + CLAUDE.md"
-
-# ---- rules (filtered by enabled flags) ----------------------------------
-for r in $RULES; do
-  # Skip rules whose feature is disabled for this project.
-  case "$r" in
-    mempalace)          [[ "$MEMORY_BOOL" == "true" ]] || continue ;;
-    design-routing)     [[ "$DESIGN_ON"   == "true" ]] || continue ;;
-    plan-output-format) [[ "$PLANS_ON"    == "true" ]] || continue ;;
-  esac
-  src="$KIT_ROOT/templates/rules/$r.md"
-  [[ -f "$src" ]] || { echo "  missing rule: $r"; continue; }
-  safe_write "$src" "$TARGET/.claude/rules/$r.md"
-  echo "  + .claude/rules/$r.md"
-done
-# code-retrieval is in no profile: `cckit add <id>` writes it when a code-graph integration is
-# switched on. An upgrade re-adds it only for a project whose config already has one on.
-if [[ "$CODEGRAPH_ON" == "true" ]]; then
-  safe_write "$KIT_ROOT/templates/rules/code-retrieval.md" "$TARGET/.claude/rules/code-retrieval.md"
-  echo "  + .claude/rules/code-retrieval.md"
-fi
-
-# ---- agents --------------------------------------------------------------
+# ---- agents: one role source, one definition per selected runtime (E257.6) ----
+# templates/agents/<role>.md is the role. Claude Code reads it as markdown; Codex reads a custom
+# agent as TOML, so the SAME rendered role is translated by agent_def_codex (scripts/lib/agent-def.sh).
+if adapter_has "$ADAPTERS" claude; then
+use_adapter claude
 for a in $AGENTS; do
   src="$KIT_ROOT/templates/agents/$a.md"
   [[ -f "$src" ]] || continue
   safe_write "$src" "$TARGET/.claude/agents/$a/AGENT.md"
   echo "  + .claude/agents/$a/AGENT.md"
 done
+fi
+if adapter_has "$ADAPTERS" codex; then
+use_adapter codex
+# shellcheck source=/dev/null
+. "$KIT_ROOT/scripts/lib/agent-def.sh"
+for a in $AGENTS; do
+  src="$KIT_ROOT/templates/agents/$a.md"
+  [[ -f "$src" ]] || continue
+  _ca_rel=".codex/agents/$a.toml"; _ca_dst="$TARGET/$_ca_rel"
+  if _upgrade_excluded "$_ca_rel"; then UPGRADE_SKIPPED+=("$_ca_rel"); continue; fi
+  if [[ $UPGRADE -eq 1 && -e "$_ca_dst" ]]; then UPGRADE_PRESERVED+=("$_ca_rel"); continue; fi
+  if [[ $UPGRADE -eq 0 && $FORCE -eq 0 && -e "$_ca_dst" ]]; then
+    # A fresh init over a .codex/agents/ the user already keeps: their file wins, as AGENTS.md does.
+    echo "  = $_ca_rel (already there — kept; --force replaces it)"; continue
+  fi
+  _ca_tmp="$(mktemp)"
+  render_tpl "$src" > "$_ca_tmp"
+  mkdir -p "$TARGET/.codex/agents"
+  if agent_def_codex "$_ca_tmp" > "$_ca_dst.kit-new"; then
+    mv "$_ca_dst.kit-new" "$_ca_dst"
+    WRITTEN+=("$_ca_rel")
+    [[ $UPGRADE -eq 1 ]] && UPGRADE_ADDED+=("$_ca_rel")
+    echo "  + $_ca_rel"
+  else
+    rm -f "$_ca_dst.kit-new"
+    echo "  ! $_ca_rel not written — templates/agents/$a.md has no name or description" >&2
+  fi
+  rm -f "$_ca_tmp"
+done
+fi
+use_adapter "${ADAPTERS%% *}"
+
+# ---- instructions + rules + skills, once per selected adapter ------------
+# Same templates, same loop: the adapter decides the destination dir and the IF:ADAPTER_* blocks.
+# A second adapter's pass never touches the first one's tree.
+for _ad in $ADAPTERS; do
+use_adapter "$_ad"
+AD="$ADAPTER_DIR"; _instr="$(adapter_instructions "$_ad")"
+
+# CLAUDE.md / AGENTS.md — one source (templates/instructions.md.tmpl). A pre-existing AGENTS.md is
+# usually the project's own contract, so a fresh init keeps it unless --force (CLAUDE.md keeps its
+# historical behavior: a fresh init writes it).
+if [[ "$_ad" == "codex" && -e "$TARGET/$_instr" && $UPGRADE -eq 0 && $FORCE -eq 0 ]]; then
+  echo "  = $_instr exists — kept (re-run with --force to replace it with the cckit instructions)"
+else
+  safe_write "$KIT_ROOT/templates/instructions.md.tmpl" "$TARGET/$_instr"
+  echo "  + $_instr"
+fi
+
+# ---- rules (filtered by enabled flags) ----------------------------------
+for r in $RULES; do
+  # Skip rules whose feature is disabled for this project.
+  _rule_enabled "$r" || continue
+  src="$KIT_ROOT/templates/rules/$r.md"
+  [[ -f "$src" ]] || { echo "  missing rule: $r"; continue; }
+  safe_write "$src" "$TARGET/$AD/rules/$r.md"
+  echo "  + $AD/rules/$r.md"
+done
+# code-retrieval is in no profile: `cckit add <id>` writes it when a code-graph integration is
+# switched on. An upgrade re-adds it only for a project whose config already has one on.
+if [[ "$CODEGRAPH_ON" == "true" ]]; then
+  safe_write "$KIT_ROOT/templates/rules/code-retrieval.md" "$TARGET/$AD/rules/code-retrieval.md"
+  echo "  + $AD/rules/code-retrieval.md"
+fi
 
 # ---- skills --------------------------------------------------------------
 for s in $SKILLS; do
@@ -748,30 +887,35 @@ for s in $SKILLS; do
   if [[ -n "$SKILL_PREFIX" ]] && _is_namespaced "$s"; then
     dest_name="${SKILL_PREFIX}${s}"
   fi
-  safe_write "$src" "$TARGET/.claude/skills/$dest_name/SKILL.md"
+  safe_write "$src" "$TARGET/$AD/skills/$dest_name/SKILL.md"
   # If prefixed AND this was a FRESH scaffold (frontmatter still bare), rewrite name + sibling refs.
   # An existing (preserved) skill already reads `name: $dest_name`, so the guard skips it.
-  if [[ "$dest_name" != "$s" && -f "$TARGET/.claude/skills/$dest_name/SKILL.md" ]] \
-     && grep -qE "^name:[[:space:]]*${s}[[:space:]]*\$" "$TARGET/.claude/skills/$dest_name/SKILL.md"; then
-    _prefix_skill_file "$TARGET/.claude/skills/$dest_name/SKILL.md"
+  if [[ "$dest_name" != "$s" && -f "$TARGET/$AD/skills/$dest_name/SKILL.md" ]] \
+     && grep -qE "^name:[[:space:]]*${s}[[:space:]]*\$" "$TARGET/$AD/skills/$dest_name/SKILL.md"; then
+    _prefix_skill_file "$TARGET/$AD/skills/$dest_name/SKILL.md"
   fi
-  echo "  + .claude/skills/$dest_name/SKILL.md"
+  echo "  + $AD/skills/$dest_name/SKILL.md"
   # bundled references for multi-file skills (copied verbatim, no templating).
   # Per-file safe_copy so the upgrade contract (preserve existing, skip excluded) applies.
   if [[ -d "$KIT_ROOT/templates/skills/$s/references" ]]; then
     for _ref in "$KIT_ROOT/templates/skills/$s/references/"*; do
       [[ -f "$_ref" ]] || continue
-      safe_copy "$_ref" "$TARGET/.claude/skills/$dest_name/references/$(basename "$_ref")"
+      safe_copy "$_ref" "$TARGET/$AD/skills/$dest_name/references/$(basename "$_ref")"
     done
-    echo "  + .claude/skills/$dest_name/references/"
+    echo "  + $AD/skills/$dest_name/references/"
   fi
 done
+done   # adapters
+use_adapter "${ADAPTERS%% *}"
 
 # ---- scripts (libs + setup + sync; kit-owned) ---------------------------
 # safe_copy honors the upgrade contract: on --upgrade an EXISTING script is PRESERVED, never
 # overwritten with an older template (the #334 downgrade that erased #307/#313/#314). Fresh
 # inits get the current scripts; to refresh a kit-owned script later, delete it then re-upgrade.
 safe_copy "$KIT_ROOT/scripts/lib/kit-config.sh"     "$TARGET/scripts/lib/kit-config.sh"
+# kit-config.sh and kit-version-check.sh both source this resolver from beside themselves; without it
+# they only ever look at .claude/kit.config.json and miss a Codex-only project's root config.
+safe_copy "$KIT_ROOT/scripts/lib/config-path.sh"    "$TARGET/scripts/lib/config-path.sh"
 safe_copy "$KIT_ROOT/scripts/lib/gh-project.sh"     "$TARGET/scripts/lib/gh-project.sh"
 safe_copy "$KIT_ROOT/scripts/lib/worktree-issue.sh" "$TARGET/scripts/lib/worktree-issue.sh"
 safe_copy "$KIT_ROOT/scripts/lib/role-identity.sh"  "$TARGET/scripts/lib/role-identity.sh"
@@ -840,7 +984,13 @@ echo "  + benchmarks/ (example dataset + schema — grow your own; run: scripts/
 # ---- knowledge base (governed dir: INDEX manifest; upgrade-safe) ---------
 mkdir -p "$TARGET/knowledge"
 safe_write "$KIT_ROOT/templates/knowledge-INDEX.md.tmpl" "$TARGET/knowledge/INDEX.md"
-echo "  + knowledge/INDEX.md (manifest — see .claude/rules/knowledge-base.md)"
+echo "  + knowledge/INDEX.md (manifest — see $ADAPTER_DIR/rules/knowledge-base.md)"
+
+# ==== Claude adapter only: sigil lib, settings, hooks, statusline wiring ====
+# Everything from here to the matching `fi` is Claude Code configuration. A Codex-only project gets
+# none of it — Codex hook registration is E257.5 — and the body is left unindented on purpose so the
+# hook blocks keep their history.
+if adapter_has "$ADAPTERS" claude; then
 
 # ---- .claude/lib (kit-sigil attribution helper; all projects; idempotent) ----
 # Sourced by the task-* skill footers + repo-hygiene to emit one "claude-kit"
@@ -941,6 +1091,24 @@ jq --arg g '$CLAUDE_PROJECT_DIR/.claude/hooks/guard-raw-git-ops.sh' \
   "$_TRACKED" > "$_TRACKED.tmp" && mv "$_TRACKED.tmp" "$_TRACKED"
 echo "  + .claude/hooks/guard-raw-git-ops.sh (PreToolUse Bash, wired in tracked settings.json: raw gh/git -> cckit verb)"
 
+# ---- session-mail hook (all projects; init AND --upgrade; idempotent) ----
+# One script on four events delivers `cckit msg` mail to a running session (E257.5). Wired in the
+# TRACKED settings.json for the same reason as the raw-git guard: mail has to reach worktrees. A
+# registration that is already there is left as it is (its timeout or position may be the user's),
+# and a project that listed the hook in `upgrade.removed` is not re-wired.
+if ! _upgrade_excluded ".claude/hooks/kit-mail-check.sh"; then
+  hook_write "$KIT_ROOT/templates/hooks/kit-mail-check.sh.tmpl" "$TARGET/.claude/hooks/kit-mail-check.sh"
+  chmod +x "$TARGET/.claude/hooks/kit-mail-check.sh" 2>/dev/null || true
+  # shellcheck disable=SC2016  # $CLAUDE_PROJECT_DIR is expanded by Claude Code at hook time
+  jq --arg m 'bash "$CLAUDE_PROJECT_DIR/.claude/hooks/kit-mail-check.sh"' '
+    reduce (["PostToolUse","*"], ["UserPromptSubmit",""], ["SessionStart",""], ["Stop",""]) as [$e, $mt] (.;
+      if ([ (.hooks[$e] // [])[] | (.hooks // [])[] | .command ] | index($m)) != null then .
+      else .hooks[$e] = ((.hooks[$e] // [])
+        + [ (if $mt == "" then {} else {matcher: $mt} end) + {hooks: [{type: "command", command: $m, timeout: 10}]} ])
+      end)' "$_TRACKED" > "$_TRACKED.tmp" && mv "$_TRACKED.tmp" "$_TRACKED"
+  echo "  + .claude/hooks/kit-mail-check.sh (session mail, wired in tracked settings.json on 4 events)"
+fi
+
 # ---- version-check SessionStart hook (all projects; idempotent) ---------
 mkdir -p "$TARGET/.claude/hooks"
 hook_write "$KIT_ROOT/templates/hooks/kit_version_check.sh.tmpl" "$TARGET/.claude/hooks/kit_version_check.sh"
@@ -949,26 +1117,97 @@ merge_settings --arg vc "$TARGET/.claude/hooks/kit_version_check.sh" \
   '.hooks.SessionStart = (((.hooks.SessionStart // []) | map(select((.hooks[0].command // "") != $vc))) + [{matcher:"",hooks:[{type:"command",command:$vc,timeout:10}]}])'
 HOOK_NOTE="$HOOK_NOTE + version-check"
 
+echo "  + .claude/settings.local.json${HOOK_NOTE:+ (}${HOOK_NOTE# + }${HOOK_NOTE:+)}"
+else
+  echo "  · Codex adapter only: no .claude/ tree"
+fi   # ==== end Claude adapter only ====
+
+# ==== Codex adapter: hook scripts + their registration in .codex/hooks.json (E257.5) ====
+# The SAME hook templates as the Claude adapter, rendered into .codex/hooks/: Codex sends the event
+# fields they read (hook_event_name, cwd, tool_input.command) and honours the same answers (exit 2 +
+# stderr blocks a tool, decision:block continues a Stop, additionalContext injects text).
+# Not installed: the MemPalace hooks. mempal_save / mempal_precompact mine ~/.claude/projects/, the
+# Claude Code transcript store, and no Codex transcript format has been validated against
+# `mempalace mine` — see agent-compatibility.mdx.
+CODEX_HOOKS_CHANGED=0
+if adapter_has "$ADAPTERS" codex; then
+# shellcheck source=/dev/null
+. "$KIT_ROOT/scripts/lib/codex-hooks.sh"
+# shellcheck source=/dev/null
+. "$KIT_ROOT/scripts/lib/kit-manifest.sh"
+mkdir -p "$TARGET/.codex/hooks"
+_CX_SRC="$(mktemp)"
+cp "$KIT_ROOT/templates/codex/hooks.json.tmpl" "$_CX_SRC"
+_CX_HOOKS="repo-hygiene.sh kit_version_check.sh kit-mail-check.sh guard-base-branch-commit.sh guard-raw-git-ops.sh"
+_cx_optional() {  # <event> <matcher> <script> <timeout> — an opt-in hook joins the set to register
+  local frag; frag="$(mktemp)"
+  codex_hooks_fragment "$1" "$2" "$3" "$4" > "$frag" && codex_hooks_merge "$_CX_SRC" "$frag" >/dev/null
+  rm -f "$frag"
+  _CX_HOOKS="$_CX_HOOKS $3"
+}
+[[ "$PREPUSH_ENABLED" == "true" ]] && _cx_optional PreToolUse Bash prepush_gate.sh 120
+[[ "$LOCAL_ON"        == "true" ]] && _cx_optional SessionStart "" kit-local-status.sh 10
+for _h in $_CX_HOOKS; do
+  _cx_dst="$TARGET/.codex/hooks/$_h"
+  _cx_n=$(( ${#WRITTEN[@]} + ${#UPGRADE_REFRESHED[@]} ))
+  if [[ $UPGRADE -eq 0 && $FORCE -eq 0 && -e "$_cx_dst" ]]; then
+    # A fresh init over a .codex/hooks/ the user already keeps: their file wins, as AGENTS.md does.
+    echo "  = .codex/hooks/$_h (already there — kept; --force replaces it)"
+  else
+    hook_write "$KIT_ROOT/templates/hooks/$_h.tmpl" "$_cx_dst"
+    chmod +x "$_cx_dst" 2>/dev/null || true
+  fi
+  [[ $(( ${#WRITTEN[@]} + ${#UPGRADE_REFRESHED[@]} )) -gt $_cx_n ]] && CODEX_HOOKS_CHANGED=1
+done
+echo "  + .codex/hooks/ ($(printf '%s' "$_CX_HOOKS" | sed 's/ /, /g'))"
+# hooks.json is the project's file. cckit's handlers are merged in (a handler already registered for
+# the event is skipped, everything else in the file is kept) and a merge that changes nothing does
+# not rewrite it. It is recorded as kit-owned only when cckit created it or the manifest still
+# proves it unmodified — a hooks.json holding the user's own entries is never claimed.
+_CX_JSON="$TARGET/.codex/hooks.json"; _cx_own=0
+if [[ ! -e "$_CX_JSON" ]]; then _cx_own=1
+elif [[ "$( cd "$TARGET" && KIT_MANIFEST="$MANIFEST_REL" kit_manifest_verify .codex/hooks.json 2>/dev/null )" == "intact" ]]; then _cx_own=1
+fi
+if _upgrade_excluded ".codex/hooks.json"; then
+  UPGRADE_SKIPPED+=(".codex/hooks.json")
+elif _cx_state="$(codex_hooks_merge "$_CX_JSON" "$_CX_SRC")"; then
+  case "$_cx_state" in
+    created) echo "  + .codex/hooks.json (SessionStart / PreToolUse Bash / PostToolUse / UserPromptSubmit / Stop)"
+             [[ $UPGRADE -eq 1 ]] && UPGRADE_ADDED+=(".codex/hooks.json") ;;
+    merged)  echo "  ~ .codex/hooks.json (cckit's hooks added; the entries already there are kept)" ;;
+    *)       [[ $UPGRADE -eq 1 ]] && UPGRADE_PRESERVED+=(".codex/hooks.json") ;;
+  esac
+  if [[ "$_cx_state" != "unchanged" ]]; then
+    CODEX_HOOKS_CHANGED=1
+    [[ $_cx_own -eq 1 ]] && WRITTEN+=(".codex/hooks.json")
+  fi
+else
+  echo "  ! .codex/hooks.json was left untouched — cckit's Codex hooks are NOT registered. Fix the file, then run: cckit init --upgrade" >&2
+fi
+rm -f "$_CX_SRC"
+[[ "$MEMORY_BOOL" == "true" ]] && echo "  · Codex adapter: no memory hooks — the transcript sweep reads Claude Code's ~/.claude/projects/ only"
+fi   # ==== end Codex adapter hooks ====
+
 # ---- recommended .gitignore entries (idempotent) ------------------------
 # kit.manifest.json is kit-managed bookkeeping (content hashes + timestamps, re-stamped on every
 # wire) — tracking it would dirty the tree on every session/upgrade, the exact churn #334 removes.
 GI="$TARGET/.gitignore"
-for _ig in ".claude/settings.local.json" ".claude/kit.manifest.json" ".kann/"; do
+_GI_LOCAL=""; adapter_has "$ADAPTERS" claude && _GI_LOCAL=".claude/settings.local.json"
+for _ig in "$_GI_LOCAL" "$MANIFEST_REL" ".kann/"; do
+  [[ -n "$_ig" ]] || continue
   if [[ -f "$GI" ]]; then grep -qxF "$_ig" "$GI" || printf '%s\n' "$_ig" >> "$GI"; else printf '%s\n' "$_ig" > "$GI"; fi
 done
-
-echo "  + .claude/settings.local.json${HOOK_NOTE:+ (}${HOOK_NOTE# + }${HOOK_NOTE:+)}"
 
 # ---- wire (converge) -----------------------------------------------------
 # Runs on BOTH scaffold and --upgrade so every update re-wires (fixes the class of bug where
 # /kit-update refreshed files but never re-ran the wiring → statusline/settings drifted). #369
-if [[ -f "$KIT_ROOT/scripts/kit-wire.sh" ]]; then
+if [[ -f "$KIT_ROOT/scripts/kit-wire.sh" ]] && adapter_has "$ADAPTERS" claude; then
   # On --upgrade an EXISTING .claude/statusline.sh follows the same contract as safe_write: the
   # conffiles guard in kit-operate keeps a customized (or untracked) shim; only a shim the kit
   # provably owns intact is refreshed (#149).
   _SHIM="$TARGET/.claude/statusline.sh"
   _shim_before=""; [[ -f "$_SHIM" ]] && _shim_before="$(cat "$_SHIM" 2>/dev/null)"
-  if ( cd "$TARGET" && CLAUDE_PLUGIN_ROOT="$KIT_ROOT" KIT_ASSUME_YES=1 bash "$KIT_ROOT/scripts/kit-wire.sh" >/dev/null 2>&1 ); then
+  if ( cd "$TARGET" && KIT_MANIFEST="$MANIFEST_REL" CLAUDE_PLUGIN_ROOT="$KIT_ROOT" KIT_ASSUME_YES=1 bash "$KIT_ROOT/scripts/kit-wire.sh" >/dev/null 2>&1 ); then
     echo "  + wired: statusline shim + settings.statusLine (kit-wire)"
   fi
   if [[ $UPGRADE -eq 1 && -n "$_shim_before" && "$_shim_before" == "$(cat "$_SHIM" 2>/dev/null)" ]]; then
@@ -976,11 +1215,26 @@ if [[ -f "$KIT_ROOT/scripts/kit-wire.sh" ]]; then
   fi
 fi
 
+# ---- ownership manifest: record what this run wrote ----------------------
+# Only the adapter files written NOW (never a preserved one — its content may be the user's), hashed
+# after every merge above so the recorded hash is the file as it was left. Keyed by path, so a
+# repeated upgrade updates nothing and adds nothing. This is what lets `cckit remove` and a later
+# upgrade tell a kit-owned file from an edited one for BOTH adapters.
+# shellcheck source=/dev/null
+. "$KIT_ROOT/scripts/lib/kit-manifest.sh"
+if [[ ${#WRITTEN[@]} -gt 0 ]]; then
+  ( cd "$TARGET" && for _w in "${WRITTEN[@]}"; do
+      if adapter_managed "$_w"; then printf '%s\t%s\n' "$(adapter_tier "$_w")" "$_w"; fi
+    done | sort -u | KIT_MANIFEST="$MANIFEST_REL" kit_manifest_record_batch init "$PLUGIN_VERSION" ) \
+    || echo "  ! could not record the ownership manifest ($MANIFEST_REL)" >&2
+fi
+
 # ---- summary -------------------------------------------------------------
 echo ""
 echo "claude-kit $([[ $UPGRADE -eq 1 ]] && echo upgraded || echo scaffolded) — profile: $PROFILE"
 echo "  Project : $NAME ($SLUG)"
 echo "  Repo    : $REPO"
+echo "  Adapters: $ADAPTERS"
 echo "  Board   : $([[ "$PROJECTS_V2" == "true" ]] && echo "Projects v2 #$PROJECT_NUMBER" || echo "off (gh issues only)")"
 echo "  Agents  : $(echo $AGENTS | tr '\n' ' ')"
 echo "  Memory  : $MEMORY_BOOL   Plans: $PLANS_FORMAT   Lang: $LANG_PREF   kitVersion: $PLUGIN_VERSION"
@@ -994,13 +1248,15 @@ if [[ $UPGRADE -eq 1 ]]; then
   if [[ ${#UPGRADE_SKIPPED[@]}   -gt 0 ]]; then echo "  Skipped (removed/renamed via kit.config upgrade):"; printf '    - %s\n' "${UPGRADE_SKIPPED[@]}"; fi
   if [[ ${#UPGRADE_REFRESHED[@]} -gt 0 ]]; then echo "  Refreshed (unmodified hook, now the current template):"; printf '    ~ %s\n' "${UPGRADE_REFRESHED[@]}"; fi
   if [[ ${#UPGRADE_DRIFTED[@]}   -gt 0 ]]; then echo "  Drifted (customized hook, kept — diff it against templates/hooks/ by hand):"; printf '    ! %s\n' "${UPGRADE_DRIFTED[@]}"; fi
+  [[ $CODEX_HOOKS_CHANGED -eq 1 ]] && echo "  Codex hooks changed: Codex skips a new or changed hook until you trust it — run /hooks in Codex."
 else
   echo ""
   echo "Next steps:"
-  echo "  1. Review CLAUDE.md and .claude/kit.config.json"
+  echo "  1. Review $(adapter_instructions "${ADAPTERS%% *}") and $CONFIG_REL"
   echo "  2. ./scripts/setup-labels.sh && ./scripts/setup-milestones.sh   # seed the repo"
   [[ "$PROJECTS_V2" == "true" ]] && echo "  3. ./scripts/capture-project-ids.sh   # cache Projects v2 field IDs"
   [[ "$LOCAL_ON" == "true" ]] && echo "  4. /kit-doctor   # local model layer: installs mlx-lm (recipe: integrations/mlx-lm.json) + starts mlx_lm.server"
+  adapter_has "$ADAPTERS" codex && echo "  · Codex: commit .codex/, then run /hooks in Codex and trust the project hooks — Codex skips them until you do."
 fi
 
 exit 0

@@ -30,7 +30,7 @@ for one task into a **single** prompt at the start — never drip-feed interrupt
 
 ## Anti-repeat (don't nag)
 
-Record outcomes in `.claude/kit.config.json` under `skillPrompts`:
+Record outcomes in `{{CONFIG_REL}}` under `skillPrompts`:
 
 ```json
 "skillPrompts": { "asked": ["<gap-key>"], "declined": ["<gap-key>"], "wired": ["<skill-name>"] }

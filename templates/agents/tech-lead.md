@@ -27,7 +27,7 @@ Authority:
 
 ## Stack
 
-Read the project's actual stack from `CLAUDE.md` and `.claude/kit.config.json` before acting. Do not assume a framework — confirm what's in the repo.
+Read the project's actual stack from `{{ADAPTER_INSTRUCTIONS}}` and `{{CONFIG_REL}}` before acting. Do not assume a framework — confirm what's in the repo.
 
 ## ADR format
 

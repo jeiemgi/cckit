@@ -54,7 +54,7 @@ Authority:
 
 ## Stack
 
-Read the project's actual frontend stack from `CLAUDE.md` and `.claude/kit.config.json` — framework, styling, state libs. Don't assume.
+Read the project's actual frontend stack from `{{ADAPTER_INSTRUCTIONS}}` and `{{CONFIG_REL}}` — framework, styling, state libs. Don't assume.
 
 ## Architecture rules
 

@@ -24,6 +24,13 @@ cckit runs in the directory you invoke it from. It finds the config for that pro
 
 No org, repo, or path is hardcoded — every value comes from this file. A repo with no config is invited to run `cckit init`.
 
+`cckit init` writes source 3 when the Claude adapter is selected and source 2 for a Codex-only
+project, which has no `.claude/` directory. The config's `adapters` array records the selection
+(`["claude"]`, `["codex"]` or both); a config without the key means `["claude"]`. The ownership
+manifest — the hashes `cckit remove` and `--upgrade` use to tell a kit-owned file from an edited one —
+sits beside it: `.claude/kit.manifest.json`, or `.cckit/kit.manifest.json` in a project that started
+Codex-only. Neither file moves when the second adapter is enabled later.
+
 ### Overriding the base branch for one command
 
 `github.baseBranch` is the default, not the last word. A `KIT_BASE_BRANCH` already in the
@@ -138,7 +145,7 @@ a single invocation without editing the file.
 | `floors` | `true` | Refuse to auto-merge a PR that touches `.github/workflows/**`, a lockfile or dependency-graph file, or a security-sensitive path — and always honour a `hold` label. Verdict becomes `HELD`. | `KIT_CAPTAIN_FLOORS=0` |
 | `protectedGlobs` | `[]` | Extra path globs added to the floors above. | `KIT_CAPTAIN_EXTRA_GLOBS` |
 | `requireChecks` | `false` | Treat a PR with **no checks at all** as unverified rather than green. Verdict becomes `CHECKS_MISSING`, action `verify`. | `KIT_CAPTAIN_REQUIRE_CHECKS=1` |
-| `requireReview` | *(implied)* | Treat a PR with **no agent review recorded** as unverified. Verdict becomes `REVIEW_MISSING`, action `verify`. Defaults to on when `review.command` is set and off when it is not — set it explicitly to break that link either way. | `KIT_CAPTAIN_REQUIRE_REVIEW=1` |
+| `requireReview` | *(implied)* | Treat a PR with **no agent review recorded** as unverified. Verdict becomes `REVIEW_MISSING`, action `verify`. Defaults to on when `review.command` or `review.headless` is set and off when it is not — set it explicitly to break that link either way. | `KIT_CAPTAIN_REQUIRE_REVIEW=1` |
 | `requireQa` | `false` | Hold a PR for a **human QA pass**. `true` covers every PR; a list of label names (`["flow:ui"]`) covers only PRs carrying one of them. A would-be merge with no `cckit qa verdict pass` recorded against its current head becomes `QA_MISSING`, action `verify`. | `KIT_CAPTAIN_REQUIRE_QA=1`, `KIT_CAPTAIN_QA_LABELS` |
 
 ### Holding merges for a QA pass
@@ -192,11 +199,21 @@ rollup prints that green was assumed, not proved, and names this key. If your re
 ## The agent review stage
 
 The captain can run an agent over a pull request before it merges, and refuse to merge on what that
-agent finds. It is **off until you name the command that runs a reviewer**:
+agent finds. It is **off until you turn it on**, one of two ways:
 
 ```json
 { "review": { "command": "claude -p", "timeoutSeconds": 900 } }
 ```
+
+```json
+{ "review": { "headless": true, "timeoutSeconds": 900 } }
+```
+
+`command` is your own command line. `headless: true` has cckit build it from the resolved review
+profile's `kind` and `args`: `claude -p <args>` or `codex exec <args> -`. `command` wins when both
+are set. A profile whose `kind` is neither `claude` nor `codex` is refused under `headless` (no
+receipt, the PR stays at `verify`) — give that one a `command`. Either setting turns
+`requireReview` on.
 
 cckit pipes a brief to that command's **stdin** and reads the reviewer's report off its **stdout**.
 That report becomes a [stage receipt](#stage-receipts) at stage `review`, written locally and
@@ -219,14 +236,16 @@ reviewer that never returns blocks the whole pass — every other PR in it inclu
 watching. On expiry the process is killed and **no receipt is written**: a killed reviewer is not a
 verdict. A non-numeric or zero value falls back to the default rather than disabling the bound.
 
-<Aside type="note" title="Why you name the command and cckit does not">
-cckit has no way to start an agent without a terminal. Every launcher it has attaches to something
-a human is looking at — a Herdr pane, a tmux window — and the captain runs with neither. Running an
-agent non-interactively is [an open gap](/agent-compatibility/) tracked under effort 257.
+<Aside type="note" title="What headless builds, and what it does not">
+`headless` uses the same launcher as [`cckit autopilot run`](/agent-compatibility/#unattended-run-limits)
+(`scripts/lib/agent-launch.sh`). It adds no permission flag and names no model, so what the reviewer
+may do is set by the CLI's defaults, your own agent settings and the profile's `args` — cckit
+refuses a `write: true` profile but does not verify the process is read-only. Both command forms are
+read from each CLI's `--help`; the tests drive stub binaries, so no live reviewer has been run this
+way.
 
-So cckit does not guess at anyone's flags. You write the command that works on your machine; cckit
-only supplies the brief and reads the answer. That also means the reviewer can be anything that
-reads stdin and writes the report format — an agent CLI, a wrapper script, a hosted service.
+`command` remains for everything else: the reviewer can be anything that reads stdin and writes the
+report format — a wrapper script, a hosted service, an agent CLI cckit has no headless form for.
 </Aside>
 
 ### What gets reviewed, and when

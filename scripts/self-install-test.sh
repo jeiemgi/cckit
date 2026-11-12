@@ -40,6 +40,12 @@ merge-safety rendered
 naming-and-ids verbatim
 shared-checkout rendered'
 
+# INSTALLED_HOOKS: the hook scripts under .claude/hooks/, same "<name> <mode>" form. A hook cckit
+# runs straight from templates/hooks/ (guard-raw-git-ops, wired by path in .claude/settings.json) has
+# no installed copy and so nothing to drift; it is not listed. The other hook templates are wired by
+# `cckit init` into consuming projects and were never installed here.
+INSTALLED_HOOKS='kit-mail-check verbatim'
+
 # The kit-owned sections of delegation-brief.md — the transferable instruction `cckit brief` lifts.
 # Project-specific sections ("Project specifics", "Gate commands") are filled in for cckit and are
 # NOT compared.
@@ -114,6 +120,10 @@ t "installed skills == the manifest" "$(printf '%s\n' "$inst_skills" | tr '\n' '
   "$(_names "$INSTALLED_SKILLS" | tr '\n' ' ')"
 t "installed rules == the manifest"  "$(printf '%s\n' "$inst_rules" | tr '\n' ' ')" \
   "$(_names "$INSTALLED_RULES" | tr '\n' ' ')"
+inst_hooks="$(find .claude/hooks -maxdepth 1 -type f -name '*.sh' 2>/dev/null \
+  | while IFS= read -r f; do b="$(basename "$f")"; echo "${b%.sh}"; done | sort)"
+t "installed hooks == the manifest"  "$(printf '%s\n' "$inst_hooks" | tr '\n' ' ')" \
+  "$(_names "$INSTALLED_HOOKS" | tr '\n' ' ')"
 
 # ── 3. content: the installed copy has not drifted from its template ───────────────────────────
 # `jq` is REQUIRED here, not optional. A drift guard that skips its content comparison when a tool
@@ -198,6 +208,15 @@ while IFS=' ' read -r name mode; do
   _compare "rules/$name" "templates/rules/$name.md" ".claude/rules/$name.md" "$mode"
 done <<EOF
 $(printf '%s\n' "$INSTALLED_RULES" | grep .)
+EOF
+
+# The session-mail hook is one script for every project and both adapters (E257.5): cckit's own copy
+# must be the template byte for byte, or this repo runs a different mail hook than it ships.
+while IFS=' ' read -r name mode; do
+  [ -n "$name" ] || continue
+  _compare "hooks/$name" "templates/hooks/$name.sh.tmpl" ".claude/hooks/$name.sh" "$mode"
+done <<EOF
+$(printf '%s\n' "$INSTALLED_HOOKS" | grep .)
 EOF
 
 # ── 4. the mandate chain the issue is about actually connects ──────────────────────────────────

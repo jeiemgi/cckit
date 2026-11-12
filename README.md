@@ -89,6 +89,12 @@ Requirements: `bash` 4+, `git`, and `gh` (GitHub CLI) authenticated. `jq` recomm
 cckit doctor                  # onboarding preflight: deps, gh auth, and each integration you switched on
 cckit init --profile software # scaffold cckit.config.json + .claude/ for this repo
                               #   profiles: software · content · research · automation · minimal
+                              #   --adapter claude|codex|both picks the agent (default claude);
+                              #   codex writes AGENTS.md + .agents/ and no .claude/ tree;
+                              #   both get the commit guards + session-mail hooks (Codex: in
+                              #   .codex/hooks.json, merged with yours — trust them with /hooks)
+                              #   and one specialist agent per role from the same role source:
+                              #   .claude/agents/<role>/AGENT.md and .codex/agents/<role>.toml
 cckit add                     # list the optional integrations + modules; `cckit add <name>` switches one on
                               #   `cckit add graft`: code-graph retrieval + the code-retrieval rule
 cckit plan-next               # propose what to build next, grounded in current capabilities
@@ -274,13 +280,21 @@ that gate and merge themselves. This is the part that turns one keyboard into a 
 
 ```bash
 cckit plan                 # the wave plan: deps-ordered, p0-first inside a wave, file-disjoint
-cckit wave                 # a Task-subagent fan-out brief Claude Code enacts (proposes the next wave)
+cckit wave                 # the wave-0 fan-out brief the driving agent enacts: same wave data for
+                           #   every runtime, dispatch wording per adapter (--adapter claude|codex|both)
 cckit orchestrate 12 14 17 # run N flows in parallel worktrees (tmux by default)
+cckit orchestrate --results --wait 600 # how each worker ended: success · failure · interrupted
 cckit orchestrate --runtime herdr --agent codex 12 14 17 # persistent, state-aware agent terminals
 cckit watch --merge        # the captain: gate open PRs, squash-merge the CLEAN ones, advance
                            #   (policy floors hold PRs touching CI, lockfiles, or secrets for review)
 cckit watch --loop         # self-pace gate/merge passes until steady state
 cckit autopilot            # select unblocked work, then call orchestrate --detach under a cap
+cckit autopilot run 12 --agent codex --objective "make the tests pass" --until "pnpm test" --max-iters 5
+                           # ONE headless objective on this branch (claude -p / codex exec): code
+                           #   stops it on a limit, a failing gate, or a round that changed nothing;
+                           #   a killed runner's agent is stopped, or the next start is refused
+                           #   while it lives; --resume counts the cut-short round as usage
+                           #   unknown, not zero
 KIT_BASE_BRANCH=effort/42-auth cckit orchestrate 44   # cut an effort's sub from the effort branch
 ```
 
@@ -298,7 +312,8 @@ See [Night mode](https://cckit.dev/config-and-permissions/#night-mode).
 Set `review.command` in your config and the captain sends every PR it would merge to an agent
 reviewer first, records the verdict as a stage receipt, and refuses to merge on a `fail`. You name
 the command that runs the reviewer — cckit pipes it a brief on stdin and reads the report off
-stdout, so it asserts nothing about any agent's flags. A PR with **no** verdict recorded reads
+stdout, so it asserts nothing about any agent's flags. (`review.headless: true` instead has cckit
+build `claude -p` / `codex exec` from the review profile.) A PR with **no** verdict recorded reads
 `verify`, never merges silently: absence of evidence is not a pass. Off until you configure it.
 → [the agent review stage](https://cckit.dev/config-and-permissions/#the-agent-review-stage)
 
@@ -330,7 +345,8 @@ the contract. Every verb accepts `--llm` for structured output — uniform paylo
 ```bash
 cckit sync --llm           # board state for an agent to reason over
 cckit plan --llm           # the wave plan as TOON rows
-cckit wave --llm           # the fan-out (one subagent prompt per issue) as TOON
+cckit wave --llm           # the fan-out (one worker prompt per issue) as TOON
+cckit orchestrate --results --llm # each worker's collected result as JSON
 ```
 
 Human output renders as markdown — rich via `glow` in a terminal, native in the Claude Code

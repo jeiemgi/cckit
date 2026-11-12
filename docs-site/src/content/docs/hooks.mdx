@@ -11,18 +11,19 @@ import TagRow from '../../components/TagRow.astro';
 
 The hooks cckit installs, what fires each one, and what it does.
 
-A **hook** is a script Claude Code runs automatically when something happens — a session starts, a
-command is about to run, a session ends. cckit scaffolds a few during `cckit init`, so the right
-check runs at the right moment without you remembering to run it.
+A **hook** is a script the agent runtime (Claude Code or Codex) runs automatically when something
+happens — a session starts, a command is about to run, a session ends. cckit scaffolds a few during
+`cckit init`, so the right check runs at the right moment without you remembering to run it. Both
+adapters get the same scripts; [Codex](#codex) registers them in a different file.
 
 <Aside type="tip" title="You don't do this by hand">
-Hooks run on their own — Claude Code fires them on an **event**, you never call one. Read this to
+Hooks run on their own — the runtime fires them on an **event**, you never call one. Read this to
 know what runs and when; there's nothing here for you to trigger.
 </Aside>
 
 ## Always set up
 
-These four are scaffolded for every project.
+These are scaffolded for every project.
 
 <div class="cckit-nowrap-2">
 
@@ -32,6 +33,7 @@ These four are scaffolded for every project.
 | `SessionStart` | `kit_version_check.sh` | A quiet notice if this project is behind the installed cckit — the prompt to run `cckit update`. |
 | `PreToolUse` (Bash) | `guard-base-branch-commit.sh` | Blocks a commit made straight to the base branch, so work always goes through a branch and a PR. |
 | `PreToolUse` (Bash) | `guard-raw-git-ops.sh` | Blocks a raw `gh issue create`, `gh pr create`, `gh pr merge`, `gh issue close`, or a branch cut from the base branch, and prints the cckit verb to run instead. The verb adds the item to the board; the raw command does not. `KIT_ALLOW_RAW=1` lets one command through and records it in `<git-common-dir>/cckit/raw-bypass.log`. |
+| `PostToolUse` · `UserPromptSubmit` · `SessionStart` · `Stop` | `kit-mail-check.sh` | Delivers [session mail](/cookbook/) (`cckit msg send`): unread mail is injected between tool calls, on the next prompt and at session start. `Stop` is blocked only by `--steer` mail, and a message is consumed when delivered, so it cannot block a second time. Silent when there is no mail. |
 
 </div>
 
@@ -79,13 +81,54 @@ that branch against `develop`.
 ## Where they live
 
 Hooks are plain scripts under `.claude/hooks/` in your project, registered in
-`.claude/settings.local.json`. The raw-git guard is the exception: it is registered in the checked-in
-`.claude/settings.json`, so it also runs in every worktree. They are yours to read and edit — every one is a safe no-op when its
+`.claude/settings.local.json`. The raw-git guard and the mail hook are the exceptions: they are
+registered in the checked-in `.claude/settings.json`, so they also run in every worktree. They are yours to read and edit — every one is a safe no-op when its
 tool isn't installed, so nothing breaks if a dependency is missing.
 
 `cckit init --upgrade` refreshes a hook you never edited: one whose content matches an earlier
 version of its template, or the hash recorded in `.claude/kit.manifest.json`. A hook you customized
 is kept and listed as **Drifted** in the upgrade summary, for you to compare with the template.
+
+## Codex
+
+`cckit init --adapter codex` (or `both`) renders the same hook templates into `.codex/hooks/` and
+registers them in `.codex/hooks.json`. One script serves both runtimes: Codex sends the fields the
+scripts read (`hook_event_name`, `cwd`, `tool_input.command`) and documents the same answers — exit
+`2` with the reason on stderr blocks a tool, `decision: block` continues a `Stop`, and
+`additionalContext` injects text.
+
+| | Claude Code | Codex |
+| --- | --- | --- |
+| Scripts | `.claude/hooks/` | `.codex/hooks/` |
+| Registration | `.claude/settings.local.json` (per checkout) and `.claude/settings.json` (tracked) | `.codex/hooks.json` (tracked) |
+| Command path | absolute in the local file, `$CLAUDE_PROJECT_DIR` in the tracked one | `$(git rev-parse --show-toplevel)/.codex/hooks/<name>.sh` — no absolute path |
+| Installed | every hook on this page | the "Always set up" hooks, plus `prepush_gate.sh` and `kit-local-status.sh` when enabled |
+| Not installed | — | the four memory hooks |
+
+- **Your `hooks.json` is merged, never replaced.** A handler is added only when the event does not
+  already run the same command; your own handlers, their order and any other key stay. A merge that
+  changes nothing does not rewrite the file. A `hooks.json` that is not valid JSON is left untouched
+  and reported; fix it and run `cckit init --upgrade`, which runs at the same version when the
+  Codex hooks are unregistered.
+- **A hook script you already keep wins.** A fresh init does not overwrite an existing file under
+  `.codex/hooks/` unless you pass `--force`. `.codex/config.toml` is never touched.
+- **Trust.** Codex skips a project hook until you review and trust it (`/hooks` in Codex), and
+  skips it again after it changes. cckit cannot read or grant that trust: `cckit doctor` reports
+  whether the hooks are registered, not whether they run. Commit `.codex/` so worktrees have the
+  scripts the registration points at.
+- **Memory.** `mempal_save.sh` and `mempal_precompact.sh` mine `~/.claude/projects/`, the Claude
+  Code transcript store. No Codex transcript format has been validated against `mempalace mine`, so
+  the memory hooks are not installed for Codex. See [Memory](/memory/#codex).
+- **`cckit remove`** deletes the hook scripts it installed and a `hooks.json` it created and you
+  never edited. Entries merged into a `hooks.json` of your own stay; delete those by hand.
+
+What is tested: `scripts/hook-adapter-test.sh` feeds each installed hook the event JSON each
+runtime documents and asserts the same result on both — a base-branch commit blocked with a reason,
+a worktree commit passing, `--steer` mail blocking `Stop` once, ordinary mail never blocking it, and
+each message delivered once in a combined install. What is not: no live Codex session has fired
+these hooks. Whether `codex-cli 0.154.0` honours a blocking `PreToolUse` hook, and whether
+`codex exec` runs project hooks without an interactive trust step, are unverified — see
+[Agent compatibility](/agent-compatibility/).
 
 | Do this | Command |
 | ------- | ------- |

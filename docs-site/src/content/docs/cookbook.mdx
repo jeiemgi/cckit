@@ -229,6 +229,11 @@ cckit orchestrate --cap 3 46 47 48    # launch, at most 3 concurrent; the rest q
 cckit orchestrate --runtime herdr --agent codex --cap 3 46 47 48
 cckit autopilot --cap 3               # auto-pick unblocked issues and drive them
 cckit autopilot --runtime herdr --agent codex --cap 3
+
+# one objective, no terminal, stopped by code (run it inside the issue's worktree)
+cckit autopilot run 46 --agent codex --agent-arg -s --agent-arg workspace-write \
+  --objective "make the failing tests pass" --until "pnpm test" --max-iters 5 --max-seconds 1800
+cckit autopilot run --resume          # continue a stopped run; round and token counts carry over
 ```
 
 ## Keep a weekly cadence
