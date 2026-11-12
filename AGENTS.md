@@ -49,6 +49,7 @@ the same commit.
 | --- | --- | --- |
 | `cckit init` | scaffold config + `.claude/` | — |
 | `cckit sync` | board state / what's unblocked | `--llm` → TOON |
+| `cckit sync --json` | the board as ONE JSON object for a dashboard: per-role issues, `unassigned`, `blocked`, `stale`, `mergeQueue` (merge order). `--write` saves it atomically to `<git-common-dir>/kit-sync-cache.json` and never overwrites it with a failed or partial fetch; `--cached [TTL]` prints that cache with no `gh` call while it is younger than TTL seconds (default 60), else refreshes it; `--watch [SECS]` refreshes every SECS (default 30) and keeps the last good cache when a fetch fails; `--plan` inlines `effort plan`. Each fetch emits `op.start` / `op.done` (op `sync`) to `kit-events.jsonl`. `--write` / `--cached` / `--watch` refuse `--role` / `--milestone` (exit 2) | `--json` → JSON (`--llm` / `--output=json` stay TOON) |
 | `cckit next` | the next unblocked issue + how to start it | `--llm` → TOON |
 | `cckit plan` | wave plan: deps-ordered, priority-sorted within a wave, file-disjoint, session-fit | `--llm` → TOON |
 | `cckit plan-next` | forward plan: inventory current skills/verbs/rules/docs → propose what to build next | `--llm` → TOON |

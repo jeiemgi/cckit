@@ -102,6 +102,8 @@ cckit brief 42                # the delegation brief for #42, read out of the re
 cckit lib                     # every scripts/lib helper: functions, purpose, error contract
 cckit pr 42 "what changed"    # commit, push, open the PR
 cckit sync                    # board state, what's unblocked
+cckit sync --cached 60        # the board as one JSON document, from a cache at most 60s old
+                              #   (--json / --write / --watch [secs] / --plan — for a TUI or statusline)
 cckit handoff "resume note"   # save a handoff — bare `cckit` prints it next session
 cckit gc                      # report prunable branches + worktrees (deletes nothing)
 cckit cleanup [--yes]         # act on that report: delete the SAFE + LANDED rows, prune listed zombies, keep orphans/stashes

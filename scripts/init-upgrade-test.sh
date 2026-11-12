@@ -50,6 +50,9 @@ t "scaffold added morning-briefing skill" "$([ -f .claude/skills/morning-briefin
 t "scaffold added speckit skill"         "$([ -d .claude/skills/speckit ] && echo yes || echo no)"           "yes"
 t "scaffold added task-management rule"  "$([ -f .claude/rules/task-management.md ] && echo yes || echo no)" "yes"
 t "scaffold copied task-sync.sh"         "$([ -f scripts/task-sync.sh ] && echo yes || echo no)"             "yes"
+# task-sync.sh sources board-view.sh under `set -e` and effort-plan.sh for --plan (#383).
+t "scaffold copied board-view.sh"        "$([ -f scripts/lib/board-view.sh ] && echo yes || echo no)"        "yes"
+t "scaffold copied effort-plan.sh"       "$([ -f scripts/lib/effort-plan.sh ] && echo yes || echo no)"       "yes"
 
 git add -A && git commit -q -m "scaffold"
 

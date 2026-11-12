@@ -19,6 +19,9 @@
 #   cckit contribute "<summary>"    open a contribution PR to cckit, gated on scripts/check.sh
 #                                   (from the cckit checkout or worktree you are in; else the installed one)
 #   cckit sync [--llm]              board state / what's unblocked
+#     sync --json | --write | --cached [TTL] | --watch [SECS] | --plan
+#                                   the dashboard layer: one JSON summary, cached atomically in
+#                                   <git-common-dir>/kit-sync-cache.json (--llm stays TOON)
 #   cckit plan [--llm] [--effort N] wave plan: deps-ordered, p0-first in a wave, file-disjoint (TOON --llm)
 #   cckit plan-next [--llm]         forward plan: current skills/verbs/rules/docs -> what to build next
 #   cckit effort <new|chain|start|pr|close|plan>   the effort lifecycle
