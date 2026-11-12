@@ -98,6 +98,23 @@ al_pidfile_alive "$tmp/live.pid"; rc "a recorded live pid reads alive" "$?" "0"
 kill "$live" 2>/dev/null; wait "$live" 2>/dev/null
 al_pidfile_alive "$tmp/live.pid"; rc "a recorded dead pid does not" "$?" "1"
 al_pidfile_alive "$tmp/absent.pid"; rc "a missing pid file does not" "$?" "1"
+# A zombie answers `kill -0` and is not running. The subshell execs sleep without ever waiting for
+# the child it started, so that child stays a zombie until the sleep ends.
+if ps -A -o pid=,pgid=,stat= >/dev/null 2>&1; then
+  ( sh -c "echo \$\$ > '$tmp/zombie.raw'" & exec sleep 20 ) & holder=$!
+  i=0; while [ ! -s "$tmp/zombie.raw" ] && [ "$i" -lt 50 ]; do sleep 0.2; i=$((i + 1)); done
+  sleep 0.5
+  zpid="$(cat "$tmp/zombie.raw" 2>/dev/null)"
+  printf '%s 0\n' "$zpid" > "$tmp/zombie.pid"
+  if kill -0 "$zpid" 2>/dev/null; then
+    al_pidfile_alive "$tmp/zombie.pid"; rc "a recorded zombie does not read alive" "$?" "1"
+  else
+    echo "skip: no zombie to probe (pid $zpid was already reaped)"
+  fi
+  kill "$holder" 2>/dev/null; wait "$holder" 2>/dev/null
+else
+  echo "skip: ps absent — zombie state not exercised"
+fi
 printf 'junk\n' > "$tmp/junk.pid"
 al_pidfile_alive "$tmp/junk.pid"; rc "a pid file that holds no pid does not" "$?" "1"
 

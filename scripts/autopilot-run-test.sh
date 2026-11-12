@@ -11,6 +11,8 @@
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 command -v jq >/dev/null 2>&1 || { echo "autopilot-run-test: jq absent — skipping"; exit 0; }
+# shellcheck source=/dev/null
+. "$ROOT/scripts/lib/agent-launch.sh"
 
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 fail=0
@@ -247,6 +249,9 @@ for agent in claude codex; do
     kill -KILL "$dpid"; wait "$dpid" 2>/dev/null
     i=0; while [ -n "$apid" ] && kill -0 "$apid" 2>/dev/null && [ "$i" -lt 100 ]; do sleep 0.2; i=$((i + 1)); done
     t "[$agent] the agent does not outlive a SIGKILLed runner" "$([ -n "$apid" ] && kill -0 "$apid" 2>/dev/null && echo alive || echo gone)" "gone"
+    # The watchdog reaps the agent and then exits; until it has, a start is refused, correctly.
+    i=0; while al_pidfile_alive "$TMP/state/autopilot/task_7-thing.agent.pid" && [ "$i" -lt 100 ]; do sleep 0.2; i=$((i + 1)); done
+    t "[$agent] nor does the process recorded for it" "$(al_pidfile_alive "$TMP/state/autopilot/task_7-thing.agent.pid" && echo alive || echo gone)" "gone"
     t "[$agent] the dead runner left status running"           "$(field .status)" "running"
     t "[$agent] with the round marked open"                    "$(field .round_open)" "true"
     run --resume --max-tokens 100000

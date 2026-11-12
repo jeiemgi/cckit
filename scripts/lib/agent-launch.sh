@@ -54,14 +54,16 @@ AL_PIDFILE="${AL_PIDFILE:-}"
 # compares its parent pid with the one it started under: a different parent means the shell that
 # called al_run is gone, so nothing is left to enforce the bound, and it stops the group itself
 # with TERM, up to 10s of grace, then KILL. It ignores TERM/INT/HUP so a group-wide TERM from
-# al_stop reaches the command while the watchdog stays to report how the command ended.
+# al_stop reaches the command while the watchdog stays to report how the command ended. The empty
+# CHLD handler is there to cut the 0.2s sleep short: without it the watchdog outlives the command
+# by up to one tick, and a start made in that tick is refused for a process that is already over.
 _AL_WATCHDOG='
 setpgrp(0, 0);
 my $parent = getppid();
 my $kid = fork();
 exit 126 unless defined $kid;
 if ($kid == 0) { exec @ARGV; exit 127 }
-$SIG{TERM} = $SIG{INT} = $SIG{HUP} = sub { };
+$SIG{TERM} = $SIG{INT} = $SIG{HUP} = $SIG{CHLD} = sub { };
 sub status { my $s = shift; exit(($s & 127) ? 128 + ($s & 127) : $s >> 8) }
 while (1) {
   my $r = waitpid($kid, 1);
@@ -148,14 +150,26 @@ al_stop() {
 
 # al_pidfile_alive <file> — rc 0 when the "<pid> <group>" al_run wrote there is still running.
 # The group is probed as well as the pid: the leader can be gone while a member it started is not.
+#
+# A zombie is not running. `kill -0` succeeds on one, and an orphaned watchdog stays a zombie for
+# as long as whatever adopted it does not reap (a container whose pid 1 is not an init), so the
+# process state is read from ps when ps is there. When it is not, `kill -0` is the answer: a
+# refusal the user can clear by removing the file is the safe side of that doubt.
 al_pidfile_alive() {
-  local f="${1:-}" p="" g=""
+  local f="${1:-}" p="" g="" rows=""
   [ -n "$f" ] && [ -f "$f" ] || return 1
   read -r p g < "$f" || true
   case "$p" in ''|*[!0-9]*) return 1 ;; esac
-  kill -0 "$p" 2>/dev/null && return 0
-  [ "$g" = "1" ] && kill -0 -- "-$p" 2>/dev/null && return 0
-  return 1
+  if [ "$g" = "1" ]; then
+    kill -0 "$p" 2>/dev/null || kill -0 -- "-$p" 2>/dev/null || return 1
+  else
+    kill -0 "$p" 2>/dev/null || return 1
+  fi
+  rows="$(ps -A -o pid=,pgid=,stat= 2>/dev/null)" || rows=""
+  [ -n "$rows" ] || return 0
+  printf '%s\n' "$rows" | awk -v p="$p" -v g="$g" '
+    ($1 == p || (g == "1" && $2 == p)) && $3 !~ /^Z/ { live = 1 }
+    END { exit live ? 0 : 1 }'
 }
 
 # al_run <seconds> <command> — run the command with this shell's stdin, stdout and stderr, bounded.
