@@ -17,7 +17,8 @@
 #   kit_gc_cleanup [--yes]    the guided sweep: plan every bucket, then act on SAFE + LANDED + ZOMBIE.
 #
 # Verdicts: PROTECTED (issue open) · SAFE (own PR merged) · ACTIVE (own PR open / base) · LANDED (no
-# PR of its own, work already on base — #388: effort subs, agent isolation worktrees) · ORPHAN.
+# PR of its own, work already on base — #388: effort subs, agent isolation worktrees) · ORPHAN ·
+# UNKNOWN (a gh read FAILED, so the verdict could not be determined — #330; never deletable).
 #
 # Requires: git; gh (degrades to "unknown" issue/PR state without it); scripts/lib/worktree-issue.sh.
 # Portable: bash 3.2+ AND zsh.
@@ -74,15 +75,35 @@ _kit_gc_require_deps() {
 # _kit_gc_pr_index [repo] — echo one "<headRefName>\tPR#<num> <STATE>" line per PR in ONE gh call, so
 # branch classification is a local lookup instead of a per-branch `gh pr list --head` — an N+1 that
 # scaled badly exactly when gc matters most (many stale branches). #124.
+#
+# A FAILED read is not an empty list (#330): an empty index means "this repo has no PRs", and every
+# branch then reads as having none. So a failure warns on stderr and emits ONE sentinel line,
+# `?<TAB>UNKNOWN` — `?` cannot be a branch name (git refuses it), so no lookup ever matches it — and
+# _kit_gc_classify answers UNKNOWN instead of ORPHAN/LANDED for a branch it finds no PR for. rc 0
+# always: kit-status.sh calls this in a bare assignment under `set -e`.
 _kit_gc_pr_index() {
-  local repo="${1:-$KIT_GC_REPO}"
+  local repo="${1:-$KIT_GC_REPO}" out
   if cckit_gh_rest; then
-    gh api "repos/$repo/pulls" -X GET -f state=all -f per_page=100 \
-      --jq '.[] | "\(.head.ref)\tPR#\(.number) \(if .merged_at then "MERGED" else (.state | ascii_upcase) end)"' 2>/dev/null || true
-    return 0
+    out="$(gh api "repos/$repo/pulls" -X GET -f state=all -f per_page=100 \
+      --jq '.[] | "\(.head.ref)\tPR#\(.number) \(if .merged_at then "MERGED" else (.state | ascii_upcase) end)"' 2>/dev/null)" \
+      || { _kit_gc_pr_index_failed; return 0; }
+  else
+    out="$(gh pr list --repo "$repo" --state all --limit 200 --json number,state,headRefName \
+      --jq '.[] | "\(.headRefName)\tPR#\(.number) \(.state)"' 2>/dev/null)" \
+      || { _kit_gc_pr_index_failed; return 0; }
   fi
-  gh pr list --repo "$repo" --state all --limit 200 --json number,state,headRefName \
-    --jq '.[] | "\(.headRefName)\tPR#\(.number) \(.state)"' 2>/dev/null || true
+  [ -n "$out" ] && printf '%s\n' "$out"
+  return 0
+}
+
+_kit_gc_pr_index_failed() {
+  echo "kit-gc: could not read the PR list from GitHub (gh failed) — a branch whose PR is not known is reported UNKNOWN and kept" >&2
+  printf '?\tUNKNOWN\n'
+}
+
+# _kit_gc_pr_index_unknown <index> — rc 0 when <index> carries the failed-read sentinel.
+_kit_gc_pr_index_unknown() {
+  printf '%s\n' "$1" | grep -q "^?$(printf '\t')UNKNOWN\$"
 }
 
 # _kit_gc_pr_for <index> <branch> — first PR line matching <branch> as head (mirrors the old `.[0]`).
@@ -210,21 +231,35 @@ EOF
 # _kit_gc_classify <branch> <pr_index> [repo] — the ONE verdict for a branch, exactly as
 # kit_gc_analyze prints it after `-> `. kit_gc_prune acts on this same function, so the plan a human
 # approved and the delete that follows can never disagree (Family 1, the failure mode #219 was about).
-# Order: base branch > PROTECTED (issue open) > SAFE (own PR merged) > ACTIVE (own PR open) > a
-# CLOSED-unmerged PR verbatim > LANDED (no PR, work on base) > ORPHAN.
+# Order: base branch > PROTECTED (issue open) > UNKNOWN (issue state read failed) > SAFE (own PR
+# merged) > ACTIVE (own PR open) > a CLOSED-unmerged PR verbatim > UNKNOWN (PR list read failed) >
+# LANDED (no PR, work on base) > ORPHAN.
+#
+# The two UNKNOWN rungs are #330. A failed issue-state read sits ABOVE SAFE and LANDED because the
+# issue may be open: with gh failing, an open issue's branch with no commits beyond base used to
+# lose PROTECTED and be classified LANDED by the content check, which needs no gh at all — and
+# LANDED is deletable. A failed PR-list read sits above LANDED/ORPHAN because "found no PR" is not
+# "has no PR" when the list never arrived. Neither string says "no PR", and neither is deletable
+# (_kit_gc_prune_why answers nothing for it).
 _kit_gc_classify() {
-  local b="$1" pr_index="$2" repo="${3:-$KIT_GC_REPO}" pr prot landed
+  local b="$1" pr_index="$2" repo="${3:-$KIT_GC_REPO}" pr n state="" landed
   case "$b" in "${KIT_BASE_BRANCH:-main}"|develop|main) echo "ACTIVE (base branch)"; return 0 ;; esac
   pr="$(_kit_gc_pr_for "$pr_index" "$b")"
-  prot="$(wt_protected_reason "$b" "$repo" 2>/dev/null || true)"
-  if [ -n "$prot" ]; then
-    echo "PROTECTED: $prot"
+  # The same read wt_protected_reason makes, kept as a state so `unknown` is not flattened to "".
+  n="$(wt_issue_number "$b" 2>/dev/null || true)"
+  [ -n "$n" ] && state="$(wt_issue_state "$n" "$repo" 2>/dev/null || true)"
+  if [ "$state" = open ]; then
+    echo "PROTECTED: issue #$n still OPEN"
+  elif [ "$state" = unknown ]; then
+    echo "UNKNOWN (could not determine — the state read for issue #$n failed; kept, never auto-deleted)"
   elif printf '%s' "$pr" | grep -q 'MERGED'; then
     echo "SAFE (${pr}, issue closed/absent — verify level with remote before delete)"
   elif printf '%s' "$pr" | grep -q 'OPEN'; then
     echo "ACTIVE (${pr})"
   elif [ -n "$pr" ]; then
     echo "$pr"
+  elif _kit_gc_pr_index_unknown "$pr_index"; then
+    echo "UNKNOWN (could not determine — the PR list read failed; kept, never auto-deleted)"
   else
     landed="$(_kit_gc_landed_reason "$b" "$pr_index" "$repo")"
     if [ -n "$landed" ]; then echo "LANDED ($landed)"
@@ -233,8 +268,8 @@ _kit_gc_classify() {
 }
 
 # kit_gc_analyze — read-only classification of worktrees, branches, and stashes. Writes NOTHING.
-# Each row is tagged PROTECTED / SAFE / ACTIVE / LANDED / ORPHAN so a human or UI can decide what
-# to prune.
+# Each row is tagged PROTECTED / SAFE / ACTIVE / LANDED / ORPHAN / UNKNOWN so a human or UI can
+# decide what to prune.
 kit_gc_analyze() {
   _kit_gc_require_deps || return 1
   _kit_gc_cache_reset
@@ -382,7 +417,8 @@ _kit_gc_only_match() {
 }
 
 # _kit_gc_prune_why <verdict> — echo the reason a prune row prints, or nothing when the verdict is
-# not a deletable one. SAFE (own PR merged) and LANDED (no PR, work on base — #388) are the only two.
+# not a deletable one. SAFE (own PR merged) and LANDED (no PR, work on base — #388) are the only two;
+# UNKNOWN (#330, a failed gh read) falls through with every other kept verdict.
 _kit_gc_prune_why() {
   case "$1" in
     SAFE*)   echo "PR MERGED" ;;
@@ -506,6 +542,7 @@ kit_gc_cleanup() {
   local repo="$KIT_GC_REPO" yes=0 a out b n_safe n_orphan n_prot n_stash n_wt rc=0 n_rfail=0
   local zname zbranch zstaged
   local safe_list landed_list orphan_list prot_list stash_list wt_list zomb_list level_ok n_zomb n_landed
+  local unknown_list n_unknown
   for a in "$@"; do case "$a" in --yes|-y) yes=1 ;; esac; done
 
   out="$(kit_gc_analyze)" || return 1
@@ -516,6 +553,7 @@ kit_gc_cleanup() {
     in_s && / -> LANDED / { sub(/^  /, ""); sub(/ -> LANDED /, " "); print }')"
   orphan_list="$(_kit_gc_names "$out" branches ' -> ORPHAN')"
   prot_list="$(_kit_gc_names "$out" branches ' -> PROTECTED:')"
+  unknown_list="$(_kit_gc_names "$out" branches ' -> UNKNOWN ')"
   stash_list="$(printf '%s\n' "$out" | awk '/^# /{in_s=($0=="# stashes"); next} in_s && NF' | sed 's/^  //')"
 
   # Worktrees kit_gc_prune would remove: the ones whose branch is itself SAFE or LANDED (the same
@@ -553,6 +591,7 @@ ZEOF
   n_landed="$(printf '%s' "$landed_list" | grep -c . || true)"
   n_orphan="$(printf '%s' "$orphan_list" | grep -c . || true)"
   n_prot="$(printf '%s' "$prot_list"   | grep -c . || true)"
+  n_unknown="$(printf '%s' "$unknown_list" | grep -c . || true)"
   n_stash="$(printf '%s' "$stash_list" | grep -c . || true)"
   n_wt="$(printf '%s' "$wt_list"       | grep -c . || true)"
   n_zomb="$(printf '%s' "$zomb_list"   | grep -c . || true)"
@@ -570,6 +609,8 @@ ZEOF
   printf '%s\n' "$orphan_list" | grep . | sed 's/^/      /' || true
   printf '  PROTECTED kept    %3s  issue still OPEN\n' "$n_prot"
   printf '%s\n' "$prot_list" | grep . | sed 's/^/      /' || true
+  printf '  UNKNOWN kept      %3s  a GitHub read failed — could not determine, rerun when gh answers\n' "$n_unknown"
+  printf '%s\n' "$unknown_list" | grep . | sed 's/^/      /' || true
   printf '  stashes kept      %3s  irreversible — drop by hand after reading each diff\n' "$n_stash"
   printf '%s\n' "$stash_list" | grep . | sed 's/^/      /' || true
 
@@ -613,6 +654,6 @@ EOF
 $level_ok
 EOF
   printf '  remote deletes failed %3s\n' "$n_rfail"
-  echo "cleanup: done — $n_safe safe + $n_landed landed deleted / $n_zomb zombie pruned / $n_orphan orphan / $n_prot protected / $n_stash stash left untouched."
+  echo "cleanup: done — $n_safe safe + $n_landed landed deleted / $n_zomb zombie pruned / $n_orphan orphan / $n_prot protected / $n_unknown unknown / $n_stash stash left untouched."
   return "$rc"
 }
