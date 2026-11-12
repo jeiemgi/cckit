@@ -28,6 +28,14 @@ if ! command -v effort_slug_resolve >/dev/null 2>&1; then
   unset _eo_dir
 fi
 
+# The closed kind: vocabulary (KIT_KINDS / kit_kind_valid) — what `effort new --kind` accepts.
+if ! command -v kit_kind_valid >/dev/null 2>&1; then
+  _eo_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+  # shellcheck source=/dev/null
+  [ -f "$_eo_dir/kinds.sh" ] && . "$_eo_dir/kinds.sh"
+  unset _eo_dir
+fi
+
 # The GitHub transport switch (#396): in rest mode the lifecycle calls below are `gh api repos/…`.
 if ! command -v cckit_gh_rest >/dev/null 2>&1; then
   _eo_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
@@ -146,7 +154,7 @@ effort_new() {
   local repo; repo="$(_eff_repo)"
   [ -n "$repo" ] || { echo "effort_new: no repo (KIT_REPO/EFFORT_REPO unset — run in a kit project)" >&2; return 1; }
 
-  local flow="" role="" priority="p1" goal="" scope="" for_agents="" verification="" depends_on="" milestone="" explicit_slug="" par=""
+  local flow="" role="" priority="p1" goal="" scope="" for_agents="" verification="" depends_on="" milestone="" explicit_slug="" kind="task"
   # Flags are position-INDEPENDENT: recognized --flag [value] pairs are consumed wherever they occur
   # (before the title, between subs, or after them) and the remaining positionals are collected as the
   # title (first) + sub specs (rest). Previously the parser broke at the first positional, so any flag
@@ -166,8 +174,8 @@ effort_new() {
       --milestone)    milestone="${2:-}"; shift 2 ;;
       --slug)         explicit_slug="${2:-}"; shift 2 ;;
       --slug=*)       explicit_slug="${1#*=}"; shift ;;
-      --par)          par="${2:-}"; shift 2 ;;
-      --par=*)        par="${1#*=}"; shift ;;
+      --kind)         kind="${2:-}"; shift 2 ;;
+      --kind=*)       kind="${1#*=}"; shift ;;
       --)             shift; while [ $# -gt 0 ]; do pos+=("$1"); shift; done ;;
       --*)            echo "effort_new: unknown flag $1" >&2; return 1 ;;
       *)              pos+=("$1"); shift ;;
@@ -175,15 +183,13 @@ effort_new() {
   done
   set -- "${pos[@]+"${pos[@]}"}"
 
-  # Parallelism hint label (#121): --par seq | wide | <positive-int> → a par:<value> label on the
-  # parent (how the effort's subs are meant to run). Validated before anything is created.
-  if [ -n "$par" ]; then
-    case "$par" in
-      seq|wide) : ;;
-      ''|*[!0-9]*) echo "effort_new: --par must be 'seq', 'wide', or a positive integer (got '$par')" >&2; return 1 ;;
-      *) : ;;
-    esac
+  # --kind picks the kind:<k> label on the parent and every sub (default task). It is validated
+  # against the closed set (kinds.sh) before anything is created: `cckit start` turns the label into
+  # the branch prefix, so a value outside the set would yield a branch the hygiene hook rejects.
+  if command -v kit_kind_valid >/dev/null 2>&1 && ! kit_kind_valid "$kind"; then
+    echo "effort_new: --kind must be one of: $KIT_KINDS (got '$kind')" >&2; return 1
   fi
+  [ -n "$kind" ] || { echo "effort_new: --kind needs a value" >&2; return 1; }
 
   local name="${1:-}"; shift || true
   [ -n "$name" ] || { echo 'effort_new: usage: effort_new [flags] "<name>" [<sub spec> …]' >&2; return 1; }
@@ -224,7 +230,7 @@ effort_new() {
   # Every kit-defined label is ensured before use — `gh issue create --label` fails hard on a
   # missing label, which aborted the whole parent create on repos without the ctx:* set (#153).
   _eff_ensure_label "$ctx" bfd4f2 "effort session weight"
-  _eff_ensure_label "kind:task" d4c5f9 "kit issue kind"
+  _eff_ensure_label "kind:$kind" d4c5f9 "kit issue kind"
   _eff_ensure_label "priority:$priority" e99695 "kit priority"
   # `effort` is what marks the parent AS an effort, and it is the label `effort_plan` queries
   # (`gh issue list --label effort`, effort-plan.sh). It was read and never written: the label did
@@ -232,7 +238,7 @@ effort_new() {
   # every effort ever created here. A label something reads and nothing writes is the same defect
   # as one something writes and nothing reads — see rules/naming-and-ids.md § Labels.
   _eff_ensure_label "effort" 5319e7 "an effort parent issue"
-  local labels="effort,$ctx,kind:task,priority:$priority"
+  local labels="effort,$ctx,kind:$kind,priority:$priority"
   if [ -n "$role" ]; then
     _eff_ensure_label "role:$role" 0e8a16 "kit role lane"
     labels="$labels,role:$role"
@@ -241,10 +247,6 @@ effort_new() {
     local flow_lc; flow_lc="$(printf '%s' "$flow" | tr '[:upper:]' '[:lower:]')"
     _eff_ensure_label "flow:$flow_lc" 1d76db "kit flow lane"
     labels="$labels,flow:$flow_lc"
-  fi
-  if [ -n "$par" ]; then
-    _eff_ensure_label "par:$par" c5def5 "effort parallelism hint"
-    labels="$labels,par:$par"
   fi
 
   local url num slug
@@ -290,7 +292,7 @@ effort_new() {
     sub_name="${spec%% :: *}"
     sub_desc="${spec#* :: }"; [ "$sub_desc" = "$spec" ] && sub_desc=""
     sub_title="[Effort $num] $i · $sub_name"
-    local sub_labels="kind:task,priority:$priority"
+    local sub_labels="kind:$kind,priority:$priority"
     [ -n "$role" ] && sub_labels="$sub_labels,role:$role"
     if cckit_gh_rest; then
       child="$(gh_rest_issue_create "$repo" "$sub_title" \

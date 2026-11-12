@@ -98,10 +98,10 @@ kit autopilot --plan            # read the plan and launch the planned set
 ```
 
 1. **Read the plan** — `kit effort plan` groups open efforts by `flow:`, orders each flow by its
-   `blocked_by` edges, sizes each by `ctx:*`, and declares fan-out per effort via `par:*`. That
+   `blocked_by` edges, and sizes each by `ctx:*`. That
    output IS the launch plan — the set, the order, and the budget are read from it, not chosen.
 2. **Launch** — `orchestrate.sh <issueA> <issueB> ...` (one worktree per effort, file-disjoint;
-   respect `par:*`/`blocked_by` so blocked efforts wait). Use `--notify`.
+   respect `blocked_by` so blocked efforts wait). Use `--notify`.
 3. **Babysit** — `orchestrate-watch.sh` (launched by `--notify`) signals PR open / conflict / failing
    checks / merged, and GCs each worktree + branch on merge.
 4. **Decide + advance** — as each wave's gates go green, **merge it** (established-plan autonomy

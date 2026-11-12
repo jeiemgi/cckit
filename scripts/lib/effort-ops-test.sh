@@ -585,7 +585,7 @@ cd "$tmp/work" || exit 1
 
 # 15. the label `effort_plan` READS is a label `effort_new` WRITES.
 #     These drifted apart silently: effort-plan.sh queried `--label effort`, effort_new applied
-#     ctx/kind/priority/role/flow/par/slug and never `effort`, and setup-labels.sh never created
+#     ctx/kind/priority/role/flow/slug and never `effort`, and setup-labels.sh never created
 #     it. `cckit effort plan` therefore answered "no open efforts found" for every effort ever
 #     made, in every repo, with no error anywhere. A static check because the failure mode is
 #     silence — there is nothing at runtime to notice.

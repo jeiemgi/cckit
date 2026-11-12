@@ -106,18 +106,31 @@ effort_pr_title_check "[Tech Lead] [#115] adoption hardening" 115; t "check acce
 effort_pr_title_check "[Effort] 115 · adoption hardening" 115 2>/dev/null; t "check refuses a title lacking [#N]" "$?" "1"
 effort_pr_title_check "[#7] anything" 2>/dev/null; t "check accepts any [#N] when no num given" "$?" "0"
 
-# ── #121: --par applies a par:<value> label on the parent; bad values are rejected up front ───────
+# ── #277: --kind picks the kind: label (parent + subs) from the closed set; --par is gone ──────────
 : > "$GH_LOG"; printf '0' > "$GH_N"
-effort_new --flow Core --par wide "parallel wide effort" "a :: x" "b :: y" >/dev/null 2>&1
-tc "$GH_LOG" 'issue create .*--label [^ ]*,par:wide' "--par wide adds a par:wide label to the parent"
-tc "$GH_LOG" 'label create par:wide'                 "--par creates the par:wide label idempotently"
+effort_new --flow Core --kind fix "kind fix effort" "a :: x" >/dev/null 2>&1
+tc "$GH_LOG" 'issue create .*--title \[Effort\] · .*--label effort,ctx:[SMLX]+,kind:fix,' "--kind fix labels the parent kind:fix"
+tc "$GH_LOG" 'issue create .*--title \[Effort 1\] 1 · a.*--label kind:fix,'              "--kind fix labels every sub kind:fix"
+tc "$GH_LOG" 'label create kind:fix'                                                      "--kind ensures the kind label exists"
+tn "$GH_LOG" 'kind:task'                                                                  "--kind fix leaves no kind:task behind"
 : > "$GH_LOG"; printf '0' > "$GH_N"
-effort_new --par 3 "parallel three effort" >/dev/null 2>&1
-tc "$GH_LOG" 'issue create .*--label [^ ]*,par:3'    "--par 3 adds a par:3 label"
+effort_new --kind=chore "kind chore effort" >/dev/null 2>&1
+tc "$GH_LOG" 'issue create .*--label effort,ctx:[SMLX]+,kind:chore,' "--kind=chore (equals form) is accepted"
+for k in $KIT_KINDS; do
+  : > "$GH_LOG"; printf '0' > "$GH_N"
+  effort_new --kind "$k" "kind vocabulary effort" >/dev/null 2>&1 && rc=0 || rc=1
+  t "--kind $k is accepted" "$rc" "0"
+done
 : > "$GH_LOG"; printf '0' > "$GH_N"
-effort_new --par nonsense "bad par effort" >/dev/null 2>&1 && rc=0 || rc=1
-t  "--par rejects a non seq/wide/int value"          "$rc" "1"
-t  "--par creates nothing on a bad value"            "$(grep -c 'issue create' "$GH_LOG")" "0"
+err="$(effort_new --kind bug "bad kind effort" 2>&1 >/dev/null)" && rc=0 || rc=1
+t  "--kind rejects a value outside the closed set"   "$rc" "1"
+t  "--kind creates nothing on a bad value"           "$(grep -c 'issue create' "$GH_LOG")" "0"
+t  "the refusal lists the accepted set"              "$(printf '%s' "$err" | grep -c "must be one of: $KIT_KINDS")" "1"
+: > "$GH_LOG"; printf '0' > "$GH_N"
+effort_new --par wide "parallel wide effort" >/dev/null 2>&1 && rc=0 || rc=1
+t  "--par is no longer a flag (rc 1)"                "$rc" "1"
+t  "--par creates nothing"                           "$(grep -c . "$GH_LOG")" "0"
+t  "nothing in effort-ops.sh writes a par: label"    "$(grep -c 'par:' "$LIB/effort-ops.sh" | tr -d ' ')" "0"
 
 # ── #121: flags are position-INDEPENDENT — trailing --flow/--role no longer become junk sub-issues ─
 : > "$GH_LOG"; printf '0' > "$GH_N"
