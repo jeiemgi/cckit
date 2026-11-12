@@ -3,24 +3,32 @@ export const meta = {
   description: 'Run an approved effort plan unattended, wave by wave, under a runtime-enforced token budget',
   whenToUse: 'Unattended execution of approved waves, launched by the kit-autopilot captain with a +N budget',
   phases: [
-    { title: 'Preflight', detail: 'refuse efforts that are not approved' },
-    { title: 'Execute', detail: 'one implementer per effort, at most 4 at once' },
+    { title: 'Preflight', detail: 'refuse a closed issue, a non-effort, or a held effort' },
+    { title: 'Execute', detail: 'one implementer per effort, no wider than the effort WIP limit (max 4)' },
     { title: 'Verify', detail: 'independent gate + always-human floor read' },
     { title: 'Merge', detail: 'close each verified effort' },
-    { title: 'Stop check', detail: 'the grant command, or the base branch green' },
+    { title: 'Stop check', detail: 'the grant command after a wave; the gate on the base branch at the end' },
   ],
 }
 
 /* global agent, pipeline, log, budget, args -- the Workflow runtime injects these */
 
 // The night engine. A Workflow script is the runtime that enforces the caps a prompt cannot: the
-// token budget is `budget.total` (a +N directive), and concurrency, stall and stop are code here.
-// args: { waves: number[][], gate?: string,
+// token budget is `budget.total` (a +N directive), and concurrency, wave order and stop are code here.
+// args: { waves: number[][], gate?: string, wipLimit?: number,
 //         grant?: { waivers?: string[], stopCommand?: string,
 //                   extraFloors?: {[name]: description}, neverWaivable?: string[] },
-//         maxConcurrent?: number, stallLimit?: number, waveReserve?: number,
-//         refuseLabels?: string[] }
-// `scripts/night-grant.sh read <issue>` builds these args from the night grant + kit.config.json.
+//         maxConcurrent?: number, waveReserve?: number, refuseLabels?: string[] }
+// `scripts/night-grant.sh read <issue>` builds these args from the owner's night grant + the kit
+// config. APPROVAL is that grant: the owner names each effort in `waves`, in a comment only the
+// owner can write. There is no second approval marker on the effort itself.
+//
+// WAVE ORDER. Waves are dependency-ordered, so a wave that did not fully merge ends the run: the
+// next wave would build on a base that lacks a parked or refused predecessor.
+//
+// WIP. Every executor runs `cckit effort start`, which refuses a NEW effort once `effort.wipLimit`
+// (default 2) effort branches exist. The engine therefore runs no wider than `wipLimit`, and an
+// effort that parked keeps its branch, so it takes a slot from the rest of its wave.
 // Returns the wake report data; the captain (kit-autopilot) renders it and decides what follows.
 
 const HARD_CONCURRENCY = 4 // one usage pool per account: a wide fan-out can spend a window in minutes
@@ -41,10 +49,11 @@ const grant = args?.grant ?? {}
 const floors = { ...BASE_FLOORS, ...(grant.extraFloors ?? {}) }
 const neverWaivable = [...BASE_NEVER_WAIVABLE, ...(grant.neverWaivable ?? [])]
 const waivers = new Set([...(grant.waivers ?? []), ...STANDING_WAIVERS])
-const concurrency = Math.max(1, Math.min(args?.maxConcurrent ?? HARD_CONCURRENCY, HARD_CONCURRENCY))
-const stallLimit = args?.stallLimit ?? 2
+const DEFAULT_WIP_LIMIT = 2 // effort.wipLimit's default (scripts/lib/effort-ops.sh, _eff_wip_limit)
+const wipLimit = Number.isInteger(args?.wipLimit) && args.wipLimit >= 1 ? args.wipLimit : DEFAULT_WIP_LIMIT
+const concurrency = Math.max(1, Math.min(args?.maxConcurrent ?? HARD_CONCURRENCY, HARD_CONCURRENCY, wipLimit))
 const waveReserve = args?.waveReserve ?? 150_000
-const refuseLabels = args?.refuseLabels ?? ['grill:assumed']
+const refuseLabels = Array.isArray(args?.refuseLabels) ? args.refuseLabels : [] // night.refuseLabels
 const gate = args?.gate ?? "the gate commands in the project's delegation brief"
 
 const efforts = []
@@ -104,16 +113,19 @@ const BRIEF =
   'return only the schema.'
 
 const preflightPrompt = (n) =>
-  `${BRIEF}\nRead effort #${n}: \`gh issue view ${n} --json labels,body,state\`. ok=false when it ` +
-  'is closed, lacks the `effort` label, or its body has neither a `## Grilling` nor a `## Assumed` ' +
-  'section. Return every label name verbatim; reason names what is missing.'
+  `${BRIEF}\nRead effort #${n}: \`gh issue view ${n} --json labels,state\`. ok=false when it ` +
+  'is closed or lacks the `effort` label. Return every label name verbatim; reason names what ' +
+  'is missing.'
 
 const executePrompt = (n) =>
   `${BRIEF}\nYou implement effort #${n}, an approved plan, under the kit-autopilot plan-mode ` +
   `contract. Start or reuse its worktree (\`cckit effort start ${n}\`). Build each open sub-issue ` +
   `in order, one commit per sub. Run ${gate}, open the ONE effort PR with /kit-effort-pr ${n}, ` +
-  'and never merge. blocker is empty unless you stopped on a genuine blocker: an unresolvable ' +
-  'conflict, an ambiguity the plan is silent on, a secret only the owner has, or a cost.'
+  'and never merge. Never pass `--force` and never set `KIT_FORCE` or `EFFORT_WIP_LIMIT`: when ' +
+  '`cckit effort start` refuses on the WIP limit, stop and report that refusal as the blocker. ' +
+  'blocker is empty unless you stopped on a genuine blocker: an unresolvable ' +
+  'conflict, an ambiguity the plan is silent on, a secret only the owner has, a cost, or that ' +
+  'WIP refusal.'
 
 const floorList = Object.entries(floors)
   .map(([name, what]) => `${name} (${what})`)
@@ -130,10 +142,12 @@ const mergePrompt = (n) =>
   'effort PR, closes the parent and its subs, and garbage-collects. merged=true only when the PR ' +
   'state reads MERGED afterwards.'
 
+// Two separate checks, never one standing in for the other: the grant's stop command ends the
+// night early, the gate is what "the base branch is green" means.
 const stopPrompt = () =>
-  grant.stopCommand
-    ? `${BRIEF}\nFrom a worktree at the base branch head run: ${grant.stopCommand}\npassed = exit code 0.`
-    : `${BRIEF}\nIn a fresh worktree at the base branch head run ${gate}. passed = all green.`
+  `${BRIEF}\nFrom a worktree at the base branch head run: ${grant.stopCommand}\npassed = exit code 0.`
+const gatePrompt = () =>
+  `${BRIEF}\nIn a fresh worktree at the base branch head run ${gate}. passed = all green.`
 
 function decide(verdict) {
   if (verdict.gate !== 'PASS') return { status: 'parked', reason: 'gate FAIL on the effort branch' }
@@ -197,34 +211,64 @@ async function stopCheck() {
   return verdict?.passed === true
 }
 
-let stalled = 0
+async function gateCheck() {
+  const verdict = await agent(gatePrompt(), { label: 'gate', phase: 'Stop check', schema: STOP })
+  return verdict?.passed === true
+}
+
+const tag = (e) => `#${e.effort} ${e.status}`
+let stopCommandFailed = false
+
 for (let w = 0; w < waves.length; w++) {
   if (budget.remaining() < waveReserve) {
     return report('budget', `${budget.remaining()} tokens left, a wave reserves ${waveReserve}`)
   }
-  log(`wave ${w + 1}/${waves.length}: ${waves[w].map((n) => `#${n}`).join(' ')}`)
+  const wave = waves[w]
+  log(`wave ${w + 1}/${waves.length}: ${wave.map((n) => `#${n}`).join(' ')}`)
 
-  // Groups of `concurrency`, each a pipeline, so no more than 4 implementers share the pool at once.
-  const before = efforts.filter((e) => e.status === 'merged').length
-  for (let i = 0; i < waves[w].length; i += concurrency) {
-    await pipeline(waves[w].slice(i, i + concurrency), (n) => runEffort(n))
+  // Groups of at most `concurrency`, each a pipeline. An effort of this wave that started and did
+  // not merge still holds its effort branch, so it takes a WIP slot from the groups after it.
+  const first = efforts.length
+  for (let i = 0; i < wave.length; ) {
+    const held = efforts.slice(first).filter((e) => e.status !== 'merged' && e.status !== 'refused').length
+    const slots = concurrency - held
+    if (slots <= 0) {
+      for (const n of wave.slice(i)) {
+        efforts.push({
+          effort: n,
+          status: 'skipped',
+          reason: `no WIP slot: ${held} unmerged effort(s) of this wave hold the limit of ${concurrency}`,
+          prUrl: '',
+        })
+      }
+      break
+    }
+    const group = wave.slice(i, i + slots)
+    i += group.length
+    await pipeline(group, (n) => runEffort(n))
+    if (efforts.some((e) => e.status === 'unavailable' || e.status === 'pending')) {
+      return report('usage-limit', `wave ${w + 1} lost an agent; resume this run after the reset`)
+    }
   }
 
-  if (efforts.some((e) => e.status === 'unavailable' || e.status === 'pending')) {
-    return report('usage-limit', `wave ${w + 1} lost an agent; resume this run after the reset`)
+  const unmerged = efforts.slice(first).filter((e) => e.status !== 'merged')
+  if (unmerged.length) {
+    const later = waves.length - (w + 1)
+    return report(
+      'blocked',
+      `wave ${w + 1} did not fully merge (${unmerged.map(tag).join(', ')})` +
+        (later ? `; ${later} later wave(s) were not started because they build on it` : ''),
+    )
   }
-  const mergedThisWave = efforts.filter((e) => e.status === 'merged').length - before
-  stalled = mergedThisWave ? 0 : stalled + 1
-  if (stalled >= stallLimit) return report('stall', `${stalled} waves in a row merged nothing`)
 
-  if (grant.stopCommand && (await stopCheck())) {
-    return report('done', `stop command passed after wave ${w + 1}`)
+  if (grant.stopCommand) {
+    if (await stopCheck()) return report('done', `stop command passed after wave ${w + 1}`)
+    stopCommandFailed = true
   }
 }
 
-if (efforts.every((e) => e.status === 'merged')) {
-  return (await stopCheck())
-    ? report('done', 'every approved wave merged and the base branch is green')
-    : report('blocked', 'every wave merged but the base branch gate is red')
-}
-return report('blocked', 'waves finished with parked or refused efforts')
+// Every wave merged. "Green" here is the gate, whatever the grant's stop command said.
+const note = stopCommandFailed ? '; the stop command did not pass' : ''
+return (await gateCheck())
+  ? report('done', `every approved wave merged and the base branch gate is green${note}`)
+  : report('blocked', `every wave merged but the base branch gate is red${note}`)

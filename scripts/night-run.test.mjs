@@ -15,6 +15,7 @@ function run({ args, total = 1_000_000, agents = {} }) {
   let spent = 0
   let inFlight = 0
   const calls = []
+  const prompts = {}
   const stats = { maxInFlight: 0 }
   const budget = {
     total,
@@ -24,6 +25,7 @@ function run({ args, total = 1_000_000, agents = {} }) {
   const agent = async (prompt, opts = {}) => {
     const [kind, id] = (opts.label ?? '').split(':')
     calls.push(opts.label)
+    prompts[opts.label] = prompt
     inFlight++
     stats.maxInFlight = Math.max(stats.maxInFlight, inFlight)
     await new Promise((resolve) => setTimeout(resolve, 1))
@@ -61,6 +63,7 @@ function run({ args, total = 1_000_000, agents = {} }) {
   return body(agent, parallel, pipeline, () => {}, () => {}, budget, args).then((result) => ({
     result,
     calls,
+    prompts,
     stats,
   }))
 }
@@ -70,7 +73,8 @@ const green = {
   execute: (n) => ({ prUrl: `https://example.test/pull/${n}`, branch: `effort/${n}`, blocker: '' }),
   verify: () => ({ gate: 'PASS', floors: [] }),
   merge: () => ({ merged: true, detail: '' }),
-  stop: () => ({ passed: true, detail: 'develop green' }),
+  stop: () => ({ passed: true, detail: 'stop command exit 0' }),
+  gate: () => ({ passed: true, detail: 'develop green' }),
 }
 
 const statusOf = (result, effort) => result.efforts.find((e) => e.effort === effort)?.status
@@ -96,22 +100,72 @@ test('merges every approved wave and stops as done when develop is green', async
   )
 })
 
-test('never runs more than four agents at once, whatever the wave size', async () => {
+test('never runs more than four agents at once, whatever the wave size or the WIP limit', async () => {
   const { stats } = await run({
-    args: { waves: [[1, 2, 3, 4, 5, 6, 7, 8, 9]], maxConcurrent: 16 },
+    args: { waves: [[1, 2, 3, 4, 5, 6, 7, 8, 9]], maxConcurrent: 16, wipLimit: 16 },
     agents: green,
   })
-  assert.ok(stats.maxInFlight <= 4, `saw ${stats.maxInFlight} agents in flight`)
+  assert.equal(stats.maxInFlight, 4)
 })
 
-test('refuses an effort still carrying grill:assumed', async () => {
+test('runs no wider than the default effort WIP limit of 2 when args carry none', async () => {
+  const { result, stats } = await run({ args: { waves: [[1, 2, 3, 4, 5, 6]] }, agents: green })
+  assert.equal(stats.maxInFlight, 2)
+  assert.equal(result.stop, 'done')
+})
+
+test('runs as wide as effort.wipLimit, and no wider', async () => {
+  const { stats } = await run({ args: { waves: [[1, 2, 3, 4, 5, 6]], wipLimit: 3 }, agents: green })
+  assert.equal(stats.maxInFlight, 3)
+})
+
+test('a parked effort keeps its WIP slot from the rest of its wave', async () => {
+  const one = await run({
+    args: { waves: [[1, 2, 3, 4]], wipLimit: 2 },
+    agents: { ...green, verify: (n) => ({ gate: n === 1 ? 'FAIL' : 'PASS', floors: [] }) },
+  })
+  // #1 parked and holds a branch, so #3 and #4 run one at a time in the single slot left
+  assert.deepEqual(
+    one.result.efforts.map((e) => e.status),
+    ['parked', 'merged', 'merged', 'merged'],
+  )
+  assert.ok(one.calls.indexOf('merge:3') < one.calls.indexOf('preflight:4'))
+
+  const both = await run({
+    args: { waves: [[1, 2, 3, 4]], wipLimit: 2 },
+    agents: { ...green, verify: () => ({ gate: 'FAIL', floors: [] }) },
+  })
+  assert.equal(statusOf(both.result, 3), 'skipped')
+  assert.equal(statusOf(both.result, 4), 'skipped')
+  assert.match(both.result.efforts[2].reason, /WIP/)
+  assert.ok(!both.calls.includes('preflight:3'))
+})
+
+test('the executor is told never to force past the WIP limit', async () => {
+  const { prompts } = await run({ args: { waves: [[1]] }, agents: green })
+  assert.match(prompts['execute:1'], /Never pass `--force`/)
+  assert.match(prompts['execute:1'], /EFFORT_WIP_LIMIT/)
+})
+
+test('an effort created by `cckit effort new` passes preflight: no body section is demanded', async () => {
+  const { result, prompts } = await run({
+    args: { waves: [[1]] },
+    // the labels effort_new applies; no grill:* label and no ## Grilling section exists in the kit
+    agents: { ...green, preflight: () => ({ ok: true, labels: ['effort', 'ctx:M', 'flow:core'], reason: '' }) },
+  })
+  assert.equal(statusOf(result, 1), 'merged')
+  assert.doesNotMatch(prompts['preflight:1'], /Grilling|Assumed/)
+  assert.doesNotMatch(prompts['preflight:1'], /body/)
+})
+
+test('refuses an effort carrying a label the project holds out of night runs', async () => {
   const { result, calls } = await run({
-    args: { waves: [[1, 2]] },
+    args: { waves: [[1, 2]], refuseLabels: ['hold'] },
     agents: {
       ...green,
       preflight: (n) =>
         n === 2
-          ? { ok: true, labels: ['effort', 'grill:assumed'], reason: '' }
+          ? { ok: true, labels: ['effort', 'hold'], reason: '' }
           : { ok: true, labels: ['effort'], reason: '' },
     },
   })
@@ -193,13 +247,60 @@ test('an agent lost mid-wave returns usage-limit so the captain can resume', asy
   assert.equal(statusOf(result, 3), undefined)
 })
 
-test('stops as stalled after two waves in a row with nothing merged', async () => {
-  const { result } = await run({
-    args: { waves: [[1], [2], [3]] },
+test('a parked wave stops the run before the waves that depend on it', async () => {
+  const { result, calls } = await run({
+    args: { waves: [[12], [15], [16]] },
     agents: { ...green, verify: () => ({ gate: 'FAIL', floors: [] }) },
   })
-  assert.equal(result.stop, 'stall')
-  assert.equal(statusOf(result, 3), undefined)
+  assert.equal(result.stop, 'blocked')
+  assert.match(result.reason, /wave 1 did not fully merge \(#12 parked\)/)
+  assert.match(result.reason, /2 later wave\(s\) were not started/)
+  assert.equal(statusOf(result, 15), undefined)
+  assert.ok(!calls.includes('preflight:15'))
+  assert.ok(!calls.includes('gate'))
+})
+
+test('a partly merged wave stops the run too: one refused effort holds its dependents back', async () => {
+  const { result, calls } = await run({
+    args: { waves: [[1, 2], [3]] },
+    agents: {
+      ...green,
+      preflight: (n) => ({ ok: n !== 2, labels: ['effort'], reason: n === 2 ? 'closed' : '' }),
+    },
+  })
+  assert.equal(result.stop, 'blocked')
+  assert.equal(statusOf(result, 1), 'merged')
+  assert.equal(statusOf(result, 2), 'refused')
+  assert.ok(!calls.includes('execute:3'))
+})
+
+test('the final check runs the gate, not the stop command, when every wave merged', async () => {
+  const grant = { stopCommand: 'pnpm typecheck' }
+  const failing = { ...green, stop: () => ({ passed: false, detail: 'exit 1' }) }
+
+  const greenGate = await run({ args: { waves: [[1], [2]], gate: 'make check', grant }, agents: failing })
+  assert.equal(greenGate.result.stop, 'done')
+  assert.match(greenGate.result.reason, /gate is green; the stop command did not pass/)
+  assert.equal(greenGate.calls.at(-1), 'gate')
+  assert.match(greenGate.prompts.gate, /make check/)
+  assert.doesNotMatch(greenGate.prompts.gate, /pnpm typecheck/)
+  assert.doesNotMatch(greenGate.prompts.stop, /make check/)
+
+  const redGate = await run({
+    args: { waves: [[1], [2]], gate: 'make check', grant },
+    agents: { ...failing, gate: () => ({ passed: false, detail: 'red' }) },
+  })
+  assert.equal(redGate.result.stop, 'blocked')
+  assert.match(redGate.result.reason, /gate is red/)
+})
+
+test('without a stop command the stop agent never runs and the gate decides', async () => {
+  const { result, calls } = await run({
+    args: { waves: [[1]] },
+    agents: { ...green, gate: () => ({ passed: false, detail: 'red' }) },
+  })
+  assert.equal(result.stop, 'blocked')
+  assert.ok(!calls.includes('stop'))
 })
 
 test('the grant stop command ends the night early when it passes', async () => {
