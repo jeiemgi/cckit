@@ -35,13 +35,28 @@ DIR="$(bench_dir)"
 [ -n "$OUT" ] || OUT="$DIR/RESULTS.md"
 DRYFLAG=""; [ "$DRY" -eq 1 ] && DRYFLAG="--dry"
 
+# tier_json <script> — one tier's --json summary, or {} when the tier printed no usable JSON.
+# The exit code is deliberately NOT the signal: run.sh exits 1 whenever a record failed and still
+# prints its full summary, so `$(run … || echo '{}')` captured two documents and every
+# `jq -r '.x // 0'` below printed two lines — "33\n0%" in the headline (#252).
+tier_json() {
+  local out
+  # shellcheck disable=SC2086  # DRYFLAG is empty or one flag; it must word-split away when empty
+  out="$(bash "$1" $DRYFLAG --json 2>/dev/null)"
+  if [ "$(printf '%s' "$out" | jq -s 'length == 1 and (.[0] | type == "object")' 2>/dev/null)" = "true" ]; then
+    printf '%s' "$out"
+  else
+    printf '{}'
+  fi
+}
+
 # Gather the two tier summaries (retrieval+abstain+adversarial in one, quality separately).
 if [ "$STDIN" -eq 1 ]; then
   RET_JSON="$(cat)"
   QUAL_JSON='{"kind":"quality-run","dry":true,"count":0,"mean":0,"results":[]}'
 else
-  RET_JSON="$(bash "$SCRIPT_DIR/run.sh" $DRYFLAG --json 2>/dev/null || echo '{}')"
-  QUAL_JSON="$(bash "$SCRIPT_DIR/run-quality.sh" $DRYFLAG --json 2>/dev/null || echo '{}')"
+  RET_JSON="$(tier_json "$SCRIPT_DIR/run.sh")"
+  QUAL_JSON="$(tier_json "$SCRIPT_DIR/run-quality.sh")"
 fi
 
 # Pull the numbers with safe defaults (a tier may be absent).

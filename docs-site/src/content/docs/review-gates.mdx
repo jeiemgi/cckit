@@ -1,6 +1,6 @@
 ---
 title: Codified review gates
-description: Two ratchets that keep an AI reviewer's mechanical findings, and a skill listing's context cost, from coming back.
+description: Three ratchets that keep an AI reviewer's mechanical findings, a skill listing's context cost, and the instruction files every session loads, from coming back.
 ---
 
 import { Aside } from '@astrojs/starlight/components';
@@ -8,10 +8,11 @@ import { Aside } from '@astrojs/starlight/components';
 An AI reviewer finds the same classes of defect over and over, and its findings live in pull-request
 threads and die there. `scripts/review-lint.sh` is where the mechanical slice of that stream goes to
 stay fixed; `scripts/skill-frontmatter-lint.sh` does the same job for a cost that no reviewer sees at
-all — the bytes a skill listing occupies in every session. `scripts/check.sh` runs both, and
-`cckit init` scaffolds both into your project.
+all — the bytes a skill listing occupies in every session. `scripts/instruction-budget-lint.sh` is the
+same idea one level up: `CLAUDE.md` and the rules themselves. `scripts/check.sh` runs all three, and
+`cckit init` scaffolds all three into your project.
 
-Both are **ratchets, not caps**: today's offenders are recorded in a baseline and allowed to stay,
+All three are **ratchets, not caps**: today's offenders are recorded in a baseline and allowed to stay,
 but nothing may grow past its recorded size and nothing new may land dirty. Adding a rule therefore
 never forces a repo-wide fix.
 
@@ -76,6 +77,61 @@ The lint therefore pins `LC_ALL=C` and measures bytes. Every environment can pro
 and no locale has to be installed to reproduce a number. An em-dash costs the three bytes it occupies.
 </Aside>
 
+## instruction-budget-lint — what every session loads
+
+Claude Code loads every `CLAUDE.md`, and every `.claude/rules/*.md` that has no `paths:`
+frontmatter, into every session whatever the task. It warns at startup once those files pass a
+combined 150k characters; over the limit they still load, and its docs say adherence drops. A
+project adds rules one decision at a time, so the resident set grows with no single commit to blame.
+
+A rule that covers one kind of file opts out of the resident set by declaring when it loads:
+
+```markdown
+---
+paths:
+  - "src/components/**/*.tsx"
+---
+```
+
+```bash
+scripts/instruction-budget-lint.sh              # the gate
+scripts/instruction-budget-lint.sh --report     # every file's bytes and lines, resident and path-scoped; never fails
+scripts/instruction-budget-lint.sh --summary    # one line: the resident total and the three largest files
+scripts/instruction-budget-lint.sh --update     # re-baseline from current sizes
+```
+
+The gate holds two limits, both in the baseline when exceeded:
+
+| Limit | Default | Override | Baseline row |
+| --- | --- | --- | --- |
+| Resident total — `CLAUDE.md`, `CLAUDE.local.md`, `.claude/CLAUDE.md`, and every rule without `paths:` | 150000 bytes | `KIT_INSTRUCTION_BUDGET` | `@resident <bytes>` |
+| Any one instruction file, resident or path-scoped | 200 lines | `KIT_INSTRUCTION_MAX_LINES` | `<path> <lines>` |
+
+`--report` prints the path-scoped rules as their own block with a byte total: what those rules would
+add to every session if their `paths:` were removed. `cckit status` and `cckit doctor` print the
+`--summary` line, so the number is seen before the startup warning is.
+
+Two ways to bring the resident total down, and they pair:
+
+- **Scope it.** Give a rule about one surface a `paths:` list. Globs resolve from the directory that
+  holds the rule's `.claude/`, so a session started in the main checkout that edits inside
+  `.claude/worktrees/<wt>/` needs the `.claude/worktrees/*/apps/**` form next to `apps/**`.
+- **Split it.** Keep a short rule resident and move the reference material to a `knowledge/` doc the
+  rule points at.
+
+Do not scope a behavioural routing rule ("send every design question to the designer agent"): it
+would not load until a matching file had already been read. The rules `cckit init` scaffolds from a
+profile are cross-cutting and stay unscoped; `react-annotate.md`, written by `/kit-annotate`, ships
+scoped to `**/*.tsx` and `**/*.jsx`.
+
+<Aside type="caution" title="What the number leaves out">
+The lint measures bytes with `LC_ALL=C`, for the reason in the note above; bytes are never fewer
+than characters, so it reaches the limit no later than Claude Code does. It does not follow `@path`
+imports inside a `CLAUDE.md`, and it does not count `CLAUDE.md` files in subdirectories or in
+`~/.claude`. `paths:` is detected as a top-level frontmatter key on line 1's block; the globs are
+not evaluated.
+</Aside>
+
 ## Baselines are seeded once
 
 `cckit init` seeds each baseline the first time it scaffolds the lint, so a fresh project starts green
@@ -92,9 +148,15 @@ Each lint reports its own baseline path, which is how `init.sh` finds it:
 ```bash
 scripts/review-lint.sh --baseline-path             # scripts/review-lint-baseline.txt
 scripts/skill-frontmatter-lint.sh --baseline-path  # scripts/skill-frontmatter-baseline.txt
+scripts/instruction-budget-lint.sh --baseline-path # scripts/instruction-budget-baseline.txt
 ```
 
-## Both self-disable
+A freshly scaffolded project's instruction-budget baseline already lists two rules: the shipped
+`effort-model.md` (205 lines) and `naming-and-ids.md` (202) are over the 200-line limit, so they are
+grandfathered and may shrink but not grow.
+
+## All three self-disable
 
 `review-lint` exits 0 when there is no rule table; `skill-frontmatter-lint` exits 0 when there is no
-`skills/` or `.claude/skills/` directory. Shipping them to every project is safe.
+`skills/` or `.claude/skills/` directory; `instruction-budget-lint` exits 0 when there is no
+`CLAUDE.md` and no `.claude/rules/`. Shipping them to every project is safe.

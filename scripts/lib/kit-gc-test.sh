@@ -386,5 +386,177 @@ t   "--yes deleted the parent-landed agent branch" "$(git branch --list worktree
 t   "--yes KEPT the not-planned effort branch"     "$(git branch --list effort/80-not-planned | wc -l | tr -d ' ')" "1"
 unset KIT_BASE_BRANCH
 
+# ── #390: a detached worktree gets a verdict ───────────────────────────────────────────────────
+# `git worktree list --porcelain` writes `detached` where an attached worktree has `branch …`, so a
+# filter on `/^branch /` never sees one: gc printed no row and prune could not remove it. Three live
+# shapes and two dead ones:
+#   det-landed   clean, HEAD an ancestor of base        -> LANDED, removed by --yes
+#   det-commit   clean, HEAD is a commit on no branch   -> ORPHAN, kept (the only copy of that work)
+#   det-dirty    HEAD on base, an uncommitted file      -> ORPHAN, kept
+#   det-zclean   dir gone, index == its HEAD's tree     -> ZOMBIE, no staged delta, pruned by --yes
+#   det-zstaged  dir gone, index holds a staged file    -> ZOMBIE kept: no branch to recover onto
+export KIT_BASE_BRANCH="$init_branch"
+git checkout -q "$init_branch"
+git worktree add -q --detach ../det-landed HEAD~1 >/dev/null 2>&1
+git worktree add -q --detach ../det-commit HEAD >/dev/null 2>&1
+echo "on no branch" > ../det-commit/only.txt; git -C ../det-commit add only.txt; git -C ../det-commit commit -qm "detached work"
+DET_COMMIT="$(git -C ../det-commit rev-parse HEAD)"
+git worktree add -q --detach ../det-dirty HEAD >/dev/null 2>&1
+echo "scratch" > ../det-dirty/scratch.txt
+git worktree add -q --detach ../det-zclean HEAD >/dev/null 2>&1
+rm -rf ../det-zclean
+git worktree add -q --detach ../det-zstaged HEAD >/dev/null 2>&1
+echo "staged, detached" > ../det-zstaged/zs.txt; git -C ../det-zstaged add zs.txt
+rm -rf ../det-zstaged
+admin="$(git rev-parse --git-common-dir)/worktrees"
+
+analysis="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_analyze 2>/dev/null)"
+drow() { printf '%s\n' "$analysis" | grep -F "$1 [detached@" | head -1; }
+has "clean detached worktree on base is LANDED"     "$(drow /det-landed)" "-> LANDED (detached; ancestor of $init_branch)"
+has "detached worktree with its own commit is ORPHAN" "$(drow /det-commit)" "-> ORPHAN"
+has "dirty detached worktree is ORPHAN"             "$(drow /det-dirty)"  "-> ORPHAN"
+has "the dirty row says why"                        "$(drow /det-dirty)"  "uncommitted"
+t   "a detached row is labelled by its HEAD"        "$(drow /det-commit | grep -c "detached@$(printf '%.12s' "$DET_COMMIT")")" "1"
+t   "has_prunable sees a LANDED detached worktree"  "$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_has_prunable && echo yes || echo no)" "yes"
+# The zombie verdict compares the admin index to the detached HEAD's tree, not to an empty branch tip.
+z="$(_kit_gc_zombies)"
+t   "clean detached zombie has no staged delta" "$(printf '%s\n' "$z" | awk -F'\t' '$1=="det-zclean"{print $3}')"  "no"
+t   "staged detached zombie is flagged"         "$(printf '%s\n' "$z" | awk -F'\t' '$1=="det-zstaged"{print $3}')" "yes"
+has "a detached zombie is labelled by its HEAD" "$(printf '%s\n' "$z" | awk -F'\t' '$1=="det-zclean"{print $2}')"  "detached@"
+has "analyze: clean detached zombie is prunable" "$(printf '%s\n' "$analysis" | grep -F '  det-zclean [')"  "ZOMBIE (no staged delta) — prunable"
+has "analyze: staged detached zombie is kept"    "$(printf '%s\n' "$analysis" | grep -F '  det-zstaged [')" "kept, never pruned"
+
+# Without --yes: listed, nothing removed, nothing locked.
+dry="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_prune 2>&1)"
+has "dry-run lists the LANDED detached worktree" "$dry" "would remove worktree"
+has "dry-run names it"                           "$dry" "det-landed [detached@"
+[ -d ../det-landed ] && echo "ok: dry-run kept the LANDED detached worktree" || { echo "FAIL: dry-run removed a detached worktree"; fail=1; }
+[ -e "$admin/det-zstaged/locked" ] && { echo "FAIL: dry-run wrote a lock"; fail=1; } || echo "ok: dry-run wrote no lock"
+plan="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_cleanup 2>&1)"
+has "plan lists the LANDED detached worktree as removable" \
+    "$(printf '%s\n' "$plan" | awk '/^  SAFE worktrees/{s=1; next} /^  [A-Zs]/{s=0} s')" "det-landed [detached@"
+has "plan keeps the detached orphans by name" \
+    "$(printf '%s\n' "$plan" | awk '/^  ORPHAN kept/{s=1; next} /^  [A-Zs]/{s=0} s')" "det-commit [detached@"
+has "plan says the staged detached zombie is kept" "$plan" "det-zstaged [detached@"
+has "plan gives the kept zombie its reason"        "$plan" "kept, not pruned"
+[ -d ../det-landed ] && echo "ok: plan-only kept the LANDED detached worktree" || { echo "FAIL: plan-only removed a detached worktree"; fail=1; }
+[ -d "$admin/det-zclean" ] && echo "ok: plan-only kept the detached zombie metadata" || { echo "FAIL: plan-only pruned zombie metadata"; fail=1; }
+
+# kit_gc_prune --yes: the LANDED one goes, both ORPHANs stay, the clean zombie is pruned, the
+# staged one is not.
+git worktree add -q --detach ../det-landed2 HEAD~1 >/dev/null 2>&1
+out="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_prune --yes 2>&1)"
+[ -d ../det-landed ] && { echo "FAIL: prune --yes left the LANDED detached worktree"; fail=1; } || echo "ok: prune --yes removed the LANDED detached worktree"
+has "prune says why it removed it" "$out" "(LANDED (detached; ancestor of $init_branch))"
+[ -d ../det-commit ] && echo "ok: prune --yes kept the detached worktree with a commit" || { echo "FAIL: prune --yes destroyed a detached commit"; fail=1; }
+[ -d ../det-dirty ]  && echo "ok: prune --yes kept the dirty detached worktree"       || { echo "FAIL: prune --yes destroyed a dirty detached worktree"; fail=1; }
+[ -d "$admin/det-zclean" ]  && { echo "FAIL: prune --yes left the clean detached zombie"; fail=1; } || echo "ok: prune --yes pruned the clean detached zombie"
+[ -d "$admin/det-zstaged" ] && echo "ok: prune --yes did NOT prune the staged detached zombie" || { echo "FAIL: staged detached zombie pruned — its index is lost"; fail=1; }
+has "prune says the staged zombie is kept" "$out" "det-zstaged"
+t   "the staged tree is still readable from the kept index" \
+    "$(GIT_INDEX_FILE="$admin/det-zstaged/index" git ls-files | grep -c '^zs.txt$')" "1"
+# A second run must not prune it either (the keep is durable, not a one-off skip).
+PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_prune --yes >/dev/null 2>&1
+[ -d "$admin/det-zstaged" ] && echo "ok: a second prune --yes still keeps it" || { echo "FAIL: second prune dropped the staged detached zombie"; fail=1; }
+
+# kit_gc_cleanup --yes takes the same path.
+[ -d ../det-landed2 ] && { echo "FAIL: prune --yes left the second LANDED detached worktree"; fail=1; } || echo "ok: prune --yes removed every LANDED detached worktree"
+git worktree add -q --detach ../det-landed3 HEAD~1 >/dev/null 2>&1
+applied="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_cleanup --yes 2>&1)"
+[ -d ../det-landed3 ] && { echo "FAIL: cleanup --yes left the LANDED detached worktree"; fail=1; } || echo "ok: cleanup --yes removed the LANDED detached worktree"
+[ -d ../det-commit ] && echo "ok: cleanup --yes kept the detached commit" || { echo "FAIL: cleanup --yes destroyed a detached commit"; fail=1; }
+[ -d ../det-dirty ]  && echo "ok: cleanup --yes kept the dirty detached worktree" || { echo "FAIL: cleanup --yes destroyed a dirty detached worktree"; fail=1; }
+[ -d "$admin/det-zstaged" ] && echo "ok: cleanup --yes kept the staged detached zombie" || { echo "FAIL: cleanup --yes pruned the staged detached zombie"; fail=1; }
+t   "the detached commit is still reachable from its worktree" "$(git -C ../det-commit rev-parse HEAD)" "$DET_COMMIT"
+# --only is branch-scoped (effort close): it must not touch a detached worktree.
+git worktree add -q --detach ../det-landed4 HEAD~1 >/dev/null 2>&1
+PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_prune --yes --only '^sub/50[a-z]-' >/dev/null 2>&1
+[ -d ../det-landed4 ] && echo "ok: --only leaves detached worktrees alone" || { echo "FAIL: --only removed a detached worktree"; fail=1; }
+unset KIT_BASE_BRANCH
+
+# ── #330: a FAILED gh read is "could not determine" — never "no PR", never deletable ────────────
+# Two branches in a fresh repo. task/41-fresh has no commit beyond base, so the content check calls
+# it LANDED without asking gh anything — the deletable verdict an OPEN issue #41 must block.
+# task/42-work has a commit of its own and a PR the failing gh cannot list.
+lacks(){ case "$2" in *"$3"*) echo "FAIL: $1 -> '$2' contains '$3'"; fail=1 ;; *) echo "ok: $1" ;; esac; }
+mkdir "$tmp/outage"; cd "$tmp/outage" || exit 1
+git init -q .; git config user.email t@t; git config user.name t
+git symbolic-ref HEAD refs/heads/main   # `cckit gc` below resolves the base from config: main
+echo base > base.txt; git add base.txt; git commit -q -m init
+export KIT_BASE_BRANCH=main
+git branch task/41-fresh
+git checkout -q -b task/42-work; echo w > w.txt; git add w.txt; git commit -q -m "work"; git checkout -q "$KIT_BASE_BRANCH"
+ghfail() {   # ghfail <case-arms> — a gh that answers the given arms and FAILS everything else
+  cat > "$stub/gh" <<SH
+#!/usr/bin/env bash
+case "\$1 \$2" in
+$1
+  *) echo "GraphQL: API rate limit exceeded" >&2; exit 1 ;;
+esac
+SH
+  chmod +x "$stub/gh"
+}
+for transport in graphql rest; do
+  export CCKIT_GH_TRANSPORT="$transport"
+  # (b) the PR list read fails; the issue-state read answers `closed`.
+  ghfail '  "issue view"|"api repos/o/r/issues/41"|"api repos/o/r/issues/42") echo closed ;;'
+  analysis="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_analyze 2>"$tmp/outage.err")"
+  has   "$transport: PR list failed -> could not determine" "$(row task/42-work)" "UNKNOWN (could not determine"
+  lacks "$transport: PR list failed -> never 'no PR'"       "$(row task/42-work)" "no PR"
+  lacks "$transport: PR list failed -> not ORPHAN"          "$(row task/42-work)" "ORPHAN"
+  has   "$transport: PR list failed -> an ancestor of base is not LANDED" "$(row task/41-fresh)" "UNKNOWN (could not determine"
+  has   "$transport: PR list failure is said on stderr" "$(cat "$tmp/outage.err")" "could not read the PR list"
+
+  # (c) every read fails: the open issue #41 cannot be seen, and its branch must still be kept.
+  ghfail ''
+  analysis="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_analyze 2>/dev/null)"
+  has   "$transport: all reads failed -> 41 names the failed issue read" "$(row task/41-fresh)" "state read for issue #41 failed"
+  lacks "$transport: all reads failed -> 41 is not LANDED"  "$(row task/41-fresh)" "LANDED"
+  lacks "$transport: all reads failed -> 42 never 'no PR'"  "$(row task/42-work)"  "no PR"
+  t     "$transport: all reads failed -> nothing is prunable" \
+        "$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_has_prunable && echo yes || echo no)" "no"
+  out="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_prune 2>&1)"
+  lacks "$transport: all reads failed -> dry-run prune lists no delete" "$out" "would delete"
+  PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_prune --yes >/dev/null 2>&1
+  t     "$transport: all reads failed -> --yes KEPT task/41-fresh" "$(git branch --list task/41-fresh | wc -l | tr -d ' ')" "1"
+  t     "$transport: all reads failed -> --yes KEPT task/42-work"  "$(git branch --list task/42-work | wc -l | tr -d ' ')" "1"
+  plan="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_cleanup 2>/dev/null)"
+  t     "$transport: cleanup plan counts both as UNKNOWN kept" "$(printf '%s\n' "$plan" | awk '/^  UNKNOWN kept/{print $3}')" "2"
+  t     "$transport: cleanup plan counts no ORPHAN"            "$(printf '%s\n' "$plan" | awk '/^  ORPHAN kept/{print $3}')" "0"
+  t     "$transport: cleanup plan counts no LANDED"            "$(printf '%s\n' "$plan" | awk '/^  LANDED branches/{print $3}')" "0"
+
+  # (e) only the issue-state read fails; the PR list answers, and it is empty.
+  ghfail '  "pr list"|"api repos/o/r/pulls") : ;;'
+  analysis="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_analyze 2>/dev/null)"
+  has   "$transport: issue read failed, PR list ok -> 41 is UNKNOWN" "$(row task/41-fresh)" "state read for issue #41 failed"
+
+  # (d) the verbs' JSON stays valid JSON with the failing gh, and carries the count.
+  if command -v jq >/dev/null 2>&1; then
+    ghfail ''
+    js="$(PATH="$stub:$PATH" KIT_REPO="o/r" KIT_GC_REPO="o/r" "$ROOT/bin/cckit" gc --llm 2>/dev/null)"
+    t "$transport: cckit gc --llm is valid JSON with gh failing" "$(printf '%s' "$js" | jq -r 'type' 2>/dev/null)" "object"
+    t "$transport: cckit gc --llm counts the unknown rows"       "$(printf '%s' "$js" | jq -r '.unknown' 2>/dev/null)" "2"
+    t "$transport: cckit gc --llm reports no orphan"             "$(printf '%s' "$js" | jq -r '.orphan' 2>/dev/null)" "0"
+    js="$(PATH="$stub:$PATH" KIT_REPO="o/r" KIT_GC_REPO="o/r" "$ROOT/bin/cckit" cleanup --llm 2>/dev/null)"
+    t "$transport: cckit cleanup --llm counts the unknown rows"  "$(printf '%s' "$js" | jq -r '.unknown' 2>/dev/null)" "2"
+  fi
+done
+unset CCKIT_GH_TRANSPORT
+
+# A definite answer still classifies as before: gh says "no such issue" for #41 (404 / GraphQL
+# not-found) and returns an empty PR list — the branch is LANDED by content, not UNKNOWN.
+cat > "$stub/gh" <<'SH'
+#!/usr/bin/env bash
+case "$1 $2" in
+  "pr list") : ;;
+  "issue view") echo "GraphQL: Could not resolve to an Issue with the number of 41. (repository.issue)" >&2; exit 1 ;;
+  *) exit 1 ;;
+esac
+SH
+chmod +x "$stub/gh"
+analysis="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" CCKIT_GH_TRANSPORT=graphql kit_gc_analyze 2>/dev/null)"
+has "an absent issue is not a failed read: 41 is LANDED" "$(row task/41-fresh)" "LANDED (ancestor of"
+unset KIT_BASE_BRANCH
+
 [ "$fail" -eq 0 ] && echo "ALL OK (kit-gc)" || echo "kit-gc: FAILURES"
 exit "$fail"

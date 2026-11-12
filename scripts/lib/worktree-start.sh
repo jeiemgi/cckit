@@ -4,7 +4,10 @@
 # Family 1 of kit-engine-boundary.md (rule #1/#2): one bash home for the op, consumed by the
 # kit-task-start skill, scripts/orchestrate.sh, and `kit task start`. No second implementation.
 #
-#   wt_start <issue-number> [slug-override]
+#   wt_start [--force] <issue-number> [slug-override]
+#     Refuses (rc 1, before any fetch / branch / worktree) when another LIVE session already holds
+#     the issue's claim in <git-common-dir>/kit-sessions (session-registry.sh). `--force` or
+#     KIT_FORCE=1 starts anyway and takes the claim over.
 #     stdout: "<worktree-path>|<branch>|<issue-number>"   (one line, machine-readable)
 #     stderr: human progress
 #     returns: 0 on success (created or reused), 1 on failure
@@ -20,6 +23,31 @@ if ! command -v cckit_gh_rest >/dev/null 2>&1; then
   unset _ghr_lib
 fi
 command -v cckit_gh_rest >/dev/null 2>&1 || cckit_gh_rest() { return 1; }
+
+# The claims registry (#384). Guarded: a project scaffolded before session-registry.sh shipped has
+# worktree-start.sh without it, and there wt_start runs with no claim check rather than failing.
+if ! command -v sreg_claim >/dev/null 2>&1; then
+  _sr_lib="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)/session-registry.sh"
+  # shellcheck source=/dev/null
+  [ -f "$_sr_lib" ] && . "$_sr_lib"
+  unset _sr_lib
+fi
+
+# The closed kind: vocabulary (kinds.sh). The issue's `kind:` label becomes the branch prefix, so it
+# is mapped through the set: a label outside it (kind:bug, kind:docs, a typo) would otherwise produce
+# a branch the hygiene hook rejects as non-conventional.
+if ! command -v kit_kind_branch >/dev/null 2>&1; then
+  _wtk_lib="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)/kinds.sh"
+  # shellcheck source=/dev/null
+  [ -f "$_wtk_lib" ] && . "$_wtk_lib"
+  unset _wtk_lib
+fi
+# _wt_kind_prefix <kind> — the branch prefix for a kind label value. With kinds.sh loaded: the value
+# itself when it is in the closed set, else `task` plus a warning on stderr. Without kinds.sh (a
+# project scaffolded before it shipped) the value passes through unchanged, as it always did.
+_wt_kind_prefix() {
+  if command -v kit_kind_branch >/dev/null 2>&1; then kit_kind_branch "${1:-}"; else printf '%s\n' "${1:-task}"; fi
+}
 
 WT_START_REPO="${WT_START_REPO:-${KIT_REPO:-}}"
 
@@ -457,7 +485,8 @@ _wt_is_clean() {
 }
 
 # _wt_session_owns <root> <path> — true when a LIVE Claude session sits in <path> (or a subdir),
-# per the kit-sessions registry (.git/kit-sessions/*.json, written by session-registry.sh). A dead
+# per the kit-sessions registry (.git/kit-sessions/*.json — wt_start writes one claim per issue
+# through session-registry.sh, with `cwd` set to the worktree). A dead
 # pid is not an owner. No registry → no known live owner (returns false).
 _wt_session_owns() {
   local root="$1" wt_path="$2" common reg f opid ocwd
@@ -522,15 +551,46 @@ wt_pool_status() {
   [[ "$any" == "1" ]] || echo "(no pooled worktrees under $wtdir)"
 }
 
+# _wt_claim_desc <tsv-row> — one human line for a claim row from sreg_issue_claim.
+_wt_claim_desc() {
+  local c_issue c_branch c_wt c_pid c_host c_started
+  IFS=$'\t' read -r c_issue c_branch c_wt c_pid c_host c_started <<EOF
+$1
+EOF
+  printf 'pid %s on %s, worktree %s' "$c_pid" "$c_host" "$c_wt"
+}
+
 wt_start() {
-  local num="${1:-}" slug_override="${2:-}" root meta title kind slug branch wt reused cand
+  local num="" slug_override="" root meta title kind slug branch wt reused cand
+  local force="${KIT_FORCE:-0}" _arg _claim _claimed="" _crc
+  for _arg in "$@"; do
+    case "$_arg" in
+      --force) force=1 ;;
+      -*) echo "wt_start: unknown flag '$_arg' (usage: start [--force] <issue> [slug])" >&2; return 1 ;;
+      *) if [[ -z "$num" ]]; then num="$_arg"; elif [[ -z "$slug_override" ]]; then slug_override="$_arg"; fi ;;
+    esac
+  done
   [[ -n "$num" ]] || { echo "wt_start: issue number required" >&2; return 1; }
 
   root="$(git worktree list --porcelain | awk '/^worktree /{print $2; exit}')"
   [[ -n "$root" ]] || { echo "wt_start: not in a git repo" >&2; return 1; }
 
-  # The board's Status is set server-side by built-in automations (Item closed→Done, PR
-  # merged→Done) — wt_start no longer writes In Progress, so no board helpers are loaded here.
+  # Claim check (#384) — BEFORE the issue read, the fetch and `git worktree add`, so a refusal
+  # makes no network call, no branch and no worktree. A claim this session already holds (same
+  # session pid, or the caller stands inside the claimed worktree) is not a collision: re-running
+  # start stays the no-op it always was.
+  if command -v sreg_issue_claim >/dev/null 2>&1 && _claim="$(sreg_issue_claim "$root" "$num")" \
+     && ! sreg_claim_mine "$root" "$num"; then
+    if [[ "$force" != "1" ]]; then
+      echo "[#$num] refused: a live session already claims this issue — $(_wt_claim_desc "$_claim")" >&2
+      echo "[#$num] see 'cckit claims'; 'cckit start --force $num' (or KIT_FORCE=1) starts anyway and takes the claim." >&2
+      return 1
+    fi
+    echo "[#$num] ⚠ --force: taking over the claim of a live session — $(_wt_claim_desc "$_claim")" >&2
+  fi
+
+  # The board helpers load lazily, further down: Status is otherwise set server-side by built-in
+  # automations (Item closed→Done, PR merged→Done), and In Progress is the one write wt_start owns.
 
   if cckit_gh_rest; then
     meta="$(gh_rest_issue_json "$WT_START_REPO" "$num" 2>/dev/null)" || { echo "[#$num] issue not found" >&2; return 1; }
@@ -540,6 +600,7 @@ wt_start() {
   fi
   title="$(echo "$meta" | jq -r '.title')"
   kind="$(echo "$meta" | jq -r '([.labels[].name | select(startswith("kind:"))][0] // "kind:task") | sub("^kind:";"")')"
+  kind="$(_wt_kind_prefix "$kind")"
   if [[ -n "$slug_override" ]]; then
     slug="$slug_override"
   else
@@ -551,6 +612,24 @@ wt_start() {
   fi
   branch="$kind/$num-$slug"
   wt="$root/.claude/worktrees/${kind}+${num}-${slug}"
+
+  # Take the claim now that the worktree path is known, still before the fetch. rc 3 = another
+  # session claimed the issue between the check above and here. An unwritable registry only warns:
+  # the registry is a guard, not a precondition for working.
+  if command -v sreg_claim >/dev/null 2>&1; then
+    # _claimed marks a claim THIS call writes (none before, or one taken over by force), so a
+    # failed `worktree add` below releases only that — never a claim the session already held.
+    sreg_claim_mine "$root" "$num" || _claimed="1"
+    # `&& … ||` so a caller running under `set -e` (bin/cckit) reaches the refusal message.
+    sreg_claim "$root" "$num" "$branch" "$wt" "$force" && _crc=0 || _crc=$?
+    if [[ "$_crc" -eq 3 ]]; then
+      echo "[#$num] refused: another session claimed this issue just now — see 'cckit claims'." >&2
+      return 1
+    elif [[ "$_crc" -ne 0 ]]; then
+      _claimed=""
+      echo "[#$num] ⚠ could not record the session claim; continuing without one." >&2
+    fi
+  fi
 
   git -C "$root" fetch origin "${KIT_BASE_BRANCH:-main}" --quiet
   if git -C "$root" worktree list --porcelain | grep -q "/${kind}+${num}-${slug}$"; then
@@ -575,7 +654,8 @@ wt_start() {
     fi
     if [[ -z "$reused" ]]; then
       git -C "$root" worktree add -B "$branch" "$wt" origin/${KIT_BASE_BRANCH:-main} >/dev/null 2>&1 \
-        || { echo "[#$num] worktree add failed (branch $branch may exist elsewhere)" >&2; return 1; }
+        || { if [[ -n "$_claimed" ]]; then sreg_release "$root" "$num" 2>/dev/null || true; fi
+             echo "[#$num] worktree add failed (branch $branch may exist elsewhere)" >&2; return 1; }
       echo "[#$num] created worktree $wt (branch $branch)" >&2
     fi
   fi
@@ -595,12 +675,14 @@ wt_start() {
     command -v cckit_board_skipped >/dev/null 2>&1 && cckit_board_skipped
   elif source "$root/scripts/lib/gh-project.sh" 2>/dev/null; then
     [[ -n "${STATUS_FIELD_ID:-}" ]] || load_project_ids >/dev/null 2>&1 || true
-    # Claim precheck (#124): if the issue is ALREADY In Progress on the board, another session may
-    # already own it — warn (never block; the start still proceeds) so two agents don't collide.
+    # Board precheck (#124, #384): an issue ALREADY In Progress or In Review may belong to someone
+    # the local claims registry cannot see (a teammate's machine). Warn only — wt_start writes In
+    # Progress itself and nothing resets it when a session dies, so refusing on board Status would
+    # lock out every restart after a crash. The refusal is the live claim, checked at the top.
     if command -v project_issue_status >/dev/null 2>&1; then
       local _prev_status; _prev_status="$(project_issue_status "$num" 2>/dev/null || true)"
-      [[ "$_prev_status" == "In Progress" ]] \
-        && echo "[#$num] ⚠ already In Progress on the board — another session may own this issue; continuing." >&2
+      [[ "$_prev_status" == "In Progress" || "$_prev_status" == "In Review" ]] \
+        && echo "[#$num] ⚠ already $_prev_status on the board — another session may own this issue; continuing." >&2
     fi
     item="$(project_find_item_by_issue "$num" 2>/dev/null)"
     if [[ -z "$item" ]]; then
