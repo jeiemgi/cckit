@@ -30,7 +30,7 @@ job that runs the same command is the second observation, not the gate.
 | Surface | What it does | On by default? |
 | --- | --- | --- |
 | `prePush.enabled` + `prePush.command` in the kit config, read by `.claude/hooks/prepush_gate.sh` | a Claude Code `PreToolUse` hook on Bash: when a command contains `git push`, it runs `prePush.command` and stops the push if that exits non-zero | **No — opt-in.** `cckit init --prepush "<command>"` writes the hook and sets both keys; without the flag no profile installs it and `prePush.enabled` is `false` |
-| `scripts/lib/pr-evidence.sh` — `pr_attach_evidence <pr> <file> [caption]` | posts a log (or an image) as a PR comment, one comment per caption, edited in place on a re-run | a helper, listed by `cckit lib`. No verb calls it: attach the gate's log yourself after the PR opens |
+| `scripts/lib/pr-evidence.sh` — `pr_attach_evidence <pr> <file> [caption]` | posts a log (or an image) as a PR comment, one comment per caption, edited in place on a re-run | a helper `cckit init` copies into the project's `scripts/lib/`, listed by `cckit lib`; a project scaffolded before it shipped gets it from `cckit init --upgrade`. No verb calls it: attach the gate's log yourself after the PR opens |
 | `captain.mergePolicy.requireChecks` | `cckit watch --merge` reads a PR with **no checks at all** as `CHECKS_MISSING` → `verify` instead of green, and does not merge it | **No.** Default `false`; `KIT_CAPTAIN_REQUIRE_CHECKS=1` sets it for one run |
 
 - **The hook gates the agent, not the terminal.** It is a Claude Code hook, not a git hook: a
@@ -41,7 +41,7 @@ job that runs the same command is the second observation, not the gate.
 
 ```bash
 <your gate command> > gate.log 2>&1; echo "exit $?" >> gate.log
-source <cckit lib dir>/pr-evidence.sh    # `cckit lib` prints the directory and the source line
+source scripts/lib/pr-evidence.sh       # from the project root; `cckit init` copies it there
 pr_attach_evidence <pr-number> gate.log "gate"
 ```
 

@@ -765,6 +765,9 @@ safe_copy "$KIT_ROOT/scripts/lib/effort-metrics.sh" "$TARGET/scripts/lib/effort-
 safe_copy "$KIT_ROOT/scripts/lib/gh-log.sh"         "$TARGET/scripts/lib/gh-log.sh"
 safe_copy "$KIT_ROOT/scripts/lib/kit-events.sh"     "$TARGET/scripts/lib/kit-events.sh"
 safe_copy "$KIT_ROOT/scripts/lib/worktree-start.sh" "$TARGET/scripts/lib/worktree-start.sh"
+# pr-evidence.sh is the helper rules/gate-and-review.md tells a project to source; without this copy
+# `cckit lib` resolves to the project's own scripts/lib, where the helper would be missing.
+safe_copy "$KIT_ROOT/scripts/lib/pr-evidence.sh"    "$TARGET/scripts/lib/pr-evidence.sh"
 safe_copy "$KIT_ROOT/scripts/kit-version-check.sh"  "$TARGET/scripts/kit-version-check.sh" exec
 for sc in setup-labels.sh setup-milestones.sh capture-project-ids.sh task-sync.sh knowledge-lint.sh \
           review-lint.sh skill-frontmatter-lint.sh; do

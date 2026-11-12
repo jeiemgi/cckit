@@ -126,11 +126,12 @@ conversation resolution before merging* in the base branch's protection on GitHu
 `cckit status` lists each open PR's unresolved review threads.
 
 To put the gate's output on the PR, `scripts/lib/pr-evidence.sh` posts a log as a comment and edits
-that comment in place on a re-run. No verb calls it for you; `cckit lib` prints the line to source:
+that comment in place on a re-run. `cckit init` copies it into the project (`cckit init --upgrade`
+adds it to a project scaffolded before it shipped). No verb calls it for you; from the project root:
 
 ```bash
 <your gate command> > gate.log 2>&1; echo "exit $?" >> gate.log
-source <cckit lib dir>/pr-evidence.sh
+source scripts/lib/pr-evidence.sh
 pr_attach_evidence <pr-number> gate.log "gate"
 ```
 

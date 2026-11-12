@@ -16,7 +16,8 @@ its stash stack and its `.cckit/` state. To tell which one you are in:
 
 ```bash
 git worktree list --porcelain | head -1                  # the primary checkout's path
-[ "$(git rev-parse --git-dir)" = "$(git rev-parse --git-common-dir)" ] && echo "primary checkout"
+[ "$(git rev-parse --path-format=absolute --git-dir)" = "$(git rev-parse --path-format=absolute --git-common-dir)" ] \
+  && echo "primary checkout"               # absolute on both sides: the bare forms differ in a subdirectory
 ```
 
 ## 1. Never move the primary checkout by hand
