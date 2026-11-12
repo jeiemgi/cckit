@@ -85,6 +85,20 @@ wt_assign_ports "$W" 7 "$P" >/dev/null 2>&1
 after="$(ports_of "$W" | tr '\n' ' ')"
 [ "$before" = "$after" ] && ok || bad "re-run renumbered a live lane: '$before' -> '$after'"
 
+# ── 4b. the public readers agree with the allocation (#295) ───────────────────────────────────
+# The QA lane derives its ports from wt_port_slot + wt_port_stride. If either disagreed with what
+# wt_assign_ports wrote, a lane's stack would boot off the worktree's own port block.
+slot7="$(wt_port_slot "$P" 7 "$W" 2>/dev/null)"
+stride7="$(wt_port_stride "$P/cckit.config.json")"
+[ "$stride7" = 10 ] && ok || bad "wt_port_stride default: got '$stride7', want 10"
+first7="$(ports_of "$W" | head -1)"
+[ "$first7" = "$(( 3001 + slot7 * stride7 ))" ] && ok || bad "wt_port_slot disagrees with the assigned port: slot '$slot7' stride '$stride7' port '$first7'"
+[ "$(wt_port_slot "$P" 7 "$W" 2>/dev/null)" = "$slot7" ] && ok || bad "wt_port_slot renumbered a live issue"
+printf '%s' '{"worktree":{"devPortStride":25}}' > "$TMP/stride.json"
+[ "$(wt_port_stride "$TMP/stride.json")" = 25 ] && ok || bad "wt_port_stride ignored worktree.devPortStride"
+printf '%s' '{"worktree":{"devPortStride":"wide"}}' > "$TMP/stride.json"
+[ "$(wt_port_stride "$TMP/stride.json")" = 10 ] && ok || bad "wt_port_stride accepted a non-integer stride"
+
 # ── 5. a freed slot is reclaimed, not leaked ──────────────────────────────────────────────────
 slots="$(git -C "$P" rev-parse --git-common-dir 2>/dev/null)"
 case "$slots" in /*) : ;; *) slots="$(cd "$P" && cd "$slots" && pwd)" ;; esac

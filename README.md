@@ -300,6 +300,25 @@ stdout, so it asserts nothing about any agent's flags. A PR with **no** verdict 
 `verify`, never merges silently: absence of evidence is not a pass. Off until you configure it.
 → [the agent review stage](https://cckit.dev/config-and-permissions/#the-agent-review-stage)
 
+For review by a person on the running app, `cckit qa` drives one review stack per lane — a lane is
+an issue number, so an effort's worktree is one lane. Declare how the project boots once
+(`/kit-add qa`: the stack command, its port env vars, one readiness probe per service, a fallback
+route, the names of the test-credential env vars), then:
+
+```bash
+cckit qa up                # launch the declared stack on this lane's ports; exit 0 only once
+                           #   every readiness probe answers 2xx/3xx; refuses (exit 2) when
+                           #   a lane port is already in use
+cckit qa open              # open the changed screen: the PR body's `QA route:` line, else qa.route
+cckit qa verdict pass      # record the verdict against the reviewed commit (a push makes it stale)
+cckit qa verdict fail --note "what is wrong"   # also mails the notes to the builder's branch
+cckit qa stop              # stop the stack; exit 0 only when nothing listens on the lane's ports
+                           #   (a listener the lane did not launch is left running; --force stops it)
+```
+
+Set `captain.mergePolicy.requireQa` and `cckit watch` holds a PR until a pass is recorded against
+its current head. Off by default. → [the QA lane](https://cckit.dev/qa-lane/)
+
 ## Driven by agents
 
 cckit is meant to be operated by an agent loop, not only a human. See [`AGENTS.md`](AGENTS.md) for

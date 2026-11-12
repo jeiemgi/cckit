@@ -73,6 +73,15 @@
 #   cckit lib [--llm] [--all]       list every scripts/lib helper: functions, purpose, error contract
 #   cckit brief <issue>             the delegation brief for an issue, from real state
 #   cckit receipt <issue> …        record/read one stage receipt (a worker's durable report)
+#   cckit qa <up|ready> [--lane N] [--timeout S]   launch the declared review stack on this lane's
+#                                   ports; exit 0 only once every readiness probe answers
+#   cckit qa open [--lane N] [--pr N] [--route /p] [--print]   open the screen the change touched
+#                                   (the PR body's `QA route:` line, else qa.route) on a usable lane
+#   cckit qa stop [--lane N] [--force]   stop the lane's stack — supervisors before listeners — and
+#                                   exit 0 only when nothing listens on the lane's ports
+#   cckit qa verdict [pass|fail] [--lane N] [--note T] [--shot F]   record the verdict against the
+#                                   reviewed commit (PR comment upserted, a fail mailed to the builder);
+#                                   with no pass|fail, read it back: pass · fail · stale · none
 #   cckit completions [bash|zsh]    print a shell-completion script to source
 #   cckit help
 set -eu
@@ -513,6 +522,14 @@ case "$cmd" in
     # shellcheck source=/dev/null
     source "$LIB/stage-receipt.sh"
     sr_cli "$@"
+    ;;
+  qa)
+    # The QA lane (#295): launch the stack command the project declared under `qa`, on this lane's
+    # port block, and report USABLE only when every readiness probe answers. One dispatcher in the
+    # lib, as `receipt` does with sr_cli, so later subcommands land there and not here.
+    # shellcheck source=/dev/null
+    source "$LIB/qa-lane.sh"
+    qa_cli "$@"
     ;;
   completions)
     case "${1:-bash}" in

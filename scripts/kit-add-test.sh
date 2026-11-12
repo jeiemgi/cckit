@@ -47,6 +47,34 @@ if [ -n "${KIT_ADD_TEST_INNER:-}" ]; then
   t "dry-run no write" "$([ -f "$fresh/app/.claude/kit.config.json" ] && echo wrote || echo clean)" "clean"
   rm -rf "$fresh"
 
+  # --- qa module (#294): `kit-add.sh qa --answers F` writes the qa block; a 2nd run is a no-op ---
+  printf '%s\n' '{"command":"pnpm dev:stack","ports":"WEB_PORT=3000, API_PORT=4000","readiness":"WEB_PORT=/, API_PORT=/health","route":"/dashboard","credentialEnv":"QA_EMAIL, QA_PASSWORD"}' > "$ws/qa.json"
+  "$ADD" qa --dir "$ws/myapp" --answers "$ws/qa.json" >/dev/null 2>&1; t "qa add rc" "$?" "0"
+  t "qa block"         "$(jq -c .qa "$cfg")" '{"command":"pnpm dev:stack","ports":[{"env":"WEB_PORT","base":3000},{"env":"API_PORT","base":4000}],"readiness":[{"env":"WEB_PORT","path":"/"},{"env":"API_PORT","path":"/health"}],"route":"/dashboard","credentialEnv":["QA_EMAIL","QA_PASSWORD"]}'
+  t "qa stacks on software" "$(jq -c .modules "$cfg")" '["qa","software"]'
+  t "qa keeps software answers" "$(jq -r .deploy.target "$cfg")" "vercel"
+  before="$(cat "$cfg")"
+  "$ADD" qa --dir "$ws/myapp" --answers "$ws/qa.json" >/dev/null 2>&1; t "qa 2nd run rc" "$?" "0"
+  t "qa 2nd run no-op" "$(cat "$cfg")" "$before"
+  # a credential VALUE never reaches the config: the add fails and the file is untouched
+  printf '%s\n' '{"command":"pnpm dev:stack","credentialEnv":"QA_PASSWORD=hunter2-value"}' > "$ws/qa-leak.json"
+  "$ADD" qa --dir "$ws/myapp" --answers "$ws/qa-leak.json" >/dev/null 2>&1; t "qa value refused rc" "$?" "1"
+  t "qa value refused: file untouched" "$(cat "$cfg")" "$before"
+  # no stack command, no qa block (KIT_ASSUME_YES has no default to fall back on)
+  bare="$(mktemp -d)"; mkdir -p "$bare/app"
+  "$ADD" qa --dir "$bare/app" >/dev/null 2>&1; t "qa without a command rc" "$?" "1"
+  t "qa without a command: no write" "$([ -f "$bare/app/.claude/kit.config.json" ] && echo wrote || echo clean)" "clean"
+  # self-host layout: a root cckit.config.json is the config kit-add targets, not a second file.
+  # That file pre-exists and is not manifest-tracked, so the conffiles guard applies: an unattended
+  # run keeps it, and only an explicit yes on stdin writes.
+  printf '%s\n' '{"project":{"name":"Self"}}' > "$bare/app/cckit.config.json"
+  "$ADD" qa --dir "$bare/app" --answers "$ws/qa.json" >/dev/null 2>&1; t "qa self-host unattended rc" "$?" "0"
+  t "qa self-host unattended: kept" "$(jq -c . "$bare/app/cckit.config.json")" '{"project":{"name":"Self"}}'
+  printf 'y\n' | env -u KIT_ASSUME_YES "$ADD" qa --dir "$bare/app" --answers "$ws/qa.json" >/dev/null 2>&1; t "qa self-host confirmed rc" "$?" "0"
+  t "qa self-host: root config" "$(jq -r '[.project.name, .qa.command] | join("|")' "$bare/app/cckit.config.json")" "Self|pnpm dev:stack"
+  t "qa self-host: no scaffolded twin" "$([ -f "$bare/app/.claude/kit.config.json" ] && echo wrote || echo clean)" "clean"
+  rm -rf "$bare"
+
   [ "$fail" -eq 0 ] && echo "ALL OK($KIT_ADD_TEST_INNER)"
   exit "$fail"
 fi

@@ -4,7 +4,7 @@
 # THE SPLIT: the ASKING is interactive (the kit-onboard skill drives AskUserQuestion — Tier A,
 # portable to Cowork/claude.ai). The DERIVING is pure data and lives here, so it is unit-testable
 # under bash AND zsh with zero interactivity:
-#   - catalog : the question set per tier (global | project | software), loaded from interview/*.json
+#   - catalog : the question set per tier (global | project | software | qa), loaded from interview/*.json
 #               and modules/*.json — data, reviewable, not buried in bash.
 #   - context : profile + repo detection, used to PRE-FILL per-project / wizard defaults.
 #   - render  : the catalog with every `default` resolved from context (what the skill renders).
@@ -121,15 +121,67 @@ _kit_iv_apply_set() {
   esac
 }
 
+# _kit_iv_listval <question-json> <answersfile> -> a JSON array on stdout, for `list` / `pairs`
+# questions (text answers only ever wrote ONE string; a QA block needs lists — #294).
+#   list  : "A, B" or ["A","B"]            -> ["A","B"]            (order kept, duplicates dropped)
+#   pairs : "A=1, B" or [{k:..,v:..}, ...]  -> [{<k>:"A",<v>:1}, …] keyed by .pairKeys = [k, v].
+#           A pair with no value DERIVES one from .pairDefault: number -> default + its position,
+#           string -> the default itself. .pairValtype: number | string.
+# .pattern constrains every list item / pair KEY. That is the credential guard: a pattern of bare
+# env-var NAMES makes `QA_PASSWORD=hunter2` fail instead of landing in config. A refusal names the
+# question and the item's POSITION, never the item — the refused text may be the secret itself.
+# rc 1 on a refused answer (nothing on stdout). An empty answer yields [].
+_kit_iv_listval() {
+  local q="$1" ans="$2"
+  jq -c --argjson q "$q" '
+    def items: if type=="array" then . elif type=="string" then [splits("[,\\s]+") | select(length>0)] else [] end;
+    def refuse($i; $why): error("answer for \($q.key): item \($i + 1) \($why)");
+    ($q.pattern // "") as $pat
+    | ($q.pairKeys // ["key","value"]) as $pk
+    | ($q.pairValtype // "string") as $vt
+    | (.[$q.key] // null) as $raw
+    | (if ($raw == null or $raw == "" or $raw == []) then ($q.default // "") else $raw end | items) as $it
+    | if ($q.type == "list") then
+        reduce range(0; $it|length) as $i ([];
+          ($it[$i]) as $x
+          | if ($x|type) != "string" then refuse($i; "is not a string")
+            elif ($pat != "" and ($x|test($pat)|not)) then refuse($i; "is not a bare name (names only — a value is never stored)")
+            elif any(.[]; . == $x) then .
+            else . + [$x] end)
+      else
+        reduce range(0; $it|length) as $i ([];
+          ($it[$i]) as $x
+          | (if ($x|type) == "string" then ($x | capture("^(?<k>[^=]*)(=(?<v>.*))?$"))
+             elif ($x|type) == "object" then {k: $x[$pk[0]], v: $x[$pk[1]]}
+             else refuse($i; "is neither NAME=value nor an object") end) as $kv
+          | if ($kv.k|type) != "string" or ($pat != "" and ($kv.k|test($pat)|not)) then refuse($i; "has no valid name before `=`")
+            elif any(.[]; .[$pk[0]] == $kv.k) then refuse($i; "repeats a name already given")
+            else
+              (if ($kv.v == null or $kv.v == "") then
+                 (if $vt == "number" then (($q.pairDefault // 0) + $i) else ($q.pairDefault // refuse($i; "has no value after `=`")) end)
+               elif $vt == "number" then
+                 (if ($kv.v|type) == "number" then $kv.v
+                  elif (($kv.v|type) == "string" and ($kv.v|test("^[0-9]+$"))) then ($kv.v|tonumber)
+                  else refuse($i; "needs a whole number after `=`") end)
+               else ($kv.v|tostring) end) as $v
+              | . + [{($pk[0]): $kv.k, ($pk[1]): $v}]
+            end)
+      end
+  ' "$ans"
+}
+
 # kit_interview_apply <tier> <answersfile> [basefile] -> merged config JSON on stdout.
 # answersfile: {"<key>":"<chosen value>", ...}. Unanswered questions fall back to their default.
+# Question types: select (the option's set[]) · text (one string at .target) · list / pairs (an
+# ARRAY at .target, REPLACED not unioned, so re-answering shrinks it and a re-run is a no-op).
+# A question marked "required": true with no answer and no default fails the whole apply (rc 1).
 # Control questions (e.g. project.software) carry no `set` — they steer the caller, not the config.
 kit_interview_apply() {
   _kit_iv_require || return 1
   # ALL locals declared ONCE up front. A BARE `local x` re-run inside a loop PRINTS the var under
   # zsh (treated like `typeset x`), polluting stdout — so never re-declare locals in the loops below.
   local tier="$1" ans="$2" base="${3:-}"
-  local catalog merged nsets nq i p v vt tmp q key qtype def answer target nset j
+  local catalog merged nsets nq i p v vt tmp q key qtype def answer target nset j arr
   [ -f "$ans" ] || { kit_warn "kit-interview apply: answers file missing: $ans"; return 1; }
   catalog="$(kit_interview_catalog "$tier")" || return 1
   merged="$(mktemp)" || return 1
@@ -154,10 +206,19 @@ kit_interview_apply() {
     key="$(printf '%s' "$q" | jq -r '.key')"
     qtype="$(printf '%s' "$q" | jq -r '.type // "text"')"
     def="$(printf '%s' "$q" | jq -r '.default // ""')"
-    answer="$(jq -r --arg k "$key" '.[$k] // empty' "$ans")"
+    answer="$(jq -r --arg k "$key" '.[$k] // empty | if type=="array" then map(tostring) | join(",") else . end' "$ans")"
     [ -z "$answer" ] && answer="$def"
+    if [ -z "$answer" ] && [ "$(printf '%s' "$q" | jq -r '.required // false')" = "true" ]; then
+      kit_warn "kit-interview apply: '$key' is required and has no answer"; rm -f "$merged"; return 1
+    fi
 
-    if [ "$qtype" = "text" ]; then
+    if [ "$qtype" = "list" ] || [ "$qtype" = "pairs" ]; then
+      target="$(printf '%s' "$q" | jq -r '.target // empty')"
+      arr="$(_kit_iv_listval "$q" "$ans")" || { kit_warn "kit-interview apply: answer for '$key' refused — nothing written"; rm -f "$merged"; return 1; }
+      if [ -n "$target" ] && [ "$arr" != "[]" ]; then
+        tmp="$(mktemp)"; jq --argjson v "$arr" "setpath($(printf '%s' "$target" | jq -Rc 'split(".")'); \$v)" < "$merged" > "$tmp" && mv "$tmp" "$merged" || { rm -f "$tmp" "$merged"; return 1; }
+      fi
+    elif [ "$qtype" = "text" ]; then
       target="$(printf '%s' "$q" | jq -r '.target // empty')"
       if [ -n "$target" ] && [ -n "$answer" ]; then
         tmp="$(mktemp)"; _kit_iv_apply_set "$target" "$answer" string < "$merged" > "$tmp" && mv "$tmp" "$merged" || { rm -f "$tmp" "$merged"; return 1; }

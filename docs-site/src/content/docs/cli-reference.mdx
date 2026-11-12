@@ -169,6 +169,7 @@ A **wave** is a set of issues with no blockers between them, so they can run at 
 | Verb | Purpose |
 | --- | --- |
 | `cckit receipt <issue> --stage <s>` | Record one stage receipt from stdin, locally and as a comment on the issue (`--no-remote` skips the comment). `receipt list [<issue>]` and `receipt show <issue> <stage> [<attempt>]` read them back. |
+| `cckit qa <up\|ready\|open\|stop\|verdict> [--lane N]` | The [QA lane](/qa-lane/): `up` launches the stack command declared under `qa` on this lane's ports and exits 0 only once every readiness probe answers (`ready` waits on a launched lane), and refuses with exit 2 when a lane port is already in use; `open` opens the changed screen — the PR body's `QA route:` line, else `qa.route`; `stop` frees the lane's ports, leaving a listener the lane did not launch running unless `--force`; `verdict <pass\|fail>` records the verdict against the reviewed commit, and with no `pass\|fail` reads it back as `pass` · `fail` · `stale` · `none`. |
 | `cckit orchestrate <a> <b> …` | Run N flows in parallel worktrees (`--dry-run` / `--cap` / `--agent` / `--runtime tmux\|herdr`). |
 | `cckit autopilot [<a> …]` | Select the passed issues, or the current unblocked set, then call `orchestrate --detach`. It accepts the same cap, agent, profile, and runtime flags. |
 
