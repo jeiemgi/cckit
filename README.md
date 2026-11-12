@@ -101,7 +101,12 @@ cckit start 42                # isolated worktree + branch for issue #42, bootst
 cckit brief 42                # the delegation brief for #42, read out of the repo not memory
 cckit lib                     # every scripts/lib helper: functions, purpose, error contract
 cckit pr 42 "what changed"    # commit, push, open the PR
-# cckit pr 42 "what changed" --base main   # same, against a branch other than the configured base
+cckit pr 42 "what changed" --base main   # target main, not the integration branch; the push
+                              #   exports the target as KIT_PR_BASE for a git pre-push hook
+cckit hotfix 268              # cherry-pick merged PR 268 (or a commit sha) onto main (--base B
+                              #   for another branch): worktree from origin/main, cherry-pick -x,
+                              #   push, PR titled after the source with `Cherry-pick of #268`;
+                              #   a rebase-merged PR is carried commit by commit
 cckit sync                    # board state, what's unblocked
 cckit handoff "resume note"   # save a handoff — bare `cckit` prints it next session
 cckit gc                      # report prunable branches + worktrees (deletes nothing); a failed GitHub read shows as UNKNOWN, kept

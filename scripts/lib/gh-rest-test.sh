@@ -110,6 +110,11 @@ tc <(CCKIT_GH_TRANSPORT=soap cckit_gh_transport 2>&1 >/dev/null) "must be rest o
 t "closing refs are read from a PR body" \
   "$(printf 'Closes #42\nfixes #43 and resolves #7\nsee #44\nCloses #42\n' | gh_rest_closing_refs | tr '\n' ' ')" "7 42 43 "
 
+# The PR read carries what `cckit hotfix <pr>` needs (#360): the title, and a merge commit only once
+# MERGED — the fixture PR is open, and its merge_commit_sha is GitHub's test merge, not a real one.
+t "pr json carries the title"                       "$(gh_rest_pr_json o/r 9 | jq -r .title)" "feat: sub 9"
+t "an open PR has no merge commit"                  "$(gh_rest_pr_json o/r 9 | jq -r '.mergeCommit.oid // "none"')" "none"
+
 # ── board steps in rest mode ──────────────────────────────────────────────────────────────────────
 : > "$GH_LOG"
 out="$(CCKIT_GH_TRANSPORT=rest bash -c '

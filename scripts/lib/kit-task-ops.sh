@@ -229,7 +229,9 @@ _kto_role_option_for_slug() {
 # --base (#391) targets a branch other than the configured base — a release PR develop -> main.
 # load_kit_config re-exports KIT_BASE_BRANCH from the config, so an env override cannot do this.
 # The flag is parsed out before the positionals are read, anywhere on the line, and a missing value
-# returns 2 before the commit and the push.
+# returns 2 before the commit and the push. The target is exported to the push as KIT_PR_BASE (set
+# with or without the flag), so a project's git pre-push hook can compare against the branch the PR
+# targets (#360).
 kto_task_pr() {
   # Default-safe reads: callers (scripts/kit) may run under `set -u`.
   local num="" summary="" commit_msg="" base_override="" _pos=0
@@ -252,6 +254,7 @@ kto_task_pr() {
         shift ;;
     esac
   done
+  local base; base="$(kto_base_branch "$base_override")"
   local repo branch meta title labels milestone role author="" url pr_num pr_node item role_opt issue_item
   repo="$(kto_repo)"
   branch="$(git rev-parse --abbrev-ref HEAD)"
@@ -286,14 +289,14 @@ kto_task_pr() {
     fi
   fi
 
-  git push -u origin "$branch" || return 1
+  KIT_PR_BASE="$base" git push -u origin "$branch" || return 1
 
   if cckit_gh_rest; then
-    url=$(gh_rest_pr_create "$repo" "$(kto_base_branch "$base_override")" "$branch" "$pr_title" \
+    url=$(gh_rest_pr_create "$repo" "$base" "$branch" "$pr_title" \
       "$(kto_compose_pr_body "$num" "$summary" "$role" "$title")" "$labels" "$milestone") || return 1
   else
   url=$(gh pr create --repo "$repo" \
-    --base "$(kto_base_branch "$base_override")" --head "$branch" \
+    --base "$base" --head "$branch" \
     --title "$pr_title" \
     --body "$(kto_compose_pr_body "$num" "$summary" "$role" "$title")" \
     --label "$labels" \
