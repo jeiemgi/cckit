@@ -53,9 +53,15 @@ Read-only. It writes nothing, deletes nothing, and pushes nothing.
 
 | # | Bucket | What it answers |
 | --- | --- | --- |
-| 1 | **Local undone work** | What exists only on this machine: worktrees with uncommitted changes, branches holding commits reachable from **no** remote ref, and effort subs not yet merged into their effort branch. Plus the worktree inventory — a clean worktree on an issue branch is still work in progress. |
+| 1 | **Local undone work** | What exists only on this machine: worktrees with uncommitted changes, branches holding commits reachable from **no** remote ref, and effort subs not yet merged into their effort branch. Plus the worktree inventory — a clean worktree on an issue branch is still work in progress. A detached worktree that `cckit gc` rates LANDED (clean, HEAD on the base branch or `main`) is left out of the **In progress** list and counted in one line under it; `--llm` `worktrees` still carries every worktree. |
 | 2 | **PRs waiting on a human** | Every open PR with the ONE thing it needs: `conflict`, `checks`, `draft`, `wait`, `threads`, `ai-review`, `review`, or `ready`. |
-| 3 | **Cleanup available** | Branches and worktrees that can go — **local and remote** — plus what is deliberately kept (orphan work, open-issue branches). |
+| 3 | **Cleanup available** | Branches and worktrees that can go — **local and remote** — plus what is deliberately kept (orphan work, open-issue branches), and a count of branches that could not be classified because a GitHub read failed. |
+
+After the buckets the report prints one **Instruction files** line: the bytes `CLAUDE.md` and the
+rules without a `paths:` frontmatter load into every session, against Claude Code's 150k limit, and
+the three largest files. It is not a fourth bucket — nothing in it is pending work — and it is
+absent when the project has no instruction files. Relay it as printed;
+`scripts/instruction-budget-lint.sh --report` lists every file.
 
 ## Next effort per flow
 

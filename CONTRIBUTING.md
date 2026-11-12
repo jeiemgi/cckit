@@ -26,7 +26,26 @@ cckit pr <issue> "<summary>" # open the PR
   to set the type yourself. CI (`commitlint`) fails the PR until the title is valid; check one locally
   with `scripts/lib/commitlint.sh "feat: your summary"`.
 - Run the local gate before opening a PR: `bash scripts/check.sh` (shell syntax, valid manifests,
-  no stray branding, the commitlint rules). A green gate is the bar.
+  no stray branding, the commitlint rules, the skill-listing and instruction-file budgets). A green gate is the bar.
+
+## A rule declares when it loads
+
+Claude Code loads every `.claude/rules/*.md` without a `paths:` frontmatter into every session. A
+rule that covers one kind of file therefore opens with `paths:`, so it loads only when a matching file is read:
+
+```markdown
+---
+paths:
+  - "**/*.tsx"
+---
+```
+
+`templates/rules/react-annotate.md` is the shipped example. A cross-cutting rule (branch naming, the
+effort model) stays unscoped, and a behavioural routing rule must: scoped, it would not load until a
+matching file had already been read. A rule that outgrows 200 lines splits into a short rule plus a
+`knowledge/` doc it points at. `scripts/instruction-budget-lint.sh` is the gate — `--report` lists
+every file's cost; `scripts/instruction-budget-baseline.txt` grandfathers `effort-model.md` (205
+lines) and `naming-and-ids.md` (202), which may shrink but not grow.
 
 ## Durable prose goes through `concrete`
 

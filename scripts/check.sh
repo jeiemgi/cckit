@@ -65,6 +65,13 @@ fi
 note "==> skill frontmatter context budget"
 bash scripts/skill-frontmatter-lint.sh || fail=1
 
+# 5b. Instruction-file budget. CLAUDE.md and every `.claude/rules/*.md` without a `paths:`
+# frontmatter load into every session; Claude Code warns once they pass 150k characters combined.
+# Same ratchet: an over-long file or an over-limit total is grandfathered in the baseline, and only
+# growth (or a new offender) fails the gate.
+note "==> instruction-file budget"
+bash scripts/instruction-budget-lint.sh || fail=1
+
 # 6. Codified review findings. Mechanical defect classes caught in past reviews, encoded as rules
 # in scripts/review-rules.conf so the same bug cannot land twice. Per-file ratchet: today's hits are
 # grandfathered in the baseline, only new or grown hits fail. Rules needing intent stay with review.

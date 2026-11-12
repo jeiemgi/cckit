@@ -17,7 +17,10 @@
 #   kit_gc_cleanup [--yes]    the guided sweep: plan every bucket, then act on SAFE + LANDED + ZOMBIE.
 #
 # Verdicts: PROTECTED (issue open) · SAFE (own PR merged) · ACTIVE (own PR open / base) · LANDED (no
-# PR of its own, work already on base — #388: effort subs, agent isolation worktrees) · ORPHAN.
+# PR of its own, work already on base — #388: effort subs, agent isolation worktrees) · ORPHAN ·
+# UNKNOWN (a gh read FAILED, so the verdict could not be determined — #330; never deletable).
+# A DETACHED worktree has no branch to classify, so it gets its own row (#390): LANDED when it is
+# clean and its HEAD is already on the base branch or `main`, ORPHAN otherwise.
 #
 # Requires: git; gh (degrades to "unknown" issue/PR state without it); scripts/lib/worktree-issue.sh.
 # Portable: bash 3.2+ AND zsh.
@@ -74,15 +77,35 @@ _kit_gc_require_deps() {
 # _kit_gc_pr_index [repo] — echo one "<headRefName>\tPR#<num> <STATE>" line per PR in ONE gh call, so
 # branch classification is a local lookup instead of a per-branch `gh pr list --head` — an N+1 that
 # scaled badly exactly when gc matters most (many stale branches). #124.
+#
+# A FAILED read is not an empty list (#330): an empty index means "this repo has no PRs", and every
+# branch then reads as having none. So a failure warns on stderr and emits ONE sentinel line,
+# `?<TAB>UNKNOWN` — `?` cannot be a branch name (git refuses it), so no lookup ever matches it — and
+# _kit_gc_classify answers UNKNOWN instead of ORPHAN/LANDED for a branch it finds no PR for. rc 0
+# always: kit-status.sh calls this in a bare assignment under `set -e`.
 _kit_gc_pr_index() {
-  local repo="${1:-$KIT_GC_REPO}"
+  local repo="${1:-$KIT_GC_REPO}" out
   if cckit_gh_rest; then
-    gh api "repos/$repo/pulls" -X GET -f state=all -f per_page=100 \
-      --jq '.[] | "\(.head.ref)\tPR#\(.number) \(if .merged_at then "MERGED" else (.state | ascii_upcase) end)"' 2>/dev/null || true
-    return 0
+    out="$(gh api "repos/$repo/pulls" -X GET -f state=all -f per_page=100 \
+      --jq '.[] | "\(.head.ref)\tPR#\(.number) \(if .merged_at then "MERGED" else (.state | ascii_upcase) end)"' 2>/dev/null)" \
+      || { _kit_gc_pr_index_failed; return 0; }
+  else
+    out="$(gh pr list --repo "$repo" --state all --limit 200 --json number,state,headRefName \
+      --jq '.[] | "\(.headRefName)\tPR#\(.number) \(.state)"' 2>/dev/null)" \
+      || { _kit_gc_pr_index_failed; return 0; }
   fi
-  gh pr list --repo "$repo" --state all --limit 200 --json number,state,headRefName \
-    --jq '.[] | "\(.headRefName)\tPR#\(.number) \(.state)"' 2>/dev/null || true
+  [ -n "$out" ] && printf '%s\n' "$out"
+  return 0
+}
+
+_kit_gc_pr_index_failed() {
+  echo "kit-gc: could not read the PR list from GitHub (gh failed) — a branch whose PR is not known is reported UNKNOWN and kept" >&2
+  printf '?\tUNKNOWN\n'
+}
+
+# _kit_gc_pr_index_unknown <index> — rc 0 when <index> carries the failed-read sentinel.
+_kit_gc_pr_index_unknown() {
+  printf '%s\n' "$1" | grep -q "^?$(printf '\t')UNKNOWN\$"
 }
 
 # _kit_gc_pr_for <index> <branch> — first PR line matching <branch> as head (mirrors the old `.[0]`).
@@ -210,21 +233,35 @@ EOF
 # _kit_gc_classify <branch> <pr_index> [repo] — the ONE verdict for a branch, exactly as
 # kit_gc_analyze prints it after `-> `. kit_gc_prune acts on this same function, so the plan a human
 # approved and the delete that follows can never disagree (Family 1, the failure mode #219 was about).
-# Order: base branch > PROTECTED (issue open) > SAFE (own PR merged) > ACTIVE (own PR open) > a
-# CLOSED-unmerged PR verbatim > LANDED (no PR, work on base) > ORPHAN.
+# Order: base branch > PROTECTED (issue open) > UNKNOWN (issue state read failed) > SAFE (own PR
+# merged) > ACTIVE (own PR open) > a CLOSED-unmerged PR verbatim > UNKNOWN (PR list read failed) >
+# LANDED (no PR, work on base) > ORPHAN.
+#
+# The two UNKNOWN rungs are #330. A failed issue-state read sits ABOVE SAFE and LANDED because the
+# issue may be open: with gh failing, an open issue's branch with no commits beyond base used to
+# lose PROTECTED and be classified LANDED by the content check, which needs no gh at all — and
+# LANDED is deletable. A failed PR-list read sits above LANDED/ORPHAN because "found no PR" is not
+# "has no PR" when the list never arrived. Neither string says "no PR", and neither is deletable
+# (_kit_gc_prune_why answers nothing for it).
 _kit_gc_classify() {
-  local b="$1" pr_index="$2" repo="${3:-$KIT_GC_REPO}" pr prot landed
+  local b="$1" pr_index="$2" repo="${3:-$KIT_GC_REPO}" pr n state="" landed
   case "$b" in "${KIT_BASE_BRANCH:-main}"|develop|main) echo "ACTIVE (base branch)"; return 0 ;; esac
   pr="$(_kit_gc_pr_for "$pr_index" "$b")"
-  prot="$(wt_protected_reason "$b" "$repo" 2>/dev/null || true)"
-  if [ -n "$prot" ]; then
-    echo "PROTECTED: $prot"
+  # The same read wt_protected_reason makes, kept as a state so `unknown` is not flattened to "".
+  n="$(wt_issue_number "$b" 2>/dev/null || true)"
+  [ -n "$n" ] && state="$(wt_issue_state "$n" "$repo" 2>/dev/null || true)"
+  if [ "$state" = open ]; then
+    echo "PROTECTED: issue #$n still OPEN"
+  elif [ "$state" = unknown ]; then
+    echo "UNKNOWN (could not determine — the state read for issue #$n failed; kept, never auto-deleted)"
   elif printf '%s' "$pr" | grep -q 'MERGED'; then
     echo "SAFE (${pr}, issue closed/absent — verify level with remote before delete)"
   elif printf '%s' "$pr" | grep -q 'OPEN'; then
     echo "ACTIVE (${pr})"
   elif [ -n "$pr" ]; then
     echo "$pr"
+  elif _kit_gc_pr_index_unknown "$pr_index"; then
+    echo "UNKNOWN (could not determine — the PR list read failed; kept, never auto-deleted)"
   else
     landed="$(_kit_gc_landed_reason "$b" "$pr_index" "$repo")"
     if [ -n "$landed" ]; then echo "LANDED ($landed)"
@@ -232,9 +269,54 @@ _kit_gc_classify() {
   fi
 }
 
+# _kit_gc_detached_verdict <worktree-path> <head-sha> — the ONE verdict for a live worktree whose HEAD
+# is detached (#390), exactly as kit_gc_analyze prints it after `-> `. It has no branch, so none of
+# the branch checks apply (no name to carry an issue number, no PR head to look up):
+#   LANDED  the tree is clean AND HEAD is an ancestor of the base ref or of `main` — every commit it
+#           can reach is already there and no file differs, so removing it loses nothing. The shape
+#           an agent tool leaves behind when the `claude/*` branch it made the worktree for is gone,
+#           and a temp worktree a review built at a base commit.
+#   ORPHAN  anything else: uncommitted changes, a status that cannot be read, or a HEAD that is on
+#           neither ref. A commit made on a detached HEAD is on no branch, so the worktree is the
+#           only handle on it — never deleted, surfaced by path.
+# An ignored file does not make the tree dirty (same rule as the branch worktrees above).
+_kit_gc_detached_verdict() {
+  local wtpath="$1" sha="$2" ref dirt
+  dirt="$(git -C "$wtpath" status --porcelain 2>/dev/null)" \
+    || { echo "ORPHAN (detached, status unreadable — surface, never auto-delete)"; return 0; }
+  if [ -n "$dirt" ]; then
+    echo "ORPHAN (detached, uncommitted changes — surface, never auto-delete)"; return 0
+  fi
+  for ref in "$(_kit_gc_base_ref)" origin/main main; do
+    [ -n "$ref" ] || continue
+    git rev-parse --verify --quiet "${ref}^{commit}" >/dev/null 2>&1 || continue
+    if git merge-base --is-ancestor "$sha" "$ref" 2>/dev/null; then
+      echo "LANDED (detached; ancestor of $ref)"; return 0
+    fi
+  done
+  echo "ORPHAN (detached, HEAD on neither the base branch nor main — surface, never auto-delete)"
+}
+
+# _kit_gc_detached_rows — echo "<path>\t<head-sha>\t<verdict>" for each LIVE linked worktree whose
+# HEAD is detached. The first porcelain record is the main checkout (or a bare repo): it cannot be
+# removed as a worktree, so it is never a row. A detached worktree whose directory is gone is a
+# ZOMBIE and belongs to _kit_gc_zombies, not here. `substr`, not `$2`: a path may hold a space.
+# Writes NOTHING. analyze, prune, cleanup and `cckit status` all read this one list.
+_kit_gc_detached_rows() {
+  local wtpath sha
+  git worktree list --porcelain 2>/dev/null \
+    | awk '/^worktree /  { n++; w = substr($0, 10); h = ""; next }
+           /^HEAD /      { h = substr($0, 6); next }
+           /^detached$/  { if (n > 1) print w "\t" h }' \
+    | while IFS="$(printf '\t')" read -r wtpath sha; do
+        [ -n "$wtpath" ] && [ -d "$wtpath" ] || continue
+        printf '%s\t%s\t%s\n' "$wtpath" "$sha" "$(_kit_gc_detached_verdict "$wtpath" "$sha")"
+      done
+}
+
 # kit_gc_analyze — read-only classification of worktrees, branches, and stashes. Writes NOTHING.
-# Each row is tagged PROTECTED / SAFE / ACTIVE / LANDED / ORPHAN so a human or UI can decide what
-# to prune.
+# Each row is tagged PROTECTED / SAFE / ACTIVE / LANDED / ORPHAN / UNKNOWN so a human or UI can
+# decide what to prune.
 kit_gc_analyze() {
   _kit_gc_require_deps || return 1
   _kit_gc_cache_reset
@@ -252,6 +334,14 @@ kit_gc_analyze() {
         if [ -n "$reason" ]; then echo "  $wtpath [$b] -> PROTECTED: $reason"
         else echo "  $wtpath [$b] -> prunable if PR merged"; fi
       done
+  # Detached worktrees: no `branch` line, so the loop above never sees them (#390).
+  local dsha dverdict
+  while IFS="$(printf '\t')" read -r wtpath dsha dverdict; do
+    [ -n "$wtpath" ] || continue
+    echo "  $wtpath [detached@$(printf '%.12s' "$dsha")] -> $dverdict"
+  done <<EOF
+$(_kit_gc_detached_rows)
+EOF
 
   echo "# branches"
   # All PRs in ONE call, indexed locally by head branch (#124). while-read (NOT `for b in $(...)`) so
@@ -270,7 +360,9 @@ kit_gc_analyze() {
   while IFS="$(printf '\t')" read -r zname zbranch zstaged; do
     [ -n "$zname" ] || continue
     found=1
-    if [ "$zstaged" = yes ]; then
+    if [ "$zstaged" = yes ] && _kit_gc_zombie_detached "$zbranch"; then
+      echo "  $zname [$zbranch] -> ZOMBIE with STAGED work, detached — kept, never pruned (no branch to recover onto; recover by hand)"
+    elif [ "$zstaged" = yes ]; then
       echo "  $zname [$zbranch] -> ZOMBIE with STAGED work — recover-before-prune (gc --prune --yes recovers it to a commit)"
     else
       echo "  $zname [$zbranch] -> ZOMBIE (no staged delta) — prunable"
@@ -281,8 +373,8 @@ EOF
   [ "$found" -eq 1 ] || echo "  (none)"
 }
 
-# kit_gc_has_prunable — rc 0 if at least one branch is deletable: SAFE (its own PR merged) or LANDED
-# (no PR of its own, work already on base).
+# kit_gc_has_prunable — rc 0 if at least one row is deletable: a branch that is SAFE (its own PR
+# merged) or LANDED (no PR of its own, work already on base), or a LANDED detached worktree.
 kit_gc_has_prunable() {
   kit_gc_analyze 2>/dev/null | grep -qE '> (SAFE|LANDED) '
 }
@@ -290,9 +382,11 @@ kit_gc_has_prunable() {
 # _kit_gc_zombies — echo "<name>\t<branch>\t<staged:yes|no>" for each ZOMBIE worktree: its working
 # dir is gone but its admin metadata (<git-common-dir>/worktrees/<name>/) lingers. staged=yes when
 # the admin index holds a tree that differs from the branch tip (staged-but-uncommitted work that
-# `git worktree prune` would orphan). Writes NOTHING. bash 3.2.
+# `git worktree prune` would orphan). A DETACHED zombie (its admin HEAD is a raw commit id, not a
+# `ref:`) is compared to THAT commit's tree and labelled `detached@<sha12>` (#390): comparing it to
+# an empty branch tip called every clean one "staged". Writes NOTHING. bash 3.2.
 _kit_gc_zombies() {
-  local common wdir name gitdir wtpath branch tree tip tiptree staged
+  local common wdir name gitdir wtpath branch tree tip tiptree staged dsha
   common="$(git rev-parse --git-common-dir 2>/dev/null)" || return 0
   case "$common" in /*) : ;; *) common="$(cd "$common" 2>/dev/null && pwd)" || return 0 ;; esac
   [ -d "$common/worktrees" ] || return 0
@@ -304,11 +398,28 @@ _kit_gc_zombies() {
     name="$(basename "$wdir")"
     branch="$(sed -n 's#^ref: refs/heads/##p' "$wdir/HEAD" 2>/dev/null)"
     tree=""; [ -f "$wdir/index" ] && tree="$(GIT_INDEX_FILE="$wdir/index" git write-tree 2>/dev/null)"
-    tip="$(git rev-parse --verify --quiet "refs/heads/${branch}" 2>/dev/null)"
+    dsha=""; [ -n "$branch" ] || dsha="$(_kit_gc_zombie_head_sha "$wdir")"
+    if [ -n "$dsha" ]; then
+      tip="$(git rev-parse --verify --quiet "${dsha}^{commit}" 2>/dev/null)"
+      branch="detached@$(printf '%.12s' "$dsha")"
+    else
+      tip="$(git rev-parse --verify --quiet "refs/heads/${branch}" 2>/dev/null)"
+    fi
     tiptree=""; [ -n "$tip" ] && tiptree="$(git rev-parse --verify --quiet "${tip}^{tree}" 2>/dev/null)"
     if [ -n "$tree" ] && [ "$tree" != "$tiptree" ]; then staged=yes; else staged=no; fi
     printf '%s\t%s\t%s\n' "$name" "${branch:-?}" "$staged"
   done
+}
+
+# _kit_gc_zombie_head_sha <admin-dir> — echo the commit id a worktree's admin HEAD holds when it is
+# DETACHED (a bare 40- or 64-hex line), nothing when HEAD is a `ref:`.
+_kit_gc_zombie_head_sha() {
+  sed -n '1p' "$1/HEAD" 2>/dev/null | grep -E '^[0-9a-f]{40}([0-9a-f]{24})?$' || true
+}
+
+# _kit_gc_zombie_detached <label> — rc 0 when a _kit_gc_zombies branch column names a detached HEAD.
+_kit_gc_zombie_detached() {
+  case "$1" in detached@*) return 0 ;; *) return 1 ;; esac
 }
 
 # kit_gc_recover_zombies <yes> — the recover-before-prune mechanic (#111). For each ZOMBIE worktree
@@ -316,8 +427,15 @@ _kit_gc_zombies() {
 # prune: GIT_INDEX_FILE=<admin>/index git write-tree -> git commit-tree -p <tip> -> update-ref. With
 # <yes>=1 it performs the recovery + sweeps that zombie's stale locks; otherwise it reports what it
 # WOULD recover (dry-run). Never prunes; that stays with the caller (gated on --yes). bash 3.2.
+#
+# A DETACHED zombie (#390) has no branch to commit onto. With no staged delta beyond its HEAD's tree
+# it is skipped like any clean zombie and the caller's prune drops it. With one, the admin index is
+# the only blob->path map and there is nowhere to recover it, so under <yes>=1 the admin dir is
+# LOCKED (git's own `locked` file, which `git worktree prune` honors) — the caller's prune then
+# leaves that one entry in place while it drops the rest. Before this, the message said "leaving it
+# for manual recovery" and the prune that followed deleted the index anyway.
 kit_gc_recover_zombies() {
-  local yes="${1:-0}" common wdir name gitdir wtpath branch tree tip tiptree newc msg
+  local yes="${1:-0}" common wdir name gitdir wtpath branch tree tip tiptree newc msg dsha
   common="$(git rev-parse --git-common-dir 2>/dev/null)" || return 0
   case "$common" in /*) : ;; *) common="$(cd "$common" 2>/dev/null && pwd)" || return 0 ;; esac
   [ -d "$common/worktrees" ] || return 0
@@ -330,11 +448,26 @@ kit_gc_recover_zombies() {
     [ -f "$wdir/index" ] || continue
     tree="$(GIT_INDEX_FILE="$wdir/index" git write-tree 2>/dev/null)" || continue
     [ -n "$tree" ] || continue
-    tip="$(git rev-parse --verify --quiet "refs/heads/${branch}" 2>/dev/null)"
+    dsha=""; [ -n "$branch" ] || dsha="$(_kit_gc_zombie_head_sha "$wdir")"
+    if [ -n "$dsha" ]; then tip="$(git rev-parse --verify --quiet "${dsha}^{commit}" 2>/dev/null)"
+    else tip="$(git rev-parse --verify --quiet "refs/heads/${branch}" 2>/dev/null)"; fi
     tiptree=""; [ -n "$tip" ] && tiptree="$(git rev-parse --verify --quiet "${tip}^{tree}" 2>/dev/null)"
     # No staged delta beyond the tip → nothing to recover; the zombie is safe to prune as-is.
     [ "$tree" = "$tiptree" ] && continue
-    [ -n "$branch" ] || { echo "  gc: zombie $name is detached with staged work — leaving it for manual recovery" >&2; continue; }
+    if [ -z "$branch" ]; then
+      if [ "$yes" -ne 1 ]; then
+        echo "  would KEEP zombie worktree $name — detached with staged work (staged tree $tree), no branch to recover onto" >&2
+        continue
+      fi
+      [ -e "$wdir/locked" ] \
+        || printf '%s\n' "kit gc: detached zombie holds staged work (tree $tree) — recover before pruning" > "$wdir/locked" 2>/dev/null
+      if [ -e "$wdir/locked" ]; then
+        echo "  KEPT zombie worktree $name — detached with staged work, locked so the prune skips it. Recover: git branch <name> \$(git commit-tree $tree${tip:+ -p $tip} -m recovered); then rm '${wdir%/}/locked' && git worktree prune" >&2
+      else
+        echo "  gc: could not lock detached zombie $name — its staged work (tree $tree) is NOT protected from the prune" >&2
+      fi
+      continue
+    fi
     if [ "$yes" -ne 1 ]; then
       echo "  would RECOVER staged work from zombie worktree $name -> a commit on $branch (staged tree $tree)" >&2
       continue
@@ -382,7 +515,8 @@ _kit_gc_only_match() {
 }
 
 # _kit_gc_prune_why <verdict> — echo the reason a prune row prints, or nothing when the verdict is
-# not a deletable one. SAFE (own PR merged) and LANDED (no PR, work on base — #388) are the only two.
+# not a deletable one. SAFE (own PR merged) and LANDED (no PR, work on base — #388) are the only two;
+# UNKNOWN (#330, a failed gh read) falls through with every other kept verdict.
 _kit_gc_prune_why() {
   case "$1" in
     SAFE*)   echo "PR MERGED" ;;
@@ -393,6 +527,7 @@ _kit_gc_prune_why() {
 
 # kit_gc_prune [--yes] [--only <regex>] - remove worktrees + local branches whose PR is MERGED (the
 # SAFE rows) or whose work is already on base with no PR of their own (the LANDED rows, #388).
+# A detached worktree rated LANDED (#390) goes the same way; one rated ORPHAN never does.
 # DRY-RUN by default (lists what it WOULD remove); --yes performs the deletions. Never touches a
 # PROTECTED/ACTIVE/ORPHAN branch, and never a DIRTY worktree (recover-before-prune): a worktree with
 # staged/unstaged/untracked changes is skipped with a warning, not destroyed. The remote branch is
@@ -439,6 +574,28 @@ kit_gc_prune() {
           echo "  would remove worktree $wtpath [$b] ($why)"
         fi
       done
+
+  # Detached worktrees (#390): only the LANDED ones, by the same verdict analyze printed. No
+  # `--force`: the verdict already required a clean tree, so a refusal here means it changed since
+  # (or is locked) and the worktree is left exactly as it is. Not branch-scoped, so skipped under
+  # --only like the zombie pass below.
+  if [ -z "$only" ]; then
+    local dsha dlabel
+    while IFS="$(printf '\t')" read -r wtpath dsha verdict; do
+      [ -n "$wtpath" ] || continue
+      why="$(_kit_gc_prune_why "$verdict")"; [ -n "$why" ] || continue
+      dlabel="detached@$(printf '%.12s' "$dsha")"
+      if [ "$yes" -ne 1 ]; then
+        echo "  would remove worktree $wtpath [$dlabel] ($why)"
+      elif git worktree remove "$wtpath" 2>/dev/null; then
+        echo "  removed worktree $wtpath [$dlabel] ($why)"
+      else
+        echo "  SKIP worktree $wtpath [$dlabel] - git refused to remove it (locked, or changed since the plan)" >&2
+      fi
+    done <<EOF
+$(_kit_gc_detached_rows)
+EOF
+  fi
 
   # recover-before-prune (#111): a zombie worktree (working dir gone, admin metadata lingers) may
   # hold staged-but-uncommitted work in its admin index — the ONLY blob->path map. `git worktree
@@ -506,6 +663,8 @@ kit_gc_cleanup() {
   local repo="$KIT_GC_REPO" yes=0 a out b n_safe n_orphan n_prot n_stash n_wt rc=0 n_rfail=0
   local zname zbranch zstaged
   local safe_list landed_list orphan_list prot_list stash_list wt_list zomb_list level_ok n_zomb n_landed
+  local unknown_list n_unknown
+  local det_rows det_wt det_orphan wtpath dsha dverdict n_zkept
   for a in "$@"; do case "$a" in --yes|-y) yes=1 ;; esac; done
 
   out="$(kit_gc_analyze)" || return 1
@@ -516,6 +675,7 @@ kit_gc_cleanup() {
     in_s && / -> LANDED / { sub(/^  /, ""); sub(/ -> LANDED /, " "); print }')"
   orphan_list="$(_kit_gc_names "$out" branches ' -> ORPHAN')"
   prot_list="$(_kit_gc_names "$out" branches ' -> PROTECTED:')"
+  unknown_list="$(_kit_gc_names "$out" branches ' -> UNKNOWN ')"
   stash_list="$(printf '%s\n' "$out" | awk '/^# /{in_s=($0=="# stashes"); next} in_s && NF' | sed 's/^  //')"
 
   # Worktrees kit_gc_prune would remove: the ones whose branch is itself SAFE or LANDED (the same
@@ -533,13 +693,28 @@ kit_gc_cleanup() {
         fi
       done)"
 
+  # Detached worktrees (#390) have no branch, so neither list above carries them. The LANDED ones
+  # join the worktrees --yes removes; the ORPHAN ones join the kept rows, named by path. Same helper
+  # as the analyze report and the prune pass, so the three cannot diverge.
+  det_rows="$(_kit_gc_detached_rows)"
+  det_wt="$(printf '%s\n' "$det_rows" | while IFS="$(printf '\t')" read -r wtpath dsha dverdict; do
+        case "$dverdict" in LANDED*) echo "$wtpath [detached@$(printf '%.12s' "$dsha")] ${dverdict#LANDED }" ;; *) : ;; esac
+      done)"
+  det_orphan="$(printf '%s\n' "$det_rows" | while IFS="$(printf '\t')" read -r wtpath dsha dverdict; do
+        case "$dverdict" in ORPHAN*) echo "$wtpath [detached@$(printf '%.12s' "$dsha")] ${dverdict#ORPHAN }" ;; *) : ;; esac
+      done)"
+  [ -n "$det_wt" ] && wt_list="$(printf '%s\n%s' "$wt_list" "$det_wt" | grep . || true)"
+  [ -n "$det_orphan" ] && orphan_list="$(printf '%s\n%s' "$orphan_list" "$det_orphan" | grep . || true)"
+
   # ZOMBIE worktrees (dir gone, admin metadata lingers). kit_gc_prune --yes acts on these two ways
   # — kit_gc_recover_zombies commits any staged delta to the branch, then `git worktree prune`
   # drops the metadata — so the plan MUST name them or --yes would touch a row nobody approved
   # (#227 review). Same helper as the analyze report, so the two cannot diverge.
   zomb_list="$(while IFS="$(printf '\t')" read -r zname zbranch zstaged; do
         [ -n "$zname" ] || continue
-        if [ "$zstaged" = yes ]; then
+        if [ "$zstaged" = yes ] && _kit_gc_zombie_detached "$zbranch"; then
+          echo "$zname [$zbranch] (STAGED work, detached — kept, not pruned: no branch to recover onto)"
+        elif [ "$zstaged" = yes ]; then
           echo "$zname [$zbranch] (STAGED work — recovered to a commit on $zbranch, then metadata pruned)"
         else
           echo "$zname [$zbranch] (no staged delta — metadata pruned)"
@@ -553,9 +728,11 @@ ZEOF
   n_landed="$(printf '%s' "$landed_list" | grep -c . || true)"
   n_orphan="$(printf '%s' "$orphan_list" | grep -c . || true)"
   n_prot="$(printf '%s' "$prot_list"   | grep -c . || true)"
+  n_unknown="$(printf '%s' "$unknown_list" | grep -c . || true)"
   n_stash="$(printf '%s' "$stash_list" | grep -c . || true)"
   n_wt="$(printf '%s' "$wt_list"       | grep -c . || true)"
   n_zomb="$(printf '%s' "$zomb_list"   | grep -c . || true)"
+  n_zkept="$(printf '%s' "$zomb_list"  | grep -c 'kept, not pruned' || true)"
 
   echo "# cleanup plan"
   printf '  SAFE branches     %3s  merged PR, issue closed/absent\n' "$n_safe"
@@ -570,6 +747,8 @@ ZEOF
   printf '%s\n' "$orphan_list" | grep . | sed 's/^/      /' || true
   printf '  PROTECTED kept    %3s  issue still OPEN\n' "$n_prot"
   printf '%s\n' "$prot_list" | grep . | sed 's/^/      /' || true
+  printf '  UNKNOWN kept      %3s  a GitHub read failed — could not determine, rerun when gh answers\n' "$n_unknown"
+  printf '%s\n' "$unknown_list" | grep . | sed 's/^/      /' || true
   printf '  stashes kept      %3s  irreversible — drop by hand after reading each diff\n' "$n_stash"
   printf '%s\n' "$stash_list" | grep . | sed 's/^/      /' || true
 
@@ -613,6 +792,6 @@ EOF
 $level_ok
 EOF
   printf '  remote deletes failed %3s\n' "$n_rfail"
-  echo "cleanup: done — $n_safe safe + $n_landed landed deleted / $n_zomb zombie pruned / $n_orphan orphan / $n_prot protected / $n_stash stash left untouched."
+  echo "cleanup: done — $n_safe safe + $n_landed landed deleted / $((n_zomb - n_zkept)) zombie pruned / $n_orphan orphan / $n_prot protected / $n_unknown unknown / $n_stash stash left untouched."
   return "$rc"
 }

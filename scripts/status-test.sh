@@ -121,7 +121,7 @@ t "llm: no efforts is [] not null" "$(run_status_llm | jq -c '.next_efforts')" "
 t "llm: unreadable efforts is null" "$(GH_EFFORTS_FAIL=1 run_status_llm | jq -c '.next_efforts')" "null"
 t "llm: the pre-existing keys are all still there" \
   "$(printf '%s' "$jse" | jq -r 'keys | join(",")')" \
-  "ai_review_expected,cleanup,deps,local_undone,next_efforts,prs,prs_read,worktrees"
+  "ai_review_expected,cleanup,deps,instruction_budget,local_undone,next_efforts,prs,prs_read,worktrees"
 
 [ "$fail" -eq 0 ] && echo "ALL OK (status)" || echo "status: FAILURES"
 exit "$fail"

@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # effort-plan.sh — the session-fit view (`kit effort plan` when the project ships the kit CLI).
 #
-# Reads the open efforts (label:effort), groups them by their `flow:` tag, orders each flow by the
+# Reads the open efforts — from GitHub (label:effort), or from the local executable named by
+# `effort.planSource` when one is configured (falling back to GitHub when it fails or prints
+# nothing; the output names the source used) — groups them by their `flow:` tag, orders each flow by the
 # native `blocked_by` edges, and packs the efforts into session-sized batches under a context budget.
 # Answers "which efforts fit in one session before the context window fills, and in what order?".
 #
@@ -11,17 +13,32 @@
 # in its own context; only a summary returns), which is the real lever that widens a session
 # (rules/agent-execution-routing.md).
 #
-# Requires: gh, jq. bash 3.2 (no associative arrays — parallel indexed arrays + linear scan; N small).
-# `effort_plan` itself is bash-only; effort_open_rows / effort_next_pick / effort_next_rows hold no
-# arrays and run under zsh too, because `cckit status` reads them (scripts/lib/kit-status.sh).
-# errors: strict — refuses to plan without gh + jq
+# Requires: gh, jq for the GitHub read; a local source that answers needs neither. bash 3.2 (no
+# associative arrays — parallel indexed arrays + linear scan; N small).
+# `effort_plan` and the `_ep_*` plan-source helpers are bash-only; effort_open_rows /
+# effort_next_pick / effort_next_rows / effort_cadence_md hold no arrays and run under zsh too,
+# because `cckit status` reads them (scripts/lib/kit-status.sh). Those four always read GitHub —
+# `effort.planSource` feeds `effort_plan` only.
+# errors: strict — refuses to plan from GitHub without gh + jq
 
 EFFORT_REPO="${EFFORT_REPO:-${KIT_REPO:-}}"
 
-_ep_weight() { case "$1" in S) echo 1 ;; M) echo 2 ;; L) echo 4 ;; XL) echo 8 ;; *) echo 2 ;; esac; }
+# _ep_weight <ctx> [issue] — session weight of a ctx: value. Anything outside S|M|L|XL weighs
+# EP_UNSIZED_WEIGHT (2), and never silently: `?` (no ctx: label at all) is explained by the legend in
+# the plan header, and any other value (ctx:XXL, ctx:xl) warns on stderr naming the value and issue.
+# The fallback used to be a bare `*) echo 2`, which planned a mislabeled effort as an M.
+EP_UNSIZED_WEIGHT=2
+_ep_weight() {
+  case "$1" in
+    S) echo 1 ;; M) echo 2 ;; L) echo 4 ;; XL) echo 8 ;;
+    '?'|'') echo "$EP_UNSIZED_WEIGHT" ;;
+    *) echo "⚠ effort plan: ${2:+#$2 }carries ctx:$1, which is not S|M|L|XL — weighed $EP_UNSIZED_WEIGHT" >&2
+       echo "$EP_UNSIZED_WEIGHT" ;;
+  esac
+}
 
 # effort_open_rows [repo] — one TSV row per OPEN effort (label:effort), the single read both
-# `effort_plan` and `cckit status` build on:
+# `effort_plan` (its GitHub source, via _ep_rows_github) and `cckit status` build on:
 #
 #   number<TAB>flow<TAB>ctx<TAB>priority<TAB>blockers<TAB>open-blockers<TAB>title
 #
@@ -107,25 +124,100 @@ effort_cadence_md() {
   printf '%s\n' '**Weekly cadence** — Monday: `cckit plan` orders the week · daily: `cckit next` picks up one issue · Friday: `cckit gc` reports what can be pruned.'
 }
 
+# Rows travel between the readers and the planner as five fields joined by the ASCII unit
+# separator: number, flow, ctx, title, blockers (comma-separated issue numbers). Not TAB — TAB is
+# IFS whitespace, so `read` collapses two adjacent tabs and an empty column shifts every later one.
+_EP_SEP=$'\037'
+
+# _ep_rows_github <repo> — the open efforts from GitHub, in the planner's row format. It is
+# effort_open_rows re-joined: the priority and open-blockers columns are dropped and the `-`
+# empty-blockers placeholder becomes an empty field. rc 1 when the read fails; prints nothing when
+# there are no open efforts.
+_ep_rows_github() {
+  local rows
+  rows="$(effort_open_rows "$1")" || return 1
+  [[ -n "$rows" ]] || return 0
+  printf '%s\n' "$rows" | awk -F'\t' -v sep="$_EP_SEP" '
+    NF >= 7 { b = ($5 == "-" ? "" : $5); printf "%s%s%s%s%s%s%s%s%s\n", $1, sep, $2, sep, $3, sep, $7, sep, b }'
+}
+
+# _ep_project_root — the directory a relative `effort.planSource` resolves against: the project
+# root the config file belongs to (config-path.sh), else the current directory.
+_ep_project_root() {
+  local cfg=""
+  command -v kit_config_path >/dev/null 2>&1 && cfg="$(kit_config_path 2>/dev/null || true)"
+  [[ -n "$cfg" && -f "$cfg" ]] || { pwd; return 0; }
+  case "$cfg" in
+    */.claude/kit.config.json) (cd "$(dirname "$cfg")/.." 2>/dev/null && pwd) || pwd ;;
+    *)                         (cd "$(dirname "$cfg")" 2>/dev/null && pwd) || pwd ;;
+  esac
+}
+
+# _ep_source_rows — normalize a plan source's stdout (stdin here) to the internal row format.
+# The source contract (effort.planSource):
+#   number<TAB>flow<TAB>ctx<TAB>title[<TAB>blockers]   one line per open effort
+#   # age: <text>                                       optional, anywhere; how old the snapshot is
+# `blockers` is a comma-separated list of issue numbers (a leading # is accepted). Lines that start
+# with # are metadata, and a line whose first column is not a number is ignored. An empty flow
+# becomes "—" and an empty ctx "?", the same defaults the GitHub reader uses.
+_ep_source_rows() {
+  awk -F'\t' -v sep="$_EP_SEP" '
+    /^#/ { next }
+    $1 ~ /^[0-9]+$/ {
+      f = ($2 == "" ? "—" : $2); c = ($3 == "" ? "?" : $3); b = $5; gsub(/[^0-9,]/, "", b)
+      printf "%s%s%s%s%s%s%s%s%s\n", $1, sep, f, sep, c, sep, $4, sep, b
+    }'
+}
+
 effort_plan() {
-  command -v gh >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 || { echo "effort plan: needs gh + jq" >&2; return 1; }
   local repo="$EFFORT_REPO" budget="${KIT_SESSION_BUDGET:-4}"
   [[ -n "$repo" ]] || { echo "effort plan: no repo (set KIT_REPO / EFFORT_REPO)" >&2; return 1; }
 
-  # 1. open efforts + their flow:/ctx: labels and blocked_by numbers (effort_open_rows).
-  local raw
-  raw="$(effort_open_rows "$repo")" \
-    || { echo "effort plan: gh query failed (check gh auth)" >&2; return 1; }
-  [[ -n "$raw" ]] || { echo "effort plan: no open efforts found" >&2; return 0; }
+  # 1. rows. A configured local source (effort.planSource, or EFFORT_PLAN_SOURCE per invocation)
+  #    is tried first; if it is not executable, exits non-zero or prints no rows, the plan falls
+  #    back to GitHub and says so. `srcline` is printed under the header either way — a plan that
+  #    does not say what it was built from can be stale without anyone noticing.
+  local rows="" srcline="" fellback=""
+  local src="${EFFORT_PLAN_SOURCE:-${KIT_EFFORT_PLAN_SOURCE:-}}"
+  if [[ -n "$src" ]]; then
+    local root srcpath srcout src_rc=0 age
+    root="$(_ep_project_root)"
+    case "$src" in /*) srcpath="$src" ;; *) srcpath="$root/$src" ;; esac
+    if [[ ! -x "$srcpath" || -d "$srcpath" ]]; then
+      fellback="planSource $src is not executable"
+    else
+      srcout="$(cd "$root" 2>/dev/null && "$srcpath" "$repo")" || src_rc=$?
+      if [[ "$src_rc" -ne 0 ]]; then
+        fellback="planSource $src failed (exit $src_rc)"
+      else
+        rows="$(printf '%s\n' "$srcout" | _ep_source_rows)"
+        if [[ -z "$rows" ]]; then
+          fellback="planSource $src printed no rows"
+        else
+          age="$(printf '%s\n' "$srcout" | sed -n 's/^#[[:space:]]*age:[[:space:]]*//p' | head -1)"
+          srcline="planSource $src"
+          [[ -n "$age" ]] && srcline="$srcline · age $age"
+        fi
+      fi
+    fi
+    [[ -n "$fellback" ]] && echo "effort plan: $fellback — falling back to GitHub" >&2
+  fi
+  if [[ -z "$srcline" ]]; then
+    command -v gh >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 || { echo "effort plan: needs gh + jq" >&2; return 1; }
+    srcline="GitHub ($repo)"
+    [[ -n "$fellback" ]] && srcline="$srcline — $fellback, fell back"
+    rows="$(_ep_rows_github "$repo")" \
+      || { echo "effort plan: gh query failed (check gh auth)" >&2; return 1; }
+    [[ -n "$rows" ]] || { echo "effort plan: no open efforts found (source: $srcline)" >&2; return 0; }
+  fi
 
-  # 2. read into parallel arrays (small N). `-` is the empty-blockers placeholder.
+  # 2. read into parallel arrays.
   local -a nums=() flows=() ctxs=() titles=() blocks=()
-  local n f c p b ob t
-  while IFS=$'\t' read -r n f c p b ob t; do
+  local n f c t bl
+  while IFS="$_EP_SEP" read -r n f c t bl; do
     [[ -n "$n" ]] || continue
-    [[ "$b" == "-" ]] && b=""
-    nums+=("$n"); flows+=("$f"); ctxs+=("$c"); titles+=("$t"); blocks+=("$b")
-  done <<< "$raw"
+    nums+=("$n"); flows+=("$f"); ctxs+=("$c"); titles+=("$t"); blocks+=("$bl")
+  done <<< "$rows"
 
   # 3. distinct flows, first-seen order.
   local -a flowlist=()
@@ -133,7 +225,8 @@ effort_plan() {
     case " ${flowlist[*]-} " in *" $f "*) ;; *) flowlist+=("$f") ;; esac
   done
 
-  printf '\n  kit effort plan — session budget %s  (ctx S=1 M=2 L=4 XL=8 · L/XL → delegate subs)\n' "$budget"
+  printf '\n  kit effort plan — session budget %s  (ctx S=1 M=2 L=4 XL=8 · ? = no ctx: label, weighed %s · L/XL → delegate subs)\n' "$budget" "$EP_UNSIZED_WEIGHT"
+  printf '  source: %s\n' "$srcline"
 
   local i j b
   for f in "${flowlist[@]}"; do
@@ -169,7 +262,7 @@ effort_plan() {
     local sess=1 load=0 batch=" "
     printf '    Session %s:\n' "$sess"
     for i in "${order[@]}"; do
-      local w; w="$(_ep_weight "${ctxs[$i]}")"
+      local w; w="$(_ep_weight "${ctxs[$i]}" "${nums[$i]}")"
       local neednew=0
       (( load + w > budget )) && neednew=1
       for b in ${blocks[$i]//,/ }; do case "$batch" in *" $b "*) neednew=1 ;; esac; done

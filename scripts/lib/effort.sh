@@ -184,18 +184,50 @@ EOF_ROWS
 # opens it. The MANDATORY element is the [#N] effort id — a PR title without it is a review blocker
 # (effort-model.md), enforced by effort_pr_title_check.
 #
-# effort_pr_title <num> <name> [role_display] — compose the canonical title:
-#   effort_pr_title 115 "adoption hardening"             -> "[#115] adoption hardening"
-#   effort_pr_title 115 "adoption hardening" "Tech Lead" -> "[Tech Lead] [#115] adoption hardening"
-# A full parent title ("[Effort] 115 · [Core] adoption hardening") is accepted too — the
-# "[Effort] N · " prefix is peeled so the id is never duplicated.
+# effort_pr_title <num> <name> [labels_csv] [type] [role_display] — compose the title (#237).
+# PRs are squash-merged, so the title becomes the commit release-please reads and the commitlint
+# gate (.github/workflows/commitlint.yml) checks. The default is therefore a Conventional Commit
+# subject with the id trailing, which passes both commitlint_check and effort_pr_title_check:
+#   effort_pr_title 115 "adoption hardening"                         -> "feat: adoption hardening [#115]"
+#   effort_pr_title 115 "adoption hardening" "flow:core,kind:chore"  -> "chore(core): adoption hardening [#115]"
+#   effort_pr_title 115 "[Effort] 115 · [Core] adoption hardening"   -> "feat(core): adoption hardening [#115]"
+#   scope  the `flow:<flow>` label, else the name's leading [Flow] tag; lowercased, and dropped
+#          when it is not a valid Conventional Commit scope. The tag is peeled from the name.
+#   type   the explicit <type> (`effort pr --type`), else the `kind:` label mapped as kto_pr_title
+#          maps it (kind:task and anything unknown -> feat; a `bug` label -> fix).
+# A full parent title is accepted — the "[Effort] N · " prefix is peeled so the id is never doubled.
+# pr.titleStyle = issue-title (KIT_PR_TITLE_STYLE) keeps the non-conventional form, for a repo with
+# no commitlint gate: "[Role] [#N] <name>" (the role prefix only when <role_display> is given).
 effort_pr_title() {
-  local num="${1:-}" name="${2:-}" role="${3:-}"
+  local num="${1:-}" name="${2:-}" labels="${3:-}" ctype="${4:-}" role="${5:-}" tag scope kind
   num="${num#\#}"
   name="$(printf '%s' "$name" | sed -E 's/^\[Effort\] [0-9]+ · ?//')"
   [ -n "$name" ] || name="effort"
-  if [ -n "$role" ]; then printf '[%s] [#%s] %s' "$role" "$num" "$name"
-  else printf '[#%s] %s' "$num" "$name"; fi
+  if [ "${KIT_PR_TITLE_STYLE:-conventional}" = "issue-title" ]; then
+    if [ -n "$role" ]; then printf '[%s] [#%s] %s' "$role" "$num" "$name"
+    else printf '[#%s] %s' "$num" "$name"; fi
+    return 0
+  fi
+  tag="$(printf '%s' "$name" | sed -nE 's/^\[([^]]+)\] +.*$/\1/p')"
+  if [ -n "$tag" ]; then
+    name="$(printf '%s' "$name" | sed -E 's/^\[[^]]+\] +//')"
+    [ -n "$name" ] || name="effort"
+  fi
+  scope="$(printf '%s' "$labels" | tr ',' '\n' | sed -n 's/^flow://p' | head -1)"
+  [ -n "$scope" ] || scope="$tag"
+  scope="$(printf '%s' "$scope" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')"
+  printf '%s' "$scope" | grep -qE '^[a-z0-9][a-z0-9._/-]*$' || scope=""
+  if [ -z "$ctype" ]; then
+    kind="$(printf '%s' "$labels" | tr ',' '\n' | sed -n 's/^kind://p' | head -1)"
+    case "$kind" in
+      feat|chore|docs|ci|test|perf|refactor|fix) ctype="$kind" ;;
+      bug) ctype=fix ;;
+      *)   ctype=feat ;;
+    esac
+    case ",$labels," in *,bug,*) ctype=fix ;; esac
+  fi
+  if [ -n "$scope" ]; then printf '%s(%s): %s [#%s]' "$ctype" "$scope" "$name" "$num"
+  else printf '%s: %s [#%s]' "$ctype" "$name" "$num"; fi
 }
 
 # effort_pr_title_check <title> [num] — rc 0 iff <title> carries the effort id token [#N] (the exact

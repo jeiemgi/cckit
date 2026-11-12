@@ -1,3 +1,9 @@
+---
+paths:
+  - "**/*.tsx"
+  - "**/*.jsx"
+---
+
 # React UI Annotation — Agentation loop ({{PROJECT_NAME}})
 
 > Active because this project ran `/kit-annotate`. It wires the **Agentation** toolbar — an in-app,

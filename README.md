@@ -98,31 +98,59 @@ cckit start 42                # isolated worktree + branch for issue #42, bootst
                               #   regardless of their manifests), else a root that declares
                               #   deps or is a workspace root with members, else nothing
                               #   (KIT_WT_INSTALL=0 skips the install entirely)
+                              #   refused when another live session already claims #42;
+                              #   `cckit start --force 42` (or KIT_FORCE=1) starts anyway
+cckit claims                  # which live session is working which issue (read-only)
 cckit brief 42                # the delegation brief for #42, read out of the repo not memory
 cckit lib                     # every scripts/lib helper: functions, purpose, error contract
 cckit pr 42 "what changed"    # commit, push, open the PR
+cckit pr 42 "what changed" --base main   # target main, not the integration branch; the push
+                              #   exports the target as KIT_PR_BASE for a git pre-push hook
+cckit hotfix 268              # cherry-pick merged PR 268 (or a commit sha) onto main (--base B
+                              #   for another branch): worktree from origin/main, cherry-pick -x,
+                              #   push, PR titled after the source with `Cherry-pick of #268`;
+                              #   a rebase-merged PR is carried commit by commit
 cckit sync                    # board state, what's unblocked
+cckit sync --cached 60        # the board as one JSON document, from a cache at most 60s old
+                              #   (--json / --write / --watch [secs] / --plan — for a TUI or statusline)
 cckit handoff "resume note"   # save a handoff — bare `cckit` prints it next session
-cckit gc                      # report prunable branches + worktrees (deletes nothing)
+cckit gc                      # report prunable branches + worktrees, detached worktrees included (deletes nothing); a failed GitHub read shows as UNKNOWN, kept
 cckit cleanup [--yes]         # act on that report: delete the SAFE + LANDED rows, prune listed zombies, keep orphans/stashes
 ```
 
 Adopting cckit in a repo that already has history? `cckit scan` detects the stack, `cckit adopt`
 records kit-shaped files the repo already has, and `cckit status` answers "where are we" — local
 undone work, the open PRs waiting on a human, and the cleanup available, plus the board and the
-resume handoff in one screen. Run `cckit help` for the full verb list, or
+resume handoff in one screen. It ends with the instruction-file line: the bytes `CLAUDE.md` and the
+rules without a `paths:` frontmatter put into every session, against Claude Code's 150k limit, and
+the three largest files (`cckit doctor` prints the same line; `scripts/instruction-budget-lint.sh`
+is the gate behind it). Run `cckit help` for the full verb list, or
 `cckit <verb> --help` for any one.
 
 ## Efforts and slug handles
 
 A big piece of work is an **effort** — a parent issue with sub-issues. `cckit effort new "<name>" "sub :: desc" …`
 creates the parent issue (the four-section plan body), applies the `ctx/kind/priority/role/flow` labels, and lints
-every sub-issue title — the same effort `/kit-effort-new` produces, since both call one shared core. The `--flow`
+every sub-issue title — the same effort `/kit-effort-new` produces, since both call one shared core. `--kind` sets
+the `kind:` label on the parent and every sub: one of `feat fix task chore security scaffold ci adr spike plan`
+(default `task`), the same closed set `cckit start` uses as the branch prefix; any other value is refused before
+anything is created. In `cckit plan` and `cckit effort plan` an issue with no `ctx:` label shows `?` and weighs 2;
+a `ctx:` value outside `S|M|L|XL` also weighs 2 and warns on stderr. The `--flow`
 vocabulary (the `[Flow]` title tags) reads from `effort.flows` in the project config, so `cckit effort new --flow X`
 works out of the box in any configured repo (an explicit `EFFORT_FLOWS` env var still wins per invocation).
 `cckit effort close` is likewise the **single close implementation** (the `/kit-effort-close` skill is a thin caller
 of the same function): pre-squash work-record snapshot + metrics, squash-merge, close parent + subs, board
 Status=Done, worktree/branch GC, an optional knowledge-ingest hook, and an advisory kit-sync drift check.
+The metrics judge reads its hosted endpoint from `CCKIT_MODEL_URL` / `CCKIT_MODEL` / `CCKIT_MODEL_TOKEN`; a project
+with its own variables names them in the config (`model.urlEnv` / `model.modelEnv` / `model.tokenEnv` — env var
+names, never values).
+`cckit merge` refuses a PR whose head is an `effort/*` branch and names `cckit effort close <N>`: its squash would
+skip that snapshot. `KIT_FORCE=1 cckit merge <pr>` merges anyway, with a warning.
+Before the squash deletes `effort/<N>-…` it re-targets every open PR based on that branch to the base branch
+(`↻ PR <n> re-targeted to develop`) — GitHub closes a PR, unmerged, when its base branch is deleted. If a
+re-target fails, or the list of those PRs cannot be read, the close refuses, names the PR, and merges nothing.
+A project gate goes in `effort.preCloseHook`: it runs as `<hook> <effort#> <sub#…>` from the effort worktree
+before the snapshot and the merge, a non-zero exit refuses the close, and `KIT_FORCE=1` skips it with a notice.
 
 The GitHub issue **number** stays the canonical key, but every effort also has a memorable **slug** handle (the one
 already in its `effort/<N>-<slug>` branch). Effort commands take the slug *or* the number interchangeably:
@@ -133,6 +161,10 @@ cckit effort start slug-handles                                   # same as: cck
 cckit effort pr slug-handles
 cckit effort close slug-handles
 ```
+
+`cckit effort pr` titles the PR as a Conventional Commit subject carrying the effort id —
+`feat(core): adoption hardening [#115]` (scope from the `flow:` label, type from `--type` or the
+`kind:` label) — and refuses to open a PR whose title its commitlint gate would reject.
 
 A pure-digits argument is always a number; anything else is resolved to the canonical number by
 matching `effort/*` branches, the `slug:<slug>` label, then open effort titles. An unknown or
@@ -215,6 +247,23 @@ flow, the effort with no open blocker, p0 → p3 then lowest number, plus how ma
 `cckit status --llm` carries those rows as `next_efforts`; the cadence line is human output only,
 so `cckit next --llm` rows stay `{number,ctx,title}`.
 
+**`cckit effort plan` can read a local snapshot instead of GitHub.** By default it makes one
+listing call plus one `blocked_by` call per open effort. Set `effort.planSource` in
+`cckit.config.json` to an executable and the plan calls it instead, as `<source> <owner/repo>` from
+the project root:
+
+```text
+# age: 2h
+241<TAB>Core<TAB>M<TAB>order and cadence
+257<TAB>Core<TAB>L<TAB>release gates<TAB>241
+```
+
+Columns are `number`, `flow`, `ctx`, `title` and an optional comma-separated `blockers` list; the
+`# age:` line is optional. A source that is not executable, exits non-zero or prints no rows falls
+back to GitHub. The plan prints a `source:` line under its header — the source used, its age when it
+reports one, and the reason for a fallback — so a plan built from a snapshot never passes for a live
+one. `EFFORT_PLAN_SOURCE` overrides the config per invocation.
+
 ## Waves — parallel agentic development
 
 `cckit wave` reads your open efforts and proposes the incoming waves of work — parallel agent tasks
@@ -229,7 +278,19 @@ cckit watch --merge        # the captain: gate open PRs, squash-merge the CLEAN 
                            #   (policy floors hold PRs touching CI, lockfiles, or secrets for review)
 cckit watch --loop         # self-pace gate/merge passes until steady state
 cckit autopilot            # select unblocked work, then call orchestrate --detach under a cap
+KIT_BASE_BRANCH=effort/42-auth cckit orchestrate 44   # cut an effort's sub from the effort branch
 ```
+
+`KIT_BASE_BRANCH` in the environment overrides `github.baseBranch` for that one invocation, so a
+sub-issue starts with the commits its effort has already landed. The branch has to exist on origin,
+and `orchestrate` prints a line naming the override and the config value it replaced.
+
+**Night mode** runs approved waves unattended under a token budget the Workflow runtime enforces.
+The owner posts one `<!-- night-grant -->` comment on the plan parent — budget, waves, waivers — and
+`/kit-autopilot` reads it with `scripts/night-grant.sh`, then launches `scripts/night-run.mjs`. Only
+a grant written by the repository owner (or a login in `night.grantors`) counts. The run is no wider
+than `effort.wipLimit`, stops at the first wave that did not fully merge, and finishes on the gate.
+See [Night mode](https://cckit.dev/config-and-permissions/#night-mode).
 
 Set `review.command` in your config and the captain sends every PR it would merge to an agent
 reviewer first, records the verdict as a stage receipt, and refuses to merge on a `fail`. You name

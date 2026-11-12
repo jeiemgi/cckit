@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # kto-task-pr-merge-test.sh — kto_task_pr_merge never acts on the base branch (#366), cleans up from
 # the PR's own worktree (#371), and merges by squash, merge commit or rebase into develop or an
-# effort branch (#376).
+# effort branch (#376). An effort/* HEAD is refused — its PR merges with `cckit effort close` (#379).
 # A flag taken as the PR number used to "merge" (gh pr merge --help exits 0) and then run the branch
 # cleanup on the base branch; a conflicting PR merged from the hub would rebase + force-push it.
 # Hermetic: stubbed gh, throwaway repo + bare remote. Run: bash scripts/lib/kto-task-pr-merge-test.sh
@@ -14,14 +14,19 @@ t() { if [ "$2" = "$3" ]; then echo "ok: $1"; else echo "FAIL: $1 -> got '[$2]' 
 command -v jq >/dev/null 2>&1 || { echo "kto-task-pr-merge-test: jq required" >&2; exit 1; }
 
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
-export GH_LOG="$tmp/gh.log" GH_MERGEABLE="MERGEABLE" GH_BASE="develop" GH_HEAD=""; : > "$GH_LOG"
+export GH_LOG="$tmp/gh.log" GH_MERGEABLE="MERGEABLE" GH_BASE="develop" GH_HEAD="" GH_CLOSING="" GH_ISSUE_STATE=""; : > "$GH_LOG"
 mkdir -p "$tmp/bin"
 cat > "$tmp/bin/gh" <<'SH'
 #!/usr/bin/env bash
 echo "$*" >> "$GH_LOG"
 case "$1 $2" in
-  "pr view")  printf '{"mergeable":"%s","mergeStateStatus":"CLEAN","baseRefName":"%s","headRefName":"%s"}\n' \
+  "pr view")  case "$*" in
+                *closingIssuesReferences*) [ -n "${GH_CLOSING:-}" ] && printf '%s\n' $GH_CLOSING; exit 0 ;;
+                *"--json body"*) exit 0 ;;
+              esac
+              printf '{"mergeable":"%s","mergeStateStatus":"CLEAN","baseRefName":"%s","headRefName":"%s"}\n' \
                 "$GH_MERGEABLE" "${GH_BASE:-develop}" "${GH_HEAD:-}" ;;
+  "issue view") [ -n "${GH_ISSUE_STATE:-}" ] && echo "$GH_ISSUE_STATE"; exit 0 ;;
   *) exit 0 ;;
 esac
 SH
@@ -124,6 +129,35 @@ t "the effort worktree still survives"           "$([ -d "$ewt" ] && echo presen
 t "the sub branch (not the cwd branch) is deleted" "$(git branch --list sub/5b-y | wc -l | tr -d ' ')" "0"
 t "and on origin"                                "$(git ls-remote --heads origin sub/5b-y | wc -l | tr -d ' ')" "0"
 t "effort/5-e is still on origin"                "$(git ls-remote --heads origin effort/5-e | wc -l | tr -d ' ')" "1"
+
+# ── #379: the linked-issue loop does not depend on IFS ───────────────────────────────────────────
+# The effort worktree lives under the main checkout here; keep it out of `git status` so the main
+# checkout reads clean.
+echo ".claude/" >> "$tmp/work/.git/info/exclude"
+# A caller that left IFS NUL-polluted made `for n in $issues` pass "21\n22" as ONE issue number.
+: > "$GH_LOG"; GH_BASE="develop"; GH_HEAD="fix/20-x"; GH_CLOSING="21 22"; GH_ISSUE_STATE="OPEN"
+( IFS=$'\0'; kto_task_pr_merge 20 ) >/dev/null 2>&1; rc=$?
+t "merge under IFS=\$'\\0' exits 0"                "$rc" "0"
+t "issue 21 is closed on its own"                "$(grep -c '^issue close 21 ' "$GH_LOG")" "1"
+t "issue 22 is closed on its own"                "$(grep -c '^issue close 22 ' "$GH_LOG")" "1"
+t "exactly two issue close calls"                "$(grep -c '^issue close ' "$GH_LOG")" "2"
+GH_CLOSING=""; GH_ISSUE_STATE=""
+
+# ── #379: an effort/* head is refused — the squash would destroy the per-sub trace ───────────────
+: > "$GH_LOG"; GH_BASE="develop"; GH_HEAD="effort/5-e"
+kto_task_pr_merge 14 >/dev/null 2>"$tmp/err14"; rc=$?
+t "an effort head is refused (rc 1)"             "$rc" "1"
+t "the refusal names cckit effort close 5"       "$(grep -c 'cckit effort close 5' "$tmp/err14")" "1"
+t "nothing was merged on the effort refusal"     "$(grep -c 'pr merge' "$GH_LOG")" "0"
+t "the refused effort branch survives"           "$(git branch --list effort/5-e | tr -d ' *+')" "effort/5-e"
+( cd "$ewt" && kto_task_pr_merge ) >/dev/null 2>&1; rc=$?
+t "refused from the effort worktree too (rc 1)"  "$rc" "1"
+t "still nothing merged"                         "$(grep -c 'pr merge' "$GH_LOG")" "0"
+: > "$GH_LOG"
+KIT_FORCE=1 kto_task_pr_merge 14 >/dev/null 2>"$tmp/err14f"; rc=$?
+t "KIT_FORCE=1 merges the effort head (rc 0)"    "$rc" "0"
+t "KIT_FORCE=1 warns about the lost trace"       "$(grep -c 'KIT_FORCE=1' "$tmp/err14f")" "1"
+t "KIT_FORCE=1 reaches gh pr merge"              "$(grep -c 'pr merge 14' "$GH_LOG")" "1"
 
 [ "$fail" -eq 0 ] && echo "kto-task-pr-merge: all passed" || echo "kto-task-pr-merge: FAILURES"
 exit "$fail"

@@ -45,7 +45,24 @@ load_kit_config() {
   # Integration branch, resolved through a fallback chain so a host project that names its
   # integration branch under an older/alternate key still works on adoption: baseBranch (canonical)
   # -> integrationBranch -> flow -> "main". First non-null wins (#117).
-  export KIT_BASE_BRANCH="$(jq -r '.github.baseBranch // .github.integrationBranch // .github.flow // "main"' "$cfg")"
+  # A KIT_BASE_BRANCH already in the environment WINS over the config (#352): the config is the
+  # default, not the assignment. That is how a sub-issue is cut from its effort branch —
+  # `KIT_BASE_BRANCH=effort/<N>-<slug> cckit orchestrate <sub>` — and it matches init.sh, which
+  # already reads the variable as the caller's override. KIT_BASE_BRANCH_CONFIG always carries what
+  # the config says, so a caller can tell an override from the default and say which one it used.
+  export KIT_BASE_BRANCH_CONFIG="$(jq -r '.github.baseBranch // .github.integrationBranch // .github.flow // "main"' "$cfg")"
+  # An inherited value is an override only if the CALLER set it. load_kit_config exports the base
+  # it resolved, so every process cckit starts inherits one, and a later load in another project
+  # would read project A's config value as an override of project B's config. So a load that
+  # defaults to the config records the value in KIT_BASE_BRANCH_DEFAULTED, and an inherited
+  # KIT_BASE_BRANCH equal to that record is cckit's own earlier export: the config answers again.
+  # Limit: in an environment that already carries the record, an explicit override that names the
+  # recorded value itself is indistinguishable from the leak and is read as the config default.
+  if [ -n "${KIT_BASE_BRANCH:-}" ] && [ "$KIT_BASE_BRANCH" != "${KIT_BASE_BRANCH_DEFAULTED:-}" ]; then
+    export KIT_BASE_BRANCH KIT_BASE_BRANCH_DEFAULTED=""
+  else
+    export KIT_BASE_BRANCH="$KIT_BASE_BRANCH_CONFIG" KIT_BASE_BRANCH_DEFAULTED="$KIT_BASE_BRANCH_CONFIG"
+  fi
   export KIT_PROJECTS_V2="$(jq -r '.github.projectsV2' "$cfg")"
   export KIT_PROJECT_NUMBER="$(jq -r '.github.projectNumber' "$cfg")"
   export KIT_PROJECT_TITLE="$(jq -r '.github.projectTitle'   "$cfg")"
@@ -85,6 +102,11 @@ load_kit_config() {
   # before `cckit effort start` refuses (#244). Empty when unconfigured; effort-ops.sh then falls
   # back to its built-in default of 2. An EFFORT_WIP_LIMIT env var still wins per invocation.
   export KIT_EFFORT_WIP_LIMIT="$(jq -r 'if (.effort.wipLimit | type) == "null" then "" else (.effort.wipLimit | tostring) end' "$cfg")"
+
+  # Local rows source for `cckit effort plan` (effort.planSource, #382) — an executable that prints
+  # the open-effort rows so the plan need not query GitHub. Empty when unconfigured (GitHub is read).
+  # An EFFORT_PLAN_SOURCE env var still wins per invocation.
+  export KIT_EFFORT_PLAN_SOURCE="$(jq -r '.effort.planSource // ""' "$cfg")"
 
   # PR conventions (#361). pr.titleStyle: "conventional" (default — release-please + commitlint read
   # the squash subject) or "issue-title" (the PR title is the issue title, verbatim).
@@ -127,5 +149,6 @@ _kit_apply_claudekit_overlays() {
   export KIT_ANNOTATE_FRAMEWORK="$(_kit_cfg_get '.annotate.framework // ""')"
   export KIT_EFFORT_FLOWS="$(_kit_cfg_get '[.effort.flows[]? | tostring] | join(" ")')"
   export KIT_EFFORT_WIP_LIMIT="$(_kit_cfg_get 'if (.effort.wipLimit | type) == "null" then "" else (.effort.wipLimit | tostring) end')"
+  export KIT_EFFORT_PLAN_SOURCE="$(_kit_cfg_get '.effort.planSource // ""')"
   export KIT_EFFECTIVE_CONFIG="$merged"
 }

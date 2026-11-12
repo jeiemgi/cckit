@@ -90,6 +90,8 @@ Every issue lands on `main` through a Pull Request. No direct commits to `main`.
 
 - Keep this file tight — point to files, don't duplicate content.
 - Bullets and tables preferred. No long intros.
+- A rule about one kind of file opens with a `paths:` frontmatter (a list of globs) so it loads only when a matching file is read. A rule without it loads into every session.
+- A long rule splits in two: a short rule here, the full reference in `knowledge/`. `scripts/instruction-budget-lint.sh --report` shows what every session pays.
 - Communication style → `.claude/rules/communication-style.md`
 <!-- IF:DESIGN -->
 - All design + adjustment questions → Designer agent (`.claude/rules/design-routing.md`)
