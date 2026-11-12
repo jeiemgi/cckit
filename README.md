@@ -139,6 +139,10 @@ cckit effort pr slug-handles
 cckit effort close slug-handles
 ```
 
+`cckit effort pr` titles the PR as a Conventional Commit subject carrying the effort id —
+`feat(core): adoption hardening [#115]` (scope from the `flow:` label, type from `--type` or the
+`kind:` label) — and refuses to open a PR whose title its commitlint gate would reject.
+
 A pure-digits argument is always a number; anything else is resolved to the canonical number by
 matching `effort/*` branches, the `slug:<slug>` label, then open effort titles. An unknown or
 ambiguous slug fails with a clear error rather than guessing. Efforts render as `slug #N`.

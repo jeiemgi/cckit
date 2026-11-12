@@ -91,6 +91,9 @@ chore(security): update docs-site deps to clear Dependabot alerts [#249]
 **Enforced now:** `effort_pr_title_check` (`scripts/lib/effort.sh`) requires a `[#<num>]` token —
 the exact `[#num]` when given a number, otherwise any `[#digits]` — and `effort_pr` refuses to open
 a PR without it. That check runs on **effort PRs only**; standalone task PRs are unchecked.
+`effort_pr_title` generates the conventional form above, `type(scope): <name> [#<num>]`, and under
+`pr.titleStyle: conventional` (the default) `effort_pr` also refuses, before calling `gh`, a title
+that `commitlint_check` (`scripts/lib/commitlint.sh`) rejects.
 
 **This rule targets** `[E<n>]` / `[E<n>.<step>]` on effort and sub PRs, and the check extended to
 every PR. Until that ships, `[#<num>]` is correct and `effort_pr` will keep generating it.

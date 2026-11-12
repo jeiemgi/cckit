@@ -698,7 +698,7 @@ effort_pr() {
   # [--for-agents A|--for-agents-file F] [--message M] [--title T]. SUMMARY / FOR_AGENTS / COMMIT_MSG env are
   # honoured as fallbacks.
   _eff_need gh || return 1
-  local raw="" summary="${SUMMARY:-}" for_agents="${FOR_AGENTS:-}" msg="${COMMIT_MSG:-}" title_override=""
+  local raw="" summary="${SUMMARY:-}" for_agents="${FOR_AGENTS:-}" msg="${COMMIT_MSG:-}" title_override="" ctype=""
   while [ $# -gt 0 ]; do
     case "$1" in
       --summary)          summary="${2:-}"; shift 2 ;;
@@ -707,6 +707,7 @@ effort_pr() {
       --for-agents-file)  for_agents="$(cat "${2:-/dev/null}")"; shift 2 ;;
       --message|-m)       msg="${2:-}"; shift 2 ;;
       --title)            title_override="${2:-}"; shift 2 ;;
+      --type)             ctype="${2:-}"; shift 2 ;;
       *)                  [ -z "$raw" ] && raw="$1"; shift ;;
     esac
   done
@@ -758,10 +759,24 @@ effort_pr() {
 
   # ONE shared composer (effort.sh) so every surface titles identically, then the mandatory-[#N]
   # check before we ever call gh — refuse rather than open an id-less PR (#121).
-  # --title serves a repo whose PR titles follow another convention (Conventional Commits under a
-  # commitlint gate); it must still carry the [#N] id, checked below.
-  pr_title="${title_override:-$(effort_pr_title "$num" "${name:-effort}" "$role_disp")}"
+  # --title replaces the composed title; it must still carry the [#N] id, checked below.
+  pr_title="${title_override:-$(effort_pr_title "$num" "${name:-effort}" "$labels" "$ctype" "$role_disp")}"
   effort_pr_title_check "$pr_title" "$num" || { echo "effort_pr: refusing to open a PR without the [#$num] effort id" >&2; return 1; }
+  # #237: under pr.titleStyle = conventional (the default) the title becomes the squash commit the
+  # commitlint gate checks, so a title that gate rejects — composed (a bad --type) or passed with
+  # --title — is refused here, before gh. issue-title repos run no such gate and skip the check.
+  if [ "${KIT_PR_TITLE_STYLE:-conventional}" != "issue-title" ]; then
+    if ! command -v commitlint_check >/dev/null 2>&1; then
+      local _cl_dir; _cl_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)"
+      # shellcheck source=/dev/null
+      [ -f "$_cl_dir/commitlint.sh" ] && . "$_cl_dir/commitlint.sh"
+    fi
+    if command -v commitlint_check >/dev/null 2>&1; then
+      commitlint_check "$pr_title" || { echo "effort_pr: refusing to open a PR whose title is not a Conventional Commit subject (pass --type <type> or --title, or set pr.titleStyle to issue-title)" >&2; return 1; }
+    else
+      echo "effort_pr: commitlint.sh not found — the PR title was not checked against Conventional Commits" >&2
+    fi
+  fi
   body="$(_eff_pr_body "$num" "$summary" "$for_agents" "$role")"
 
   # Four explicit forms, not ${x:+--flag "$x"}: that idiom word-splits under zsh, and this file is
