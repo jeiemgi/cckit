@@ -40,7 +40,7 @@ cckit release --next        # or: scripts/lib/version-bump.sh --next
 
 <Steps>
 
-1. **Work reaches `main`.** Feature branches merge into `develop`; when you're ready, `develop` merges into `main` via PR. (`main` is protected — releases only.)
+1. **Work reaches `main`.** Feature branches merge into `develop`; when you're ready, `develop` merges into `main` via PR. (`main` is protected — releases only.) Open that PR with `cckit pr <issue> "<summary>" --base main` from a branch cut from `develop`: an explicit `--base` wins over `github.baseBranch`, and the labels, milestone and board steps run as for any other PR. Setting `KIT_BASE_BRANCH=main` in the environment does not do this — the config file is read after it.
 
 2. **release-please opens/updates the Release PR** — it computes the bump from the commits since the last tag, bumps all four version surfaces (`package.json`, `docs-site/package.json`, `.claude-plugin/plugin.json`, `cckit.config.json`) plus `Formula/cckit.rb`, and regenerates `CHANGELOG.md`. Review it whenever; nothing ships yet.
 
@@ -53,6 +53,39 @@ A batch with only `chore`/`docs` noise produces no Release PR (`bump=none` → n
 <Aside type="caution" title="Workflow edits are human-reviewed">
 Changes to the release workflow are always reviewed by a person — the CI token has a wide blast radius. This repo ships the workflow; a maintainer merges the PR that adds or edits it.
 </Aside>
+
+## Hotfix to the release branch
+
+A fix that cannot wait for the next `develop` → `main` promotion goes to `main` on its own. It lands
+on `develop` first, through the normal flow; then one command carries it across:
+
+```sh
+cckit hotfix 268              # a merged PR, by number
+cckit hotfix 3f2a9c1          # or a commit
+cckit hotfix 268 --base release/1.x   # a release branch other than main
+```
+
+| Step | What happens |
+| --- | --- |
+| Source | A digits-only argument is a PR number: its merge commit and title are read from GitHub, and an unmerged PR is refused. Anything else is a commit; its PR number is read from a squash `(#N)` suffix or a `Merge pull request #N` subject. |
+| Worktree | `.claude/worktrees/fix+<N>-hotfix-<base>` on branch `fix/<N>-hotfix-<base>`, cut from `origin/<base>`. A commit that names no PR gets `fix/hotfix-<sha7>-<base>`. |
+| Pick | `git cherry-pick -x`, with `-m 1` for a merge commit, so the branch carries the source commit's diff and its message records where it came from. A PR that was rebase-merged has no single commit carrying it (GitHub reports its last rebased commit as the merge commit), so each of its commits is picked, oldest first. It is recognized by the PR's commit subjects sitting unchanged under that commit; a PR whose commits cannot be read is refused, and a commit sha still works as the source. |
+| Push | `git push`, with `KIT_PR_BASE=<base>` in the environment of the git pre-push hook. |
+| PR | Opened against `<base>`, titled after the source PR (or the commit subject without its `(#N)` suffix), body `Cherry-pick of #N`. It has no `Closes` line: the issue was closed by the source PR. |
+
+The command is re-runnable. A commit already picked is not picked again, and a PR already open for
+the branch is reported instead of re-created. If the pick conflicts, nothing is pushed: resolve it
+in the worktree, run `git cherry-pick --continue` there, and run the same `cckit hotfix` again. A
+change `origin/<base>` already carries is refused, and the worktree it made is removed.
+
+With `--llm` the result is one JSON object (`ok`, `url`, `worktree`, `detail`). A refusal or a
+conflict exits non-zero with `ok: false` and the reason in `detail`.
+
+For a hotfix that is new work, not a cherry-pick, branch from the release branch by hand and open the
+PR with `cckit pr <issue> "<summary>" --base main`.
+
+The hotfix PR's title becomes the squash commit release-please reads on `main`, so a `fix:` source
+produces a patch release there. Merge it with `cckit merge <pr>`.
 
 ## Publishing to npm + Homebrew
 
@@ -111,7 +144,8 @@ hand from the repo root: `vercel --prod --archive=tgz`.
 ## Commit message rules (the contract)
 
 - **Every PR title** uses a Conventional Commit subject: `type(scope): summary`. PRs are **squash-merged**, so the PR title becomes the single commit on the base branch — the exact line release-please reads to pick the next version.
-- **`cckit pr` generates a conventional title for you** — it derives the `type` from the issue's `kind:` label (`kind:task` → `feat`, a `bug` label → `fix`, `kind:chore` → `chore`, …) and strips the `[Effort N] M ·` / `[Tag]` prefix from the issue title. Pass a summary that is *already* a Conventional Commit subject (e.g. `cckit pr 42 "fix: guard the empty case"`) to override the derived type when you know the change's true nature. Either way the opened PR passes the gate below.
+- **`cckit pr` generates a conventional title for you** — it derives the `type` from the issue's `kind:` label (`kind:feat` and `kind:task` → `feat`, `kind:fix` or a `bug` label → `fix`, `kind:chore` → `chore`, `kind:ci` → `ci`; the other kinds → `feat`) and strips the `[Effort N] M ·` / `[Tag]` prefix from the issue title. Pass a summary that is *already* a Conventional Commit subject (e.g. `cckit pr 42 "fix: guard the empty case"`) to override the derived type when you know the change's true nature. Either way the opened PR passes the gate below.
+- **`cckit effort pr` does the same for an effort PR** — `type(scope): name [#N]`, with the scope from the effort's `flow:` label and the type from `--type` or the `kind:` label (default `feat`). It refuses to open a PR whose title fails the same check the gate runs, so an effort PR never needs a manual retitle to merge.
 - **Breaking changes** use `!` after the type/scope **or** a `BREAKING CHANGE:` footer — never a silent major.
 - **One logical change per PR** so the generated release notes read cleanly.
 

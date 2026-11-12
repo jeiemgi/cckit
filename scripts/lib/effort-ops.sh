@@ -28,6 +28,14 @@ if ! command -v effort_slug_resolve >/dev/null 2>&1; then
   unset _eo_dir
 fi
 
+# The closed kind: vocabulary (KIT_KINDS / kit_kind_valid) — what `effort new --kind` accepts.
+if ! command -v kit_kind_valid >/dev/null 2>&1; then
+  _eo_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+  # shellcheck source=/dev/null
+  [ -f "$_eo_dir/kinds.sh" ] && . "$_eo_dir/kinds.sh"
+  unset _eo_dir
+fi
+
 # The GitHub transport switch (#396): in rest mode the lifecycle calls below are `gh api repos/…`.
 if ! command -v cckit_gh_rest >/dev/null 2>&1; then
   _eo_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
@@ -125,8 +133,8 @@ _eff_board_add() {
   [ -n "$item" ] || return 0
   [ -n "${STATUS_FIELD_ID:-}" ] && [ -n "${STATUS_OPT_TODO:-}" ] \
     && project_set_single_select "$item" "$STATUS_FIELD_ID" "$STATUS_OPT_TODO" 2>/dev/null || true
-  if [ -n "$role" ] && command -v role_option_id >/dev/null 2>&1; then
-    ropt="$(role_option_id "$role" 2>/dev/null || echo "")"
+  if [ -n "$role" ] && [ -n "${ROLE_FIELD_ID:-}" ] && command -v role_option_id >/dev/null 2>&1; then
+    ropt="$(role_option_id "$role" || echo "")"
     [ -n "$ropt" ] && [ -n "${ROLE_FIELD_ID:-}" ] \
       && project_set_single_select "$item" "$ROLE_FIELD_ID" "$ropt" 2>/dev/null || true
   fi
@@ -146,7 +154,7 @@ effort_new() {
   local repo; repo="$(_eff_repo)"
   [ -n "$repo" ] || { echo "effort_new: no repo (KIT_REPO/EFFORT_REPO unset — run in a kit project)" >&2; return 1; }
 
-  local flow="" role="" priority="p1" goal="" scope="" for_agents="" verification="" depends_on="" milestone="" explicit_slug="" par=""
+  local flow="" role="" priority="p1" goal="" scope="" for_agents="" verification="" depends_on="" milestone="" explicit_slug="" kind="task"
   # Flags are position-INDEPENDENT: recognized --flag [value] pairs are consumed wherever they occur
   # (before the title, between subs, or after them) and the remaining positionals are collected as the
   # title (first) + sub specs (rest). Previously the parser broke at the first positional, so any flag
@@ -166,8 +174,8 @@ effort_new() {
       --milestone)    milestone="${2:-}"; shift 2 ;;
       --slug)         explicit_slug="${2:-}"; shift 2 ;;
       --slug=*)       explicit_slug="${1#*=}"; shift ;;
-      --par)          par="${2:-}"; shift 2 ;;
-      --par=*)        par="${1#*=}"; shift ;;
+      --kind)         kind="${2:-}"; shift 2 ;;
+      --kind=*)       kind="${1#*=}"; shift ;;
       --)             shift; while [ $# -gt 0 ]; do pos+=("$1"); shift; done ;;
       --*)            echo "effort_new: unknown flag $1" >&2; return 1 ;;
       *)              pos+=("$1"); shift ;;
@@ -175,15 +183,13 @@ effort_new() {
   done
   set -- "${pos[@]+"${pos[@]}"}"
 
-  # Parallelism hint label (#121): --par seq | wide | <positive-int> → a par:<value> label on the
-  # parent (how the effort's subs are meant to run). Validated before anything is created.
-  if [ -n "$par" ]; then
-    case "$par" in
-      seq|wide) : ;;
-      ''|*[!0-9]*) echo "effort_new: --par must be 'seq', 'wide', or a positive integer (got '$par')" >&2; return 1 ;;
-      *) : ;;
-    esac
+  # --kind picks the kind:<k> label on the parent and every sub (default task). It is validated
+  # against the closed set (kinds.sh) before anything is created: `cckit start` turns the label into
+  # the branch prefix, so a value outside the set would yield a branch the hygiene hook rejects.
+  if command -v kit_kind_valid >/dev/null 2>&1 && ! kit_kind_valid "$kind"; then
+    echo "effort_new: --kind must be one of: $KIT_KINDS (got '$kind')" >&2; return 1
   fi
+  [ -n "$kind" ] || { echo "effort_new: --kind needs a value" >&2; return 1; }
 
   local name="${1:-}"; shift || true
   [ -n "$name" ] || { echo 'effort_new: usage: effort_new [flags] "<name>" [<sub spec> …]' >&2; return 1; }
@@ -224,7 +230,7 @@ effort_new() {
   # Every kit-defined label is ensured before use — `gh issue create --label` fails hard on a
   # missing label, which aborted the whole parent create on repos without the ctx:* set (#153).
   _eff_ensure_label "$ctx" bfd4f2 "effort session weight"
-  _eff_ensure_label "kind:task" d4c5f9 "kit issue kind"
+  _eff_ensure_label "kind:$kind" d4c5f9 "kit issue kind"
   _eff_ensure_label "priority:$priority" e99695 "kit priority"
   # `effort` is what marks the parent AS an effort, and it is the label `effort_plan` queries
   # (`gh issue list --label effort`, effort-plan.sh). It was read and never written: the label did
@@ -232,7 +238,7 @@ effort_new() {
   # every effort ever created here. A label something reads and nothing writes is the same defect
   # as one something writes and nothing reads — see rules/naming-and-ids.md § Labels.
   _eff_ensure_label "effort" 5319e7 "an effort parent issue"
-  local labels="effort,$ctx,kind:task,priority:$priority"
+  local labels="effort,$ctx,kind:$kind,priority:$priority"
   if [ -n "$role" ]; then
     _eff_ensure_label "role:$role" 0e8a16 "kit role lane"
     labels="$labels,role:$role"
@@ -241,10 +247,6 @@ effort_new() {
     local flow_lc; flow_lc="$(printf '%s' "$flow" | tr '[:upper:]' '[:lower:]')"
     _eff_ensure_label "flow:$flow_lc" 1d76db "kit flow lane"
     labels="$labels,flow:$flow_lc"
-  fi
-  if [ -n "$par" ]; then
-    _eff_ensure_label "par:$par" c5def5 "effort parallelism hint"
-    labels="$labels,par:$par"
   fi
 
   local url num slug
@@ -290,7 +292,7 @@ effort_new() {
     sub_name="${spec%% :: *}"
     sub_desc="${spec#* :: }"; [ "$sub_desc" = "$spec" ] && sub_desc=""
     sub_title="[Effort $num] $i · $sub_name"
-    local sub_labels="kind:task,priority:$priority"
+    local sub_labels="kind:$kind,priority:$priority"
     [ -n "$role" ] && sub_labels="$sub_labels,role:$role"
     if cckit_gh_rest; then
       child="$(gh_rest_issue_create "$repo" "$sub_title" \
@@ -657,9 +659,22 @@ effort_start() {
 
   if [ -n "$slug_override" ]; then slug="$(_eff_slug "$slug_override")"
   else
-    if cckit_gh_rest; then title="$(gh api "repos/$repo/issues/$num" --jq .title 2>/dev/null)" || title=""
-    else title="$(gh issue view "$num" --repo "$repo" --json title -q .title 2>/dev/null)"; fi
-    slug="$(_eff_title_slug "${title:-effort}")"; [ -n "$slug" ] || slug="effort"
+    # A soft read (#330): the slug has a fallback, so a failed gh must not end the op — and under
+    # `set -e` a bare failed assignment did exactly that, rc 1 with no output. Failed is told apart
+    # from empty by gh's exit code, and said on stderr.
+    local title_rc=0
+    if cckit_gh_rest; then title="$(gh api "repos/$repo/issues/$num" --jq .title 2>/dev/null)" || title_rc=$?
+    else title="$(gh issue view "$num" --repo "$repo" --json title -q .title 2>/dev/null)" || title_rc=$?; fi
+    slug=""
+    if [ "$title_rc" -ne 0 ]; then
+      title=""
+      # An effort already started keeps its branch: a re-start during an outage must land on
+      # effort/<N>-<its slug>, not cut a second branch named after the fallback.
+      slug="$(git -C "$root" for-each-ref --format='%(refname:short)' "refs/heads/effort/$num-*" 2>/dev/null | head -1)"
+      slug="${slug#effort/"$num"-}"
+      echo "effort_start: could not read the title of issue #$num from GitHub (gh exited $title_rc) — continuing with the slug '${slug:-effort}'. To choose the slug: effort start $num <slug>" >&2
+    fi
+    [ -n "$slug" ] || slug="$(_eff_title_slug "${title:-effort}")"; [ -n "$slug" ] || slug="effort"
   fi
   # Worktree dir follows the kind+N-slug convention (branch-naming.md) so kit-gc's issue-open
   # protection recognizes it by DIRECTORY name too — matching the kit-effort-start skill (#119).
@@ -698,7 +713,7 @@ effort_pr() {
   # [--for-agents A|--for-agents-file F] [--message M] [--title T]. SUMMARY / FOR_AGENTS / COMMIT_MSG env are
   # honoured as fallbacks.
   _eff_need gh || return 1
-  local raw="" summary="${SUMMARY:-}" for_agents="${FOR_AGENTS:-}" msg="${COMMIT_MSG:-}" title_override=""
+  local raw="" summary="${SUMMARY:-}" for_agents="${FOR_AGENTS:-}" msg="${COMMIT_MSG:-}" title_override="" ctype=""
   while [ $# -gt 0 ]; do
     case "$1" in
       --summary)          summary="${2:-}"; shift 2 ;;
@@ -707,6 +722,7 @@ effort_pr() {
       --for-agents-file)  for_agents="$(cat "${2:-/dev/null}")"; shift 2 ;;
       --message|-m)       msg="${2:-}"; shift 2 ;;
       --title)            title_override="${2:-}"; shift 2 ;;
+      --type)             ctype="${2:-}"; shift 2 ;;
       *)                  [ -z "$raw" ] && raw="$1"; shift ;;
     esac
   done
@@ -758,10 +774,24 @@ effort_pr() {
 
   # ONE shared composer (effort.sh) so every surface titles identically, then the mandatory-[#N]
   # check before we ever call gh — refuse rather than open an id-less PR (#121).
-  # --title serves a repo whose PR titles follow another convention (Conventional Commits under a
-  # commitlint gate); it must still carry the [#N] id, checked below.
-  pr_title="${title_override:-$(effort_pr_title "$num" "${name:-effort}" "$role_disp")}"
+  # --title replaces the composed title; it must still carry the [#N] id, checked below.
+  pr_title="${title_override:-$(effort_pr_title "$num" "${name:-effort}" "$labels" "$ctype" "$role_disp")}"
   effort_pr_title_check "$pr_title" "$num" || { echo "effort_pr: refusing to open a PR without the [#$num] effort id" >&2; return 1; }
+  # #237: under pr.titleStyle = conventional (the default) the title becomes the squash commit the
+  # commitlint gate checks, so a title that gate rejects — composed (a bad --type) or passed with
+  # --title — is refused here, before gh. issue-title repos run no such gate and skip the check.
+  if [ "${KIT_PR_TITLE_STYLE:-conventional}" != "issue-title" ]; then
+    if ! command -v commitlint_check >/dev/null 2>&1; then
+      local _cl_dir; _cl_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)"
+      # shellcheck source=/dev/null
+      [ -f "$_cl_dir/commitlint.sh" ] && . "$_cl_dir/commitlint.sh"
+    fi
+    if command -v commitlint_check >/dev/null 2>&1; then
+      commitlint_check "$pr_title" || { echo "effort_pr: refusing to open a PR whose title is not a Conventional Commit subject (pass --type <type> or --title, or set pr.titleStyle to issue-title)" >&2; return 1; }
+    else
+      echo "effort_pr: commitlint.sh not found — the PR title was not checked against Conventional Commits" >&2
+    fi
+  fi
   body="$(_eff_pr_body "$num" "$summary" "$for_agents" "$role")"
 
   # Four explicit forms, not ${x:+--flag "$x"}: that idiom word-splits under zsh, and this file is
@@ -810,7 +840,7 @@ _eff_pr_board() {
   _eo_source_board
   command -v project_add_item >/dev/null 2>&1 || return 0
   repo="$(_eff_repo)"; pr_num="${url##*/}"
-  node="$(gh api "repos/$repo/pulls/$pr_num" --jq .node_id 2>/dev/null)"
+  node="$(gh api "repos/$repo/pulls/$pr_num" --jq .node_id 2>/dev/null)" || node=""
   item=""
   [ -n "$node" ] && item="$(project_add_item "$node" 2>/dev/null || true)"
   if [ -z "$item" ]; then
@@ -820,7 +850,7 @@ _eff_pr_board() {
       project_set_single_select "$item" "$STATUS_FIELD_ID" "$STATUS_OPT_IN_REVIEW" >/dev/null 2>&1 || true
     fi
     if [ -n "$role" ] && [ -n "${ROLE_FIELD_ID:-}" ] && command -v role_option_id >/dev/null 2>&1; then
-      ropt="$(role_option_id "$role" 2>/dev/null || true)"
+      ropt="$(role_option_id "$role" || true)"
       [ -n "$ropt" ] && { project_set_single_select "$item" "$ROLE_FIELD_ID" "$ropt" >/dev/null 2>&1 || true; }
     fi
   fi
@@ -918,6 +948,68 @@ _eo_knowledge_ingest() {
   ( cd "${root:-/}" && "$hook" "$num" "$trace" ) >/dev/null 2>&1 || echo "effort_close: knowledge-ingest hook failed (non-fatal)" >&2
 }
 
+# _eo_dependent_prs <branch> — pure selector (#358): `gh pr list --json number,baseRefName` on stdin,
+# the numbers of the PRs whose base is exactly <branch> on stdout, one per line. Empty stdin prints
+# nothing; input that is not a JSON array is rc 1, so the caller can tell "none" from "unreadable".
+_eo_dependent_prs() {
+  jq -r --arg b "$1" 'if type == "array" then .[] | select(.baseRefName == $b) | .number else error("not a list") end' 2>/dev/null
+}
+
+# _eo_retarget_dependents <repo> <branch> <base> — re-target every open PR based on <branch> to
+# <base> (#358). GitHub closes a PR, unmerged, the moment its base branch is deleted, and the squash
+# below deletes <branch>. rc 1 when the list cannot be read or an edit fails: the caller refuses the
+# close, because either one means a PR would be closed by the delete.
+_eo_retarget_dependents() {
+  local repo="$1" branch="$2" base="$3" json deps dep
+  json="$(gh pr list --repo "$repo" --base "$branch" --state open --limit 200 --json number,baseRefName 2>/dev/null)" \
+    && deps="$(printf '%s' "$json" | _eo_dependent_prs "$branch")" \
+    || { echo "effort_close: could not list the open PRs based on $branch — deleting it would close any that exist. Rerun when 'gh pr list --base $branch' works (nothing was merged)" >&2; return 1; }
+  while IFS= read -r dep; do
+    [ -n "$dep" ] || continue
+    gh pr edit "$dep" --repo "$repo" --base "$base" >/dev/null 2>&1 \
+      || { echo "effort_close: PR $dep is based on $branch and could not be re-targeted to $base — deleting the branch would close it. Run 'gh pr edit $dep --base $base', then rerun (nothing was merged)" >&2; return 1; }
+    echo "  ↻ PR $dep re-targeted to $base" >&2
+  done <<EOF_DEPS
+$deps
+EOF_DEPS
+}
+
+# _eo_pre_close_hook <num> <repo> <root> <cwd> [<subs>] — optional project gate that runs BEFORE the
+# close writes anything (#380). Runs a project-configured command (effort.preCloseHook, or
+# KIT_EFFORT_PRE_CLOSE_HOOK) as `<hook> <effort#> <sub#…>` with cwd = <cwd> (the effort worktree; the
+# checkout the close was run from on the wave path). <subs> is a newline-separated sub list; when
+# omitted the native sub-issues are read from GitHub. Returns 1 — the caller refuses the close —
+# when the hook exits non-zero, or is configured but not executable: a gate that cannot run must not
+# pass. The hook's stdout + stderr go to stderr. KIT_FORCE=1 skips the hook and says so. A NO-OP
+# (rc 0, no GitHub read) when no hook is configured — the kit ships no default hook.
+_eo_pre_close_hook() {
+  local num="$1" repo="$2" root="$3" cwd="$4" subs="${5:-}" hook="" cfg sub rc
+  hook="${KIT_EFFORT_PRE_CLOSE_HOOK:-}"
+  if [ -z "$hook" ]; then
+    cfg="${KIT_CONFIG:-}"; [ -n "$cfg" ] || { [ -f "$root/cckit.config.json" ] && cfg="$root/cckit.config.json" || cfg="$root/.claude/kit.config.json"; }
+    [ -f "$cfg" ] && command -v jq >/dev/null 2>&1 \
+      && hook="$(jq -r '.effort.preCloseHook // empty' "$cfg" 2>/dev/null)"
+  fi
+  [ -n "$hook" ] || return 0
+  case "$hook" in /*) : ;; *) hook="$root/$hook" ;; esac   # resolve a relative hook against the root
+  if [ "${KIT_FORCE:-0}" = "1" ]; then
+    echo "effort_close: pre-close hook '$hook' skipped (KIT_FORCE=1)" >&2; return 0
+  fi
+  [ -x "$hook" ] || { echo "effort_close: pre-close hook '$hook' is configured but not executable — refusing to close #$num (nothing was written). Fix effort.preCloseHook, or set KIT_FORCE=1 to skip it." >&2; return 1; }
+  [ "$#" -ge 5 ] || subs="$(gh api "repos/$repo/issues/$num/sub_issues" --jq '.[].number' 2>/dev/null)"
+  set -- "$num"
+  while IFS= read -r sub; do
+    [ -n "$sub" ] && set -- "$@" "$sub"
+  done <<EOF_SUBS
+$subs
+EOF_SUBS
+  echo "  → pre-close hook: $hook $*" >&2
+  ( cd "${cwd:-.}" && "$hook" "$@" ) 1>&2; rc=$?
+  [ "$rc" -eq 0 ] && return 0
+  echo "effort_close: pre-close hook exited $rc — refusing to close #$num (nothing was written). Fix what it reports, or set KIT_FORCE=1 to skip it." >&2
+  return 1
+}
+
 # effort_close <N> — the SINGLE close implementation (#148): the /kit-effort-close skill is a thin
 # caller of this function, never a second close. Snapshot per-sub diffs + capture metrics BEFORE the
 # squash (the squash erases the per-sub history), REFUSE to squash if no work trace was captured
@@ -948,6 +1040,10 @@ effort_close() {
   self_wt="$(git rev-parse --show-toplevel 2>/dev/null)"
   _eo_source_metrics
 
+  # (pre) optional project gate (effort.preCloseHook, #380) — before the snapshot, so a refusal
+  # writes nothing: no trace, no metrics row, no merge.
+  _eo_pre_close_hook "$num" "$repo" "$root" "$self_wt" || return 1
+
   # (a) snapshot the per-sub-issue diffs while the unsquashed history still exists (echoes the trace dir).
   trace_dir="$(effort_snapshot_subs "$num" "origin/$base" 2>/dev/null)"
 
@@ -970,14 +1066,34 @@ effort_close() {
   # row the retry duplicates with build_seconds null. UNKNOWN (GitHub still computing) proceeds.
   local rest_pr="" mergeable
   if cckit_gh_rest; then
-    rest_pr="$(gh_rest_pr_for_head "$repo" "$branch" 2>/dev/null)"
-    mergeable=""; [ -n "$rest_pr" ] && mergeable="$(gh_rest_pr_json "$repo" "$rest_pr" 2>/dev/null | jq -r .mergeable)"
+    # Same refusal as the graphql branch below (#330): a failed read, or no open PR, must stop here.
+    # Carrying on let the capture write its row and consume the start marker before the merge failed.
+    local rest_meta=""
+    rest_pr="$(gh_rest_pr_for_head "$repo" "$branch" 2>/dev/null)" || rest_pr=""
+    [ -n "$rest_pr" ] && rest_meta="$(gh_rest_pr_json "$repo" "$rest_pr" 2>/dev/null)" || rest_meta=""
+    [ -n "$rest_meta" ] || {
+      echo "effort_close: could not read the PR for $branch from GitHub (gh failed: no PR, or the API is unavailable) — rerun when it answers (nothing was written)" >&2
+      return 1
+    }
+    mergeable="$(printf '%s' "$rest_meta" | jq -r .mergeable)"
   else
-    mergeable="$(gh pr view "$branch" --repo "$repo" --json mergeable -q .mergeable 2>/dev/null)"
+    # A failed read is not "mergeable" (#330). Under `set -e` this bare assignment ended the close
+    # with rc 1 and no output; refusing by name keeps the nothing-written guarantee this step is for.
+    mergeable="$(gh pr view "$branch" --repo "$repo" --json mergeable -q .mergeable 2>/dev/null)" || {
+      echo "effort_close: could not read the PR for $branch from GitHub (gh failed: no PR, or the API is unavailable) — rerun when it answers (nothing was written)" >&2
+      return 1
+    }
   fi
   if [ "$mergeable" = "CONFLICTING" ]; then
     echo "effort_close: the PR for $branch conflicts with $base — merge or rebase $base into it, then rerun (nothing was written)" >&2
     return 1
+  fi
+
+  # (a3) re-target the open PRs based on this branch before the squash deletes it (#358). Here, not
+  # next to the merge, for the same reason as the conflict check: a refusal after the capture leaves
+  # a records.jsonl row the retry duplicates. Skipped over REST, where the remote branch is kept.
+  if ! cckit_gh_rest; then
+    _eo_retarget_dependents "$repo" "$branch" "$base" || return 1
   fi
 
   # (b) capture effort metrics PRE-squash (needs the live-branch diff + commit signals).
@@ -1100,6 +1216,11 @@ _eo_close_wave() {
     printf '%s\n' "$bad" >&2
     return 1
   fi
+
+  # (pre) the same optional project gate as the branch path (#380), before the trace is written.
+  # There is no effort worktree here, so it runs from the checkout the close was invoked in.
+  _eo_pre_close_hook "$num" "$repo" "$root" "$(git rev-parse --show-toplevel 2>/dev/null)" \
+    "$(printf '%s\n' "$rows" | cut -d'|' -f1)" || return 1
 
   # (c) the work trace, from the merged sub PR diffs (the record the per-sub squashes left behind).
   # Same refuse-without-trace backstop as the branch path (#120) — KIT_FORCE=1 overrides.

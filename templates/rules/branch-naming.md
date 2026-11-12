@@ -31,6 +31,22 @@ it protects any branch whose issue is still open. One trailing letter only — `
 is not an issue number and gets no protection. (The parser honors the suffix for any kind, not
 just `sub` — it errs toward protection rather than risk deleting a misnamed live branch.)
 
+### Hotfix branches (created by `cckit hotfix`, not by hand)
+
+`cckit hotfix <pr|sha> [--base <branch>]` cherry-picks one merged change onto the release branch and
+names its branch after the **source PR**, not an issue — a cherry-pick has no issue of its own:
+
+| Pattern | When | `N` |
+| --- | --- | --- |
+| `fix/<N>-hotfix-<base>` | the source is a PR, or a commit whose subject names one | the **source PR's** number |
+| `fix/hotfix-<sha7>-<base>` | the source commit names no PR | none |
+
+`<base>` is the target branch, lowercased with every non-alphanumeric run turned into `-`
+(`release/1.x` → `release-1-x`), so the same PR can be carried to two release branches. `N` parses
+as an issue number, and a merged PR reads as closed, so `gc` treats the branch like any other whose
+issue is closed: prunable once its own PR merges. Do not run `cckit pr` in a hotfix worktree — it
+would read the source PR number as the issue to close.
+
 ### Closed set of kinds
 
 | Kind       | For                                                | Typical risk |
@@ -87,6 +103,12 @@ Lockfiles (`pnpm-lock.yaml`, `package-lock.json`, …) and manifest config confl
   live writer already owns refuses the launch, and the wave's other claims are released. A lease is
   reclaimed only on positive evidence — its worktree is gone, or its process died on the host that
   recorded it — never on a process check against another host.
+- **`start` enforces it too, with a session claim.** `orchestrate`'s lease covers a wave; a second
+  session running `cckit start <issue>` by hand is outside it. `wt_start` records one claim per
+  issue under `<git-common-dir>/kit-sessions/` (`scripts/lib/session-registry.sh`) and refuses a
+  start while another live session holds it — before any fetch, branch or worktree. `--force` /
+  `KIT_FORCE=1` starts anyway; a claim whose pid is dead is reaped; `cckit claims` lists the live
+  ones. A board Status of In Progress or In Review only warns.
 - Prefer giving local sub-agents their own worktree.
 - Remote CI agents (Auto-Dev) are isolated per runner — favor them for parallel fixes.
 - Before editing shared files, check whether another agent is active.

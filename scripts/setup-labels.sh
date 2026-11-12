@@ -3,10 +3,14 @@
 # Reads repo + roles from .claude/kit.config.json; the flow vocabulary from effort.sh (EFFORT_FLOWS).
 # These are exactly the labels `cckit effort new` / /kit-effort-new apply — provision them here so a
 # fresh repo can create a fully-labeled effort with no manual label creation. Run from project root.
+# The families are the ones rules/naming-and-ids.md § Labels documents, each with a reader; `slug:`
+# is per-effort and created by `effort new`.
 set -euo pipefail
 source "$(dirname "$0")/lib/kit-config.sh" && load_kit_config
 # shellcheck source=/dev/null
 source "$(dirname "$0")/lib/effort.sh" 2>/dev/null || true   # for EFFORT_FLOWS (the flow:* vocabulary)
+# shellcheck source=/dev/null
+source "$(dirname "$0")/lib/kinds.sh" 2>/dev/null || true    # for KIT_KINDS (the kind:* vocabulary)
 
 ensure_label() { # name color description
   gh label create "$1" --repo "$KIT_REPO" --color "$2" --description "$3" --force >/dev/null 2>&1 \
@@ -19,7 +23,10 @@ echo "→ Labels on $KIT_REPO"
 echo "effort:"
 ensure_label "effort" "5319e7" "An effort parent issue"
 echo "kinds:"
-for k in task plan adr scaffold spike; do ensure_label "kind:$k" "5319e7" "Kind: $k"; done
+# The closed set of rules/branch-naming.md — a kind is also the branch prefix `cckit start` cuts, so
+# the two lists are one list. The literal is the fallback for a project without lib/kinds.sh;
+# scripts/lib/kinds-test.sh fails if it drifts from KIT_KINDS.
+for k in ${KIT_KINDS:-feat fix task chore security scaffold ci adr spike plan}; do ensure_label "kind:$k" "5319e7" "Kind: $k"; done
 echo "priorities:"
 ensure_label "priority:p0" "8b0000" "Drop everything"
 ensure_label "priority:p1" "b60205" "Now / blocking"

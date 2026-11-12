@@ -91,6 +91,27 @@ Unattended runs create real branches, worktrees, and PRs. Seeing the plan first 
 agent) catch a wrong issue or a bad cap before it fans out.
 </Aside>
 
+## Night mode: approved waves under a token budget
+
+`cckit autopilot` caps concurrency; it does not cap spend. Night mode does: the `kit-autopilot`
+skill launches a Workflow script, and the Workflow runtime stops the run when the token budget is
+spent. You approve the night with one comment on the plan parent issue — the budget, the effort
+waves, and the review floors you waive:
+
+````markdown
+<!-- night-grant -->
+Tonight: run the two approved waves. I accept the lockfile floor.
+
+```json
+{ "budget": "+2000k", "waves": [[12], [15]], "waivers": ["lockfile"], "stopCommand": null }
+```
+````
+
+Only a grant written by the repository owner, or by a login in `night.grantors`, is read. The run
+is no wider than `effort.wipLimit`, ends at the first wave that did not fully merge, and reports
+`done` only when the gate is green on the base branch. Every rule and config key:
+[Night mode](/config-and-permissions/#night-mode).
+
 ## Troubleshooting
 
 **It stopped on a blocker.** That's by design — unattended runs ping you only on a genuine blocker

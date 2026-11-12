@@ -16,11 +16,19 @@ close logic is re-authored inline (kit-engine-boundary #1/#2). Respects `KIT_BAS
 The effort lifecycle's terminal op. Board state, issue state, and the work record are correct
 **by construction** — the core op owns them, in this order:
 
+0. **Pre-close hook** (optional, config-gated via `effort.preCloseHook`) — a project gate called as
+   `<hook> <effort#> <sub#…>` from the effort worktree before anything is written. A non-zero exit
+   refuses the close and its output is printed; `KIT_FORCE=1` skips it and says so.
 1. **Snapshot sub-diffs BEFORE squash** (squash destroys the per-sub-issue commit pairs that ARE
    the work record — effort-model.md "Trace hard rules"), with a **refuse-squash-without-trace**
    backstop (`KIT_FORCE=1` overrides).
 2. **Capture effort metrics** pre-squash (telemetry: live-branch diff + commit signals).
-3. **Squash-merge** the effort PR.
+3. **Re-target dependent PRs, then squash-merge** the effort PR. The merge deletes the remote
+   effort branch, and GitHub closes — unmerged — any open PR still based on it. So the core first
+   lists them (`gh pr list --base effort/<N>-… --state open`) and moves each to the base branch
+   (`gh pr edit <n> --base <base>`, one `↻ PR <n> re-targeted to <base>` line). If an edit fails,
+   or the list cannot be read, the close **refuses**, names the PR, and merges nothing; this runs
+   before step 2, so a refusal writes no metrics row. Skipped over REST, where the branch is kept.
 4. **Judge + sync** the metrics (reads the durable trace dir; no-ops when the engine is off).
 5. **Close the parent + ALL native sub-issues** and set the **board Status=Done** for each
    (guarded — a no-op when Projects v2 is off).
@@ -51,7 +59,7 @@ If not, abort and route to `/kit-effort-pr` first.
 ## Execution
 
 This skill is a **thin caller** of `effort_close` (`scripts/lib/effort-ops.sh`) — the SAME
-function `cckit effort close` runs. The core owns the pre-squash snapshot + trace backstop,
+function `cckit effort close` runs. The core owns the pre-close hook, the pre-squash snapshot + trace backstop,
 telemetry capture/judge/sync, the squash-merge, issue closes, board Done, GC, the
 knowledge-ingest hook, and the kit-sync drift check. There is no second implementation here.
 
@@ -88,6 +96,7 @@ effort_close "$NUM"
 
 - Pre-squash trace dir (`<git-common-dir>/traces/effort-<N>/` + `index.jsonl`) + captured metrics
 - PR squash-merged; parent + all native sub-issues closed
+- Every PR that was based on the effort branch is still OPEN, now based on the base branch
 - Board Status=Done for parent + every sub (if Projects v2 is on)
 - Main checkout on the base branch, up to date; effort worktree + local/remote branch removed and pruned, and every LANDED `sub/<N>…` worktree + branch with them (`✓ sub gc:` lines)
 - Knowledge-ingest hook ran (if configured); a kit-sync warning if the effort touched kit-managed files
