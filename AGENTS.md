@@ -92,7 +92,7 @@ Every operation an unattended run needs is reachable through the one CLI:
 | `cckit doctor [--fix]` | onboarding preflight (deps, gh auth); asks before installing on a TTY, `--fix` skips the prompt |
 | `cckit update` | report whether the project is behind the installed cckit |
 | `cckit migrate` | reshuffle an old kit layout to the current one |
-| `cckit digest` | summarize recent activity |
+| `cckit digest <path\|url>` | summarize one file or URL with the local model (exit 2 when the local model server is down) |
 | `cckit release <ver>` | cut a release — **dry-run by default**, `--publish` to act |
 
 ### Orchestration flags (`orchestrate` / `autopilot`)
