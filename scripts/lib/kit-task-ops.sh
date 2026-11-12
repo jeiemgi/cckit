@@ -19,7 +19,7 @@
 #   kto_compose_pr_body <num> <summary> <role-slug>   echo a PR body from the template
 #   kto_compose_issue_body <user-body> <plan> <blocked> <role-slug>   echo an issue body
 #   kto_closing_issue_numbers <pr-num>                echo the issue #s a merged PR closes
-#   kto_task_pr   <num> <summary> [commit-msg]        commit+push+open PR (board → In Review)
+#   kto_task_pr   <num> <summary> [commit-msg] [--base <branch>]   commit+push+open PR (board → In Review)
 #   kto_task_pr_merge [pr-num] [--squash|--merge|--rebase]   merge (squash default) + close issues + GC + update the PR base
 #   kto_task_new  <title> <role> <kind> <prio> [ms] [plan] [blocked] <body>   create issue + board fields (ms may be empty)
 #   kto_task_close <num> <summary> [pr-num] [--reason R] [--duplicate-of N] [--superseded-by N]   close + reason + board → Done
@@ -55,7 +55,9 @@ kto_repo() {
 }
 
 # The base branch a PR targets / pr-merge returns to (portable: KIT_BASE_BRANCH, default develop).
+# Args: [override] — a non-empty override wins over the configured base (#391: `cckit pr --base`).
 kto_base_branch() {
+  if [[ -n "${1:-}" ]]; then printf '%s' "$1"; return 0; fi
   printf '%s' "${KIT_BASE_BRANCH:-main}"
 }
 
@@ -220,10 +222,34 @@ _kto_role_option_for_slug() {
 # kit task pr — commit current changes (role identity in a Co-authored-by TRAILER, never the
 # author field — Vercel rejects unknown author emails), push, open the PR with the issue's
 # labels/milestone, add it to the board In Review, and move the issue to In Review.
-# Args: <issue-num> <summary> [commit-msg]
+# Args: <issue-num> <summary> [commit-msg] [--base <branch>]
+#
+# --base (#391) targets a branch other than the configured base — a release PR develop -> main.
+# load_kit_config re-exports KIT_BASE_BRANCH from the config, so an env override cannot do this.
+# The flag is parsed out before the positionals are read, anywhere on the line, and a missing value
+# returns 2 before the commit and the push.
 kto_task_pr() {
   # Default-safe reads: callers (scripts/kit) may run under `set -u`.
-  local num="${1:-}" summary="${2:-}" commit_msg="${3:-}"
+  local num="" summary="" commit_msg="" base_override="" _pos=0
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --base)
+        if [ "$#" -lt 2 ] || [ -z "$2" ]; then
+          echo "✗ kto_task_pr: --base needs a branch — usage: cckit pr <issue> \"<summary>\" [--base <branch>]" >&2; return 2
+        fi
+        base_override="$2"; shift 2 ;;
+      --base=*)
+        base_override="${1#--base=}"
+        if [ -z "$base_override" ]; then
+          echo "✗ kto_task_pr: --base needs a branch — usage: cckit pr <issue> \"<summary>\" [--base <branch>]" >&2; return 2
+        fi
+        shift ;;
+      *)
+        _pos=$((_pos + 1))
+        case "$_pos" in 1) num="$1" ;; 2) summary="$1" ;; 3) commit_msg="$1" ;; esac
+        shift ;;
+    esac
+  done
   local repo branch meta title labels milestone role author="" url pr_num pr_node item role_opt issue_item
   repo="$(kto_repo)"
   branch="$(git rev-parse --abbrev-ref HEAD)"
@@ -261,11 +287,11 @@ kto_task_pr() {
   git push -u origin "$branch" || return 1
 
   if cckit_gh_rest; then
-    url=$(gh_rest_pr_create "$repo" "$(kto_base_branch)" "$branch" "$pr_title" \
+    url=$(gh_rest_pr_create "$repo" "$(kto_base_branch "$base_override")" "$branch" "$pr_title" \
       "$(kto_compose_pr_body "$num" "$summary" "$role" "$title")" "$labels" "$milestone") || return 1
   else
   url=$(gh pr create --repo "$repo" \
-    --base "$(kto_base_branch)" --head "$branch" \
+    --base "$(kto_base_branch "$base_override")" --head "$branch" \
     --title "$pr_title" \
     --body "$(kto_compose_pr_body "$num" "$summary" "$role" "$title")" \
     --label "$labels" \

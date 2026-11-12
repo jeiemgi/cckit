@@ -40,7 +40,7 @@ cckit release --next        # or: scripts/lib/version-bump.sh --next
 
 <Steps>
 
-1. **Work reaches `main`.** Feature branches merge into `develop`; when you're ready, `develop` merges into `main` via PR. (`main` is protected — releases only.)
+1. **Work reaches `main`.** Feature branches merge into `develop`; when you're ready, `develop` merges into `main` via PR. (`main` is protected — releases only.) Open that PR with `cckit pr <issue> "<summary>" --base main` from a branch cut from `develop`: an explicit `--base` wins over `github.baseBranch`, and the labels, milestone and board steps run as for any other PR. Setting `KIT_BASE_BRANCH=main` in the environment does not do this — the config file is read after it.
 
 2. **release-please opens/updates the Release PR** — it computes the bump from the commits since the last tag, bumps all four version surfaces (`package.json`, `docs-site/package.json`, `.claude-plugin/plugin.json`, `cckit.config.json`) plus `Formula/cckit.rb`, and regenerates `CHANGELOG.md`. Review it whenever; nothing ships yet.
 

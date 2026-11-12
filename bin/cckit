@@ -9,7 +9,8 @@
 #   cckit install [bin-dir]         symlink cckit onto your PATH (global install)
 #   cckit init --profile <p>        scaffold cckit.config.json + .claude/ (--profile required)
 #   cckit start <issue> [slug]      isolated worktree + branch for an issue
-#   cckit pr <issue> <summary>      commit + push + open the PR
+#   cckit pr <issue> <summary> [--base <branch>]   commit + push + open the PR; --base targets a
+#                                   branch other than the configured base (a release PR to main)
 #   cckit close <issue> <summary> [--reason completed|not-planned|duplicate] [--duplicate-of N]
 #               [--superseded-by N]  close the issue with a reason + summary comment; board Done
 #   cckit new [--role R --kind K --priority P --milestone M --blocked-by "#1" --body B|--body-file F] "<title>"
@@ -177,6 +178,8 @@ case "$cmd" in
     wt_start "$@"
     ;;
   pr|close)
+    if [ "$cmd" = pr ]; then case "${1:-}" in -h|--help)
+      echo 'cckit pr <issue> "<summary>" ["<commit-msg>"] [--base <branch>]'; exit 0 ;; esac; fi
     # shellcheck source=/dev/null
     source "$LIB/kit-config.sh" && load_kit_config
     # shellcheck source=/dev/null
@@ -189,6 +192,12 @@ case "$cmd" in
         close) out="$(kto_task_close "$@" 2>&1)"; rc=$? ;;
       esac
       url="$(printf '%s' "$out" | grep -oE 'https://[^ ]+/pull/[0-9]+' | tail -1)"
+      # pr: --base may come before the issue number, so skip it when reporting the issue (#391).
+      if [ "$cmd" = pr ]; then
+        while [ "$#" -gt 0 ]; do
+          case "$1" in --base) shift; [ "$#" -gt 0 ] && shift ;; --base=*) shift ;; *) break ;; esac
+        done
+      fi
       cckit_json verb "$cmd" issue "${1:-}" ok "$([ "$rc" -eq 0 ] && echo true || echo false)" \
         url "$url" detail "$(printf '%s' "$out" | tail -1)"
       exit "$rc"
