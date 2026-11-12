@@ -87,6 +87,12 @@ Lockfiles (`pnpm-lock.yaml`, `package-lock.json`, …) and manifest config confl
   live writer already owns refuses the launch, and the wave's other claims are released. A lease is
   reclaimed only on positive evidence — its worktree is gone, or its process died on the host that
   recorded it — never on a process check against another host.
+- **`start` enforces it too, with a session claim.** `orchestrate`'s lease covers a wave; a second
+  session running `cckit start <issue>` by hand is outside it. `wt_start` records one claim per
+  issue under `<git-common-dir>/kit-sessions/` (`scripts/lib/session-registry.sh`) and refuses a
+  start while another live session holds it — before any fetch, branch or worktree. `--force` /
+  `KIT_FORCE=1` starts anyway; a claim whose pid is dead is reaped; `cckit claims` lists the live
+  ones. A board Status of In Progress or In Review only warns.
 - Prefer giving local sub-agents their own worktree.
 - Remote CI agents (Auto-Dev) are isolated per runner — favor them for parallel fixes.
 - Before editing shared files, check whether another agent is active.
