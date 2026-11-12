@@ -45,7 +45,13 @@ load_kit_config() {
   # Integration branch, resolved through a fallback chain so a host project that names its
   # integration branch under an older/alternate key still works on adoption: baseBranch (canonical)
   # -> integrationBranch -> flow -> "main". First non-null wins (#117).
-  export KIT_BASE_BRANCH="$(jq -r '.github.baseBranch // .github.integrationBranch // .github.flow // "main"' "$cfg")"
+  # A KIT_BASE_BRANCH already in the environment WINS over the config (#352): the config is the
+  # default, not the assignment. That is how a sub-issue is cut from its effort branch —
+  # `KIT_BASE_BRANCH=effort/<N>-<slug> cckit orchestrate <sub>` — and it matches init.sh, which
+  # already reads the variable as the caller's override. KIT_BASE_BRANCH_CONFIG always carries what
+  # the config says, so a caller can tell an override from the default and say which one it used.
+  export KIT_BASE_BRANCH_CONFIG="$(jq -r '.github.baseBranch // .github.integrationBranch // .github.flow // "main"' "$cfg")"
+  export KIT_BASE_BRANCH="${KIT_BASE_BRANCH:-$KIT_BASE_BRANCH_CONFIG}"
   export KIT_PROJECTS_V2="$(jq -r '.github.projectsV2' "$cfg")"
   export KIT_PROJECT_NUMBER="$(jq -r '.github.projectNumber' "$cfg")"
   export KIT_PROJECT_TITLE="$(jq -r '.github.projectTitle'   "$cfg")"

@@ -138,6 +138,11 @@ open_blockers() {
 # Partition the requested issues into eligible / blocked / (later) queued.
 ELIGIBLE=()
 echo "orchestrate: repo $REPO (base ${KIT_BASE_BRANCH:-main}), cap $CAP, runtime '$RUNTIME', agent '$AGENT'"
+# Say when the base is not the config's (#352). A KIT_BASE_BRANCH from the environment overrides the
+# config and every flow below is cut from it; printed as a bare name it reads like the default.
+if [ -n "${KIT_BASE_BRANCH_CONFIG:-}" ] && [ "${KIT_BASE_BRANCH:-}" != "$KIT_BASE_BRANCH_CONFIG" ]; then
+  echo "orchestrate: base '$KIT_BASE_BRANCH' comes from KIT_BASE_BRANCH in the environment (the config says '$KIT_BASE_BRANCH_CONFIG')"
+fi
 for num in "${ISSUES[@]}"; do
   blockers="$(open_blockers "$num")"
   if [ -n "$blockers" ] && [ "$FORCE" -eq 0 ]; then

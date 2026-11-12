@@ -107,6 +107,14 @@ Every operation an unattended run needs is reachable through the one CLI:
 | `--force` | launch even if an issue is `blocked_by` an OPEN issue (the gate is on by default) |
 | `--no-seed` | start the agent without an auto-prompt |
 
+**Base branch override.** `KIT_BASE_BRANCH` in the environment wins over `github.baseBranch` in the
+config for that invocation: `KIT_BASE_BRANCH=effort/<N>-<slug> cckit orchestrate <sub>` cuts the
+sub's worktree from the effort branch instead of the base. `orchestrate` then prints
+`base '<branch>' comes from KIT_BASE_BRANCH in the environment (the config says '<base>')`. The
+branch must exist on origin (`wt_start` fetches it). Every verb that loads the config reads the same
+variable — `cckit start` cuts from it and `cckit pr` targets it — so set it per command, not with a
+shell-wide `export`.
+
 ## The agent loop (reference)
 
 1. `cckit sync --llm` → pick an unblocked issue.
