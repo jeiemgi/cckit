@@ -105,7 +105,8 @@ cckit pr 42 "what changed" --base main   # target main, not the integration bran
                               #   exports the target as KIT_PR_BASE for a git pre-push hook
 cckit hotfix 268              # cherry-pick merged PR 268 (or a commit sha) onto main (--base B
                               #   for another branch): worktree from origin/main, cherry-pick -x,
-                              #   push, PR titled after the source with `Cherry-pick of #268`
+                              #   push, PR titled after the source with `Cherry-pick of #268`;
+                              #   a rebase-merged PR is carried commit by commit
 cckit sync                    # board state, what's unblocked
 cckit handoff "resume note"   # save a handoff — bare `cckit` prints it next session
 cckit gc                      # report prunable branches + worktrees (deletes nothing)

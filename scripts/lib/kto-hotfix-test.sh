@@ -4,7 +4,9 @@
 # throwaway repo and a bare remote: the worktree is cut from origin/<base>, the branch carries
 # exactly the source commit's diff, the push exports KIT_PR_BASE, and the PR targets <base> with
 # `Cherry-pick of #N` in its body. Covers both transports, a merge-commit source, a re-run, and the
-# refusals (unmerged PR, unknown sha, missing base, conflict).
+# rebase-merged multi-commit PR (every commit carried), a squash of a multi-commit PR (one commit), a
+# refusal reported as `--llm` JSON, and the refusals (unmerged PR, unknown sha, missing base,
+# conflict).
 # Run: bash scripts/lib/kto-hotfix-test.sh
 # errors: strict — a test runner: rc 1 on any failed assertion
 set -u
@@ -20,7 +22,7 @@ tn() { if grep -qE -- "$2" "$1"; then echo "FAIL: $3 (/$2/ in $1)"; fail=1; else
 command -v jq >/dev/null 2>&1 || { echo "kto-hotfix-test: jq required" >&2; exit 1; }
 
 tmp="$(cd "$(mktemp -d)" && pwd -P)"; trap 'rm -rf "$tmp"' EXIT
-export GH_LOG="$tmp/gh.log" GH_SHA="" GH_STATE="MERGED" GH_OPEN_URL=""
+export GH_LOG="$tmp/gh.log" GH_SHA="" GH_STATE="MERGED" GH_OPEN_URL="" GH_SUBJECTS="wip"
 : > "$GH_LOG"
 mkdir -p "$tmp/bin"
 # A gh that logs one call per line (newlines in a body become \036) and answers both transports.
@@ -30,10 +32,12 @@ cat > "$tmp/bin/gh" <<'SH'
 jqx=""; prev=""; for a in "$@"; do [ "$prev" = "--jq" ] && jqx="$a"; prev="$a"; done
 out() { if [ -n "$jqx" ]; then printf '%s' "$1" | jq -r -c "$jqx"; else printf '%s\n' "$1"; fi; }
 merged="null"; [ "$GH_STATE" = "MERGED" ] && merged='"2026-10-30T00:00:00Z"'
+# GH_SUBJECTS: the PR's own commit subjects, one per line, oldest first.
+commits="$(printf '%s\n' "$GH_SUBJECTS" | jq -R -s -c '[split("\n")[] | select(length > 0)]')"
 case "$1 $2" in
   "pr view")
     if [ "$GH_STATE" = "MERGED" ]; then mc="{\"oid\":\"$GH_SHA\"}"; else mc="null"; fi
-    out "{\"title\":\"fix: the thing [#11]\",\"state\":\"$GH_STATE\",\"mergeCommit\":$mc}" ;;
+    out "{\"title\":\"fix: the thing [#11]\",\"state\":\"$GH_STATE\",\"mergeCommit\":$mc,\"commits\":$(printf '%s' "$commits" | jq -c '[.[] | {messageHeadline: .}]')}" ;;
   "pr list")   out "[$( [ -n "$GH_OPEN_URL" ] && printf '{"url":"%s"}' "$GH_OPEN_URL" )]" ;;
   "pr create") echo "https://github.com/o/r/pull/77" ;;
   "api repos/o/r/pulls")
@@ -41,6 +45,8 @@ case "$1 $2" in
       *" POST "*) out '{"number":77,"html_url":"https://github.com/o/r/pull/77","user":{"login":"me"}}' ;;
       *)          out "[]" ;;
     esac ;;
+  "api repos/o/r/pulls/"*"/commits")
+    out "$(printf '%s' "$commits" | jq -c '[.[] | {commit: {message: (. + "\n\nbody text")}}]')" ;;
   "api repos/o/r/pulls/"*)
     out "{\"title\":\"fix: the thing [#11]\",\"mergeable\":null,\"mergeable_state\":\"unknown\",\"base\":{\"ref\":\"develop\"},\"head\":{\"ref\":\"fix/11-x\"},\"body\":\"\",\"state\":\"closed\",\"merged_at\":$merged,\"merge_commit_sha\":\"$GH_SHA\"}" ;;
   *) exit 0 ;;
@@ -68,6 +74,9 @@ git checkout -q -b side HEAD~1; echo side > side.txt; git add side.txt; git comm
 git checkout -q develop; git merge -q --no-ff side -m "Merge pull request #14 from o/side"
 MERGE="$(git rev-parse HEAD)"
 printf 'a\nB\nc\nd\n' > app.txt; git commit -q -am "feat: conflicts with a main-only edit (#15)"; CONF="$(git rev-parse HEAD)"
+# PR 20 as a REBASE merge leaves it: its two commits on develop, subjects unchanged, no merge commit.
+echo one > r1.txt; git add r1.txt; git commit -q -m "fix: rebased part one"
+echo two > r2.txt; git add r2.txt; git commit -q -m "fix: rebased part two"; REB="$(git rev-parse HEAD)"
 git push -q origin develop
 cat > .git/hooks/pre-push <<SH
 #!/usr/bin/env bash
@@ -125,6 +134,12 @@ js="$(GH_SHA="$SRC" "$CCKIT" hotfix '#12' --llm 2>/dev/null)"
 t  "--llm: ok + url"                              "$(printf '%s' "$js" | jq -r '"\(.ok) \(.url)"' 2>/dev/null)" "true https://github.com/o/r/pull/77"
 t  "--llm: the worktree path"                     "$(printf '%s' "$js" | jq -r .worktree 2>/dev/null)" "$wt"
 
+# --llm on a refusal: still one JSON object, ok false, the reason in `detail`
+js="$(GH_STATE="OPEN" "$CCKIT" hotfix 99 --llm 2>/dev/null)"; rc=$?
+t  "--llm: a refusal exits 1"                     "$rc" "1"
+t  "--llm: a refusal reports ok false"            "$(printf '%s' "$js" | jq -r '"\(.verb) \(.ok)"' 2>/dev/null)" "hotfix false"
+t  "--llm: …and carries the reason"               "$(printf '%s' "$js" | jq -r .detail 2>/dev/null | grep -c 'not merged')" "1"
+
 # ── REST transport: only `gh api repos/…` calls ──────────────────────────────────────────────────
 reset_hotfix
 : > "$GH_LOG"
@@ -141,6 +156,31 @@ t  "rest: the branch diff equals the source's"    "$(git diff origin/main fix/12
 t  "a merge-commit source succeeds"               "$rc" "0"
 t  "…carrying the merged side's diff"             "$(git diff origin/main fix/14-hotfix-main)" "$(git diff "$MERGE~1" "$MERGE")"
 tc "$GH_LOG" 'Cherry-pick of #14'                  "…and the PR number from the merge subject"
+
+# ── a rebase-merged PR: GitHub names only its LAST commit, every one of its commits is carried ───
+for tr in graphql rest; do
+  : > "$GH_LOG"
+  GH_SHA="$REB" GH_SUBJECTS="$(printf 'fix: rebased part one\nfix: rebased part two')" CCKIT_GH_TRANSPORT="$tr" \
+    "$CCKIT" hotfix 20 >/dev/null 2>"$tmp/err"; rc=$?
+  t  "$tr: a rebase-merged PR succeeds"           "$rc" "0"
+  t  "$tr: …carrying both of its commits"         "$(git rev-list --count origin/main..fix/20-hotfix-main 2>/dev/null)" "2"
+  t  "$tr: …whose diff is the whole PR's"         "$(git diff origin/main fix/20-hotfix-main)" "$(git diff "$REB~2" "$REB")"
+  tc "$tmp/err" 'rebase-merged: carrying its 2 commits' "$tr: …and says so"
+  tc "$GH_LOG" "Source commits.*$(git rev-parse "$REB~1").*$REB" "$tr: the body lists both source commits"
+  git worktree remove --force "$tmp/work/.claude/worktrees/fix+20-hotfix-main"; git branch -q -D fix/20-hotfix-main
+  git push -q origin :fix/20-hotfix-main 2>/dev/null
+done
+# A SQUASH of a multi-commit PR is one commit carrying all of it: the subjects under it are not the PR's.
+reset_hotfix
+: > "$GH_LOG"
+GH_SHA="$SRC" GH_SUBJECTS="$(printf 'wip one\nwip two')" "$CCKIT" hotfix 12 >/dev/null 2>"$tmp/err"; rc=$?
+t  "a squashed two-commit PR succeeds"            "$rc" "0"
+t  "…as the one squash commit"                    "$(git rev-list --count origin/main..fix/12-hotfix-main)" "1"
+tn "$tmp/err" 'rebase-merged'                      "…and is not taken for a rebase merge"
+# A PR whose commits cannot be read is refused, not guessed at.
+GH_SHA="$SRC" GH_SUBJECTS="" "$CCKIT" hotfix 12 >/dev/null 2>"$tmp/err"; rc=$?
+t  "unreadable PR commits are refused"            "$rc" "1"
+tc "$tmp/err" 'cannot read the commits'            "…and says why"
 
 # ── a commit with no PR in its subject: named by sha ─────────────────────────────────────────────
 : > "$GH_LOG"

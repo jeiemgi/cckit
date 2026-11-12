@@ -209,7 +209,7 @@ case "$cmd" in
     # shellcheck source=/dev/null
     source "$LIB/worktree-start.sh"; source "$LIB/kit-hotfix.sh"
     if cckit_is_json; then
-      out="$(kto_hotfix "$@" 2>&1)"; rc=$?
+      out="$(kto_hotfix "$@" 2>&1)" && rc=0 || rc=$?
       url="$(printf '%s' "$out" | grep -oE 'https://[^ ]+/pull/[0-9]+' | tail -1)"
       cckit_json verb hotfix source "${1:-}" ok "$([ "$rc" -eq 0 ] && echo true || echo false)" \
         url "$url" worktree "$(printf '%s\n' "$out" | sed -n 's/^worktree: //p' | tail -1)" \

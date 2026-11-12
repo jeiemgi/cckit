@@ -29,6 +29,7 @@
 #   gh_rest_pr_create <repo> <base> <head> <title> <body> <labels-csv> [milestone-title]   → html_url
 #   gh_rest_pr_for_head <repo> <branch>   the open PR number for a head branch
 #   gh_rest_pr_json <repo> <pr>           {mergeable,mergeStateStatus,baseRefName,headRefName,body,title,mergeCommit,state}
+#   gh_rest_pr_commit_subjects <repo> <pr>  one subject line per PR commit, oldest first
 #   gh_rest_pr_merge <repo> <pr> <squash|merge|rebase>
 #   gh_rest_pr_closing_issues <repo> <pr>
 #   gh_rest_pr_diff <repo> <pr>
@@ -244,6 +245,11 @@ gh_rest_pr_json() {
     title: (.title // ""),
     mergeCommit: (if .merged_at then {oid: .merge_commit_sha} else null end),
     state: (if .merged_at then "MERGED" else (.state | ascii_upcase) end)}'
+}
+
+gh_rest_pr_commit_subjects() {
+  _ghr_read "repos/$1/pulls/$2/commits" -X GET -f per_page=100 --paginate \
+    --jq '.[].commit.message | split("\n")[0]'
 }
 
 gh_rest_pr_merge() {

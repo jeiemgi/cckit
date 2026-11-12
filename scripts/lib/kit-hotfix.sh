@@ -11,7 +11,9 @@
 #      `Merge pull request #N` subject, when there is one)
 #   2. worktree `.claude/worktrees/fix+<N>-hotfix-<base>` on branch `fix/<N>-hotfix-<base>`, cut
 #      from origin/<base>   (`fix/hotfix-<sha7>-<base>` when the commit names no PR)
-#   3. `git cherry-pick -x` (`-m 1` for a merge commit)
+#   3. `git cherry-pick -x` (`-m 1` for a merge commit). A PR that was REBASE-merged has no single
+#      commit carrying it — GitHub reports only the last rebased commit as its merge commit — so
+#      every one of its commits is picked, oldest first
 #   4. push, with the target exported to the git pre-push hook as KIT_PR_BASE
 #   5. open the PR against <base>, titled after the source, body `Cherry-pick of #N`
 #
@@ -52,6 +54,7 @@ kto_hotfix_subject_pr() {
 
 kto_hotfix() {
   local src="" base="" repo root sha="" title="" pr="" meta subject slug branch wt made="" url="" body n
+  local picks="" subjects="" c had="" new="" log
 
   while [ $# -gt 0 ]; do
     case "$1" in
@@ -94,7 +97,7 @@ kto_hotfix() {
     *)
       pr="${src#\#}"
       if cckit_gh_rest; then meta="$(gh_rest_pr_json "$repo" "$pr" || true)"
-      else meta="$(gh pr view "$pr" --repo "$repo" --json title,state,mergeCommit || true)"; fi
+      else meta="$(gh pr view "$pr" --repo "$repo" --json title,state,mergeCommit,commits || true)"; fi
       [ -n "$meta" ] || { echo "✗ hotfix: PR #$pr not found in $repo" >&2; return 1; }
       [ "$(printf '%s' "$meta" | jq -r '.state // ""')" = "MERGED" ] \
         || { echo "✗ hotfix: PR #$pr is not merged — a hotfix carries a change that already landed" >&2; return 1; }
@@ -106,8 +109,23 @@ kto_hotfix() {
         || git -C "$root" fetch --quiet origin 2>/dev/null || true
       git -C "$root" cat-file -e "$sha^{commit}" 2>/dev/null \
         || { echo "✗ hotfix: merge commit $sha of PR #$pr is not on origin" >&2; return 1; }
+      # A single-parent merge commit is the whole PR only when the PR was squashed. After a rebase
+      # merge it is the LAST of the PR's commits, the others sitting right under it with their
+      # subjects unchanged — that run of subjects is the tell, and then the whole run is picked.
+      if [ "$(git -C "$root" rev-list --parents -n 1 "$sha" | wc -w | tr -d ' ')" -eq 2 ]; then
+        if cckit_gh_rest; then subjects="$(gh_rest_pr_commit_subjects "$repo" "$pr" || true)"
+        else subjects="$(printf '%s' "$meta" | jq -r '.commits[]?.messageHeadline // empty')"; fi
+        n="$(printf '%s\n' "$subjects" | grep -c . || true)"
+        [ "$n" -ge 1 ] || { echo "✗ hotfix: cannot read the commits of PR #$pr, so cannot tell a squash from a rebase merge — pass the commit sha instead" >&2; return 1; }
+        if [ "$n" -gt 1 ] \
+          && [ "$(git -C "$root" log --first-parent --reverse --format=%s -n "$n" "$sha")" = "$subjects" ]; then
+          picks="$(git -C "$root" rev-list --first-parent --reverse -n "$n" "$sha")"
+          echo "[hotfix] PR #$pr was rebase-merged: carrying its $n commits" >&2
+        fi
+      fi
       ;;
   esac
+  [ -n "$picks" ] || picks="$sha"
   [ -n "$title" ] || title="hotfix: cherry-pick $(git -C "$root" rev-parse --short=7 "$sha")"
 
   # 2. the worktree, cut from origin/<base>
@@ -136,27 +154,36 @@ kto_hotfix() {
     echo "  resolve it, run \`git cherry-pick --continue\` there, then re-run this command" >&2
     return 1
   fi
-  if git -C "$wt" log "origin/$base..HEAD" --format=%B | grep -qF "(cherry picked from commit $sha)"; then
-    echo "[hotfix] $sha is already picked onto $branch" >&2
-  else
+  log="$(git -C "$wt" log "origin/$base..HEAD" --format=%B)"
+  for c in $(printf '%s\n' "$picks"); do
+    if printf '%s\n' "$log" | grep -qF "(cherry picked from commit $c)"; then
+      echo "[hotfix] $c is already picked onto $branch" >&2
+      had=1
+      continue
+    fi
     set -- -x
-    n="$(git -C "$wt" rev-list --parents -n 1 "$sha" | wc -w | tr -d ' ')"
+    n="$(git -C "$wt" rev-list --parents -n 1 "$c" | wc -w | tr -d ' ')"
     if [ "$n" -gt 2 ]; then set -- "$@" -m 1; fi
-    if ! git -C "$wt" cherry-pick "$@" "$sha" >&2; then
+    if ! git -C "$wt" cherry-pick "$@" "$c" >&2; then
       if [ -z "$(git -C "$wt" status --porcelain --untracked-files=no)" ]; then
-        # Nothing to commit: origin/<base> already carries this change.
+        # Nothing to commit: origin/<base> already carries this commit.
         git -C "$wt" cherry-pick --abort >/dev/null 2>&1 || true
-        if [ -n "$made" ]; then
-          git -C "$root" worktree remove --force "$wt" >/dev/null 2>&1 || true
-          git -C "$root" branch -D "$branch" >/dev/null 2>&1 || true
-        fi
-        echo "✗ hotfix: $sha changes nothing on origin/$base — it is already there" >&2
-        return 1
+        echo "[hotfix] $c changes nothing on origin/$base — it is already there" >&2
+        continue
       fi
-      echo "✗ hotfix: the cherry-pick of $sha onto origin/$base conflicts" >&2
+      echo "✗ hotfix: the cherry-pick of $c onto origin/$base conflicts" >&2
       echo "  resolve it in $wt, run \`git cherry-pick --continue\` there, then re-run this command" >&2
       return 1
     fi
+    new=1
+  done
+  if [ -z "$new" ] && [ -z "$had" ]; then
+    if [ -n "$made" ]; then
+      git -C "$root" worktree remove --force "$wt" >/dev/null 2>&1 || true
+      git -C "$root" branch -D "$branch" >/dev/null 2>&1 || true
+    fi
+    echo "✗ hotfix: $sha changes nothing on origin/$base — it is already there" >&2
+    return 1
   fi
 
   # 4. push — the target reaches a git pre-push hook as KIT_PR_BASE
@@ -175,7 +202,9 @@ kto_hotfix() {
     echo "✓ $url"
     return 0
   fi
-  if [ -n "$pr" ]; then body="$(printf 'Cherry-pick of #%s onto `%s`.\n\nSource commit: %s' "$pr" "$base" "$sha")"
+  if [ "$picks" != "$sha" ]; then
+    body="$(printf 'Cherry-pick of #%s onto `%s`.\n\nSource commits (rebase-merged, oldest first):\n%s' "$pr" "$base" "$picks")"
+  elif [ -n "$pr" ]; then body="$(printf 'Cherry-pick of #%s onto `%s`.\n\nSource commit: %s' "$pr" "$base" "$sha")"
   else body="$(printf 'Cherry-pick of %s onto `%s`.' "$sha" "$base")"; fi
   if cckit_gh_rest; then
     url="$(gh_rest_pr_create "$repo" "$base" "$branch" "$title" "$body" "" "")" || return 1
