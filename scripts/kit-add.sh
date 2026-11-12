@@ -15,6 +15,7 @@
 #   scripts/kit-add.sh software [--dir DIR] --answers FILE     # non-interactive (skill/CI/tests)
 #   scripts/kit-add.sh software --set versioning=github --set deploy=vercel --set ci=github-actions
 #   KIT_ASSUME_YES=1 scripts/kit-add.sh software               # accept every recommended default
+#   scripts/kit-add.sh qa --answers FILE                       # how this project's review stack boots (#294)
 #   KIT_DRY_RUN=1 scripts/kit-add.sh software                  # preview only
 # Requires: jq.
 
@@ -41,15 +42,25 @@ kit_add() {
   target="$(cd "$target" 2>/dev/null && pwd)" || kit_die "no such dir: $target"
   cd "$target" || kit_die "cannot enter $target"
 
+  # Both supported layouts: a root cckit.config.json (self-host) wins when this island has one,
+  # else the scaffolded .claude/kit.config.json. Checked in THIS dir only — never walked upward,
+  # so a module still writes into this island and nothing above it.
   local cfg=".claude/kit.config.json" base merged tmp
+  [ -f "cckit.config.json" ] && cfg="cckit.config.json"
   base=""; [ -f "$cfg" ] && base="$cfg"
   merged="$(kit_interview_apply "$module" "$answers" "$base")" || kit_die "deriving module config failed"
   # Belt-and-suspenders: guarantee the module name is in modules[] even if the spec omitted it.
   merged="$(printf '%s' "$merged" | jq --arg m "$module" '.modules = ((.modules // []) + [$m] | unique)')"
 
   kit_say "kit add $module  ->  $target/$cfg"
-  printf '%s\n' "$merged" | kit_op_write_content "$cfg" A "add:$module"
+  # Through a FILE, not a pipe: kit_op_write asks before overwriting a config it does not track
+  # (every `cckit init` config, every self-host one) and reads that yes from stdin. Piping the
+  # content in made stdin the already-drained pipe, so the prompt always read EOF and declined.
+  tmp="$(mktemp)" || kit_die "mktemp failed"
+  printf '%s\n' "$merged" > "$tmp"
+  kit_op_write "$tmp" "$cfg" A "add:$module"
   local rc=$?
+  rm -f "$tmp"
   case $rc in
     0)  kit_say "module '$module' active here. modules: $(printf '%s' "$merged" | jq -c '.modules')";;
     10) kit_say "no change (already applied / declined / dry-run).";;
