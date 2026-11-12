@@ -621,6 +621,18 @@ out="$( set -e; cd "$(git worktree list --porcelain | awk -v b=refs/heads/effort
 t "#330: effort_close refuses when the PR cannot be read (rc 1)" "$rc" "1"
 case "$out" in *"could not read the PR for effort/801-effort"*) echo "ok: #330: effort_close names the failed PR read" ;;
   *) echo "FAIL: #330: effort_close gave no reason -> '$out'"; fail=1 ;; esac
+# The REST twin. REST is the transport in use when GraphQL is unavailable, and there the failed read
+# was swallowed: the capture wrote a records.jsonl row and consumed the start marker, then the merge
+# failed — the write-then-fail #394 exists to prevent.
+out="$( set -e; cd "$(git worktree list --porcelain | awk -v b=refs/heads/effort/801-effort '/^worktree /{w=$2} $2==b{print w}')" \
+        && echo work > rest-twin.txt && git add rest-twin.txt \
+        && git -c user.email=t@t -c user.name=t commit -q -m "feat: work (#801)" \
+        && PATH="$fstub:$PATH" && CCKIT_GH_TRANSPORT=rest KIT_FORCE=1 effort_close 801 2>&1 )"; rc=$?
+t "#330: rest: effort_close refuses when the PR cannot be read (rc 1)" "$rc" "1"
+case "$out" in
+  *"metrics:"*) echo "FAIL: #330: rest: metrics captured before the failed PR read was refused -> '$out'"; fail=1 ;;
+  *"could not read the PR for effort/801-effort"*"nothing was written"*) echo "ok: #330: rest: effort_close names the failed PR read" ;;
+  *) echo "FAIL: #330: rest: effort_close gave no reason -> '$out'"; fail=1 ;; esac
 
 [ "$fail" -eq 0 ] && echo "ALL OK (effort-ops)" || echo "effort-ops: FAILURES"
 exit "$fail"

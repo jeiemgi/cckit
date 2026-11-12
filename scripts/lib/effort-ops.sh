@@ -983,8 +983,16 @@ effort_close() {
   # row the retry duplicates with build_seconds null. UNKNOWN (GitHub still computing) proceeds.
   local rest_pr="" mergeable
   if cckit_gh_rest; then
+    # Same refusal as the graphql branch below (#330): a failed read, or no open PR, must stop here.
+    # Carrying on let the capture write its row and consume the start marker before the merge failed.
+    local rest_meta=""
     rest_pr="$(gh_rest_pr_for_head "$repo" "$branch" 2>/dev/null)" || rest_pr=""
-    mergeable=""; [ -n "$rest_pr" ] && mergeable="$(gh_rest_pr_json "$repo" "$rest_pr" 2>/dev/null | jq -r .mergeable)"
+    [ -n "$rest_pr" ] && rest_meta="$(gh_rest_pr_json "$repo" "$rest_pr" 2>/dev/null)" || rest_meta=""
+    [ -n "$rest_meta" ] || {
+      echo "effort_close: could not read the PR for $branch from GitHub (gh failed: no PR, or the API is unavailable) — rerun when it answers (nothing was written)" >&2
+      return 1
+    }
+    mergeable="$(printf '%s' "$rest_meta" | jq -r .mergeable)"
   else
     # A failed read is not "mergeable" (#330). Under `set -e` this bare assignment ended the close
     # with rc 1 and no output; refusing by name keeps the nothing-written guarantee this step is for.
