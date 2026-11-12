@@ -1,0 +1,3 @@
+{"id":"adv-01","q":"Two of my helpers grabbed the same ticket at once. What in the tool prevents that?","expect":"docs-site/src/content/docs/multi-session.mdx"}
+{"id":"adv-02","q":"I want the thing to keep working while I sleep, but with a spending ceiling. Where is that explained step by step?","expect":["docs-site/src/content/docs/tutorials/run-claude-code-unattended.mdx","docs-site/src/content/docs/config-and-permissions.mdx"]}
+{"id":"adv-03","q":"My project never opens a browser to check the change actually works before it lands. What part covers that?","expect":["docs-site/src/content/docs/qa-lane.mdx","docs-site/src/content/docs/debug.mdx"]}

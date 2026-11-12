@@ -1,0 +1,3 @@
+{"id":"abs-01","q":"What does the cckit enterprise tier cost per seat?","expect":"NONE"}
+{"id":"abs-02","q":"How do I deploy cckit to a Kubernetes cluster with Helm?","expect":"NONE"}
+{"id":"abs-03","q":"Which Slack channel do I post in to reach cckit support?","expect":"NONE"}

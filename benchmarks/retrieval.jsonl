@@ -1,0 +1,6 @@
+{"id":"ret-01","q":"How do I cut a release, and what does release-please do on main?","expect":"docs-site/src/content/docs/releasing.mdx"}
+{"id":"ret-02","q":"How does an effort differ from a single task, and how are waves ordered?","expect":["docs-site/src/content/docs/efforts-and-waves.mdx","docs-site/src/content/docs/wave.mdx"]}
+{"id":"ret-03","q":"Which hooks does cckit install and what does each one block?","expect":"docs-site/src/content/docs/hooks.mdx"}
+{"id":"ret-04","q":"How do I give Claude Code memory that persists across sessions?","expect":["docs-site/src/content/docs/memory.mdx","docs-site/src/content/docs/tutorials/give-claude-code-persistent-memory.mdx"]}
+{"id":"ret-05","q":"Where is every config key documented, for example worktree.installPaths?","expect":"docs-site/src/content/docs/config-and-permissions.mdx"}
+{"id":"ret-06","q":"Which lint gates turn a repeated AI-review finding into a permanent check?","expect":"docs-site/src/content/docs/review-gates.mdx"}

@@ -61,13 +61,15 @@ _bench_complete() {
       bench_timeout "$BENCH_TIMEOUT_SECS" curl -sS "$url" \
         -H 'Content-Type: application/json' \
         ${BENCH_API_KEY:+-H "Authorization: Bearer $BENCH_API_KEY"} \
-        -d "$body" 2>/dev/null \
+        -d "$body" </dev/null 2>/dev/null \
         | jq -r '.choices[0].message.content // empty' 2>/dev/null ;;
     claude|*)
       command -v claude >/dev/null 2>&1 || { return 1; }
       # Headless one-shot. `-p` prints the final answer and exits; the model may use its tools to
       # grep the repo, which is exactly the retrieval behavior we want to measure.
-      bench_timeout "$BENCH_TIMEOUT_SECS" claude -p "$prompt" 2>/dev/null ;;
+      # stdin is /dev/null on purpose: the runners call this inside `while read … done < <(records)`,
+      # and a child that inherits that stdin drains it, so every set stopped after its first record.
+      bench_timeout "$BENCH_TIMEOUT_SECS" claude -p "$prompt" </dev/null 2>/dev/null ;;
   esac
 }
 
