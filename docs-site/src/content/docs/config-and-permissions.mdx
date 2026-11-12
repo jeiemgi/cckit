@@ -379,6 +379,28 @@ origin, and a `<slug>` argument was resolved before it, which can run `gh issue 
 `cckit start <issue>` (a plain task worktree) has no WIP limit. Full behaviour:
 [Only so many efforts at once](/efforts-and-waves/#only-so-many-efforts-at-once).
 
+## Integrations
+
+An optional third-party tool is described by one JSON file, `integrations/<id>.json`, checked
+against `integrations/integration.schema.json`. A descriptor carries a label, the config key that
+turns the tool on, a detect command, install candidates tried in the order written, a verify
+command, a docs link and an attribution block whose `affiliated` field is a boolean. An optional
+`appliesWhen.anyExtension` list limits the tool to repos holding at least one file with a listed
+extension; inside a git work tree the file list is git's tracked and unignored files.
+
+The config key names a capability, never the vendor: `<capability>.provider` whose value names the
+tool, or an existing `<capability>.enabled` switch. A key containing the descriptor's own id is
+refused by the validator.
+
+| Key | Default | What it does |
+| --- | --- | --- |
+| `codeGraph.provider` | *(unset — off)* | Which integration provides code-graph retrieval, as its descriptor's `config.value` names it. Unset or `none`: no code graph. |
+
+`bash scripts/lib/integrations.sh --validate` checks every descriptor and prints one
+`<id>: <field>: <problem>` line per problem; `--list` prints the ids; `--applies <id> [dir]` exits
+0 when the tool can work on the repo at `dir`. No descriptor ships yet, and nothing installs from
+one: this is the format only.
+
 ## Agent profiles
 
 A **profile** is a named agent configuration: which CLI to run, roughly what it costs, under which

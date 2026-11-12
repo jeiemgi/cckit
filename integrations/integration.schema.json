@@ -1,0 +1,172 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://cckit.dev/integration.schema.json",
+  "title": "cckit integration descriptor",
+  "description": "One optional third-party tool cckit can offer, install and verify. One file per tool: integrations/<id>.json. Checked by integration_validate (scripts/lib/integrations.sh), which implements exactly these keywords: type, required, properties, additionalProperties:false, items, minItems, minLength, pattern, enum. A keyword outside that list is NOT enforced — extend the validator before using one here.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "label", "summary", "config", "detect", "install", "verify", "docs", "attribution"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+      "description": "The handle typed after `cckit add`. Must equal the file name without `.json`."
+    },
+    "label": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human name shown in lists and prompts."
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1,
+      "description": "One line: what the tool does for the project."
+    },
+    "why": {
+      "type": "string",
+      "description": "Optional: what it costs and what it replaces."
+    },
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key"],
+      "description": "The project-config key that turns the integration on. Naming rule: the key names a CAPABILITY, never the vendor — `<capability>.provider` whose value names the tool (the `deploy.target` / `ci.provider` precedent in modules/software.json), or `<capability>.enabled` for a boolean switch that already exists (`memory.enabled`, `local.enabled`). A key containing the descriptor's own id is refused. Every key used here needs a property in kit.config.schema.json.",
+      "properties": {
+        "key": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9]*(\\.[A-Za-z][A-Za-z0-9]*)+$",
+          "description": "Dotted path into the project config, e.g. `codeGraph.provider`."
+        },
+        "value": {
+          "description": "The value at `key` that means ON. Omitted = boolean true."
+        }
+      }
+    },
+    "appliesWhen": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["anyExtension"],
+      "description": "Which repos the tool can work on. Omitted = any repo. An integration that does not apply is not offered.",
+      "properties": {
+        "anyExtension": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "pattern": "^\\.[A-Za-z0-9_+-]+$" },
+          "description": "Applies when at least one file in the repo ends in one of these extensions. Case-sensitive, leading dot. The repo's files are git's tracked + unignored list inside a work tree, otherwise every file outside .git/ and node_modules/."
+        },
+        "note": {
+          "type": "string",
+          "description": "Where the list was verified, and what happens to a file outside it."
+        }
+      }
+    },
+    "detect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["run"],
+      "description": "How to tell the tool is already installed.",
+      "properties": {
+        "run": { "type": "string", "minLength": 1, "description": "Command that exits 0 when the tool is present." }
+      }
+    },
+    "install": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Install candidates, tried IN THIS ORDER; the first that works wins.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["manager", "run"],
+        "properties": {
+          "manager": {
+            "type": "string",
+            "enum": ["brew", "pipx", "uv", "npm", "pnpm", "npx", "curl"],
+            "description": "The tool that must be on the machine for this candidate to be tried."
+          },
+          "run": { "type": "string", "minLength": 1, "description": "The install command." },
+          "resident": { "type": "boolean", "description": "false when the candidate leaves no binary behind (npx). Default true." },
+          "note": { "type": "string" }
+        }
+      }
+    },
+    "wire": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["run"],
+      "description": "Optional per-repo step after install, for a tool that writes into the project.",
+      "properties": {
+        "run": { "type": "string", "minLength": 1, "description": "The wire command, without the declined flags." },
+        "dryRun": { "type": "string", "description": "A form of the command that prints what it would write." },
+        "writes": { "type": "array", "items": { "type": "string" }, "description": "Paths the wire step creates or edits." },
+        "declined": {
+          "type": "object",
+          "description": "Flags cckit passes to turn a tool feature OFF, each mapped to the reason. Keys are the flags, values the reasons."
+        }
+      }
+    },
+    "build": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["run"],
+      "description": "Optional step that produces the tool's own data (an index, a graph).",
+      "properties": {
+        "run": { "type": "string", "minLength": 1 },
+        "cost": { "type": "string", "description": "What the step spends: time, network, API calls." },
+        "deep": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["run"],
+          "description": "A costlier variant of the build. cckit runs it only when `auto` is true.",
+          "properties": {
+            "run": { "type": "string", "minLength": 1 },
+            "cost": { "type": "string" },
+            "auto": { "type": "boolean", "description": "Default false: recorded for the user, never run by cckit." }
+          }
+        }
+      }
+    },
+    "verify": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["run"],
+      "description": "How to tell the installed tool works.",
+      "properties": {
+        "run": { "type": "string", "minLength": 1, "description": "Command that exits 0 when the tool is healthy." },
+        "failsOn": { "type": "string", "description": "What a non-zero exit means." },
+        "json": { "type": "string", "description": "A form of the command with machine-readable output." }
+      }
+    },
+    "uninstall": {
+      "type": "string",
+      "description": "Optional command that removes what install + wire added."
+    },
+    "recheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Optional: what the scheduled recipe check should watch.",
+      "properties": {
+        "cadence": { "type": "string", "enum": ["monthly"] },
+        "drifts": { "type": "array", "items": { "type": "string" }, "description": "The parts of the recipe that go stale: package names, flag names, lists." }
+      }
+    },
+    "docs": {
+      "type": "string",
+      "pattern": "^https://",
+      "description": "The tool's own documentation."
+    },
+    "attribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["author", "homepage", "affiliated", "notice"],
+      "description": "Credit for a tool cckit did not write. Held as fields so the next integration cannot ship without them.",
+      "properties": {
+        "author": { "type": "string", "minLength": 1 },
+        "license": { "type": "string" },
+        "homepage": { "type": "string", "pattern": "^https://" },
+        "affiliated": { "type": "boolean", "description": "false when cckit has no relationship with the author." },
+        "notice": { "type": "string", "minLength": 1, "description": "The sentence shown to the user: who makes the tool and whether cckit is affiliated." },
+        "telemetry": { "type": "string", "description": "What the tool reports home, and what cckit does about it." }
+      }
+    }
+  }
+}

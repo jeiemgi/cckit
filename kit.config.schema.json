@@ -140,6 +140,14 @@
         "claudeProjectSlug": { "type": "string" }
       }
     },
+    "codeGraph": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Code-graph retrieval: agents query an index of the code instead of grepping the tree. Off when absent. Turned on by an integration descriptor (integrations/<id>.json) whose `config.key` is `codeGraph.provider`.",
+      "properties": {
+        "provider": { "type": "string", "description": "Which integration provides the code graph, as the descriptor's `config.value` names it. Absent or \"none\" = no code graph; every path that would use one skips." }
+      }
+    },
     "routines": {
       "type": "array",
       "description": "Opt-in scheduled routines accepted by the user (briefing, board sweep, gc, ...). The kit SUGGESTS; the user accepts; nothing is created without opt-in.",

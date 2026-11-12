@@ -289,6 +289,7 @@ cckit/
   skills/ commands/      # Claude Code skills + slash commands
   profiles/ templates/   # init profiles + scaffold templates
   routines/ modules/     # scheduled routines + optional modules
+  integrations/          # one JSON descriptor per optional third-party tool + its schema
   docs-site/             # documentation source — Astro/Starlight (deployed to cckit.dev)
   .claude/skills/        # the subset of templates/skills/ cckit installs for ITSELF
   .claude/rules/         # the subset of templates/rules/ cckit installs for ITSELF
