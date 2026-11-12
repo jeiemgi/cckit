@@ -29,12 +29,16 @@ kto_task_pr_merge            # open PR for the current branch
 # kto_task_pr_merge 845      # an explicit PR number
 ```
 
-After it returns on the base branch, run the kit-sync drift check (advisory; never blocks):
+After it returns on the base branch, run the kit-sync drift check (advisory; never blocks). The
+pattern is `_EO_KIT_MANAGED_RE` from `effort-ops.sh` — the same one `cckit effort close` uses, so
+the two checks agree. Under `.claude/rules/` it matches only the rule files the kit ships
+(`templates/rules/*.md`); a rule the project wrote itself is not flagged.
 
 ```bash
+source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/effort-ops.sh"   # _EO_KIT_MANAGED_RE
 MAIN_WT=$(git worktree list --porcelain | awk '/^worktree /{print $2; exit}')
 KIT_TOUCHED=$(git -C "$MAIN_WT" show --name-only --pretty=format: HEAD 2>/dev/null \
-  | grep -E '^(scripts/(lib/|kit$|kit-)|\.claude/(skills|rules|hooks|lib|agents)/)' | sort -u || true)
+  | grep -E "$_EO_KIT_MANAGED_RE" | sort -u || true)
 if [[ -n "$KIT_TOUCHED" ]]; then
   echo ""
   echo "⚠ kit-sync: this change touched kit-managed files — review for upstream (/kit-contribute):"

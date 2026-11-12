@@ -33,7 +33,8 @@ The effort lifecycle's terminal op. Board state, issue state, and the work recor
    that fails both LANDED checks is left for `cckit gc` to show as ORPHAN.
 7. **Knowledge-ingest hook** (optional, config-gated via `effort.knowledgeIngestHook`).
 8. **Kit-sync drift check** — advisory warning when the effort touched kit-managed files that
-   belong upstream (/kit-contribute).
+   belong upstream (/kit-contribute). Under `.claude/rules/` only the rule files the kit ships
+   (`templates/rules/*.md`) count; a rule the project wrote itself is never flagged.
 
 ## Preconditions
 
