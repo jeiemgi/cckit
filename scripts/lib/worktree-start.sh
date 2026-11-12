@@ -59,7 +59,8 @@ WT_START_REPO="${WT_START_REPO:-${KIT_REPO:-}}"
 # file. A script like `next dev -p ${PORT:-3003}` is expanded by the npm-script shell, which never
 # reads .env.local, so the value is INERT for it and every worktree falls back to the same default.
 # cckit therefore does not RELY on it: everything cckit launches itself passes the port explicitly
-# (scripts/lib/qa-lane.sh injects one QA_PORT_<service> per service). Treat the .env.local write as
+# (scripts/lib/qa-lane.sh exports each port env var the project declared in `qa.ports`, set to that
+# lane's port, into the command it launches). Treat the .env.local write as
 # a convenience for apps that do read it — and if you start a dev server by hand in a worktree,
 # check which port you actually got.
 _wt_set_port() {
@@ -174,6 +175,22 @@ _wt_slot_for() {
   printf '%s' "$out"
 }
 
+# wt_port_slot <root> <issue-num> <worktree> — the PUBLIC reader of the slot ledger: echo the slot
+# (0-39) this issue holds, allocating one on first call. Same row `cckit start` uses, so a caller
+# that launches something for an issue's worktree (the QA lane, qa-lane.sh) lands on the port block
+# that worktree already owns instead of deriving a second one.
+wt_port_slot() { _wt_slot_for "$1" "$2" "$3"; }
+
+# wt_port_stride <config-file> — the distance between one slot's port block and the next:
+# `worktree.devPortStride`, default 10. One reader, so wt_assign_ports and the QA lane cannot
+# disagree about where the next block starts.
+wt_port_stride() {
+  local stride=""
+  stride="$(jq -r '.worktree.devPortStride // empty' "${1:-}" 2>/dev/null)"
+  [[ "$stride" =~ ^[0-9]+$ && "$stride" -gt 0 ]] || stride=10
+  printf '%s' "$stride"
+}
+
 wt_assign_ports() {
   # `apppath`, not `path`: under zsh `path` is tied to PATH (special array); a bare `path` local
   # would clobber the command search path on assignment. A namespaced name is inert.
@@ -196,8 +213,7 @@ wt_assign_ports() {
   # different worktrees. Real example (bases 3001/3003/3004, n=3): worktree offset k+1's admin port
   # (3004+3k) IS worktree offset k's api port. Configurable as `worktree.devPortStride`; the default
   # leaves room for up to 10 services per project.
-  stride="$(jq -r '.worktree.devPortStride // empty' "$cfg" 2>/dev/null)"
-  [[ "$stride" =~ ^[0-9]+$ && "$stride" -gt 0 ]] || stride=10
+  stride="$(wt_port_stride "$cfg")"
 
   # The invariant that keeps blocks disjoint: every base must sit inside ONE stride-wide window.
   # Warn rather than fail — the ports still work, they just stop being collision-proof, and a

@@ -268,6 +268,25 @@ EOF
     has "the brief reaches the helpers table"   "$brief_out" "## Helpers you already have"
     has "the brief reaches the standing gotchas" "$brief_out" "fixture gotcha"
     has "the brief reaches the durable-prose mandate" "$brief_out" 'concrete'
+
+    # ── the QA route ask appears only when a `qa` block is configured (#297) ───────────────────
+    # `cckit qa open` reads a `QA route:` line out of the PR body; the brief is where the builder
+    # is told to write it. With no review stack nothing reads the line, so the brief stays silent.
+    # KIT_CONFIG is unset so the config is found by the walk-up from the repo root, as in a project.
+    no  "no qa block: the brief does not ask for a route" "$brief_out" "QA route"
+    eq  "no config: the route ask is empty" "$(unset KIT_CONFIG; kit_brief_qa_route "$repo")" ""
+    printf '%s' '{"qa":{"route":"/dashboard"}}' > "$repo/cckit.config.json"
+    eq  "a qa block with no command is not a review stack" \
+        "$(unset KIT_CONFIG; kit_brief_qa_route "$repo")" ""
+    printf '%s' '{"qa":{"command":"pnpm dev:stack","route":"/dashboard"}}' > "$repo/cckit.config.json"
+    brief_qa="$(cd "$repo" && unset KIT_CONFIG && export PATH="$ghstub:$PATH" && ( set -eu; kit_brief 5 ) 2>&1)"
+    has "qa block: the brief has the route section"  "$brief_qa" "## QA route"
+    has "qa block: the brief shows the line to write" "$brief_qa" "QA route: /path/of/the/changed/screen"
+    has "qa block: the brief names the fallback route" "$brief_qa" '`/dashboard`'
+    has "qa block: the brief names the verb that reads it" "$brief_qa" 'cckit qa open'
+    has "the route section comes after the durable-prose mandate" \
+        "$(printf '%s\n' "$brief_qa" | sed -n '/^## Durable prose/,$p')" "## QA route"
+    rm -f "$repo/cckit.config.json"
   else
     echo "  (git, jq or kit-lib.sh absent — skipping the full-render assertions)"
   fi

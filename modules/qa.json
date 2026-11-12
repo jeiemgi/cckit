@@ -1,0 +1,63 @@
+{
+  "module": "qa",
+  "tier": "qa",
+  "label": "QA lane",
+  "description": "Tells cckit how THIS project's review stack boots, so a wave can be reviewed on one running stack. cckit asks and records; it never boots the project by guessing and never writes a boot script.",
+  "title": "QA lane — how this project boots",
+  "intro": "Five answers, saved under `qa` in this project's kit config. Credentials are recorded by env var NAME only: a value is refused, never written.",
+  "sets": [
+    { "path": "modules", "value": "[\"qa\"]", "valtype": "json" }
+  ],
+  "questions": [
+    {
+      "key": "command",
+      "header": "Stack command",
+      "question": "Which command boots the whole review stack (every service a reviewer needs)? e.g. `pnpm dev:stack`",
+      "type": "text",
+      "target": "qa.command",
+      "required": true,
+      "default": ""
+    },
+    {
+      "key": "ports",
+      "header": "Port env vars",
+      "question": "Which port env vars does that command honour, and what is each one's base port? Comma-separated NAME=port, e.g. `WEB_PORT=3000, API_PORT=4000`. A name with no port gets the next free base from 3000.",
+      "type": "pairs",
+      "target": "qa.ports",
+      "pairKeys": ["env", "base"],
+      "pairValtype": "number",
+      "pairDefault": 3000,
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+      "default": ""
+    },
+    {
+      "key": "readiness",
+      "header": "Readiness",
+      "question": "Which path answers once each service is usable? Comma-separated PORT_VAR=path, one probe per service, e.g. `WEB_PORT=/, API_PORT=/health`. A name with no path probes `/`.",
+      "type": "pairs",
+      "target": "qa.readiness",
+      "pairKeys": ["env", "path"],
+      "pairValtype": "string",
+      "pairDefault": "/",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+      "default": ""
+    },
+    {
+      "key": "route",
+      "header": "Review route",
+      "question": "Which route should a reviewer land on when the work declares none? e.g. `/dashboard`",
+      "type": "text",
+      "target": "qa.route",
+      "default": "/"
+    },
+    {
+      "key": "credentialEnv",
+      "header": "Test credentials",
+      "question": "Which env vars hold the test account's credentials? NAMES only, comma-separated, e.g. `QA_EMAIL, QA_PASSWORD`. Never type a value here.",
+      "type": "list",
+      "target": "qa.credentialEnv",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+      "default": ""
+    }
+  ]
+}

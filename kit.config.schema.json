@@ -45,9 +45,48 @@
     "modules": {
       "type": "array",
       "items": { "type": "string" },
-      "description": "Stackable modules added on top of the profile (e.g. \"software\"). Empty/absent = base project."
+      "description": "Stackable modules added on top of the profile (e.g. \"software\", \"qa\"). Empty/absent = base project."
     },
     "roles": { "type": "array", "items": { "type": "string" } },
+    "qa": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "How THIS project's review stack boots, written by `kit-add.sh qa` from the QA interview (modules/qa.json). cckit records the answers; it does not boot the project by guessing and does not write a boot script. Credentials appear by env var NAME only — a value is refused at interview time and never stored.",
+      "required": ["command"],
+      "properties": {
+        "command": { "type": "string", "description": "The command that boots the whole review stack (every service a reviewer needs), run from the worktree root, e.g. \"pnpm dev:stack\"." },
+        "ports": {
+          "type": "array",
+          "description": "The port env vars the stack command honours, one entry per service. A lane sets each `env` to a port derived from its `base`, so two lanes never share a port. Every base must sit inside ONE `worktree.devPortStride`-wide window, the same invariant as `worktree.devPorts`.",
+          "items": {
+            "type": "object",
+            "required": ["env", "base"],
+            "properties": {
+              "env": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "description": "Env var NAME the stack command reads its port from (e.g. WEB_PORT)." },
+              "base": { "type": "integer", "description": "Base port for this service. The interview derives 3000 + position when the answer names no port." }
+            }
+          }
+        },
+        "readiness": {
+          "type": "array",
+          "description": "Readiness probes, one per service that must answer before the stack counts as usable (e.g. web AND API).",
+          "items": {
+            "type": "object",
+            "required": ["env", "path"],
+            "properties": {
+              "env": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "description": "Which service to probe, named by its port env var from `qa.ports`." },
+              "path": { "type": "string", "description": "Path requested on that port (e.g. \"/\" or \"/health\")." }
+            }
+          }
+        },
+        "route": { "type": "string", "default": "/", "description": "Route a reviewer lands on when the work declares none (e.g. \"/dashboard\")." },
+        "credentialEnv": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
+          "description": "NAMES of the env vars that hold the test account's credentials (e.g. [\"QA_EMAIL\", \"QA_PASSWORD\"]). Names only: the values stay in the reviewer's environment."
+        }
+      }
+    },
     "github": {
       "type": "object",
       "additionalProperties": true,
@@ -141,7 +180,14 @@
           "additionalProperties": true,
           "properties": {
             "floors": { "type": "boolean", "description": "Auto-merge policy floors (default true). When on, `cckit watch --merge` never auto-merges a PR touching .github/workflows/**, lockfile/graph files, or security-sensitive paths, and always honors a `hold` label + draft state. Set false to disable (or KIT_CAPTAIN_FLOORS=0)." },
-            "protectedGlobs": { "type": "array", "items": { "type": "string" }, "description": "Extra path globs the captain must not auto-merge (added to the built-in floors). Also settable via KIT_CAPTAIN_EXTRA_GLOBS." }
+            "protectedGlobs": { "type": "array", "items": { "type": "string" }, "description": "Extra path globs the captain must not auto-merge (added to the built-in floors). Also settable via KIT_CAPTAIN_EXTRA_GLOBS." },
+            "requireQa": {
+              "oneOf": [
+                { "type": "boolean" },
+                { "type": "array", "items": { "type": "string" } }
+              ],
+              "description": "Hold a PR for a human QA pass (default false). true: `cckit watch --merge` reads every would-be merge with no `cckit qa verdict pass` recorded against its current head as QA_MISSING (action verify). A list of label names: only PRs carrying one of them, e.g. [\"flow:ui\"]. A recorded QA fail on the current head blocks regardless (QA_FAILING). Env: KIT_CAPTAIN_REQUIRE_QA=1|0, KIT_CAPTAIN_QA_LABELS (space-separated); either one set means the key is not read."
+            }
           }
         }
       }

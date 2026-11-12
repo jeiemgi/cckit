@@ -60,6 +60,10 @@ Here's the whole shape, then the steps below walk each part:
    the captain would merge goes to a reviewer first and waits for its verdict — one extra turn of
    the loop, not a separate command.
 
+   A person can review the running app the same way: the [QA lane](/qa-lane/) brings one stack up
+   per lane, and with `captain.mergePolicy.requireQa` set the captain holds a PR until
+   `cckit qa verdict pass` is recorded against its current head.
+
 4. **Advance** — merging unblocks the next wave. Re-run `cckit wave` and the loop repeats until
    there's nothing left to propose.
 
@@ -112,10 +116,12 @@ permanently either.
 | Let the captain self-pace | `cckit watch --loop` |
 | Machine-readable plan | `cckit plan --llm` |
 | Read a recorded verdict | `cckit receipt show <issue> review` |
+| Review a lane on a running stack | `cckit qa up` → `cckit qa open` → `cckit qa verdict <pass\|fail>` |
 
 
 ## Links to learn more
 
 - [Efforts, waves & worktrees](/efforts-and-waves/) — where the waves come from.
+- [QA lane](/qa-lane/) — review a lane on a running stack and record the verdict the captain reads.
 - [Driving cckit from agents](/agents/) — the full agent-facing surface.
 

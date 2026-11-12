@@ -354,6 +354,11 @@ different files, they merge cleanly.
 `cckit start <issue>` makes the branch and the worktree for you. You don't manage worktrees by hand.
 </Aside>
 
+A worktree also holds its own port block, so a reviewer can run the app from it without colliding
+with another worktree's stack. `cckit qa up` launches the review stack the project declared,
+on that worktree's ports, and `cckit qa verdict` records the result against the reviewed commit — see the
+[QA lane](/qa-lane/).
+
 ### A sub-issue starts from its effort branch
 
 A sub-issue builds on what its effort has already landed, and those commits are on
