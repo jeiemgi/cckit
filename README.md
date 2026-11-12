@@ -297,6 +297,11 @@ cckit/
   cckit.config.json      # project configuration (no hardcoded org/repo)
 ```
 
+Every `skills:` entry in `templates/agents/*.md` has to resolve: `scripts/agent-skills-lint.sh` (a
+step of `bash scripts/check.sh`) fails on a name that is not under `skills/` or `templates/skills/`,
+not a `plugin:skill` reference, and not declared third-party in `scripts/agent-skills-external.txt`.
+See [Codified review gates](https://cckit.dev/review-gates/).
+
 `cckit init` also scaffolds `benchmarks/` — a per-project **documentation benchmark** that scores how
 well an agent finds and uses your own canonical docs (retrieval / adversarial / abstain / quality
 tiers). Run `cckit bench report` after a docs or kit-version change to catch findability regressions;

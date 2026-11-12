@@ -9,7 +9,8 @@ An AI reviewer finds the same classes of defect over and over, and its findings 
 threads and die there. `scripts/review-lint.sh` is where the mechanical slice of that stream goes to
 stay fixed; `scripts/skill-frontmatter-lint.sh` does the same job for a cost that no reviewer sees at
 all — the bytes a skill listing occupies in every session. `scripts/check.sh` runs both, and
-`cckit init` scaffolds both into your project.
+`cckit init` scaffolds both into your project. A third gate, `scripts/agent-skills-lint.sh`, resolves
+every `skills:` entry in the kit's agent templates; it is described [below](#agent-skills-lint--every-agent-skill-resolves).
 
 Both are **ratchets, not caps**: today's offenders are recorded in a baseline and allowed to stay,
 but nothing may grow past its recorded size and nothing new may land dirty. Adding a rule therefore
@@ -72,6 +73,39 @@ under `LC_ALL=C`, and CI only looked green because `ubuntu-latest` happens to ex
 The lint therefore pins `LC_ALL=C` and measures bytes. Every environment can produce a byte count,
 and no locale has to be installed to reproduce a number. An em-dash costs the three bytes it occupies.
 </Aside>
+
+## agent-skills-lint — every agent skill resolves
+
+A `skills:` entry that names nothing fails silently: the agent loads, answers, and has fewer skills
+than its frontmatter lists. A rename is how it happens — `templates/agents/pm.md` kept listing
+`task-sync`, `task-new` and `task-close` after the kit shipped them as `kit-task-*`, so all three of
+the PM agent's lifecycle skills were dead.
+
+```bash
+scripts/agent-skills-lint.sh           # the gate: fails on any unresolved entry
+```
+
+It reads the frontmatter `skills:` key of every `templates/agents/*.md` (block list or inline
+`[a, b]`) and accepts an entry that is one of:
+
+| Form | Resolves against |
+| --- | --- |
+| a skill the kit ships | `skills/<name>/SKILL.md` |
+| a skill the kit scaffolds | `templates/skills/<name>/SKILL.md` |
+| another plugin's skill | the `plugin:skill` form, e.g. `agent-skills:context7` |
+| a third-party bare name | a line in `scripts/agent-skills-external.txt` |
+
+Anything else is reported as `<file>:<line>: <entry>` and fails `scripts/check.sh`.
+
+`scripts/agent-skills-external.txt` is the list of **optional** skills: names an agent template
+lists that come from a third-party skill pack or from the harness (`deep-research`, `impeccable`,
+the `gsap-*` and `n8n-*` sets). An agent scaffolded into a project without one of them runs without
+that skill. A name that is both in that file and shipped by the kit fails the lint, so the list
+cannot keep describing a kit skill as third-party.
+
+Unlike the two ratchets above, this lint has no baseline — every entry resolves or the gate is red —
+and it is **not** scaffolded by `cckit init`: it checks the kit's own agent templates. A
+`plugin:skill` entry is accepted on its form alone; the lint cannot see another plugin's skills.
 
 ## Baselines are seeded once
 
