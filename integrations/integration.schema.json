@@ -120,6 +120,10 @@
         "declined": {
           "type": "object",
           "description": "Flags cckit passes to turn a tool feature OFF, each mapped to the reason. Keys are the flags, values the reasons."
+        },
+        "kept": {
+          "type": "object",
+          "description": "Tool features cckit leaves ON although it could decline them, each mapped to the evidence for that decision. Keys name the feature, values the test that was run. Never reaches the command line."
         }
       }
     },
@@ -154,6 +158,11 @@
         "failsOn": { "type": "string", "description": "What a non-zero exit means." },
         "json": { "type": "string", "description": "A form of the command with machine-readable output." }
       }
+    },
+    "rules": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$" },
+      "description": "Optional: rule templates (templates/rules/<name>.md) that `cckit add <id>` writes into the project's .claude/rules/ when the integration is switched on. A rule file already in the project is kept, never overwritten."
     },
     "afterInstall": {
       "type": "string",

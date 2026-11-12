@@ -90,6 +90,7 @@ cckit doctor                  # onboarding preflight: deps, gh auth, and each in
 cckit init --profile software # scaffold cckit.config.json + .claude/ for this repo
                               #   profiles: software · content · research · automation · minimal
 cckit add                     # list the optional integrations + modules; `cckit add <name>` switches one on
+                              #   `cckit add graft`: code-graph retrieval + the code-retrieval rule
 cckit plan-next               # propose what to build next, grounded in current capabilities
 cckit status                  # where are we: local undone work, PRs to attend, cleanup available
 cckit next                    # the next unblocked issue + how to start it
@@ -291,7 +292,7 @@ cckit/
   profiles/ templates/   # init profiles + scaffold templates
   routines/ modules/     # scheduled routines + optional modules
   integrations/          # one JSON descriptor per optional third-party tool + its schema
-                         #   (mempalace.json, mlx-lm.json). `cckit doctor` installs each one the
+                         #   (mempalace.json, mlx-lm.json, graft.json). `cckit doctor` installs each one the
                          #   config switches on through scripts/lib/integration-install.sh, only
                          #   with consent recorded in .cckit/consent (`--fix`, or yes at the prompt)
   docs-site/             # documentation source — Astro/Starlight (deployed to cckit.dev)

@@ -243,7 +243,7 @@ done
 
 # The two tools that used to be hardcoded in scripts/kit-doctor.sh (E303.4), one unit test each.
 # They are unlike on purpose: the format has to carry both shapes.
-t "shipped descriptors" "$(integrations_list | tr '\n' ' ')" "mempalace mlx-lm "
+t "shipped descriptors" "$(integrations_list | tr '\n' ' ')" "graft mempalace mlx-lm "
 mp="$ROOT/integrations/mempalace.json"; mlx="$ROOT/integrations/mlx-lm.json"
 integration_validate "$mp" >/dev/null 2>&1;  rc "mempalace validates" "$?" "0"
 t "mempalace: turned on by memory.enabled" "$(integration_config_key "$mp")" "memory.enabled"
@@ -263,6 +263,44 @@ t "mlx-lm: not affiliated" "$(jq -r '.attribution.affiliated' "$mlx")" "false"
 # Neither descriptor may fall back to plain pip: Homebrew's Python is externally managed (PEP 668).
 t "no shipped candidate is a plain pip install" \
   "$(jq -r '.install[].run, (.install[].bootstrap.run // empty)' "$mp" "$mlx" | grep -cE '(^| )pip3? install' )" "0"
+
+# Graft (E303.10): the first descriptor that judges the REPO (anyExtension), wires into it, and
+# ships a rule. The wire flags below are the ones the hook-merge test ran with.
+gr="$ROOT/integrations/graft.json"
+integration_validate "$gr" >/dev/null 2>&1; rc "graft validates" "$?" "0"
+t "graft: turned on by codeGraph.provider" "$(integration_config_key "$gr")" "codeGraph.provider"
+t "graft: ON value names the provider" "$(jq -r '.config.value' "$gr")" "graft"
+t "graft: npm before pnpm" "$(jq -r '[.install[].manager] | join(" ")' "$gr")" "npm pnpm"
+t "graft: every candidate leaves a binary (the wire step needs one)" "$(jq -r '[.install[] | select(.resident == false)] | length' "$gr")" "0"
+t "graft: wire flags decline the statusline and every out-of-repo write" \
+  "$(jq -r '.wire.declined | keys_unsorted | join(" ")' "$gr")" "--no-statusline --no-global"
+t "graft: hooks are NOT declined" "$(jq -r '.wire.declined | has("--no-hooks")' "$gr")" "false"
+has "graft: the hook decision records its test" "$(jq -r '.wire.kept.hooks' "$gr")" "All four entries survived"
+t "graft: never auto-runs the LLM build" "$(jq -r '.build.deep.auto' "$gr")" "false"
+t "graft: not affiliated" "$(jq -r '.attribution.affiliated' "$gr")" "false"
+on_machine Darwin arm64 "$gr" "$repo/scripts"; rc "graft does not apply to a .sh-only repo" "$?" "1"
+on_machine Linux x86_64 "$gr" "$repo";         rc "graft applies once a .ts file exists" "$?" "0"
+# Every rule a descriptor ships must exist as a template, or `cckit add` would write nothing.
+for id in $(integrations_list); do
+  for r in $(jq -r '.rules // [] | .[]' "$(integration_file "$id")"); do
+    t "$id: rule template $r exists" "$([ -f "$ROOT/templates/rules/$r.md" ] && echo yes || echo no)" "yes"
+  done
+done
+t "graft: ships the code-retrieval rule" "$(jq -c '.rules' "$gr")" '["code-retrieval"]'
+rule="$ROOT/templates/rules/code-retrieval.md"
+# `cckit add` copies the rule verbatim, so it must hold nothing init.sh would have to resolve.
+t "code-retrieval: no template variable or IF block" "$(grep -cE '\{\{|<!-- /?IF:' "$rule")" "0"
+t "code-retrieval: names no machine-specific search tool" "$(grep -ciE '(^|[^a-z])fff([^a-z]|$)' "$rule")" "0"
+for verb in 'graft ask' 'graft grep' 'graft skeleton' 'graft callers' 'graft map' 'graft blast --base'; do
+  has "code-retrieval routes: $verb" "$(cat "$rule")" "$verb"
+done
+has "code-retrieval: the fallback is silent" "$(cat "$rule")" "Fall back to Grep/Glob silently"
+has "code-retrieval: the vendor numbers are attributed" "$(cat "$rule")" "cckit has not reproduced them"
+bad="$(jq '.rules = ["Not A Rule"]' "$gr" > "$tmp/graft.json"; integration_validate "$tmp/graft.json" 2>&1)"
+has "a rule name outside the grammar is refused" "$bad" "rules[0]"
+bad="$(jq '.wire.kept = "yes"' "$gr" > "$tmp/graft.json"; integration_validate "$tmp/graft.json" 2>&1)"
+has "wire.kept must be an object" "$bad" "wire.kept: expected object"
+
 t "kit.config.schema.json declares local.enabled" \
   "$(jq -r '.properties.local.properties.enabled.type // "absent"' "$ROOT/kit.config.schema.json")" "boolean"
 t "package.json ships integrations/ in the npm tarball" \

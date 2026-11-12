@@ -135,6 +135,43 @@ if [ -n "${KIT_ADD_TEST_INNER:-}" ]; then
   has "invalid descriptor names the field" "$out" "verify"
   rm -f "$reg/gamma.json"
 
+  # ── a descriptor that ships a rule (E303.10): the shipped Graft descriptor, with detect forced
+  # to fail so the plan is the same on a machine that has graft and one that does not ───────────
+  jq '.detect.run = "false"' "$dir/../integrations/graft.json" > "$reg/graft.json"
+  # a repo of only .sh files: declined, rc 0, nothing written and nothing installed
+  shg="$ws/sh-graft"; mkdir -p "$shg/.claude" "$shg/scripts"; : > "$shg/scripts/run.sh"
+  printf '%s\n' '{"project":{"name":"s"}}' > "$shg/.claude/kit.config.json"
+  out="$("$ADD" graft --dir "$shg" 2>&1)"; t "graft on a .sh-only repo rc" "$?" "0"
+  has "graft on a .sh-only repo: not offered" "$out" "not offered here"
+  t "graft on a .sh-only repo: config untouched" "$(jq -c . "$shg/.claude/kit.config.json")" '{"project":{"name":"s"}}'
+  t "graft on a .sh-only repo: no rule, no consent, nothing else" "$(cd "$shg" && find . -type f | sort | tr '\n' ' ')" "./.claude/kit.config.json ./scripts/run.sh "
+  # a repo with a .ts file, dry-run: the install + wire plan is printed and nothing is written
+  tsg="$ws/ts-graft"; mkdir -p "$tsg/.claude" "$tsg/src"; : > "$tsg/src/a.ts"
+  printf '%s\n' '{"project":{"name":"t"}}' > "$tsg/.claude/kit.config.json"
+  out="$(KIT_DRY_RUN=1 "$ADD" graft --dir "$tsg" 2>&1)"; t "graft dry-run rc" "$?" "0"
+  has "graft dry-run: npm is candidate 1"  "$out" "1. npm install -g @nanonets/graft"
+  has "graft dry-run: pnpm is candidate 2" "$out" "2. pnpm add -g @nanonets/graft"
+  has "graft dry-run: the wire command"    "$out" "graft init --agents claude --no-statusline --no-global"
+  has "graft dry-run: names the rule it would write" "$out" "would write $tsg/.claude/rules/code-retrieval.md"
+  t "graft dry-run: nothing written" "$(cd "$tsg" && find . -type f | sort | tr '\n' ' ')" "./.claude/kit.config.json ./src/a.ts "
+  # declining writes no rule
+  "$ADD" graft --dir "$tsg" --set enable=no >/dev/null 2>&1
+  t "graft declined: no rule" "$([ -e "$tsg/.claude/rules/code-retrieval.md" ] && echo made || echo none)" "none"
+  # a real add: the key and the rule, and still no install
+  out="$("$ADD" graft --dir "$tsg" 2>&1)"; t "graft add rc" "$?" "0"
+  t "graft add: the key" "$(jq -r .codeGraph.provider "$tsg/.claude/kit.config.json")" "graft"
+  t "graft add: the rule is the template, verbatim" "$(cmp -s "$dir/../templates/rules/code-retrieval.md" "$tsg/.claude/rules/code-retrieval.md" && echo same || echo differs)" "same"
+  t "graft add: writes the config and the rule, nothing else" "$(cd "$tsg" && find . -type f | sort | tr '\n' ' ')" "./.claude/kit.config.json ./.claude/rules/code-retrieval.md ./src/a.ts "
+  has "graft add: says nothing was installed" "$out" "Nothing was installed."
+  # a second run keeps an edited rule, and restores a deleted one
+  echo "# local edit" >> "$tsg/.claude/rules/code-retrieval.md"
+  "$ADD" graft --dir "$tsg" >/dev/null 2>&1
+  t "second add keeps an edited rule" "$(tail -1 "$tsg/.claude/rules/code-retrieval.md")" "# local edit"
+  rm -f "$tsg/.claude/rules/code-retrieval.md"
+  "$ADD" graft --dir "$tsg" >/dev/null 2>&1
+  t "second add restores a missing rule" "$([ -f "$tsg/.claude/rules/code-retrieval.md" ] && echo yes || echo no)" "yes"
+  rm -f "$reg/graft.json"
+
   # a module wins a name it shares with an integration
   desc software '{"key":"codeGraph.provider","value":"clash"}' null
   mkdir -p "$ws/clash"

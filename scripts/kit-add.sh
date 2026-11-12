@@ -15,6 +15,8 @@
 # integrations/<id>.json. `kit-add.sh` with no name LISTS what can be added. `kit-add.sh <id>` asks
 # the one question kit-interview derives from the descriptor and sets that descriptor's config key
 # in the project config kit_config_path resolves — no other key changes. It installs nothing.
+# A descriptor that lists `rules` (E303.10) also gets each rule template copied into the project's
+# .claude/rules/, and under KIT_DRY_RUN the install + wire plan is printed after the config diff.
 #
 # Run:
 #   scripts/kit-add.sh                                         # list integrations + modules
@@ -31,6 +33,8 @@ _add_dir="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
 . "$_add_dir/lib/kit-interview.sh"   # catalog/apply (pulls kit-cli + kit-profile)
 # shellcheck source=/dev/null
 . "$_add_dir/lib/kit-operate.sh"     # four-beat machine + manifest
+# shellcheck source=/dev/null
+. "$_add_dir/lib/integration-install.sh"  # integration_install_plan — the dry-run plan
 
 # kit_add_module_exists <module> -> rc 0 if a module spec is installed
 kit_add_module_exists() { [ -f "$(kit_interview_catalog_file "$1")" ]; }
@@ -120,8 +124,40 @@ kit_add_list() {
   fi
 }
 
+# _kit_add_root <config> -> the project root a config file belongs to: the dir holding .claude/
+# for the scaffolded layout, the config's own dir for a root cckit.config.json.
+_kit_add_root() {
+  case "$1" in
+    */.claude/kit.config.json) dirname "$(dirname "$1")" ;;
+    *) dirname "$1" ;;
+  esac
+}
+
+# _kit_add_rules <descriptor> <project-root> <id>
+# Copies each rule template the descriptor lists (`rules`) into <root>/.claude/rules/. A rule file
+# already there is kept — never overwritten, so a project's edits survive a re-run. Under
+# KIT_DRY_RUN it names the files and writes none. A descriptor with no `rules` does nothing.
+_kit_add_rules() {
+  local f="$1" root="$2" id="$3" r src dest
+  for r in $(jq -r '.rules // [] | .[]' "$f" 2>/dev/null); do
+    src="$(kit_iv_plugin_root)/templates/rules/$r.md"; dest=".claude/rules/$r.md"
+    [ -e "$root/$dest" ] && continue
+    [ -f "$src" ] || { kit_warn "kit add $id: rule template missing ($src) — rule not written"; continue; }
+    if [ -n "${KIT_DRY_RUN:-}" ]; then kit_say "  [dry-run] would write $root/$dest"; continue; fi
+    if mkdir -p "$root/.claude/rules" 2>/dev/null && cp "$src" "$root/$dest" 2>/dev/null; then
+      # Tracked only where a manifest already exists: an add never invents one.
+      [ -f "$root/.claude/kit.manifest.json" ] && ( cd "$root" && kit_manifest_record "$dest" A "add:$id" ) >/dev/null 2>&1
+      kit_say "rule written: $root/$dest"
+    else
+      kit_warn "kit add $id: cannot write $root/$dest"
+    fi
+  done
+  return 0
+}
+
 # kit_add_integration <id> <answersfile> [targetdir]
-# Sets the descriptor's config key in the project config and nothing else. Refusals, each before
+# Sets the descriptor's config key in the project config, and copies the rule templates the
+# descriptor lists (_kit_add_rules); it installs nothing. Refusals, each before
 # any write: an invalid descriptor (rc 1), a repo the tool cannot work on (rc 0 — declined, not an
 # error), no project config (rc 1). The merge keeps every existing key, so the write does not go
 # through kit_op_write's conffiles guard, which exists to stop a WHOLE-FILE replacement of a file
@@ -147,7 +183,10 @@ kit_add_integration() {
   merged="$(kit_interview_apply "$id" "$answers" "$cfg")" || kit_die "deriving the config for '$id' failed"
 
   if [ "$(printf '%s' "$merged" | jq -S .)" = "$(jq -S . "$cfg")" ]; then
-    if integration_enabled "$f" "$cfg"; then kit_say "kit add $id: no change — $key already selects $label in $cfg."
+    if integration_enabled "$f" "$cfg"; then
+      kit_say "kit add $id: no change — $key already selects $label in $cfg."
+      _kit_add_rules "$f" "$(_kit_add_root "$cfg")" "$id"
+      [ -n "${KIT_DRY_RUN:-}" ] && integration_install_plan "$f" "$target"
     else kit_say "kit add $id: left off — nothing written."; fi
     return 0
   fi
@@ -157,7 +196,11 @@ kit_add_integration() {
   printf '%s\n' "$merged" > "$tmp"
   _kit_op_diff "$tmp" "$cfg"
   if [ -n "${KIT_DRY_RUN:-}" ]; then
-    rm -f "$tmp"; kit_say "  [dry-run] would write $cfg"; return 0
+    rm -f "$tmp"; kit_say "  [dry-run] would write $cfg"
+    _kit_add_rules "$f" "$(_kit_add_root "$cfg")" "$id"
+    # What `cckit doctor` would then install, and the wire command, for this repo. Runs nothing.
+    integration_install_plan "$f" "$target"
+    return 0
   fi
   # Manifest paths are relative to the project root: the dir holding .claude/, or the config's own.
   root="$(dirname "$cfg")"; rel="$(basename "$cfg")"
@@ -166,6 +209,7 @@ kit_add_integration() {
   mv "$tmp" "$cfg" || { rm -f "$tmp"; kit_die "failed to write $cfg"; }
   [ "$verdict" = "intact" ] && ( cd "$root" && kit_manifest_record "$rel" A "add:$id" ) >/dev/null 2>&1
   kit_say "$label is on: $key = $(jq -c --arg k "$key" 'getpath($k | split("."))' "$cfg"). Nothing was installed."
+  _kit_add_rules "$f" "$root" "$id"
   kit_say "$(jq -r '"\(.attribution.notice)  Docs: \(.docs)"' "$f")"
   return 0
 }

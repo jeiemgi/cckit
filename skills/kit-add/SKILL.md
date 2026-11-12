@@ -13,7 +13,7 @@ Two kinds of thing can be added, through the same entry:
 
 | Kind | Described by | What `add` writes |
 | --- | --- | --- |
-| **Integration** — an optional third-party tool | `integrations/<id>.json` | the one config key the descriptor names (`config.key`), in the project config `kit_config_path` resolves |
+| **Integration** — an optional third-party tool | `integrations/<id>.json` | the one config key the descriptor names (`config.key`), in the project config `kit_config_path` resolves, plus each rule the descriptor lists (`rules`) into `.claude/rules/` |
 | **Module** — e.g. `software` | `modules/<name>.json` | this directory's `.claude/kit.config.json`: `modules[]` plus the wizard answers |
 
 `cckit add <integration>` **installs nothing.** It records the choice; the tool's install is a
@@ -34,9 +34,10 @@ separate step.
    tool and the user should see who makes it before saying yes.
 4. **Preview, then persist.** Write the answers as `{"<key>":"<value>"}` to a temp file and run
    `KIT_DRY_RUN=1 cckit add <name> --answers <file>` to show the diff, then the same command
-   without `KIT_DRY_RUN`. Add `--dir <project-dir>` when not in the project root.
-5. **Report** the config path and the key that changed. For an integration, say that nothing was
-   installed.
+   without `KIT_DRY_RUN`. For an integration the preview also lists the rule files, the install
+   candidates in order and the wire command; show those too. Add `--dir <project-dir>` when not in the project root.
+5. **Report** the config path, the key that changed and any rule file written. For an
+   integration, say that nothing was installed.
 
 ## What the verb refuses
 
@@ -52,7 +53,7 @@ separate step.
 - **Never hand-edit the config** to switch an integration on — go through `cckit add`.
 - **Idempotent.** A second run with the same answer leaves the file byte-identical.
 - Answering `no` to an integration writes nothing; it does not switch off one that is already on.
-- An integration add changes one key. If the diff in step 4 shows more than that key, stop and
-  report it instead of applying.
+- An integration add changes one config key. If the diff in step 4 shows more than that key, stop
+  and report it instead of applying. Rule files are separate: an existing one is never overwritten.
 - A module is written into this directory only, never above it.
 - `KIT_DRY_RUN=1` previews; `KIT_ASSUME_YES=1` accepts every default (for batch and CI).

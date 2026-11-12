@@ -298,4 +298,42 @@ if command -v zsh >/dev/null 2>&1; then
   t "zsh: order of calls" "$(calls)" "npm install -g fixture-tool|pipx install fixture-tool|"
 fi
 
+# ── 14. the shipped Graft descriptor through the runner (E303.10) ──────────────────────────────
+# shellcheck source=/dev/null
+. "$LIB/integration-install.sh"
+gr="$ROOT/integrations/graft.json"
+gwire="$(integration_wire_command "$gr")"
+t   "graft: the wire command" "$gwire" "graft init --agents claude --no-statusline --no-global"
+# No verb runs the wire step yet, so afterInstall hands the user the same command. It must not drift.
+has "graft: afterInstall carries the wire command" "$(jq -r '.afterInstall' "$gr")" "'$gwire'"
+has "graft: the dry-run form is the wire command plus --dry-run" "$(jq -r '.wire.dryRun' "$gr")" "$gwire --dry-run"
+unstub; stub npm works; stub pnpm works; h="$tmp/h14"; mkdir -p "$h"
+plan="$(PATH="$stubs:$sealed" HOME="$h" KIT_STATE_DIR="$h/state" bash "$LIB/integration-install.sh" --plan graft "$proj" 2>/dev/null)"
+has "graft plan: npm is candidate 1" "$plan" "1. npm install -g @nanonets/graft"
+has "graft plan: pnpm is candidate 2" "$plan" "2. pnpm add -g @nanonets/graft"
+has "graft plan: names the wire command" "$plan" "wire (in $proj): $gwire"
+
+# The hook-merge test behind `wire.kept.hooks`, against the REAL graft binary. Opt-in
+# (GRAFT_MERGE_TEST=1) and skipped when graft is absent: it runs a third-party tool, which the
+# gate must not depend on. HOME is a throwaway dir, so --no-global is checked rather than trusted.
+if [ "${GRAFT_MERGE_TEST:-}" = "1" ] && command -v graft >/dev/null 2>&1; then
+  gm="$tmp/graft-merge"; gh_home="$tmp/graft-home"; mkdir -p "$gm/.claude" "$gm/src" "$gh_home/.claude"
+  printf 'export function hello(n: string) { return greet(n) }\nfunction greet(n: string) { return "hi " + n }\n' > "$gm/src/a.ts"
+  hk='{"hooks":[{"type":"command","command":"bash .claude/hooks/kit-mail-check.sh"}]}'
+  jq -n --argjson h "$hk" '{hooks: {SessionStart: [$h], UserPromptSubmit: [$h], PostToolUse: [$h + {matcher: "Bash"}], Stop: [$h]}}' > "$gm/.claude/settings.json"
+  printf '{"keep":true}\n' > "$gh_home/.claude/settings.json"
+  before="$(jq -cS '[.hooks[][0]]' "$gm/.claude/settings.json")"
+  ( cd "$gm" && git init -q && HOME="$gh_home" DO_NOT_TRACK=1 sh -c "$gwire" ) >/dev/null 2>&1; rc "graft init (real binary) -> rc 0" "$?" "0"
+  t "graft init: the four existing hook entries survive, first in their event" "$(jq -cS '[.hooks[][0]]' "$gm/.claude/settings.json")" "$before"
+  t "graft init: it added its own hooks" "$(jq -r '[.hooks[][] | .hooks[].command | select(test("graft-hooks"))] | length > 0' "$gm/.claude/settings.json")" "true"
+  t "graft init --no-statusline: no statusLine key" "$(jq -r 'has("statusLine")' "$gm/.claude/settings.json")" "false"
+  t "graft init --no-global: the user-level settings are untouched" "$(cat "$gh_home/.claude/settings.json")" '{"keep":true}'
+  t "graft init --no-global: no user-level ~/.claude.json" "$([ -e "$gh_home/.claude.json" ] && echo made || echo none)" "none"
+  once="$(cat "$gm/.claude/settings.json")"
+  ( cd "$gm" && HOME="$gh_home" DO_NOT_TRACK=1 sh -c "$gwire" ) >/dev/null 2>&1
+  t "graft init twice: settings.json identical" "$(cat "$gm/.claude/settings.json")" "$once"
+else
+  echo "skip: graft hook-merge test (set GRAFT_MERGE_TEST=1 with graft on PATH to run it)"
+fi
+
 [ "$fail" = "0" ] && echo "ALL OK" || { echo "SOME FAILED"; exit 1; }
