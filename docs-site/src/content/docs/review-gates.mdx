@@ -10,7 +10,7 @@ threads and die there. `scripts/review-lint.sh` is where the mechanical slice of
 stay fixed; `scripts/skill-frontmatter-lint.sh` does the same job for a cost that no reviewer sees at
 all — the bytes a skill listing occupies in every session. `scripts/instruction-budget-lint.sh` is the
 same idea one level up: `CLAUDE.md` and the rules themselves. `scripts/check.sh` runs all three, and
-`cckit init` scaffolds all three into your project. A third gate, `scripts/agent-skills-lint.sh`, resolves
+`cckit init` scaffolds all three into your project. A fourth gate, `scripts/agent-skills-lint.sh`, resolves
 every `skills:` entry in the kit's agent templates; it is described [below](#agent-skills-lint--every-agent-skill-resolves).
 
 All three are **ratchets, not caps**: today's offenders are recorded in a baseline and allowed to stay,
