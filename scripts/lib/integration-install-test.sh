@@ -27,7 +27,7 @@ tmp="$(cd "$tmp" && pwd -P)"
 
 # ── the sealed PATH: real tools the runner needs, and nothing that is a package manager ────────
 sealed="$tmp/sealed"; mkdir -p "$sealed"
-for tool in sh bash jq git grep sed awk sort cat mkdir rm dirname basename chmod ls pwd env tr head find; do
+for tool in sh bash jq git grep sed awk sort cat mkdir rm dirname basename chmod ls pwd env tr head find cp; do
   src="$(command -v "$tool" 2>/dev/null)" || continue
   case "$src" in /*) ln -s "$src" "$sealed/$tool" ;; esac
 done
@@ -175,6 +175,48 @@ unstub; : > "$log"
 out="$(run "$h" "integration_install '$desc' '$proj'")"; r=$?
 t  "no manager on PATH -> failed, rc 1" "$out|$r" "failed|1"
 has "no manager on PATH -> the managers are named" "$(cat "$tmp/err")" "npm, pnpm, pipx, uv"
+
+# ── 7b. bootstrap: with NO candidate manager on the machine, a candidate's `bootstrap` brings one ──
+# brew is a stub whose `install pipx` puts a working pipx on PATH. The bootstrap sits on the THIRD
+# candidate: it is the absence of every manager, not the position, that triggers it.
+mkdir -p "$tmp/boot"; cp "$fx/integration.schema.json" "$tmp/boot/"
+jq '.install[2].bootstrap = {"manager":"brew","run":"brew install pipx"}' "$desc" > "$tmp/boot/fixture-tool.json"
+bdesc="$tmp/boot/fixture-tool.json"
+stub pipx works; mv "$stubs/pipx" "$tmp/pipx.real"
+brew_stub() {
+  { printf '#!/bin/sh\necho "brew $*" >> "%s"\n' "$log"
+    printf 'cp "%s" "%s/pipx"\n' "$tmp/pipx.real" "$stubs"; } > "$stubs/brew"; chmod +x "$stubs/brew"
+}
+bcalls() { grep -E '^(brew|npm|pnpm|pipx|uv) ' "$log" | tr '\n' '|'; }
+unstub; brew_stub; : > "$log"; h="$tmp/h7b"
+run "$h" "integration_consent_record fixture-tool '$proj'"
+out="$(run "$h" "KIT_INTEGRATIONS_DIR='$tmp/boot' integration_install '$bdesc' '$proj'")"
+t  "no manager on PATH -> bootstrap, then the candidate it enabled" "$out|$(bcalls)" "installed pipx|brew install pipx|pipx install fixture-tool|"
+# a machine that already holds ANY listed manager is never bootstrapped
+unstub; brew_stub; stub uv works; : > "$log"; h="$tmp/h7c"
+run "$h" "integration_consent_record fixture-tool '$proj'"
+out="$(run "$h" "KIT_INTEGRATIONS_DIR='$tmp/boot' integration_install '$bdesc' '$proj'")"
+t  "a manager is already there -> no bootstrap" "$out|$(bcalls)" "installed uv|uv tool install fixture-tool|"
+# the two gates come first: no consent and dry-run never run the bootstrap
+unstub; brew_stub; : > "$log"
+out="$(run "$tmp/h7d" "KIT_INTEGRATIONS_DIR='$tmp/boot' integration_install '$bdesc' '$proj'")"
+t  "bootstrap is behind the consent gate" "$out|$(bcalls)" "no-consent|"
+out="$(run "$tmp/h7d" "KIT_INTEGRATIONS_DIR='$tmp/boot' KIT_DRY_RUN=1 integration_install '$bdesc' '$proj'")"
+t  "bootstrap is behind the dry-run gate" "$out|$(bcalls)" "dry-run|"
+has "dry-run plan names the bootstrap" "$(cat "$tmp/err")" "bootstrap, because none of those managers is on PATH: brew install pipx   (needs brew)"
+# the bootstrap's own manager is absent -> nothing to try, the plain failure
+unstub; : > "$log"; h="$tmp/h7e"
+run "$h" "integration_consent_record fixture-tool '$proj'"
+out="$(run "$h" "KIT_INTEGRATIONS_DIR='$tmp/boot' integration_install '$bdesc' '$proj'")"; r=$?
+t  "no manager and no brew -> failed, rc 1" "$out|$r|$(bcalls)" "failed|1|"
+
+# ── 7c. detect.bin names the binary when detect.run does not start with it ─────────────────────
+mkdir -p "$tmp/dbin"; cp "$fx/integration.schema.json" "$tmp/dbin/"
+jq '.detect = {"run":"command -v fixture-tool","bin":"fixture-tool"}' "$desc" > "$tmp/dbin/fixture-tool.json"
+h="$tmp/h1"   # h1: the tool was installed into ~/.local/bin by section 3
+t  "detect.bin -> the binary is resolved off PATH" "$(run "$h" "integration_bin '$tmp/dbin/fixture-tool.json'")" "$h/.local/bin/fixture-tool"
+run "$h" "integration_detect '$tmp/dbin/fixture-tool.json'"; rc "a 'command -v' probe sees the off-PATH binary" "$?" "0"
+run "$tmp/h7e" "integration_detect '$tmp/dbin/fixture-tool.json'"; rc "a 'command -v' probe on a machine without the tool -> rc 1" "$?" "1"
 
 # ── 8. KIT_DRY_RUN prints the plan and runs nothing ────────────────────────────────────────────
 unstub; stub npm works; stub uv works; : > "$log"; h="$tmp/h8"

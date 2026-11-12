@@ -384,9 +384,30 @@ origin, and a `<slug>` argument was resolved before it, which can run `gh issue 
 An optional third-party tool is described by one JSON file, `integrations/<id>.json`, checked
 against `integrations/integration.schema.json`. A descriptor carries a label, the config key that
 turns the tool on, a detect command, install candidates tried in the order written, a verify
-command, a docs link and an attribution block whose `affiliated` field is a boolean. An optional
-`appliesWhen.anyExtension` list limits the tool to repos holding at least one file with a listed
-extension; inside a git work tree the file list is git's tracked and unignored files.
+command, a docs link and an attribution block whose `affiliated` field is a boolean.
+
+An optional `appliesWhen` block says where the tool can work. It holds two kinds of condition, and
+every one present must hold:
+
+| Condition | Judges | Holds when |
+| --- | --- | --- |
+| `anyExtension` | the repo | At least one file ends in a listed extension. Inside a git work tree the file list is git's tracked and unignored files. |
+| `platform` (`os`, `arch`) | the machine | Each field present equals `uname -s` / `uname -m` verbatim, e.g. `{"os":"Darwin","arch":"arm64"}` for Apple silicon. |
+
+Three optional fields carry what an installer needs beyond the candidate list:
+
+| Field | What it does |
+| --- | --- |
+| `install[].bootstrap` (`manager`, `run`) | How to get that candidate's manager, e.g. `brew install uv`. Run only when **none** of the descriptor's managers is on `PATH`; a machine that already has any of them is never bootstrapped. |
+| `detect.bin` | The binary's name when `detect.run` does not start with it (a `command -v <bin>` probe, for a tool whose own flags are slow to answer). |
+| `afterInstall` | The one step left to the user after a successful install, shown once in the install report. |
+
+Two descriptors ship:
+
+| Descriptor | Config key | Candidates, in order | Bootstrap | Applies |
+| --- | --- | --- | --- | --- |
+| `integrations/mempalace.json` | `memory.enabled` | `pipx install mempalace`, then `uv tool install mempalace` | `brew install pipx` | any repo, any machine |
+| `integrations/mlx-lm.json` | `local.enabled` | `uv tool install mlx-lm`, then `pipx install mlx-lm` | `brew install uv` | `Darwin` + `arm64` only |
 
 The config key names a capability, never the vendor: `<capability>.provider` whose value names the
 tool, or an existing `<capability>.enabled` switch. A key containing the descriptor's own id is
@@ -395,6 +416,8 @@ refused by the validator.
 | Key | Default | What it does |
 | --- | --- | --- |
 | `codeGraph.provider` | *(unset — off)* | Which integration provides code-graph retrieval, as its descriptor's `config.value` names it. Unset or `none`: no code graph. |
+| `memory.enabled` | `false` | `true` switches on `integrations/mempalace.json`: `cckit doctor` installs the MemPalace CLI and checks the wake-up header and session-start hook. |
+| `local.enabled` | *(unset — off)* | `true` switches on `integrations/mlx-lm.json`: `cckit doctor` installs the runtime on Apple silicon and starts `mlx_lm.server` on `local.port` (default `8080`) with `local.model`. |
 
 `bash scripts/lib/integrations.sh --validate` checks every descriptor and prints one
 `<id>: <field>: <problem>` line per problem; `--list` prints the ids; `--applies <id> [dir]` exits
@@ -403,7 +426,7 @@ refused by the validator.
 ### Switching one on: `cckit add`
 
 `cckit add` with no name lists every descriptor in `integrations/`, each marked `on` or `off` for
-this project and flagged when it does not apply to the repo, followed by the modules. It exits 0
+this project and flagged when it does not apply here, followed by the modules. It exits 0
 when the registry is empty. `cckit add --llm` prints the same list as one JSON object:
 `{"integrations":[{id,label,summary,key,enabled,applies}],"modules":[{id,label}]}`.
 
@@ -416,13 +439,13 @@ That is the only key it changes. The file it writes is the project config: a roo
 | --- | --- |
 | `--set enable=no`, or answering no | Nothing is written. It does not switch off an integration that is already on. |
 | The key already holds the ON value | No write; the file stays byte-identical. |
-| No file in the repo ends in an extension from `appliesWhen.anyExtension` | Declined with the extensions named. Exit 0, nothing written. |
+| An `appliesWhen` condition does not hold (no file with a listed extension, or the wrong machine) | Declined with the conditions named. Exit 0, nothing written. |
 | No project config found | Exit 1. Run `cckit init` first; `add` does not create a config for an integration. |
 | The descriptor fails the schema | Exit 1 with the `<id>: <field>: <problem>` lines. Nothing written. |
 | `KIT_DRY_RUN=1` | Prints the diff. Nothing written. |
 
-`cckit add <id>` installs nothing: it records the choice. No descriptor ships yet, so on a fresh
-install the list shows only the modules. `cckit add software` is the module form of the same verb
+`cckit add <id>` installs nothing: it records the choice, and the next `cckit doctor` run does the
+install. `cckit add software` is the module form of the same verb
 and writes this directory's `.claude/kit.config.json`. In Claude Code the `kit-add` skill drives
 the same verb; the typed-only `/kit-add` command it replaces is gone.
 
@@ -436,11 +459,12 @@ only commands the descriptor names, and applies four rules in this order:
 | The descriptor's `detect.run` exits 0 | Status `present`. Nothing runs, so a second run is a no-op. |
 | `KIT_DRY_RUN=1` | Status `dry-run`. The plan is printed: each candidate in order, whether its manager is on `PATH`, whether consent is recorded, and the wire command. Nothing runs. |
 | No consent recorded for this integration | Status `no-consent`, exit 0. Nothing runs. `KIT_ASSUME_YES` is not consent. |
-| Otherwise | The `install` candidates are tried in the order written. One whose `manager` is not on `PATH` is skipped. The first whose command exits 0 **and** leaves the tool detectable wins (`installed <manager>`); later candidates never run. If none does: `failed`, exit 1. |
+| Otherwise | If no candidate's `manager` is on `PATH`, the candidates' `bootstrap` commands are tried in order until one puts a manager there. Then the `install` candidates are tried in the order written. One whose `manager` is not on `PATH` is skipped. The first whose command exits 0 **and** leaves the tool detectable wins (`installed <manager>`); later candidates never run. If none does: `failed`, exit 1. |
 
 Consent is one `install:<id>` line in `.cckit/consent`, the gitignored state file shared by every
-worktree of the repo. `bash scripts/lib/integration-install.sh --consent <id>` records it;
-no cckit verb writes it yet.
+worktree of the repo. `cckit doctor` records it when you approve installs in that run — `--fix`
+(alias `--yes`), or a yes at its terminal prompt. `bash scripts/lib/integration-install.sh
+--consent <id>` records it without running the doctor.
 
 `uv` and `pipx` put binaries in `~/.local/bin`, which is often not on `PATH` in the session that
 ran the install. Every detect, install and wire command therefore runs with `$HOME/.local/bin`
@@ -452,8 +476,25 @@ the reasons and never reach the command line. A candidate marked `"resident": fa
 form that leaves no binary) is judged by its exit code alone.
 
 `--plan <id> [dir]`, `--install <id> [dir]`, `--wire <id> [dir]` and `--wire-command <id>` are the
-script's CLI forms. `cckit doctor` does not call the runner yet: its two built-in installers move
-onto it in a later change.
+script's CLI forms.
+
+### What `cckit doctor` does with them
+
+For every descriptor whose config key is on, the doctor prints one row under **Integrations**. It
+holds no tool's recipe: the row is the runner's status line.
+
+| Run | Tool missing | Row | Exit code |
+| --- | --- | --- | --- |
+| `cckit doctor --fix`, or yes at the prompt | Consent is recorded, then the runner installs | `installed via <manager> (<path>)` | 0 |
+| No terminal and no `--fix` | Nothing installs, no consent is recorded | `missing — nothing installs without your yes: cckit doctor --fix` | 1 |
+| `--dry-run` or `--no-install` | Nothing installs, no consent is recorded | `missing — <first candidate>` | 1 |
+| Any, on a machine or repo where `appliesWhen` does not hold | Nothing installs | a skip row naming the condition | unchanged |
+
+With the key off or unset there is no row and the exit code is what it would be without the
+descriptor. `cckit init` runs the doctor with `--yes`, so setup keeps installing.
+
+Before this, a doctor run with no terminal and no flag installed the MemPalace CLI and mlx-lm
+without asking. It now reports them missing; pass `--fix` in automation that relied on the install.
 
 ## Agent profiles
 

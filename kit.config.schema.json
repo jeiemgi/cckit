@@ -140,6 +140,17 @@
         "claudeProjectSlug": { "type": "string" }
       }
     },
+    "local": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Local model layer: natural-language chores run on this machine through mlx_lm.server. Off when absent. `enabled` is the config key of the integration descriptor integrations/mlx-lm.json.",
+      "properties": {
+        "enabled": { "type": "boolean", "description": "true = `cckit doctor` installs the runtime (with consent) and starts the server." },
+        "port": { "type": "integer", "description": "Port mlx_lm.server listens on. Default 8080." },
+        "model": { "type": "string", "description": "Model the server loads. Default mlx-community/Qwen3-8B-4bit." },
+        "dismissed": { "type": "string", "description": "kitVersion at which the \"local layer down\" session notice was dismissed (`cckit doctor --dismiss-local`)." }
+      }
+    },
     "codeGraph": {
       "type": "object",
       "additionalProperties": true,

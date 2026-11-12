@@ -45,14 +45,22 @@
     "appliesWhen": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["anyExtension"],
-      "description": "Which repos the tool can work on. Omitted = any repo. An integration that does not apply is not offered.",
+      "description": "Where the tool can work. Omitted = any repo on any machine. Two kinds of condition, and every one present must hold: `anyExtension` judges the repo, `platform` judges the machine. An integration that does not apply is not offered and not installed.",
       "properties": {
         "anyExtension": {
           "type": "array",
           "minItems": 1,
           "items": { "type": "string", "pattern": "^\\.[A-Za-z0-9_+-]+$" },
           "description": "Applies when at least one file in the repo ends in one of these extensions. Case-sensitive, leading dot. The repo's files are git's tracked + unignored list inside a work tree, otherwise every file outside .git/ and node_modules/."
+        },
+        "platform": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "The machine the tool needs. Each field present is compared to `uname` output verbatim.",
+          "properties": {
+            "os": { "type": "string", "enum": ["Darwin", "Linux"], "description": "`uname -s`." },
+            "arch": { "type": "string", "enum": ["arm64", "aarch64", "x86_64"], "description": "`uname -m`. Apple silicon reports arm64; 64-bit ARM Linux reports aarch64." }
+          }
         },
         "note": {
           "type": "string",
@@ -66,7 +74,8 @@
       "required": ["run"],
       "description": "How to tell the tool is already installed.",
       "properties": {
-        "run": { "type": "string", "minLength": 1, "description": "Command that exits 0 when the tool is present." }
+        "run": { "type": "string", "minLength": 1, "description": "Command that exits 0 when the tool is present." },
+        "bin": { "type": "string", "minLength": 1, "description": "The tool's binary name, when it is not the first word of `run` (a `command -v <bin>` probe, for a tool whose own flags are slow to answer)." }
       }
     },
     "install": {
@@ -85,6 +94,16 @@
           },
           "run": { "type": "string", "minLength": 1, "description": "The install command." },
           "resident": { "type": "boolean", "description": "false when the candidate leaves no binary behind (npx). Default true." },
+          "bootstrap": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["manager", "run"],
+            "description": "How to get this candidate's `manager` when the machine has none of the descriptor's managers. Run only then: a machine that already holds any listed manager is never bootstrapped.",
+            "properties": {
+              "manager": { "type": "string", "enum": ["brew", "pipx", "uv", "npm", "pnpm", "npx", "curl"], "description": "The tool that must be on the machine for the bootstrap to be tried." },
+              "run": { "type": "string", "minLength": 1, "description": "The command that installs the candidate's manager." }
+            }
+          },
           "note": { "type": "string" }
         }
       }
@@ -135,6 +154,11 @@
         "failsOn": { "type": "string", "description": "What a non-zero exit means." },
         "json": { "type": "string", "description": "A form of the command with machine-readable output." }
       }
+    },
+    "afterInstall": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Optional: the one step cckit leaves to the user after a successful install, shown once in the install report."
     },
     "uninstall": {
       "type": "string",

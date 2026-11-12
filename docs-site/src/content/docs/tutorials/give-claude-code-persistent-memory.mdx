@@ -70,7 +70,8 @@ MemPalace bugs to its own issue tracker.
 ## Troubleshooting
 
 **`doctor` didn't install MemPalace.** It only installs it when memory is on. Re-run `cckit init` with
-`--memory on` (or answer yes), then `cckit doctor`.
+`--memory on` (or answer yes), then `cckit doctor`. With no terminal attached it installs nothing
+unless you pass `--fix`.
 
 **Claude isn't recalling anything.** Confirm the MCP server line from `mempalace mcp` is wired into
 Claude Code, and that `.claude/rules/mempalace.md` exists — it's what teaches Claude to recall before

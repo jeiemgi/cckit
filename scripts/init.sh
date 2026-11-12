@@ -976,7 +976,7 @@ else
   echo "  1. Review CLAUDE.md and .claude/kit.config.json"
   echo "  2. ./scripts/setup-labels.sh && ./scripts/setup-milestones.sh   # seed the repo"
   [[ "$PROJECTS_V2" == "true" ]] && echo "  3. ./scripts/capture-project-ids.sh   # cache Projects v2 field IDs"
-  [[ "$LOCAL_ON" == "true" ]] && echo "  4. /kit-doctor   # local model layer: installs mlx-lm (uv tool install) + starts mlx_lm.server"
+  [[ "$LOCAL_ON" == "true" ]] && echo "  4. /kit-doctor   # local model layer: installs mlx-lm (recipe: integrations/mlx-lm.json) + starts mlx_lm.server"
 fi
 
 exit 0

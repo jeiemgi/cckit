@@ -112,7 +112,7 @@ kit_add_list() {
   else
     printf 'Integrations — optional third-party tools (cckit add <name>):\n'
     printf '%s' "$j" | jq -r '.integrations[]
-      | "  \(.id)  \(.label) — \(.summary)  [\(if .enabled then "on" else "off" end)\(if .applies then "" else ", does not apply to this repo" end)]"'
+      | "  \(.id)  \(.label) — \(.summary)  [\(if .enabled then "on" else "off" end)\(if .applies then "" else ", does not apply here" end)]"'
   fi
   if [ "$(printf '%s' "$j" | jq '.modules | length')" -gt 0 ]; then
     printf 'Modules (cckit add <name>):\n'
@@ -137,8 +137,8 @@ kit_add_integration() {
   label="$(jq -r '.label' "$f")"; key="$(jq -r '.config.key' "$f")"
 
   if ! integration_applies "$f" "$target"; then
-    exts="$(jq -r '.appliesWhen.anyExtension // [] | join(" ")' "$f")"
-    kit_say "kit add $id: not offered here — $label needs at least one file ending in: $exts. This repo has none. Nothing written."
+    exts="$(integration_applies_needs "$f")"
+    kit_say "kit add $id: not offered here — $label needs $exts. That does not hold here. Nothing written."
     return 0
   fi
 

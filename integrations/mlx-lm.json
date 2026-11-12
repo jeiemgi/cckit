@@ -1,0 +1,32 @@
+{
+  "id": "mlx-lm",
+  "label": "mlx-lm",
+  "summary": "Local model runtime: natural-language chores (digest, summarize, classify) run on this Mac through mlx_lm.server instead of a paid API.",
+  "why": "Apple silicon only. The first server start downloads the configured model (about 4.5 GB for the default).",
+  "config": { "key": "local.enabled" },
+  "appliesWhen": {
+    "platform": { "os": "Darwin", "arch": "arm64" },
+    "note": "MLX runs on Apple silicon only. On any other machine the local layer stays dormant and every caller falls back."
+  },
+  "detect": { "run": "command -v mlx_lm.server", "bin": "mlx_lm.server" },
+  "install": [
+    {
+      "manager": "uv",
+      "run": "uv tool install mlx-lm",
+      "bootstrap": { "manager": "brew", "run": "brew install uv" },
+      "note": "Isolated tool venv. Never plain pip: Homebrew's Python is externally managed (PEP 668)."
+    },
+    { "manager": "pipx", "run": "pipx install mlx-lm" }
+  ],
+  "verify": { "run": "mlx_lm.server --help", "failsOn": "The runtime is missing, or MLX cannot load on this machine." },
+  "uninstall": "uv tool uninstall mlx-lm || pipx uninstall mlx-lm",
+  "recheck": { "cadence": "monthly", "drifts": ["the package name mlx-lm on PyPI", "the mlx_lm.server entry point"] },
+  "docs": "https://github.com/ml-explore/mlx-lm#readme",
+  "attribution": {
+    "author": "Apple (ml-explore)",
+    "license": "MIT",
+    "homepage": "https://github.com/ml-explore/mlx-lm",
+    "affiliated": false,
+    "notice": "mlx-lm is open-source software from Apple's ml-explore project. cckit is not affiliated with Apple."
+  }
+}

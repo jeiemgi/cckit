@@ -41,7 +41,7 @@ Memory isn't a bolt-on — cckit treats it as **first-class in the lifecycle**. 
    cckit init --profile software --memory on
    ```
 
-2. **Install the MemPalace CLI** — `cckit doctor` sees that memory is on and installs it for you into an isolated venv (pipx, falling back to uv), then points you at the MCP wiring:
+2. **Install the MemPalace CLI** — `cckit doctor` sees that memory is on and, once you answer yes at its prompt (or pass `--fix`), installs it into an isolated venv (pipx, falling back to uv), then points you at the MCP wiring. The recipe is data: `integrations/mempalace.json`.
 
    ```bash
    cckit doctor     # installs mempalace + seeds this project's wake-up header

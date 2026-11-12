@@ -42,7 +42,7 @@ separate step.
 
 | Case | Result |
 | --- | --- |
-| The repo holds no file with an extension the integration lists in `appliesWhen.anyExtension` | declined, exit 0, nothing written |
+| An `appliesWhen` condition does not hold: no file with a listed extension (`anyExtension`), or the wrong machine (`platform`) | declined, exit 0, nothing written |
 | No project config found from the directory | exit 1 — run `cckit init` first; `add` does not invent a config for an integration |
 | The descriptor fails `integrations/integration.schema.json` | exit 1, the bad field is named, nothing written |
 | The name is neither a module nor an integration | exit 1 |

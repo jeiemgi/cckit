@@ -15,8 +15,9 @@ Run the kit-doctor script to check all dependencies and authentication required 
 | Tier 0 | Homebrew (macOS bootstrap — installs if missing, requires sudo password) |
 | Tier 1 | `git`, `gh` (≥2.29 for Projects v2), `jq`, `perl` — auto-installs via brew |
 | Tier 2 | `node`, `pnpm`, `vercel` (if .vercel/ exists), `turbo`/`playwright` (dev deps only) |
-| Local | Only when `.local.enabled` — installs `mlx-lm` via `uv tool install` (fallback `pipx`, never plain `pip`) + starts `mlx_lm.server` in background with a port health check (first run downloads ~4.5 GB) |
-| Memory | Only when `.memory.enabled` — installs the [MemPalace](https://github.com/MemPalace/mempalace) CLI if missing (pipx, fallback uv), seeds the per-wing wake-up header (`.claude/mempal-identity.<wing>.txt`), and refreshes a stale session-start hook. Install + seed + refresh obey the consent guard: `--fix` applies them, `--dry-run`/`--no-install` only report |
+| Integrations | One row per descriptor in `integrations/` whose config key is on: `mempalace CLI` (`.memory.enabled`) and `mlx-lm` (`.local.enabled`, Apple silicon only). A missing tool is installed by the shared runner (`scripts/lib/integration-install.sh`) from the descriptor's ordered candidates — never plain `pip`. Installs need consent recorded in `.cckit/consent`: `--fix` or a yes at the prompt records it; a run with neither (no terminal, no `--fix`) reports the tool missing and installs nothing; `--dry-run`/`--no-install` only report |
+| Local | Only when `.local.enabled` — starts `mlx_lm.server` in background with a port health check (first run downloads ~4.5 GB) |
+| Memory | Only when `.memory.enabled` — seeds the per-wing wake-up header (`.claude/mempal-identity.<wing>.txt`) and refreshes a stale session-start hook. Seed + refresh obey the consent guard: `--fix` applies them, `--dry-run`/`--no-install` only report |
 | Auth | `gh auth status`, scope `project`, `git config user.name/email` |
 | Repo | `github.baseBranch` vs the repo's GitHub default branch — a mismatch means `Closes #N` won't auto-close issues on GitHub-UI merges (report-only; `cckit pr-merge` already closes them explicitly) |
 | SSH | Optional: detect existing key; `KIT_DOCTOR_SSH=1` triggers guided ed25519 setup |

@@ -14,7 +14,9 @@
 #   integration_validate <file>           rc 0, or rc 1 with one `<id>: <field>: <problem>` line
 #                                         per problem on stderr
 #   integrations_validate_all             validate every descriptor; rc 1 if any fails
-#   integration_applies <file> [dir]      rc 0 when the tool can work on the repo at dir
+#   integration_applies <file> [dir]      rc 0 when the tool can work on the repo at dir, on this
+#                                         machine
+#   integration_applies_needs <file>      the descriptor's conditions in words, for a decline message
 #   integration_config_key <file>         the dotted config key that turns it on
 #   integration_enabled <file> [config]   rc 0 when that key holds the descriptor's ON value
 # CLI:        integrations.sh --list
@@ -135,14 +137,20 @@ _kit_ig_repo_files() {
   fi
 }
 
-# integration_applies <file> [dir] -> rc 0 when the tool can work on the repo at dir.
-# No `appliesWhen` = language-agnostic = applies anywhere. With `appliesWhen.anyExtension`, at
-# least one file must end in a listed extension (case-sensitive; a dotfile named exactly `.ts`
-# has no extension). rc 1 otherwise, including an absent dir.
+# integration_applies <file> [dir] -> rc 0 when the tool can work on the repo at dir, on this
+# machine. No `appliesWhen` = applies anywhere. Two kinds of condition; every one present must hold:
+#   platform      `os` / `arch` equal `uname -s` / `uname -m` verbatim (the machine, not the repo)
+#   anyExtension  at least one file ends in a listed extension (case-sensitive; a dotfile named
+#                 exactly `.ts` has no extension)
+# rc 1 otherwise, including an absent dir when the repo is what is being judged.
 integration_applies() {
   _kit_ig_require || return 1
-  local f="${1:-}" d="${2:-$PWD}" exts
+  local f="${1:-}" d="${2:-$PWD}" exts want_os want_arch
   [ -f "$f" ] || return 1
+  want_os="$(jq -r '.appliesWhen.platform.os // ""' "$f" 2>/dev/null)" || return 1
+  want_arch="$(jq -r '.appliesWhen.platform.arch // ""' "$f" 2>/dev/null)" || return 1
+  if [ -n "$want_os" ] && [ "$(uname -s 2>/dev/null)" != "$want_os" ]; then return 1; fi
+  if [ -n "$want_arch" ] && [ "$(uname -m 2>/dev/null)" != "$want_arch" ]; then return 1; fi
   exts="$(jq -r '.appliesWhen.anyExtension // [] | join(" ")' "$f" 2>/dev/null)" || return 1
   [ -n "$exts" ] || return 0
   [ -d "$d" ] || return 1
@@ -152,6 +160,19 @@ integration_applies() {
     BEGIN { n = split(exts, a, " "); for (i = 1; i <= n; i++) want[a[i]] = 1 }
     { b = $0; sub(/.*\//, "", b); i = match(b, /\.[^.]*$/); if (i > 1 && (substr(b, i) in want)) found = 1 }
     END { exit(found ? 0 : 1) }'
+}
+
+# integration_applies_needs <file> -> what the descriptor requires, in words, on one line. Empty
+# when it has no `appliesWhen`. The one wording every decline message uses.
+integration_applies_needs() {
+  _kit_ig_require || return 1
+  [ -f "${1:-}" ] || return 1
+  jq -r '(.appliesWhen // {}) as $a
+    | [ (($a.platform // {}) | [.os // empty, .arch // empty] | select(length > 0)
+          | "a " + join(" ") + " machine"),
+        (($a.anyExtension // []) | select(length > 0)
+          | "at least one file ending in: " + join(" ")) ]
+    | join(", and ")' "$1" 2>/dev/null
 }
 
 # integration_config_key <file> -> the dotted key, e.g. codeGraph.provider

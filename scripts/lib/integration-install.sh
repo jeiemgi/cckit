@@ -3,8 +3,8 @@
 #
 # integrations.sh reads and checks a descriptor; this file ACTS on one: it walks the descriptor's
 # ordered `install` candidates, finds the binary afterwards, and runs the optional `wire` step.
-# It replaces the per-tool copies of that walk (the two in scripts/kit-doctor.sh move onto it in
-# the next sub) and holds no tool-specific code — every command it runs comes from the descriptor.
+# It replaced the per-tool copies of that walk (scripts/kit-doctor.sh calls it for every enabled
+# descriptor) and holds no tool-specific code — every command it runs comes from the descriptor.
 #
 # Four rules, in the order integration_install applies them:
 #   1. Already installed (the descriptor's `detect.run` exits 0) -> nothing runs. A second run is
@@ -15,6 +15,9 @@
 #      shared by every worktree of the repo). KIT_ASSUME_YES is NOT consent.
 #   4. Candidates are tried in descriptor order. One whose `manager` is not on PATH is skipped.
 #      The first whose command exits 0 AND leaves the tool detectable wins; the rest never run.
+#      When NO candidate's manager is on PATH, each candidate's optional `bootstrap` is tried in
+#      the same order (`brew install uv`); the first that puts a manager on PATH lets the walk
+#      run. A machine that already holds any listed manager is never bootstrapped.
 #
 # uv and pipx drop binaries into ~/.local/bin, which is often not on PATH in the session that ran
 # the install. Every detect / install / wire command therefore runs with `$HOME/.local/bin`
@@ -24,8 +27,9 @@
 #   integration_consent_file [dir]        the consent file for the repo at dir (not created)
 #   integration_consent_has <id> [dir]    rc 0 when `install:<id>` is recorded
 #   integration_consent_record <id> [dir] record it (idempotent); rc 1 when it cannot be written
-#   integration_bin <file>                path of the tool's binary (first word of detect.run):
-#                                         PATH, then ~/.local/bin; rc 1 when it is in neither
+#   integration_bin <file>                path of the tool's binary (detect.bin, else the first
+#                                         word of detect.run): PATH, then ~/.local/bin; rc 1 when
+#                                         it is in neither
 #   integration_detect <file>             rc 0 when detect.run exits 0
 #   integration_install_plan <file> [dir] the plan on stdout; runs nothing
 #   integration_install <file> [dir]      one status line on stdout, progress on stderr:
@@ -89,7 +93,7 @@ integration_consent_record() {
 integration_bin() {
   local f="${1:-}" name
   [ -f "$f" ] || return 1
-  name="$(jq -r '.detect.run | split(" ")[0] // ""' "$f" 2>/dev/null)" || return 1
+  name="$(jq -r '.detect.bin // (.detect.run | split(" ")[0]) // ""' "$f" 2>/dev/null)" || return 1
   [ -n "$name" ] || return 1
   if command -v "$name" >/dev/null 2>&1; then command -v "$name"; return 0; fi
   if [ -x "$HOME/.local/bin/$name" ]; then printf '%s\n' "$HOME/.local/bin/$name"; return 0; fi
@@ -122,11 +126,44 @@ integration_install_plan() {
       printf '  %s. %s   (%s)\n' "$((i + 1))" "$run" "$have"
       i=$((i + 1))
     done
+    if ! _kit_ii_any_manager "$f"; then
+      jq -r '.install[] | select(.bootstrap != null)
+        | "  bootstrap, because none of those managers is on PATH: \(.bootstrap.run)   (needs \(.bootstrap.manager))"' "$f"
+    fi
     if integration_consent_has "$id" "$d"; then printf '  consent: recorded in %s\n' "$(integration_consent_file "$d")"
     else printf '  consent: NOT recorded in %s — nothing installs without it\n' "$(integration_consent_file "$d")"; fi
   fi
   if wire="$(integration_wire_command "$f")"; then printf '  wire (in %s): %s\n' "$d" "$wire"; fi
   return 0
+}
+
+# _kit_ii_any_manager <file> -> rc 0 when at least one install candidate's manager is on PATH.
+_kit_ii_any_manager() {
+  local m
+  for m in $(jq -r '.install[].manager' "$1" 2>/dev/null); do
+    if command -v "$m" >/dev/null 2>&1; then return 0; fi
+  done
+  return 1
+}
+
+# _kit_ii_bootstrap <file> <dir> -> with no candidate manager on PATH, run the candidates'
+# `bootstrap` commands in descriptor order until one puts a manager on PATH. rc 0 when a manager
+# is then available. Only integration_install calls it, past the dry-run and consent gates.
+_kit_ii_bootstrap() {
+  local f="$1" d="$2" id n i bmgr brun
+  id="$(jq -r '.id' "$f")"
+  n="$(jq '.install | length' "$f")"; i=0
+  while [ "$i" -lt "$n" ]; do
+    bmgr="$(jq -r --argjson i "$i" '.install[$i].bootstrap.manager // ""' "$f")"
+    brun="$(jq -r --argjson i "$i" '.install[$i].bootstrap.run // ""' "$f")"
+    i=$((i + 1))
+    [ -n "$bmgr" ] && [ -n "$brun" ] || continue
+    command -v "$bmgr" >/dev/null 2>&1 || continue
+    kit_say "integration $id: no installer on this machine — bootstrapping with $bmgr — $brun"
+    _kit_ii_sh "$d" "$brun" 2>/dev/null || true
+    if _kit_ii_any_manager "$f"; then return 0; fi
+  done
+  return 1
 }
 
 # integration_install <file> [dir] -> one status line on stdout (see the header).
@@ -143,6 +180,7 @@ integration_install() {
     kit_say "integration $id: not installed — no consent recorded in $(integration_consent_file "$d")"
     printf 'no-consent\n'; return 0
   fi
+  if ! _kit_ii_any_manager "$f"; then _kit_ii_bootstrap "$f" "$d" || true; fi
   n="$(jq '.install | length' "$f")"; i=0
   while [ "$i" -lt "$n" ]; do
     mgr="$(jq -r --argjson i "$i" '.install[$i].manager' "$f")"

@@ -86,7 +86,7 @@ Requirements: `bash` 4+, `git`, and `gh` (GitHub CLI) authenticated. `jq` recomm
 ## Quick start
 
 ```bash
-cckit doctor                  # onboarding preflight: deps, gh auth
+cckit doctor                  # onboarding preflight: deps, gh auth, and each integration you switched on
 cckit init --profile software # scaffold cckit.config.json + .claude/ for this repo
                               #   profiles: software · content · research · automation · minimal
 cckit add                     # list the optional integrations + modules; `cckit add <name>` switches one on
@@ -291,8 +291,9 @@ cckit/
   profiles/ templates/   # init profiles + scaffold templates
   routines/ modules/     # scheduled routines + optional modules
   integrations/          # one JSON descriptor per optional third-party tool + its schema
-                         #   installed by scripts/lib/integration-install.sh, only with consent
-                         #   recorded in .cckit/consent
+                         #   (mempalace.json, mlx-lm.json). `cckit doctor` installs each one the
+                         #   config switches on through scripts/lib/integration-install.sh, only
+                         #   with consent recorded in .cckit/consent (`--fix`, or yes at the prompt)
   docs-site/             # documentation source — Astro/Starlight (deployed to cckit.dev)
   .claude/skills/        # the subset of templates/skills/ cckit installs for ITSELF
   .claude/rules/         # the subset of templates/rules/ cckit installs for ITSELF

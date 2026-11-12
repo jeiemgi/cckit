@@ -24,7 +24,7 @@ The tables are grouped by job: setup, the daily lifecycle, planning a wave, runn
 | `cckit install [bin-dir]` | Symlink `cckit` onto your PATH. |
 | `cckit init --profile <p>` | Scaffold `cckit.config.json` + `.claude/` for this repo. |
 | `cckit scan` | Detect this repo's stack + kit state (JSON). |
-| `cckit doctor` | Onboarding preflight: deps present, `gh` authenticated, and (when enabled) the MemPalace CLI + per-wing wake-up header. Asks before installing; `--fix` installs and seeds without the prompt. |
+| `cckit doctor` | Onboarding preflight: deps present, `gh` authenticated, one row per [integration](/config-and-permissions/#integrations) the config switches on (the MemPalace CLI, mlx-lm), and (when memory is on) the per-wing wake-up header. Asks before installing; `--fix` installs and seeds without the prompt. An integration installs only after one of those two; with no terminal and no `--fix` it is reported missing and the exit code is 1. |
 | `cckit add [<name>]` | No name: list the integrations described in `integrations/` and the modules. With an integration: set the one config key its descriptor names, and nothing else; nothing is installed. With a module (`software`): write this directory's `.claude/kit.config.json`. `KIT_DRY_RUN=1` previews. See [Integrations](/config-and-permissions/#integrations). |
 | `cckit adopt` | Record kit-shaped files a repo already has. |
 | `cckit migrate` | Reshuffle an old kit layout to the current one. |

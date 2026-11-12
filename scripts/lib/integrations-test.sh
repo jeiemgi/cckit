@@ -117,6 +117,12 @@ rejects "config key that is no path"   '.config.key = "codeGraph"'          "con
 rejects "config key named after the vendor" '.config.key = "fixtureTool.enabled"' "config.key: names the tool"
 rejects "id that is not the file name" '.id = "other-tool"'                 "id: 'other-tool' must match the file name 'fixture-tool'"
 rejects "docs that is not a URL"       '.docs = "see the readme"'           "docs: does not match"
+rejects "platform os outside the list" '.appliesWhen.platform = {"os":"Plan9"}' "appliesWhen.platform.os: must be one of"
+rejects "unknown platform field"       '.appliesWhen.platform = {"cpu":"arm64"}' "appliesWhen.platform.cpu: unknown field"
+rejects "bootstrap without a command"  '.install[0].bootstrap = {"manager":"brew"}' "install[0].bootstrap.run: required field is missing"
+rejects "bootstrap by an unknown manager" '.install[0].bootstrap = {"manager":"apt","run":"apt install npm"}' "install[0].bootstrap.manager: must be one of"
+rejects "empty detect.bin"             '.detect.bin = ""'                   "detect.bin: must not be empty"
+rejects "empty afterInstall"           '.afterInstall = ""'                 "afterInstall: must not be empty"
 
 printf '{ not json' > "$mdir/fixture-tool.json"
 out="$(integration_validate "$mdir/fixture-tool.json" 2>&1)"; r=$?
@@ -164,6 +170,27 @@ fi
 jq 'del(.appliesWhen)' "$good" > "$tmp/agnostic.json"
 integration_applies "$tmp/agnostic.json" "$repo/scripts"; rc "no appliesWhen -> applies anywhere" "$?" "0"
 integration_applies "$good" "$tmp/does-not-exist";        rc "absent dir -> does not apply" "$?" "1"
+
+# The second kind of condition judges the MACHINE: `platform` is compared to `uname` verbatim. A
+# stub `uname` first on PATH makes this the same on every host.
+ubin="$tmp/ubin"; mkdir -p "$ubin"
+printf '#!/bin/sh\ncase "${1:-}" in -m) echo "$FAKE_ARCH" ;; *) echo "$FAKE_OS" ;; esac\n' > "$ubin/uname"; chmod +x "$ubin/uname"
+on_machine() { FAKE_OS="$1" FAKE_ARCH="$2" PATH="$ubin:$PATH" integration_applies "$3" "$4"; }
+jq 'del(.appliesWhen) | .appliesWhen = {"platform":{"os":"Darwin","arch":"arm64"}}' "$good" > "$tmp/plat.json"
+on_machine Darwin arm64  "$tmp/plat.json" "$repo/scripts"; rc "platform matches -> applies, whatever the repo holds" "$?" "0"
+on_machine Darwin x86_64 "$tmp/plat.json" "$repo";         rc "wrong arch -> does not apply" "$?" "1"
+on_machine Linux  arm64  "$tmp/plat.json" "$repo";         rc "wrong os -> does not apply" "$?" "1"
+jq '.appliesWhen = {"platform":{"os":"Linux"}}' "$good" > "$tmp/os-only.json"
+on_machine Linux aarch64 "$tmp/os-only.json" "$repo";      rc "os alone, arch unstated -> any arch applies" "$?" "0"
+# Both kinds present: every one must hold.
+jq '.appliesWhen.platform = {"os":"Darwin","arch":"arm64"}' "$good" > "$tmp/both.json"
+on_machine Darwin arm64  "$tmp/both.json" "$repo";         rc "platform + extension both hold -> applies" "$?" "0"
+on_machine Darwin arm64  "$tmp/both.json" "$repo/scripts"; rc "platform holds, no listed extension -> does not apply" "$?" "1"
+on_machine Darwin x86_64 "$tmp/both.json" "$repo";         rc "extension holds, wrong platform -> does not apply" "$?" "1"
+t "the conditions in words: extensions" "$(integration_applies_needs "$good")" "at least one file ending in: .ts .tsx .R"
+t "the conditions in words: platform"   "$(integration_applies_needs "$tmp/plat.json")" "a Darwin arm64 machine"
+t "the conditions in words: both"       "$(integration_applies_needs "$tmp/both.json")" "a Darwin arm64 machine, and at least one file ending in: .ts .tsx .R"
+t "the conditions in words: none"       "$(integration_applies_needs "$tmp/agnostic.json")" ""
 
 # ── 6. the config key that turns it on ─────────────────────────────────────────────────────────
 t "config key is read from the descriptor" "$(integration_config_key "$good")" "codeGraph.provider"
@@ -213,6 +240,31 @@ for id in $(integrations_list); do
   t "config schema has a property for $id's key ($top)" \
     "$(jq -r --arg k "$top" '.properties | has($k)' "$ROOT/kit.config.schema.json")" "true"
 done
+
+# The two tools that used to be hardcoded in scripts/kit-doctor.sh (E303.4), one unit test each.
+# They are unlike on purpose: the format has to carry both shapes.
+t "shipped descriptors" "$(integrations_list | tr '\n' ' ')" "mempalace mlx-lm "
+mp="$ROOT/integrations/mempalace.json"; mlx="$ROOT/integrations/mlx-lm.json"
+integration_validate "$mp" >/dev/null 2>&1;  rc "mempalace validates" "$?" "0"
+t "mempalace: turned on by memory.enabled" "$(integration_config_key "$mp")" "memory.enabled"
+t "mempalace: pipx first, uv second" "$(jq -r '[.install[].run] | join(" | ")' "$mp")" "pipx install mempalace | uv tool install mempalace"
+t "mempalace: bootstrap brings pipx, the FIRST candidate's manager" "$(jq -r '.install[0].bootstrap | "\(.manager): \(.run)"' "$mp")" "brew: brew install pipx"
+t "mempalace: no applicability condition" "$(jq -r 'has("appliesWhen")' "$mp")" "false"
+on_machine Linux x86_64 "$mp" "$repo/scripts"; rc "mempalace applies on any machine and repo" "$?" "0"
+t "mempalace: not affiliated" "$(jq -r '.attribution.affiliated' "$mp")" "false"
+integration_validate "$mlx" >/dev/null 2>&1; rc "mlx-lm validates" "$?" "0"
+t "mlx-lm: turned on by local.enabled" "$(integration_config_key "$mlx")" "local.enabled"
+t "mlx-lm: uv first, pipx second" "$(jq -r '[.install[].run] | join(" | ")' "$mlx")" "uv tool install mlx-lm | pipx install mlx-lm"
+t "mlx-lm: bootstrap is brew install uv" "$(jq -r '.install[0].bootstrap | "\(.manager): \(.run)"' "$mlx")" "brew: brew install uv"
+on_machine Darwin arm64  "$mlx" "$repo/scripts"; rc "mlx-lm applies on Apple silicon" "$?" "0"
+on_machine Darwin x86_64 "$mlx" "$repo";         rc "mlx-lm does not apply on an Intel Mac" "$?" "1"
+on_machine Linux  aarch64 "$mlx" "$repo";        rc "mlx-lm does not apply on Linux" "$?" "1"
+t "mlx-lm: not affiliated" "$(jq -r '.attribution.affiliated' "$mlx")" "false"
+# Neither descriptor may fall back to plain pip: Homebrew's Python is externally managed (PEP 668).
+t "no shipped candidate is a plain pip install" \
+  "$(jq -r '.install[].run, (.install[].bootstrap.run // empty)' "$mp" "$mlx" | grep -cE '(^| )pip3? install' )" "0"
+t "kit.config.schema.json declares local.enabled" \
+  "$(jq -r '.properties.local.properties.enabled.type // "absent"' "$ROOT/kit.config.schema.json")" "boolean"
 t "package.json ships integrations/ in the npm tarball" \
   "$(jq -r '.files | index("integrations") != null' "$ROOT/package.json")" "true"
 
