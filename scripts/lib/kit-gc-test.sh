@@ -386,6 +386,94 @@ t   "--yes deleted the parent-landed agent branch" "$(git branch --list worktree
 t   "--yes KEPT the not-planned effort branch"     "$(git branch --list effort/80-not-planned | wc -l | tr -d ' ')" "1"
 unset KIT_BASE_BRANCH
 
+# ── #390: a detached worktree gets a verdict ───────────────────────────────────────────────────
+# `git worktree list --porcelain` writes `detached` where an attached worktree has `branch …`, so a
+# filter on `/^branch /` never sees one: gc printed no row and prune could not remove it. Three live
+# shapes and two dead ones:
+#   det-landed   clean, HEAD an ancestor of base        -> LANDED, removed by --yes
+#   det-commit   clean, HEAD is a commit on no branch   -> ORPHAN, kept (the only copy of that work)
+#   det-dirty    HEAD on base, an uncommitted file      -> ORPHAN, kept
+#   det-zclean   dir gone, index == its HEAD's tree     -> ZOMBIE, no staged delta, pruned by --yes
+#   det-zstaged  dir gone, index holds a staged file    -> ZOMBIE kept: no branch to recover onto
+export KIT_BASE_BRANCH="$init_branch"
+git checkout -q "$init_branch"
+git worktree add -q --detach ../det-landed HEAD~1 >/dev/null 2>&1
+git worktree add -q --detach ../det-commit HEAD >/dev/null 2>&1
+echo "on no branch" > ../det-commit/only.txt; git -C ../det-commit add only.txt; git -C ../det-commit commit -qm "detached work"
+DET_COMMIT="$(git -C ../det-commit rev-parse HEAD)"
+git worktree add -q --detach ../det-dirty HEAD >/dev/null 2>&1
+echo "scratch" > ../det-dirty/scratch.txt
+git worktree add -q --detach ../det-zclean HEAD >/dev/null 2>&1
+rm -rf ../det-zclean
+git worktree add -q --detach ../det-zstaged HEAD >/dev/null 2>&1
+echo "staged, detached" > ../det-zstaged/zs.txt; git -C ../det-zstaged add zs.txt
+rm -rf ../det-zstaged
+admin="$(git rev-parse --git-common-dir)/worktrees"
+
+analysis="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_analyze 2>/dev/null)"
+drow() { printf '%s\n' "$analysis" | grep -F "$1 [detached@" | head -1; }
+has "clean detached worktree on base is LANDED"     "$(drow /det-landed)" "-> LANDED (detached; ancestor of $init_branch)"
+has "detached worktree with its own commit is ORPHAN" "$(drow /det-commit)" "-> ORPHAN"
+has "dirty detached worktree is ORPHAN"             "$(drow /det-dirty)"  "-> ORPHAN"
+has "the dirty row says why"                        "$(drow /det-dirty)"  "uncommitted"
+t   "a detached row is labelled by its HEAD"        "$(drow /det-commit | grep -c "detached@$(printf '%.12s' "$DET_COMMIT")")" "1"
+t   "has_prunable sees a LANDED detached worktree"  "$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_has_prunable && echo yes || echo no)" "yes"
+# The zombie verdict compares the admin index to the detached HEAD's tree, not to an empty branch tip.
+z="$(_kit_gc_zombies)"
+t   "clean detached zombie has no staged delta" "$(printf '%s\n' "$z" | awk -F'\t' '$1=="det-zclean"{print $3}')"  "no"
+t   "staged detached zombie is flagged"         "$(printf '%s\n' "$z" | awk -F'\t' '$1=="det-zstaged"{print $3}')" "yes"
+has "a detached zombie is labelled by its HEAD" "$(printf '%s\n' "$z" | awk -F'\t' '$1=="det-zclean"{print $2}')"  "detached@"
+has "analyze: clean detached zombie is prunable" "$(printf '%s\n' "$analysis" | grep -F '  det-zclean [')"  "ZOMBIE (no staged delta) — prunable"
+has "analyze: staged detached zombie is kept"    "$(printf '%s\n' "$analysis" | grep -F '  det-zstaged [')" "kept, never pruned"
+
+# Without --yes: listed, nothing removed, nothing locked.
+dry="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_prune 2>&1)"
+has "dry-run lists the LANDED detached worktree" "$dry" "would remove worktree"
+has "dry-run names it"                           "$dry" "det-landed [detached@"
+[ -d ../det-landed ] && echo "ok: dry-run kept the LANDED detached worktree" || { echo "FAIL: dry-run removed a detached worktree"; fail=1; }
+[ -e "$admin/det-zstaged/locked" ] && { echo "FAIL: dry-run wrote a lock"; fail=1; } || echo "ok: dry-run wrote no lock"
+plan="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_cleanup 2>&1)"
+has "plan lists the LANDED detached worktree as removable" \
+    "$(printf '%s\n' "$plan" | awk '/^  SAFE worktrees/{s=1; next} /^  [A-Zs]/{s=0} s')" "det-landed [detached@"
+has "plan keeps the detached orphans by name" \
+    "$(printf '%s\n' "$plan" | awk '/^  ORPHAN kept/{s=1; next} /^  [A-Zs]/{s=0} s')" "det-commit [detached@"
+has "plan says the staged detached zombie is kept" "$plan" "det-zstaged [detached@"
+has "plan gives the kept zombie its reason"        "$plan" "kept, not pruned"
+[ -d ../det-landed ] && echo "ok: plan-only kept the LANDED detached worktree" || { echo "FAIL: plan-only removed a detached worktree"; fail=1; }
+[ -d "$admin/det-zclean" ] && echo "ok: plan-only kept the detached zombie metadata" || { echo "FAIL: plan-only pruned zombie metadata"; fail=1; }
+
+# kit_gc_prune --yes: the LANDED one goes, both ORPHANs stay, the clean zombie is pruned, the
+# staged one is not.
+git worktree add -q --detach ../det-landed2 HEAD~1 >/dev/null 2>&1
+out="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_prune --yes 2>&1)"
+[ -d ../det-landed ] && { echo "FAIL: prune --yes left the LANDED detached worktree"; fail=1; } || echo "ok: prune --yes removed the LANDED detached worktree"
+has "prune says why it removed it" "$out" "(LANDED (detached; ancestor of $init_branch))"
+[ -d ../det-commit ] && echo "ok: prune --yes kept the detached worktree with a commit" || { echo "FAIL: prune --yes destroyed a detached commit"; fail=1; }
+[ -d ../det-dirty ]  && echo "ok: prune --yes kept the dirty detached worktree"       || { echo "FAIL: prune --yes destroyed a dirty detached worktree"; fail=1; }
+[ -d "$admin/det-zclean" ]  && { echo "FAIL: prune --yes left the clean detached zombie"; fail=1; } || echo "ok: prune --yes pruned the clean detached zombie"
+[ -d "$admin/det-zstaged" ] && echo "ok: prune --yes did NOT prune the staged detached zombie" || { echo "FAIL: staged detached zombie pruned — its index is lost"; fail=1; }
+has "prune says the staged zombie is kept" "$out" "det-zstaged"
+t   "the staged tree is still readable from the kept index" \
+    "$(GIT_INDEX_FILE="$admin/det-zstaged/index" git ls-files | grep -c '^zs.txt$')" "1"
+# A second run must not prune it either (the keep is durable, not a one-off skip).
+PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_prune --yes >/dev/null 2>&1
+[ -d "$admin/det-zstaged" ] && echo "ok: a second prune --yes still keeps it" || { echo "FAIL: second prune dropped the staged detached zombie"; fail=1; }
+
+# kit_gc_cleanup --yes takes the same path.
+[ -d ../det-landed2 ] && { echo "FAIL: prune --yes left the second LANDED detached worktree"; fail=1; } || echo "ok: prune --yes removed every LANDED detached worktree"
+git worktree add -q --detach ../det-landed3 HEAD~1 >/dev/null 2>&1
+applied="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_cleanup --yes 2>&1)"
+[ -d ../det-landed3 ] && { echo "FAIL: cleanup --yes left the LANDED detached worktree"; fail=1; } || echo "ok: cleanup --yes removed the LANDED detached worktree"
+[ -d ../det-commit ] && echo "ok: cleanup --yes kept the detached commit" || { echo "FAIL: cleanup --yes destroyed a detached commit"; fail=1; }
+[ -d ../det-dirty ]  && echo "ok: cleanup --yes kept the dirty detached worktree" || { echo "FAIL: cleanup --yes destroyed a dirty detached worktree"; fail=1; }
+[ -d "$admin/det-zstaged" ] && echo "ok: cleanup --yes kept the staged detached zombie" || { echo "FAIL: cleanup --yes pruned the staged detached zombie"; fail=1; }
+t   "the detached commit is still reachable from its worktree" "$(git -C ../det-commit rev-parse HEAD)" "$DET_COMMIT"
+# --only is branch-scoped (effort close): it must not touch a detached worktree.
+git worktree add -q --detach ../det-landed4 HEAD~1 >/dev/null 2>&1
+PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_prune --yes --only '^sub/50[a-z]-' >/dev/null 2>&1
+[ -d ../det-landed4 ] && echo "ok: --only leaves detached worktrees alone" || { echo "FAIL: --only removed a detached worktree"; fail=1; }
+unset KIT_BASE_BRANCH
+
 # ── #330: a FAILED gh read is "could not determine" — never "no PR", never deletable ────────────
 # Two branches in a fresh repo. task/41-fresh has no commit beyond base, so the content check calls
 # it LANDED without asking gh anything — the deletable verdict an OPEN issue #41 must block.

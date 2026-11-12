@@ -62,6 +62,7 @@ Classify every branch/worktree (issue-open protection wins over everything excep
 | **Safe to delete** | PR `MERGED`, level with its remote (no unpushed commits), **and** issue closed/absent | prune |
 | **Active** | open PR, or the base branch, or a worktree branch with an open PR | keep |
 | **Landed** | **no PR of its own**, but its work is already on base — either check suffices: (a) *content*: every file it changed since its merge base has the same content on `origin/<base>`; (b) *lineage*: its name (`sub/<N>…`, `effort/<N>…`) or a `[#N]` / `(#N)` in a commit subject names an issue that is **closed with a merged PR** — found in the 200-PR index by head `<kind>/<N>-…`, or, when that PR has scrolled out of the window, through the issue's own `closedByPullRequestsReferences`; a sub-issue with no closing PR (subs close through `effort close`) is resolved once through its **parent**'s closing PR (sub-issues API). One lookup per issue per run, cached | prune, under the same dirty-worktree / unpushed guards as SAFE |
+| **Detached worktree** | a worktree whose HEAD is detached has no branch, so no branch rule applies. It gets its own row in `# worktrees`, labelled `[detached@<sha12>]`: **LANDED** when the tree is clean **and** HEAD is an ancestor of the base branch or of `main`; **ORPHAN** otherwise (uncommitted changes, or a HEAD on neither ref — a commit made on a detached HEAD is on no branch) | LANDED: prune (`git worktree remove`, no `--force`). ORPHAN: **surface, never auto-delete** |
 | **Orphan** | fails both LANDED checks: commits whose content is **not on the base branch's remote** and no merged PR | **surface, never auto-delete** — offer to open a recovery PR |
 | **Unknown** | a `gh` read **failed** (rate limit, outage, no `gh`): the PR list, or the branch's issue state. `UNKNOWN (could not determine …)` names which. Not the same as "no PR" or "issue closed" | **keep** — rerun when GitHub answers; never prune, never report it as an orphan |
 
@@ -78,7 +79,7 @@ section used to document is what the base-branch guard exists to prevent, and it
 recover-before-prune checks. `/kit-cleanup` prints the same plan, then acts on it:
 
 ```bash
-cckit cleanup --yes      # deletes the SAFE + LANDED rows (worktree, local branch, level remote ref), prunes listed ZOMBIE metadata
+cckit cleanup --yes      # deletes the SAFE + LANDED rows (worktree, local branch, level remote ref, LANDED detached worktree), prunes listed ZOMBIE metadata
 # Stale-open issues (PR already merged)
 cckit close <n> "Delivered via PR #<pr>."   # board Done + close; raw gh issue close is blocked (#364)
 # Stashes — the one step that stays by hand, only after showing each diff and getting an explicit OK

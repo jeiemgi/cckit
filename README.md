@@ -109,7 +109,7 @@ cckit hotfix 268              # cherry-pick merged PR 268 (or a commit sha) onto
                               #   a rebase-merged PR is carried commit by commit
 cckit sync                    # board state, what's unblocked
 cckit handoff "resume note"   # save a handoff — bare `cckit` prints it next session
-cckit gc                      # report prunable branches + worktrees (deletes nothing); a failed GitHub read shows as UNKNOWN, kept
+cckit gc                      # report prunable branches + worktrees, detached worktrees included (deletes nothing); a failed GitHub read shows as UNKNOWN, kept
 cckit cleanup [--yes]         # act on that report: delete the SAFE + LANDED rows, prune listed zombies, keep orphans/stashes
 ```
 

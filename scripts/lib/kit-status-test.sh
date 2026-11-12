@@ -185,6 +185,28 @@ if [ -n "${KS_TEST_INNER:-}" ]; then
     eq  "one row per worktree, detached included" \
         "$(printf '%s\n' "$wts" | grep -c . | tr -d ' ')" "3"
 
+    # #390: a detached worktree gc rates LANDED (clean, HEAD on the base branch) is not work in
+    # progress, so the "In progress" list leaves it out; the inventory above still carries it. One
+    # with a commit on no branch stays listed. gh is stubbed out: the report must not reach GitHub.
+    ( cd "$repo" && git worktree add -q --detach "$tmp/detwork" HEAD \
+      && cd "$tmp/detwork" && echo w > w.txt && git add w.txt && git commit -q -m "detached work" ) >/dev/null 2>&1
+    nogh="$tmp/noghbin"; mkdir -p "$nogh"; printf '#!/bin/sh\nexit 1\n' > "$nogh/gh"; chmod +x "$nogh/gh"
+    # `inprog gc` loads the classifier in its own subshell, so the assertions after this block still
+    # run without it, as they did before.
+    inprog() { ( if [ "${1:-}" = gc ]; then . "$dir/kit-gc.sh"; fi
+                 cd "$repo" && PATH="$nogh:$PATH" KIT_BASE_BRANCH=trunk KIT_REPO="" status_buckets_md "$repo" 2>/dev/null ) \
+                 | awk '/^\*\*In progress\*\*/{s=1} /^## 2/{s=0} s'; }
+    # Without the gc classifier loaded there is no verdict, so nothing is dropped.
+    has "no classifier: the detached worktree stays listed" "$(inprog)" '`det`'
+    md="$(inprog gc)"
+    no  "a LANDED detached worktree is not in progress"   "$md" '`det`'
+    has "a detached worktree with its own commit still is" "$md" '`detwork`'
+    has "attached worktrees are still in progress"        "$md" '`wt`'
+    has "the list counts what it shows"                   "$md" '3 worktree(s) checked out'
+    has "the report says what it left out"                "$md" '1 detached worktree(s)'
+    wts="$(cd "$repo" && status_worktree_rows)"
+    has "the inventory still carries the LANDED detached worktree" "$wts" "$tmp/det	"
+
     # status_cleanup_counts must return five integers even with no classifier loaded.
     counts="$(cd "$clean" && status_cleanup_counts)"
     eq "cleanup counts are five fields" \
