@@ -18,7 +18,19 @@
 
 EFFORT_REPO="${EFFORT_REPO:-${KIT_REPO:-}}"
 
-_ep_weight() { case "$1" in S) echo 1 ;; M) echo 2 ;; L) echo 4 ;; XL) echo 8 ;; *) echo 2 ;; esac; }
+# _ep_weight <ctx> [issue] — session weight of a ctx: value. Anything outside S|M|L|XL weighs
+# EP_UNSIZED_WEIGHT (2), and never silently: `?` (no ctx: label at all) is explained by the legend in
+# the plan header, and any other value (ctx:XXL, ctx:xl) warns on stderr naming the value and issue.
+# The fallback used to be a bare `*) echo 2`, which planned a mislabeled effort as an M.
+EP_UNSIZED_WEIGHT=2
+_ep_weight() {
+  case "$1" in
+    S) echo 1 ;; M) echo 2 ;; L) echo 4 ;; XL) echo 8 ;;
+    '?'|'') echo "$EP_UNSIZED_WEIGHT" ;;
+    *) echo "⚠ effort plan: ${2:+#$2 }carries ctx:$1, which is not S|M|L|XL — weighed $EP_UNSIZED_WEIGHT" >&2
+       echo "$EP_UNSIZED_WEIGHT" ;;
+  esac
+}
 
 # Rows travel between the readers and the planner as five fields joined by the ASCII unit
 # separator: number, flow, ctx, title, blockers (comma-separated issue numbers). Not TAB — TAB is
@@ -127,7 +139,7 @@ effort_plan() {
     case " ${flowlist[*]-} " in *" $f "*) ;; *) flowlist+=("$f") ;; esac
   done
 
-  printf '\n  kit effort plan — session budget %s  (ctx S=1 M=2 L=4 XL=8 · L/XL → delegate subs)\n' "$budget"
+  printf '\n  kit effort plan — session budget %s  (ctx S=1 M=2 L=4 XL=8 · ? = no ctx: label, weighed %s · L/XL → delegate subs)\n' "$budget" "$EP_UNSIZED_WEIGHT"
   printf '  source: %s\n' "$srcline"
 
   local i j b
@@ -164,7 +176,7 @@ effort_plan() {
     local sess=1 load=0 batch=" "
     printf '    Session %s:\n' "$sess"
     for i in "${order[@]}"; do
-      local w; w="$(_ep_weight "${ctxs[$i]}")"
+      local w; w="$(_ep_weight "${ctxs[$i]}" "${nums[$i]}")"
       local neednew=0
       (( load + w > budget )) && neednew=1
       for b in ${blocks[$i]//,/ }; do case "$batch" in *" $b "*) neednew=1 ;; esac; done

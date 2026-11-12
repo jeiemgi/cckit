@@ -60,9 +60,12 @@ The slug is a *derived* convenience, not a second source of truth. `--slug` only
 
 ## The lifecycle: start → pr → close
 
-- **`cckit effort new`** — flags (`--flow`, `--role`, `--priority`, `--par`, …) may appear in **any
-  position**, before or after the name and sub specs. `--par seq | wide | <N>` records how the
-  effort's subs are meant to run as a `par:` label on the parent. The `--flow` values (the `[Flow]`
+- **`cckit effort new`** — flags (`--flow`, `--role`, `--priority`, `--kind`, …) may appear in **any
+  position**, before or after the name and sub specs. `--kind` sets the `kind:` label on the parent
+  and every sub: one of `feat fix task chore security scaffold ci adr spike plan` (default `task`).
+  That is the closed set `cckit start` uses as the branch prefix (`<kind>/<N>-<slug>`), so a value
+  outside it is refused before anything is created; an issue that already carries such a label
+  starts on a `task/` branch, with a warning. The `--flow` values (the `[Flow]`
   title tags) come from a controlled vocabulary your project sets once as `effort.flows` in
   `cckit.config.json` / `.claude/kit.config.json` — e.g. `"effort": { "flows": ["Growth", "Checkout"] }`.
   Unset, it defaults to `Core UI API Docs Infra Auth Data Web App`; an explicit `EFFORT_FLOWS` env

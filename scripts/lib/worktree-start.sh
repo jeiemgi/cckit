@@ -33,6 +33,22 @@ if ! command -v sreg_claim >/dev/null 2>&1; then
   unset _sr_lib
 fi
 
+# The closed kind: vocabulary (kinds.sh). The issue's `kind:` label becomes the branch prefix, so it
+# is mapped through the set: a label outside it (kind:bug, kind:docs, a typo) would otherwise produce
+# a branch the hygiene hook rejects as non-conventional.
+if ! command -v kit_kind_branch >/dev/null 2>&1; then
+  _wtk_lib="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)/kinds.sh"
+  # shellcheck source=/dev/null
+  [ -f "$_wtk_lib" ] && . "$_wtk_lib"
+  unset _wtk_lib
+fi
+# _wt_kind_prefix <kind> — the branch prefix for a kind label value. With kinds.sh loaded: the value
+# itself when it is in the closed set, else `task` plus a warning on stderr. Without kinds.sh (a
+# project scaffolded before it shipped) the value passes through unchanged, as it always did.
+_wt_kind_prefix() {
+  if command -v kit_kind_branch >/dev/null 2>&1; then kit_kind_branch "${1:-}"; else printf '%s\n' "${1:-task}"; fi
+}
+
 WT_START_REPO="${WT_START_REPO:-${KIT_REPO:-}}"
 
 # _wt_set_port <app-env-file> <port> <issue-num> — append a per-worktree dev PORT to an app's
@@ -584,6 +600,7 @@ wt_start() {
   fi
   title="$(echo "$meta" | jq -r '.title')"
   kind="$(echo "$meta" | jq -r '([.labels[].name | select(startswith("kind:"))][0] // "kind:task") | sub("^kind:";"")')"
+  kind="$(_wt_kind_prefix "$kind")"
   if [[ -n "$slug_override" ]]; then
     slug="$slug_override"
   else
