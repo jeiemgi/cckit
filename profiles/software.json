@@ -21,6 +21,11 @@
     "effort-model",
     "delegation-brief",
     "skill-gaps",
+    "issue-lifecycle",
+    "merge-safety",
+    "gate-and-review",
+    "authoring",
+    "shared-checkout",
     "task-management"
   ],
   "roles": ["PM", "Tech Lead", "Designer", "DevOps", "Backend", "Frontend", "QA", "Security"],

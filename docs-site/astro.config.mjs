@@ -145,6 +145,7 @@ export default defineConfig({
           { label: 'How to read this guide', slug: 'how-to-read' },
           { label: 'Quickstart', slug: 'getting-started', badge: { text: 'Start here', variant: 'success' } },
           { label: 'Install cckit', slug: 'install' },
+          { label: 'Install & update matrix', slug: 'install-matrix' },
           { label: 'Check your platform', slug: 'check-your-platform' },
           { label: 'Initialize cckit', slug: 'initialize' },
           { label: 'Set up memory', slug: 'memory', badge: { text: 'Optional', variant: 'note' } },
@@ -173,6 +174,7 @@ export default defineConfig({
           { label: 'Efforts, waves & worktrees', slug: 'efforts-and-waves' },
           { label: 'Hooks', slug: 'hooks' },
           { label: 'Adapters', slug: 'adapters' },
+          { label: 'Multi-session safety', slug: 'multi-session' },
         ]},
         { label: 'Guides', items: [
           { label: 'All guides', slug: 'guides' },
@@ -185,6 +187,7 @@ export default defineConfig({
           { label: 'CLI reference', slug: 'cli-reference' },
           { label: 'Documentation benchmark', slug: 'benchmark' },
           { label: 'Skills cckit ships', slug: 'skills' },
+          { label: 'Rules cckit ships', slug: 'rules' },
           { label: 'Tags directory', slug: 'tags' },
           { label: 'Config & permissions', slug: 'config-and-permissions' },
           { label: 'Releasing', slug: 'releasing' },

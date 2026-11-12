@@ -21,6 +21,11 @@
     "knowledge-base",
     "mempalace",
     "plan-output-format",
+    "issue-lifecycle",
+    "merge-safety",
+    "gate-and-review",
+    "authoring",
+    "shared-checkout",
     "task-management"
   ],
   "roles": [
