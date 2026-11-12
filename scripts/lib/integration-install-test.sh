@@ -217,6 +217,10 @@ h="$tmp/h1"   # h1: the tool was installed into ~/.local/bin by section 3
 t  "detect.bin -> the binary is resolved off PATH" "$(run "$h" "integration_bin '$tmp/dbin/fixture-tool.json'")" "$h/.local/bin/fixture-tool"
 run "$h" "integration_detect '$tmp/dbin/fixture-tool.json'"; rc "a 'command -v' probe sees the off-PATH binary" "$?" "0"
 run "$tmp/h7e" "integration_detect '$tmp/dbin/fixture-tool.json'"; rc "a 'command -v' probe on a machine without the tool -> rc 1" "$?" "1"
+# The probe's own exit code never leaks: `command -v <missing>` is 1 under bash-as-sh and 127 under
+# dash (Linux /bin/sh), and a detect.run that names a missing binary is 127 under both.
+jq '.detect = {"run":"fixture-absent-tool --version"}' "$desc" > "$tmp/dbin/absent.json"
+run "$tmp/h7e" "integration_detect '$tmp/dbin/absent.json'"; rc "a detect.run that exits 127 -> rc 1" "$?" "1"
 
 # ── 8. KIT_DRY_RUN prints the plan and runs nothing ────────────────────────────────────────────
 unstub; stub npm works; stub uv works; : > "$log"; h="$tmp/h8"

@@ -30,7 +30,7 @@
 #   integration_bin <file>                path of the tool's binary (detect.bin, else the first
 #                                         word of detect.run): PATH, then ~/.local/bin; rc 1 when
 #                                         it is in neither
-#   integration_detect <file>             rc 0 when detect.run exits 0
+#   integration_detect <file>             rc 0 when detect.run exits 0, else rc 1
 #   integration_install_plan <file> [dir] the plan on stdout; runs nothing
 #   integration_install <file> [dir]      one status line on stdout, progress on stderr:
 #                                           present | dry-run | no-consent | installed <manager>
@@ -105,7 +105,9 @@ integration_detect() {
   [ -f "$f" ] || return 1
   cmd="$(jq -r '.detect.run // ""' "$f" 2>/dev/null)" || return 1
   [ -n "$cmd" ] || return 1
-  _kit_ii_sh "${2:-$PWD}" "$cmd" >/dev/null 2>&1
+  # Normalized to 0/1: the probe's own code differs by shell (`command -v <missing>` is 1 under
+  # bash-as-sh, 127 under dash) and a caller should not have to know which sh ran it.
+  _kit_ii_sh "${2:-$PWD}" "$cmd" >/dev/null 2>&1 || return 1
 }
 
 # ── install ────────────────────────────────────────────────────────────────────────────────────
