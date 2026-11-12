@@ -24,6 +24,7 @@ cckit init --dry-run
 | `task-management` | GitHub issues as the source of truth, and the task loop | all five |
 | [`issue-lifecycle`](#issue-lifecycle) | deliverables as native sub-issues, approved-plan autonomy, explicit closes | all five |
 | [`merge-safety`](#merge-safety) | rebase onto the current base before merging, a coupled chain as one PR, the gate re-run on the integration branch | all five |
+| [`gate-and-review`](#gate-and-review) | the gate blocks the push and its output goes on the PR; every AI-reviewer finding is fixed or rebutted before the merge | all five |
 | `mempalace` | the persistent-memory protocol — written only when memory is on | all five |
 | `knowledge-base` | frontmatter and the index for the project's knowledge docs | software, content, research, automation |
 | `plan-output-format` | a plan is a file with a `## Deliverables` table | software, content, research, automation |
@@ -95,3 +96,42 @@ git diff --stat origin/<base>...HEAD   # a deletion the issue never asked for is
 ```
 
 Then run your gate and push.
+
+### gate-and-review
+
+`templates/rules/gate-and-review.md` — two conventions about what stands between a commit and a
+merge.
+
+| Convention | Where it came from | Wins against |
+| --- | --- | --- |
+| The gate runs before `git push` and blocks it; the PR carries the run's output and exit code. CI running the same command is the second observation | a stated preference repeated across projects: a blocking pre-push hook plus exit evidence on the PR, not a CI lint job | `risk-tiered-review` § *The gates* on when and how the gate runs; that rule still decides who reads the PR |
+| Every AI-reviewer finding is fixed, or rebutted with a reason on its own thread, before the merge — silence is never an outcome | measured: five review rounds collapsed to one when the reviewer's pass ran locally before the push | `risk-tiered-review`'s `risk:low` auto-pass and its approved-plan exemption, for a PR that carries findings |
+
+The rule states the conventions; these are the switches that enforce them. All are off until you
+turn them on:
+
+| Switch | Effect | Turn it on |
+| --- | --- | --- |
+| `prePush.enabled` + `prePush.command` | a Claude Code `PreToolUse` hook (`.claude/hooks/prepush_gate.sh`) runs the command before an agent's `git push` and stops the push on a non-zero exit | `cckit init --prepush "<command>"` |
+| `captain.mergePolicy.requireChecks` | `cckit watch --merge` reads a PR with no checks as `CHECKS_MISSING` and does not merge it | set it `true` in the config, or `KIT_CAPTAIN_REQUIRE_CHECKS=1` |
+| `review.command` | the captain sends each PR it would merge to your reviewer; a recorded `gate: fail` blocks the merge | name the command in the config |
+| `captain.mergePolicy.requireReview` | a PR with no verdict recorded reads `REVIEW_MISSING` and is not merged | implied by `review.command`; or set it `true`, or `KIT_CAPTAIN_REQUIRE_REVIEW=1` |
+
+Two things no switch covers. The hook is a Claude Code hook, not a git hook, so a `git push` typed
+in a terminal outside the agent session is not checked. And the captain reads one verdict per PR,
+not one answer per finding: to make an unanswered thread block a merge, turn on *Require
+conversation resolution before merging* in the base branch's protection on GitHub.
+`cckit status` lists each open PR's unresolved review threads.
+
+To put the gate's output on the PR, `scripts/lib/pr-evidence.sh` posts a log as a comment and edits
+that comment in place on a re-run. No verb calls it for you; `cckit lib` prints the line to source:
+
+```bash
+<your gate command> > gate.log 2>&1; echo "exit $?" >> gate.log
+source <cckit lib dir>/pr-evidence.sh
+pr_attach_evidence <pr-number> gate.log "gate"
+```
+
+See [Captain merge policy](/config-and-permissions/#captain-merge-policy),
+[the agent review stage](/config-and-permissions/#the-agent-review-stage) and
+[Codified review gates](/review-gates/) for the lint that turns a recurring finding into a gate.

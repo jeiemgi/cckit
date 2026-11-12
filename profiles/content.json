@@ -23,6 +23,7 @@
     "plan-output-format",
     "issue-lifecycle",
     "merge-safety",
+    "gate-and-review",
     "task-management"
   ],
   "roles": [

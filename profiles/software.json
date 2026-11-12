@@ -23,6 +23,7 @@
     "skill-gaps",
     "issue-lifecycle",
     "merge-safety",
+    "gate-and-review",
     "task-management"
   ],
   "roles": ["PM", "Tech Lead", "Designer", "DevOps", "Backend", "Frontend", "QA", "Security"],
