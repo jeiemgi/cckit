@@ -93,6 +93,18 @@
         "tokenEnv": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "default": "CCKIT_MODEL_TOKEN", "description": "Env var holding the bearer token. Empty or unset at run time: no Authorization header is sent." }
       }
     },
+    "night": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Night mode (`kit-autopilot` § Mode: night): what `scripts/night-grant.sh` adds to the owner's night grant before it launches `scripts/night-run.mjs`. Every key is optional; without the object a night run uses the base floors, the delegation brief's gate, and accepts a grant only from `github.owner` or a commenter GitHub reports as OWNER.",
+      "properties": {
+        "floors": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Extra always-human floors, name -> what a diff must touch to trip it. Added to the base floors (lockfile, auth, security-code, security-prose, workflows, cost, secret). A tripped floor parks the effort unless that night's grant waives it by its exact name." },
+        "neverWaivable": { "type": "array", "items": { "type": "string" }, "description": "Floor names no grant may waive, added to the base list (workflows, cost, secret). A grant that waives one is refused when it is read; the engine refuses it again at merge time." },
+        "gate": { "type": "string", "description": "The gate command executors and verifiers run, and the command the final check runs on the base branch once every wave merged. Unset: the gate commands in the project's delegation brief." },
+        "grantors": { "type": "array", "items": { "type": "string" }, "description": "GitHub logins allowed to write the night grant, besides `github.owner` and any commenter whose author_association is OWNER. Compared case-insensitively. Needed on an organization repo, where no commenter is OWNER and `github.owner` is the org. A grant comment from any other author is ignored." },
+        "refuseLabels": { "type": "array", "items": { "type": "string" }, "description": "Labels that hold an effort out of a night run: preflight refuses an effort carrying any of them. Default: none. The kit applies no such label itself." }
+      }
+    },
     "agents": {
       "type": "object",
       "additionalProperties": true,

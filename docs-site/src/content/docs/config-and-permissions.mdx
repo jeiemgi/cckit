@@ -523,6 +523,65 @@ The sub numbers are the effort's native sub-issues. On a wave-style close (no `e
 anywhere) there is no effort worktree: the pre-close hook runs from the checkout the close was
 invoked in, after every sub is verified closed with a merged PR and before the trace is written.
 
+## Night mode
+
+Night mode runs approved effort waves unattended. The `kit-autopilot` skill reads the owner's
+**night grant** with `scripts/night-grant.sh`, then launches the Workflow script
+`scripts/night-run.mjs`; the Workflow runtime enforces the grant's token budget. In a project that
+installed cckit as a plugin both scripts live under `${CLAUDE_PLUGIN_ROOT}/scripts/`.
+
+The grant is one comment on the plan parent issue:
+
+````markdown
+<!-- night-grant -->
+Tonight: run the two approved waves. I accept the lockfile floor.
+
+```json
+{ "budget": "+2000k", "waves": [[12], [15]], "waivers": ["lockfile"], "stopCommand": null }
+```
+````
+
+**Only the owner's grant counts.** A grant sets the budget, the waivers and a shell `stopCommand`,
+and anyone can comment on a public repository. `night-grant.sh read` therefore keeps a marker
+comment only when GitHub reports its `author_association` as `OWNER`, or its author is
+`github.owner` or a login in `night.grantors`. The latest of those wins; a marker comment from any
+other author is ignored and named on stderr. With no owner grant the read exits 1.
+
+The optional `night` object in the config file resolved above adds to the grant:
+
+```json
+{
+  "night": {
+    "floors": { "auth-dep": "the auth library version" },
+    "neverWaivable": ["auth-dep"],
+    "gate": "pnpm typecheck && pnpm lint",
+    "grantors": ["a-maintainer"],
+    "refuseLabels": ["hold"]
+  }
+}
+```
+
+| Key | Default | What it does |
+| --- | --- | --- |
+| `night.floors` | none | Extra always-human floors, name → what a diff must touch to trip it. Added to the base floors `lockfile`, `auth`, `security-code`, `security-prose`, `workflows`, `cost`, `secret`. A tripped floor parks the effort unless the grant waives it by its exact name. |
+| `night.neverWaivable` | none | Floor names no grant may waive, added to the base list `workflows`, `cost`, `secret`. |
+| `night.gate` | the delegation brief's gate commands | The gate executors and verifiers run, and the final check on the base branch. |
+| `night.grantors` | none | Logins allowed to write the grant besides `github.owner` and an `OWNER` commenter. Needed on an organization repository, where no commenter is `OWNER` and `github.owner` is the org. |
+| `night.refuseLabels` | none | Labels that hold an effort out of a night run. cckit applies no such label itself. |
+
+What the engine holds in code:
+
+| Rule | Behaviour |
+| --- | --- |
+| Approval | An effort runs because the owner named its number in the grant's `waves`. No label or body section is required; preflight refuses only a closed issue, an issue without the `effort` label, or one carrying a `night.refuseLabels` label. |
+| Width | `effort.wipLimit` efforts at once (default `2`), never more than 4. Every executor runs `cckit effort start`, which refuses a new effort at that limit, so a wider run would only park efforts. Executors are told never to pass `--force`. A parked effort keeps its branch and takes a slot from the rest of its wave; efforts already in progress before the night take slots too. A limit of `0` refuses the grant. |
+| Wave order | Waves are dependency-ordered. A wave with any effort parked, refused or skipped ends the run `blocked`, and no later wave starts. |
+| Final check | Once every wave merged, the gate runs on the base branch and decides `done` or `blocked`. A `stopCommand` is a separate check after each wave that ends the night early when it exits 0. |
+| Waivers | Each waiver must equal one floor name. `"lockfile auth"` and `"*"` are refused when the grant is read. |
+
+`night-grant.sh` finds the config the way every verb does — `$KIT_CONFIG`, else a walk up from the
+current directory — so a project's floors and gate apply from any subdirectory.
+
 ## Agent profiles
 
 A **profile** is a named agent configuration: which CLI to run, roughly what it costs, under which

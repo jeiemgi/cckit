@@ -267,6 +267,13 @@ KIT_BASE_BRANCH=effort/42-auth cckit orchestrate 44   # cut an effort's sub from
 sub-issue starts with the commits its effort has already landed. The branch has to exist on origin,
 and `orchestrate` prints a line naming the override and the config value it replaced.
 
+**Night mode** runs approved waves unattended under a token budget the Workflow runtime enforces.
+The owner posts one `<!-- night-grant -->` comment on the plan parent — budget, waves, waivers — and
+`/kit-autopilot` reads it with `scripts/night-grant.sh`, then launches `scripts/night-run.mjs`. Only
+a grant written by the repository owner (or a login in `night.grantors`) counts. The run is no wider
+than `effort.wipLimit`, stops at the first wave that did not fully merge, and finishes on the gate.
+See [Night mode](https://cckit.dev/config-and-permissions/#night-mode).
+
 Set `review.command` in your config and the captain sends every PR it would merge to an agent
 reviewer first, records the verdict as a stage receipt, and refuses to merge on a `fail`. You name
 the command that runs the reviewer — cckit pipes it a brief on stdin and reads the report off
