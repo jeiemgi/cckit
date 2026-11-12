@@ -212,12 +212,41 @@ if [ -n "${KS_TEST_INNER:-}" ]; then
     # in the exit status — otherwise an agent treats "could not look" as "nothing to do".
     eq "JSON reports whether the PRs were read" "$(printf '%s' "$js" | jq -r '.prs_read | type')" "boolean"
     eq "JSON carries the dependency state"      "$(printf '%s' "$js" | jq -r '.deps | keys | join(",")')" "gh,git,jq"
+    eq "no instruction files: instruction_budget is null" \
+       "$(printf '%s' "$js" | jq -r '.instruction_budget')" "null"
     stub="$tmp/nogh"; mkdir -p "$stub"
     for c in git jq; do p_="$(command -v $c)"; [ -n "$p_" ] && ln -sf "$p_" "$stub/$c"; done
     js2="$(cd "$clean" && PATH="$stub" KIT_BASE_BRANCH=trunk KIT_REPO="o/r" status_buckets_json "$clean" 2>/dev/null)"; jrc=$?
     eq "no gh: prs_read is false"  "$(printf '%s' "$js2" | jq -r '.prs_read')" "false"
     eq "no gh: deps.gh is false"   "$(printf '%s' "$js2" | jq -r '.deps.gh')" "false"
     eq "no gh: the rc is non-zero" "$([ "$jrc" -ne 0 ] && echo yes || echo no)" "yes"
+  fi
+
+  # ── the resident instruction-file line (#357) ───────────────────────────────────────────────
+  # One rule with no `paths:` is resident; one with `paths:` is not. The line must count the first
+  # and leave the second out, in the markdown and in the JSON, or it reports a cost nobody pays.
+  if command -v git >/dev/null 2>&1; then
+    ib="$tmp/ib"; mkdir -p "$ib/.claude/rules"
+    ( cd "$ib" && git init -q . ) >/dev/null 2>&1
+    printf '%s\n' "12345" > "$ib/CLAUDE.md"                                   # 6 bytes
+    printf '%s\n' "123456789" > "$ib/.claude/rules/always.md"                 # 10 bytes
+    printf '%s\n' "---" "paths:" '  - "src/**"' "---" "scoped body" > "$ib/.claude/rules/scoped.md"
+    lint="$dir/../instruction-budget-lint.sh"
+    line="$(cd "$ib" && KIT_INSTRUCTION_LINT="$lint" status_instruction_budget "$ib")"
+    has "the line carries the resident total against the limit" "$line" \
+        "instruction files: 16 of 150000 bytes resident"
+    has "the line names the largest files" "$line" "largest: .claude/rules/always.md (10), CLAUDE.md (6)"
+    no  "a path-scoped rule is not in the line" "$line" "scoped.md"
+    eq  "no lint available: the line is empty, not an error" \
+        "$(cd "$ib" && KIT_INSTRUCTION_LINT="$tmp/absent.sh" status_instruction_budget "$ib")" ""
+    md="$(cd "$ib" && KIT_INSTRUCTION_LINT="$lint" KIT_BASE_BRANCH=trunk KIT_REPO="" status_buckets_md "$ib" 2>/dev/null)"
+    has "the markdown report carries the resident line" "$md" \
+        "- instruction files: 16 of 150000 bytes resident"
+    if command -v jq >/dev/null 2>&1; then
+      jsb="$(cd "$ib" && KIT_INSTRUCTION_LINT="$lint" KIT_BASE_BRANCH=trunk KIT_REPO="" status_buckets_json "$ib" 2>/dev/null)"
+      eq "JSON carries the resident bytes" "$(printf '%s' "$jsb" | jq -r '.instruction_budget.resident_bytes')" "16"
+      eq "JSON carries the limit"          "$(printf '%s' "$jsb" | jq -r '.instruction_budget.limit_bytes')" "150000"
+    fi
   fi
 
   rm -rf "$tmp"

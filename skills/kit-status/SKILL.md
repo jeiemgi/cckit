@@ -56,6 +56,12 @@ Read-only. It writes nothing, deletes nothing, and pushes nothing.
 | 2 | **PRs waiting on a human** | Every open PR with the ONE thing it needs: `conflict`, `checks`, `draft`, `wait`, `threads`, `ai-review`, `review`, or `ready`. |
 | 3 | **Cleanup available** | Branches and worktrees that can go — **local and remote** — plus what is deliberately kept (orphan work, open-issue branches). |
 
+After the buckets the report prints one **Instruction files** line: the bytes `CLAUDE.md` and the
+rules without a `paths:` frontmatter load into every session, against Claude Code's 150k limit, and
+the three largest files. It is not a fourth bucket — nothing in it is pending work — and it is
+absent when the project has no instruction files. Relay it as printed;
+`scripts/instruction-budget-lint.sh --report` lists every file.
+
 ## Reading bucket 2
 
 The verdict is the single next action, most-blocking first, because the later signals cannot be

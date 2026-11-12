@@ -24,7 +24,7 @@ The tables are grouped by job: setup, the daily lifecycle, planning a wave, runn
 | `cckit install [bin-dir]` | Symlink `cckit` onto your PATH. |
 | `cckit init --profile <p>` | Scaffold `cckit.config.json` + `.claude/` for this repo. |
 | `cckit scan` | Detect this repo's stack + kit state (JSON). |
-| `cckit doctor` | Onboarding preflight: deps present, `gh` authenticated, and (when enabled) the MemPalace CLI + per-wing wake-up header. Asks before installing; `--fix` installs and seeds without the prompt. |
+| `cckit doctor` | Onboarding preflight: deps present, `gh` authenticated, and (when enabled) the MemPalace CLI + per-wing wake-up header. Asks before installing; `--fix` installs and seeds without the prompt. Also prints the resident instruction-file total against the 150k limit. |
 | `cckit adopt` | Record kit-shaped files a repo already has. |
 | `cckit migrate` | Reshuffle an old kit layout to the current one. |
 
@@ -41,7 +41,7 @@ One issue becomes one branch, one worktree, one PR. These verbs walk that path.
 | `cckit new --role R "<title>"` | File one issue: labels, board add, Role and Status fields. Milestone optional. |
 | `cckit merge [<pr>] [--merge\|--rebase]` | Merge the PR (squash by default), close its linked issues, clean the branch and worktree, and update the PR's base, which may be an `effort/<N>` branch. |
 | `cckit sync` | Board state: issues by role with Project Status, a merge-ordered open-PR queue, and blocked / not-on-board / stale (>14d) flags. |
-| `cckit status` | "Where are we?" in three buckets — local undone work, open PRs waiting on a human, cleanup available (local + remote) — plus the board and the resume handoff. Read-only. |
+| `cckit status` | "Where are we?" in three buckets — local undone work, open PRs waiting on a human, cleanup available (local + remote) — plus the board and the resume handoff, and one line with the resident instruction-file total. Read-only. |
 | `cckit handoff "<note>"` | Save a resume-here note for the next session. |
 
 
@@ -54,6 +54,8 @@ One issue becomes one branch, one worktree, one PR. These verbs walk that path.
 | 1 | **Local undone work** | Worktrees with uncommitted changes; branches holding commits reachable from **no** remote ref; effort subs not yet merged into their effort branch. Plus the worktree inventory, because a clean worktree on an issue branch is still work in progress. |
 | 2 | **PRs waiting on a human** | Each open PR with the one thing it needs: `conflict` · `checks` · `draft` · `wait` · `threads` · `ai-review` · `review` · `ready`. |
 | 3 | **Cleanup available** | What can go, local **and** remote, plus what is deliberately kept (orphan work, open-issue branches). `cckit gc` shows the same classification in full; acting on it is the `/kit-cleanup` skill. |
+
+The report ends with one **Instruction files** line — the bytes `CLAUDE.md` and every rule without a `paths:` frontmatter load into every session, against Claude Code's 150k limit, and the three largest files. `cckit doctor` prints the same line and warns over the limit; `--llm` carries it as `instruction_budget` (`null` when the project has no instruction files). The gate behind it is [`instruction-budget-lint`](/review-gates/#instruction-budget-lint--what-every-session-loads).
 
 Two details worth knowing, because both are places a naive reading gets it wrong:
 

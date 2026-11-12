@@ -277,6 +277,25 @@ EOT
   printf '%s\t%s\t%s\t%s\n' "${safe:-0}" "${orphan:-0}" "${prot:-0}" "${rstale:-0}"
 }
 
+# ── instruction-file budget ────────────────────────────────────────────────────────────────────
+
+# status_instruction_budget [kit_root] — one line: the resident instruction-file total against the
+# 150k limit and the three largest files, for the project the command is run in (#357). Claude Code
+# warns at startup once CLAUDE.md + the rules without `paths:` pass that limit; this puts the number
+# in front of the reader before the warning does.
+#
+# The measurement is scripts/instruction-budget-lint.sh --summary — the ONE implementation, so the
+# status line, the doctor row and the gate can never disagree. KIT_INSTRUCTION_LINT overrides where
+# it is looked up. best-effort: no lint, or nothing to measure, prints nothing.
+status_instruction_budget() {
+  local root="${1:-.}" lint proj
+  lint="${KIT_INSTRUCTION_LINT:-$root/scripts/instruction-budget-lint.sh}"
+  [ -f "$lint" ] || return 0
+  proj="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+  [ -n "$proj" ] || proj="$PWD"
+  INSTRUCTION_BUDGET_ROOT="$proj" bash "$lint" --summary 2>/dev/null || true
+}
+
 # ── the three-bucket report ────────────────────────────────────────────────────────────────────
 
 # status_buckets_md [root] — the three buckets as markdown on stdout. Each bucket states its own
@@ -284,7 +303,7 @@ EOT
 # indistinguishable from a clean one and this report is read to decide what to do next.
 status_buckets_md() {
   local root="${1:-.}" base="${KIT_BASE_BRANCH:-main}" rows prs ai prrows counts safe orphan prot rstale
-  local kind name detail verdict num title n_local
+  local kind name detail verdict num title n_local budget_line
 
   echo "## 1 · Local undone work"
   echo ""
@@ -367,6 +386,16 @@ EOF
     printf -- '_Nothing to clean. %s orphan / %s protected branch(es) are kept by design._\n' \
       "${orphan:-0}" "${prot:-0}"
   fi
+
+  # Not a fourth bucket — nothing here is work to do — so it is one line, and absent when there is
+  # nothing to measure.
+  budget_line="$(status_instruction_budget "$root")"
+  if [ -n "$budget_line" ]; then
+    echo ""
+    echo "## Instruction files"
+    echo ""
+    printf -- '- %s\n' "$budget_line"
+  fi
 }
 
 # status_buckets_json [root] — the same three buckets as one JSON object, for an agent. Same
@@ -389,6 +418,13 @@ status_buckets_json() {
   safe="${counts%%	*}"; counts="${counts#*	}"
   orphan="${counts%%	*}"; counts="${counts#*	}"
   prot="${counts%%	*}"; rstale="${counts##*	}"
+  # `instruction files: <resident> of <limit> bytes resident …` — fields 3 and 5 are the numbers.
+  local budget_line budget_resident budget_limit
+  budget_line="$(status_instruction_budget "$root")"
+  budget_resident="$(printf '%s' "$budget_line" | awk '{print $3}')"
+  budget_limit="$(printf '%s' "$budget_line" | awk '{print $5}')"
+  case "$budget_resident" in ''|*[!0-9]*) budget_resident=0; budget_line="" ;; esac
+  case "$budget_limit"    in ''|*[!0-9]*) budget_limit=0 ;; esac
 
   jq -n \
     --arg local_rows "$rows" \
@@ -398,12 +434,17 @@ status_buckets_json() {
     --argjson protected "${prot:-0}" --argjson remote_stale "${rstale:-0}" \
     --argjson ai_expected "${ai:-0}" \
     --argjson prs_read "$([ "$pr_rc" -eq 0 ] && echo true || echo false)" \
-    --argjson has_gh "$has_gh" --argjson has_git "$has_git" '
+    --argjson has_gh "$has_gh" --argjson has_git "$has_git" \
+    --arg budget_line "$budget_line" \
+    --argjson budget_resident "$budget_resident" --argjson budget_limit "$budget_limit" '
     def rows($s): if ($s | length) == 0 then [] else ($s | rtrimstr("\n") | split("\n") | map(select(length > 0) | split("\t"))) end;
     { local_undone: (rows($local_rows) | map({kind: .[0], name: .[1], detail: .[2]})),
       worktrees:    (rows($wt_rows)    | map({path: .[0], branch: .[1]})),
       prs:          (rows($pr_rows)    | map({verdict: .[0], number: (.[1]|tonumber?), title: .[2], detail: .[3]})),
       cleanup:      { safe: $safe, orphan: $orphan, protected: $protected, remote_stale: $remote_stale },
+      # null means nothing was measured (no CLAUDE.md and no rules, or the lint is absent) — not zero.
+      instruction_budget: (if $budget_line == "" then null else
+        { resident_bytes: $budget_resident, limit_bytes: $budget_limit, summary: $budget_line } end),
       ai_review_expected: ($ai_expected == 1),
       # `prs_read: false` means the PR bucket is UNKNOWN, not empty — never treat its `[]` as "none".
       prs_read: $prs_read,
