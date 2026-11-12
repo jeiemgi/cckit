@@ -118,7 +118,10 @@ cckit cleanup [--yes]         # act on that report: delete the SAFE + LANDED row
 Adopting cckit in a repo that already has history? `cckit scan` detects the stack, `cckit adopt`
 records kit-shaped files the repo already has, and `cckit status` answers "where are we" — local
 undone work, the open PRs waiting on a human, and the cleanup available, plus the board and the
-resume handoff in one screen. Run `cckit help` for the full verb list, or
+resume handoff in one screen. It ends with the instruction-file line: the bytes `CLAUDE.md` and the
+rules without a `paths:` frontmatter put into every session, against Claude Code's 150k limit, and
+the three largest files (`cckit doctor` prints the same line; `scripts/instruction-budget-lint.sh`
+is the gate behind it). Run `cckit help` for the full verb list, or
 `cckit <verb> --help` for any one.
 
 ## Efforts and slug handles

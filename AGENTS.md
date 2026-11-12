@@ -55,7 +55,7 @@ the same commit.
 | `cckit next` | the next unblocked issue + how to start it | `--llm` → TOON |
 | `cckit plan` | wave plan: deps-ordered, priority-sorted within a wave, file-disjoint, session-fit | `--llm` → TOON |
 | `cckit plan-next` | forward plan: inventory current skills/verbs/rules/docs → propose what to build next | `--llm` → TOON |
-| `cckit status` | where are we: local undone work, open PRs waiting on a human, cleanup available (local + remote) | `--llm` → JSON |
+| `cckit status` | where are we: local undone work, open PRs waiting on a human, cleanup available (local + remote), then one line with the resident instruction-file bytes (`CLAUDE.md` + rules without `paths:`) against the 150k limit and the three largest files | `--llm` → JSON (`instruction_budget`, `null` when nothing was measured) |
 | `cckit brief <issue>` | the delegation brief for an issue, from real state: worktree, seed freshness, owned files, the helpers they sit on, standing gotchas | — |
 | `cckit wave` | read open efforts, propose incoming waves: fan-out brief + captain drive | `--llm` → TOON |
 | `cckit watch [--merge] [--loop]` | captain: gate open PRs, squash-merge CLEAN, advance the wave | — |
@@ -94,7 +94,7 @@ Every operation an unattended run needs is reachable through the one CLI:
 | Verb | Purpose |
 | --- | --- |
 | `cckit scan` | detect the repo's stack + kit state (emits JSON) |
-| `cckit doctor [--fix]` | onboarding preflight (deps, gh auth); asks before installing on a TTY, `--fix` skips the prompt |
+| `cckit doctor [--fix]` | onboarding preflight (deps, gh auth); asks before installing on a TTY, `--fix` skips the prompt. Also prints the resident instruction-file line `cckit status` prints, and warns when it is over the 150k limit |
 | `cckit update` | report whether the project is behind the installed cckit |
 | `cckit migrate` | reshuffle an old kit layout to the current one |
 | `cckit digest` | summarize recent activity |
