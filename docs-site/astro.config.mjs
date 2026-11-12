@@ -56,7 +56,7 @@ const GSC_VERIFICATION = envVar('PUBLIC_GSC_VERIFICATION');
 // https://astro.build/config
 export default defineConfig({
   // Live domain. cckit.dev is the production canonical home; canonical + OG resolve
-  // against it. cckit.vercel.app stays as the preview URL for non-production deploys.
+  // against it. cckit.vercel.app and www.cckit.dev redirect here (308, set on the Vercel project).
   site: 'https://cckit.dev',
   // Keep old docs URLs alive after renames.
   redirects: {
