@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# status.sh - the "where are we?" dashboard: the board, then the THREE buckets a session actually
-# opens with (local undone work · PRs waiting on a human · cleanup available), then the resume
-# handoff. The bucket logic lives in scripts/lib/kit-status.sh (kit-engine-boundary: verb logic in a
+# status.sh - the "where are we?" dashboard: the board, the next effort that can start in each flow,
+# then the THREE buckets a session actually opens with (local undone work · PRs waiting on a human ·
+# cleanup available), then the resume handoff. The bucket logic lives in scripts/lib/kit-status.sh (kit-engine-boundary: verb logic in a
 # sourceable lib, never inline in a script), so every verdict is unit-tested rather than eyeballed. Output is MARKDOWN routed through the rendering seam (#82): rich via glow in a TTY,
 # verbatim markdown otherwise (renders natively in Claude Code, always pipe-safe — no escape codes
 # leak into a redirect). This is the lightweight cockpit; the rich opentui TUI is an OPTIONAL
@@ -16,6 +16,8 @@ source "$ROOT/scripts/lib/render.sh" 2>/dev/null || true
 source "$ROOT/scripts/lib/kit-config.sh" && load_kit_config
 # shellcheck source=/dev/null
 source "$ROOT/scripts/lib/kit-gc.sh" 2>/dev/null || true
+# shellcheck source=/dev/null
+source "$ROOT/scripts/lib/effort-plan.sh" 2>/dev/null || true
 # shellcheck source=/dev/null
 source "$ROOT/scripts/lib/kit-status.sh"
 
@@ -47,6 +49,10 @@ _status_md() {
   else
     echo "_(jq/gh absent — run \`cckit sync\`)_"
   fi
+  echo ""
+
+  # The order of work: the next effort that can start in each flow, plus the weekly cadence.
+  status_next_efforts_md
   echo ""
 
   # The three buckets. Each one names its own emptiness, so a clean bucket and a broken one never

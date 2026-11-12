@@ -52,12 +52,14 @@
 #   cckit autopilot run [<issue>] --objective "<text>"   ONE bounded headless objective on this branch
 #   cckit watch [--merge] [--loop]  captain: gate open PRs, squash-merge CLEAN, advance the wave
 #   cckit next [--effort N]         everyday helper: the unblocked set + how to start the top issue
+#                                   + the weekly cadence (plan Monday, next daily, gc Friday)
 #   cckit wave [--effort N]         read open efforts, propose incoming waves: fan-out + captain drive
 #   cckit msg <send|read|list>      session mail across projects: steer a live session (--steer)
 #   cckit claims                    live session claims: which session is working which issue (read-only)
 #   cckit gc [--prune [--yes]]      report (default) or prune merged + landed branches and worktrees
 #   cckit cleanup [--yes]           guided destructive sweep over the gc report (plan first)
-#   cckit status                    thin dashboard: board + worktrees + resume handoff
+#   cckit status                    where are we: board, next effort per flow, local undone work,
+#                                   PRs waiting on a human, cleanup available, resume handoff
 #   cckit scan [--llm]              detect this repo's stack + kit state (JSON)
 #   cckit debug [--check] <args>    optional browser-debug via chrome-devtools-axi (auto-detected)
 #   cckit encode-context            stdin JSON -> compact TOON (uniform arrays; JSON fallback)

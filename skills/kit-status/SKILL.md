@@ -42,8 +42,9 @@ mistake this skill exists to prevent.
 ## Execution
 
 ```bash
-cckit status          # the three buckets as markdown
-cckit status --llm    # the same verdicts as JSON, for an agent
+cckit status          # the board, the next effort per flow, the three buckets — as markdown
+cckit status --llm    # the same verdicts as JSON, for an agent: local_undone, worktrees, prs,
+                      # cleanup, next_efforts
 ```
 
 Read-only. It writes nothing, deletes nothing, and pushes nothing.
@@ -61,6 +62,19 @@ rules without a `paths:` frontmatter load into every session, against Claude Cod
 the three largest files. It is not a fourth bucket — nothing in it is pending work — and it is
 absent when the project has no instruction files. Relay it as printed;
 `scripts/instruction-budget-lint.sh --report` lists every file.
+
+## Next effort per flow
+
+Before the buckets the report prints one row per flow that has an open effort (an open issue with
+the `effort` label): the effort that can start now — no open blocker, most urgent `priority:pN`
+first, then the lowest number — and how many of the flow's efforts still wait on an open blocker.
+Any open `blocked_by` issue blocks, in the same flow or another; a closed one does not. A flow where
+nothing can start keeps its row and says so. In `--llm` output these rows are `next_efforts`
+(`{flow, number, ctx, title, waiting}`; `number` is `null` for a blocked flow, and the whole key is
+`null` when the efforts could not be read).
+
+The line under the table is the weekly cadence, the same line `cckit next` prints: Monday
+`cckit plan`, daily `cckit next`, Friday `cckit gc`. Relay it when the owner asks what to do next.
 
 ## Reading bucket 2
 

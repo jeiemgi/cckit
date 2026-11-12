@@ -75,7 +75,8 @@ Run `cckit scan` before `init` — it reports the repo's stack and whether any k
 `templates/rules/` and `templates/skills/`, selected by your profile and filled in with your project's
 values. They become **yours** once written: `cckit init --upgrade` preserves every file that already
 exists and only adds genuinely missing ones, so your edits survive an upgrade. Run `cckit init --dry-run`
-to see the exact list before anything is written.
+to see the exact list before anything is written. [Rules cckit ships](/rules/) says what each rule
+governs and which profiles carry it.
 
 A rule with no `paths:` frontmatter loads into every session. When you add a rule that covers one
 kind of file, open it with `paths:` (a list of globs) so it loads only when a matching file is read;

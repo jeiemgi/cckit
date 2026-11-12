@@ -13,7 +13,12 @@
 # in its own context; only a summary returns), which is the real lever that widens a session
 # (rules/agent-execution-routing.md).
 #
-# Requires: gh, jq for the GitHub read; a local source that answers needs neither. bash 3.2 (no associative arrays — parallel indexed arrays + linear scan; N small).
+# Requires: gh, jq for the GitHub read; a local source that answers needs neither. bash 3.2 (no
+# associative arrays — parallel indexed arrays + linear scan; N small).
+# `effort_plan` and the `_ep_*` plan-source helpers are bash-only; effort_open_rows /
+# effort_next_pick / effort_next_rows / effort_cadence_md hold no arrays and run under zsh too,
+# because `cckit status` reads them (scripts/lib/kit-status.sh). Those four always read GitHub —
+# `effort.planSource` feeds `effort_plan` only.
 # errors: strict — refuses to plan from GitHub without gh + jq
 
 EFFORT_REPO="${EFFORT_REPO:-${KIT_REPO:-}}"
@@ -32,27 +37,108 @@ _ep_weight() {
   esac
 }
 
+# effort_open_rows [repo] — one TSV row per OPEN effort (label:effort), the single read both
+# `effort_plan` (its GitHub source, via _ep_rows_github) and `cckit status` build on:
+#
+#   number<TAB>flow<TAB>ctx<TAB>priority<TAB>blockers<TAB>open-blockers<TAB>title
+#
+# `blockers` is every native `blocked_by` number, `open-blockers` only the ones whose issue is still
+# OPEN; each is a csv, or `-` when empty (a tab-separated `read` collapses an empty field, so no
+# column is ever left blank). flow falls back to `—`, ctx to `?`, priority to `-`.
+# rc 1 when gh/jq are absent, no repo is known, or the issue query fails — "could not read" must not
+# look like "no efforts". No open effort is rc 0 with no rows. A blocked_by read that fails for one
+# effort degrades to `-` for that effort (the dependency API is optional on older GitHub hosts).
+# Costs one `gh issue list` plus one `gh api` per open effort.
+effort_open_rows() {
+  local repo="${1:-${EFFORT_REPO:-${KIT_REPO:-}}}" raw n f c p t b tab
+  tab="$(printf '\t')"
+  command -v gh >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 || return 1
+  [ -n "$repo" ] || return 1
+  raw="$(gh issue list --repo "$repo" --label effort --state open --limit 100 --json number,title,labels 2>/dev/null)" || return 1
+  raw="$(printf '%s' "$raw" | jq -r '.[] | [ (.number|tostring),
+                  ([.labels[].name|select(startswith("flow:"))|ltrimstr("flow:")]|first // "—"),
+                  ([.labels[].name|select(startswith("ctx:"))|ltrimstr("ctx:")]|first // "?"),
+                  ([.labels[].name|select(startswith("priority:"))|ltrimstr("priority:")]|first // "-"),
+                  .title ] | @tsv' 2>/dev/null)" || return 1
+  [ -n "$raw" ] || return 0
+  while IFS="$tab" read -r n f c p t; do
+    [ -n "$n" ] || continue
+    b="$(gh api "repos/$repo/issues/$n/dependencies/blocked_by" 2>/dev/null \
+      | jq -r '[ ([.[].number|tostring]|join(",")),
+                 ([.[]|select((.state // "open")|ascii_downcase == "open")|.number|tostring]|join(",")) ]
+               | map(if . == "" then "-" else . end) | @tsv' 2>/dev/null)"
+    [ -n "$b" ] || b="-$tab-"
+    printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$n" "$f" "$c" "$p" "$b" "$t"
+  done <<EOT
+$raw
+EOT
+}
+
+# effort_next_pick — pure. stdin: `effort_open_rows` rows; stdout: ONE row per flow, sorted by flow:
+#
+#   flow<TAB>number<TAB>ctx<TAB>title<TAB>waiting
+#
+# `number` is the next effort that can start: among the flow's efforts with NO open blocker, the
+# most urgent `priority:pN` (p0 → p3, unlabeled last), then the lowest issue number. `waiting` counts
+# the flow's efforts that still have an open blocker. A flow where every effort is blocked keeps its
+# row with `-` for number/ctx/title, so a stuck flow is visible instead of silently absent.
+#
+# What blocks: ANY open blocker — an effort in the same flow, an effort in another flow, or a plain
+# issue. A closed blocker does not. (`effort_plan` orders a flow by its in-flow blockers only; that
+# is a layout question. "Can this start now" is stricter: the work it waits on is not done.)
+# The title drops the `[Effort] N · ` prefix and a leading `[Flow] ` tag, as `effort_plan` does.
+effort_next_pick() {
+  awk -F'\t' '
+    function rank(p) { return (p ~ /^p[0-3]$/) ? substr(p, 2) + 0 : 9 }
+    NF >= 7 {
+      f = $2; seen[f] = 1
+      if ($6 != "-") { waiting[f]++; next }
+      r = rank($4); n = $1 + 0
+      if (!(f in bn) || r < br[f] || (r == br[f] && n < bn[f])) {
+        t = $7; sub(/^\[Effort( [0-9]+)?\] [0-9]+ · ?/, "", t); sub(/^\[[A-Za-z]+\] /, "", t)
+        bn[f] = n; br[f] = r; bc[f] = $3; bt[f] = t
+      }
+    }
+    END {
+      for (f in seen) {
+        if (f in bn) printf "%s\t%s\t%s\t%s\t%d\n", f, bn[f], bc[f], bt[f], waiting[f] + 0
+        else         printf "%s\t-\t-\t-\t%d\n", f, waiting[f] + 0
+      }
+    }' | LC_ALL=C sort -t "$(printf '\t')" -k1,1
+}
+
+# effort_next_rows [repo] — the next startable effort per flow, from live state. rc 1 when the
+# efforts could not be read (see effort_open_rows); no rows + rc 0 when no open effort exists.
+effort_next_rows() {
+  local rows
+  rows="$(effort_open_rows "${1:-}")" || return 1
+  [ -n "$rows" ] || return 0
+  printf '%s\n' "$rows" | effort_next_pick
+}
+
+# effort_cadence_md — the weekly cadence as ONE markdown line. `cckit next` and `cckit status` both
+# print this function's output, so the two verbs cannot drift apart on what the cadence is.
+# Every verb named here runs as written. `cckit digest` is deliberately absent: it summarises one
+# <path|url> with a local model, it does not report on the week.
+effort_cadence_md() {
+  printf '%s\n' '**Weekly cadence** — Monday: `cckit plan` orders the week · daily: `cckit next` picks up one issue · Friday: `cckit gc` reports what can be pruned.'
+}
+
 # Rows travel between the readers and the planner as five fields joined by the ASCII unit
 # separator: number, flow, ctx, title, blockers (comma-separated issue numbers). Not TAB — TAB is
 # IFS whitespace, so `read` collapses two adjacent tabs and an empty column shifts every later one.
 _EP_SEP=$'\037'
 
-# _ep_rows_github <repo> — the open efforts from GitHub: one listing, then one blocked_by call per
-# effort (small N). rc 1 when the listing fails; prints nothing when there are no open efforts.
+# _ep_rows_github <repo> — the open efforts from GitHub, in the planner's row format. It is
+# effort_open_rows re-joined: the priority and open-blockers columns are dropped and the `-`
+# empty-blockers placeholder becomes an empty field. rc 1 when the read fails; prints nothing when
+# there are no open efforts.
 _ep_rows_github() {
-  local repo="$1" raw n f c t
-  raw="$(gh issue list --repo "$repo" --label effort --state open --limit 100 \
-    --json number,title,labels \
-    --jq '.[] | [ (.number|tostring),
-                  ([.labels[].name|select(startswith("flow:"))|ltrimstr("flow:")]|first // "—"),
-                  ([.labels[].name|select(startswith("ctx:"))|ltrimstr("ctx:")]|first // "?"),
-                  .title ] | @tsv' 2>/dev/null)" || return 1
-  [[ -n "$raw" ]] || return 0
-  while IFS=$'\t' read -r n f c t; do
-    [[ -n "$n" ]] || continue
-    printf '%s\037%s\037%s\037%s\037%s\n' "$n" "$f" "$c" "$t" \
-      "$(gh api "repos/$repo/issues/$n/dependencies/blocked_by" --jq '[.[].number]|join(",")' 2>/dev/null)"
-  done <<< "$raw"
+  local rows
+  rows="$(effort_open_rows "$1")" || return 1
+  [[ -n "$rows" ]] || return 0
+  printf '%s\n' "$rows" | awk -F'\t' -v sep="$_EP_SEP" '
+    NF >= 7 { b = ($5 == "-" ? "" : $5); printf "%s%s%s%s%s%s%s%s%s\n", $1, sep, $2, sep, $3, sep, $7, sep, b }'
 }
 
 # _ep_project_root — the directory a relative `effort.planSource` resolves against: the project

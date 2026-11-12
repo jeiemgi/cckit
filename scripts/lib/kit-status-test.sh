@@ -234,6 +234,28 @@ if [ -n "${KS_TEST_INNER:-}" ]; then
     # in the exit status — otherwise an agent treats "could not look" as "nothing to do".
     eq "JSON reports whether the PRs were read" "$(printf '%s' "$js" | jq -r '.prs_read | type')" "boolean"
     eq "JSON carries the dependency state"      "$(printf '%s' "$js" | jq -r '.deps | keys | join(",")')" "gh,git,jq"
+    # next_efforts (E241.4): with effort-plan.sh not loaded the key is null — unknown, never [].
+    eq "JSON carries next_efforts"              "$(printf '%s' "$js" | jq -r 'has("next_efforts")')" "true"
+    eq "next_efforts is null when its lib is not loaded" "$(printf '%s' "$js" | jq -c '.next_efforts')" "null"
+    has "markdown says the efforts could not be read" "$(status_next_efforts_md o/r)" "Could not read the open efforts"
+    # With the lib loaded, the rows come through the same pick `cckit effort plan` reads from.
+    # shellcheck source=/dev/null
+    . "$dir/effort-plan.sh"
+    effort_next_rows() { printf 'core\t10\tM\tfirst thing\t1\ndocs\t-\t-\t-\t2\n'; }
+    jn="$(cd "$clean" && KIT_BASE_BRANCH=trunk KIT_REPO="" status_buckets_json "$clean")"
+    eq "next_efforts: a startable row" "$(printf '%s' "$jn" | jq -c '.next_efforts[0]')" \
+       '{"flow":"core","number":10,"ctx":"M","title":"first thing","waiting":1}'
+    eq "next_efforts: a fully blocked flow has a null number" "$(printf '%s' "$jn" | jq -c '.next_efforts[1]')" \
+       '{"flow":"docs","number":null,"ctx":null,"title":null,"waiting":2}'
+    mdn="$(status_next_efforts_md o/r)"
+    has "markdown: the startable row"      "$mdn" "| core | **E10** — first thing | M | 1 |"
+    has "markdown: the blocked flow"       "$mdn" "| docs | _none can start"
+    has "markdown: the cadence line"       "$mdn" "Weekly cadence"
+    effort_next_rows() { return 0; }
+    has "markdown: no efforts states its emptiness" "$(status_next_efforts_md o/r)" "No open issue carries"
+    eq  "no efforts is [] in JSON" \
+        "$(cd "$clean" && KIT_BASE_BRANCH=trunk KIT_REPO="" status_buckets_json "$clean" | jq -c '.next_efforts')" "[]"
+    effort_next_rows() { return 1; }
     eq "no instruction files: instruction_budget is null" \
        "$(printf '%s' "$js" | jq -r '.instruction_budget')" "null"
     stub="$tmp/nogh"; mkdir -p "$stub"

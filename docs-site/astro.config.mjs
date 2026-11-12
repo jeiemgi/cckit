@@ -56,7 +56,7 @@ const GSC_VERIFICATION = envVar('PUBLIC_GSC_VERIFICATION');
 // https://astro.build/config
 export default defineConfig({
   // Live domain. cckit.dev is the production canonical home; canonical + OG resolve
-  // against it. cckit.vercel.app stays as the preview URL for non-production deploys.
+  // against it. cckit.vercel.app and www.cckit.dev redirect here (308, set on the Vercel project).
   site: 'https://cckit.dev',
   // Keep old docs URLs alive after renames.
   redirects: {
@@ -145,6 +145,7 @@ export default defineConfig({
           { label: 'How to read this guide', slug: 'how-to-read' },
           { label: 'Quickstart', slug: 'getting-started', badge: { text: 'Start here', variant: 'success' } },
           { label: 'Install cckit', slug: 'install' },
+          { label: 'Install & update matrix', slug: 'install-matrix' },
           { label: 'Check your platform', slug: 'check-your-platform' },
           { label: 'Initialize cckit', slug: 'initialize' },
           { label: 'Set up memory', slug: 'memory', badge: { text: 'Optional', variant: 'note' } },
@@ -173,6 +174,7 @@ export default defineConfig({
           { label: 'Efforts, waves & worktrees', slug: 'efforts-and-waves' },
           { label: 'Hooks', slug: 'hooks' },
           { label: 'Adapters', slug: 'adapters' },
+          { label: 'Multi-session safety', slug: 'multi-session' },
         ]},
         { label: 'Guides', items: [
           { label: 'All guides', slug: 'guides' },
@@ -185,6 +187,7 @@ export default defineConfig({
           { label: 'CLI reference', slug: 'cli-reference' },
           { label: 'Documentation benchmark', slug: 'benchmark' },
           { label: 'Skills cckit ships', slug: 'skills' },
+          { label: 'Rules cckit ships', slug: 'rules' },
           { label: 'Tags directory', slug: 'tags' },
           { label: 'Config & permissions', slug: 'config-and-permissions' },
           { label: 'Releasing', slug: 'releasing' },
