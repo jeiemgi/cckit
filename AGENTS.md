@@ -107,6 +107,24 @@ Every operation an unattended run needs is reachable through the one CLI:
 | `--force` | launch even if an issue is `blocked_by` an OPEN issue (the gate is on by default) |
 | `--no-seed` | start the agent without an auto-prompt |
 
+### Night mode (no verb: `/kit-autopilot` + two scripts)
+
+Night mode has no `cckit` verb. The `kit-autopilot` skill reads the owner's night grant with
+`scripts/night-grant.sh read <parent>` and launches the Workflow script `scripts/night-run.mjs`
+with the args that prints. In a consuming project both live under `${CLAUDE_PLUGIN_ROOT}/scripts/`.
+
+| Rule | What the scripts enforce |
+| --- | --- |
+| Who may grant | a `<!-- night-grant -->` comment counts only from an author GitHub reports as `OWNER`, from `github.owner`, or from a login in `night.grantors`; any other author's is ignored |
+| Approval | the grant's `waves` list; no label or body section on the effort is required |
+| Width | `effort.wipLimit` efforts at once (default 2), never more than 4; executors never pass `--force` |
+| Wave order | a wave that did not fully merge ends the run `blocked`; no later wave starts |
+| Final check | the gate on the base branch, even when the grant sets a `stopCommand` |
+| Waivers | each must equal one floor name; `workflows`, `cost`, `secret` and `night.neverWaivable` are never waivable |
+
+Config: `night.floors`, `night.neverWaivable`, `night.gate`, `night.grantors`, `night.refuseLabels`
+— see [Night mode](https://cckit.dev/config-and-permissions/#night-mode).
+
 ## The agent loop (reference)
 
 1. `cckit sync --llm` → pick an unblocked issue.

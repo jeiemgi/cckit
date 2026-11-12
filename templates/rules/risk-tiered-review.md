@@ -27,8 +27,9 @@ These floor to human review regardless of the `risk:*` label, per existing rules
 
 **Night runs** (`kit-autopilot` § _Mode: night_). An approved night run may merge a `security/*`
 PR whose diff is prose only, by standing rule. The lockfile, auth and `security/*` code floors are
-waived only by that night's grant (`scripts/night-grant.sh`). CI workflow changes, cost and secrets
-are never waived, whatever the grant says, and a project may add its own never-waivable floors.
+waived only by that night's grant, and a grant counts only when the repository owner (or a login
+in `night.grantors`) wrote it. CI workflow changes, cost and secrets are never waived, whatever the
+grant says, and a project may add its own never-waivable floors.
 
 ## The gates (what "green" means)
 
