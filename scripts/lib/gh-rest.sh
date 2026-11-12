@@ -184,6 +184,11 @@ gh_rest_label_create() {
   gh api "repos/$1/labels" -X POST -f "name=$2" -f "color=$3" -f "description=$4" >/dev/null 2>&1 || true
 }
 
+# Every label name in the repo, one per line. rc 1 when the list cannot be read.
+gh_rest_label_names() {
+  _ghr_read "repos/$1/labels" -X GET -f per_page=100 --paginate --jq '.[].name'
+}
+
 gh_rest_sub_issue_numbers() {
   _ghr_read "repos/$1/issues/$2/sub_issues" -X GET -f per_page=100 --jq '.[].number'
 }
