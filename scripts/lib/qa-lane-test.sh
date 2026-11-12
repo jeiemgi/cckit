@@ -322,7 +322,9 @@ qa_cli up --wat >/dev/null 2>&1;                    t "an unknown argument is rc
 # ── stop: the ports are free afterwards, and the report is what actually stopped (#298) ────────
 # These sections run REAL processes: a supervisor shell that respawns a perl listener on a port
 # the kernel just handed out. The curl stub still answers the readiness probes.
-free_port() { perl -MIO::Socket::INET -e 'my $s = IO::Socket::INET->new(Listen => 1, LocalAddr => "127.0.0.1", LocalPort => 0) or exit 1; print $s->sockport' 2>/dev/null; }
+# A lane's base must leave room for 40 slots (qa_ports_check: base + 39 * stride <= 65535), and the
+# kernel hands out ports up to 65535, so a pick above 65000 is drawn again.
+free_port() { perl -MIO::Socket::INET -e 'for (1 .. 50) { my $s = IO::Socket::INET->new(Listen => 1, LocalAddr => "127.0.0.1", LocalPort => 0) or exit 1; my $p = $s->sockport; if ($p <= 65000) { print $p; exit 0 } } exit 1' 2>/dev/null; }
 listening() { [ -n "$(qa_port_pids "$1")" ] && echo yes || echo no; }
 wait_listen() { local i=0; while [ "$(listening "$1")" = no ] && [ "$i" -lt 100 ]; do sleep 0.1; i=$((i+1)); done; }
 running() { _qa_alive "$1" && echo yes || echo no; }
