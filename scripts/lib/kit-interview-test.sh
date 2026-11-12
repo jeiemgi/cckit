@@ -63,6 +63,37 @@ if [ -n "${KIT_IV_TEST_INNER:-}" ]; then
   swd="$(kit_interview_apply software "$work/ans-empty.json")"
   t "apply default deploy" "$(printf '%s' "$swd" | jq -r .deploy.target)" "none"
 
+  # --- an integration tier: the catalog is DERIVED from the descriptor (E303.2) ---
+  export KIT_INTEGRATIONS_DIR="$work/integrations"; mkdir -p "$KIT_INTEGRATIONS_DIR"
+  mkdesc() {  # <id> <config json>
+    jq -n --arg id "$1" --argjson c "$2" '{id: $id, label: "A Rather Long Tool Label", summary: "Does a thing.",
+      config: $c, docs: "https://example.invalid/d",
+      attribution: {author: "X", homepage: "https://example.invalid", affiliated: false, notice: "Not affiliated."}}' \
+      > "$KIT_INTEGRATIONS_DIR/$1.json"
+  }
+  mkdesc igstr  '{"key":"codeGraph.provider","value":"igstr-graph"}'
+  mkdesc igbool '{"key":"memory.enabled"}'
+  ic="$(kit_interview_catalog igstr)"
+  t "integration catalog tier"      "$(printf '%s' "$ic" | jq -r .tier)" "igstr"
+  t "integration one question"      "$(printf '%s' "$ic" | jq -c '[.questions[].key]')" '["enable"]'
+  t "integration header <= 12"      "$(printf '%s' "$ic" | jq -r '.questions[0].header | length')" "12"
+  t "integration yes sets the key"  "$(printf '%s' "$ic" | jq -c '.questions[0].options[] | select(.value=="yes").set')" \
+    '[{"path":"codeGraph.provider","value":"igstr-graph","valtype":"string"}]'
+  t "integration no sets nothing"   "$(printf '%s' "$ic" | jq -c '.questions[0].options[] | select(.value=="no") | has("set")')" "false"
+  t "integration intro = notice"    "$(printf '%s' "$ic" | jq -r .intro)" "Not affiliated."
+  t "render works on an integration" "$(kit_interview_render igstr "$work/proj" | jq -r '.questions[0].default')" "yes"
+  printf '%s\n' '{"keep":{"me":1}}' > "$work/ig-base.json"
+  t "apply integration (default yes)" "$(kit_interview_apply igstr "$work/ans-empty.json" "$work/ig-base.json" | jq -c .)" \
+    '{"keep":{"me":1},"codeGraph":{"provider":"igstr-graph"}}'
+  printf '%s\n' '{"enable":"no"}' > "$work/ans-no.json"
+  t "apply integration (no) changes nothing" "$(kit_interview_apply igstr "$work/ans-no.json" "$work/ig-base.json" | jq -c .)" '{"keep":{"me":1}}'
+  t "apply integration bool ON value" "$(kit_interview_apply igbool "$work/ans-empty.json" | jq -c .)" '{"memory":{"enabled":true}}'
+  # a module keeps a name it shares with an integration; an id outside the grammar resolves nothing
+  mkdesc software '{"key":"codeGraph.provider","value":"clash"}'
+  t "module wins a shared name" "$(kit_interview_catalog software | jq -r '.module // "derived"')" "software"
+  kit_interview_catalog ../igstr >/dev/null 2>&1; t "path-shaped tier rc" "$?" "1"
+  unset KIT_INTEGRATIONS_DIR
+
   [ "$fail" -eq 0 ] && echo "ALL OK($KIT_IV_TEST_INNER)"
   exit "$fail"
 fi

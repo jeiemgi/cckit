@@ -25,6 +25,7 @@ The tables are grouped by job: setup, the daily lifecycle, planning a wave, runn
 | `cckit init --profile <p>` | Scaffold `cckit.config.json` + `.claude/` for this repo. |
 | `cckit scan` | Detect this repo's stack + kit state (JSON). |
 | `cckit doctor` | Onboarding preflight: deps present, `gh` authenticated, and (when enabled) the MemPalace CLI + per-wing wake-up header. Asks before installing; `--fix` installs and seeds without the prompt. |
+| `cckit add [<name>]` | No name: list the integrations described in `integrations/` and the modules. With an integration: set the one config key its descriptor names, and nothing else; nothing is installed. With a module (`software`): write this directory's `.claude/kit.config.json`. `KIT_DRY_RUN=1` previews. See [Integrations](/config-and-permissions/#integrations). |
 | `cckit adopt` | Record kit-shaped files a repo already has. |
 | `cckit migrate` | Reshuffle an old kit layout to the current one. |
 
@@ -85,6 +86,7 @@ Every verb below is drivable from the CLI. The ones with a skill are also reacha
 | `contribute` | `kit-contribute` | |
 | `digest` | `kit-digest` | |
 | `doctor` · `init` · `update` | `kit-doctor` · `kit-init` · `kit-update` | plugin commands |
+| `add` | `kit-add` | lists, asks the descriptor's one question, then runs the verb |
 | `effort` | `kit-effort-new` · `-start` · `-pr` · `-close` | one skill per phase |
 | `brief` | — | CLI-only |
 | `plan` · `wave` · `watch` · `orchestrate` | — | CLI-only |

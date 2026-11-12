@@ -49,6 +49,7 @@
 #   cckit encode-context            stdin JSON -> compact TOON (uniform arrays; JSON fallback)
 #   cckit render                    stdin markdown -> rich (glow on a TTY; verbatim when piped)
 #   cckit doctor                    onboarding preflight (deps, gh auth)
+#   cckit add [<name>] [--set k=v]  list integrations + modules; with a name, switch one on in the config
 #   cckit update                    check whether this project is behind the installed cckit
 #   cckit migrate                   reshuffle an old kit layout to the current one
 #   cckit adopt                     record kit-shaped files a repo already has into the manifest
@@ -369,6 +370,7 @@ case "$cmd" in
   migrate)     exec "$ROOT/scripts/kit-migrate.sh" "$@" ;;
   adopt)       exec "$ROOT/scripts/kit-adopt.sh" "$@" ;;
   doctor)      exec "$ROOT/scripts/kit-doctor.sh" "$@" ;;
+  add)         exec "$ROOT/scripts/kit-add.sh" "$@" ;;
   digest)      exec "$ROOT/scripts/kit-digest.sh" "$@" ;;
   bench)
     # Documentation benchmark (#200) — score how well this project finds + uses its OWN canonical

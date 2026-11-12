@@ -398,8 +398,33 @@ refused by the validator.
 
 `bash scripts/lib/integrations.sh --validate` checks every descriptor and prints one
 `<id>: <field>: <problem>` line per problem; `--list` prints the ids; `--applies <id> [dir]` exits
-0 when the tool can work on the repo at `dir`. No descriptor ships yet, and nothing installs from
-one: this is the format only.
+0 when the tool can work on the repo at `dir`.
+
+### Switching one on: `cckit add`
+
+`cckit add` with no name lists every descriptor in `integrations/`, each marked `on` or `off` for
+this project and flagged when it does not apply to the repo, followed by the modules. It exits 0
+when the registry is empty. `cckit add --llm` prints the same list as one JSON object:
+`{"integrations":[{id,label,summary,key,enabled,applies}],"modules":[{id,label}]}`.
+
+`cckit add <id>` asks one question, derived from the descriptor, and on `yes` sets the
+descriptor's `config.key` to its `config.value` (boolean `true` when the descriptor names none).
+That is the only key it changes. The file it writes is the project config: a root
+`cckit.config.json`, else `.claude/kit.config.json`, found by walking up from the directory.
+
+| Case | What happens |
+| --- | --- |
+| `--set enable=no`, or answering no | Nothing is written. It does not switch off an integration that is already on. |
+| The key already holds the ON value | No write; the file stays byte-identical. |
+| No file in the repo ends in an extension from `appliesWhen.anyExtension` | Declined with the extensions named. Exit 0, nothing written. |
+| No project config found | Exit 1. Run `cckit init` first; `add` does not create a config for an integration. |
+| The descriptor fails the schema | Exit 1 with the `<id>: <field>: <problem>` lines. Nothing written. |
+| `KIT_DRY_RUN=1` | Prints the diff. Nothing written. |
+
+`cckit add <id>` installs nothing: it records the choice. No descriptor ships yet, so on a fresh
+install the list shows only the modules. `cckit add software` is the module form of the same verb
+and writes this directory's `.claude/kit.config.json`. In Claude Code the `kit-add` skill drives
+the same verb; the typed-only `/kit-add` command it replaces is gone.
 
 ## Agent profiles
 

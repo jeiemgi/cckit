@@ -90,6 +90,7 @@ Every operation an unattended run needs is reachable through the one CLI:
 | --- | --- |
 | `cckit scan` | detect the repo's stack + kit state (emits JSON) |
 | `cckit doctor [--fix]` | onboarding preflight (deps, gh auth); asks before installing on a TTY, `--fix` skips the prompt |
+| `cckit add [<name>] [--set k=v] [--answers FILE] [--dir DIR]` | no name: list every integration descriptor in `integrations/` plus the modules, exit 0 (`--llm` → one JSON object with `enabled` and `applies` per integration). With an integration: set the one config key its descriptor names, in the config `kit_config_path` resolves — no other key changes, and nothing is installed. Declines (exit 0, nothing written) on a repo with no file the integration can work on; exits 1 with no project config or an invalid descriptor. With a module (`software`): write this directory's `.claude/kit.config.json`. `KIT_DRY_RUN=1` writes nothing |
 | `cckit update` | report whether the project is behind the installed cckit |
 | `cckit migrate` | reshuffle an old kit layout to the current one |
 | `cckit digest` | summarize recent activity |

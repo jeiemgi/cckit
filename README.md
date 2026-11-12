@@ -89,6 +89,7 @@ Requirements: `bash` 4+, `git`, and `gh` (GitHub CLI) authenticated. `jq` recomm
 cckit doctor                  # onboarding preflight: deps, gh auth
 cckit init --profile software # scaffold cckit.config.json + .claude/ for this repo
                               #   profiles: software · content · research · automation · minimal
+cckit add                     # list the optional integrations + modules; `cckit add <name>` switches one on
 cckit plan-next               # propose what to build next, grounded in current capabilities
 cckit status                  # where are we: local undone work, PRs to attend, cleanup available
 cckit next                    # the next unblocked issue + how to start it
