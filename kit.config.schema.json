@@ -156,7 +156,14 @@
           "additionalProperties": true,
           "properties": {
             "floors": { "type": "boolean", "description": "Auto-merge policy floors (default true). When on, `cckit watch --merge` never auto-merges a PR touching .github/workflows/**, lockfile/graph files, or security-sensitive paths, and always honors a `hold` label + draft state. Set false to disable (or KIT_CAPTAIN_FLOORS=0)." },
-            "protectedGlobs": { "type": "array", "items": { "type": "string" }, "description": "Extra path globs the captain must not auto-merge (added to the built-in floors). Also settable via KIT_CAPTAIN_EXTRA_GLOBS." }
+            "protectedGlobs": { "type": "array", "items": { "type": "string" }, "description": "Extra path globs the captain must not auto-merge (added to the built-in floors). Also settable via KIT_CAPTAIN_EXTRA_GLOBS." },
+            "requireQa": {
+              "oneOf": [
+                { "type": "boolean" },
+                { "type": "array", "items": { "type": "string" } }
+              ],
+              "description": "Hold a PR for a human QA pass (default false). true: `cckit watch --merge` reads every would-be merge with no `cckit qa verdict pass` recorded against its current head as QA_MISSING (action verify). A list of label names: only PRs carrying one of them, e.g. [\"flow:ui\"]. A recorded QA fail on the current head blocks regardless (QA_FAILING). Env: KIT_CAPTAIN_REQUIRE_QA=1|0, KIT_CAPTAIN_QA_LABELS (space-separated); either one set means the key is not read."
+            }
           }
         }
       }

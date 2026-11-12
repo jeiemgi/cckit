@@ -93,6 +93,28 @@ a single invocation without editing the file.
 | `protectedGlobs` | `[]` | Extra path globs added to the floors above. | `KIT_CAPTAIN_EXTRA_GLOBS` |
 | `requireChecks` | `false` | Treat a PR with **no checks at all** as unverified rather than green. Verdict becomes `CHECKS_MISSING`, action `verify`. | `KIT_CAPTAIN_REQUIRE_CHECKS=1` |
 | `requireReview` | *(implied)* | Treat a PR with **no agent review recorded** as unverified. Verdict becomes `REVIEW_MISSING`, action `verify`. Defaults to on when `review.command` is set and off when it is not — set it explicitly to break that link either way. | `KIT_CAPTAIN_REQUIRE_REVIEW=1` |
+| `requireQa` | `false` | Hold a PR for a **human QA pass**. `true` covers every PR; a list of label names (`["flow:ui"]`) covers only PRs carrying one of them. A would-be merge with no `cckit qa verdict pass` recorded against its current head becomes `QA_MISSING`, action `verify`. | `KIT_CAPTAIN_REQUIRE_QA=1`, `KIT_CAPTAIN_QA_LABELS` |
+
+### Holding merges for a QA pass
+
+`requireQa` reads the verdict `cckit qa verdict` records for a lane. It is off by default, and
+declaring a QA stack under `qa` does not turn it on.
+
+| Verdict | Action | What happened |
+| --- | --- | --- |
+| `QA_FAILING` | `fix` | A QA fail is recorded against the PR's current head. Blocks whether or not `requireQa` is set. |
+| `QA_MISSING` | `verify` | QA is required for this PR and no pass is recorded against its current head. |
+
+- A pass belongs to one commit. Push again and it reads as absent, so the PR is `QA_MISSING` until
+  the new head is reviewed. A fail recorded on an older head is absent too.
+- The label list is matched against the **PR's** labels. A label whose name contains a space
+  cannot be listed.
+- `KIT_CAPTAIN_QA_LABELS` is space-separated. Setting either environment value means
+  `requireQa` is not read, so `KIT_CAPTAIN_REQUIRE_QA=0` switches a configured list off for one run.
+- A PR that is both unreviewed and un-QA'd reads `REVIEW_MISSING` first: the agent reviewer runs
+  before the human one, and a PR held at `QA_MISSING` is still sent to the reviewer.
+- With `qa.command` configured and `requireQa` unset, `cckit watch` names every PR it would merge
+  with no QA pass on its head, and the key that holds them.
 
 ### Why `requireChecks` exists
 

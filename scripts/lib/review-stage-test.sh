@@ -61,6 +61,11 @@ rs_needs_dispatch REVIEW_MISSING verify 0; rc "a PR blocked ON the missing revie
 # Unless it already has a verdict — then REVIEW_MISSING means the verdict is stale, and a receipt
 # the head check rejected sets have=0, so this case only arises from a caller that lost track.
 rs_needs_dispatch REVIEW_MISSING verify 1; rc "but never twice for the same verdict" "$?" "1"
+# QA_MISSING stands where CLEAN would have: a would-be merge held for a human QA pass (#300). With
+# requireReview:false it is the only state such a PR ever shows, so it must still earn a reviewer.
+rs_needs_dispatch QA_MISSING verify 0; rc "a PR held for QA still gets its reviewer" "$?" "0"
+rs_needs_dispatch QA_MISSING verify 1; rc "and only once per head"                   "$?" "1"
+rs_needs_dispatch QA_FAILING fix 0;    rc "a PR QA failed is not sent to review"     "$?" "1"
 # A recorded FAIL is not re-reviewed on its own: the author acts on it and pushes, which changes the
 # head, which makes the verdict stale, which is what earns the next review.
 rs_needs_dispatch REVIEW_FAILING fix 1;    rc "a failing review is not re-run"       "$?" "1"
