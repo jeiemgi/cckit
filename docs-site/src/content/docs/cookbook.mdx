@@ -231,6 +231,38 @@ cckit autopilot --cap 3               # auto-pick unblocked issues and drive the
 cckit autopilot --runtime herdr --agent codex --cap 3
 ```
 
+## Keep a weekly cadence
+
+Three read-only verbs, one per moment of the week, keep the order of work visible: plan on Monday,
+next every day, gc on Friday.
+
+**Prompt:**
+
+<div class="cckit-prompt">
+
+```text frame="terminal" title="Prompt to paste"
+Run the step of the weekly cadence that fits today.
+
+On Monday, sync the board and show me the week's order. On any other day, show me what is unblocked
+and let me pick the issue to start. On Friday, also report what can be cleaned up — and delete
+nothing until I confirm.
+```
+
+</div>
+
+**What cckit does:**
+
+```bash
+cckit plan      # Monday: the waves, p0 → p3 inside each wave
+cckit next      # daily: the unblocked set + how to start the top issue
+cckit gc        # Friday: prunable branches + worktrees (a report; deletes nothing)
+cckit status    # any day: next effort per flow, local undone work, PRs to attend, cleanup available
+```
+
+`cckit next` and `cckit status` end their human output with the cadence line, so the agent and you
+read the same three steps. `cckit cleanup` is the verb that acts on the Friday report, after you
+confirm. More in [Efforts, waves & worktrees](/efforts-and-waves/#the-weekly-cadence).
+
 ## Adopt an existing repo
 
 Bring cckit to a project that already has its own structure — nothing above the kit is restructured.
@@ -255,7 +287,7 @@ Then confirm everything's wired up.
 cckit scan      # detect the repo's stack + current kit state
 cckit init      # scaffold cckit.config.json + .claude/
 cckit adopt     # record kit-shaped files the repo already has
-cckit status    # confirm the board + worktrees + handoff view
+cckit status    # confirm: next effort per flow, local undone work, PRs to attend, cleanup available
 ```
 
 The full adoption sequence is on the [adoption page](/adoption/).

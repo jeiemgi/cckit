@@ -5,7 +5,8 @@
 # the one command to start it. This is the daily-loop counterpart to `cckit wave`: wave fans a whole
 # wave out to subagents; `cckit next` is for a human (or agent) picking up one issue by hand.
 #
-#   cckit next                  the unblocked issues + the top one's start command
+#   cckit next                  the unblocked issues + the top one's start command + the weekly
+#                               cadence (plan Monday · next daily · gc Friday)
 #   cckit next --effort <N>     scope to effort #N's sub-issues
 #   cckit next --llm            the unblocked set as TOON rows {number,ctx,title}
 #
@@ -22,7 +23,7 @@ next_issue() {
       --llm|--output=json) out="json"; shift ;;
       --effort)    effort="$2"; planargs+=(--effort "$2"); shift 2 ;;
       --effort=*)  effort="${1#*=}"; planargs+=(--effort "${1#*=}"); shift ;;
-      -h|--help)   sed -n '10,13p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; return 0 ;;
+      -h|--help)   sed -n '8,11p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; return 0 ;;
       *) echo "next: unknown arg '$1'" >&2; return 2 ;;
     esac
   done
@@ -72,5 +73,10 @@ next_issue() {
     printf 'Start it in an isolated worktree + branch:\n\n'
     printf '```\ncckit start %s\n```\n\n' "$topnum"
     printf 'Or fan the whole unblocked wave out to subagents with `cckit wave%s`.\n' "$([ -n "$effort" ] && echo " --effort $effort")"
+    # the weekly cadence this verb is the daily step of — human output only; the TOON rows above
+    # stay {number,ctx,title}.
+    # shellcheck source=/dev/null
+    . "$here/effort-plan.sh"
+    printf '\n'; effort_cadence_md
   } | cckit_render
 }

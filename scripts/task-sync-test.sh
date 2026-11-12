@@ -40,7 +40,7 @@ cat > "$tmp/prs.json" <<'JSON'
 JSON
 
 # Stub gh: every call is counted; GH_FAIL=1 fails every call, GH_FAIL_PR=1 only `pr list`.
-# `issue list --label effort` is effort_plan's query (it passes --jq and expects TSV rows).
+# `issue list --label effort` is effort_plan's query (effort_open_rows parses the --json array).
 stub="$tmp/bin"; mkdir -p "$stub"
 cat > "$stub/gh" <<'SH'
 #!/usr/bin/env bash
@@ -49,7 +49,7 @@ echo "$*" >> "$GH_CALLS"
 case "$1 $2" in
   "issue list")
     case " $* " in
-      *" --label effort "*) printf '42\tcore\tM\t[Effort] 42 · [Core] demo effort\n' ;;
+      *" --label effort "*) echo '[{"number":42,"title":"[Effort] 42 · [Core] demo effort","labels":[{"name":"effort"},{"name":"flow:core"},{"name":"ctx:M"}]}]' ;;
       *) cat "$GH_ISSUES" ;;
     esac ;;
   "pr list") [ "${GH_FAIL_PR:-0}" = 1 ] && { echo "gh: pr list failed" >&2; exit 1; }; cat "$GH_PRS" ;;

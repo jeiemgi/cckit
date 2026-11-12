@@ -90,8 +90,8 @@ cckit doctor                  # onboarding preflight: deps, gh auth
 cckit init --profile software # scaffold cckit.config.json + .claude/ for this repo
                               #   profiles: software · content · research · automation · minimal
 cckit plan-next               # propose what to build next, grounded in current capabilities
-cckit status                  # where are we: local undone work, PRs to attend, cleanup available
-cckit next                    # the next unblocked issue + how to start it
+cckit status                  # where are we: next effort per flow, local undone work, PRs to attend, cleanup available
+cckit next                    # the next unblocked issue + how to start it + the weekly cadence
 cckit start 42                # isolated worktree + branch for issue #42, bootstrapped:
                               #   env files copied, dev port assigned, deps installed at the
                               #   selected targets — worktree.installPaths if set (those dirs
@@ -229,6 +229,24 @@ round-trip buys a count that is right either way.
 - **No network, no problem.** `EFFORT_WIP_REMOTE=0` skips the origin query and counts local heads
   plus your cached `refs/remotes`. If origin is simply unreachable, the count falls back to those
   same cached refs, prints one line saying the count may be stale, and the start proceeds.
+
+### The weekly cadence
+
+The three ordering tools above — the priority sort, `cckit effort chain` and the WIP limit — are
+read on a fixed weekly rhythm. `cckit next` and `cckit status` both end their human output with it,
+from one shared function, so the line cannot differ between the two verbs:
+
+| When | Run | What it gives you |
+| --- | --- | --- |
+| Monday | `cckit plan` | the week's order: waves layered from the `blocked_by` edges, and **inside a wave the issues sorted `priority:p0` → `p1` → `p2` → `p3`**, unlabeled last |
+| Daily | `cckit next` | the unblocked set and the one command that starts the top issue |
+| Friday | `cckit gc` | the branches and worktrees that can be pruned — a report, it deletes nothing (`cckit cleanup` acts on it) |
+
+Priority never overrides a dependency: a p3 issue that blocks a p0 issue sits in an earlier wave and
+still runs first. For efforts, `cckit status` opens with a **Next effort per flow** table — per
+flow, the effort with no open blocker, p0 → p3 then lowest number, plus how many are still waiting.
+`cckit status --llm` carries those rows as `next_efforts`; the cadence line is human output only,
+so `cckit next --llm` rows stay `{number,ctx,title}`.
 
 **`cckit effort plan` can read a local snapshot instead of GitHub.** By default it makes one
 listing call plus one `blocked_by` call per open effort. Set `effort.planSource` in
