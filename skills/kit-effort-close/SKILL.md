@@ -16,6 +16,9 @@ close logic is re-authored inline (kit-engine-boundary #1/#2). Respects `KIT_BAS
 The effort lifecycle's terminal op. Board state, issue state, and the work record are correct
 **by construction** — the core op owns them, in this order:
 
+0. **Pre-close hook** (optional, config-gated via `effort.preCloseHook`) — a project gate called as
+   `<hook> <effort#> <sub#…>` from the effort worktree before anything is written. A non-zero exit
+   refuses the close and its output is printed; `KIT_FORCE=1` skips it and says so.
 1. **Snapshot sub-diffs BEFORE squash** (squash destroys the per-sub-issue commit pairs that ARE
    the work record — effort-model.md "Trace hard rules"), with a **refuse-squash-without-trace**
    backstop (`KIT_FORCE=1` overrides).
@@ -56,7 +59,7 @@ If not, abort and route to `/kit-effort-pr` first.
 ## Execution
 
 This skill is a **thin caller** of `effort_close` (`scripts/lib/effort-ops.sh`) — the SAME
-function `cckit effort close` runs. The core owns the pre-squash snapshot + trace backstop,
+function `cckit effort close` runs. The core owns the pre-close hook, the pre-squash snapshot + trace backstop,
 telemetry capture/judge/sync, the squash-merge, issue closes, board Done, GC, the
 knowledge-ingest hook, and the kit-sync drift check. There is no second implementation here.
 

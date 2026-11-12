@@ -100,6 +100,13 @@ The slug is a *derived* convenience, not a second source of truth. `--slug` only
   would destroy the per-sub commits without the snapshot above. `KIT_FORCE=1 cckit merge <pr>`
   merges anyway and warns that no trace was taken. A sub PR whose **base** is `effort/<N>` still
   merges with `cckit merge`.
+- **A project can gate the close.** Set `effort.preCloseHook` to an executable and `cckit effort
+  close` calls it as `<hook> <effort#> <sub#…>` from the effort worktree **before** the snapshot and
+  the merge. A non-zero exit refuses the close: the hook's output is printed and no trace, metrics
+  row or merge is written. A configured hook that is missing or not executable refuses too.
+  `KIT_FORCE=1` skips the hook and says so on stderr. A wave-style close runs the same hook from the
+  checkout the close was invoked in, after the subs are verified. See
+  [Effort close hooks](/config-and-permissions/#effort-close-hooks).
 - **The work trace is a directory, and `index.jsonl` says it is complete.** The snapshot writes
   `<git-common-dir>/traces/effort-<N>/<seq>-<shortsha>.{diff,meta}` — one pair per commit — plus an
   `index.jsonl` holding one JSON record per line pairing each commit to its sub-issue. The index is

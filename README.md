@@ -131,6 +131,8 @@ skip that snapshot. `KIT_FORCE=1 cckit merge <pr>` merges anyway, with a warning
 Before the squash deletes `effort/<N>-…` it re-targets every open PR based on that branch to the base branch
 (`↻ PR <n> re-targeted to develop`) — GitHub closes a PR, unmerged, when its base branch is deleted. If a
 re-target fails, or the list of those PRs cannot be read, the close refuses, names the PR, and merges nothing.
+A project gate goes in `effort.preCloseHook`: it runs as `<hook> <effort#> <sub#…>` from the effort worktree
+before the snapshot and the merge, a non-zero exit refuses the close, and `KIT_FORCE=1` skips it with a notice.
 
 The GitHub issue **number** stays the canonical key, but every effort also has a memorable **slug** handle (the one
 already in its `effort/<N>-<slug>` branch). Effort commands take the slug *or* the number interchangeably:
