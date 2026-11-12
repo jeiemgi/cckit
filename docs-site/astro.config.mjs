@@ -177,6 +177,7 @@ export default defineConfig({
         { label: 'Guides', items: [
           { label: 'All guides', slug: 'guides' },
           { label: 'Wave', slug: 'wave' },
+          { label: 'QA lane', slug: 'qa-lane' },
           { label: 'Driving cckit from agents', slug: 'agents' },
           { label: 'Cookbook', slug: 'cookbook' },
           { label: 'Browser debug', slug: 'debug' },

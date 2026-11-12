@@ -246,6 +246,45 @@ patterns earned from past review findings, enforced on every commit. This page's
 **agent** reading a diff. They are complementary and neither replaces the other.
 </Aside>
 
+## The QA lane
+
+`cckit qa` reads one block, `qa`, written by the `qa` module interview (`/kit-add qa`, or
+`scripts/kit-add.sh qa --answers <file>`). cckit records how the project's review stack boots; it
+does not guess a boot command and does not write a boot script. The walkthrough is the
+[QA lane guide](/qa-lane/).
+
+```json
+{
+  "modules": ["qa"],
+  "qa": {
+    "command": "pnpm dev:stack",
+    "ports": [{ "env": "WEB_PORT", "base": 3000 }, { "env": "API_PORT", "base": 4000 }],
+    "readiness": [{ "env": "WEB_PORT", "path": "/" }, { "env": "API_PORT", "path": "/health" }],
+    "route": "/dashboard",
+    "credentialEnv": ["QA_EMAIL", "QA_PASSWORD"]
+  }
+}
+```
+
+| Key | Default | What it does |
+| --- | --- | --- |
+| `qa.command` | *(required)* | The command that boots the whole review stack, run from the worktree root. Without it `cckit qa up` refuses with exit `2`. |
+| `qa.ports` | *(none)* | `{env, base}` per service: the port env var the command honours and its base port. A lane sets each `env` to `base + slot × worktree.devPortStride`. Empty refuses the launch. |
+| `qa.ports[].env` | — | Env var name, matching `^[A-Za-z_][A-Za-z0-9_]*$`. |
+| `qa.ports[].base` | `3000 + position` | Base port. The interview derives it when the answer names no port. |
+| `qa.readiness` | *(none)* | `{env, path}` per service that must answer before the lane counts as usable. Empty refuses the launch: with no probe, launched cannot be told from usable. |
+| `qa.readiness[].env` | — | Which service to probe, named by its port variable from `qa.ports`. |
+| `qa.readiness[].path` | `/` | Path requested on that port. |
+| `qa.route` | `/` | Route `cckit qa open` lands on when the PR body carries no `QA route:` line. Must start with `/` and hold no spaces. |
+| `qa.credentialEnv` | `[]` | **Names** of the env vars holding the test account's credentials. A value is refused at interview time and never stored. Recorded only: no verb reads it yet. |
+
+- Two `qa.ports` bases that differ by a multiple of the stride, fewer than 40 strides apart, are
+  refused before anything launches — two lanes would share a port.
+- `captain.mergePolicy.requireQa` is the one other key the lane uses; see
+  [Holding merges for a QA pass](#holding-merges-for-a-qa-pass).
+- `qa` is a receipt stage, not an agent stage: it is in the [stage receipt](#stage-receipts)
+  vocabulary and not in `agents.stages`, because a person records it.
+
 ## Worktree bootstrap
 
 `cckit start <issue>` and `cckit effort start <N>` make a fresh worktree runnable before you touch it:
@@ -531,6 +570,9 @@ blocker:    none
 next stage: review
 RECEIPT
 ```
+
+The stage is one of `build` · `review` · `design` · `docs` · `qa` · `none`. `qa` is the stage
+`cckit qa verdict` writes — see [the QA lane](/qa-lane/#record-the-verdict--cckit-qa-verdict).
 
 One JSON file per attempt, under `.cckit/receipts/`, keyed `<issue>-<stage>-<attempt>`. The
 directory resolves from the repo's shared git dir, so a receipt a worker writes inside its own
