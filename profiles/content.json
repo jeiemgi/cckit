@@ -25,6 +25,7 @@
     "merge-safety",
     "gate-and-review",
     "authoring",
+    "shared-checkout",
     "task-management"
   ],
   "roles": [

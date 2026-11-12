@@ -56,6 +56,8 @@ cckit is pure bash over `git`, `gh`, and `jq`. There is no build step — instal
 
 It is a **symlink, not a copy** — the dispatcher resolves the link back to the repo, so `git pull` upgrades your install with no reinstall.
 
+That also means a source install is as old as the branch its clone is parked on. The [install & update matrix](/install-matrix/) compares every route — what lands on disk, how it updates, when a restart is needed — and [Multi-session safety](/multi-session/) covers a clone that several agent sessions share.
+
 ## Dependencies
 
 | Required | Why |

@@ -37,7 +37,8 @@ delegation-brief sections
 effort-model rendered
 issue-lifecycle rendered
 merge-safety rendered
-naming-and-ids verbatim'
+naming-and-ids verbatim
+shared-checkout rendered'
 
 # The kit-owned sections of delegation-brief.md — the transferable instruction `cckit brief` lifts.
 # Project-specific sections ("Project specifics", "Gate commands") are filled in for cckit and are

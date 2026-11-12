@@ -26,6 +26,7 @@ cckit init --dry-run
 | [`merge-safety`](#merge-safety) | rebase onto the current base before merging, a coupled chain as one PR, the gate re-run on the integration branch | all five |
 | [`gate-and-review`](#gate-and-review) | the gate blocks the push and its output goes on the PR; every AI-reviewer finding is fixed or rebutted before the merge | all five |
 | [`authoring`](#authoring) | docs and README updated in the same change, no issue numbers in pasted prompts, summaries that name the work without machine flags | all five |
+| [`shared-checkout`](#shared-checkout) | the primary checkout is shared by every session: never move it by hand, work in a worktree, call a freshly merged verb from a current worktree | all five |
 | `mempalace` | the persistent-memory protocol — written only when memory is on | all five |
 | `knowledge-base` | frontmatter and the index for the project's knowledge docs | software, content, research, automation |
 | `plan-output-format` | a plan is a file with a `## Deliverables` table | software, content, research, automation |
@@ -158,3 +159,23 @@ What each one asks for in practice:
   a PR body or a changelog still cites the real number: those describe one repository's history.
 - **Summaries.** A command belongs in a summary when you are going to run it next, written exactly
   as typed. A flag that is evidence in a PR body — the command that ran and its exit code — stays.
+
+### shared-checkout
+
+`templates/rules/shared-checkout.md` — three conventions about the one directory every session on a
+machine has in common: the primary checkout, the first entry of `git worktree list`.
+
+| Convention | Where it came from | Wins against |
+| --- | --- | --- |
+| Never move the primary checkout by hand — no `checkout`, `switch`, `pull`, `merge`, `rebase`, `reset` or `stash` there; it stays on the base branch, clean | observed 2026-07-03 with several sessions live: the primary checkout was found parked on a feature branch, then on the base, without the session reading it having moved it | `branch-naming` § *Branch lifecycle*, whose "switches to the base branch and pulls" describes the close op and stands for it only; `delegation-brief`'s `git reset --hard origin/<base>`, which is for an isolation worktree and never the primary checkout |
+| Work in a worktree, always, a one-line fix included | the same incident: the close ops only check out the base, so a primary checkout on a feature branch means a session checked it out there | `branch-naming` § *Parallel work* — its one-agent-one-worktree line is extended to a session working alone |
+| Call a freshly merged verb from a current worktree's `bin/`, not from PATH, when PATH resolves into the primary checkout | two incidents the same day: a verb merged minutes earlier answered "unknown command", and the version check read "ahead of plugin 0.3.0" from the stale branch's files | nothing — no shipped rule says which copy of a tool to run |
+
+The rule forbids hand-run git, not the verbs. `cckit merge` (`scripts/lib/kit-task-ops.sh:424-425`)
+and `cckit effort close` (`scripts/lib/effort-ops.sh:1025-1026`) check out and pull the base in the
+primary checkout as their last step. With the checkout already on the base and clean, that switches
+nothing and fast-forwards; both lines end in `|| true`, so a dirty or re-parked checkout is left
+stale without a message.
+
+[Multi-session safety](/multi-session/) lists what sessions share and what cckit already isolates;
+the [install & update matrix](/install-matrix/) says which install routes put PATH inside a clone.
