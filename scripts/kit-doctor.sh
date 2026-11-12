@@ -8,11 +8,14 @@
 #   scripts/kit-doctor.sh --no-install    # check and auth only — skip package installs
 #   scripts/kit-doctor.sh --dismiss-local # silence the "local layer down" session notice
 #                                         # until the next x.y kit update
+#   scripts/kit-doctor.sh --agents        # only the selected agent runtimes (claude / codex):
+#                                         # present or absent; exit 1 if one is absent. No network.
 #
 # Tiers:
 #   Tier 0  Homebrew (macOS bootstrap — requires sudo password)
 #   Tier 1  git, gh, jq, perl           — hard deps, auto-install via brew
 #   Tier 2  node + pnpm, vercel, turbo  — project-specific, auto-install if applicable
+#   Agents  the runtime binary of each adapter the project selected (`adapters` in the config)
 #   Local   mlx-lm via uv tool install + mlx_lm.server auto-start (when .local.enabled)
 #   Auth    gh auth status + scope:project, git config name/email
 #   SSH     optional guided flow (ed25519, pbcopy, link to github settings)
@@ -22,15 +25,16 @@ set -euo pipefail
 _export_dir_doctor="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
 
 # ---- flags ------------------------------------------------------------------
-DRY_RUN=0; NO_INSTALL=0; DISMISS_LOCAL=0; ASSUME_YES=0
+DRY_RUN=0; NO_INSTALL=0; DISMISS_LOCAL=0; ASSUME_YES=0; AGENTS_ONLY=0
 for _a in "$@"; do
   case "$_a" in
     --dry-run)       DRY_RUN=1 ;;
     --no-install)    NO_INSTALL=1 ;;
     --fix|--yes|-y)  ASSUME_YES=1 ;;
     --dismiss-local) DISMISS_LOCAL=1 ;;
+    --agents)        AGENTS_ONLY=1 ;;
     -h|--help)
-      sed -n '2,13p' "$0" | grep '^#' | sed 's/^# \?//'
+      sed -n '2,15p' "$0" | grep '^#' | sed 's/^# \?//'
       exit 0 ;;
   esac
 done
@@ -91,7 +95,7 @@ fi
 # it in a terminal, ASK first — install only if approved. Non-interactive callers (init.sh preflight,
 # hooks) pass --fix/--yes or simply have no TTY, so automation keeps its current auto-install behavior
 # and never blocks on a prompt. --dry-run / --no-install already skip installs entirely.
-if [[ $DRY_RUN -eq 0 && $NO_INSTALL -eq 0 && $ASSUME_YES -eq 0 && -t 0 ]]; then
+if [[ $DRY_RUN -eq 0 && $NO_INSTALL -eq 0 && $ASSUME_YES -eq 0 && $AGENTS_ONLY -eq 0 && -t 0 ]]; then
   printf '\n  %s%scckit doctor can install anything missing for you%s (via Homebrew, corepack, etc.).\n' "$C_BOLD" "" "$C_RESET"
   printf '  It will show each thing as it goes. Nothing is installed if you decline.\n\n'
   printf '  Install missing dependencies? [Y/n] '
@@ -130,6 +134,45 @@ brew_install() {
   if ! has_cmd brew; then return 1; fi
   brew install "$pkg" >/dev/null 2>&1 && has_cmd "$cmd"
 }
+
+# ---- agent runtimes (E257.3) ------------------------------------------------
+# One row per adapter the project SELECTED (`adapters` in its config; a config without the key means
+# claude). An adapter whose CLI is not on PATH is installed but cannot run, so it is a warning and a
+# manual action — the doctor never installs an agent CLI. Sets AGENTS_ABSENT to the count.
+AGENTS_ABSENT=0
+doctor_agents() {
+  local _d _sel _name _state _ver _tab
+  _d="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+  command -v kit_config_path >/dev/null 2>&1 || . "$_d/lib/config-path.sh"
+  command -v adapter_runtime_report >/dev/null 2>&1 || . "$_d/lib/adapter-select.sh"
+  _tab="$(printf '\t')"
+  if ! _sel="$(adapter_project_list "${TARGET:-$PWD}" 2>/dev/null)"; then
+    row "$MARK_FAIL" "adapters" "the config's 'adapters' value is invalid (expected claude and/or codex)"
+    CHECKS_FAIL=$((CHECKS_FAIL + 1)); AGENTS_ABSENT=$((AGENTS_ABSENT + 1))
+    return 0
+  fi
+  while IFS="$_tab" read -r _name _state _ver; do
+    [[ -n "$_name" ]] || continue
+    if [[ "$_state" == "present" ]]; then
+      row "$MARK_OK" "$_name" "$_ver"
+      CHECKS_OK=$((CHECKS_OK + 1))
+    else
+      row "$MARK_WARN" "$_name" "absent — the $_name adapter is selected but its CLI is not on PATH"
+      CHECKS_WARN=$((CHECKS_WARN + 1)); AGENTS_ABSENT=$((AGENTS_ABSENT + 1))
+      ACTIONS_NEEDED+=("Install the $_name CLI (the project selects the $_name adapter)")
+    fi
+  done <<EOF_AGENTS
+$(adapter_runtime_report "$_sel")
+EOF_AGENTS
+}
+
+# ---- --agents: only the runtime rows, then exit (no installs, no network) ----
+if [[ $AGENTS_ONLY -eq 1 ]]; then
+  printf '  %s%sAgent runtimes%s\n' "$C_BOLD" "" "$C_RESET"
+  doctor_agents
+  [[ $AGENTS_ABSENT -eq 0 ]] || exit 1
+  exit 0
+fi
 
 # ============================================================================
 # BANNER
@@ -385,6 +428,13 @@ if [[ -d "$_nm" ]]; then
     row "$MARK_SKIP" "playwright" "not in node_modules (run pnpm install)"
   fi
 fi
+printf '\n'
+
+# ============================================================================
+# AGENT RUNTIMES — the CLI of each selected adapter
+# ============================================================================
+printf '  %s%sAgent runtimes%s\n' "$C_BOLD" "" "$C_RESET"
+doctor_agents
 printf '\n'
 
 # ============================================================================

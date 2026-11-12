@@ -22,9 +22,9 @@ The tables are grouped by job: setup, the daily lifecycle, planning a wave, runn
 | Verb | Purpose |
 | --- | --- |
 | `cckit install [bin-dir]` | Symlink `cckit` onto your PATH. |
-| `cckit init --profile <p>` | Scaffold `cckit.config.json` + `.claude/` for this repo. |
+| `cckit init --profile <p>` | Scaffold `cckit.config.json` + `.claude/` for this repo. `--adapter <claude\|codex\|both>` selects the agent (default `claude`): `codex` writes `AGENTS.md` + `.agents/{skills,rules}` and, alone, no `.claude/` tree. `--upgrade` keeps the stored selection; `--upgrade --adapter <name>` adds one. See [Adapters](/adapters/#choosing-adapters-at-install). |
 | `cckit scan` | Detect this repo's stack + kit state (JSON). |
-| `cckit doctor` | Onboarding preflight: deps present, `gh` authenticated, and (when enabled) the MemPalace CLI + per-wing wake-up header. Asks before installing; `--fix` installs and seeds without the prompt. |
+| `cckit doctor` | Onboarding preflight: deps present, `gh` authenticated, and (when enabled) the MemPalace CLI + per-wing wake-up header. Asks before installing; `--fix` installs and seeds without the prompt. Also reports the CLI of each selected adapter present or absent; `--agents` prints only those rows, offline, and exits 1 when one is absent. |
 | `cckit adopt` | Record kit-shaped files a repo already has. |
 | `cckit migrate` | Reshuffle an old kit layout to the current one. |
 

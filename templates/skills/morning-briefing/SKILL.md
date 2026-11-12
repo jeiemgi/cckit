@@ -8,7 +8,7 @@ when_to_use: When the owner starts their day or asks for a morning briefing / da
 
 ## What it does
 
-Reads GitHub (source of truth) + active plans, then delivers a concise briefing. Reads repo + plans dir from `.claude/kit.config.json`.
+Reads GitHub (source of truth) + active plans, then delivers a concise briefing. Reads repo + plans dir from `{{CONFIG_REL}}`.
 
 ## How to run
 
@@ -42,5 +42,5 @@ Then produce:
 
 - No long intros — straight to the briefing
 - Bullets only · keep under 30 lines · skip empty sections
-- Language: match the owner (see `.claude/rules/communication-style.md`)
+- Language: match the owner (see `{{ADAPTER_DIR}}/rules/communication-style.md`)
 - Source of truth is GitHub — never invent task state

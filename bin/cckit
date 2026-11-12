@@ -8,6 +8,7 @@
 #   cckit handoff "<note>"          save a resume-here note for the next session
 #   cckit install [bin-dir]         symlink cckit onto your PATH (global install)
 #   cckit init --profile <p>        scaffold cckit.config.json + .claude/ (--profile required)
+#                                   --adapter <claude|codex|both> selects the agent (default claude)
 #   cckit start <issue> [slug]      isolated worktree + branch for an issue
 #   cckit pr <issue> <summary>      commit + push + open the PR
 #   cckit close <issue> <summary> [--reason completed|not-planned|duplicate] [--duplicate-of N]
@@ -48,7 +49,7 @@
 #   cckit debug [--check] <args>    optional browser-debug via chrome-devtools-axi (auto-detected)
 #   cckit encode-context            stdin JSON -> compact TOON (uniform arrays; JSON fallback)
 #   cckit render                    stdin markdown -> rich (glow on a TTY; verbatim when piped)
-#   cckit doctor                    onboarding preflight (deps, gh auth)
+#   cckit doctor                    onboarding preflight (deps, gh auth, selected agent CLIs)
 #   cckit update                    check whether this project is behind the installed cckit
 #   cckit migrate                   reshuffle an old kit layout to the current one
 #   cckit adopt                     record kit-shaped files a repo already has into the manifest

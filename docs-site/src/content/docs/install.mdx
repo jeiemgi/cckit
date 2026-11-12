@@ -72,7 +72,8 @@ Optional, auto-detected, never required:
 | `glow` / `fzf` / `gum` | nicer terminal output and pickers |
 | Node + Chrome | `cckit debug` (browser debugging via chrome-devtools-axi) |
 
-`cckit doctor` reports what's missing.
+`cckit doctor` reports what's missing — including the agent CLI (`claude`, `codex`) of each adapter
+the project selected. `cckit doctor --agents` prints only those rows and makes no network call.
 
 <Aside type="tip" title="What is a symlink? (skip if you know)">
 A symlink is a pointer file: it stands in one folder but redirects to a file somewhere else. cckit installs as a symlink into a PATH folder that points back to the cloned repo, so updating the repo updates your installed command automatically.

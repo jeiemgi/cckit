@@ -11,6 +11,13 @@
       "type": "string",
       "description": "Kit version that last wrote/wired this config. Drives self-heal: when it differs from the installed plugin, kit-wire re-converges."
     },
+    "adapters": {
+      "type": "array",
+      "description": "Agent adapters this project installs, written by `cckit init --adapter <claude|codex|both>`. Absent means [\"claude\"]. `cckit init --upgrade` keeps the stored selection; `--upgrade --adapter <name>` adds one and never removes one.",
+      "items": { "enum": ["claude", "codex"] },
+      "minItems": 1,
+      "uniqueItems": true
+    },
     "mode": {
       "type": "string",
       "enum": ["draft", "guided", "enforced"],

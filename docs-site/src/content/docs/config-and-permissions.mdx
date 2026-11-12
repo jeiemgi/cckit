@@ -24,6 +24,13 @@ cckit runs in the directory you invoke it from. It finds the config for that pro
 
 No org, repo, or path is hardcoded — every value comes from this file. A repo with no config is invited to run `cckit init`.
 
+`cckit init` writes source 3 when the Claude adapter is selected and source 2 for a Codex-only
+project, which has no `.claude/` directory. The config's `adapters` array records the selection
+(`["claude"]`, `["codex"]` or both); a config without the key means `["claude"]`. The ownership
+manifest — the hashes `cckit remove` and `--upgrade` use to tell a kit-owned file from an edited one —
+sits beside it: `.claude/kit.manifest.json`, or `.cckit/kit.manifest.json` in a project that started
+Codex-only. Neither file moves when the second adapter is enabled later.
+
 <Aside type="note" title="New here? Why 'nearest wins'">
 "Nearest wins" means cckit uses the config closest to where you are standing in the folder tree. If you run a command three folders deep, cckit walks up until it finds the first config file and uses that one. This is the same idea many tools use so a sub-project can override its parent.
 </Aside>

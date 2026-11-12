@@ -44,6 +44,28 @@ Afterwards your repo looks roughly like this — your own files are untouched, c
   - … your existing files, unchanged
 </FileTree>
 
+### Claude Code, Codex, or both
+
+`cckit init` installs the Claude Code adapter unless you say otherwise:
+
+```bash
+cckit init --profile software --adapter codex   # or: claude (default) · both
+```
+
+| `--adapter` | Instructions | Skills and rules | Config | Hooks, guards, agents |
+| --- | --- | --- | --- | --- |
+| `claude` | `CLAUDE.md` | `.claude/skills/`, `.claude/rules/` | `.claude/kit.config.json` | installed |
+| `codex` | `AGENTS.md` | `.agents/skills/`, `.agents/rules/` | `cckit.config.json` | not installed |
+| `both` | both files | both trees | `.claude/kit.config.json` | installed for Claude Code only |
+
+Both adapters render from the same templates, so a rule or skill reads the same in either tree. A
+Codex-only project gets no `.claude/` directory. If the repo already has its own `AGENTS.md`, a fresh
+init keeps it and tells you; `--force` replaces it.
+
+The choice is stored as `adapters` in the config. `cckit init --upgrade` keeps it, and
+`cckit init --upgrade --adapter codex` adds the second adapter without rewriting the first one's
+files. Details and current limits: [Adapters](/adapters/#choosing-adapters-at-install).
+
 <Aside type="tip" title="Want to see what's already there first?">
 Run `cckit scan` before `init` — it reports the repo's stack and whether any kit-shaped files already exist.
 </Aside>

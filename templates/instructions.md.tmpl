@@ -1,9 +1,9 @@
 # {{PROJECT_NAME}}
 
 > Scaffolded by [claude-kit](https://github.com/tuempresadigital/claude-kit) — profile `{{PROFILE}}`.
-> Project config lives in `.claude/kit.config.json`. Edit freely; this file is yours now.
+> Project config lives in `{{CONFIG_REL}}`. Edit freely; this file is yours now.
 
-<!-- IF:MEMORY -->
+<!-- IF:ADAPTER_CLAUDE --><!-- IF:MEMORY -->
 ## MANDATORY — Session Start Protocol
 
 **Do this before answering anything else:**
@@ -21,12 +21,23 @@ Spawn the matching agent for any domain task — do not answer domain decisions 
 {{AGENT_TABLE}}
 
 Agent definitions: `.claude/agents/<name>/AGENT.md`.
+<!-- /IF:ADAPTER_CLAUDE --><!-- IF:ADAPTER_CODEX -->
+## How this project is driven
+
+This project runs on [cckit](https://cckit.dev). Every operation is a `cckit` verb you run in the
+shell — read state with `cckit sync --llm` before acting, and append `--llm` to any verb for
+machine-readable output. `cckit` installs no hooks, guards or specialist agents for Codex: nothing
+blocks a commit to the base branch here, so the rules below are yours to follow.
+<!-- IF:MEMORY -->
+Memory hooks are not installed for Codex. If a MemPalace MCP server is configured, call its tools
+explicitly (wing `{{WING}}`).
+<!-- /IF:MEMORY --><!-- /IF:ADAPTER_CODEX -->
 
 ## Skills
 
 {{SKILL_TABLE}}
 
-Invoke a skill when the user types `/<skill-name>` or when its `when_to_use` matches.
+<!-- IF:ADAPTER_CLAUDE -->Invoke a skill when the user types `/<skill-name>` or when its `when_to_use` matches.<!-- /IF:ADAPTER_CLAUDE --><!-- IF:ADAPTER_CODEX -->Skills live in `.agents/skills/<name>/SKILL.md`. Use one when its description matches the task.<!-- /IF:ADAPTER_CODEX -->
 
 <!-- IF:STACK_SKILLS -->
 ## Stack conventions (auto-applying skills)
@@ -58,17 +69,17 @@ becomes the Spec Kit `feature-module.md` override.<!-- /IF:STACK_SKILLS --> Pick
 
 - **Source of truth:** GitHub issues<!-- IF:PROJECTS_V2 --> + Projects v2 board (`https://github.com/users/{{GH_OWNER}}/projects/{{PROJECT_NUMBER}}`)<!-- /IF:PROJECTS_V2 -->
 - Repo: `{{GH_REPO}}`
-- **Never** maintain task lists in markdown — use `gh issue` + the `task-*` skills
+- **Never** maintain task lists in markdown — use <!-- IF:ADAPTER_CLAUDE -->`gh issue` + the `task-*` skills<!-- /IF:ADAPTER_CLAUDE --><!-- IF:ADAPTER_CODEX -->the `cckit` verbs below<!-- /IF:ADAPTER_CODEX -->
 - Milestones: {{MILESTONES_HUMAN}}
 <!-- IF:PLANS -->
-- Plans live in `{{PLANS_DIR}}` (format: `{{PLANS_FORMAT}}`) — see `.claude/rules/plan-output-format.md`
+- Plans live in `{{PLANS_DIR}}` (format: `{{PLANS_FORMAT}}`) — see `{{ADAPTER_DIR}}/rules/plan-output-format.md`
 <!-- /IF:PLANS -->
 
 ## PR workflow
 
 Every issue lands on `main` through a Pull Request. No direct commits to `main`.
 
-| Step              | Skill              | What it does                                            |
+<!-- IF:ADAPTER_CLAUDE -->| Step              | Skill              | What it does                                            |
 | ----------------- | ------------------ | ------------------------------------------------------- |
 | 1. Pick an issue  | `/kit-task-sync`       | See the open board, choose what's unblocked             |
 | 2. Start work     | `/kit-task-start <N>`  | Isolated worktree + branch `<kind>/<N>-<slug>` from the base + mark In Progress |
@@ -76,6 +87,15 @@ Every issue lands on `main` through a Pull Request. No direct commits to `main`.
 | 4. Open PR        | `/kit-task-pr <N>`     | Commit + push + open PR with template/labels/milestone  |
 | 5. Review + merge | `/kit-task-pr-merge`   | Squash-merge PR, switch to main, pull                   |
 | 6. Close          | `/kit-task-close <N>`  | Close issue (auto on `Closes #N`) + archive plan        |
+<!-- /IF:ADAPTER_CLAUDE --><!-- IF:ADAPTER_CODEX -->| Step              | Command                         | What it does                                            |
+| ----------------- | ------------------------------- | ------------------------------------------------------- |
+| 1. Pick an issue  | `cckit sync --llm`              | See the open board, choose what's unblocked             |
+| 2. Start work     | `cckit start <N>`               | Isolated worktree + branch `<kind>/<N>-<slug>` from the base |
+| 3. Do the work    | —                               | Work inside the worktree `cckit start` printed          |
+| 4. Open PR        | `cckit pr <N> "<summary>"`      | Commit + push + open PR                                 |
+| 5. Review + merge | —                               | A human decision; report the PR URL and stop            |
+| 6. Close          | `cckit close <N> "<summary>"`   | Close the issue once its PR merged                      |
+<!-- /IF:ADAPTER_CODEX -->
 
 ### Branch naming
 
@@ -88,17 +108,21 @@ Every issue lands on `main` through a Pull Request. No direct commits to `main`.
 
 ## Rules
 
-- Keep this file tight — point to files, don't duplicate content.
+<!-- IF:ADAPTER_CODEX -->Codex does not load a rules directory on its own. Read the rule that applies before acting:
+
+{{RULE_LIST}}
+
+<!-- /IF:ADAPTER_CODEX -->- Keep this file tight — point to files, don't duplicate content.
 - Bullets and tables preferred. No long intros.
-- Communication style → `.claude/rules/communication-style.md`
+- Communication style → `{{ADAPTER_DIR}}/rules/communication-style.md`
 <!-- IF:DESIGN -->
-- All design + adjustment questions → Designer agent (`.claude/rules/design-routing.md`)
+- All design + adjustment questions → Designer agent (`{{ADAPTER_DIR}}/rules/design-routing.md`)
 <!-- /IF:DESIGN -->
 <!-- IF:PLANS -->
-- Plan output format → `.claude/rules/plan-output-format.md`
+- Plan output format → `{{ADAPTER_DIR}}/rules/plan-output-format.md`
 <!-- /IF:PLANS -->
 <!-- IF:MEMORY -->
-- Persistent memory protocol → `.claude/rules/mempalace.md`
+- Persistent memory protocol → `{{ADAPTER_DIR}}/rules/mempalace.md`
 <!-- /IF:MEMORY -->
 
 ## Language

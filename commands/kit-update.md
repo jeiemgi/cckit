@@ -108,7 +108,9 @@ _plug="$(jq -r '.version // "0.0.0"' "/Users/josegutierrezdelgado/.claude/plugin
    **adds** missing files and **merges** new required config keys — your existing `.claude/` files
    (including a customized `.claude/statusline.sh` shim) and `kit.config.json` values are never
    overwritten, and feature blocks your config deliberately lacks (`plans`, `specKit`, `prePush`,
-   `local`, `memory`) are never injected from profile defaults.
+   `local`, `memory`) are never injected from profile defaults. The stored adapter selection
+   (`adapters`) is kept; pass `--adapter codex` (or `claude`) to ADD the other adapter — the files of
+   the one already installed are not rewritten.
 
 4. **Confirm, then apply.** Ask with `AskUserQuestion`: **Apply update** · **Preview only** · **Skip**.
    Per the CLI-style preference, when the delta is purely additive (only new files, nothing preserved

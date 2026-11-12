@@ -15,6 +15,7 @@ Run the kit-doctor script to check all dependencies and authentication required 
 | Tier 0 | Homebrew (macOS bootstrap — installs if missing, requires sudo password) |
 | Tier 1 | `git`, `gh` (≥2.29 for Projects v2), `jq`, `perl` — auto-installs via brew |
 | Tier 2 | `node`, `pnpm`, `vercel` (if .vercel/ exists), `turbo`/`playwright` (dev deps only) |
+| Agents | The CLI of each adapter the project selected (`adapters` in the config; absent means `claude`): `claude` and/or `codex`, present with its version or absent. Absent is a warning and a manual action — the doctor never installs an agent CLI |
 | Local | Only when `.local.enabled` — installs `mlx-lm` via `uv tool install` (fallback `pipx`, never plain `pip`) + starts `mlx_lm.server` in background with a port health check (first run downloads ~4.5 GB) |
 | Memory | Only when `.memory.enabled` — installs the [MemPalace](https://github.com/MemPalace/mempalace) CLI if missing (pipx, fallback uv), seeds the per-wing wake-up header (`.claude/mempal-identity.<wing>.txt`), and refreshes a stale session-start hook. Install + seed + refresh obey the consent guard: `--fix` applies them, `--dry-run`/`--no-install` only report |
 | Auth | `gh auth status`, scope `project`, `git config user.name/email` |
@@ -25,6 +26,7 @@ Run the kit-doctor script to check all dependencies and authentication required 
 
 - `--dry-run` — report only, touch nothing (no installs, no server start)
 - `--no-install` — check + auth only, skip package installs
+- `--agents` — only the agent-runtime rows; no installs, no network; exits 1 when a selected runtime is absent
 - `--dismiss-local` — silence the "local layer down" SessionStart notice until the next x.y kit update (writes `.local.dismissed` to `kit.config.json`); session-only alternative: `KIT_LOCAL_DISMISS=1`
 
 ## Steps

@@ -56,8 +56,13 @@ You are initializing the current project with the **claude-kit** setup. The kit 
      --repo "<owner/repo>" \
      [--project-number <N>] \
      [--memory on] \
-     [--lang "<language>"]
+     [--lang "<language>"] \
+     [--adapter <claude|codex|both>]
    ```
+
+   `--adapter` selects the agent adapter(s), default `claude`. `codex` writes `AGENTS.md` and
+   `.agents/{skills,rules}` from the same templates; `both` writes both trees. The selection is stored
+   as `adapters` in the config.
 
    It substitutes `{{VARS}}`, resolves `<!-- IF:FLAG -->` blocks, and writes `CLAUDE.md`,
    `.claude/{kit.config.json,agents,skills,rules,settings.local.json}`, and `scripts/`.
