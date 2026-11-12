@@ -117,6 +117,10 @@ A **wave** is a set of issues with no blockers between them, so they can run at 
 
 Both are launch verbs with no JSON result — use `--dry-run` to inspect the plan before anything starts.
 
+Both cut each worktree from the config's base branch. `KIT_BASE_BRANCH=<branch>` in the environment
+[overrides it for that run](/config-and-permissions/#overriding-the-base-branch-for-one-command) —
+that is how an effort's sub-issue starts from `effort/<N>-<slug>` — and the launch plan says so.
+
 ### Tmux and Herdr
 
 Tmux is the default runtime and preserves the existing tiled session. `--runtime herdr` creates one

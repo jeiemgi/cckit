@@ -109,6 +109,17 @@ Every operation an unattended run needs is reachable through the one CLI:
 | `--force` | launch even if an issue is `blocked_by` an OPEN issue (the gate is on by default) |
 | `--no-seed` | start the agent without an auto-prompt |
 
+**Base branch override.** `KIT_BASE_BRANCH` in the environment wins over `github.baseBranch` in the
+config for that invocation: `KIT_BASE_BRANCH=effort/<N>-<slug> cckit orchestrate <sub>` cuts the
+sub's worktree from the effort branch instead of the base. `orchestrate` then prints
+`base '<branch>' comes from KIT_BASE_BRANCH in the environment (the config says '<base>')`. The
+branch must exist on origin (`wt_start` fetches it). Every verb that loads the config reads the same
+variable — `cckit start` cuts from it and `cckit pr` targets it — so set it per command, not with a
+shell-wide `export`. `orchestrate` passes an override on to each agent pane (tmux: `env KIT_BASE_BRANCH=…`
+on the agent's command line; Herdr: `--env`), so `cckit pr` in the pane targets the branch the
+worktree was cut from. The base cckit resolved from a config is not an override in a child process:
+a `cckit` run in another project reads its own config.
+
 ## The agent loop (reference)
 
 1. `cckit sync --llm` → pick an unblocked issue.

@@ -216,7 +216,12 @@ cckit watch --merge        # the captain: gate open PRs, squash-merge the CLEAN 
                            #   (policy floors hold PRs touching CI, lockfiles, or secrets for review)
 cckit watch --loop         # self-pace gate/merge passes until steady state
 cckit autopilot            # select unblocked work, then call orchestrate --detach under a cap
+KIT_BASE_BRANCH=effort/42-auth cckit orchestrate 44   # cut an effort's sub from the effort branch
 ```
+
+`KIT_BASE_BRANCH` in the environment overrides `github.baseBranch` for that one invocation, so a
+sub-issue starts with the commits its effort has already landed. The branch has to exist on origin,
+and `orchestrate` prints a line naming the override and the config value it replaced.
 
 Set `review.command` in your config and the captain sends every PR it would merge to an agent
 reviewer first, records the verdict as a stage receipt, and refuses to merge on a `fail`. You name

@@ -45,7 +45,24 @@ load_kit_config() {
   # Integration branch, resolved through a fallback chain so a host project that names its
   # integration branch under an older/alternate key still works on adoption: baseBranch (canonical)
   # -> integrationBranch -> flow -> "main". First non-null wins (#117).
-  export KIT_BASE_BRANCH="$(jq -r '.github.baseBranch // .github.integrationBranch // .github.flow // "main"' "$cfg")"
+  # A KIT_BASE_BRANCH already in the environment WINS over the config (#352): the config is the
+  # default, not the assignment. That is how a sub-issue is cut from its effort branch —
+  # `KIT_BASE_BRANCH=effort/<N>-<slug> cckit orchestrate <sub>` — and it matches init.sh, which
+  # already reads the variable as the caller's override. KIT_BASE_BRANCH_CONFIG always carries what
+  # the config says, so a caller can tell an override from the default and say which one it used.
+  export KIT_BASE_BRANCH_CONFIG="$(jq -r '.github.baseBranch // .github.integrationBranch // .github.flow // "main"' "$cfg")"
+  # An inherited value is an override only if the CALLER set it. load_kit_config exports the base
+  # it resolved, so every process cckit starts inherits one, and a later load in another project
+  # would read project A's config value as an override of project B's config. So a load that
+  # defaults to the config records the value in KIT_BASE_BRANCH_DEFAULTED, and an inherited
+  # KIT_BASE_BRANCH equal to that record is cckit's own earlier export: the config answers again.
+  # Limit: in an environment that already carries the record, an explicit override that names the
+  # recorded value itself is indistinguishable from the leak and is read as the config default.
+  if [ -n "${KIT_BASE_BRANCH:-}" ] && [ "$KIT_BASE_BRANCH" != "${KIT_BASE_BRANCH_DEFAULTED:-}" ]; then
+    export KIT_BASE_BRANCH KIT_BASE_BRANCH_DEFAULTED=""
+  else
+    export KIT_BASE_BRANCH="$KIT_BASE_BRANCH_CONFIG" KIT_BASE_BRANCH_DEFAULTED="$KIT_BASE_BRANCH_CONFIG"
+  fi
   export KIT_PROJECTS_V2="$(jq -r '.github.projectsV2' "$cfg")"
   export KIT_PROJECT_NUMBER="$(jq -r '.github.projectNumber' "$cfg")"
   export KIT_PROJECT_TITLE="$(jq -r '.github.projectTitle'   "$cfg")"

@@ -24,6 +24,51 @@ cckit runs in the directory you invoke it from. It finds the config for that pro
 
 No org, repo, or path is hardcoded — every value comes from this file. A repo with no config is invited to run `cckit init`.
 
+### Overriding the base branch for one command
+
+`github.baseBranch` is the default, not the last word. A `KIT_BASE_BRANCH` already in the
+environment wins over it:
+
+```bash
+KIT_BASE_BRANCH=effort/42-auth cckit orchestrate 44
+```
+
+```text
+orchestrate: repo owner/repo (base effort/42-auth), cap 4, runtime 'tmux', agent 'claude'
+orchestrate: base 'effort/42-auth' comes from KIT_BASE_BRANCH in the environment (the config says 'develop')
+```
+
+The second line appears only when the two differ. An empty `KIT_BASE_BRANCH` counts as unset.
+
+| Variable | Holds |
+| --- | --- |
+| `KIT_BASE_BRANCH` | The base in effect: the environment value when one is set, otherwise the config's. |
+| `KIT_BASE_BRANCH_CONFIG` | What the config says (`github.baseBranch` → `integrationBranch` → `flow` → `main`), whether or not it was overridden. |
+| `KIT_BASE_BRANCH_DEFAULTED` | The value cckit exported when it fell back to the config; empty when the caller overrode it. Internal: do not set it. |
+
+cckit exports the base it resolved, so a process it starts inherits `KIT_BASE_BRANCH`. That
+inherited value is not an override: a later `cckit` in another project compares it with
+`KIT_BASE_BRANCH_DEFAULTED`, finds them equal, and reads its own config. One limit follows: inside
+an environment cckit already exported into, an override that names that same exported value is read
+as the default.
+
+`orchestrate` hands an override to each agent it starts, so `cckit pr` inside the pane targets the
+same branch the worktree was cut from. On tmux the agent's command line becomes
+`env KIT_BASE_BRANCH='<branch>' <agent> …`; on Herdr the workspace and each tab are created with
+`--env KIT_BASE_BRANCH=<branch>`. A pane's environment comes from the tmux or Herdr server, not from
+the `orchestrate` process, so the variable alone would reach the pane only when `orchestrate`
+happened to start the server. `orchestrate` also starts a tmux server without `KIT_BASE_BRANCH` in
+its environment and removes one an earlier run left there, so panes opened later on other projects
+do not inherit it.
+
+Two things to know before using it:
+
+- **The branch must exist on origin.** `cckit start` and `orchestrate` fetch `origin/<base>` before
+  cutting the worktree, and the fetch fails on a branch that was never pushed.
+- **Every verb that loads the config reads it.** `cckit start` cuts from it, `cckit pr` opens the PR
+  against it, `cckit gc` measures "landed" against it. Set it on the one command that needs it;
+  a shell-wide `export` redirects all of them.
+
 <Aside type="note" title="New here? Why 'nearest wins'">
 "Nearest wins" means cckit uses the config closest to where you are standing in the folder tree. If you run a command three folders deep, cckit walks up until it finds the first config file and uses that one. This is the same idea many tools use so a sub-project can override its parent.
 </Aside>
