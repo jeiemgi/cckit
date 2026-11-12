@@ -154,7 +154,7 @@ managed_files() {  # managed_files <dir> <claude|codex>
       find .claude/skills .claude/rules .claude/agents .claude/hooks .claude/lib -type f 2>/dev/null
       [ -f CLAUDE.md ] && echo CLAUDE.md
     else
-      find .agents/skills .agents/rules -type f 2>/dev/null
+      find .agents/skills .agents/rules .codex/agents -type f 2>/dev/null
       [ -f AGENTS.md ] && echo AGENTS.md
     fi ) | sed 's|^\./||' | sort
 }
@@ -319,7 +319,7 @@ t "codex: mail on four events"           "$(mail_events "$fx/hx/.codex/hooks.jso
 t "codex: hooks carry no machine path"   "$(grep -rlF "$fx" "$fx/hx/.codex" 2>/dev/null | wc -l | tr -d ' ')" "0"
 t "codex: no memory hook installed"      "$(ls "$fx/hx/.codex/hooks" | grep -c mempal)" "0"
 t "codex: still no .claude tree"         "$(has_path hx .claude)" "no"
-t "codex: hooks recorded as owned"       "$(jq -r '[.entries | keys[] | select(startswith(".codex/"))] | length' "$fx/hx/.cckit/kit.manifest.json")" "6"
+t "codex: hooks recorded as owned"       "$(jq -r '[.entries | keys[] | select(startswith(".codex/hooks"))] | length' "$fx/hx/.cckit/kit.manifest.json")" "6"
 settle hx "scaffold codex with hooks"
 hx_before="$(tree_hash hx .codex)"
 setver hx cckit.config.json 0.0.1; settle hx "reset version"
@@ -372,6 +372,56 @@ t "add codex: claude hooks byte-identical" "$(tree_hash hc .claude/hooks .claude
 t "add codex: codex hooks registered"    "$(mail_events "$fx/hc/.codex/hooks.json" "$CXMAIL")" "PostToolUse SessionStart Stop UserPromptSubmit"
 t "add codex: one mail script, same bytes" "$(cmp -s "$fx/hc/.claude/hooks/kit-mail-check.sh" "$fx/hc/.codex/hooks/kit-mail-check.sh" && echo same || echo differs)" "same"
 
+# --- E257.6: one role source, one agent definition per runtime ---------------------------
+# `x` is the Codex-only project and `b` selects both, each on the minimal profile (pm, generalist).
+toml_get() {  # toml_get <file> <key> -> the value of a single-line `key = "…"` entry, unescaped
+  sed -n "s/^$2 = \"\(.*\)\"\$/\1/p" "$1" | sed 's/\\"/"/g; s/\\\\/\\/g'
+}
+# 20. Codex gets one agent definition per role, and a Claude-only project gets none
+t "codex: one agent per profile role"    "$(ls "$fx/x/.codex/agents" 2>/dev/null | LC_ALL=C sort | tr '\n' ' ')" "generalist.toml pm.toml "
+t "both: same roles on both runtimes"    "$(ls "$fx/b/.claude/agents" | LC_ALL=C sort | tr '\n' ' ')|$(ls "$fx/b/.codex/agents" | sed 's/\.toml$//' | LC_ALL=C sort | tr '\n' ' ')" "generalist pm |generalist pm "
+fresh ac claude || { echo "FAIL: fresh claude init (agents) exited non-zero"; fail=1; }
+t "claude: no .codex/agents"             "$(has_path ac .codex)$(has_path ac .claude/agents/pm/AGENT.md)" "noyes"
+t "codex: agent has the three required keys" "$(grep -cE '^(name|description|developer_instructions) = ' "$fx/x/.codex/agents/pm.toml")" "3"
+# 21. the two definitions are the same role: description and body come from one template
+b_desc="$(sed -n 's/^description: //p' "$fx/b/.claude/agents/generalist/AGENT.md") $(sed -n 's/^when_to_use: //p' "$fx/b/.claude/agents/generalist/AGENT.md")"
+t "same role: description + when_to_use"      "$(toml_get "$fx/b/.codex/agents/generalist.toml" description)" "$b_desc"
+b_body="$(awk 'c>=2{print} /^---$/{c++}' "$fx/b/.claude/agents/generalist/AGENT.md" | sed '/./,$!d')"
+x_body="$(awk '/^developer_instructions = """$/{on=1;next} /^"""$/{on=0} on' "$fx/b/.codex/agents/generalist.toml" | sed 's/\\"/"/g; s/\\\\/\\/g')"
+t "same role: instructions are the role body" "$x_body" "$b_body"
+t "codex: Claude tool allowlist is not a key" "$(grep -cE '^tools' "$fx/x/.codex/agents/pm.toml")" "0"
+t "codex: untranslated allowlist is stated" "$(grep -c '^# Not translated — Claude Code tool allowlist' "$fx/x/.codex/agents/pm.toml")" "1"
+t "codex: pm names the skills that exist" "$(grep -cE '^- kit-task-(sync|new|close)$' "$fx/x/.codex/agents/pm.toml")" "3"
+if command -v python3 >/dev/null 2>&1 && python3 -c 'import tomllib' 2>/dev/null; then
+  t "codex: every agent file parses as TOML" "$(python3 -c '
+import sys, tomllib
+for f in sys.argv[1:]:
+    d = tomllib.load(open(f, "rb"))
+    assert d["name"] and d["description"] and d["developer_instructions"], f
+print("ok")' "$fx"/x/.codex/agents/*.toml "$fx"/b/.codex/agents/*.toml 2>&1)" "ok"
+fi
+# 22. nothing Claude-specific or machine-specific leaks into a Codex-only project's agents
+t "codex agents: no .claude path"        "$(grep -rl '\.claude/' "$fx/x/.codex/agents" 2>/dev/null | wc -l | tr -d ' ')" "0"
+t "codex agents: no machine path"        "$(grep -rlF "$fx" "$fx/x/.codex/agents" "$fx/b/.codex/agents" 2>/dev/null | wc -l | tr -d ' ')" "0"
+t "codex agents: no unrendered placeholder" "$(grep -rlE '\{\{[A-Z_]+\}\}|IF:ADAPTER' "$fx/x/.codex/agents" 2>/dev/null | wc -l | tr -d ' ')" "0"
+t "codex: AGENTS.md lists the roles"     "$(grep -cE '^\| `(pm|generalist)` \|' "$fx/x/AGENTS.md")" "2"
+t "codex agents: recorded as owned"      "$(jq -r '[.entries | keys[] | select(startswith(".codex/agents/"))] | length' "$fx/x/.cckit/kit.manifest.json")" "2"
+# 23. a hand-edited agent survives an upgrade; a deleted one is restored; the user's own is kept
+A_MARKER="# LOCAL-AGENT-EDIT (must survive upgrade)"
+printf '%s\n' "$A_MARKER" >> "$fx/x/.codex/agents/pm.toml"
+rm -f "$fx/x/.codex/agents/generalist.toml"
+setver x cckit.config.json 0.0.4; settle x "edit one agent, drop another"
+upgrade x || { echo "FAIL: codex upgrade (agents) exited non-zero"; fail=1; }
+t "upgrade: hand-edited agent kept"      "$(grep -cF "$A_MARKER" "$fx/x/.codex/agents/pm.toml")" "1"
+t "upgrade: missing agent restored"      "$(has_path x .codex/agents/generalist.toml)" "yes"
+mkdir -p "$fx/au/.codex/agents" && printf 'name = "pm"\n# mine\n' > "$fx/au/.codex/agents/pm.toml"
+fresh au codex || { echo "FAIL: fresh codex init over an existing agent exited non-zero"; fail=1; }
+t "own agent: the user's file is kept"   "$(sed -n 2p "$fx/au/.codex/agents/pm.toml")" "# mine"
+t "own agent: not claimed as owned"      "$(jq '.entries | has(".codex/agents/pm.toml")' "$fx/au/.cckit/kit.manifest.json")" "false"
+t "own agent: the other role still arrives" "$(has_path au .codex/agents/generalist.toml)" "yes"
+# 24. enabling Codex on a Claude project adds its agents without touching the Claude ones
+t "add codex: agents arrive"             "$(ls "$fx/hc/.codex/agents" 2>/dev/null | LC_ALL=C sort | tr '\n' ' ')" "generalist.toml pm.toml "
+
 echo ""
-[ "$fail" -eq 0 ] && echo "PASS: init.sh --upgrade honors the preserve/exclude contract (#334, #149), adapter selection (E257.3) and hook registration (E257.5)" || echo "FAILED"
+[ "$fail" -eq 0 ] && echo "PASS: init.sh --upgrade honors the preserve/exclude contract (#334, #149), adapter selection (E257.3), hook registration (E257.5) and per-runtime agents (E257.6)" || echo "FAILED"
 exit "$fail"

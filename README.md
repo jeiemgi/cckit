@@ -93,6 +93,8 @@ cckit init --profile software # scaffold cckit.config.json + .claude/ for this r
                               #   codex writes AGENTS.md + .agents/ and no .claude/ tree;
                               #   both get the commit guards + session-mail hooks (Codex: in
                               #   .codex/hooks.json, merged with yours — trust them with /hooks)
+                              #   and one specialist agent per role from the same role source:
+                              #   .claude/agents/<role>/AGENT.md and .codex/agents/<role>.toml
 cckit plan-next               # propose what to build next, grounded in current capabilities
 cckit status                  # where are we: local undone work, PRs to attend, cleanup available
 cckit next                    # the next unblocked issue + how to start it
@@ -208,8 +210,10 @@ that gate and merge themselves. This is the part that turns one keyboard into a 
 
 ```bash
 cckit plan                 # the wave plan: deps-ordered, p0-first inside a wave, file-disjoint
-cckit wave                 # a Task-subagent fan-out brief Claude Code enacts (proposes the next wave)
+cckit wave                 # the wave-0 fan-out brief the driving agent enacts: same wave data for
+                           #   every runtime, dispatch wording per adapter (--adapter claude|codex|both)
 cckit orchestrate 12 14 17 # run N flows in parallel worktrees (tmux by default)
+cckit orchestrate --results --wait 600 # how each worker ended: success · failure · interrupted
 cckit orchestrate --runtime herdr --agent codex 12 14 17 # persistent, state-aware agent terminals
 cckit watch --merge        # the captain: gate open PRs, squash-merge the CLEAN ones, advance
                            #   (policy floors hold PRs touching CI, lockfiles, or secrets for review)
@@ -233,7 +237,8 @@ the contract. Every verb accepts `--llm` for structured output — uniform paylo
 ```bash
 cckit sync --llm           # board state for an agent to reason over
 cckit plan --llm           # the wave plan as TOON rows
-cckit wave --llm           # the fan-out (one subagent prompt per issue) as TOON
+cckit wave --llm           # the fan-out (one worker prompt per issue) as TOON
+cckit orchestrate --results --llm # each worker's collected result as JSON
 ```
 
 Human output renders as markdown — rich via `glow` in a terminal, native in the Claude Code

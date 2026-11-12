@@ -89,13 +89,13 @@ adapter_tier() {
 # The adapter files init records in the ownership manifest. NOT the project config and NOT
 # settings.local.json: the first is the project's own record, the second is per-checkout and
 # gitignored, and neither is something `cckit remove` should treat as a kit artifact. Under .codex/
-# only the hook scripts and hooks.json are cckit's (E257.5); config.toml and the rest is the user's
-# Codex setup. init records hooks.json only when it created the file or the manifest still proves it
-# unmodified.
+# only the hook scripts, hooks.json (E257.5) and the role agents init wrote (E257.6) are cckit's;
+# config.toml and the rest is the user's Codex setup. init records hooks.json only when it created
+# the file or the manifest still proves it unmodified.
 adapter_managed() {
   case "${1:-}" in
     .claude/kit.config.json|.claude/kit.manifest.json|.claude/settings.local.json) return 1 ;;
-    CLAUDE.md|AGENTS.md|.claude/*|.agents/skills/*|.agents/rules/*|.codex/hooks.json|.codex/hooks/*) return 0 ;;
+    CLAUDE.md|AGENTS.md|.claude/*|.agents/skills/*|.agents/rules/*|.codex/hooks.json|.codex/hooks/*|.codex/agents/*) return 0 ;;
   esac
   return 1
 }

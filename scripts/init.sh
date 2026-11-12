@@ -557,19 +557,23 @@ export RULE_LIST
 use_adapter() {  # <claude|codex> — point emit at that adapter's dir + IF blocks
   ADAPTER_DIR="$(adapter_dir "$1")"
   KIT_FLAGS_ON="${FLAGS_ON}ADAPTER_$(printf '%s' "$1" | tr '[:lower:]' '[:upper:]'),"
-  export ADAPTER_DIR KIT_FLAGS_ON
+  ADAPTER_INSTRUCTIONS="$(adapter_instructions "$1")"
+  export ADAPTER_DIR KIT_FLAGS_ON ADAPTER_INSTRUCTIONS
 }
 # Shared (adapter-neutral) files that name a rules path point at the first selected adapter's copy.
 use_adapter "${ADAPTERS%% *}"
 
 # emit: resolve IF blocks, then substitute {{VARS}}
-emit() {  # <src> <dest>
-  mkdir -p "$(dirname "$2")"
+render_tpl() {  # <src> -> stdout
   perl -0777 -pe '
     my %on = map { $_=>1 } grep { length } split /,/, ($ENV{KIT_FLAGS_ON}//"");
     1 while s{<!-- IF:(\w+) -->(.*?)<!-- /IF:\1 -->}{ $on{$1} ? $2 : "" }gse;
     s/\{\{(\w+)\}\}/ exists $ENV{$1} ? $ENV{$1} : "{{$1}}" /ge;
-  ' "$1" > "$2"
+  ' "$1"
+}
+emit() {  # <src> <dest>
+  mkdir -p "$(dirname "$2")"
+  render_tpl "$1" > "$2"
   WRITTEN+=("${2#"$TARGET"/}")
 }
 WRITTEN=()   # every path this run wrote (not preserved) — the adapter-managed ones go in the manifest
@@ -686,7 +690,10 @@ if [[ $DRY_RUN -eq 1 ]]; then
   if adapter_has "$ADAPTERS" codex; then
   echo "    .codex/hooks/ (repo-hygiene.sh, kit_version_check.sh, kit-mail-check.sh, guard-base-branch-commit.sh, guard-raw-git-ops.sh$([[ "$PREPUSH_ENABLED" == "true" ]] && echo ", prepush_gate.sh")$([[ "$LOCAL_ON" == "true" ]] && echo ", kit-local-status.sh"))"
   echo "    .codex/hooks.json                         (merged: cckit's registrations are added, yours are kept; trust them in Codex with /hooks)"
-  echo "    (Codex adapter: no specialist agents; no memory hooks — they read Claude Code transcripts)"
+  for a in $AGENTS; do
+    [[ -f "$KIT_ROOT/templates/agents/$a.md" ]] && echo "    .codex/agents/$a.toml"
+  done
+  echo "    (Codex adapter: no memory hooks — they read Claude Code transcripts)"
   fi
   echo "    scripts/ (kit-config.sh, gh-project.sh, kit-version-check.sh, setup-labels.sh, setup-milestones.sh, capture-project-ids.sh, task-sync.sh, knowledge-lint.sh, review-lint.sh + review-rules.conf, skill-frontmatter-lint.sh)"
   echo "    knowledge/INDEX.md                        (knowledge-base manifest — rules/knowledge-base.md)"
@@ -784,8 +791,11 @@ else
   echo "  + $CONFIG_REL"
 fi
 
-# ---- agents (Claude adapter only — Codex specialists are E257.6) ----------
+# ---- agents: one role source, one definition per selected runtime (E257.6) ----
+# templates/agents/<role>.md is the role. Claude Code reads it as markdown; Codex reads a custom
+# agent as TOML, so the SAME rendered role is translated by agent_def_codex (scripts/lib/agent-def.sh).
 if adapter_has "$ADAPTERS" claude; then
+use_adapter claude
 for a in $AGENTS; do
   src="$KIT_ROOT/templates/agents/$a.md"
   [[ -f "$src" ]] || continue
@@ -793,6 +803,36 @@ for a in $AGENTS; do
   echo "  + .claude/agents/$a/AGENT.md"
 done
 fi
+if adapter_has "$ADAPTERS" codex; then
+use_adapter codex
+# shellcheck source=/dev/null
+. "$KIT_ROOT/scripts/lib/agent-def.sh"
+for a in $AGENTS; do
+  src="$KIT_ROOT/templates/agents/$a.md"
+  [[ -f "$src" ]] || continue
+  _ca_rel=".codex/agents/$a.toml"; _ca_dst="$TARGET/$_ca_rel"
+  if _upgrade_excluded "$_ca_rel"; then UPGRADE_SKIPPED+=("$_ca_rel"); continue; fi
+  if [[ $UPGRADE -eq 1 && -e "$_ca_dst" ]]; then UPGRADE_PRESERVED+=("$_ca_rel"); continue; fi
+  if [[ $UPGRADE -eq 0 && $FORCE -eq 0 && -e "$_ca_dst" ]]; then
+    # A fresh init over a .codex/agents/ the user already keeps: their file wins, as AGENTS.md does.
+    echo "  = $_ca_rel (already there — kept; --force replaces it)"; continue
+  fi
+  _ca_tmp="$(mktemp)"
+  render_tpl "$src" > "$_ca_tmp"
+  mkdir -p "$TARGET/.codex/agents"
+  if agent_def_codex "$_ca_tmp" > "$_ca_dst.kit-new"; then
+    mv "$_ca_dst.kit-new" "$_ca_dst"
+    WRITTEN+=("$_ca_rel")
+    [[ $UPGRADE -eq 1 ]] && UPGRADE_ADDED+=("$_ca_rel")
+    echo "  + $_ca_rel"
+  else
+    rm -f "$_ca_dst.kit-new"
+    echo "  ! $_ca_rel not written — templates/agents/$a.md has no name or description" >&2
+  fi
+  rm -f "$_ca_tmp"
+done
+fi
+use_adapter "${ADAPTERS%% *}"
 
 # ---- instructions + rules + skills, once per selected adapter ------------
 # Same templates, same loop: the adapter decides the destination dir and the IF:ADAPTER_* blocks.

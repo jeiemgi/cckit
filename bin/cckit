@@ -37,6 +37,7 @@
 #     effort pr [<N>] [--summary S|--summary-file F] [--for-agents A|--for-agents-file F] [--title T]
 #         the ONE effort PR: inherits labels + milestone, rich body, board In Review
 #   cckit orchestrate <a> <b> …     run N flows in parallel worktrees (--runtime tmux|herdr)
+#   cckit orchestrate --results     how each worker ended: success | failure | interrupted
 #   cckit autopilot [<a> …]         unattended multi-flow: drive (or auto-pick) issues under a cap
 #   cckit watch [--merge] [--loop]  captain: gate open PRs, squash-merge CLEAN, advance the wave
 #   cckit next [--effort N]         everyday helper: the unblocked set + how to start the top issue

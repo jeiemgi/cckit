@@ -30,11 +30,21 @@ machine-readable output. `cckit init` registers hooks in `.codex/hooks.json`: a 
 commit to the base branch, a guard that blocks raw `gh`/`git` operations a `cckit` verb owns, session
 mail (`cckit msg`), and two session-start checks. Codex runs them only after they are trusted
 (`/hooks`), and a hook is fast feedback, not enforcement — the rules below apply whether or not one
-fires. No specialist agents are installed for Codex.
+fires.
 <!-- IF:MEMORY -->
 Memory hooks are not installed for Codex: they read Claude Code transcripts. If a MemPalace MCP
 server is configured, call its tools explicitly (wing `{{WING}}`).
-<!-- /IF:MEMORY --><!-- /IF:ADAPTER_CODEX -->
+<!-- /IF:MEMORY -->
+
+## Agents
+
+`cckit init` installs one Codex custom agent per role in `.codex/agents/<role>.toml`, rendered from
+the same role source as the Claude Code agents. Ask Codex to spawn the matching agent for a domain
+task. A Claude tool allowlist does not translate: the Codex sandbox and approval policy govern each
+agent.
+
+{{AGENT_TABLE}}
+<!-- /IF:ADAPTER_CODEX -->
 
 ## Skills
 

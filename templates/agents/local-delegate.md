@@ -47,7 +47,7 @@ Your authority:
 - **Fallback always** (hard rule from `kit-local.sh`): any non-zero exit → use the non-local path.
 - Never paste a full long original into the session when a digest succeeded (kit-digest rule).
 - Don't "improve" the chore into judgment work — if the task grows a decision, hand it back.
-- Config lives in `.claude/kit.config.json` → `.local {enabled, port, model}`; `KIT_LOCAL_*` env wins.
+- Config lives in `{{CONFIG_REL}}` → `.local {enabled, port, model}`; `KIT_LOCAL_*` env wins.
 
 ## Voice + style
 

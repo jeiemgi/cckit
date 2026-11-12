@@ -49,7 +49,7 @@ When the unblocked issues are file-disjoint and independent, drive them in paral
 at a time:
 
 ```
-cckit copilot          # emits a Task-subagent fan-out brief for wave 0
+cckit copilot          # emits the wave-0 fan-out brief (dispatch wording per adapter)
 cckit watch --merge    # gate every open PR; squash-merge the CLEAN ones; advance the next wave
 ```
 

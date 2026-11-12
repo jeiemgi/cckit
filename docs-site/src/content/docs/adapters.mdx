@@ -71,7 +71,7 @@ is being implemented; shell access alone does not establish behavioral parity.
 | Instruction file | `CLAUDE.md` | `AGENTS.md` |
 | Skills | `.claude/skills/<name>/SKILL.md` | `.agents/skills/<name>/SKILL.md` |
 | Rules | `.claude/rules/*.md` | `.agents/rules/*.md`, listed by path in `AGENTS.md` |
-| Specialist agents | `.claude/agents/` | not installed |
+| Specialist agents | `.claude/agents/<role>/AGENT.md` | `.codex/agents/<role>.toml` |
 | Hooks and guards | `.claude/hooks/`, registered in `.claude/settings*.json` | `.codex/hooks/`, registered in `.codex/hooks.json` ([details](/hooks/#codex)) |
 | Memory hooks | `.claude/hooks/mempal_*.sh` (with `--memory on`) | not installed |
 | Statusline, settings | `.claude/statusline.sh`, `.claude/settings*.json` | not installed |
@@ -82,6 +82,11 @@ is being implemented; shell access alone does not establish behavioral parity.
   skill and rule trees from `templates/skills/` and `templates/rules/`. The adapter decides the
   destination directory and which `<!-- IF:ADAPTER_CLAUDE -->` / `<!-- IF:ADAPTER_CODEX -->` blocks
   survive. There is no second copy of an instruction to keep in step.
+- **One role source.** A specialist is written once, in `templates/agents/<role>.md`. Claude Code
+  gets that file as `AGENT.md`. Codex gets the same rendered role translated to a custom-agent
+  TOML file with `name`, `description` (the role's `description` plus `when_to_use`) and
+  `developer_instructions` (the role body). `scripts/lib/agent-def.sh` is the one translation, and
+  `scripts/init-upgrade-test.sh` asserts the two definitions carry the same description and body.
 - **Stored selection.** The config's `adapters` array records the choice. `cckit init --upgrade`
   reads it and never drops an adapter; `--upgrade --adapter codex` adds one, and the adapter already
   installed keeps its files byte for byte. Config and manifest stay where the first install put them.
@@ -97,9 +102,15 @@ Limits of the Codex adapter today:
 
 - The guards and session mail are installed and fixture-tested against the event JSON Codex
   documents, but no live Codex session has fired them, and Codex runs a project hook only after you
-  trust it (`/hooks`). Until that is verified, treat a Codex guard as unproven. No specialist agent
-  is installed ([#263](https://github.com/jeiemgi/cckit/issues/263)), and no memory hook: those
-  read Claude Code transcripts.
+  trust it (`/hooks`). Until that is verified, treat a Codex guard as unproven. No memory hook is
+  installed: those read Claude Code transcripts.
+- A Codex agent file is generated and parses as TOML, but no live Codex session has spawned one.
+  Three things do not translate, and each is written into the TOML as a comment or a note instead
+  of being dropped: the Claude `tools:` allowlist (Codex has no per-agent tool list — its sandbox
+  and approval policy govern the agent), the Claude `model:` alias, and `kit-*` skill names, which
+  are Claude Code plugin skills (in Codex, run the `cckit` verb they wrap). The Codex `name` uses
+  an underscore where the role has a hyphen (`tech-lead` → `tech_lead`), matching the names in the
+  Codex documentation; whether Codex accepts a hyphen is not verified.
 - `.agents/rules/` is a cckit location, not one Codex loads on its own. `AGENTS.md` lists each rule
   file so the agent reads the one that applies.
 - Shared rules still describe Claude-only mechanics in prose — `mempalace.md` names the hooks in

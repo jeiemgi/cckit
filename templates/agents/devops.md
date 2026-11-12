@@ -29,7 +29,7 @@ Authority:
 
 ## Stack
 
-Read the project's actual infra from `CLAUDE.md`, `.claude/kit.config.json`, and any ops/infra docs before acting. Confirm the cloud provider and services in use — don't assume.
+Read the project's actual infra from `{{ADAPTER_INSTRUCTIONS}}`, `{{CONFIG_REL}}`, and any ops/infra docs before acting. Confirm the cloud provider and services in use — don't assume.
 
 ## Workflow
 

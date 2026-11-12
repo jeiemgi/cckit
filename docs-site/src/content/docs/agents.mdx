@@ -64,6 +64,7 @@ object — there's nothing to tabulate.
 | Find the next unblocked issue | `cckit next --llm` | **TOON** |
 | Get the wave plan | `cckit plan --llm` | **TOON** |
 | Get the fan-out brief | `cckit wave --llm` | **TOON** |
+| Collect a wave's results | `cckit orchestrate --results --llm` | JSON (one array) |
 | Start an issue | `cckit start <issue>` | JSON (one object) |
 | Open the PR | `cckit pr <issue> "<summary>"` | JSON (one object) |
 | Close the issue | `cckit close <issue> "<summary>"` | JSON (one object) |
@@ -73,6 +74,25 @@ So the loop is **read in TOON, act in JSON**: pull state cheaply as TOON, then f
 action verbs. An agent that stays on the `--llm` reads spends a fraction of the tokens that scraping
 human output or re-fetching JSON would cost.
 
+
+## Specialist agents, per runtime
+
+`cckit init` installs one specialist per profile role, and both runtimes get the same role. The
+source is one file, `templates/agents/<role>.md`.
+
+| | Claude Code | Codex |
+| --- | --- | --- |
+| Installed as | `.claude/agents/<role>/AGENT.md` | `.codex/agents/<role>.toml` |
+| Role text | the template's markdown body | the same body, as `developer_instructions` |
+| `description` | frontmatter `description` | `description` + `when_to_use` |
+| `tools:` allowlist | enforced by Claude Code | not translated — written as a TOML comment |
+| `skills:` | preloaded by name | listed in the instructions |
+
+Every `skills:` entry in a template has to exist. `scripts/agent-template-lint.sh` runs in
+`scripts/check.sh` and fails on a name that is neither a skill cckit ships (`skills/`,
+`templates/skills/`) nor a line in `templates/agents/EXTERNAL_SKILLS`, the list of skills another
+plugin or the user provides. An `EXTERNAL_SKILLS` line is a statement that the name is intended; it
+does not check that the skill is installed on your machine.
 
 ## Model endpoint
 

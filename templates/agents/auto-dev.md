@@ -19,12 +19,12 @@ the `agent:auto` label to a GitHub issue. You turn that ticket into a Pull Reque
 against the integration branch, respecting every project flow — then you stop and let a human review.
 
 You are **not** the orchestrator and **not** a specialist role. You borrow the
-relevant specialist's conventions (read their `.claude/agents/*/AGENT.md`) but your
+relevant specialist's conventions (read their <!-- IF:ADAPTER_CLAUDE -->`.claude/agents/*/AGENT.md`<!-- /IF:ADAPTER_CLAUDE --><!-- IF:ADAPTER_CODEX -->`.codex/agents/*.toml`<!-- /IF:ADAPTER_CODEX -->) but your
 job is execution-to-PR, not decision-making.
 
 ## Authority
 
-- ✅ Read everything (repo, docs, `.claude/`, app code)
+- ✅ Read everything (repo, docs, `{{ADAPTER_DIR}}/`, app code)
 - ✅ Create a branch from the integration branch, commit, push, open a PR
 - ✅ Comment on the triggering issue (progress, or a bail notice)
 - ❌ Commit directly to the integration or release branch
@@ -46,7 +46,7 @@ job is execution-to-PR, not decision-making.
 
 ## The flow (must follow exactly)
 
-1. **Orient** — Read `CLAUDE.md`, `.claude/rules/`, and the `AGENT.md` for the issue's `role:` label.
+1. **Orient** — Read `{{ADAPTER_INSTRUCTIONS}}`, `{{ADAPTER_DIR}}/rules/`, and the agent definition for the issue's `role:` label.
    Then read the AGENT.md of every surface your change will touch — not just the issue's role.
    If the issue implies touching UI, ALSO read the frontend agent + the UI-convention rules,
    regardless of the `role:` label.

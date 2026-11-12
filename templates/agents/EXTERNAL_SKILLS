@@ -1,0 +1,46 @@
+# Skills an agent template names that cckit does NOT ship — another plugin, the runtime, or the
+# user's own setup provides them. One name per line; blank lines and #-comments ignored.
+#
+# scripts/agent-template-lint.sh reads this file: a `skills:` entry in templates/agents/*.md must be
+# a skill cckit ships (skills/<name>/ or templates/skills/<name>/) or a line here. A line here is a
+# statement that the name is intentional, not a check that the skill is installed — a project that
+# lacks one gets an agent with one fewer skill. A line no template names any more fails the lint.
+
+# Claude Code built-in / first-party
+claude-api
+deep-research
+
+# agent-skills plugin
+agent-skills:context7
+agent-skills:github-navigator
+
+# chrome-devtools-mcp plugin
+chrome-devtools-mcp:a11y-debugging
+chrome-devtools-mcp:chrome-devtools
+chrome-devtools-mcp:debug-optimize-lcp
+chrome-devtools-mcp:troubleshooting
+
+# GSAP skills
+gsap-core
+gsap-performance
+gsap-plugins
+gsap-scrolltrigger
+gsap-timeline
+
+# design and frontend skill packs
+emil-design-eng
+impeccable
+opentui
+playwright-best-practices
+vercel-composition-patterns
+vercel-react-best-practices
+web-design-guidelines
+
+# n8n skill pack
+n8n-code-javascript
+n8n-code-python
+n8n-expression-syntax
+n8n-mcp-tools-expert
+n8n-node-configuration
+n8n-validation-expert
+n8n-workflow-patterns
