@@ -17,7 +17,9 @@
 #   Tier 2  node + pnpm, vercel, turbo  — project-specific, auto-install if applicable
 #   Agents  the runtime binary of each adapter the project selected (`adapters` in the config),
 #           plus whether the Codex hooks are registered in .codex/hooks.json when codex is selected
-#   Local   mlx-lm via uv tool install + mlx_lm.server auto-start (when .local.enabled)
+#   Integr. one row per descriptor in integrations/ whose config key is on — installed by the
+#           shared runner (scripts/lib/integration-install.sh), only with recorded consent
+#   Local   mlx_lm.server auto-start (when .local.enabled)
 #   Auth    gh auth status + scope:project, git config name/email
 #   SSH     optional guided flow (ed25519, pbcopy, link to github settings)
 set -euo pipefail
@@ -27,11 +29,12 @@ _export_dir_doctor="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" &&
 
 # ---- flags ------------------------------------------------------------------
 DRY_RUN=0; NO_INSTALL=0; DISMISS_LOCAL=0; ASSUME_YES=0; AGENTS_ONLY=0
+INSTALL_APPROVED=0   # 1 = the operator said yes to installs in THIS run (--fix/--yes, or the prompt)
 for _a in "$@"; do
   case "$_a" in
     --dry-run)       DRY_RUN=1 ;;
     --no-install)    NO_INSTALL=1 ;;
-    --fix|--yes|-y)  ASSUME_YES=1 ;;
+    --fix|--yes|-y)  ASSUME_YES=1; INSTALL_APPROVED=1 ;;
     --dismiss-local) DISMISS_LOCAL=1 ;;
     --agents)        AGENTS_ONLY=1 ;;
     -h|--help)
@@ -105,7 +108,7 @@ if [[ $DRY_RUN -eq 0 && $NO_INSTALL -eq 0 && $ASSUME_YES -eq 0 && $AGENTS_ONLY -
     [nN]|[nN][oO])
       NO_INSTALL=1
       printf '\n  %s report-only — listing what is missing and how to install it (no changes made).\n' "$MARK_SKIP" ;;
-    *) : ;;  # default (Enter / y) → proceed with installs
+    *) INSTALL_APPROVED=1 ;;  # default (Enter / y) → proceed with installs
   esac
 fi
 
@@ -457,17 +460,94 @@ doctor_agents
 printf '\n'
 
 # ============================================================================
-# LOCAL MODEL LAYER (opt-in — only checked when .local.enabled is true)
+# INTEGRATIONS (opt-in — one row per descriptor in integrations/ the project switched on)
 # ============================================================================
-# Same gating principle as vercel: silence when the project didn't opt in.
-# Install path (#313): `uv tool install mlx-lm` — isolated tool venv, PEP 668-safe
-# (Homebrew python is externally-managed; plain pip/pip3 fails there). Fallback
-# pipx; NEVER suggest plain pip. When mlx-lm is present but the server is down,
-# the doctor starts it in background + health-checks the port. --dry-run stays
-# 100% read-only: it reports what it would do, installs and starts nothing.
+# An optional third-party tool is DATA: integrations/<id>.json names its config key, its detect
+# command and its install candidates in order. This loop holds no tool's recipe. For every
+# descriptor whose config key is on it asks the shared runner (lib/integration-install.sh) and
+# turns the runner's one status line into a row. Silent when the project switched nothing on.
+#
+# The runner installs only with consent recorded in .cckit/consent (`install:<id>`). The operator
+# saying yes to installs in THIS run — --fix/--yes, or the terminal prompt above — is that consent,
+# and is recorded here, so init's `--yes` preflight keeps installing. A run nobody approved (no
+# TTY, no --fix) reports the tool missing and installs nothing. --dry-run / --no-install run the
+# runner under KIT_DRY_RUN: it plans, and neither installs nor records anything.
 command -v kit_config_path >/dev/null 2>&1 || . "$(dirname "$0")/lib/config-path.sh"
 _kitcfg="$(kit_config_path "${TARGET:-$PWD}" 2>/dev/null || true)"
 [[ -n "$_kitcfg" ]] || _kitcfg="${TARGET:-$PWD}/.claude/kit.config.json"
+
+# doctor_integration <descriptor> — one row for one enabled integration.
+doctor_integration() {
+  local f="$1" id label recipe st bin after
+  id="$(jq -r '.id' "$f")"; label="$(jq -r '.label' "$f")"
+  recipe="$(jq -r '.install[0].run' "$f")"
+  if integration_detect "$f" "$_ig_target"; then
+    bin="$(integration_bin "$f" || true)"
+    row "$MARK_OK" "$label" "installed${bin:+ ($bin)}"
+    CHECKS_OK=$((CHECKS_OK + 1))
+    return 0
+  fi
+  if ! integration_applies "$f" "$_ig_target"; then
+    row "$MARK_SKIP" "$label" "needs $(integration_applies_needs "$f") — skipping install"
+    return 0
+  fi
+  if [[ $DRY_RUN -eq 1 || $NO_INSTALL -eq 1 ]]; then
+    st="$(KIT_DRY_RUN=1 integration_install "$f" "$_ig_target" 2>/dev/null || true)"
+  else
+    if [[ $INSTALL_APPROVED -eq 1 ]]; then integration_consent_record "$id" "$_ig_target" || true; fi
+    st="$(integration_install "$f" "$_ig_target" || true)"
+  fi
+  case "$st" in
+    present|installed\ *)
+      bin="$(integration_bin "$f" || true)"
+      if [[ "$st" == present ]]; then
+        row "$MARK_OK" "$label" "installed${bin:+ ($bin)}"
+      else
+        after="$(jq -r '.afterInstall // ""' "$f")"
+        row "$MARK_OK" "$label" "installed via ${st#installed }${bin:+ ($bin)}"
+        ACTIONS_TAKEN+=("Installed $label via ${st#installed }${after:+ — $after}")
+      fi
+      CHECKS_OK=$((CHECKS_OK + 1)) ;;
+    dry-run)
+      row "$MARK_FAIL" "$label" "missing — $recipe"
+      CHECKS_FAIL=$((CHECKS_FAIL + 1))
+      ACTIONS_NEEDED+=("Install $label: $recipe") ;;
+    no-consent)
+      row "$MARK_FAIL" "$label" "missing — nothing installs without your yes: cckit doctor --fix"
+      CHECKS_FAIL=$((CHECKS_FAIL + 1))
+      ACTIONS_NEEDED+=("Install $label: cckit doctor --fix  (or by hand: $recipe)") ;;
+    *)
+      row "$MARK_FAIL" "$label" "install failed — $recipe"
+      CHECKS_FAIL=$((CHECKS_FAIL + 1))
+      ACTIONS_NEEDED+=("Install $label: $recipe") ;;
+  esac
+}
+
+_ig_target="${TARGET:-$PWD}"
+if has_cmd jq && [[ -f "$_kitcfg" ]]; then
+  # shellcheck source=/dev/null
+  . "$_export_dir_doctor/lib/integration-install.sh"
+  _ig_shown=0
+  for _ig_id in $(integrations_list); do
+    _ig_f="$(integration_file "$_ig_id")" || continue
+    integration_enabled "$_ig_f" "$_kitcfg" || continue
+    if [[ $_ig_shown -eq 0 ]]; then
+      printf '  %s%sIntegrations (optional tools this project switched on)%s\n' "$C_BOLD" "" "$C_RESET"
+      _ig_shown=1
+    fi
+    doctor_integration "$_ig_f"
+  done
+  if [[ $_ig_shown -eq 1 ]]; then printf '\n'; fi
+fi
+
+# ============================================================================
+# LOCAL MODEL LAYER (opt-in — only checked when .local.enabled is true)
+# ============================================================================
+# Same gating principle as vercel: silence when the project didn't opt in. The runtime itself is
+# an integration (integrations/mlx-lm.json) and was handled by the loop above; this section is the
+# part that is not an install — the server. When the runtime is present but the server is down,
+# the doctor starts it in background + health-checks the port. --dry-run stays 100% read-only: it
+# reports what it would do and starts nothing.
 _local_on="false"
 [[ -f "$_kitcfg" ]] && _local_on="$(jq -r '.local.enabled // false' "$_kitcfg" 2>/dev/null || echo false)"
 if [[ "$_local_on" == "true" ]]; then
@@ -475,60 +555,17 @@ if [[ "$_local_on" == "true" ]]; then
   _lport="$(jq -r '.local.port // 8080' "$_kitcfg" 2>/dev/null || echo 8080)"
   _lmodel="$(jq -r '.local.model // "mlx-community/Qwen3-8B-4bit"' "$_kitcfg" 2>/dev/null || echo "mlx-community/Qwen3-8B-4bit")"
 
-  # Apple silicon — MLX requirement; gate install/start on it
-  _mlx_capable=0
+  # Apple silicon — MLX requirement (the descriptor's appliesWhen.platform gates the install)
   if [[ $IS_MACOS -eq 1 && "$(uname -m 2>/dev/null)" == "arm64" ]]; then
     row "$MARK_OK" "apple silicon" "$(sysctl -n machdep.cpu.brand_string 2>/dev/null || echo arm64)"
     CHECKS_OK=$((CHECKS_OK + 1))
-    _mlx_capable=1
   else
     row "$MARK_WARN" "apple silicon" "MLX needs an Apple silicon Mac — local layer will stay dormant here"
     CHECKS_WARN=$((CHECKS_WARN + 1))
   fi
 
-  # mlx-lm binary — uv/pipx install to ~/.local/bin, which may not be on PATH yet
-  _mlx_find() {
-    if has_cmd mlx_lm.server; then command -v mlx_lm.server
-    elif [[ -x "$HOME/.local/bin/mlx_lm.server" ]]; then echo "$HOME/.local/bin/mlx_lm.server"
-    fi
-    return 0  # never trip set -e via the $(...) assignment
-  }
-  _mlx_bin="$(_mlx_find)"
-
-  if [[ -n "$_mlx_bin" ]]; then
-    row "$MARK_OK" "mlx-lm" "installed ($_mlx_bin)"
-    CHECKS_OK=$((CHECKS_OK + 1))
-  elif [[ $_mlx_capable -eq 0 ]]; then
-    row "$MARK_SKIP" "mlx-lm" "not Apple silicon — skipping install"
-  elif [[ $DRY_RUN -eq 1 || $NO_INSTALL -eq 1 ]]; then
-    row "$MARK_FAIL" "mlx-lm" "missing — uv tool install mlx-lm"
-    CHECKS_FAIL=$((CHECKS_FAIL + 1))
-    ACTIONS_NEEDED+=("Install the local model runtime: uv tool install mlx-lm")
-  else
-    # ensure an installer: uv preferred (brew-installable), pipx as fallback
-    if ! has_cmd uv && ! has_cmd pipx; then
-      brew_install uv uv && ACTIONS_TAKEN+=("Installed uv via brew") || true
-    fi
-    if has_cmd uv; then
-      printf '  %s mlx-lm missing — installing via uv tool install (isolated venv)...\n' "$MARK_WARN"
-      uv tool install mlx-lm >/dev/null 2>&1 || true
-      _mlx_installer="uv tool install"
-    elif has_cmd pipx; then
-      printf '  %s mlx-lm missing — installing via pipx (isolated venv)...\n' "$MARK_WARN"
-      pipx install mlx-lm >/dev/null 2>&1 || true
-      _mlx_installer="pipx"
-    fi
-    _mlx_bin="$(_mlx_find)"
-    if [[ -n "$_mlx_bin" ]]; then
-      row "$MARK_OK" "mlx-lm" "installed via ${_mlx_installer:-uv} ($_mlx_bin)"
-      CHECKS_OK=$((CHECKS_OK + 1))
-      ACTIONS_TAKEN+=("Installed mlx-lm via ${_mlx_installer:-uv}")
-    else
-      row "$MARK_FAIL" "mlx-lm" "install failed — uv tool install mlx-lm"
-      CHECKS_FAIL=$((CHECKS_FAIL + 1))
-      ACTIONS_NEEDED+=("Install the local model runtime: uv tool install mlx-lm")
-    fi
-  fi
+  # the server binary — resolved through the descriptor, so ~/.local/bin is searched too
+  _mlx_bin="$(integration_bin "$(integration_file mlx-lm 2>/dev/null || true)" 2>/dev/null || true)"
 
   # server alive on the configured port — auto-start when down + installed
   _lurl="http://127.0.0.1:${_lport}/v1/models"
@@ -579,14 +616,14 @@ fi
 # MEMORY LAYER (MemPalace) — opt-in — only checked when .memory.enabled is true
 # ============================================================================
 # Same gating principle as the local model layer: silent unless the project opted
-# into memory at init. Three things to verify:
-#   1. the `mempalace` CLI is installed — the SessionStart/Stop/… hooks no-op without it.
-#   2. a per-wing identity header exists. `mempalace wake-up` scopes the L1 *body* to the
+# into memory at init. Two things to verify:
+#   1. a per-wing identity header exists. `mempalace wake-up` scopes the L1 *body* to the
 #      wing, but reads its L0 identity *header* from the single global ~/.mempalace/identity.txt
 #      (mempalace layers.py Layer0), so every wing shows the same — usually wrong — header
 #      unless .claude/mempal-identity.<wing>.txt is present. --fix seeds a starter from kit.config.
-#   3. the session-start hook is current — older hooks just ran `wake-up --wing` and could not
-#      apply the per-wing header from (2). --fix re-emits the hook from the kit template.
+#   2. the session-start hook is current — older hooks just ran `wake-up --wing` and could not
+#      apply the per-wing header from (1). --fix re-emits the hook from the kit template.
+# The CLI itself is an integration (integrations/mempalace.json), handled by the loop above.
 _mem_on="false"
 [[ -f "$_kitcfg" ]] && _mem_on="$(jq -r '.memory.enabled // false' "$_kitcfg" 2>/dev/null || echo false)"
 if [[ "$_mem_on" == "true" ]]; then
@@ -594,54 +631,7 @@ if [[ "$_mem_on" == "true" ]]; then
   _mwing="$(jq -r '.memory.wing // .project.slug // ""' "$_kitcfg" 2>/dev/null || echo "")"
   [[ -z "$_mwing" || "$_mwing" == "null" ]] && _mwing="$(basename "${TARGET:-$PWD}")"
 
-  # 1. mempalace CLI — install it (guarded) when memory is on but the CLI is missing; the
-  #    SessionStart/Stop/… hooks are silent no-ops without it. MemPalace is a Python CLI
-  #    (github.com/MemPalace/mempalace); install into an isolated tool venv via pipx (fallback uv).
-  #    Installs obey the same consent guard as every other dep: skipped under --dry-run/--no-install
-  #    or when the operator declined the install prompt.
-  _mp_find() {  # pipx/uv drop the bin in ~/.local/bin, which may not be on PATH yet this session
-    if has_cmd mempalace; then command -v mempalace
-    elif [[ -x "$HOME/.local/bin/mempalace" ]]; then echo "$HOME/.local/bin/mempalace"
-    fi
-    return 0
-  }
-  _mp_bin="$(_mp_find)"
-  if [[ -n "$_mp_bin" ]]; then
-    _mv="$("$_mp_bin" --version 2>/dev/null | head -1)"; [[ -n "$_mv" ]] || _mv="installed"
-    row "$MARK_OK" "mempalace CLI" "$_mv"
-    CHECKS_OK=$((CHECKS_OK + 1))
-  elif [[ $DRY_RUN -eq 1 || $NO_INSTALL -eq 1 ]]; then
-    row "$MARK_FAIL" "mempalace CLI" "missing — pipx install mempalace"
-    CHECKS_FAIL=$((CHECKS_FAIL + 1))
-    ACTIONS_NEEDED+=("Install MemPalace: pipx install mempalace  (then: mempalace mcp)")
-  else
-    # ensure an installer: pipx preferred (brew-installable), uv as fallback. NEVER plain pip.
-    if ! has_cmd pipx && ! has_cmd uv; then
-      brew_install pipx pipx && ACTIONS_TAKEN+=("Installed pipx via brew") || true
-    fi
-    if has_cmd pipx; then
-      printf '  %s mempalace missing — installing via pipx (isolated venv)...\n' "$MARK_WARN"
-      pipx install mempalace >/dev/null 2>&1 || true
-      _mp_installer="pipx"
-    elif has_cmd uv; then
-      printf '  %s mempalace missing — installing via uv tool install (isolated venv)...\n' "$MARK_WARN"
-      uv tool install mempalace >/dev/null 2>&1 || true
-      _mp_installer="uv tool install"
-    fi
-    _mp_bin="$(_mp_find)"
-    if [[ -n "$_mp_bin" ]]; then
-      _mv="$("$_mp_bin" --version 2>/dev/null | head -1)"; [[ -n "$_mv" ]] || _mv="installed"
-      row "$MARK_OK" "mempalace CLI" "$_mv (via ${_mp_installer:-pipx})"
-      CHECKS_OK=$((CHECKS_OK + 1))
-      ACTIONS_TAKEN+=("Installed MemPalace via ${_mp_installer:-pipx} — run 'mempalace mcp' to wire the MCP server")
-    else
-      row "$MARK_FAIL" "mempalace CLI" "install failed — install pipx, then: pipx install mempalace"
-      CHECKS_FAIL=$((CHECKS_FAIL + 1))
-      ACTIONS_NEEDED+=("Install MemPalace: pipx install mempalace  (then: mempalace mcp)")
-    fi
-  fi
-
-  # 2. per-wing identity header — the fix for the global-header bug
+  # 1. per-wing identity header — the fix for the global-header bug
   _idfile="${TARGET:-$PWD}/.claude/mempal-identity.${_mwing}.txt"
   _idfile_generic="${TARGET:-$PWD}/.claude/mempal-identity.txt"
   if [[ -s "$_idfile" ]] || [[ -s "$_idfile_generic" ]]; then
@@ -667,13 +657,13 @@ if [[ "$_mem_on" == "true" ]]; then
     ACTIONS_NEEDED+=("Create .claude/mempal-identity.${_mwing}.txt so this wing has its own wake-up header (or run: cckit doctor --fix)")
   fi
 
-  # 3. session-start hook freshness — the `mempal-identity` marker means the hook
-  #    knows how to swap in the per-wing header (2). Older hooks lack it.
+  # 2. session-start hook freshness — the `mempal-identity` marker means the hook
+  #    knows how to swap in the per-wing header (1). Older hooks lack it.
   _hook="${TARGET:-$PWD}/.claude/hooks/mempal_session_start.sh"
   _kit_root="$(dirname "$_export_dir_doctor")"
   _hook_tmpl="$_kit_root/templates/hooks/mempal_session_start.sh.tmpl"
   if [[ ! -f "$_hook" ]]; then
-    : # no hook installed — the CLI row already covers a non-functioning memory layer
+    : # no hook installed — the integration row already covers a non-functioning memory layer
   elif grep -q 'mempal-identity' "$_hook" 2>/dev/null; then
     row "$MARK_OK" "session-start hook" "current — applies the per-wing header"
     CHECKS_OK=$((CHECKS_OK + 1))

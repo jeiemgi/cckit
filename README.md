@@ -86,7 +86,7 @@ Requirements: `bash` 4+, `git`, and `gh` (GitHub CLI) authenticated. `jq` recomm
 ## Quick start
 
 ```bash
-cckit doctor                  # onboarding preflight: deps, gh auth
+cckit doctor                  # onboarding preflight: deps, gh auth, and each integration you switched on
 cckit init --profile software # scaffold cckit.config.json + .claude/ for this repo
                               #   profiles: software · content · research · automation · minimal
                               #   --adapter claude|codex|both picks the agent (default claude);
@@ -95,6 +95,8 @@ cckit init --profile software # scaffold cckit.config.json + .claude/ for this r
                               #   .codex/hooks.json, merged with yours — trust them with /hooks)
                               #   and one specialist agent per role from the same role source:
                               #   .claude/agents/<role>/AGENT.md and .codex/agents/<role>.toml
+cckit add                     # list the optional integrations + modules; `cckit add <name>` switches one on
+                              #   `cckit add graft`: code-graph retrieval + the code-retrieval rule
 cckit plan-next               # propose what to build next, grounded in current capabilities
 cckit status                  # where are we: next effort per flow, local undone work, PRs to attend, cleanup available
 cckit next                    # the next unblocked issue + how to start it + the weekly cadence
@@ -315,6 +317,25 @@ build `claude -p` / `codex exec` from the review profile.) A PR with **no** verd
 `verify`, never merges silently: absence of evidence is not a pass. Off until you configure it.
 → [the agent review stage](https://cckit.dev/config-and-permissions/#the-agent-review-stage)
 
+For review by a person on the running app, `cckit qa` drives one review stack per lane — a lane is
+an issue number, so an effort's worktree is one lane. Declare how the project boots once
+(`/kit-add qa`: the stack command, its port env vars, one readiness probe per service, a fallback
+route, the names of the test-credential env vars), then:
+
+```bash
+cckit qa up                # launch the declared stack on this lane's ports; exit 0 only once
+                           #   every readiness probe answers 2xx/3xx; refuses (exit 2) when
+                           #   a lane port is already in use
+cckit qa open              # open the changed screen: the PR body's `QA route:` line, else qa.route
+cckit qa verdict pass      # record the verdict against the reviewed commit (a push makes it stale)
+cckit qa verdict fail --note "what is wrong"   # also mails the notes to the builder's branch
+cckit qa stop              # stop the stack; exit 0 only when nothing listens on the lane's ports
+                           #   (a listener the lane did not launch is left running; --force stops it)
+```
+
+Set `captain.mergePolicy.requireQa` and `cckit watch` holds a PR until a pass is recorded against
+its current head. Off by default. → [the QA lane](https://cckit.dev/qa-lane/)
+
 ## Driven by agents
 
 cckit is meant to be operated by an agent loop, not only a human. See [`AGENTS.md`](AGENTS.md) for
@@ -389,6 +410,14 @@ cckit/
   skills/ commands/      # Claude Code skills + slash commands
   profiles/ templates/   # init profiles + scaffold templates
   routines/ modules/     # scheduled routines + optional modules
+  integrations/          # one JSON descriptor per optional third-party tool + its schema
+                         #   (mempalace.json, mlx-lm.json, graft.json). `cckit doctor` installs each one the
+                         #   config switches on through scripts/lib/integration-install.sh, only
+                         #   with consent recorded in .cckit/consent (`--fix`, or yes at the prompt)
+                         #   scripts/integrations-check.sh installs each one for real and names the
+                         #   step that broke; .github/workflows/integrations-check.yml runs it on
+                         #   the 1st of every month and opens an issue on a failure
+                         #   user-facing page: https://cckit.dev/integrations/
   docs-site/             # documentation source — Astro/Starlight (deployed to cckit.dev)
   .claude/skills/        # the subset of templates/skills/ cckit installs for ITSELF
   .claude/rules/         # the subset of templates/rules/ cckit installs for ITSELF

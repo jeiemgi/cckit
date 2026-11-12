@@ -495,6 +495,14 @@ case "$LOCAL_LAYER" in on|true|yes) LOCAL_ON="true";; *) LOCAL_ON="false";; esac
 # stack-gated build skills present in this profile?
 if echo "$SKILLS" | grep -qE '^(feature-build-refine|supabase-patterns)$'; then STACK_SKILLS_ON="true"; else STACK_SKILLS_ON="false"; fi
 
+# code graph (an integration, switched on by `cckit add <id>` — never by an init flag). A fresh
+# scaffold therefore has it off; only --upgrade can find it on, in the project's existing config.
+CODEGRAPH_ON="false"
+if [[ $UPGRADE -eq 1 ]]; then
+  _cg="$(jq -r '.codeGraph.provider // ""' "$UP_CFG" 2>/dev/null || true)"
+  [[ -n "$_cg" && "$_cg" != "none" ]] && CODEGRAPH_ON="true"
+fi
+
 # FLAGS_ON drives <!-- IF:X --> resolution
 FLAGS_ON=""
 [[ "$MEMORY_BOOL" == "true" ]]  && FLAGS_ON="${FLAGS_ON}MEMORY,"
@@ -503,6 +511,7 @@ FLAGS_ON=""
 [[ "$DESIGN_ON" == "true" ]]        && FLAGS_ON="${FLAGS_ON}DESIGN,"
 [[ "$SPECKIT_ON" == "true" ]]       && FLAGS_ON="${FLAGS_ON}SPECKIT,"
 [[ "$STACK_SKILLS_ON" == "true" ]]  && FLAGS_ON="${FLAGS_ON}STACK_SKILLS,"
+[[ "$CODEGRAPH_ON" == "true" ]]     && FLAGS_ON="${FLAGS_ON}CODEGRAPH,"
 
 # ---- build agent/skill tables -------------------------------------------
 short_desc() { sed -n 's/^description: //p' "$1" | head -1 | cut -c1-92; }
@@ -681,6 +690,7 @@ if [[ $DRY_RUN -eq 1 ]]; then
       _rule_enabled "$r" || continue
       [[ -f "$KIT_ROOT/templates/rules/$r.md" ]] && echo "    $_add/rules/$r.md"
     done
+    [[ "$CODEGRAPH_ON" == "true" ]] && echo "    $_add/rules/code-retrieval.md           (codeGraph.provider is set)"
     for s in $SKILLS; do
       _dn="$s"; { [[ -n "$SKILL_PREFIX" ]] && _is_namespaced "$s"; } && _dn="${SKILL_PREFIX}${s}"
       [[ -f "$KIT_ROOT/templates/skills/$s/SKILL.md" ]] && echo "    $_add/skills/$_dn/SKILL.md"
@@ -860,6 +870,12 @@ for r in $RULES; do
   safe_write "$src" "$TARGET/$AD/rules/$r.md"
   echo "  + $AD/rules/$r.md"
 done
+# code-retrieval is in no profile: `cckit add <id>` writes it when a code-graph integration is
+# switched on. An upgrade re-adds it only for a project whose config already has one on.
+if [[ "$CODEGRAPH_ON" == "true" ]]; then
+  safe_write "$KIT_ROOT/templates/rules/code-retrieval.md" "$TARGET/$AD/rules/code-retrieval.md"
+  echo "  + $AD/rules/code-retrieval.md"
+fi
 
 # ---- skills --------------------------------------------------------------
 for s in $SKILLS; do
@@ -1239,7 +1255,7 @@ else
   echo "  1. Review $(adapter_instructions "${ADAPTERS%% *}") and $CONFIG_REL"
   echo "  2. ./scripts/setup-labels.sh && ./scripts/setup-milestones.sh   # seed the repo"
   [[ "$PROJECTS_V2" == "true" ]] && echo "  3. ./scripts/capture-project-ids.sh   # cache Projects v2 field IDs"
-  [[ "$LOCAL_ON" == "true" ]] && echo "  4. /kit-doctor   # local model layer: installs mlx-lm (uv tool install) + starts mlx_lm.server"
+  [[ "$LOCAL_ON" == "true" ]] && echo "  4. /kit-doctor   # local model layer: installs mlx-lm (recipe: integrations/mlx-lm.json) + starts mlx_lm.server"
   adapter_has "$ADAPTERS" codex && echo "  · Codex: commit .codex/, then run /hooks in Codex and trust the project hooks — Codex skips them until you do."
 fi
 

@@ -1,0 +1,28 @@
+{
+  "id": "mempalace",
+  "label": "mempalace CLI",
+  "summary": "Persistent project memory: sessions wake up with context and file their work back, scoped to one wing per project.",
+  "why": "Local, no API key. The four memory hooks (SessionStart, Stop, PreCompact, SessionEnd) are silent no-ops without this CLI.",
+  "config": { "key": "memory.enabled" },
+  "detect": { "run": "mempalace --version" },
+  "install": [
+    {
+      "manager": "pipx",
+      "run": "pipx install mempalace",
+      "bootstrap": { "manager": "brew", "run": "brew install pipx" },
+      "note": "Isolated tool venv. Never plain pip: Homebrew's Python is externally managed (PEP 668)."
+    },
+    { "manager": "uv", "run": "uv tool install mempalace" }
+  ],
+  "afterInstall": "run 'mempalace mcp' to wire the MCP server",
+  "verify": { "run": "mempalace --version", "failsOn": "The CLI is missing or its venv is broken." },
+  "uninstall": "pipx uninstall mempalace || uv tool uninstall mempalace",
+  "recheck": { "cadence": "monthly", "drifts": ["the package name mempalace on PyPI", "the --version flag"] },
+  "docs": "https://github.com/MemPalace/mempalace#readme",
+  "attribution": {
+    "author": "MemPalace",
+    "homepage": "https://github.com/MemPalace/mempalace",
+    "affiliated": false,
+    "notice": "MemPalace is independent open-source software by the MemPalace project. cckit is not a maintainer of it and has no affiliation with or endorsement from its authors."
+  }
+}

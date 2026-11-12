@@ -29,7 +29,7 @@ Memory isn't a bolt-on — cckit treats it as **first-class in the lifecycle**. 
 - **Four hooks wire it into every session automatically** — `SessionStart` loads a wing-scoped wake-up (identity header + recent decisions), `Stop` files the finished session, `PreCompact` sweeps to memory before the window compresses, and `SessionEnd` catches any unsynced work if a session ends abruptly.
 - **One wing per project.** Memories never bleed across repos, and each specialist agent gets its own diary wing for its notes.
 - **A scaffolded protocol.** `.claude/rules/mempalace.md` teaches Claude to *recall before it answers* and *record after it decides* — so it checks the palace instead of guessing, and writes decisions back when the work is done.
-- **Kept healthy by `cckit doctor`.** It installs the CLI, seeds this project's wake-up header, and refreshes stale hooks — so the layer keeps working as the kit evolves.
+- **Kept healthy by `cckit doctor`.** It installs the CLI once you say yes, seeds this project's wake-up header, and refreshes stale hooks — so the layer keeps working as the kit evolves.
 
 ## Turn it on
 
@@ -41,14 +41,16 @@ Memory isn't a bolt-on — cckit treats it as **first-class in the lifecycle**. 
    cckit init --profile software --memory on
    ```
 
-2. **Install the MemPalace CLI** — `cckit doctor` sees that memory is on and installs it for you into an isolated venv (pipx, falling back to uv), then points you at the MCP wiring:
+2. **Install the MemPalace CLI** — `cckit doctor` sees that memory is on and, once you answer yes at its prompt (or pass `--fix`), installs it into an isolated venv (pipx, falling back to uv), then points you at the MCP wiring. The recipe is data: `integrations/mempalace.json`, one of the [integrations](/integrations/) cckit installs the same way.
 
    ```bash
-   cckit doctor     # installs mempalace + seeds this project's wake-up header
+   cckit doctor     # asks, then installs mempalace + seeds this project's wake-up header
    mempalace mcp    # print the MCP-server setup line for Claude Code
    ```
 
-   Rather do it by hand? `pipx install mempalace`.
+   Rather do it by hand? `pipx install mempalace` — the first command the descriptor tries. The doctor then detects the CLI and reports it installed.
+
+   Memory already scaffolded and only the switch is off? `cckit add mempalace` sets `memory.enabled`.
 
 3. **That's it** — every session now loads a wing-scoped wake-up header (`.claude/mempal-identity.<wing>.txt`, seeded by `init`/`doctor`) plus your project's recent decisions. The full read/write protocol lives in the scaffolded `.claude/rules/mempalace.md`.
 

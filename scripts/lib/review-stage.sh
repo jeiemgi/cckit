@@ -74,6 +74,9 @@ rs_needs_dispatch() {
   local state="${1:-}" action="${2:-}" have="${3:-}"
   [ "$have" = "1" ] && return 1
   [ "$state" = "REVIEW_MISSING" ] && return 0
+  # QA_MISSING (#300) is returned only where CLEAN would have been, so it is the same would-be
+  # merge held for a human QA pass. It still earns its reviewer: the agent reads before the human.
+  [ "$state" = "QA_MISSING" ] && return 0
   [ "$action" = "merge" ] || return 1
   return 0
 }

@@ -360,6 +360,11 @@ and records how each one ended — `cckit orchestrate --results` reads `success`
 `interrupted` per issue, whichever agent ran. See
 [Collecting results](/wave/#collecting-results).
 
+A worktree also holds its own port block, so a reviewer can run the app from it without colliding
+with another worktree's stack. `cckit qa up` launches the review stack the project declared,
+on that worktree's ports, and `cckit qa verdict` records the result against the reviewed commit — see the
+[QA lane](/qa-lane/).
+
 ### A sub-issue starts from its effort branch
 
 A sub-issue builds on what its effort has already landed, and those commits are on

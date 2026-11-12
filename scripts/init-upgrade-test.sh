@@ -50,6 +50,11 @@ t "scaffold added morning-briefing skill" "$([ -f .claude/skills/morning-briefin
 t "scaffold added speckit skill"         "$([ -d .claude/skills/speckit ] && echo yes || echo no)"           "yes"
 t "scaffold added task-management rule"  "$([ -f .claude/rules/task-management.md ] && echo yes || echo no)" "yes"
 t "scaffold copied task-sync.sh"         "$([ -f scripts/task-sync.sh ] && echo yes || echo no)"             "yes"
+# E303.10: the code-graph integration is off in this config, so the scaffold carries neither the
+# retrieval rule nor its CLAUDE.md line.
+t "integration off: no code-retrieval rule" "$([ -e .claude/rules/code-retrieval.md ] && echo present || echo absent)" "absent"
+t "integration off: no CLAUDE.md line"      "$(grep -c 'code-retrieval' CLAUDE.md)" "0"
+t "no unresolved IF marker in CLAUDE.md"    "$(grep -c 'IF:CODEGRAPH' CLAUDE.md)" "0"
 # task-sync.sh sources board-view.sh under `set -e` and effort-plan.sh for --plan (#383).
 t "scaffold copied board-view.sh"        "$([ -f scripts/lib/board-view.sh ] && echo yes || echo no)"        "yes"
 t "scaffold copied effort-plan.sh"       "$([ -f scripts/lib/effort-plan.sh ] && echo yes || echo no)"       "yes"
@@ -143,6 +148,29 @@ CLAUDE_PLUGIN_ROOT="$PLUGIN_DIR" bash "$INIT" --upgrade --target "$proj" >/dev/n
   || { echo "FAIL: manifest-absent upgrade run exited non-zero"; exit 1; }
 t "customized statusline preserved (untracked)" "$(grep -cF "$SL_MARKER" .claude/statusline.sh)" "1"
 t "feature keys still absent after repeat upgrades" "$(jq 'has("plans")' .claude/kit.config.json)" "false"
+
+# --- E303.10: an upgrade over a config with a code-graph integration ON -----------------
+# `"none"` is off; a provider name is on. CLAUDE.md is removed first so the upgrade regenerates it
+# (an existing CLAUDE.md is preserved, line or no line).
+git add -A && git commit -q -m "settle before code-graph cases"
+jq '.kitVersion = "0.0.4" | .codeGraph = {provider: "none"}' .claude/kit.config.json > .claude/kit.config.json.tmp \
+  && mv .claude/kit.config.json.tmp .claude/kit.config.json
+rm -f CLAUDE.md
+git add -A && git commit -q -m "codeGraph none"
+CLAUDE_PLUGIN_ROOT="$PLUGIN_DIR" bash "$INIT" --upgrade --target "$proj" >/dev/null 2>&1 \
+  || { echo "FAIL: codeGraph-none upgrade run exited non-zero"; exit 1; }
+t "provider none: no code-retrieval rule" "$([ -e .claude/rules/code-retrieval.md ] && echo present || echo absent)" "absent"
+t "provider none: no CLAUDE.md line"      "$(grep -c 'code-retrieval' CLAUDE.md)" "0"
+
+jq '.kitVersion = "0.0.5" | .codeGraph.provider = "graft"' .claude/kit.config.json > .claude/kit.config.json.tmp \
+  && mv .claude/kit.config.json.tmp .claude/kit.config.json
+rm -f CLAUDE.md
+git add -A && git commit -q -m "codeGraph graft"
+CLAUDE_PLUGIN_ROOT="$PLUGIN_DIR" bash "$INIT" --upgrade --target "$proj" >/dev/null 2>&1 \
+  || { echo "FAIL: codeGraph-on upgrade run exited non-zero"; exit 1; }
+t "provider on: code-retrieval rule added" "$([ -f .claude/rules/code-retrieval.md ] && echo yes || echo no)" "yes"
+t "provider on: CLAUDE.md carries the line" "$(grep -c 'rules/code-retrieval.md' CLAUDE.md)" "1"
+t "provider on: the key survives the merge" "$(jq -r '.codeGraph.provider' .claude/kit.config.json)" "graft"
 
 # --- E257.3: adapter selection — claude / codex / both ----------------------------------
 # Fresh inits in throwaway projects. KIT_INIT_PREFLIGHT=0 skips the doctor (it installs packages and
