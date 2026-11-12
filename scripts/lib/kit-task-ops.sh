@@ -452,9 +452,36 @@ EOF
   fi
 }
 
+# _kto_existing_labels <repo> <comma-labels> — the subset of <comma-labels> the repo has, comma-joined
+# on stdout; each one it lacks is named in a warning on stderr (#387). `gh issue create --label`
+# aborts on an unknown label before any issue exists, and the REST endpoint creates the label
+# instead, so both transports are filtered here: the issue is filed, no label is invented. Names
+# match case-insensitively, as GitHub's do. A label list that cannot be read filters nothing.
+_kto_existing_labels() {
+  local repo="$1" want="$2" have l keep=""
+  if cckit_gh_rest; then
+    have="$(gh_rest_label_names "$repo")" || { printf '%s' "$want"; return 0; }
+  else
+    have="$(gh label list --repo "$repo" --limit 1000 --json name --jq '.[].name' 2>/dev/null)" \
+      || { printf '%s' "$want"; return 0; }
+  fi
+  while IFS= read -r l; do
+    [[ -n "$l" ]] || continue
+    if printf '%s\n' "$have" | grep -qixF -- "$l"; then
+      keep="${keep:+$keep,}$l"
+    else
+      echo "⚠ label '$l' not found in $repo — issue created without it (scripts/setup-labels.sh provisions the kit's labels)" >&2
+    fi
+  done <<EOF
+$(printf '%s\n' "$want" | tr ',' '\n')
+EOF
+  printf '%s' "$keep"
+}
+
 # kit task new — create a GitHub issue with labels + milestone, add it to the board, set Role +
 # Status(Todo) + Plan Link. Inputs are passed (the caller does the AskUserQuestion). No invented
-# values; fails loudly on an unknown label family upstream (the caller validates the closed sets).
+# values: a label the repo does not have is dropped with a warning, never created, and the issue is
+# still filed (#387). Non-zero only when the issue itself was not created.
 # Args: <title> <role-display-or-slug> <kind> <priority> [milestone|""] [plan-link] [blocked-by] <body>
 kto_task_new() {
   local title="${1:-}" role="${2:-}" kind="${3:-}" prio="${4:-}" milestone="${5:-}" plan="${6:-}" blocked="${7:-}" body_user="${8:-}"
@@ -468,13 +495,14 @@ kto_task_new() {
   role_slug="$(printf '%s' "$role" | tr 'A-Z ' 'a-z-')"
   labels="kind:${kind},priority:${prio},role:${role_slug}"
   body="$(kto_compose_issue_body "$body_user" "$plan" "$blocked" "$role_slug")"
+  labels="$(_kto_existing_labels "$repo" "$labels")"
 
   if cckit_gh_rest; then
     url=$(gh_rest_issue_create "$repo" "$title" "$body" "$labels" "$milestone") || return 1
   else
   url=$(gh issue create --repo "$repo" \
     --title "$title" --body "$body" \
-    --label "$labels" ${milestone:+--milestone "$milestone"} --assignee "@me") || return 1
+    ${labels:+--label} ${labels:+"$labels"} ${milestone:+--milestone "$milestone"} --assignee "@me") || return 1
   fi
   num=$(basename "$url")
   echo "✓ $url"
