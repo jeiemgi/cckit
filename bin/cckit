@@ -51,6 +51,7 @@
 #   cckit next [--effort N]         everyday helper: the unblocked set + how to start the top issue
 #   cckit wave [--effort N]         read open efforts, propose incoming waves: fan-out + captain drive
 #   cckit msg <send|read|list>      session mail across projects: steer a live session (--steer)
+#   cckit claims                    live session claims: which session is working which issue (read-only)
 #   cckit gc [--prune [--yes]]      report (default) or prune merged + landed branches and worktrees
 #   cckit cleanup [--yes]           guided destructive sweep over the gc report (plan first)
 #   cckit status                    thin dashboard: board + worktrees + resume handoff
@@ -179,8 +180,11 @@ case "$cmd" in
     # shellcheck source=/dev/null
     source "$LIB/role-identity.sh"; source "$LIB/worktree-start.sh"
     if cckit_is_json; then
-      out="$(wt_start "$@" 2>&1)"; rc=$?
-      cckit_json verb start issue "${1:-}" ok "$([ "$rc" -eq 0 ] && echo true || echo false)" \
+      # `&& … ||` keeps `set -e` from exiting on a refused start before the JSON result is printed.
+      out="$(wt_start "$@" 2>&1)" && rc=0 || rc=$?
+      # The issue is the first non-flag argument: `start --force 42` reports 42, not `--force`.
+      start_issue=""; for a in "$@"; do case "$a" in -*) ;; *) start_issue="$a"; break ;; esac; done
+      cckit_json verb start issue "$start_issue" ok "$([ "$rc" -eq 0 ] && echo true || echo false)" \
         detail "$(printf '%s' "$out" | tail -1)"
       exit "$rc"
     fi
@@ -438,6 +442,20 @@ case "$cmd" in
     [ "$croot" = "$ROOT" ] || echo "contribute: using the checkout at $croot" >&2
     cd "$croot"; exec "$croot/scripts/contribute.sh" "$@" ;;
   status|ui)   exec "$ROOT/scripts/status.sh" "$@" ;;
+  claims)
+    # Live session claims (#384) — which session is working which issue. Read-only: a dead claim is
+    # skipped here and reaped by the next `cckit start` on that issue, never by this verb.
+    # shellcheck source=/dev/null
+    source "$LIB/session-registry.sh"
+    if cckit_is_json; then sreg_list "$PWD" --json; exit 0; fi
+    rows="$(sreg_list "$PWD")"
+    if [ -z "$rows" ]; then echo "(no live claims)"; exit 0; fi
+    printf '%-7s %-8s %-17s %-42s %s\n' "ISSUE" "PID" "SINCE" "BRANCH" "WORKTREE"
+    printf '%s\n' "$rows" | while IFS=$'\t' read -r c_issue c_branch c_wt c_pid c_host c_started; do
+      c_since="$(date -r "$c_started" '+%Y-%m-%d %H:%M' 2>/dev/null || date -d "@$c_started" '+%Y-%m-%d %H:%M' 2>/dev/null || echo "$c_started")"
+      printf '%-7s %-8s %-17s %-42s %s\n' "#$c_issue" "$c_pid" "$c_since" "$c_branch" "$c_wt"
+    done
+    ;;
   resume)      source "$LIB/handoff.sh"; handoff_read ;;
   handoff)     source "$LIB/handoff.sh"; handoff_write "$@" ;;
   msg)

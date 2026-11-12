@@ -768,6 +768,7 @@ safe_copy "$KIT_ROOT/scripts/lib/kit-events.sh"     "$TARGET/scripts/lib/kit-eve
 safe_copy "$KIT_ROOT/scripts/lib/board-view.sh"     "$TARGET/scripts/lib/board-view.sh"
 safe_copy "$KIT_ROOT/scripts/lib/effort-plan.sh"    "$TARGET/scripts/lib/effort-plan.sh"
 safe_copy "$KIT_ROOT/scripts/lib/worktree-start.sh" "$TARGET/scripts/lib/worktree-start.sh"
+safe_copy "$KIT_ROOT/scripts/lib/session-registry.sh" "$TARGET/scripts/lib/session-registry.sh"
 safe_copy "$KIT_ROOT/scripts/kit-version-check.sh"  "$TARGET/scripts/kit-version-check.sh" exec
 for sc in setup-labels.sh setup-milestones.sh capture-project-ids.sh task-sync.sh knowledge-lint.sh \
           review-lint.sh skill-frontmatter-lint.sh instruction-budget-lint.sh; do

@@ -35,7 +35,8 @@ One issue becomes one branch, one worktree, one PR. These verbs walk that path.
 | Verb | Purpose |
 | --- | --- |
 | `cckit next [--effort N]` | The unblocked set + how to start the top issue. |
-| `cckit start <issue> [slug]` | Create an isolated worktree + branch for an issue, [bootstrapped](/config-and-permissions/#worktree-bootstrap) — env files copied, dev port assigned, deps installed at the selected targets (`worktree.installPaths` if set — those dirs regardless of their manifests — else a root that declares dependencies or is a workspace root with members, else nothing). |
+| `cckit start <issue> [slug]` | Create an isolated worktree + branch for an issue, [bootstrapped](/config-and-permissions/#worktree-bootstrap) — env files copied, dev port assigned, deps installed at the selected targets (`worktree.installPaths` if set — those dirs regardless of their manifests — else a root that declares dependencies or is a workspace root with members, else nothing). [Claim-checked](#session-claims): refused when another live session already holds the issue, unless `--force` / `KIT_FORCE=1`. |
+| `cckit claims` | List the live [session claims](#session-claims) — issue, session pid, start time, branch, worktree. Read-only. `--llm` returns a JSON array. |
 | `cckit pr <issue> <summary> [--base <branch>]` | Commit, push, and open the PR. `--base <branch>` opens it against a branch other than the configured base — a release PR from `develop` to `main`, or a hotfix to the release branch — with the same labels, milestone and board steps. The push exports the target as `KIT_PR_BASE`, so a git pre-push hook can compare against the branch the PR targets. |
 | `cckit hotfix <pr\|sha> [--base <branch>]` | Cherry-pick one merged PR or commit onto the release branch (`main` by default): a worktree from `origin/<base>`, `git cherry-pick -x`, push, and a PR titled after the source with `Cherry-pick of #N` in its body. See [Hotfix to the release branch](/releasing/#hotfix-to-the-release-branch). |
 | `cckit close <issue> <summary> [--reason R] [--duplicate-of N] [--superseded-by N]` | Close the issue with a summary comment and a reason (`completed`, `not-planned`, `duplicate`; superseded closes as not planned with a "Superseded by #N" comment), and mark it done on the board. |
@@ -46,6 +47,38 @@ One issue becomes one branch, one worktree, one PR. These verbs walk that path.
 | `cckit status` | "Where are we?" in three buckets — local undone work, open PRs waiting on a human, cleanup available (local + remote) — plus the board and the resume handoff, and one line with the resident instruction-file total. Read-only. |
 | `cckit handoff "<note>"` | Save a resume-here note for the next session. |
 
+
+### Session claims
+
+Git refuses one branch in two worktrees. It does not stop a second session from starting the same
+issue: the worktree already exists, so the second `cckit start` used to report "reusing worktree"
+and both sessions wrote one tree. `cckit start` now records a **claim** and checks for one first.
+
+- **The record.** One JSON file per issue at `<git-common-dir>/kit-sessions/issue-<N>.json`:
+  issue, branch, worktree, session pid, host, start time. It lives in the shared git dir, so every
+  worktree of the repo reads the same set. Nothing is committed and nothing leaves the machine.
+- **The check.** It runs before the issue read, the fetch and `git worktree add`. A refusal exits 1
+  with the claimant's pid and worktree, and creates no branch and no worktree.
+- **Your own claim never blocks you.** Re-running `cckit start <issue>` from the session that
+  claimed it, or from inside the claimed worktree, is the same no-op it always was.
+- **`--force`** (or `KIT_FORCE=1`) starts anyway and takes the claim over. `KIT_FORCE=1` is also how
+  to relaunch `cckit orchestrate` onto an issue another session still claims — orchestrate stops at
+  the first refused start.
+- **Which pid.** The session, not the command: `KIT_SESSION_PID` when set, otherwise the nearest
+  ancestor process that is not a throwaway shell — the agent process, or your terminal's own shell.
+  Sub-agents that share one agent process share one session pid and are not told apart; give each
+  its own `KIT_SESSION_PID` if they must be.
+- **When a claim ends.** Nothing has to release it. A claim is dropped when its pid is dead (or
+  alive with a different start time — a reused pid), or when its worktree has been gone for more
+  than five minutes. A claim written on another host is never dropped on a pid check.
+- **The board is a warning, not a gate.** An issue already In Progress or In Review prints a
+  warning and the start proceeds: nothing resets the board when a session dies, so refusing on it
+  would block every restart after a crash.
+- **Scope.** `cckit start <issue>` only. `cckit effort start` has its own WIP limit and writes no
+  claim.
+
+`cckit claims` prints the live claims and writes nothing — a dead claim is hidden there and removed
+by the next `cckit start` on that issue.
 
 ### Where are we?
 
