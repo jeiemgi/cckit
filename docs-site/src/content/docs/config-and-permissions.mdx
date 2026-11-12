@@ -31,7 +31,7 @@ No org, repo, or path is hardcoded — every value comes from this file. A repo 
 ### Where these live on disk
 
 Sources 2–4 are files; source 1 (`$KIT_CONFIG`) is an environment variable, so it isn't in the
-tree. Everything cckit writes about *you* — consent, identity — lands in `.cckit/`, which is
+tree. Everything cckit writes about *you* — install consent, identity — lands in `.cckit/`, which is
 gitignored, so it never leaves your machine.
 
 <FileTree>
@@ -41,7 +41,7 @@ gitignored, so it never leaves your machine.
     - kit.config.json    **source 3** · a kit-scaffolded project's config
     - …    agents, hooks, rules, skills
   - .cckit/    gitignored — cckit's local state, never committed
-    - consent    your recorded yes to mutate this repo
+    - consent    one `install:<id>` line per integration you approved installing
     - identity    your name, asked once on first run
     - privacy-denylist    extra paths the secret guard must block
   - … your existing files, untouched
@@ -76,8 +76,9 @@ resume-here handoff saved" everywhere else.
 
 cckit asks before it changes anything in a repo it has not worked in before.
 
-- **Read-only by default in an unknown repo.** Before the first *mutating* operation, cckit records your consent in `.cckit/consent` (gitignored).
-- **The secret and privacy guard always runs** before anything is committed or published. It is not optional and consent does not bypass it — see [Security](/security/).
+- **A config or `.claude/` file is proposed before it is written.** `cckit add <module>` and `cckit migrate` go through one machine (`scripts/lib/kit-operate.sh`): show the change, ask, apply, record. `KIT_DRY_RUN=1` previews and writes nothing; `KIT_ASSUME_YES=1` skips the question, and still keeps a file you edited. `cckit init --dry-run` prints the scaffold plan and writes nothing.
+- **A third-party tool installs only with recorded consent.** Your yes to `cckit doctor` (its prompt, or `--fix`) is written as one `install:<id>` line in `.cckit/consent` (gitignored). That file holds install consent and nothing else: no other verb reads or writes it. See [Integrations](/integrations/#what-your-yes-records).
+- **The secret and privacy guard always runs** before anything is committed or published. It is not optional and no consent bypasses it — see [Security](/security/).
 - **Destructive or irreversible operations** (force-push, repo create, history rewrite) always require a separate, explicit confirmation.
 
 ## Captain merge policy
@@ -381,6 +382,9 @@ origin, and a `<slug>` argument was resolved before it, which can run `gh issue 
 
 ## Integrations
 
+This section is the reference. For the list of tools and the steps to switch one on, start at
+[Integrations](/integrations/).
+
 An optional third-party tool is described by one JSON file, `integrations/<id>.json`, checked
 against `integrations/integration.schema.json`. A descriptor carries a label, the config key that
 turns the tool on, a detect command, install candidates tried in the order written, a verify
@@ -421,6 +425,9 @@ refused by the validator.
 | `codeGraph.provider` | *(unset — off)* | Which integration provides code-graph retrieval, as its descriptor's `config.value` names it. `graft` switches on `integrations/graft.json`. Unset or `none`: no code graph. |
 | `memory.enabled` | `false` | `true` switches on `integrations/mempalace.json`: `cckit doctor` installs the MemPalace CLI and checks the wake-up header and session-start hook. |
 | `local.enabled` | *(unset — off)* | `true` switches on `integrations/mlx-lm.json`: `cckit doctor` installs the runtime on Apple silicon and starts `mlx_lm.server` on `local.port` (default `8080`) with `local.model`. |
+| `local.port` | `8080` | The port `mlx_lm.server` listens on. |
+| `local.model` | `mlx-community/Qwen3-8B-4bit` | The model the server loads. The first start downloads it. |
+| `local.dismissed` | *(unset)* | The `kitVersion` at which the "local layer down" session notice was dismissed. Written by `cckit doctor --dismiss-local`. |
 
 `bash scripts/lib/integrations.sh --validate` checks every descriptor and prints one
 `<id>: <field>: <problem>` line per problem; `--list` prints the ids; `--applies <id> [dir]` exits

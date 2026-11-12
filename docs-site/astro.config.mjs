@@ -178,6 +178,7 @@ export default defineConfig({
           { label: 'All guides', slug: 'guides' },
           { label: 'Wave', slug: 'wave' },
           { label: 'Driving cckit from agents', slug: 'agents' },
+          { label: 'Integrations', slug: 'integrations' },
           { label: 'Cookbook', slug: 'cookbook' },
           { label: 'Browser debug', slug: 'debug' },
         ]},

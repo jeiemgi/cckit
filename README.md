@@ -298,6 +298,7 @@ cckit/
                          #   scripts/integrations-check.sh installs each one for real and names the
                          #   step that broke; .github/workflows/integrations-check.yml runs it on
                          #   the 1st of every month and opens an issue on a failure
+                         #   user-facing page: https://cckit.dev/integrations/
   docs-site/             # documentation source — Astro/Starlight (deployed to cckit.dev)
   .claude/skills/        # the subset of templates/skills/ cckit installs for ITSELF
   .claude/rules/         # the subset of templates/rules/ cckit installs for ITSELF

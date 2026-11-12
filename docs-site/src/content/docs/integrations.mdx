@@ -1,0 +1,155 @@
+---
+title: Integrations
+description: The optional third-party tools cckit can switch on, install and re-check — MemPalace, mlx-lm and Graft — and what each step asks of you.
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+import TagRow from '../../components/TagRow.astro';
+
+<TagRow kinds={["flow"]} />
+
+An **integration** is an optional third-party tool that cckit can switch on, install and re-check.
+Each one is a JSON file, `integrations/<id>.json`: its config key, its install commands in the order
+they are tried, the command that proves it works, and who makes it. `cckit add`, `cckit doctor` and
+the monthly check all read that file, and none of them holds a tool's recipe in code.
+
+Every integration is off until you switch it on. With its key unset, no row is printed, nothing is
+installed and no exit code changes.
+
+## The integrations that ship
+
+| `cckit add …` | What it gives you | Config key | Offered where | Made by |
+| --- | --- | --- | --- | --- |
+| `mempalace` | Persistent per-project memory: sessions wake up with context and file their work back. | `memory.enabled` | any repo, any machine | [MemPalace](https://github.com/MemPalace/mempalace) |
+| `mlx-lm` | A local model runtime: digest, summarize and classify run on this Mac through `mlx_lm.server`. | `local.enabled` | Apple silicon only (`Darwin` + `arm64`) | [Apple, ml-explore](https://github.com/ml-explore/mlx-lm) |
+| `graft` | Code-graph retrieval: agents ask an index where code lives and who calls a symbol. | `codeGraph.provider` = `graft` | a repo with at least one file in a language Graft indexes | [NanoNets / Trail](https://github.com/trailhq/Trail-Code) |
+
+`cckit add` with no name prints this list for the repo you are in, each row marked `on` or `off`,
+and says which ones do not apply here.
+
+## Switch one on
+
+<Steps>
+
+1. **Choose it.** `cckit add <id>` asks one question and, on yes, sets that integration's config
+   key in the project config. No other key changes and nothing is installed.
+
+   ```bash
+   cckit add            # list what can be added
+   cckit add graft      # sets codeGraph.provider = graft
+   ```
+
+   An integration that cannot work in this repo is declined: exit 0, nothing written. In a repo of
+   only `.sh` files, `cckit add graft` declines because Graft has no shell grammar.
+
+2. **Install it.** `cckit doctor` prints one row per integration that is switched on. A missing
+   tool is installed only after your yes for that run:
+
+   ```bash
+   cckit doctor         # in a terminal: asks, then installs on yes
+   cckit doctor --fix   # installs without the prompt (alias --yes)
+   ```
+
+   With no terminal and no `--fix`, the doctor installs nothing, reports the tool missing and
+   exits 1.
+
+3. **Finish the step the doctor names.** After an install the doctor prints the one step it leaves
+   to you: `mempalace mcp` for MemPalace, `graft init --agents claude --no-statusline --no-global`
+   for Graft. mlx-lm has none.
+
+</Steps>
+
+`KIT_DRY_RUN=1 cckit add <id>` writes nothing and prints the install candidates in order plus the
+wire command.
+
+## What your yes records
+
+Your yes to an install is recorded as one line, `install:<id>`, in `.cckit/consent`. That file is
+gitignored and shared by every worktree of the repo.
+
+| Fact | Detail |
+| --- | --- |
+| What writes the line | `cckit doctor --fix`, a yes at the doctor's terminal prompt, or `bash scripts/lib/integration-install.sh --consent <id>`. |
+| What it permits | The shared runner installing and wiring that one integration in that one repo. |
+| What it does not permit | Any other integration, any other repo, or any other change cckit makes. |
+| Without the line | The runner reports `no-consent` and runs nothing. `KIT_ASSUME_YES` is not consent. |
+| To withdraw it | Delete the `install:<id>` line from `.cckit/consent`. |
+
+`.cckit/consent` holds install consent only. It is not a general switch for cckit changing your
+repo: see [the permission gate](/config-and-permissions/#the-permission-gate-ask-before-operating).
+
+## How an install runs
+
+`scripts/lib/integration-install.sh` is the one runner. For a missing tool with consent recorded,
+it tries the descriptor's install candidates in the order written and skips one whose package
+manager is not on `PATH`. The first candidate that exits 0 **and** leaves the tool detectable wins;
+later candidates never run. If the tool is already detectable, nothing runs, so a second
+`cckit doctor --fix` is a no-op.
+
+| Integration | Candidates, in order | If no manager is present |
+| --- | --- | --- |
+| `mempalace` | `pipx install mempalace`, then `uv tool install mempalace` | `brew install pipx` |
+| `mlx-lm` | `uv tool install mlx-lm`, then `pipx install mlx-lm` | `brew install uv` |
+| `graft` | `npm install -g @nanonets/graft`, then `pnpm add -g @nanonets/graft` | nothing: the install fails |
+
+Installing by hand with any of those commands works too: the doctor detects the tool and reports it
+installed.
+
+The full rule table, the descriptor fields and the doctor's exit codes are in the reference:
+[Config & permissions → Integrations](/config-and-permissions/#integrations).
+
+## The recipes are re-checked every month
+
+A descriptor hardcodes facts its vendor can change: a package name, a flag, a binary's name.
+`.github/workflows/integrations-check.yml` installs every descriptor for real on the 1st of each
+month, on `ubuntu-latest` and `macos-15` (arm64), and opens an issue naming the integration and the
+step that broke. Details: [the monthly recipe check](/config-and-permissions/#the-monthly-recipe-check).
+
+## The tools, and who makes them
+
+cckit wrote none of these tools. Each descriptor carries an `attribution` block, and the validator
+refuses a descriptor without one.
+
+### MemPalace
+
+Persistent memory, scoped to one wing per project. Local, no API key. Setup and what the hooks do:
+[Set up memory](/memory/).
+
+<Aside type="note" title="Not affiliated">
+MemPalace is independent open-source software by the [MemPalace](https://github.com/MemPalace/mempalace)
+project. cckit is not a maintainer of it and has no affiliation with or endorsement from its
+authors. Send MemPalace bugs to [its issue tracker](https://github.com/MemPalace/mempalace/issues).
+</Aside>
+
+### mlx-lm
+
+The local model runtime behind cckit's local layer. Apple silicon only; on any other machine the
+doctor prints a skip row and every caller falls back. The first server start downloads the
+configured model, about 4.5 GB for the default. `local.port` and `local.model` are in the
+[config reference](/config-and-permissions/#integrations).
+
+<Aside type="note" title="Not affiliated">
+mlx-lm is open-source software (MIT) from Apple's [ml-explore](https://github.com/ml-explore/mlx-lm)
+project. cckit is not affiliated with Apple.
+</Aside>
+
+### Graft
+
+Code-graph retrieval. `cckit add graft` also writes `.claude/rules/code-retrieval.md`, which routes
+code questions to Graft verbs and falls back to Grep/Glob silently when the graph is absent. The
+retrieval verbs parse with tree-sitter and call no model; `graft build --deep` is the one command
+that calls an LLM, and cckit never runs it. Flags, files written and the hook-merge test:
+[Code-graph retrieval: Graft](/config-and-permissions/#code-graph-retrieval-graft).
+
+<Aside type="note" title="Not affiliated">
+Graft is open-source software (MIT) by [NanoNets / Trail](https://github.com/trailhq/Trail-Code),
+installed from its public npm package. cckit is not affiliated with either. Per the vendor README,
+Graft makes a daily npm version check and one batched anonymous usage ping;
+`graft telemetry disable` or `DO_NOT_TRACK=1` turns the ping off. cckit sets neither.
+</Aside>
+
+## Add a tool of your own
+
+Write `integrations/<id>.json` against `integrations/integration.schema.json`, then run
+`bash scripts/lib/integrations.sh --validate`: it prints one `<id>: <field>: <problem>` line per
+problem. The field list is in [Config & permissions → Integrations](/config-and-permissions/#integrations).
