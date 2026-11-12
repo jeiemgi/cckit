@@ -186,6 +186,35 @@ What it never does is fail for want of a network: `cckit effort start` degrades 
 than erroring out.
 </Aside>
 
+## Planning sessions from a local snapshot
+
+`cckit effort plan` groups the open efforts by flow, orders each flow by its `blocked_by` edges and
+packs them into session-sized batches. It reads those efforts from GitHub — one listing, then one
+call per effort for its blockers.
+
+If your project already keeps that data locally, set `effort.planSource` to an executable that
+prints one `number<TAB>flow<TAB>ctx<TAB>title[<TAB>blockers]` line per open effort, and the plan
+reads it instead. The source may also print `# age: <text>` to say how old its data is.
+
+```console
+$ cckit effort plan
+
+  kit effort plan — session budget 4  (ctx S=1 M=2 L=4 XL=8 · L/XL → delegate subs)
+  source: planSource tools/effort-rows.sh · age 2h
+
+  Flow: Core
+    Session 1:
+      #241  [M ] order and cadence
+    Session 2:
+      #257  [L ] release gates   (after #241)   → delegate subs
+```
+
+The `source:` line is on every plan. When the source is not executable, exits non-zero or prints no
+rows, the plan falls back to GitHub and the line says why:
+`source: GitHub (acme/shop) — planSource tools/effort-rows.sh failed (exit 3), fell back`.
+The row format and the override are in
+[Effort plan source](/config-and-permissions/#effort-plan-source).
+
 ## Waves
 
 Some sub-issues depend on others: sub #4 can't start until sub #1 is merged. cckit reads those

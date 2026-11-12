@@ -47,5 +47,17 @@ t "effort.wipLimit is exported"        "$(wip_for '{"github":{},"effort":{"wipLi
 t "effort.wipLimit 0 survives export"  "$(wip_for '{"github":{},"effort":{"wipLimit":0}}')" "0"
 t "unset effort.wipLimit exports ''"   "$(wip_for '{"github":{}}')" ""
 
+# ── #382 · effort.planSource is exported as KIT_EFFORT_PLAN_SOURCE ───────────────────────────
+# `cckit effort plan` reads this env var when EFFORT_PLAN_SOURCE is unset. An UNSET key must export
+# an EMPTY string (not "null"): non-empty means "a local source is configured", and "null" would
+# send every unconfigured repo down the not-executable fallback with a warning.
+plan_source_for() {
+  local json="$1" d; d="$(mktemp -d "$tmp/src.XXXXXX")"
+  printf '%s' "$json" > "$d/cckit.config.json"
+  KIT_CONFIG="$d/cckit.config.json" bash -c "source '$LIB/kit-config.sh'; load_kit_config >/dev/null 2>&1; printf '%s' \"\$KIT_EFFORT_PLAN_SOURCE\""
+}
+t "effort.planSource is exported"        "$(plan_source_for '{"github":{},"effort":{"planSource":"tools/rows.sh"}}')" "tools/rows.sh"
+t "unset effort.planSource exports ''"   "$(plan_source_for '{"github":{}}')" ""
+
 [ "$fail" -eq 0 ] && echo "ALL OK (kit-config)" || echo "kit-config: FAILURES"
 exit "$fail"

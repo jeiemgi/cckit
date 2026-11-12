@@ -197,6 +197,23 @@ round-trip buys a count that is right either way.
   plus your cached `refs/remotes`. If origin is simply unreachable, the count falls back to those
   same cached refs, prints one line saying the count may be stale, and the start proceeds.
 
+**`cckit effort plan` can read a local snapshot instead of GitHub.** By default it makes one
+listing call plus one `blocked_by` call per open effort. Set `effort.planSource` in
+`cckit.config.json` to an executable and the plan calls it instead, as `<source> <owner/repo>` from
+the project root:
+
+```text
+# age: 2h
+241<TAB>Core<TAB>M<TAB>order and cadence
+257<TAB>Core<TAB>L<TAB>release gates<TAB>241
+```
+
+Columns are `number`, `flow`, `ctx`, `title` and an optional comma-separated `blockers` list; the
+`# age:` line is optional. A source that is not executable, exits non-zero or prints no rows falls
+back to GitHub. The plan prints a `source:` line under its header — the source used, its age when it
+reports one, and the reason for a fallback — so a plan built from a snapshot never passes for a live
+one. `EFFORT_PLAN_SOURCE` overrides the config per invocation.
+
 ## Waves — parallel agentic development
 
 `cckit wave` reads your open efforts and proposes the incoming waves of work — parallel agent tasks

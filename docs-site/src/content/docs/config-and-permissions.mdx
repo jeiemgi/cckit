@@ -379,6 +379,50 @@ origin, and a `<slug>` argument was resolved before it, which can run `gh issue 
 `cckit start <issue>` (a plain task worktree) has no WIP limit. Full behaviour:
 [Only so many efforts at once](/efforts-and-waves/#only-so-many-efforts-at-once).
 
+## Effort plan source
+
+`cckit effort plan` reads the open efforts from GitHub: one listing call, then one `blocked_by` call
+per effort. A project that already keeps a local snapshot of that data can name an executable that
+prints it, and the plan calls that instead:
+
+```json
+{
+  "effort": {
+    "planSource": "tools/effort-rows.sh"
+  }
+}
+```
+
+| Key | Default | What it does | Env override |
+| --- | --- | --- | --- |
+| `effort.planSource` | unset — GitHub is read | Path to an executable that prints the open-effort rows. A relative path resolves against the project root (the directory holding `cckit.config.json`, or the parent of `.claude/` in the scaffolded layout). | `EFFORT_PLAN_SOURCE` |
+
+The source is called as `<source> <owner/repo>` with the project root as its working directory, and
+writes to stdout:
+
+| Line | Meaning |
+| --- | --- |
+| `number<TAB>flow<TAB>ctx<TAB>title` | One open effort. An empty `flow` is shown as `—`; an empty `ctx` as `?`, which weighs the same as `M`. |
+| `number<TAB>flow<TAB>ctx<TAB>title<TAB>blockers` | The same, with its blockers: a comma-separated list of issue numbers (`241,257`; a leading `#` is accepted). |
+| `# age: <text>` | Optional. How old the data is, in the source's own words (`2h`, `synced 09:14`). Printed verbatim. |
+
+Any other line starting with `#`, and any line whose first column is not a number, is ignored.
+
+The plan falls back to GitHub, with a one-line warning on stderr, when the source is not executable,
+exits non-zero, or prints no rows. A source that answers needs neither `gh` nor `jq`; the fallback
+needs both.
+
+Every plan prints a `source:` line under its header:
+
+```text
+  source: planSource tools/effort-rows.sh · age 2h
+  source: GitHub (acme/shop)
+  source: GitHub (acme/shop) — planSource tools/effort-rows.sh failed (exit 3), fell back
+```
+
+Resolution order, first non-empty wins: `EFFORT_PLAN_SOURCE` in the environment →
+`KIT_EFFORT_PLAN_SOURCE` (what `load_kit_config` exports from `effort.planSource`) → GitHub.
+
 ## Agent profiles
 
 A **profile** is a named agent configuration: which CLI to run, roughly what it costs, under which

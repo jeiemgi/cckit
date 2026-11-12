@@ -86,6 +86,11 @@ load_kit_config() {
   # back to its built-in default of 2. An EFFORT_WIP_LIMIT env var still wins per invocation.
   export KIT_EFFORT_WIP_LIMIT="$(jq -r 'if (.effort.wipLimit | type) == "null" then "" else (.effort.wipLimit | tostring) end' "$cfg")"
 
+  # Local rows source for `cckit effort plan` (effort.planSource, #382) — an executable that prints
+  # the open-effort rows so the plan need not query GitHub. Empty when unconfigured (GitHub is read).
+  # An EFFORT_PLAN_SOURCE env var still wins per invocation.
+  export KIT_EFFORT_PLAN_SOURCE="$(jq -r '.effort.planSource // ""' "$cfg")"
+
   # PR conventions (#361). pr.titleStyle: "conventional" (default — release-please + commitlint read
   # the squash subject) or "issue-title" (the PR title is the issue title, verbatim).
   # pr.orchestratorSection: true adds a 2-line `## For the orchestrator` section to `cckit pr` bodies.
@@ -127,5 +132,6 @@ _kit_apply_claudekit_overlays() {
   export KIT_ANNOTATE_FRAMEWORK="$(_kit_cfg_get '.annotate.framework // ""')"
   export KIT_EFFORT_FLOWS="$(_kit_cfg_get '[.effort.flows[]? | tostring] | join(" ")')"
   export KIT_EFFORT_WIP_LIMIT="$(_kit_cfg_get 'if (.effort.wipLimit | type) == "null" then "" else (.effort.wipLimit | tostring) end')"
+  export KIT_EFFORT_PLAN_SOURCE="$(_kit_cfg_get '.effort.planSource // ""')"
   export KIT_EFFECTIVE_CONFIG="$merged"
 }
