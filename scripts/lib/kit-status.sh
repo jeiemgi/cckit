@@ -16,7 +16,8 @@
 # thin fetcher collected, so the verdicts are unit-tested against fixtures rather than the network.
 #
 # Source it:  source scripts/lib/kit-status.sh
-# Depends on: git; gh + jq for the PR bucket (absent → the bucket says so); kit-gc.sh for cleanup.
+# Depends on: git; gh + jq for the PR bucket (absent → the bucket says so); kit-gc.sh for cleanup;
+#             effort-plan.sh for the next-effort-per-flow section (not loaded → it says so).
 
 # ── bucket 1: local undone work ────────────────────────────────────────────────────────────────
 
@@ -325,6 +326,53 @@ status_instruction_budget() {
   INSTRUCTION_BUDGET_ROOT="$proj" bash "$lint" --summary 2>/dev/null || true
 }
 
+# ── next effort per flow ───────────────────────────────────────────────────────────────────────
+
+# status_next_efforts_rows [repo] — `flow<TAB>number<TAB>ctx<TAB>title<TAB>waiting`, one row per flow
+# that has an open effort: the next effort that can start (no open blocker; p0 → p3, then the lowest
+# number), or `-` when every effort in the flow is blocked. The pick is `effort_next_rows`
+# (scripts/lib/effort-plan.sh), which the caller sources — status.sh does, next to kit-gc.sh.
+# rc 1 when the efforts could not be read, or that lib is not loaded: unknown, not empty.
+status_next_efforts_rows() {
+  command -v effort_next_rows >/dev/null 2>&1 || return 1
+  effort_next_rows "${1:-${KIT_REPO:-}}"
+}
+
+# status_next_efforts_md [repo] — the section as markdown. It states its own emptiness, and tells
+# "no effort" apart from "could not read", for the same reason the buckets below do.
+status_next_efforts_md() {
+  local rows ne_rc=0 flow num ctx title waiting
+  echo "## Next effort per flow"
+  echo ""
+  rows="$(status_next_efforts_rows "${1:-}")" || ne_rc=$?
+  if [ "$ne_rc" -ne 0 ]; then
+    echo "_Could not read the open efforts (gh or jq absent, unauthenticated, or offline). This is NOT"
+    echo "the same as having none._"
+  elif [ -z "$rows" ]; then
+    echo "_No open issue carries the \`effort\` label, so there is no effort to order."
+    echo "\`cckit effort new\` applies the label; an effort created without it is invisible here._"
+  else
+    echo "| flow | next effort | ctx | waiting on a blocker |"
+    echo "| --- | --- | --- | --- |"
+    while IFS="$(printf '\t')" read -r flow num ctx title waiting; do
+      [ -n "$flow" ] || continue
+      if [ "$num" = "-" ]; then
+        printf '| %s | _none can start — every open effort has an open blocker_ | — | %s |\n' "$flow" "$waiting"
+      else
+        printf '| %s | **E%s** — %s | %s | %s |\n' "$flow" "$num" "$title" "$ctx" "$waiting"
+      fi
+    done <<EOF
+$rows
+EOF
+    echo ""
+    echo "_\`cckit effort start <N>\` starts one; \`cckit effort plan\` shows each flow's full order._"
+  fi
+  if command -v effort_cadence_md >/dev/null 2>&1; then
+    echo ""
+    effort_cadence_md
+  fi
+}
+
 # ── the three-bucket report ────────────────────────────────────────────────────────────────────
 
 # status_buckets_md [root] — the three buckets as markdown on stdout. Each bucket states its own
@@ -466,8 +514,12 @@ status_buckets_json() {
   budget_limit="$(printf '%s' "$budget_line" | awk '{print $5}')"
   case "$budget_resident" in ''|*[!0-9]*) budget_resident=0; budget_line="" ;; esac
   case "$budget_limit"    in ''|*[!0-9]*) budget_limit=0 ;; esac
+  local ne_rows ne_rc=0
+  ne_rows="$(status_next_efforts_rows)" || ne_rc=$?
 
   jq -n \
+    --arg ne_rows "$ne_rows" \
+    --argjson ne_read "$([ "$ne_rc" -eq 0 ] && echo true || echo false)" \
     --arg local_rows "$rows" \
     --arg wt_rows "$wt_rows" \
     --arg pr_rows "$prrows" \
@@ -488,6 +540,12 @@ status_buckets_json() {
       # null means nothing was measured (no CLAUDE.md and no rules, or the lint is absent) — not zero.
       instruction_budget: (if $budget_line == "" then null else
         { resident_bytes: $budget_resident, limit_bytes: $budget_limit, summary: $budget_line } end),
+      # One row per flow with an open effort. `number: null` = every effort in that flow has an open
+      # blocker. The whole key is `null` (not `[]`) when the efforts could not be read.
+      next_efforts: (if $ne_read then (rows($ne_rows) | map({flow: .[0], number: (.[1] | tonumber? // null),
+                        ctx: (if .[2] == "-" then null else .[2] end),
+                        title: (if .[3] == "-" then null else .[3] end),
+                        waiting: (.[4] | tonumber? // 0)})) else null end),
       ai_review_expected: ($ai_expected == 1),
       # `prs_read: false` means the PR bucket is UNKNOWN, not empty — never treat its `[]` as "none".
       prs_read: $prs_read,

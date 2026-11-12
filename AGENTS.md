@@ -38,8 +38,13 @@ adapter one) — is described in [the Adapters page](docs-site/src/content/docs/
 
 `templates/` is what `cckit init` writes into a consuming project. `.claude/skills/` and
 `.claude/rules/` in this repo are the subset cckit applies to its **own** work — `concrete`,
-`karpathy-guidelines`, and the rules for branches, efforts, PR titles, delegation and communication
-style. No agents are installed: this file plus `cckit brief` is the delegation contract here.
+`karpathy-guidelines`, and the rules for branches, efforts, PR titles, delegation, communication
+style and issue lifecycle (`issue-lifecycle.md`: sub-issues not checkboxes, approved-plan autonomy,
+explicit closes) and merge safety (`merge-safety.md`: current base before merging, a coupled chain as
+one PR, the gate re-run on the integration branch) and authoring (`authoring.md`: docs in the same change,
+no issue numbers in pasted prompts, summaries without machine flags) and the shared checkout
+(`shared-checkout.md`: never move the primary checkout by hand, work in a worktree, call a freshly merged verb from a
+current worktree's `bin/cckit`). No agents are installed: this file plus `cckit brief` is the delegation contract here.
 
 The manifest and the reason for every skipped template are in `scripts/self-install-test.sh`, which
 also fails if an installed copy drifts from its template. Edit a template and its installed copy in
@@ -52,10 +57,10 @@ the same commit.
 | `cckit init` | scaffold config + `.claude/` | — |
 | `cckit sync` | board state / what's unblocked | `--llm` → TOON |
 | `cckit sync --json` | the board as ONE JSON object for a dashboard: per-role issues, `unassigned`, `blocked`, `stale`, `mergeQueue` (merge order). `--write` saves it atomically to `<git-common-dir>/kit-sync-cache.json` and never overwrites it with a failed or partial fetch; `--cached [TTL]` prints that cache with no `gh` call while it is younger than TTL seconds (default 60), else refreshes it; `--watch [SECS]` refreshes every SECS (default 30) and keeps the last good cache when a fetch fails; `--plan` inlines `effort plan`. Each fetch emits `op.start` / `op.done` (op `sync`) to `kit-events.jsonl`. `--write` / `--cached` / `--watch` refuse `--role` / `--milestone` (exit 2) | `--json` → JSON (`--llm` / `--output=json` stay TOON) |
-| `cckit next` | the next unblocked issue + how to start it | `--llm` → TOON |
+| `cckit next` | the next unblocked issue + how to start it. Human output ends with the weekly cadence line (Monday `cckit plan` · daily `cckit next` · Friday `cckit gc`); the TOON rows stay `{number,ctx,title}` | `--llm` → TOON |
 | `cckit plan` | wave plan: deps-ordered, priority-sorted within a wave, file-disjoint, session-fit | `--llm` → TOON |
 | `cckit plan-next` | forward plan: inventory current skills/verbs/rules/docs → propose what to build next | `--llm` → TOON |
-| `cckit status` | where are we: local undone work, open PRs waiting on a human, cleanup available (local + remote), then one line with the resident instruction-file bytes (`CLAUDE.md` + rules without `paths:`) against the 150k limit and the three largest files | `--llm` → JSON (`instruction_budget`, `null` when nothing was measured) |
+| `cckit status` | where are we: the next effort that can start in each flow (no open blocker; p0 → p3, then lowest number), local undone work, open PRs waiting on a human, cleanup available (local + remote), then one line with the resident instruction-file bytes (`CLAUDE.md` + rules without `paths:`) against the 150k limit and the three largest files | `--llm` → JSON (`next_efforts` is one row per flow; `null` when the efforts could not be read) (`instruction_budget`, `null` when nothing was measured) |
 | `cckit brief <issue>` | the delegation brief for an issue, from real state: worktree, seed freshness, owned files, the helpers they sit on, standing gotchas | — |
 | `cckit wave` | read open efforts, propose incoming waves: fan-out brief + captain drive | `--llm` → TOON |
 | `cckit watch [--merge] [--loop]` | captain: gate open PRs, squash-merge CLEAN, advance the wave | — |
@@ -99,7 +104,7 @@ Every operation an unattended run needs is reachable through the one CLI:
 | `cckit add [<name>] [--set k=v] [--answers FILE] [--dir DIR]` | no name: list every integration descriptor in `integrations/` plus the modules, exit 0 (`--llm` → one JSON object with `enabled` and `applies` per integration). With an integration: set the one config key its descriptor names, in the config `kit_config_path` resolves — no other key changes, and nothing is installed. A descriptor that lists `rules` (`graft` → `code-retrieval`) also gets each one copied into `.claude/rules/`; an existing rule file is kept. Declines (exit 0, nothing written) on a repo with no file the integration can work on; exits 1 with no project config or an invalid descriptor. With a module (`software`): write this directory's `.claude/kit.config.json`. `KIT_DRY_RUN=1` writes nothing, and for an integration prints the install candidates in order plus the wire command. The tools, the consent line and the install order: [Integrations](https://cckit.dev/integrations/) |
 | `cckit update` | report whether the project is behind the installed cckit |
 | `cckit migrate` | reshuffle an old kit layout to the current one |
-| `cckit digest` | summarize recent activity |
+| `cckit digest <path\|url>` | summarize one file or URL with the local model (exit 2 when the local model server is down) |
 | `cckit release <ver>` | cut a release — **dry-run by default**, `--publish` to act |
 
 ### Orchestration flags (`orchestrate` / `autopilot`)

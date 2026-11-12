@@ -97,7 +97,10 @@ The slug is a *derived* convenience, not a second source of truth. `--slug` only
   closes the parent and every sub and sets the board **Status=Done** for each, garbage-collects the
   worktree/branch, runs an optional, config-gated knowledge-ingest hook
   (`effort.knowledgeIngestHook`), and finishes with an advisory **kit-sync drift check** that flags
-  any kit-managed files the effort touched (they belong upstream via `/kit-contribute`).
+  any kit-managed files the effort touched (they belong upstream via `/kit-contribute`). Kit-managed
+  means `scripts/lib/`, `scripts/kit*`, `.claude/{skills,hooks,lib,agents}/`, and the rule files the
+  kit ships under `.claude/rules/`. A rule the project wrote itself is not flagged: `cckit init`
+  and `/kit-update` only write rules that have a template, so they cannot overwrite it.
 - **`cckit merge` refuses an effort PR.** A PR whose head is an `effort/*` branch is refused before
   anything is rebased or merged, and the message names `cckit effort close <N>`: a plain squash
   would destroy the per-sub commits without the snapshot above. `KIT_FORCE=1 cckit merge <pr>`
@@ -301,6 +304,38 @@ What it does and does not do:
 `cckit effort chain 241 242` and `cckit effort chain '#241' '#242'` are the same command. Unlike
 `start` / `pr` / `close`, `chain` takes issue **numbers** only — not slug handles — because it wires
 plain issues, not just efforts.
+</Aside>
+
+### The weekly cadence
+
+Priority, chains and the WIP limit decide the order. The cadence is when you read it:
+
+| When | Run | What it gives you |
+| --- | --- | --- |
+| Monday | `cckit plan` | The week's order: the waves, and inside each wave p0 → p3. |
+| Daily | `cckit next` | The unblocked set, and the one command that starts the top issue. |
+| Friday | `cckit gc` | The branches and worktrees that can be pruned. It is a report and deletes nothing; `cckit cleanup` acts on it. |
+
+You do not have to remember the table. `cckit next` and `cckit status` both end their output with
+the same line, printed by one shared function:
+
+```text
+Weekly cadence — Monday: `cckit plan` orders the week · daily: `cckit next` picks up one issue · Friday: `cckit gc` reports what can be pruned.
+```
+
+`cckit status` also opens with **Next effort per flow**: for each flow, the effort that has no open
+blocker — p0 → p3, then the lowest issue number — and a count of the efforts still waiting. That
+table reads the `effort` label, which `cckit effort new` applies; with no labelled effort open it
+says so instead of printing an empty table.
+
+The line is for people. `cckit next --llm` rows stay `{number,ctx,title}` and carry no cadence text;
+`cckit status --llm` carries the per-flow rows under `next_efforts`
+([CLI reference](/cli-reference/)).
+
+<Aside type="note" title="Why digest is not a Friday step">
+`cckit digest <path|url>` summarises **one file or URL** with the local model, and exits 2 when the
+local model server is down. It takes a required input and does not summarise the week, so it has no
+slot in the cadence.
 </Aside>
 
 

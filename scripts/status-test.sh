@@ -17,12 +17,23 @@ tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 fix="$tmp/proj"; mkdir -p "$fix"; ( cd "$fix" && git init -q )
 printf '{"kitVersion":"9.9.9","project":{"name":"fix"},"github":{"repo":"octo/fixture","owner":"octo","baseBranch":"main"}}' > "$fix/cckit.config.json"
 
-# Stub gh: `issue list` returns $GH_ISSUES (a JSON array file); everything else returns [].
+# Stub gh: `issue list` returns $GH_ISSUES (a JSON array file) — or, when the call filters on
+# `--label effort`, $GH_EFFORTS (the open efforts; [] when unset, i.e. "no issue carries the label").
+# `api …/issues/<N>/dependencies/blocked_by` returns $GH_DEPS/<N>.json when present. Everything
+# else returns [].
 stub="$tmp/bin"; mkdir -p "$stub"
 cat > "$stub/gh" <<'SH'
 #!/usr/bin/env bash
 case "$1 $2" in
-  "issue list") cat "$GH_ISSUES" 2>/dev/null || echo '[]' ;;
+  "issue list")
+    case " $* " in
+      *" --label effort "*) [ -z "${GH_EFFORTS_FAIL:-}" ] || exit 1
+                            cat "${GH_EFFORTS:-/nonexistent}" 2>/dev/null || echo '[]' ;;
+      *) cat "$GH_ISSUES" 2>/dev/null || echo '[]' ;;
+    esac ;;
+  "api repos/"*)
+    n="${2%/dependencies/blocked_by}"; n="${n##*/}"
+    cat "${GH_DEPS:-/nonexistent}/$n.json" 2>/dev/null || echo '[]' ;;
   *) echo "[]" ;;
 esac
 SH
@@ -58,6 +69,59 @@ echo '[]' > "$tmp/issues0.json"
 out0="$(run_status "$tmp/issues0.json")"
 has "empty board counts 0/0" "$out0" "open issues: 0   blocked: 0"
 no  "no integer-expression error (empty)" "$out0" "integer expression"
+
+# ── next effort per flow (E241.4) ────────────────────────────────────────────────────────────────
+# No open issue carries the `effort` label (the stub's default): the section is still there and
+# says why it is empty, instead of being absent.
+has "section is present with no efforts"   "$out3" "## Next effort per flow"
+has "no efforts: states its own emptiness" "$out3" 'No open issue carries the `effort` label'
+has "the section sits before the buckets"  "$(printf '%s\n' "$out3" | grep -E '^## ' | tr '\n' '|')" \
+    "## Board|## Next effort per flow|## 1 · Local undone work|"
+has "status names the cadence"             "$out3" 'Monday: `cckit plan`'
+has "status names the Friday step"         "$out3" 'Friday: `cckit gc`'
+
+# Two flows; core #11 is blocked_by the OPEN core #10, docs #20 is free.
+mkdir -p "$tmp/deps"
+cat > "$tmp/efforts.json" <<'JSON'
+[ {"number":20,"title":"[Effort] 20 · [Docs] cadence page","labels":[{"name":"effort"},{"name":"flow:docs"},{"name":"ctx:S"}]},
+  {"number":11,"title":"[Effort] 11 · [Core] second thing","labels":[{"name":"effort"},{"name":"flow:core"},{"name":"ctx:L"}]},
+  {"number":10,"title":"[Effort] 10 · [Core] first thing","labels":[{"name":"effort"},{"name":"flow:core"},{"name":"ctx:M"}]} ]
+JSON
+echo '[{"number":10,"state":"open"}]' > "$tmp/deps/11.json"
+oute="$(GH_EFFORTS="$tmp/efforts.json" GH_DEPS="$tmp/deps" run_status "$tmp/issues3.json")"
+has "core row names the unblocked effort"   "$oute" "| core | **E10** — first thing | M | 1 |"
+has "docs row names its effort"             "$oute" "| docs | **E20** — cadence page | S | 0 |"
+no  "the blocked effort is never offered"   "$oute" "**E11**"
+no  "a populated section is not 'empty'"    "$oute" "No open issue carries"
+has "the board count is untouched by it"    "$oute" "open issues: 3   blocked: 1"
+
+# Every effort in the flow blocked: the flow keeps its row and says nothing can start.
+echo '[{"number":999,"state":"open"}]' > "$tmp/deps/10.json"
+outb="$(GH_EFFORTS="$tmp/efforts.json" GH_DEPS="$tmp/deps" run_status "$tmp/issues3.json")"
+has "a fully blocked flow says so"          "$outb" "| core | _none can start"
+rm -f "$tmp/deps/10.json"
+
+# The effort query fails: "could not read" must not read as "no efforts".
+outf="$(GH_EFFORTS_FAIL=1 run_status "$tmp/issues3.json")"
+has "unreadable efforts say so"             "$outf" "Could not read the open efforts"
+no  "unreadable is not reported as empty"   "$outf" "No open issue carries"
+
+# --llm: the same rows under ONE new key, next_efforts.
+run_status_llm() {
+  ( cd "$fix" && KIT_CONFIG="$fix/cckit.config.json" PATH="$stub:$PATH" GH_ISSUES="$tmp/issues3.json" \
+      bash "$ROOT/scripts/status.sh" --llm 2>/dev/null )
+}
+jse="$(GH_EFFORTS="$tmp/efforts.json" GH_DEPS="$tmp/deps" run_status_llm)"
+t "llm: next_efforts has one row per flow" "$(printf '%s' "$jse" | jq -r '.next_efforts | length')" "2"
+t "llm: the core row"  "$(printf '%s' "$jse" | jq -c '.next_efforts[0]')" \
+  '{"flow":"core","number":10,"ctx":"M","title":"first thing","waiting":1}'
+t "llm: the docs row"  "$(printf '%s' "$jse" | jq -c '.next_efforts[1]')" \
+  '{"flow":"docs","number":20,"ctx":"S","title":"cadence page","waiting":0}'
+t "llm: no efforts is [] not null" "$(run_status_llm | jq -c '.next_efforts')" "[]"
+t "llm: unreadable efforts is null" "$(GH_EFFORTS_FAIL=1 run_status_llm | jq -c '.next_efforts')" "null"
+t "llm: the pre-existing keys are all still there" \
+  "$(printf '%s' "$jse" | jq -r 'keys | join(",")')" \
+  "ai_review_expected,cleanup,deps,instruction_budget,local_undone,next_efforts,prs,prs_read,worktrees"
 
 [ "$fail" -eq 0 ] && echo "ALL OK (status)" || echo "status: FAILURES"
 exit "$fail"

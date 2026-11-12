@@ -1,0 +1,133 @@
+---
+title: Install & update matrix
+description: "Every way cckit gets onto a machine, what each one puts on disk, how it updates, when a restart is needed, and how to read a kitVersion that is not a released tag."
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+[Installing cckit](/install/) gets you a working `cckit`. This page is the reference behind it:
+what each install route leaves on disk, what moves it forward, and why two machines that both say
+`0.9.0` can be running different code. Every claim names the script that implements it.
+
+## Three things carry a version
+
+Updating cckit means moving up to three separate things, and they do not move together.
+
+| Layer | What it is | Where its version is read from |
+| --- | --- | --- |
+| The CLI | `bin/cckit` and `scripts/` in the install root | `cckit version` prints `.kitVersion` of the install root's `cckit.config.json` (`bin/cckit:121-123`) |
+| The Claude Code plugin | the same tree, loaded by Claude Code for its slash commands and skills | `.version` of `.claude-plugin/plugin.json` |
+| Your project | the `.claude/` files `cckit init` wrote, plus the `kitVersion` it recorded | `.kitVersion` of the project's config |
+
+A release sets all of them to one number: release-please writes `cckit.config.json`,
+`.claude-plugin/plugin.json`, `package.json` and `docs-site/package.json` in the release PR
+(`release-please-config.json`), and `scripts/lib/version-bump.sh --write` does the same for a
+manual `cckit release`.
+
+## Install routes
+
+| Route | What lands on disk | What code you get | How it updates |
+| --- | --- | --- | --- |
+| One-liner | a shallow clone at `~/.cckit` (or `$CCKIT_HOME`), and a symlink to its `bin/cckit` in a PATH folder | the tip of the repository's default branch — `scripts/web-install.sh:17` clones with no `--branch` and no tag | run the one-liner again: an existing clone gets `git pull --ff-only` (`scripts/web-install.sh:14`) |
+| Homebrew | the release tarball under Homebrew's `libexec`, with a wrapper script on PATH (`Formula/cckit.rb`) | exactly the tagged release | `brew upgrade cckit` |
+| npm | the published package, `bin/cckit` linked by npm (`package.json` → `bin`) | exactly the published version | `npm install -g @jeiemgi/cckit@latest` |
+| From source | a symlink from a PATH folder to `bin/cckit` in **your** clone — `ln -sf`, no copy (`scripts/install.sh:19`) | whatever branch that clone is parked on, at this moment | `git pull` in the clone, or anything else that moves its `HEAD` |
+| Claude Code plugin | a copy in Claude Code's plugin cache under `~/.claude/plugins/` | the version the marketplace listed when you installed | `/plugin marketplace update <marketplace>`, then `/plugin update <plugin>@<marketplace>` |
+
+`bin/cckit` follows symlinks back to the real install root on every run (`bin/cckit:66-76`), so
+the first four routes read their scripts straight from disk. Nothing is cached.
+
+<Aside type="caution" title="The plugin route needs a marketplace this repository does not ship">
+The repository carries `.claude-plugin/plugin.json` and no `marketplace.json`. A marketplace
+install exists only where someone publishes a marketplace that lists the plugin. To load the plugin
+from a clone without one, start Claude Code with `claude --plugin-dir <clone>`.
+</Aside>
+
+### The source install is the one that moves under you
+
+The first three routes put cckit somewhere nobody works. The source route points PATH at a clone,
+and if that clone is also where you develop, **`cckit` on PATH is as old as the branch the clone is
+parked on**. Park it on a branch cut last week and `cckit` loses every verb merged since.
+
+That is the situation the [`shared-checkout` rule](/rules/#shared-checkout) and
+[Multi-session safety](/multi-session/) cover. Check what you have:
+
+```bash
+readlink "$(command -v cckit)"        # a path into a clone you work in = this applies to you
+```
+
+`scripts/kit-self-update.sh` fast-forwards the clone it lives in: `git pull --ff-only` on the
+clone's **current branch** (line 47), at most once per four hours unless `--force`
+(`CCKIT_SELF_UPDATE_THROTTLE`, line 34), always exiting 0. No verb and no hook calls it — run it by
+path. Because it pulls the current branch, it does not rescue a clone parked on a stale branch.
+
+## Updating a project
+
+Updating the install does not touch a project that was already scaffolded. Two steps do that.
+
+1. **`cckit update` reports; it changes nothing.** The verb runs `scripts/kit-version-check.sh`
+   (`bin/cckit:368`), which compares the project's `kitVersion` (line 49) with the installed
+   `.claude-plugin/plugin.json` version (line 50) and prints one line.
+
+   | Output | Meaning | Exit |
+   | --- | --- | --- |
+   | `up to date` | the two strings are equal | 0 |
+   | `update available · <have> -> <latest>` | the install is newer than the project | 10 |
+   | `ahead of plugin <latest>` | the project records a **newer** version than the install it is being compared with | 0 |
+
+   Which install it compares with is resolved in order (lines 26-46): `--plugin-root` or
+   `CLAUDE_PLUGIN_ROOT`; then the install the script itself sits in; then the most recently
+   modified match in `~/.claude/plugins/`. With no config or no `plugin.json` found it prints
+   nothing and exits 0.
+
+2. **`cckit init --upgrade` writes.** It adds the files the project is missing, preserves every
+   file that exists, and sets `kitVersion` to the installed version. It reads
+   `.claude/kit.config.json` and stops if that file is absent (`scripts/init.sh:282-283`).
+
+## Updates are skipped when the version string did not change
+
+Two places compare version **strings**, not content. Both skip silently when the string is equal.
+
+| Where | What is compared | What a skip looks like |
+| --- | --- | --- |
+| Claude Code's `/plugin update` | the marketplace's listed version against the cached one | nothing is fetched. `scripts/kit-bump-version.sh:15-17` exists for this reason: it bumps the version "so the installed plugin (deduped by version) sees every release" |
+| `cckit init --upgrade` | the project's `kitVersion` against the installed `plugin.json` version (`scripts/init.sh:297-300`) | `already at <version> -- nothing to upgrade`, exit 0, no file written |
+
+The second one matters with a one-liner or source install. Those track a branch, and the version
+string on a branch only changes when a release PR merges. Pull forty commits of new templates and
+`cckit init --upgrade` still answers `already at 0.9.0`, because `0.9.0` is what both sides say.
+The new templates arrive in the project after the next release changes the string.
+
+`scripts/kit-bump-version.sh` is the manual bump for a plugin build between releases. It writes
+`.claude-plugin/plugin.json` and `package.json` (lines 65-66) and not `cckit.config.json`, so
+after it runs `cckit version` and `cckit update` report different numbers until a release realigns
+them.
+
+## When a restart is needed
+
+| What changed | Picked up by |
+| --- | --- |
+| The CLI (`bin/`, `scripts/`) | the next `cckit` command. It is bash read from disk on every run |
+| Project rules, skills, hooks and settings under `.claude/` — after `cckit init --upgrade` | the next Claude Code session. A session that is already open keeps what it loaded at start |
+| The Claude Code plugin — after `/plugin update` | `/reload-plugins` in an open session, or a new session (`skills/kit-dev/SKILL.md:42-43`) |
+| An MCP server a setup step registered | a restart of Claude Code — `scripts/annotate-setup.sh:150` prints that instruction |
+
+The same holds for a branch switch: a session started in a checkout parked on an old branch has
+that branch's rules and hooks until it is restarted from a current one.
+
+## A `kitVersion` that is not a released tag
+
+`kitVersion` is the `.version` of the `plugin.json` that sat in the install when `cckit init` ran
+(`scripts/init.sh:276-277`). It is a version **string**, not a commit. To test whether it names a
+release:
+
+```bash
+git ls-remote --tags https://github.com/jeiemgi/cckit "v<kitVersion>"   # one line = a released tag
+```
+
+| You see | It means | Do |
+| --- | --- | --- |
+| `0.1.0`, or no `kitVersion` | the default in `templates/kit.config.json.tmpl`, never stamped by an install | run `cckit init --upgrade`; treat everything since as new |
+| a pre-release such as `0.7.0-beta.6` | scaffolded from a build stamped by `scripts/kit-bump-version.sh` in `beta` mode (lines 42-49). That script cuts no tag, so `git ls-remote` prints nothing | upgrade from a released install |
+| a tag's number, but files the tag does not have | scaffolded from a one-liner or source install that was past the tag. The string says the last release; the content is later | nothing. This is expected on those routes; compare files, not the number, if you need to know |
+| `cckit update` says `ahead of plugin <older>` | the install being compared is older than the one that scaffolded the project — typically a source install parked on an old branch | do **not** downgrade the project. Find out what PATH points at (`readlink "$(command -v cckit)"`) and run cckit from a current copy |

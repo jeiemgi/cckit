@@ -78,7 +78,14 @@ bash scripts/instruction-budget-lint.sh || fail=1
 note "==> codified review findings"
 bash scripts/review-lint.sh || fail=1
 
-# 7. Behavioral tests - run every *-test.sh through the test runner.
+# 7. Agent skill references. Every `skills:` entry in templates/agents/*.md must resolve to a skill
+# the kit ships or scaffolds, a `plugin:skill` reference, or a name declared third-party in
+# scripts/agent-skills-external.txt. An unresolved entry fails silently at runtime: the agent loads
+# with fewer skills than its frontmatter lists.
+note "==> agent skill references"
+bash scripts/agent-skills-lint.sh || fail=1
+
+# 8. Behavioral tests - run every *-test.sh through the test runner.
 note "==> behavioral tests"
 bash scripts/test.sh || fail=1
 
