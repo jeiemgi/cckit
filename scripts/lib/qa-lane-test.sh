@@ -615,7 +615,9 @@ yes "cckit commands lists qa" " $("$ROOT/bin/cckit" commands) " " qa "
 answers ":3 200" ":4 200"
 "$ROOT/bin/cckit" qa ready --lane 7 --timeout 5 >/dev/null 2>&1; t "cckit qa ready dispatches to the lib" "$?" "0"
 yes "cckit qa stop dispatches to the lib" "$("$ROOT/bin/cckit" qa stop --lane 34 2>&1)" "nothing stopped"
-t "cckit qa verdict dispatches to the lib" "$("$ROOT/bin/cckit" qa verdict --lane 78 --head "$sha2" 2>/dev/null)" "pass"
+# Its own lane, recorded here: lane 78's pass exists only when zsh ran the pass above.
+qa_cli verdict pass --lane 79 --head "$sha2" >/dev/null 2>&1
+t "cckit qa verdict dispatches to the lib" "$("$ROOT/bin/cckit" qa verdict --lane 79 --head "$sha2" 2>/dev/null)" "pass"
 t "cckit qa open dispatches to the lib" "$("$ROOT/bin/cckit" qa open --lane 7 --route /wired --print 2>/dev/null)" "http://localhost:$web7/wired"
 
 [ "$fail" -eq 0 ] && echo "ALL OK (qa-lane)" || echo "qa-lane: FAILURES"
