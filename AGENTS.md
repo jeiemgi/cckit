@@ -65,8 +65,8 @@ the same commit.
 | `cckit effort plan` | session-fit effort plan | `--llm` → JSON |
 | `cckit orchestrate <a> <b> …` | run N flows in parallel worktrees, in tmux or Herdr | — (use `--dry-run`) |
 | `cckit autopilot [<a> …]` | select work, then call `orchestrate --detach` under a cap | — (use `--dry-run`) |
-| `cckit gc` | report prunable branches + worktrees — SAFE (own PR merged) and LANDED (no PR of its own, work already on base: effort subs, `worktree-agent-*` isolation worktrees) — never one whose issue is still open; aborts if the protection helper is missing | `--llm` → JSON counts (`safe`, `landed`, `protected`, `orphan`) |
-| `cckit cleanup [--yes]` | the guided destructive sweep over that report: plan first, delete only the SAFE + LANDED rows and prune the listed ZOMBIE metadata (staged work recovered to its branch first); ORPHAN / PROTECTED / stashes are never deletable | `--llm` → JSON counts + `applied` |
+| `cckit gc` | report prunable branches + worktrees — SAFE (own PR merged) and LANDED (no PR of its own, work already on base: effort subs, `worktree-agent-*` isolation worktrees) — never one whose issue is still open; aborts if the protection helper is missing. A worktree with a detached HEAD gets its own row: LANDED when it is clean and its HEAD is on the base branch or `main`, ORPHAN otherwise | `--llm` → JSON counts (`safe`, `landed`, `protected`, `orphan`) |
+| `cckit cleanup [--yes]` | the guided destructive sweep over that report: plan first, delete only the SAFE + LANDED rows and prune the listed ZOMBIE metadata (staged work recovered to its branch first); ORPHAN / PROTECTED / stashes are never deletable. A LANDED detached worktree is removed; an ORPHAN one, and a detached zombie still holding staged work, are kept | `--llm` → JSON counts + `applied` |
 | `cckit render` | stdin markdown → rich (glow on a TTY; verbatim when piped) | — |
 | `cckit version` | the installed cckit version | `--llm` |
 

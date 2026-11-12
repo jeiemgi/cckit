@@ -105,6 +105,31 @@ status_worktree_rows() {
            END         { emit() }'
 }
 
+# status_inprogress_rows — status_worktree_rows minus the detached worktrees gc rates LANDED (#390):
+# clean, HEAD already on the base branch or `main`. Nothing is in progress there — `cckit cleanup`
+# removes it — so listing it as work under way sends a session to look at an empty checkout. The
+# verdict is gc's own (_kit_gc_detached_rows), never re-derived here. A detached worktree gc rates
+# ORPHAN (a commit on no branch, or uncommitted changes) stays, and so does every attached one.
+# best-effort: without the gc classifier loaded there is no verdict, and every row is kept.
+status_inprogress_rows() {
+  local rows landed wtpath b
+  rows="$(status_worktree_rows)"
+  landed=""
+  if command -v _kit_gc_detached_rows >/dev/null 2>&1; then
+    landed="$(_kit_gc_detached_rows 2>/dev/null | awk -F'\t' '$3 ~ /^LANDED/ {print $1}')"
+  fi
+  while IFS="$(printf '\t')" read -r wtpath b; do
+    [ -n "$wtpath" ] || continue
+    case "$b" in
+      detached@*) [ -n "$landed" ] && printf '%s\n' "$landed" | grep -qxF -- "$wtpath" && continue ;;
+      *) : ;;
+    esac
+    printf '%s\t%s\n' "$wtpath" "$b"
+  done <<EOF
+$rows
+EOF
+}
+
 # ── bucket 2: open PRs waiting on a human ──────────────────────────────────────────────────────
 
 # status_prs_classify [ai_expected] — stdin is a JSON array of shaped PR objects; echo one TSV row
@@ -306,9 +331,10 @@ EOF
     echo "_Nothing local-only: every worktree is clean and every branch's commits are pushed._"
   fi
 
-  local wt_rows n_wt
-  wt_rows="$(status_worktree_rows)"
+  local wt_rows n_wt n_all
+  wt_rows="$(status_inprogress_rows)"
   n_wt="$(printf '%s' "$wt_rows" | grep -c . || true)"
+  n_all="$(status_worktree_rows | grep -c . || true)"
   if [ "${n_wt:-0}" -gt 0 ]; then
     echo ""
     printf -- '**In progress** — %s worktree(s) checked out:\n\n' "${n_wt:-0}"
@@ -318,6 +344,11 @@ EOF
     done <<EOF
 $wt_rows
 EOF
+  fi
+  if [ "${n_all:-0}" -gt "${n_wt:-0}" ]; then
+    echo ""
+    printf -- '_%s detached worktree(s) hold nothing to lose (clean, HEAD on the base branch) and are not listed — `cckit cleanup` removes them._\n' \
+      "$((n_all - n_wt))"
   fi
 
   echo ""

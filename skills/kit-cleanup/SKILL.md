@@ -33,7 +33,8 @@ kit_gc_cleanup          # plan only — deletes no branch, worktree, remote ref 
 ```
 
 Or through the CLI: `cckit cleanup` (add `--llm` for JSON counts: `safe`, `landed`, `worktrees`,
-`zombie`, `orphan`, `protected`, `stash`, `remote_failed`, `applied`).
+`zombie`, `orphan`, `protected`, `stash`, `remote_failed`, `applied`). A LANDED detached worktree
+counts under `worktrees`, an ORPHAN one under `orphan`.
 
 ### 2. Present it and ask
 
@@ -46,7 +47,8 @@ veto per-bucket — if they want the orphans looked at first, do that before del
 | **LANDED** | **no PR of its own**, work already on base — by content (every file it changed since its merge base matches `origin/<base>`) or by lineage (`sub/<N>…`, `effort/<N>…`, or a `[#N]` commit subject names an issue closed with a merged PR). Effort subs after `effort close`, `effort/<N>` branches whose remote is gone, Claude Code Agent-tool `worktree-agent-<hash>` isolation worktrees | **deletes** exactly like SAFE — worktree, local branch, level remote ref — under the same guards: a dirty worktree or a branch ahead of its remote is skipped with a warning. The plan prints the block with each row's reason, before ORPHAN |
 | **PROTECTED** | associated issue **still OPEN** | **keeps** — close the issue first |
 | **ORPHAN** | fails both LANDED checks: commits whose content is not on the base branch's remote, no merged PR | **keeps** — offer to recover into a PR (step 4) |
-| **ZOMBIE** | worktree dir gone, admin metadata lingers | **recovers** any staged delta to a commit on its branch, **then prunes** the metadata |
+| **ZOMBIE** | worktree dir gone, admin metadata lingers | **recovers** any staged delta to a commit on its branch, **then prunes** the metadata. A **detached** zombie is compared to its own HEAD's tree: no staged delta → pruned; a staged delta has no branch to land on, so the entry is **locked and kept** and the output prints the `git commit-tree` line that recovers it |
+| **detached worktree** | HEAD detached, directory present. LANDED: clean, HEAD an ancestor of the base branch or `main`. ORPHAN: anything else | LANDED: **removes** the worktree (listed under SAFE worktrees). ORPHAN: **keeps**, listed by path under ORPHAN |
 | **stashes** | any stash entry | **keeps** — irreversible; drop only after showing each diff |
 
 ### 3. Execute
