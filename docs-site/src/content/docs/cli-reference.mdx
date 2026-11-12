@@ -24,7 +24,7 @@ The tables are grouped by job: setup, the daily lifecycle, planning a wave, runn
 | `cckit install [bin-dir]` | Symlink `cckit` onto your PATH. |
 | `cckit init --profile <p>` | Scaffold `cckit.config.json` + `.claude/` for this repo. |
 | `cckit scan` | Detect this repo's stack + kit state (JSON). |
-| `cckit doctor` | Onboarding preflight: deps present, `gh` authenticated, and (when enabled) the MemPalace CLI + per-wing wake-up header. Asks before installing; `--fix` installs and seeds without the prompt. |
+| `cckit doctor` | Onboarding preflight: deps present, `gh` authenticated, and (when enabled) the MemPalace CLI + per-wing wake-up header. Asks before installing; `--fix` installs and seeds without the prompt. Also prints the resident instruction-file total against the 150k limit. |
 | `cckit adopt` | Record kit-shaped files a repo already has. |
 | `cckit migrate` | Reshuffle an old kit layout to the current one. |
 
@@ -35,15 +35,50 @@ One issue becomes one branch, one worktree, one PR. These verbs walk that path.
 | Verb | Purpose |
 | --- | --- |
 | `cckit next [--effort N]` | The unblocked set + how to start the top issue. |
-| `cckit start <issue> [slug]` | Create an isolated worktree + branch for an issue, [bootstrapped](/config-and-permissions/#worktree-bootstrap) — env files copied, dev port assigned, deps installed at the selected targets (`worktree.installPaths` if set — those dirs regardless of their manifests — else a root that declares dependencies or is a workspace root with members, else nothing). |
-| `cckit pr <issue> <summary>` | Commit, push, and open the PR. |
+| `cckit start <issue> [slug]` | Create an isolated worktree + branch for an issue, [bootstrapped](/config-and-permissions/#worktree-bootstrap) — env files copied, dev port assigned, deps installed at the selected targets (`worktree.installPaths` if set — those dirs regardless of their manifests — else a root that declares dependencies or is a workspace root with members, else nothing). [Claim-checked](#session-claims): refused when another live session already holds the issue, unless `--force` / `KIT_FORCE=1`. |
+| `cckit claims` | List the live [session claims](#session-claims) — issue, session pid, start time, branch, worktree. Read-only. `--llm` returns a JSON array. |
+| `cckit pr <issue> <summary> [--base <branch>]` | Commit, push, and open the PR. `--base <branch>` opens it against a branch other than the configured base — a release PR from `develop` to `main`, or a hotfix to the release branch — with the same labels, milestone and board steps. The push exports the target as `KIT_PR_BASE`, so a git pre-push hook can compare against the branch the PR targets. |
+| `cckit hotfix <pr\|sha> [--base <branch>]` | Cherry-pick one merged PR or commit onto the release branch (`main` by default): a worktree from `origin/<base>`, `git cherry-pick -x`, push, and a PR titled after the source with `Cherry-pick of #N` in its body. See [Hotfix to the release branch](/releasing/#hotfix-to-the-release-branch). |
 | `cckit close <issue> <summary> [--reason R] [--duplicate-of N] [--superseded-by N]` | Close the issue with a summary comment and a reason (`completed`, `not-planned`, `duplicate`; superseded closes as not planned with a "Superseded by #N" comment), and mark it done on the board. |
-| `cckit new --role R "<title>"` | File one issue: labels, board add, Role and Status fields. Milestone optional. |
-| `cckit merge [<pr>] [--merge\|--rebase]` | Merge the PR (squash by default), close its linked issues, clean the branch and worktree, and update the PR's base, which may be an `effort/<N>` branch. |
+| `cckit new --role R "<title>"` | File one issue: labels, board add, Role and Status fields. Milestone optional. A label the repo does not have is left off with a warning that names it; the issue is still created, and the verb exits non-zero only when the issue itself is not. `R` matches any option of the board's Role field by name, ignoring case and treating spaces and hyphens alike (`backend`, `Tech Lead`, `tech-lead`); a role the board has no option for leaves Role unset and prints a warning on stderr naming the missing `ROLE_OPT_<NAME>`. |
+| `cckit merge [<pr>] [--merge\|--rebase]` | Merge the PR (squash by default), close its linked issues, clean the branch and worktree, and update the PR's base, which may be an `effort/<N>` branch. Refuses a PR whose **head** is `effort/*` and names `cckit effort close <N>`; `KIT_FORCE=1` merges anyway, with a warning. |
 | `cckit sync` | Board state: issues by role with Project Status, a merge-ordered open-PR queue, and blocked / not-on-board / stale (>14d) flags. |
-| `cckit status` | "Where are we?" in three buckets — local undone work, open PRs waiting on a human, cleanup available (local + remote) — plus the board and the resume handoff. Read-only. |
+| `cckit sync --json \| --write \| --cached [TTL] \| --watch [SECS] \| --plan` | The same board as one cached JSON document for a TUI or statusline — see [Board cache and watch mode](#board-cache-and-watch-mode). |
+| `cckit status` | "Where are we?" in three buckets — local undone work, open PRs waiting on a human, cleanup available (local + remote) — plus the board and the resume handoff, and one line with the resident instruction-file total. Read-only. |
 | `cckit handoff "<note>"` | Save a resume-here note for the next session. |
 
+
+### Session claims
+
+Git refuses one branch in two worktrees. It does not stop a second session from starting the same
+issue: the worktree already exists, so the second `cckit start` used to report "reusing worktree"
+and both sessions wrote one tree. `cckit start` now records a **claim** and checks for one first.
+
+- **The record.** One JSON file per issue at `<git-common-dir>/kit-sessions/issue-<N>.json`:
+  issue, branch, worktree, session pid, host, start time. It lives in the shared git dir, so every
+  worktree of the repo reads the same set. Nothing is committed and nothing leaves the machine.
+- **The check.** It runs before the issue read, the fetch and `git worktree add`. A refusal exits 1
+  with the claimant's pid and worktree, and creates no branch and no worktree.
+- **Your own claim never blocks you.** Re-running `cckit start <issue>` from the session that
+  claimed it, or from inside the claimed worktree, is the same no-op it always was.
+- **`--force`** (or `KIT_FORCE=1`) starts anyway and takes the claim over. `KIT_FORCE=1` is also how
+  to relaunch `cckit orchestrate` onto an issue another session still claims — orchestrate stops at
+  the first refused start.
+- **Which pid.** The session, not the command: `KIT_SESSION_PID` when set, otherwise the nearest
+  ancestor process that is not a throwaway shell — the agent process, or your terminal's own shell.
+  Sub-agents that share one agent process share one session pid and are not told apart; give each
+  its own `KIT_SESSION_PID` if they must be.
+- **When a claim ends.** Nothing has to release it. A claim is dropped when its pid is dead (or
+  alive with a different start time — a reused pid), or when its worktree has been gone for more
+  than five minutes. A claim written on another host is never dropped on a pid check.
+- **The board is a warning, not a gate.** An issue already In Progress or In Review prints a
+  warning and the start proceeds: nothing resets the board when a session dies, so refusing on it
+  would block every restart after a crash.
+- **Scope.** `cckit start <issue>` only. `cckit effort start` has its own WIP limit and writes no
+  claim.
+
+`cckit claims` prints the live claims and writes nothing — a dead claim is hidden there and removed
+by the next `cckit start` on that issue.
 
 ### Where are we?
 
@@ -51,9 +86,11 @@ One issue becomes one branch, one worktree, one PR. These verbs walk that path.
 
 | # | Bucket | What it reports |
 | --- | --- | --- |
-| 1 | **Local undone work** | Worktrees with uncommitted changes; branches holding commits reachable from **no** remote ref; effort subs not yet merged into their effort branch. Plus the worktree inventory, because a clean worktree on an issue branch is still work in progress. |
+| 1 | **Local undone work** | Worktrees with uncommitted changes; branches holding commits reachable from **no** remote ref; effort subs not yet merged into their effort branch. Plus the worktree inventory, because a clean worktree on an issue branch is still work in progress. A detached worktree that `cckit gc` rates LANDED (clean, HEAD on the base branch or `main`) is left out of the **In progress** list and counted in one line under it; `--llm` `worktrees` still carries every worktree. |
 | 2 | **PRs waiting on a human** | Each open PR with the one thing it needs: `conflict` · `checks` · `draft` · `wait` · `threads` · `ai-review` · `review` · `ready`. |
-| 3 | **Cleanup available** | What can go, local **and** remote, plus what is deliberately kept (orphan work, open-issue branches). `cckit gc` shows the same classification in full; acting on it is the `/kit-cleanup` skill. |
+| 3 | **Cleanup available** | What can go, local **and** remote, plus what is deliberately kept (orphan work, open-issue branches) and how many branches could not be classified because a GitHub read failed (`cleanup.unknown` in the JSON). `cckit gc` shows the same classification in full; acting on it is the `/kit-cleanup` skill. |
+
+The report ends with one **Instruction files** line — the bytes `CLAUDE.md` and every rule without a `paths:` frontmatter load into every session, against Claude Code's 150k limit, and the three largest files. `cckit doctor` prints the same line and warns over the limit; `--llm` carries it as `instruction_budget` (`null` when the project has no instruction files). The gate behind it is [`instruction-budget-lint`](/review-gates/#instruction-budget-lint--what-every-session-loads).
 
 Two details worth knowing, because both are places a naive reading gets it wrong:
 
@@ -98,12 +135,13 @@ A **wave** is a set of issues with no blockers between them, so they can run at 
 
 | Verb | Purpose |
 | --- | --- |
-| `cckit plan [--effort N]` | Wave plan: deps-ordered, file-disjoint, session-fit. Inside a wave, issues are ordered by their `priority:pN` label — p0 → p1 → p2 → p3, unlabeled last — with ties keeping the dependency-derived order. Dependencies always win: a blocker sits in an earlier wave than what it blocks, so priority never pulls a dependent ahead of its blocker. |
+| `cckit plan [--effort N]` | Wave plan: deps-ordered, file-disjoint, session-fit (`ctx:` weights S=1 M=2 L=4 XL=8; an issue with no `ctx:` label shows `?` and weighs 2, and a value outside the scale weighs 2 with a warning on stderr). Inside a wave, issues are ordered by their `priority:pN` label — p0 → p1 → p2 → p3, unlabeled last — with ties keeping the dependency-derived order. Dependencies always win: a blocker sits in an earlier wave than what it blocks, so priority never pulls a dependent ahead of its blocker. |
 | `cckit plan-next` | Forward plan: inventory the kit's own skills/verbs/rules/docs, propose what to build next. |
 | `cckit wave [--effort N]` | Read open efforts, propose incoming waves: subagent fan-out + captain drive. |
 | `cckit watch [--merge] [--loop]` | Captain: gate open PRs, squash-merge clean ones, advance. Policy floors (default on) hold PRs touching CI workflows, lockfiles, or security paths — and any `hold`-labelled or draft PR — for human review. |
-| `cckit effort <new\|chain\|start\|pr\|close\|plan>` | The effort lifecycle (a parent issue + sub-issues). `new` takes `--slug`; `start`/`pr`/`close` accept a `<slug>` or the effort `<N>`. |
-| `cckit effort start [--force] <slug\|N> [slug]` | Create the effort's `effort/<N>-<slug>` branch + bootstrapped worktree. **WIP-limited:** refuses a *new* effort once `effort.wipLimit` (default 2) are already in progress — in progress meaning an `effort/<N>-<slug>` branch exists as a local head **or** on origin, read with `git ls-remote` rather than the cached `refs/remotes`. At the limit refuses; only strictly under it starts. Re-starting an effort that is already in progress is never gated. The check runs before anything is written, so a refusal makes no branch, no worktree and no board change. `--force` (or `KIT_FORCE=1`) starts anyway; `0` refuses every ordinary start but not a forced one. `EFFORT_WIP_REMOTE=0`, or an unreachable origin, counts the cached refs instead and the start still proceeds. Does not affect `cckit start <issue>`. |
+| `cckit effort <new\|chain\|start\|pr\|close\|plan>` | The effort lifecycle (a parent issue + sub-issues). `new` takes `--slug` and `--kind` (one of `feat fix task chore security scaffold ci adr spike plan`, default `task`; sets the `kind:` label on the parent and every sub); `start`/`pr`/`close` accept a `<slug>` or the effort `<N>`. |
+| `cckit effort start [--force] <slug\|N> [slug]` | Create the effort's `effort/<N>-<slug>` branch + bootstrapped worktree. **WIP-limited:** refuses a *new* effort once `effort.wipLimit` (default 2) are already in progress — in progress meaning an `effort/<N>-<slug>` branch exists as a local head **or** on origin, read with `git ls-remote` rather than the cached `refs/remotes`. At the limit refuses; only strictly under it starts. Re-starting an effort that is already in progress is never gated. The check runs before anything is written, so a refusal makes no branch, no worktree and no board change. `--force` (or `KIT_FORCE=1`) starts anyway; `0` refuses every ordinary start but not a forced one. `EFFORT_WIP_REMOTE=0`, or an unreachable origin, counts the cached refs instead and the start still proceeds. With no `[slug]` the slug comes from the issue title; if that read fails, the verb says so on stderr and continues with the effort's existing branch slug, or `effort`, instead of exiting 1 with no output. Does not affect `cckit start <issue>`. |
+| `cckit effort plan` | Session-fit plan over the open efforts: grouped by flow, ordered by `blocked_by`, packed into sessions under `KIT_SESSION_BUDGET` (default 4). Rows come from GitHub, or from the executable named by [`effort.planSource`](/config-and-permissions/#effort-plan-source) (`EFFORT_PLAN_SOURCE` overrides); a source that is not executable, exits non-zero or prints no rows falls back to GitHub. A `source:` line under the header names the source used, its age when reported, and any fallback. |
 | `cckit effort chain <a> <b> [<c> …]` | Declare a linear order over 2+ issues: `b` `blocked_by` `a`, `c` `blocked_by` `b`, plus a `- Depends on #<predecessor>` line in each successor's `## Relations` section. These are the edges `cckit plan` layers into waves. Idempotent, and additive — an issue already blocked by something else keeps that blocker. Refuses (and writes nothing) on fewer than two numbers, a non-numeric argument, an issue that does not exist, a repeated number, or an edge that would close a cycle. |
 
 
@@ -116,6 +154,10 @@ A **wave** is a set of issues with no blockers between them, so they can run at 
 | `cckit autopilot [<a> …]` | Select the passed issues, or the current unblocked set, then call `orchestrate --detach`. It accepts the same cap, agent, profile, and runtime flags. |
 
 Both are launch verbs with no JSON result — use `--dry-run` to inspect the plan before anything starts.
+
+Both cut each worktree from the config's base branch. `KIT_BASE_BRANCH=<branch>` in the environment
+[overrides it for that run](/config-and-permissions/#overriding-the-base-branch-for-one-command) —
+that is how an effort's sub-issue starts from `effort/<N>-<slug>` — and the launch plan says so.
 
 ### Tmux and Herdr
 
@@ -161,8 +203,8 @@ A test greps the shipped `scripts/lib` and `bin` for any vendor model id and req
 
 | Verb | Purpose |
 | --- | --- |
-| `cckit gc [--prune [--yes]]` | Report (default) or prune merged branches + worktrees. Never touches a branch/worktree whose issue is still open — including an effort sub (`sub/<N><letter>-…`) of an open effort — and aborts rather than classify anything if that protection helper cannot load. |
-| `cckit cleanup [--yes]` | The guided destructive sweep over the `gc` classification: prints the plan (SAFE branches + worktrees, ZOMBIE worktrees, LANDED branches, ORPHAN, PROTECTED, stashes) and deletes nothing without `--yes`. A **LANDED** branch has no PR of its own but its work is already on base — by content (every file it changed since its merge base matches `origin/<base>`) or by lineage (`sub/<N>…`, `effort/<N>…`, or a `[#N]` commit subject names an issue closed with a merged PR): an effort's subs, an `effort/<N>` whose remote is gone, a Claude Code Agent-tool `worktree-agent-<hash>` isolation worktree. `--yes` deletes LANDED rows exactly like SAFE rows, under the same guards; a branch failing both checks stays ORPHAN. `effort close` runs the same LANDED prune over its `sub/<N>…` worktrees and branches, so an effort closes with no residue. Both verbs refresh remote-tracking refs (`git fetch --prune`) so the classification is not made against a stale view of the remote — that is the only write a plan-only run performs, and it touches no branch, worktree, stash, or commit of yours. `--yes` deletes the SAFE local branches, the **clean** SAFE worktrees (a dirty one is skipped with a warning, never destroyed), and the remote refs of branches proven exactly level with theirs. It also prunes the admin metadata of the **ZOMBIE** worktrees the plan listed — a worktree whose directory is gone but whose metadata lingers — after committing any staged work it still holds to its branch (recover-before-prune), so no blob is orphaned by the prune. An ORPHAN branch, a branch whose issue is still open, and a stash are never deletable — they are surfaced and left alone. |
+| `cckit gc [--prune [--yes]]` | Report (default) or prune merged branches + worktrees. Never touches a branch/worktree whose issue is still open — including an effort sub (`sub/<N><letter>-…`) of an open effort — and aborts rather than classify anything if that protection helper cannot load. A worktree with a **detached HEAD** has no branch, so it gets its own row: **LANDED** when its tree is clean and its HEAD is an ancestor of the base branch or of `main` (`--prune --yes` removes it), **ORPHAN** otherwise — uncommitted changes, or a HEAD on neither ref, where the worktree is the only handle on those commits. A failed `gh` read is not an empty answer: when the PR list or a branch's issue state cannot be read (rate limit, outage, no `gh`), the branch is reported `UNKNOWN (could not determine …)` — never `ORPHAN (no PR …)` and never LANDED — and no prune deletes it. `gh` answering "no such issue" is a definite answer and classifies as before. `--llm` counts those rows as `unknown`. |
+| `cckit cleanup [--yes]` | The guided destructive sweep over the `gc` classification: prints the plan (SAFE branches + worktrees, ZOMBIE worktrees, LANDED branches, ORPHAN, PROTECTED, UNKNOWN, stashes) and deletes nothing without `--yes`. A **LANDED** branch has no PR of its own but its work is already on base — by content (every file it changed since its merge base matches `origin/<base>`) or by lineage (`sub/<N>…`, `effort/<N>…`, or a `[#N]` commit subject names an issue closed with a merged PR): an effort's subs, an `effort/<N>` whose remote is gone, a Claude Code Agent-tool `worktree-agent-<hash>` isolation worktree. `--yes` deletes LANDED rows exactly like SAFE rows, under the same guards; a branch failing both checks stays ORPHAN. `effort close` runs the same LANDED prune over its `sub/<N>…` worktrees and branches, so an effort closes with no residue. Both verbs refresh remote-tracking refs (`git fetch --prune`) so the classification is not made against a stale view of the remote — that is the only write a plan-only run performs, and it touches no branch, worktree, stash, or commit of yours. `--yes` deletes the SAFE local branches, the **clean** SAFE worktrees (a dirty one is skipped with a warning, never destroyed), and the remote refs of branches proven exactly level with theirs. It also prunes the admin metadata of the **ZOMBIE** worktrees the plan listed — a worktree whose directory is gone but whose metadata lingers — after committing any staged work it still holds to its branch (recover-before-prune), so no blob is orphaned by the prune. An ORPHAN branch, a branch whose issue is still open, an UNKNOWN branch (a GitHub read failed, so its verdict could not be determined) and a stash are never deletable — they are surfaced and left alone. Detached worktrees follow the `gc` verdict: a LANDED one is listed with the worktrees `--yes` removes, an ORPHAN one is listed by path under ORPHAN and kept. A detached ZOMBIE is compared to its own HEAD's tree: with no staged delta its metadata is pruned; with one there is no branch to recover onto, so `--yes` locks that entry (git's `locked` file) and the prune leaves it for recovery by hand. |
 | `cckit render` | stdin markdown → rich output (glow on a TTY, verbatim when piped). |
 | `cckit encode-context` | stdin JSON → compact TOON (token-saving for subagents). |
 | `cckit digest <path\|url>` | Summarize a file or URL with the local model. |
@@ -218,6 +260,57 @@ cckit brief 226           # the brief for issue #226
 ```
 
 Reading the issue is the verb's one hard dependency: a `gh` failure propagates rather than yielding a brief with an empty issue in it.
+
+## Board cache and watch mode
+
+A dashboard that polls the board — a TUI, a statusline — reads one JSON document instead of running its own `gh` queries:
+
+```bash
+cckit sync --json          # print the document (one JSON object)
+cckit sync --write         # fetch, then write it to <git-common-dir>/kit-sync-cache.json
+cckit sync --cached 60     # print the cache if it is under 60s old (no gh call), else refresh it
+cckit sync --watch 30      # refresh the cache every 30s until interrupted
+cckit sync --plan          # the human board plus an inline `effort plan`
+```
+
+| Flag | Behavior |
+| --- | --- |
+| `--json` | One JSON object on stdout. `--llm` and `--output=json` are unchanged: they still return the issue list as TOON. |
+| `--write` | Writes the document to `<git-common-dir>/kit-sync-cache.json` — one file shared by every worktree. The write goes to a temp file that is validated and then renamed, so a reader sees the old document or the new one. A failed or partial fetch (issues, the PR list, or the Projects v2 board when it is on) exits `1` and leaves the file untouched. Prints nothing on stdout unless `--json` is also given. |
+| `--cached [TTL]` | Prints the cache with no `gh` call when it is younger than `TTL` seconds (default `60`); otherwise refreshes, writes and prints it. A failed refresh exits `1` and leaves the cache as it was. |
+| `--watch [SECS]` | Refreshes and writes every `SECS` seconds (default `30`). A failed refresh logs `kept the last good cache` on stderr and the loop continues. `KIT_SYNC_WATCH_MAX=<n>` stops after `n` refreshes, exiting `1` if the last one failed. With `--json` each refreshed document is also printed, one per line. |
+| `--plan` | Adds `effort plan` output: an `### Effort plan` section on the human board, a `plan` string in the document. |
+
+`--write`, `--cached` and `--watch` refuse `--role` / `--milestone` (exit `2`): the cache is one file every reader shares, so it only ever holds the whole board.
+
+The document:
+
+```json
+{
+  "schema": 1,
+  "repo": "owner/repo",
+  "generatedAt": "2026-11-11T10:00:00Z",
+  "generatedEpoch": 1794391200,
+  "open": 3,
+  "roles": [
+    { "role": "Tech Lead", "slug": "tech-lead",
+      "issues": [ { "number": 1, "title": "…", "status": "—", "priority": "p1", "milestone": "v1", "blocked": false } ] }
+  ],
+  "unassigned": [],
+  "blocked": [2],
+  "notOnBoard": null,
+  "stale": { "days": 14, "issues": [ { "number": 2, "days": 20 } ] },
+  "mergeQueue": [
+    { "number": 14, "title": "…", "risk": "low", "size": "S", "state": "ready",
+      "blocked": false, "draft": false, "agent": false, "conflict": false, "approved": true }
+  ]
+}
+```
+
+- `roles` follows the config's role order; `unassigned` holds open issues with none of those `role:` labels.
+- `notOnBoard` is `null` when no Projects v2 board is configured, otherwise the issue numbers missing from it.
+- `mergeQueue` is in merge order — ready, then draft, then blocked; within a tier `risk:low` first, then smaller size. `state` is `ready`, `needs-review`, `conflict`, `draft` or `blocked`. It is the same ordering the human table prints.
+- Every fetch appends `op.start` and `op.done` (op `sync`, `payload.ok` true or false) to `<git-common-dir>/kit-events.jsonl`. A `--cached` hit makes no fetch and emits nothing.
 
 ## Structured output for agents
 

@@ -1,6 +1,6 @@
 ---
 name: kit-effort-pr
-description: Open the ONE pull request for an effort — `effort/<N>` → base branch — with a rich human-facing review body plus a `## For agents` section listing the file paths/entry points. Title `[Role] [#N] <title>`. Inherits labels + milestone from the parent issue and moves it to In Review on the board.
+description: Open the ONE pull request for an effort — `effort/<N>` → base branch — with a rich human-facing review body plus a `## For agents` section listing the file paths/entry points. Title `type: <name> [#N]`. Inherits labels + milestone from the parent issue and moves it to In Review on the board.
 when_to_use: When an effort branch is ready for review (all its sub-issues built + merged into the effort branch). One effort = one PR (effort-model.md) — never open per-sub PRs to the base branch. Mirrors `kit-task-pr` for the effort lifecycle.
 ---
 
@@ -14,7 +14,8 @@ body). Never re-implement it here, and never paste it into a shell.
 Opens the **single** PR for an effort. The PR carries the human-facing review write-up + a
 `## For agents` section (retrieval context / the work record). The parent issue holds the plan;
 this PR is where humans review the result. The title carries `[#N]` (the effort id) — mandatory
-(effort-model.md, effort-id taxonomy).
+(effort-model.md, effort-id taxonomy) — inside a Conventional Commit subject, because the PR is
+squash-merged and its title becomes the commit release-please and the commitlint gate read.
 
 ## Inputs
 
@@ -32,20 +33,23 @@ From the effort worktree (branch `effort/<N>-<slug>`):
 ```bash
 cckit effort pr <N> --summary-file <summary.md> --for-agents-file <for-agents.md>
 # short form: cckit effort pr <N> --summary "<what + why>" --for-agents "<paths>"
-# a repo with its own PR-title convention: add --title "<title carrying [#N]>"
+# the change is not a feat: add --type fix   (any Conventional Commit type)
+# replace the composed title: add --title "<conventional subject carrying [#N]>"
 ```
 
 What the verb does, in order: commits pending **tracked** changes (role identity as a
 `Co-authored-by` trailer; untracked files are listed, never swept in) → pushes → reads the parent's
-title, labels and milestone → composes the title with `effort_pr_title` and refuses one without
-`[#N]` → opens the PR with the body below → adds the PR to the board at In Review (+ Role) and moves
+title, labels and milestone → composes the title with `effort_pr_title` as
+`type(scope): <name> [#N]` (scope = the `flow:` label, else the title's `[Flow]` tag; type =
+`--type`, else the `kind:` label, where `kind:task` → `feat` and a `bug` label → `fix`) → refuses,
+before any `gh` call, a title without `[#N]` or one `commitlint_check` rejects → opens the PR with the body below → adds the PR to the board at In Review (+ Role) and moves
 the parent to In Review. A failed board add prints a warning; it is never silent.
 
 Body: `## For the orchestrator` (+ `Closes #N`) · `## Summary` · `## For agents` · `## Verification`.
 
 ## Output
 
-- The single effort PR URL (title `[Role] [#N] <title>`)
+- The single effort PR URL (title `type(scope): <name> [#N]`, e.g. `feat(core): adoption hardening [#115]`)
 - PR + parent issue both at In Review on the board (if Projects v2 is on)
 - Suggested next: `/kit-effort-close <N>`
 
@@ -55,6 +59,9 @@ Body: `## For the orchestrator` (+ `Closes #N`) · `## Summary` · `## For agent
   branch to the base; sub-issues merge into the effort branch first (effort-model.md).
 - The title MUST carry `[#N]` (the effort id) — a PR title without it is a review blocker
   (effort-model.md, effort-id taxonomy).
+- The title MUST be a Conventional Commit subject under `pr.titleStyle: conventional` (the default):
+  the verb refuses a composed or `--title` value that fails `scripts/lib/commitlint.sh`. A project
+  with `pr.titleStyle: issue-title` gets `[Role] [#N] <name>` and no commitlint check.
 - The body MUST include both a human `## Summary` and a `## For agents` (file paths) — the latter is
   retrieval context + part of the work record.
 - `Closes #$NUM` closes the **parent** on merge; the sub-issues are closed by `/kit-effort-close`

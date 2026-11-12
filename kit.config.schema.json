@@ -68,7 +68,7 @@
       "type": "object",
       "additionalProperties": true,
       "properties": {
-        "titleStyle": { "type": "string", "enum": ["conventional", "issue-title"], "default": "conventional", "description": "How `cckit pr` titles a single-issue PR. conventional (default): a Conventional Commits subject derived from the kind label, which release-please and a commitlint gate read. issue-title: the issue title, verbatim." },
+        "titleStyle": { "type": "string", "enum": ["conventional", "issue-title"], "default": "conventional", "description": "How `cckit pr` titles a single-issue PR. conventional (default): a Conventional Commits subject derived from the kind label, which release-please and a commitlint gate read. issue-title: the issue title, verbatim. `cckit effort pr` follows the same key: conventional gives `type(scope): name [#N]` and refuses a title that fails commitlint; issue-title gives `[Role] [#N] name`, unchecked." },
         "orchestratorSection": { "type": "boolean", "default": false, "description": "When true, `cckit pr` opens the PR body with a two-line `## For the orchestrator` section: the issue number and what to review." }
       }
     },
@@ -77,8 +77,32 @@
       "additionalProperties": true,
       "properties": {
         "flows": { "type": "array", "items": { "type": "string" }, "description": "Controlled flow vocabulary for effort titles — the values accepted by the leading [Flow] title tag and `--flow` (also the flow:<flow> labels). Replaces the built-in default (Core UI API Docs Infra Auth Data Web App); an explicit EFFORT_FLOWS env var still wins per invocation." },
+        "preCloseHook": { "type": "string", "description": "Optional path to an executable `cckit effort close` runs BEFORE the snapshot and the merge, invoked as `<hook> <effort-number> <sub-number>…` with cwd = the effort worktree (wave-style close: the checkout the close was run from). A relative path resolves against the main checkout. A non-zero exit refuses the close with nothing written; so does a configured hook that is missing or not executable. `KIT_FORCE=1` skips the hook and says so. An explicit KIT_EFFORT_PRE_CLOSE_HOOK env var wins per invocation. No-op when unset; the kit ships no default." },
         "knowledgeIngestHook": { "type": "string", "description": "Optional path to an executable run after `cckit effort close`, invoked as `<hook> <effort-number> <trace-dir>` to fold the closed effort's work record into a knowledge base. No-op when unset or not executable; the kit ships no default." },
+        "planSource": { "type": "string", "description": "Optional path to an executable `cckit effort plan` calls for the open-effort rows instead of querying GitHub, invoked as `<source> <owner/repo>` from the project root (a relative path resolves against that root). It prints one `number<TAB>flow<TAB>ctx<TAB>title[<TAB>blockers]` line per open effort, `blockers` being a comma-separated list of issue numbers, and may print a `# age: <text>` line saying how old its data is. The plan prints which source it used, with that age. A source that is not executable, exits non-zero or prints no rows falls back to GitHub, and the plan says so. Unset: GitHub is read. An explicit EFFORT_PLAN_SOURCE env var wins per invocation." },
         "wipLimit": { "type": "integer", "minimum": 0, "description": "How many efforts may be in progress at once before `cckit effort start` refuses a NEW effort (default 2). In progress = an `effort/<N>-<slug>` branch exists as a local head or on origin (read with `git ls-remote`, not the cached refs/remotes; EFFORT_WIP_REMOTE=0 or an unreachable origin counts the cached refs instead). Refusal happens before anything is written; `--force` (or KIT_FORCE=1) starts anyway. 0 refuses every ordinary start of a NEW effort but not a forced one, and not a re-start of an effort already in progress (that adds no WIP, so it is never gated); a non-integer value is ignored with a warning and the default is used. An explicit EFFORT_WIP_LIMIT env var wins per invocation. Does not affect `cckit start <issue>`." }
+      }
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Which environment variables the hosted effort-metrics judge reads. Names only, never values — no URL or token belongs in this file. Every key is optional; unset, the built-in name is used. A value that is not a shell identifier (letters, digits, underscore, not starting with a digit) is ignored with a warning and the built-in name is used.",
+      "properties": {
+        "urlEnv": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "default": "CCKIT_MODEL_URL", "description": "Env var holding the OpenAI-compatible base URL; the judge POSTs to `<value>/chat/completions`. Empty or unset at run time: the hosted judge is skipped and the local model (if enabled) is tried." },
+        "modelEnv": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "default": "CCKIT_MODEL", "description": "Env var holding the model name sent in the request and recorded as the record's judge model id. Empty or unset at run time: the literal `default` is sent." },
+        "tokenEnv": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "default": "CCKIT_MODEL_TOKEN", "description": "Env var holding the bearer token. Empty or unset at run time: no Authorization header is sent." }
+      }
+    },
+    "night": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Night mode (`kit-autopilot` § Mode: night): what `scripts/night-grant.sh` adds to the owner's night grant before it launches `scripts/night-run.mjs`. Every key is optional; without the object a night run uses the base floors, the delegation brief's gate, and accepts a grant only from `github.owner` or a commenter GitHub reports as OWNER.",
+      "properties": {
+        "floors": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Extra always-human floors, name -> what a diff must touch to trip it. Added to the base floors (lockfile, auth, security-code, security-prose, workflows, cost, secret). A tripped floor parks the effort unless that night's grant waives it by its exact name." },
+        "neverWaivable": { "type": "array", "items": { "type": "string" }, "description": "Floor names no grant may waive, added to the base list (workflows, cost, secret). A grant that waives one is refused when it is read; the engine refuses it again at merge time." },
+        "gate": { "type": "string", "description": "The gate command executors and verifiers run, and the command the final check runs on the base branch once every wave merged. Unset: the gate commands in the project's delegation brief." },
+        "grantors": { "type": "array", "items": { "type": "string" }, "description": "GitHub logins allowed to write the night grant, besides `github.owner` and any commenter whose author_association is OWNER. Compared case-insensitively. Needed on an organization repo, where no commenter is OWNER and `github.owner` is the org. A grant comment from any other author is ignored." },
+        "refuseLabels": { "type": "array", "items": { "type": "string" }, "description": "Labels that hold an effort out of a night run: preflight refuses an effort carrying any of them. Default: none. The kit applies no such label itself." }
       }
     },
     "agents": {

@@ -77,7 +77,10 @@ copilot_brief() {
   # shellcheck source=/dev/null
   . "$here/render.sh"
   local n0 esfx; n0="$(printf '%s\n' "$wave0" | grep -c .)"
-  esfx="$([ -n "$effort" ] && echo " --effort $effort")"
+  # Not `esfx="$([ -n "$effort" ] && echo …)"`: with no --effort the substitution ends on the failed
+  # test, the assignment returns 1, and the dispatcher's `set -e` exits before the brief (#316).
+  esfx=""
+  if [ -n "$effort" ]; then esfx=" --effort $effort"; fi
   {
     printf '# cckit wave — %s%s\n' "$repo" "$([ -n "$effort" ] && echo " · effort #$effort")"
     printf '\nThe plan machine laid out %s wave(s). You are the orchestrator: fan wave 0 out as parallel\nTask subagents, gate + merge with the captain, then re-run this brief for the next wave.\n' "$((waves_total + 1))"

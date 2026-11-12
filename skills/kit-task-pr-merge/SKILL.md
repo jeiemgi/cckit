@@ -50,6 +50,7 @@ fi
 ## Rules
 
 - Never merge a DRAFT PR — undraft first
+- An effort's PR (head `effort/*`) is refused: merge it with `cckit effort close <N>`, which snapshots the per-sub diffs before the squash. `KIT_FORCE=1` overrides, with a warning
 - Never force-push to the base branch
 - If rebase conflicts can't auto-resolve, the op aborts cleanly and surfaces the conflicting files
 - If merge fails for a non-conflict reason (failing checks), the op reports verbatim and does not retry

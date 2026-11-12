@@ -135,7 +135,7 @@ rm -rf "$snap_tmp"
 # Match a `local` declaration listing a bare `path` word, or a bare `g()` function definition. The
 # fixed files use namespaced names (wtpath / apppath / logpath / _kit_cfg_get); a plain word here
 # would be the regression. Comments are stripped first so the explanatory notes don't trip it.
-for f in kit-config.sh kit-gc.sh worktree-start.sh kit-events.sh; do
+for f in kit-config.sh kit-gc.sh worktree-start.sh kit-events.sh session-registry.sh; do
   code="$(sed 's/#.*$//' "$LIB/$f")"
   if printf '%s\n' "$code" | grep -qE '\blocal\b[^=]*\bpath\b'; then
     bad "$f still declares a bare \`local … path …\`"

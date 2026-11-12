@@ -31,6 +31,14 @@ has "draft PR marked · draft"   "$MQ" "· draft"
 has "blocked PR marked ▪ blocked" "$MQ" "▪ blocked"
 has "agent branch flagged ● agent" "$MQ" "● agent"
 
+# The data form carries the same order as the renderer (one ordering, two outputs).
+MQD="$(board_merge_queue_data "$PRS")"
+t "merge queue data is in the rendered order" "$(printf '%s' "$MQD" | jq -r '[.[].number|tostring]|join(" ")')" "14 13 12 11 10"
+t "merge queue data names each state" "$(printf '%s' "$MQD" | jq -r '[.[].state]|join(" ")')" "ready ready ready draft blocked"
+t "merge queue data flags the agent branch" "$(printf '%s' "$MQD" | jq -r '[.[]|select(.agent)|.number|tostring]|join(" ")')" "12"
+t "merge queue data drops the sort keys" "$(printf '%s' "$MQD" | jq -r '.[0]|has("rr") or has("sr") or has("ready")')" "false"
+t "empty merge queue data is []" "$(board_merge_queue_data '[]')" "[]"
+
 # empty PR set renders the no-open-PRs row, not an error.
 has "empty merge queue renders a friendly row" "$(board_merge_queue '[]')" "no open PRs ✓"
 
@@ -44,6 +52,9 @@ t "stale list picks the >14d issues, most-stale first" "${sl%% *}" "#3(40d)"
 has "stale list includes the 20d issue" "$sl" "#1(20d)"
 case "$sl" in *"#2"*) echo "FAIL: fresh issue wrongly flagged stale"; fail=1 ;; *) echo "ok: fresh issue not flagged stale" ;; esac
 t "no stale issues yields empty (caller renders none)" "$(board_stale_list "[{\"number\":9,\"updatedAt\":\"$NOW\"}]" 14)" ""
+
+t "stale data is [{number,days}], most-stale first" "$(board_stale_data "$ISS" 14)" '[{"number":3,"days":40},{"number":1,"days":20}]'
+t "stale data is [] when nothing is stale" "$(board_stale_data "[{\"number\":9,\"updatedAt\":\"$NOW\"}]" 14)" "[]"
 
 # ── not-on-board + status lookup ────────────────────────────────────────────────────────────────
 t "not_on_board lists issues absent from the board map" "$(board_not_on_board '[{"number":1},{"number":2},{"number":3}]' '{"1":"Todo","3":"Done"}')" "#2"
