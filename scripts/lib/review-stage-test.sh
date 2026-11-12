@@ -187,17 +187,8 @@ cat > "$tmp/tozero.json" <<'JSON'
 JSON
 t "a zero bound falls back"          "$(rs_timeout "$tmp/tozero.json" 2>/dev/null)" "900"
 
-# _rs_run actually kills a hung command, on whichever path this system takes.
-start=$(date +%s)
-printf 'ignored
-' | _rs_run 2 'sleep 60' >/dev/null 2>&1
-rc "a command past its bound is rc 124" "$?" "124"
-elapsed=$(( $(date +%s) - start ))
-[ "$elapsed" -lt 30 ] && echo "ok: it was killed in ${elapsed}s, not left running" \
-  || { echo "FAIL: still ran ${elapsed}s after a 2s bound"; fail=1; }
-t "a command inside its bound returns its output" "$(printf '' | _rs_run 10 'echo alive' 2>/dev/null)" "alive"
-printf '' | _rs_run 10 'exit 7' >/dev/null 2>&1
-rc "a command's own exit code survives" "$?" "7"
+# The bound itself (TERM then KILL, rc 124, the command's own rc) is al_run's and is covered in
+# agent-launch-test.sh; what stays here is what rs_dispatch does with it.
 
 # A dispatch whose reviewer hangs writes NO receipt — a killed reviewer is not a verdict.
 cat > "$tmp/hang.json" <<'JSON'
@@ -236,6 +227,61 @@ rs_have_receipt 80;          rc "with no head given, the issue alone counts" "$?
 # it reads as absent — which is correct, and is why the gate skips the check on an empty head.
 rs_have_receipt 42 'abc123'; rc "a head-less receipt does not cover a head" "$?" "1"
 rs_have_receipt 42;          rc "but still counts when no head is asked"     "$?" "0"
+
+# ── review.headless: cckit builds the reviewer's command from the profile ────────────────────────
+# Stubs named `claude` and `codex` stand in for the agents: they record their argv and the brief
+# they were piped, and print a report. No real agent runs.
+mkdir -p "$tmp/bin"
+for k in claude codex; do
+  cat > "$tmp/bin/$k" <<STUB
+#!/usr/bin/env bash
+printf '%s\n' "\$*" > "$tmp/$k.argv"
+cat > "$tmp/$k.stdin"
+printf 'outcome: pr-open\nurl: u\ngate: pass — read by $k\nblocker: none\nnext stage: none\n'
+STUB
+  chmod +x "$tmp/bin/$k"
+done
+cat > "$tmp/headless.json" <<'JSON'
+{ "review": { "headless": true },
+  "agents": { "default": "critic",
+    "profiles": {
+      "critic": { "kind": "codex",  "stages": ["review"], "args": ["-s", "read-only"] },
+      "reader": { "kind": "claude", "stages": ["review"] },
+      "other":  { "kind": "aider",  "stages": ["review"] } } } }
+JSON
+rs_headless "$tmp/headless.json"; rc "review.headless true is read"            "$?" "0"
+rs_headless "$CFG";               rc "it is off when unset"                    "$?" "1"
+rs_enabled "$tmp/headless.json";  rc "review.headless alone turns the stage on" "$?" "0"
+rs_enabled "$tmp/none.json";      rc "neither key leaves the stage off"        "$?" "1"
+
+FX_CTX="90\t\t"
+hp="$(PATH="$tmp/bin:$PATH" rs_dispatch "$tmp/headless.json" 'o/r' 9 90)"
+t "codex ran non-interactively with the profile's args" "$(cat "$tmp/codex.argv")" "exec -s read-only -"
+has "the brief reached codex on stdin" "$(cat "$tmp/codex.stdin")" "You are reviewing pull request #9"
+t "the codex reply is the receipt" "$(jq -r .gate "$hp")" "pass — read by codex"
+
+FX_CTX="91\tagent:reader\t"
+hp="$(PATH="$tmp/bin:$PATH" rs_dispatch "$tmp/headless.json" 'o/r' 9 91)"
+t "claude ran in print mode" "$(cat "$tmp/claude.argv")" "-p"
+t "the claude reply is the receipt" "$(jq -r .gate "$hp")" "pass — read by claude"
+
+FX_CTX="92\tagent:other\t"
+before3="$(ls "$KIT_STATE_DIR/receipts" 2>/dev/null | wc -l | tr -d ' ')"
+PATH="$tmp/bin:$PATH" rs_dispatch "$tmp/headless.json" 'o/r' 9 92 >/dev/null 2>&1
+rc "a kind with no headless form is refused" "$?" "2"
+t "and writes no receipt" "$(ls "$KIT_STATE_DIR/receipts" 2>/dev/null | wc -l | tr -d ' ')" "$before3"
+
+# review.command still wins over review.headless.
+cat > "$tmp/both.json" <<'JSON'
+{ "review": { "headless": true, "command": "cat > /dev/null; printf 'outcome: pr-open\nurl: u\ngate: pass — the override\nblocker: none\nnext stage: none\n'" },
+  "agents": { "default": "critic",
+    "profiles": { "critic": { "kind": "codex", "stages": ["review"] } } } }
+JSON
+rm -f "$tmp/codex.argv"
+FX_CTX="93\t\t"
+hp="$(PATH="$tmp/bin:$PATH" rs_dispatch "$tmp/both.json" 'o/r' 9 93)"
+t "review.command overrides the built command" "$(jq -r .gate "$hp")" "pass — the override"
+t "the agent CLI was not started" "$([ -f "$tmp/codex.argv" ] && echo ran || echo no)" "no"
 
 [ "$fail" -eq 0 ] && echo "review-stage-test: PASS" || echo "review-stage-test: FAILED"
 exit "$fail"

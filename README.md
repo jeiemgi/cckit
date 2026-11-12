@@ -219,12 +219,16 @@ cckit watch --merge        # the captain: gate open PRs, squash-merge the CLEAN 
                            #   (policy floors hold PRs touching CI, lockfiles, or secrets for review)
 cckit watch --loop         # self-pace gate/merge passes until steady state
 cckit autopilot            # select unblocked work, then call orchestrate --detach under a cap
+cckit autopilot run 12 --agent codex --objective "make the tests pass" --until "pnpm test" --max-iters 5
+                           # ONE headless objective on this branch (claude -p / codex exec): code
+                           #   stops it on a limit, a failing gate, or a round that changed nothing
 ```
 
 Set `review.command` in your config and the captain sends every PR it would merge to an agent
 reviewer first, records the verdict as a stage receipt, and refuses to merge on a `fail`. You name
 the command that runs the reviewer — cckit pipes it a brief on stdin and reads the report off
-stdout, so it asserts nothing about any agent's flags. A PR with **no** verdict recorded reads
+stdout, so it asserts nothing about any agent's flags. (`review.headless: true` instead has cckit
+build `claude -p` / `codex exec` from the review profile.) A PR with **no** verdict recorded reads
 `verify`, never merges silently: absence of evidence is not a pass. Off until you configure it.
 → [the agent review stage](https://cckit.dev/config-and-permissions/#the-agent-review-stage)
 
