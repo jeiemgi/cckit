@@ -37,7 +37,8 @@ case "$1 $2" in
   "pr list")       echo "${GH_DEP_PRS:-[]}" ;;                    # open PRs based on the effort branch (#358)
   "pr edit")       exit "${GH_PR_EDIT_RC:-0}" ;;                  # re-target a dependent PR (#358)
   "pr diff")       # a merged sub PR's diff (wave-style close, #164): one kit-managed + one app file
-    printf 'diff --git a/.claude/skills/demo.md b/.claude/skills/demo.md\n+kit\ndiff --git a/src/app.ts b/src/app.ts\n+app\n' ;;
+                   # + one project-owned rule, which the drift check must NOT name (#218)
+    printf 'diff --git a/.claude/skills/demo.md b/.claude/skills/demo.md\n+kit\ndiff --git a/src/app.ts b/src/app.ts\n+app\ndiff --git a/.claude/rules/project-owned.md b/.claude/rules/project-owned.md\n+own\n' ;;
   "api "*|"api")
     case "$*" in
       *"--method POST"*"/sub_issues"*) exit 0 ;;                # link a sub
@@ -150,7 +151,9 @@ t  "effort_close did NOT merge without a trace" "$(grep -c 'pr merge' "$GH_LOG")
 echo "work" > file.txt
 mkdir -p .claude/skills
 echo "kit-managed" > .claude/skills/demo.md   # a kit-managed path → the drift check must fire (#148)
-git -c user.email=t@t -c user.name=t add file.txt .claude/skills/demo.md
+mkdir -p .claude/rules
+echo "project-owned" > .claude/rules/project-owned.md   # no template of that name → must stay silent (#218)
+git -c user.email=t@t -c user.name=t add file.txt .claude/skills/demo.md .claude/rules/project-owned.md
 git -c user.email=t@t -c user.name=t commit -q -m "feat: do the thing (#101)"
 
 # ── effort_close #380: effort.preCloseHook — a project gate that runs BEFORE the snapshot + merge ──
@@ -255,6 +258,9 @@ tc "$BOARD_LOG" 'ITEM-101 SF1 OPT_DONE' "effort_close sets board Done for sub #1
 tc "$BOARD_LOG" 'ITEM-102 SF1 OPT_DONE' "effort_close sets board Done for sub #102"
 # #148: kit-sync drift check moved into the verb — a kit-managed path in the diff → advisory warning
 case "$close_out" in *"kit-sync"*".claude/skills/demo.md"*) echo "ok: kit-sync drift check warns on kit-managed files" ;; *) echo "FAIL: no kit-sync warning in close output"; fail=1 ;; esac
+# #218: a rule the project owns (no templates/rules/ file of that name) is never written by init or
+# /kit-update, so the warning must not name it
+case "$close_out" in *"project-owned.md"*) echo "FAIL: kit-sync warning names a project-owned rule"; fail=1 ;; *) echo "ok: kit-sync drift check skips a project-owned rule" ;; esac
 t  "effort_close GC removed the effort worktree" \
    "$(git -C "$tmp/work" worktree list --porcelain | grep -c 'effort+99-demo')" "0"
 t  "effort_close GC deleted the local branch" \
@@ -320,6 +326,23 @@ tc "$BOARD_LOG" 'ITEM-77 SF1 OPT_DONE'  "wave close sets board Done for the pare
 tc "$BOARD_LOG" 'ITEM-301 SF1 OPT_DONE' "wave close sets board Done for sub #301"
 tc "$BOARD_LOG" 'ITEM-302 SF1 OPT_DONE' "wave close sets board Done for sub #302"
 case "$close_out" in *"kit-sync"*".claude/skills/demo.md"*) echo "ok: wave drift check reads the merged PR diffs" ;; *) echo "FAIL: no kit-sync warning in wave close output"; fail=1 ;; esac
+case "$close_out" in *"project-owned.md"*) echo "FAIL: wave kit-sync warning names a project-owned rule"; fail=1 ;; *) echo "ok: wave drift check skips a project-owned rule" ;; esac
+
+# ── #218 · _EO_KIT_MANAGED_RE — only the rules the kit ships are kit-managed ──────────────────────
+# init.sh writes .claude/rules/<name>.md only for a templates/rules/<name>.md, so the regex lists
+# those basenames instead of matching the directory. The list is hand-written; this is what fails
+# when a template is added or removed without it.
+_re_hit() { printf '%s\n' "$1" | grep -qE "$_EO_KIT_MANAGED_RE" && echo yes || echo no; }
+t "a project-owned rule is not kit-managed"        "$(_re_hit .claude/rules/admin-ui-conventions.md)" "no"
+t "a shipped rule is kit-managed"                  "$(_re_hit .claude/rules/effort-model.md)"         "yes"
+t "a shipped rule name with a suffix is not"       "$(_re_hit .claude/rules/effort-model.md.bak)"     "no"
+t "a file under a rules subdirectory is not"       "$(_re_hit .claude/rules/local/effort-model.md)"   "no"
+t "skills / hooks / lib / agents stay kit-managed" \
+  "$(_re_hit .claude/skills/x/SKILL.md)$(_re_hit .claude/hooks/h.sh)$(_re_hit .claude/lib/l.sh)$(_re_hit .claude/agents/a.md)$(_re_hit scripts/lib/x.sh)" "yesyesyesyesyes"
+re_rules="$(printf '%s\n' "$_EO_KIT_MANAGED_RE" | sed -n 's/.*rules\/(\([^)]*\)).*/\1/p' | tr '|' '\n' | sort)"
+tpl_rules="$(find "$ROOT/templates/rules" -maxdepth 1 -type f -name '*.md' -exec basename {} .md \; | sort)"
+t "the regex lists exactly the templates/rules basenames" "$re_rules" "$tpl_rules"
+case "$tpl_rules" in "") echo "FAIL: no templates/rules/*.md found — the sync assertion compared nothing"; fail=1 ;; esac
 
 # ── #243 · _eff_relations_add — the ONE `Depends on` formatter (pure: no gh, no network) ──────────
 rel_body="$(printf '## Verification\nV\n')"

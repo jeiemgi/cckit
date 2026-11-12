@@ -141,6 +141,7 @@ works out of the box in any configured repo (an explicit `EFFORT_FLOWS` env var 
 `cckit effort close` is likewise the **single close implementation** (the `/kit-effort-close` skill is a thin caller
 of the same function): pre-squash work-record snapshot + metrics, squash-merge, close parent + subs, board
 Status=Done, worktree/branch GC, an optional knowledge-ingest hook, and an advisory kit-sync drift check.
+The drift check flags `.claude/rules/` files only when the kit ships a rule of that name; a project's own rules are not flagged.
 The metrics judge reads its hosted endpoint from `CCKIT_MODEL_URL` / `CCKIT_MODEL` / `CCKIT_MODEL_TOKEN`; a project
 with its own variables names them in the config (`model.urlEnv` / `model.modelEnv` / `model.tokenEnv` — env var
 names, never values).
@@ -356,6 +357,11 @@ cckit/
                          #   the manifest + every skip reason: scripts/self-install-test.sh
   cckit.config.json      # project configuration (no hardcoded org/repo)
 ```
+
+Every `skills:` entry in `templates/agents/*.md` has to resolve: `scripts/agent-skills-lint.sh` (a
+step of `bash scripts/check.sh`) fails on a name that is not under `skills/` or `templates/skills/`,
+not a `plugin:skill` reference, and not declared third-party in `scripts/agent-skills-external.txt`.
+See [Codified review gates](https://cckit.dev/review-gates/).
 
 `cckit init` also scaffolds `benchmarks/` — a per-project **documentation benchmark** that scores how
 well an agent finds and uses your own canonical docs (retrieval / adversarial / abstain / quality
