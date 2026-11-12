@@ -35,10 +35,11 @@ if [ -n "${SRT_INNER:-}" ]; then
   auto=$(sreg_session_pid)
   case "$auto" in ''|*[!0-9]*) t "auto session pid is numeric" "$auto" "<pid>" ;; esac
   kill -0 "$auto" 2>/dev/null; t "auto session pid is a live process" "$?" "0"
-  # A throwaway `sh -c` between the session and the call must not become the session: the pid
-  # resolved one shell deeper is the same one.
-  deeper=$(sh -c ". '$dir/session-registry.sh'; sreg_session_pid")
-  t "an intermediate sh -c is skipped" "$deeper" "$auto"
+  # A throwaway `<shell> -c` between the session and the call must not become the session: the pid
+  # resolved one shell deeper is the same one. The intermediate shell is the interpreter under
+  # test, never `sh`: the lib is bash/zsh-only (`[[`), and `sh` is dash on the CI runner.
+  deeper=$("$SRT_INNER" -c ". '$dir/session-registry.sh'; sreg_session_pid")
+  t "an intermediate $SRT_INNER -c is skipped" "$deeper" "$auto"
 
   # ── claim / mine / contested ──────────────────────────────────────────────────────────────
   sreg_issue_claim "$R" 5 >/dev/null; t "no claim yet" "$?" "1"
