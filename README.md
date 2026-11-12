@@ -126,6 +126,8 @@ Status=Done, worktree/branch GC, an optional knowledge-ingest hook, and an advis
 The metrics judge reads its hosted endpoint from `CCKIT_MODEL_URL` / `CCKIT_MODEL` / `CCKIT_MODEL_TOKEN`; a project
 with its own variables names them in the config (`model.urlEnv` / `model.modelEnv` / `model.tokenEnv` — env var
 names, never values).
+`cckit merge` refuses a PR whose head is an `effort/*` branch and names `cckit effort close <N>`: its squash would
+skip that snapshot. `KIT_FORCE=1 cckit merge <pr>` merges anyway, with a warning.
 
 The GitHub issue **number** stays the canonical key, but every effort also has a memorable **slug** handle (the one
 already in its `effort/<N>-<slug>` branch). Effort commands take the slug *or* the number interchangeably:
