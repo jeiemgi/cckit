@@ -82,6 +82,45 @@ else
   echo "skip: perl absent — process-group kill not exercised"
 fi
 
+# ── the pid file, and a caller that dies without running a trap ──────────────────────────────────
+# AL_PIDFILE exists while a command runs and is gone once it is reaped.
+AL_PIDFILE="$tmp/run.pid"
+al_run 10 "cat '$tmp/run.pid' > '$tmp/seen.pid'" </dev/null >/dev/null 2>&1
+t "the pid file is there while the command runs" "$([ -s "$tmp/seen.pid" ] && echo yes || echo no)" "yes"
+t "and removed once it is reaped" "$([ -e "$tmp/run.pid" ] && echo left || echo gone)" "gone"
+al_run 1 'sleep 60' </dev/null >/dev/null 2>&1
+t "a command killed at its bound leaves no pid file" "$([ -e "$tmp/run.pid" ] && echo left || echo gone)" "gone"
+AL_PIDFILE=""
+
+sleep 60 & live=$!
+printf '%s 0\n' "$live" > "$tmp/live.pid"
+al_pidfile_alive "$tmp/live.pid"; rc "a recorded live pid reads alive" "$?" "0"
+kill "$live" 2>/dev/null; wait "$live" 2>/dev/null
+al_pidfile_alive "$tmp/live.pid"; rc "a recorded dead pid does not" "$?" "1"
+al_pidfile_alive "$tmp/absent.pid"; rc "a missing pid file does not" "$?" "1"
+printf 'junk\n' > "$tmp/junk.pid"
+al_pidfile_alive "$tmp/junk.pid"; rc "a pid file that holds no pid does not" "$?" "1"
+
+# The shell that called al_run is killed with SIGKILL: no trap runs, nothing calls al_stop. The
+# watchdog notices its parent is gone and stops the command's group.
+if command -v perl >/dev/null 2>&1; then
+  cat > "$tmp/caller.sh" <<CALLER
+. "$ROOT/scripts/lib/agent-launch.sh"
+al_run 300 "echo \\\$\\\$ > '$tmp/orphan.pid'; exec sleep 300" </dev/null >/dev/null 2>&1
+CALLER
+  bash "$tmp/caller.sh" & caller=$!
+  i=0; while [ ! -s "$tmp/orphan.pid" ] && [ "$i" -lt 50 ]; do sleep 0.2; i=$((i + 1)); done
+  opid="$(cat "$tmp/orphan.pid" 2>/dev/null)"
+  t "the command started under the caller" "$([ -n "$opid" ] && kill -0 "$opid" 2>/dev/null && echo alive || echo gone)" "alive"
+  kill -KILL "$caller"; wait "$caller" 2>/dev/null
+  i=0; while [ -n "$opid" ] && kill -0 "$opid" 2>/dev/null && [ "$i" -lt 100 ]; do sleep 0.2; i=$((i + 1)); done
+  if [ -n "$opid" ] && kill -0 "$opid" 2>/dev/null; then
+    echo "FAIL: command $opid outlived its SIGKILLed caller"; kill -KILL "$opid" 2>/dev/null; fail=1
+  else echo "ok: the command does not outlive a SIGKILLed caller"; fi
+else
+  echo "skip: perl absent — the watchdog is not exercised"
+fi
+
 # ── usage, from the runtime's own output ─────────────────────────────────────────────────────────
 cat > "$tmp/claude.json" <<'JSON'
 {"type":"result","subtype":"success","is_error":false,"result":"done","total_cost_usd":0.0421,"usage":{"input_tokens":120,"cache_creation_input_tokens":30,"cache_read_input_tokens":50,"output_tokens":75}}

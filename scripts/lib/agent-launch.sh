@@ -29,6 +29,8 @@
 #   al_run <seconds> <command>           run it on stdin under the bound: rc 124 on expiry (TERM,
 #                                        then KILL), else the command's own exit status
 #   al_stop                              TERM-then-KILL whatever al_run has running (for a trap)
+#   al_pidfile_alive <file>              rc 0 when the pid an earlier al_run recorded in <file>
+#                                        (AL_PIDFILE) still names a live process or process group
 #   al_usage <kind> <output-file>        echo "<input> <output> <cost-usd>" from the runtime's own
 #                                        JSON output; each field is `unknown` when it is not there
 #
@@ -40,6 +42,43 @@
 # caller's signal trap has to be able to stop the agent, and it cannot reach a local.
 AL_PID=""
 AL_GROUP=0
+
+# AL_PIDFILE — when a caller sets it, al_run writes "<pid> <group 0|1>" there while a command runs
+# and removes it when the command is reaped. It is the only record of the command that outlives the
+# calling shell: a caller killed with SIGKILL runs no trap, and its next start needs something to
+# check before it puts a second writer on the branch (al_pidfile_alive).
+AL_PIDFILE="${AL_PIDFILE:-}"
+
+# The watchdog al_run starts under perl. It leads the command's process group, runs the command as
+# its child, and exits with the command's status (128+N when a signal killed it). Every 0.2s it
+# compares its parent pid with the one it started under: a different parent means the shell that
+# called al_run is gone, so nothing is left to enforce the bound, and it stops the group itself
+# with TERM, up to 10s of grace, then KILL. It ignores TERM/INT/HUP so a group-wide TERM from
+# al_stop reaches the command while the watchdog stays to report how the command ended.
+_AL_WATCHDOG='
+setpgrp(0, 0);
+my $parent = getppid();
+my $kid = fork();
+exit 126 unless defined $kid;
+if ($kid == 0) { exec @ARGV; exit 127 }
+$SIG{TERM} = $SIG{INT} = $SIG{HUP} = sub { };
+sub status { my $s = shift; exit(($s & 127) ? 128 + ($s & 127) : $s >> 8) }
+while (1) {
+  my $r = waitpid($kid, 1);
+  status($?) if $r == $kid;
+  exit 127 if $r < 0;
+  if (getppid() != $parent) {
+    kill("-TERM", $$);
+    for (my $i = 0; $i < 50; $i++) {
+      last if waitpid($kid, 1) != 0;
+      select(undef, undef, undef, 0.2);
+    }
+    kill("-KILL", $$);
+    exit 137;
+  }
+  select(undef, undef, undef, 0.2);
+}
+'
 
 # al_supported <kind> — matches on the basename, so `--agent /opt/bin/codex` still resolves.
 al_supported() {
@@ -103,7 +142,20 @@ al_stop() {
   _al_signal KILL
   wait "$AL_PID" 2>/dev/null
   AL_PID=""
+  [ -z "$AL_PIDFILE" ] || rm -f "$AL_PIDFILE"
   return 0
+}
+
+# al_pidfile_alive <file> — rc 0 when the "<pid> <group>" al_run wrote there is still running.
+# The group is probed as well as the pid: the leader can be gone while a member it started is not.
+al_pidfile_alive() {
+  local f="${1:-}" p="" g=""
+  [ -n "$f" ] && [ -f "$f" ] || return 1
+  read -r p g < "$f" || true
+  case "$p" in ''|*[!0-9]*) return 1 ;; esac
+  kill -0 "$p" 2>/dev/null && return 0
+  [ "$g" = "1" ] && kill -0 -- "-$p" 2>/dev/null && return 0
+  return 1
 }
 
 # al_run <seconds> <command> — run the command with this shell's stdin, stdout and stderr, bounded.
@@ -116,19 +168,24 @@ al_stop() {
 # `<&0` is load-bearing: a background job in a non-interactive shell gets /dev/null as stdin unless
 # it is redirected explicitly, and the prompt arrives on stdin.
 #
-# perl puts the command in its own process group so the bound can signal the group. Without perl
-# only the direct child is signalled, and a grandchild that ignores a closed pipe can survive.
+# perl puts the command in its own process group so the bound can signal the group, and stays as
+# that group's watchdog (_AL_WATCHDOG) so the command cannot outlive the shell that bounds it: a
+# caller killed with SIGKILL takes the bound with it, and the watchdog then stops the group.
+# Without perl only the direct child is signalled, a grandchild that ignores a closed pipe can
+# survive, and a command whose caller was killed keeps running — AL_PIDFILE is what a later start
+# checks in that case.
 al_run() {
   local secs="${1:-900}" cmd="${2:-}" ticks=0 limit rc=0
   case "$secs" in ''|*[!0-9]*) secs=900 ;; esac
   limit=$((secs * 5))
   if command -v perl >/dev/null 2>&1; then
-    perl -e 'setpgrp(0, 0); exec @ARGV; exit 127' sh -c "$cmd" <&0 &
+    perl -e "$_AL_WATCHDOG" sh -c "$cmd" <&0 &
     AL_PID=$!; AL_GROUP=1
   else
     sh -c "$cmd" <&0 &
     AL_PID=$!; AL_GROUP=0
   fi
+  [ -z "$AL_PIDFILE" ] || printf '%s %s\n' "$AL_PID" "$AL_GROUP" > "$AL_PIDFILE"
   while kill -0 "$AL_PID" 2>/dev/null; do
     if [ "$ticks" -ge "$limit" ]; then
       al_stop
@@ -138,6 +195,7 @@ al_run() {
   done
   wait "$AL_PID" 2>/dev/null; rc=$?
   AL_PID=""
+  [ -z "$AL_PIDFILE" ] || rm -f "$AL_PIDFILE"
   return "$rc"
 }
 

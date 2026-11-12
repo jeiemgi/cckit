@@ -38,8 +38,12 @@
 #   check-failed    the publication gate failed                                   exit 6
 #   publish-failed  the work passed but `cckit pr` did not open the PR            exit 7
 #   interrupted     this process or the agent was killed by a signal              exit 130
-# A refusal (bad flag, base branch, unsupported agent, a live run on the branch) is exit 2 and
-# writes nothing.
+# A refusal (bad flag, base branch, unsupported agent, a live run on the branch, an agent an
+# earlier run left alive) is exit 2 and writes nothing.
+#
+# A round that was cut short (a signal, or this process killed outright) is counted from whatever
+# usage its output holds; when it holds none the run's tokens read `unknown`, never a sum that
+# leaves the round out.
 #
 # Not here, on purpose: merging. A run never merges and never closes an issue.
 # errors: strict — every stop is a state-file write plus the exit code above
@@ -83,7 +87,7 @@ while [ "$#" -gt 0 ]; do
     --dry-run)       DRYRUN=1; shift ;;
     --notify|--notify=*|--plan|--plan=*)
       die "'${1%%=*}' is not supported: no code path delivers a notification or runs a plan from here (see docs: agent-compatibility, unattended limits)" ;;
-    -h|--help) sed -n '2,44p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,49p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     [0-9]*) [ -z "$ISSUE" ] || die "one issue at a time (got '$ISSUE' and '$1')"; ISSUE="$1"; shift ;;
     *) die "unknown arg '$1'" ;;
   esac
@@ -105,15 +109,29 @@ case "$BRANCH" in main|master|develop|"$BASE") die "refusing to run on '$BRANCH'
 KEY="$(printf '%s' "$BRANCH" | tr -c 'A-Za-z0-9._-' '_')"
 SDIR="$(kit_state_dir)/autopilot"
 STATE="$SDIR/$KEY.json"
+# Where al_run records the agent it has running. Read below before anything starts: a runner killed
+# with SIGKILL leaves `status: running` behind with a dead pid, and only this file can say whether
+# its agent went with it.
+AL_PIDFILE="$SDIR/$KEY.agent.pid"
 sget() { jq -r "$1" "$STATE" 2>/dev/null; }
 
 # --- an existing run on this branch --------------------------------------------------------------
 PREV_ROUNDS=0 PREV_ELAPSED=0 TOK_IN=0 TOK_OUT=0 TOK_KNOWN=1 COST=0 COST_KNOWN=1 PR_URL="" USAGE_SRC="none"
+PREV_OPEN_AGENT=""
 if [ -f "$STATE" ]; then
   prev_status="$(sget '.status // ""')"; prev_pid="$(sget '.pid // ""')"; prev_reason="$(sget '.reason // ""')"
   if [ "$prev_status" = "running" ] && is_uint "$prev_pid" && kill -0 "$prev_pid" 2>/dev/null \
      && [ "$(sget '.host // ""')" = "$(hostname 2>/dev/null)" ]; then
     die "a run is already live on '$BRANCH' (pid $prev_pid) - one writer per branch"
+  fi
+  # The runner is gone; its agent may not be. Checked for every start that would launch an agent
+  # (--resume, --fresh, a new run; --dry-run launches none), because each would put a second
+  # writer on the branch. Refused, not killed: the pid is all the file knows, and a recycled pid
+  # belongs to someone else.
+  if [ "$DRYRUN" != "1" ] && [ "$(sget '.host // ""')" = "$(hostname 2>/dev/null)" ] && al_pidfile_alive "$AL_PIDFILE"; then
+    read -r _apid _agrp < "$AL_PIDFILE" || true
+    [ "$_agrp" = "1" ] && _akill="kill -TERM -- -$_apid" || _akill="kill -TERM $_apid"
+    die "the agent an earlier run started on '$BRANCH' is still alive (pid $_apid) though its runner is gone - one writer per branch. Stop it with: $_akill   (if pid $_apid is not that agent, remove $AL_PIDFILE)"
   fi
   if [ "$RESUME" = "1" ]; then
     if [ "$prev_reason" = "done" ]; then
@@ -143,6 +161,9 @@ if [ -f "$STATE" ]; then
     [ "$(sget '.usage.tokens')" = "unknown" ] && [ "$PREV_ROUNDS" != "0" ] && TOK_KNOWN=0
     COST="$(sget '.usage.known_cost_usd // 0')"
     [ "$(sget '.usage.cost_usd')" = "unknown" ] && [ "$PREV_ROUNDS" != "0" ] && COST_KNOWN=0
+    # A runner that died with a round in flight never counted that round. Its output file is still
+    # there; it is counted once the helpers below exist (see "the round a dead runner left open").
+    [ "$(sget '.round_open // false')" = "true" ] && [ "$PREV_ROUNDS" != "0" ] && PREV_OPEN_AGENT="$(sget '.agent // ""')"
   elif [ "$FRESH" != "1" ] && [ "$DRYRUN" != "1" ]; then
     die "'$BRANCH' has a stopped run (reason=${prev_reason:-?}, rounds=$(sget '.rounds // 0')): pass --resume to continue it or --fresh to discard it"
   fi
@@ -205,6 +226,9 @@ STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 T0="$(date +%s)"
 ROUNDS="$PREV_ROUNDS"
 DETAIL=""
+# 1 from the moment a round is numbered until its usage is counted. A stop in between (a signal)
+# counts the round first, so the record never holds a total that silently leaves a round out.
+ROUND_OPEN=0
 
 elapsed() { echo $(( PREV_ELAPSED + $(date +%s) - T0 )); }
 tokens()  { if [ "$TOK_KNOWN" = "1" ] && [ "$ROUNDS" -gt 0 ]; then echo $(( TOK_IN + TOK_OUT )); else echo unknown; fi; }
@@ -225,14 +249,14 @@ save() {
     --argjson mi "$MAX_ITERS" --argjson ms "$MAX_SECONDS" --argjson rs "$ROUND_SECONDS" --arg mt "$MAX_TOKENS" \
     --arg tok "$tok" --argjson tin "$TOK_IN" --argjson tout "$TOK_OUT" --arg cost "$cost" --arg kcost "$COST" \
     --arg src "$USAGE_SRC" --arg pr "$PR_URL" --arg pid "$$" --arg host "$(hostname 2>/dev/null)" \
-    --arg started "$STARTED_AT" --arg updated "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '
+    --arg started "$STARTED_AT" --arg updated "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg open "$ROUND_OPEN" '
     def num: if . == "unknown" or . == "" then "unknown" else (tonumber * 1000000 | round / 1000000) end;
     { run: $run, issue: $issue, branch: $branch, worktree: $worktree,
       agent: $agent, agent_args: ($args | split("\n") | map(select(. != ""))),
       objective: $objective, until: $until, check: $check,
       publish: ($publish == "1"), summary: $summary,
       status: $status, reason: $reason, detail: $detail,
-      rounds: $rounds, elapsed_seconds: $elapsed,
+      rounds: $rounds, round_open: ($open == "1"), elapsed_seconds: $elapsed,
       limits: { max_iters: $mi, max_seconds: $ms, round_seconds: $rs,
                 max_tokens: (if $mt == "" then null else ($mt | tonumber) end) },
       usage: { tokens: ($tok | num), known_input_tokens: $tin, known_output_tokens: $tout,
@@ -242,6 +266,27 @@ save() {
       resume: (if $reason == "done" or $status == "running" then "" else "cckit autopilot run --resume" end) }' \
     > "$tmpf" && mv -f "$tmpf" "$STATE"
 }
+
+# account_round <agent> <round> — add what the runtime printed for one round to the totals. A
+# round whose output holds no usage makes the total unknown: the tokens it spent are real and
+# uncounted, so a sum without them is an undercount, not a figure.
+account_round() {
+  local u_in u_out u_cost
+  read -r u_in u_out u_cost <<< "$(al_usage "$1" "$SDIR/$KEY.round-$2.out")"
+  if is_uint "$u_in" && is_uint "$u_out"; then
+    TOK_IN=$((TOK_IN + u_in)); TOK_OUT=$((TOK_OUT + u_out)); USAGE_SRC="$1"
+  else
+    TOK_KNOWN=0
+  fi
+  if [ "$u_cost" = "unknown" ]; then COST_KNOWN=0
+  else COST="$(awk -v a="$COST" -v b="$u_cost" 'BEGIN{printf "%.6f", a + b}')"; fi
+  ROUND_OPEN=0
+}
+
+# The round a dead runner left open (SIGKILL, power loss: no trap ran). Counted here, once, from
+# the output file it left; the state written next carries round_open=false, so a second resume
+# does not count it again.
+[ -z "$PREV_OPEN_AGENT" ] || account_round "$PREV_OPEN_AGENT" "$PREV_ROUNDS"
 
 # stop <reason> <exit-code> — the one way a run ends.
 stop() {
@@ -255,6 +300,9 @@ stop() {
 on_signal() {
   trap '' INT TERM HUP
   al_stop
+  # The round in flight is over now; count it before the record is written. Skipping this left
+  # the interrupted round out of the total, and `--max-tokens` kept passing after a resume.
+  [ "$ROUND_OPEN" != "1" ] || account_round "$AGENT" "$ROUNDS"
   DETAIL="this process received a signal during round $ROUNDS"
   stop interrupted 130
 }
@@ -314,7 +362,7 @@ while :; do
     [ $(( TOK_IN + TOK_OUT )) -lt "$MAX_TOKENS" ] || { DETAIL="$(( TOK_IN + TOK_OUT )) of $MAX_TOKENS tokens used"; stop limit-tokens 4; }
   fi
 
-  ROUNDS=$((ROUNDS + 1))
+  ROUNDS=$((ROUNDS + 1)); ROUND_OPEN=1
   bound="$ROUND_SECONDS"; [ "$left" -lt "$bound" ] && bound="$left"
   {
     printf '%s\n\n' "$OBJECTIVE"
@@ -337,14 +385,7 @@ $FEEDBACK}"
   arc=$?
 
   # Usage first, so a round that failed or was killed still counts what it reported.
-  read -r u_in u_out u_cost <<< "$(al_usage "$AGENT" "$SDIR/$KEY.round-$ROUNDS.out")"
-  if is_uint "$u_in" && is_uint "$u_out"; then
-    TOK_IN=$((TOK_IN + u_in)); TOK_OUT=$((TOK_OUT + u_out)); USAGE_SRC="$AGENT"
-  else
-    TOK_KNOWN=0
-  fi
-  if [ "$u_cost" = "unknown" ]; then COST_KNOWN=0
-  else COST="$(awk -v a="$COST" -v b="$u_cost" 'BEGIN{printf "%.6f", a + b}')"; fi
+  account_round "$AGENT" "$ROUNDS"
 
   if [ "$arc" = "124" ]; then
     DETAIL="round $ROUNDS hit its ${bound}s bound and was killed"; stop limit-seconds 4

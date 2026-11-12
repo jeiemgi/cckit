@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # autopilot-run-test.sh — scenario A07 as a fixture: a bounded headless objective, under both
-# launch kinds, stopped by a failing check, a no-progress round, a kill mid-run and each configured
-# limit, then resumed without a second PR (E257.7, #264).
+# launch kinds, stopped by a failing check, a no-progress round, a kill mid-run (TERM and KILL) and
+# each configured limit, then resumed without a second PR or a second agent (E257.7, #264).
 #
 # Hermetic. `claude` and `codex` are stub scripts on PATH whose behaviour STUB_MODE selects, `gh` is
 # a stub that records every `pr create`, and origin is a bare repo in the temp dir. This proves what
@@ -205,6 +205,10 @@ for agent in claude codex; do
   t "[$agent] status is stopped"        "$(field .status)" "stopped"
   t "[$agent] the agent died with it"   "$([ -n "$apid" ] && kill -0 "$apid" 2>/dev/null && echo alive || echo gone)" "gone"
   t "[$agent] no PR from a killed run"  "$(creates)" "0"
+  # The interrupted round printed no usage, so the total is unknown, not the sum without it.
+  t "[$agent] an interrupted round reads tokens unknown" "$(field .usage.tokens)" "unknown"
+  t "[$agent] and cost unknown"                          "$(field .usage.cost_usd)" "unknown"
+  t "[$agent] the record leaves no round open"           "$(field .round_open)" "false"
   run --objective again
   t "[$agent] a new run over a stopped one is refused" "$?" "2"
   has "[$agent] and points at --resume" "$(cat "$TMP/out")" "--resume"
@@ -218,6 +222,61 @@ for agent in claude codex; do
   run --resume
   t "[$agent] resuming a finished run exits 0" "$?" "0"
   t "[$agent] and opens no second PR"          "$(creates)" "1"
+
+  # A token ceiling cannot be checked across an interrupted round: resuming under one stops with
+  # usage-unknown before another round starts, instead of counting the cut-short round as zero.
+  reset
+  STUB_MODE=hang bash "$ROOT/scripts/autopilot.sh" run --agent "$agent" --objective x --until "$UNTIL" > "$TMP/bg.out" 2>&1 &
+  dpid=$!
+  i=0; while [ ! -f "$TMP/agent.pid" ] && [ "$i" -lt 100 ]; do sleep 0.2; i=$((i + 1)); done
+  kill -TERM "$dpid"; wait "$dpid"
+  run --resume --max-tokens 100000
+  t "[$agent] resume under --max-tokens after an interrupt exits 4" "$?" "4"
+  t "[$agent] reason is usage-unknown, not an undercount"           "$(reason)" "usage-unknown"
+  t "[$agent] and no further round ran"                             "$(cat "$TMP/rounds")" "1"
+
+  # The runner is killed outright (SIGKILL): no trap runs. The agent must not outlive it, the
+  # round it left open is counted on resume, and a second resume does not count it twice.
+  if command -v perl >/dev/null 2>&1; then
+    reset
+    STUB_MODE=hang bash "$ROOT/scripts/autopilot.sh" run --agent "$agent" --objective x --until "$UNTIL" > "$TMP/bg.out" 2>&1 &
+    dpid=$!
+    i=0; while [ ! -f "$TMP/agent.pid" ] && [ "$i" -lt 100 ]; do sleep 0.2; i=$((i + 1)); done
+    apid="$(cat "$TMP/agent.pid" 2>/dev/null)"
+    t "[$agent] the running agent is recorded beside the state" "$([ -s "$TMP/state/autopilot/task_7-thing.agent.pid" ] && echo yes || echo no)" "yes"
+    kill -KILL "$dpid"; wait "$dpid" 2>/dev/null
+    i=0; while [ -n "$apid" ] && kill -0 "$apid" 2>/dev/null && [ "$i" -lt 100 ]; do sleep 0.2; i=$((i + 1)); done
+    t "[$agent] the agent does not outlive a SIGKILLed runner" "$([ -n "$apid" ] && kill -0 "$apid" 2>/dev/null && echo alive || echo gone)" "gone"
+    t "[$agent] the dead runner left status running"           "$(field .status)" "running"
+    t "[$agent] with the round marked open"                    "$(field .round_open)" "true"
+    run --resume --max-tokens 100000
+    t "[$agent] resume after SIGKILL under --max-tokens exits 4" "$?" "4"
+    t "[$agent] the open round made usage unknown"               "$(reason)" "usage-unknown"
+    t "[$agent] no second agent was started"                     "$(cat "$TMP/rounds")" "1"
+    t "[$agent] the open round is closed in the record"          "$(field .round_open)" "false"
+  fi
+
+  # Without the watchdog (no perl) a SIGKILLed runner can leave its agent alive. The recorded pid
+  # is what stops the next start: a live one refuses --resume, --fresh and a new run alike.
+  reset
+  STUB_MODE=hang bash "$ROOT/scripts/autopilot.sh" run --agent "$agent" --objective x --until "$UNTIL" > "$TMP/bg.out" 2>&1 &
+  dpid=$!
+  i=0; while [ ! -f "$TMP/agent.pid" ] && [ "$i" -lt 100 ]; do sleep 0.2; i=$((i + 1)); done
+  kill -TERM "$dpid"; wait "$dpid"
+  sleep 300 & orphan=$!
+  jq '.status = "running" | .round_open = true' "$STATE" > "$STATE.t" && mv "$STATE.t" "$STATE"
+  printf '%s 0\n' "$orphan" > "$TMP/state/autopilot/task_7-thing.agent.pid"
+  before_rounds="$(cat "$TMP/rounds")"
+  run --resume
+  t "[$agent] --resume is refused while the earlier agent lives" "$?" "2"
+  has "[$agent] and names the live agent pid" "$(cat "$TMP/out")" "still alive (pid $orphan)"
+  run --agent "$agent" --objective y --fresh
+  t "[$agent] --fresh is refused too"                 "$?" "2"
+  t "[$agent] neither refusal started an agent"       "$(cat "$TMP/rounds")" "$before_rounds"
+  kill "$orphan" 2>/dev/null; wait "$orphan" 2>/dev/null
+  STUB_DONE_AT=2 run --resume
+  t "[$agent] once that agent is gone the run resumes" "$?" "0"
+  t "[$agent] and finishes"                            "$(reason)" "done"
 
   # The state file is lost but the PR exists: a fresh run finds it instead of opening another.
   rm -rf "$TMP/state" "$TMP/rounds" "$TMP/done.flag"

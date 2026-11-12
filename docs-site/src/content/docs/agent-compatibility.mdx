@@ -101,7 +101,7 @@ checks to implement; it is not a list of passing tests.
 | `--until "<cmd>"` | Enforced | Run after every round; exit 0 ends the run. Without it the run ends when the agent exits 0 after a round that changed something. |
 | `--check "<cmd>"` | Enforced | The publication gate, run once the work is complete. A failure stops the run with `check-failed` and no PR is opened. |
 | No progress | Enforced | A round that changes neither `HEAD` nor the working tree stops the run. The agent's own claim of progress is not read. |
-| `--max-tokens <n>` | **Partly enforced** | Checked **between** rounds against the usage the runtime printed. A round in flight is not cut off by tokens, so one round can overshoot the ceiling by its own size. A round that prints no usage stops the run with `usage-unknown` rather than letting an unreadable ceiling pass. |
+| `--max-tokens <n>` | **Partly enforced** | Checked **between** rounds against the usage the runtime printed. A round in flight is not cut off by tokens, so one round can overshoot the ceiling by its own size. A round that prints no usage stops the run with `usage-unknown` rather than letting an unreadable ceiling pass. That includes a round cut short by a signal or by the runner being killed: its tokens are recorded as `unknown`, not as zero, so a `--resume` under `--max-tokens` stops with `usage-unknown` before another round starts. |
 | A hard token ceiling inside a round | **Unsupported** | Neither CLI's `--help` offers a token cap cckit can pass. Bound the round with `--round-seconds`. Claude's `--max-budget-usd` is a dollar cap you may pass yourself with `--agent-arg`; cckit does not set it. |
 | Cost limit | **Unsupported** | Codex prints no cost, and cckit applies no price list. Claude's printed cost is recorded, not limited. |
 | `--notify` | **Unsupported** | No code delivers a notification. The flag is refused, not ignored. |
@@ -112,6 +112,15 @@ Stop reasons are written to `.cckit/autopilot/<branch>.json` with the round coun
 usage and the resume command: `done` (exit 0), `agent-failed` (3), `limit-iters`, `limit-seconds`,
 `limit-tokens`, `usage-unknown` (4), `no-progress` (5), `check-failed` (6), `publish-failed` (7),
 `interrupted` (130).
+
+A runner that is killed outright (`kill -9`, power loss) writes no stop reason: the record still
+says `status: running` with `round_open: true`. Two things keep that from leaving two agents on one
+branch. With `perl` on PATH the agent runs under a watchdog that notices the runner is gone and
+stops the agent's process group (SIGTERM, then SIGKILL after 10s). And the running agent's pid is
+recorded in `.cckit/autopilot/<branch>.agent.pid`; a later `--resume`, `--fresh` or new run that
+finds that pid alive is refused with exit 2 and prints the `kill` command that stops it. Without
+`perl` there is no watchdog, so that refusal is the only guard. `--resume` then counts the open
+round from the output file it left before it checks any limit.
 
 Three things the fixture cannot show, each a limitation until a live run says otherwise: that
 `claude -p` and `codex exec` accept the prompt on stdin as their `--help` describes, that their

@@ -271,7 +271,10 @@ cckit watch --loop         # self-pace gate/merge passes until steady state
 cckit autopilot            # select unblocked work, then call orchestrate --detach under a cap
 cckit autopilot run 12 --agent codex --objective "make the tests pass" --until "pnpm test" --max-iters 5
                            # ONE headless objective on this branch (claude -p / codex exec): code
-                           #   stops it on a limit, a failing gate, or a round that changed nothing
+                           #   stops it on a limit, a failing gate, or a round that changed nothing;
+                           #   a killed runner's agent is stopped, or the next start is refused
+                           #   while it lives; --resume counts the cut-short round as usage
+                           #   unknown, not zero
 KIT_BASE_BRANCH=effort/42-auth cckit orchestrate 44   # cut an effort's sub from the effort branch
 ```
 
