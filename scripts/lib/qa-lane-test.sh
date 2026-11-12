@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # qa-lane-test.sh — launched and usable are different facts (#295); the review route comes from
-# the work (#297); a stop leaves the ports with no listener (#298).
+# the work (#297); a stop leaves the ports with no listener (#298); a verdict is bound to the
+# commit that was reviewed and a later commit reads it stale (#299).
 #
 # Hermetic: `curl` is a stub on PATH that answers from a table, the "stack" is a `sleep`, and every
 # file lands in a scratch repo. `open`, `xdg-open` and `gh` are stubs too: no browser starts and no
@@ -54,10 +55,28 @@ SH
 done
 GH_LOG="$TMP/gh.log"; export GH_LOG; : > "$GH_LOG"
 PR_BODY="$TMP/pr.body"; export PR_BODY
+PR_META="$TMP/pr.meta"; export PR_META
+GH_COMMENTS="$TMP/gh.comments"; export GH_COMMENTS; : > "$GH_COMMENTS"
 cat > "$STUB/gh" <<'SH'
 #!/usr/bin/env bash
 # stub: `gh pr view <ref> --json body --jq …` prints the body file; no file means no PR (rc 1).
+# For the verdict (#299) it also answers the PR's number/url/head/branch from $PR_META and keeps
+# the PR's comments in $GH_COMMENTS as `<id><TAB><json body>` rows: list, create, edit in place.
 printf '%s\n' "$*" >> "$GH_LOG"
+case "$*" in
+  *"--json number,url,headRefOid,headRefName"*)
+    [ -f "$PR_META" ] || { echo "no pull requests found" >&2; exit 1; }
+    cat "$PR_META"; exit 0 ;;
+  "api --paginate "*) cat "$GH_COMMENTS" 2>/dev/null; exit 0 ;;
+  "api --method PATCH "*)
+    id="${4##*/}"; f="${6#body=@}"
+    grep -v "^$id	" "$GH_COMMENTS" > "$GH_COMMENTS.tmp"
+    printf '%s\t%s\n' "$id" "$(jq -Rs . < "$f")" >> "$GH_COMMENTS.tmp"
+    mv "$GH_COMMENTS.tmp" "$GH_COMMENTS"; exit 0 ;;
+  "pr comment "*)
+    n=$(( $(wc -l < "$GH_COMMENTS" 2>/dev/null || echo 0) + 9001 ))
+    printf '%s\t%s\n' "$n" "$(jq -Rs . < "$5")" >> "$GH_COMMENTS"; exit 0 ;;
+esac
 [ -f "$PR_BODY" ] || { echo "no pull requests found" >&2; exit 1; }
 cat "$PR_BODY"
 SH
@@ -426,11 +445,118 @@ fi
 QA_PORT_TOOL=none qa_port_tool >/dev/null 2>&1; t "QA_PORT_TOOL=none means no holder lookup" "$?" "1"
 qa_cli stop --lane 34 >/dev/null 2>&1;            t "stop on a lane never launched is rc 0" "$?" "0"
 
+# ── the verdict: bound to the reviewed commit, upserted on the PR, a fail mailed back (#299) ────
+KIT_MAIL_DIR="$TMP/mail"; export KIT_MAIL_DIR
+sha1="$(git -C "$P" rev-parse HEAD)"
+printf '31\nhttps://github.com/o/r/pull/31\n%s\ntask/7-review-stack\n' "$sha1" > "$PR_META"
+: > "$GH_COMMENTS"
+ncomments() { grep -c . "$GH_COMMENTS" 2>/dev/null || true; }
+nreceipts() { ls "$KIT_STATE_DIR/receipts/7-qa-"*.json 2>/dev/null | grep -c . || true; }
+
+t "a lane with no verdict reads none" "$(qa_cli verdict 2>/dev/null)" "none"
+qa_cli verdict >/dev/null 2>&1; t "reading a lane with no verdict is rc 1" "$?" "1"
+
+ev0="$(events qa.verdict)"
+qa_cli verdict pass > "$TMP/v.out" 2> "$TMP/v.err"; rc=$?
+t "a pass verdict returns 0" "$rc" "0"
+t "the verdict prints the receipt path" "$(cat "$TMP/v.out")" "$KIT_STATE_DIR/receipts/7-qa-1.json"
+t "the qa receipt's head_sha is the reviewed commit" "$(jq -r '.head_sha' "$KIT_STATE_DIR/receipts/7-qa-1.json")" "$sha1"
+t "the qa receipt is a clean pass" \
+  "$(jq -r '"\(.stage) \(.outcome) \(.gate) \(.next_stage) \(.invalid | length)"' "$KIT_STATE_DIR/receipts/7-qa-1.json")" "qa pr-open pass none 0"
+t "the first verdict creates the PR comment" "$PR_EVIDENCE_LAST_RESULT" "created"
+t "one comment is on the PR" "$(ncomments)" "1"
+yes "the comment carries the verdict marker" "$(cat "$GH_COMMENTS")" "cckit:pr-evidence key=qa-verdict"
+yes "the comment names the reviewed commit" "$(cat "$GH_COMMENTS")" "commit:  $sha1"
+t "a verdict appends one event" "$(( $(events qa.verdict) - ev0 ))" "1"
+t "the event carries the verdict, the commit and the PR" \
+  "$(grep '"op":"qa.verdict"' "$EVENTS" | tail -n 1 | jq -r '"\(.type) \(.payload.verdict) \(.payload.head) \(.payload.pr) \(.payload.comment) \(.payload.mailed)"')" \
+  "op.done pass $sha1 31 created false"
+t "a pass mails nobody" "$(find "$KIT_MAIL_DIR" -name '*.md' 2>/dev/null | grep -c . || true)" "0"
+
+qa_cli verdict pass >/dev/null 2>&1
+t "the same verdict again edits the comment" "$PR_EVIDENCE_LAST_RESULT" "updated"
+t "still one comment on the PR" "$(ncomments)" "1"
+t "the same verdict on the same commit rewrites its attempt" "$(nreceipts)" "1"
+t "the second verdict appended its own event" "$(( $(events qa.verdict) - ev0 ))" "2"
+
+t "the verdict reads pass against the reviewed commit" "$(qa_verdict_state 7 "$sha1")" "pass"
+qa_verdict_state 7 "$sha1" >/dev/null; t "a fresh pass is rc 0" "$?" "0"
+t "the verb reads pass on the lane's head" "$(qa_cli verdict 2>/dev/null)" "pass"
+t "receipt show prints the qa receipt" "$("$ROOT/bin/cckit" receipt show 7 qa | jq -r '.head_sha')" "$sha1"
+t "the same receipt against another head reads stale" "$(qa_verdict_state 7 0000000000000000000000000000000000000000)" "stale"
+t "a verdict with no head to compare reads stale" "$(qa_verdict_state 7 '')" "stale"
+t "a lane nobody reviewed reads none" "$(qa_verdict_state 99 "$sha1")" "none"
+
+# A later commit on the lane's branch: the recorded pass no longer covers what is there.
+git -C "$P" commit -q --allow-empty -m "a later push"
+sha2="$(git -C "$P" rev-parse HEAD)"
+out="$(qa_cli verdict 2>"$TMP/v.err")"; rc=$?
+t "after a later commit the verdict reads stale" "$out" "stale"
+t "a stale verdict is rc 1" "$rc" "1"
+yes "the stale report names the commit it was recorded against" "$(cat "$TMP/v.err")" "$sha1"
+t "--llm reports the state and both commits" \
+  "$(CCKIT_OUTPUT=json qa_cli verdict 2>/dev/null | jq -r '"\(.state) \(.head) \(.verdict_head)"')" "stale $sha2 $sha1"
+t "--head reads the verdict against a named commit" "$(qa_cli verdict --head "$sha1" 2>/dev/null)" "pass"
+
+# A fail: notes are required, and they go back to the builder's branch as a steer.
+qa_cli verdict fail >/dev/null 2>"$TMP/v.err"; t "a fail with no notes is refused" "$?" "2"
+yes "the refusal says what is missing" "$(cat "$TMP/v.err")" "a fail needs its notes"
+t "a refused verdict writes no receipt" "$(nreceipts)" "1"
+qa_cli verdict pass --shot "$TMP/absent.png" >/dev/null 2>&1; t "a screenshot that is not a file is refused" "$?" "2"
+qa_cli verdict maybe >/dev/null 2>&1;                          t "an unknown verdict word is refused" "$?" "2"
+qa_cli verdict --note "orphan" >/dev/null 2>&1;                t "notes with no verdict are refused" "$?" "2"
+qa_cli up pass >/dev/null 2>&1;                                t "pass belongs to verdict only" "$?" "2"
+t "none of the refusals wrote a receipt" "$(nreceipts)" "1"
+
+printf 'png' > "$TMP/broken-save.png"
+j="$(CCKIT_OUTPUT=json qa_cli verdict fail --note "Save does nothing on /settings/billing" --shot "$TMP/broken-save.png" 2>"$TMP/v.err")"; rc=$?
+t "a fail verdict returns 0 once the notes are mailed" "$rc" "0"
+t "--llm reports the fail, its commit and the mail" \
+  "$(printf '%s' "$j" | jq -r '"\(.verdict) \(.head) \(.pr) \(.attempt) \(.mailed)"')" "fail $sha2 31 2 true"
+t "the fail is a new attempt bound to the later commit" "$(jq -r '.head_sha' "$KIT_STATE_DIR/receipts/7-qa-2.json")" "$sha2"
+t "the fail receipt sends the work back to build" \
+  "$(jq -r '"\(.outcome)|\(.gate)|\(.blocker)|\(.next_stage)|\(.invalid | length)"' "$KIT_STATE_DIR/receipts/7-qa-2.json")" \
+  "blocked|fail — Save does nothing on /settings/billing|Save does nothing on /settings/billing|build|0"
+mail="$(ls "$KIT_MAIL_DIR"/*/task+7-review-stack/new/*-steer-from-*.md 2>/dev/null)"
+t "one steer mail is in the builder branch's mailbox" "$(printf '%s\n' "$mail" | grep -c .)" "1"
+yes "the mail is a steer" "$(cat $mail 2>/dev/null)" "kind: steer"
+yes "the mail carries the notes" "$(cat $mail 2>/dev/null)" "Save does nothing on /settings/billing"
+yes "the mail names the reviewed commit" "$(cat $mail 2>/dev/null)" "$sha2"
+yes "the verdict comment was edited in place" "$(grep 'qa-verdict' "$GH_COMMENTS")" "verdict: fail"
+t "the screenshot is its own upserted comment" "$(grep -c 'key=qa-screenshot-1' "$GH_COMMENTS")" "1"
+yes "the screenshot is a path reference" "$(grep 'qa-screenshot-1' "$GH_COMMENTS")" "$TMP/broken-save.png"
+t "verdict and screenshot are the only comments" "$(ncomments)" "2"
+t "the lane now reads fail" "$(qa_cli verdict 2>/dev/null)" "fail"
+qa_cli verdict >/dev/null 2>&1; t "a fresh fail is rc 1" "$?" "1"
+yes "a PR behind the reviewed commit is said out loud" "$(cat "$TMP/v.err")" "reads stale against it until $sha2 is pushed"
+
+# --to names another mailbox; with no PR the verdict is still recorded, and nothing is posted.
+rm -f "$PR_META"; before="$(ncomments)"
+printf 'Still broken.\nSecond line.\n' > "$TMP/notes.txt"
+qa_cli verdict fail --notes-file "$TMP/notes.txt" --to task/50-elsewhere >/dev/null 2>"$TMP/v.err"; rc=$?
+t "a fail with no PR still records and mails" "$rc" "0"
+t "--to names the mailbox" "$(ls "$KIT_MAIL_DIR"/*/task+50-elsewhere/new/*-steer-from-*.md 2>/dev/null | grep -c .)" "1"
+t "with no PR nothing is posted" "$(ncomments)" "$before"
+yes "the missing PR is said out loud" "$(cat "$TMP/v.err")" "no pull request found for lane 7"
+t "the event records that nothing was posted" \
+  "$(grep '"op":"qa.verdict"' "$EVENTS" | tail -n 1 | jq -r '.payload.comment')" "no-pr"
+# A lane with no branch and no PR has no commit to bind to: refused, nothing written.
+qa_cli verdict pass --lane 77 >/dev/null 2>"$TMP/v.err"; t "a lane with no commit to bind is refused" "$?" "2"
+yes "the refusal offers --head" "$(cat "$TMP/v.err")" "pass --head <sha>"
+t "the refused lane has no receipt" "$([ -e "$KIT_STATE_DIR/receipts/77-qa-1.json" ] && echo yes || echo no)" "no"
+if command -v zsh >/dev/null 2>&1; then
+  out="$(zsh -c "cd '$P'; . '$ROOT/scripts/lib/qa-lane.sh'; qa_cli verdict pass --lane 78 --head '$sha2' >/dev/null 2>&1; qa_verdict_state 78 '$sha2'; qa_verdict_state 78 '$sha1'" 2>&1)"
+  t "zsh: a verdict records and reads back pass, then stale" "$(printf '%s' "$out" | tr '\n' ' ')" "pass stale"
+else
+  echo "ok: zsh absent — skipping the zsh verdict pass (dependency-light gate)"
+fi
+
 # ── the verb is wired ──────────────────────────────────────────────────────────────────────────
 yes "cckit commands lists qa" " $("$ROOT/bin/cckit" commands) " " qa "
 answers ":3 200" ":4 200"
 "$ROOT/bin/cckit" qa ready --lane 7 --timeout 5 >/dev/null 2>&1; t "cckit qa ready dispatches to the lib" "$?" "0"
 yes "cckit qa stop dispatches to the lib" "$("$ROOT/bin/cckit" qa stop --lane 34 2>&1)" "nothing stopped"
+t "cckit qa verdict dispatches to the lib" "$("$ROOT/bin/cckit" qa verdict --lane 78 --head "$sha2" 2>/dev/null)" "pass"
 t "cckit qa open dispatches to the lib" "$("$ROOT/bin/cckit" qa open --lane 7 --route /wired --print 2>/dev/null)" "http://localhost:$web7/wired"
 
 [ "$fail" -eq 0 ] && echo "ALL OK (qa-lane)" || echo "qa-lane: FAILURES"

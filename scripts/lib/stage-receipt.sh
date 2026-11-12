@@ -44,7 +44,7 @@ command -v kit_state_dir >/dev/null 2>&1 || . "$_sr_dir/kit-state.sh"
 # a value outside them is not a receipt with a typo — it is a routing decision nobody can make.
 SR_OUTCOMES="merged pr-open closed-no-op blocked"
 SR_GATES="pass fail"
-SR_STAGES="build review design docs none"
+SR_STAGES="build review design docs qa none"
 
 _sr_need_jq() {
   command -v jq >/dev/null 2>&1 || { echo "stage-receipt: jq is required to read and write receipts" >&2; return 3; }
@@ -76,12 +76,15 @@ sr_next_attempt() {
   [ -n "$n" ] && [ -n "$stage" ] || { echo "sr_next_attempt: <issue> <stage> required" >&2; return 2; }
   d="$(sr_dir)"
   [ -d "$d" ] || { printf '1\n'; return 0; }
-  for f in "$d/$n-$stage-"*.json; do
-    [ -f "$f" ] || continue
+  # Listed and filtered, not globbed: under zsh a glob that matches nothing is an ERROR (nomatch),
+  # so the first receipt of a stage in a directory that already held another stage's aborted.
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
     a="${f##*-}"; a="${a%.json}"
-    case "$a" in ''|*[!0-9]*) continue ;; esac
     [ "$a" -gt "$max" ] && max="$a"
-  done
+  done <<EOF
+$(ls "$d" 2>/dev/null | grep -E "^$n-$stage-[0-9]+\.json\$")
+EOF
   printf '%s\n' "$(( max + 1 ))"
 }
 
@@ -208,7 +211,9 @@ sr_list() {
   _sr_need_jq || return $?
   d="$(sr_dir)"
   [ -d "$d" ] || return 0
-  for f in "$d/${n:+$n-}"*.json; do
+  # Listed and filtered for the same zsh reason as sr_next_attempt.
+  ls "$d" 2>/dev/null | grep -E "^${n:+$n-}.*\.json\$" | while IFS= read -r f; do
+    f="$d/$f"
     [ -f "$f" ] || continue
     jq -r '[(.issue|tostring), .stage, (.attempt|tostring),
             (.outcome + (if ((.invalid // []) | length) > 0 then " (invalid: " + ((.invalid|join(","))) + ")" else "" end))]
@@ -262,7 +267,7 @@ cckit receipt <issue> --stage <stage> [--attempt <n>] [--profile <p>] [--tier <t
 cckit receipt list [<issue>]
 cckit receipt show <issue> <stage> [<attempt>]
 
-Stages:   build review design docs none
+Stages:   build review design docs qa none
 Outcomes: merged pr-open closed-no-op blocked
 
 The receipt is written locally AND mirrored as a comment on the issue. --no-remote (or

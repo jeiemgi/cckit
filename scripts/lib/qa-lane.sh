@@ -2,7 +2,8 @@
 # shellcheck shell=bash
 # qa-lane.sh — one review stack per lane: launch the command the project declared, then say
 # whether the stack is USABLE (#295), then open the screen the change touched (#297), then stop
-# it so the ports are actually free (#298).
+# it so the ports are actually free (#298), then record the reviewer's verdict against the commit
+# that was reviewed (#299).
 #
 # Launched and usable are different facts. A dev server answers on its port seconds before the
 # app behind it can serve a page, and a web process that is up while its API is down renders an
@@ -48,7 +49,10 @@
 #   qa_port_tool                            `lsof` or `ss`: what can name a port's holder; rc 1 for neither
 #   qa_port_pids <port> [<tool>]            the pids LISTENING on <port>, one per line
 #   qa_stop <lane>                          stop the lane's supervisors, then its listeners; rc 1 if a port stays held
-#   qa_cli <up|ready|open|stop> [--lane N] …   the `cckit qa` verb
+#   qa_verdict_state <lane> [<head>]        `pass` · `fail` · `stale` · `none` for the lane's verdict; rc 0 only for pass
+#   qa_verdict <lane> <pass|fail> [<pr>] [<head>] [<notes>] [<to>] [<shots>]   record it, post it, mail a fail
+#   qa_verdict_show <lane> [<pr>] [<head>]  print that state against the lane's head now
+#   qa_cli <up|ready|open|stop|verdict> [--lane N] …   the `cckit qa` verb
 #
 # The review route comes from the WORK, not from a smoke list: the builder writes one
 # `QA route: /path` line in the PR body (`cckit brief` asks for it when a `qa` block exists) and
@@ -62,7 +66,9 @@
 # `op.done qa.ready` when the lane becomes usable, `op.done qa.timeout` when the wait runs out,
 # `op.done qa.exited` when the command died before the lane became usable, `op.done qa.open` when
 # a usable lane's URL is handed over (payload: lane, url, route, source, opened), `op.done qa.stop`
-# when a stop ran against a lane with a record (payload: lane, stopped, ports, held, freed).
+# when a stop ran against a lane with a record (payload: lane, stopped, ports, held, freed),
+# `op.done qa.verdict` for each recorded verdict (payload: lane, verdict, head, pr, attempt,
+# comment, mailed).
 #
 # Tunables: QA_READY_TIMEOUT (seconds, default 120) · QA_READY_INTERVAL (seconds between rounds,
 # default 2) · QA_PROBE_TIMEOUT (seconds per request, default 5) · QA_HOST (default localhost) ·
@@ -72,7 +78,9 @@
 # `none`: force the holder lookup; default is whichever exists).
 #
 # errors: strict — rc 2 on a usage or config refusal (nothing launched), rc 3 without jq or curl,
-# rc 1 when the lane is not usable; every rc-1 message names the launch log to read.
+# rc 1 when the lane is not usable; every rc-1 message names the launch log to read. For
+# `verdict`: rc 2 refuses before any write, rc 1 after a recorded fail whose notes reached no
+# mailbox, and reading a verdict is rc 0 only for a pass on the lane's current head.
 
 # `${BASH_SOURCE[0]:-$0}`: BASH_SOURCE is empty under zsh, and `dirname ""` is "." — the sibling
 # sources below would silently miss. Same fix as stage-receipt.sh and kit-gc.sh (#219).
@@ -87,6 +95,12 @@ command -v emit_event      >/dev/null 2>&1 || . "$_qa_dir/kit-events.sh"
 command -v wt_issue_number >/dev/null 2>&1 || . "$_qa_dir/worktree-issue.sh"
 # shellcheck source=/dev/null
 command -v wt_port_slot    >/dev/null 2>&1 || . "$_qa_dir/worktree-start.sh"
+# shellcheck source=/dev/null
+command -v sr_record       >/dev/null 2>&1 || . "$_qa_dir/stage-receipt.sh"
+# shellcheck source=/dev/null
+command -v pr_attach_evidence >/dev/null 2>&1 || . "$_qa_dir/pr-evidence.sh"
+# shellcheck source=/dev/null
+command -v msg_send        >/dev/null 2>&1 || . "$_qa_dir/kit-msg.sh"
 unset _qa_dir
 
 _QA_NAME_RE='^[A-Za-z_][A-Za-z0-9_]*$'
@@ -752,12 +766,234 @@ EOF
   return "$rc"
 }
 
+# ── the verdict: pass or fail against the commit that was reviewed (#299) ──────────────────────
+#
+# A verdict is a `qa` stage receipt (stage-receipt.sh) keyed by the lane number, and its head_sha
+# is the commit the reviewer looked at. That one field is what makes it expire: the receipt is
+# read back against the lane's head NOW, and any other commit reads `stale`. Nothing has to notice
+# the push — the comparison fails on its own.
+#
+# The commit is resolved locally first, because the stack ran from a local checkout: `--head`,
+# else the tip of the PR's branch as this repo has it, else the tip of the lane's own branch, else
+# the head GitHub reports for the PR. When the PR's head on GitHub is a different commit the
+# verdict is recorded anyway and the mismatch is said out loud — it reads stale against the PR
+# until the reviewed commit is pushed.
+#
+# Three writes follow the receipt, in this order, and none of them can undo it:
+#   the PR comment   one comment, upserted through pr_attach_evidence under the caption
+#                    `QA verdict`, so a second verdict EDITS it. Each `--shot` file is one more
+#                    upserted comment (`QA screenshot <n>`). pr-evidence.sh cannot upload a binary:
+#                    a screenshot is a local path reference unless KIT_EVIDENCE_URL_BASE is set.
+#   the mail         a FAIL sends its notes to the builder's branch with msg_send --steer, so the
+#                    agent that built the change reads them between two tool calls.
+#   the event        one `op.done qa.verdict` line.
+# The receipt is not mirrored onto the issue: the PR comment is the GitHub copy, and a second
+# comment on the lane's issue would say the same thing in another place.
+
+# _qa_pr_meta <ref> — number, url, headRefOid, headRefName of the PR <ref> names, one per line.
+# Best-effort: no gh, no PR, or an unreadable answer is rc 1 and prints nothing.
+_qa_pr_meta() {
+  local out=""
+  [ -n "${1:-}" ] || return 1
+  command -v gh >/dev/null 2>&1 || return 1
+  out="$(gh pr view "$1" --json number,url,headRefOid,headRefName \
+           --jq '(.number | tostring), .url, .headRefOid, .headRefName' 2>/dev/null)" || return 1
+  case "$(printf '%s\n' "$out" | sed -n 1p)" in ''|*[!0-9]*) return 1 ;; esac
+  printf '%s\n' "$out"
+}
+
+# _qa_verdict_resolve <lane> [<pr>] [<head>] — set _QA_V_HEAD (the reviewed commit), _QA_V_PR,
+# _QA_V_URL, _QA_V_PRHEAD and _QA_V_BRANCH (the builder's branch). Globals, not a tab-separated
+# echo: an empty field between two tabs collapses under `read`. rc 2 when no commit can be named.
+_qa_verdict_resolve() {
+  local lane="$1" pr="${2:-}" head="${3:-}" branch="" meta="" tip=""
+  _QA_V_HEAD=""; _QA_V_PR=""; _QA_V_URL=""; _QA_V_PRHEAD=""; _QA_V_BRANCH=""
+  branch="$(_qa_lane_branch "$lane")"
+  if meta="$(_qa_pr_meta "${pr:-$branch}")"; then
+    _QA_V_PR="$(printf '%s\n' "$meta" | sed -n 1p)"
+    _QA_V_URL="$(printf '%s\n' "$meta" | sed -n 2p)"
+    _QA_V_PRHEAD="$(printf '%s\n' "$meta" | sed -n 3p)"
+    _QA_V_BRANCH="$(printf '%s\n' "$meta" | sed -n 4p)"
+  fi
+  [ -n "$_QA_V_BRANCH" ] || _QA_V_BRANCH="$branch"
+  if [ -n "$head" ]; then
+    tip="$(git rev-parse --verify -q "$head^{commit}" 2>/dev/null)" || tip=""
+    if [ -z "$tip" ]; then
+      # A commit this clone does not have is still a commit: accept a full sha as written.
+      printf '%s\n' "$head" | grep -qE '^[0-9a-f]{40}$' || {
+        echo "cckit qa verdict: --head '$head' is not a commit here and not a full sha" >&2; return 2; }
+      tip="$head"
+    fi
+  else
+    [ -z "$_QA_V_BRANCH" ] || tip="$(git rev-parse --verify -q "refs/heads/$_QA_V_BRANCH^{commit}" 2>/dev/null)" || tip=""
+    [ -n "$tip" ] || tip="$_QA_V_PRHEAD"
+  fi
+  [ -n "$tip" ] || {
+    echo "cckit qa verdict: no commit to bind lane $lane to — no local branch carries issue $lane and no PR answered; pass --head <sha>" >&2
+    return 2; }
+  _QA_V_HEAD="$tip"
+}
+
+# qa_verdict_state <lane> [<head>] — echo how the lane's latest verdict reads against <head>:
+# `pass` (rc 0) · `fail` · `stale` (recorded against another commit, or against none) · `none`
+# (no verdict at all). Every answer but `pass` is rc 1. An empty <head> cannot be compared, so it
+# reads `stale`: a verdict nobody can check against a commit is not a fresh one.
+qa_verdict_state() {
+  local lane="$1" head="${2:-}" got="" rhead="" gate=""
+  got="$(sr_latest "$lane" qa 2>/dev/null)" || got=""
+  [ -n "$got" ] || { printf 'none\n'; return 1; }
+  rhead="$(printf '%s' "$got" | jq -r '.head_sha // ""' 2>/dev/null)"
+  if [ -z "$head" ] || [ -z "$rhead" ] || [ "$rhead" != "$head" ]; then
+    printf 'stale\n'; return 1
+  fi
+  gate="$(printf '%s' "$got" | jq -r '.gate // ""' 2>/dev/null)"
+  gate="${gate%%[[:space:]]*}"
+  [ "$gate" = pass ] && { printf 'pass\n'; return 0; }
+  printf 'fail\n'; return 1
+}
+
+# qa_verdict <lane> <pass|fail> [<pr>] [<head>] [<notes>] [<to-branch>] [<shots>] — record the
+# verdict, then upsert it onto the PR, mail a fail's notes to the builder, and emit one event.
+# <shots> is one screenshot path per line. Echoes the receipt path (a JSON object under --llm).
+#
+# Everything that can refuse does so before the receipt is written: an unknown verdict, a fail
+# with no notes, a screenshot that is not a file, a commit that cannot be named (all rc 2).
+# rc 1 means the receipt IS written and a fail's notes reached no mailbox.
+qa_verdict() {
+  local lane="$1" verdict="${2:-}" pr="${3:-}" head="${4:-}" notes="${5:-}" to="${6:-}" shots="${7:-}"
+  local one="" outcome="" gate="" blocker="" next="" url="" attempt="" prev="" rpath="" d="" file=""
+  local comment="no-pr" mailed=false shot="" i=0 nshots=0 rc=0 target=""
+  case "$verdict" in pass|fail) ;; *) echo "cckit qa verdict: the verdict is pass or fail, got '${verdict:-nothing}'" >&2; return 2 ;; esac
+  command -v jq >/dev/null 2>&1 || { echo "cckit qa: jq is required" >&2; return 3; }
+  one="$(printf '%s' "$notes" | tr '\r\n\t' '   ' | sed -e 's/  */ /g' -e 's/^ //' -e 's/ $//')"
+  if [ "$verdict" = fail ] && [ -z "$one" ]; then
+    echo "cckit qa verdict: a fail needs its notes — --note \"<what is wrong>\" or --notes-file <file>. The builder gets nothing to act on otherwise." >&2
+    return 2
+  fi
+  while IFS= read -r shot; do
+    [ -n "$shot" ] || continue
+    [ -f "$shot" ] || { echo "cckit qa verdict: --shot '$shot' is not a file" >&2; return 2; }
+    nshots=$((nshots + 1))
+  done <<EOF
+$shots
+EOF
+  _qa_verdict_resolve "$lane" "$pr" "$head" || return $?
+  head="$_QA_V_HEAD"
+
+  url="${_QA_V_URL:--}"
+  if [ "$verdict" = pass ]; then
+    outcome="pr-open"; gate="pass"; blocker="none"; next="none"
+  else
+    outcome="blocked"; gate="fail — $one"; blocker="$one"; next="build"
+  fi
+  # The same verdict on the same commit rewrites its own attempt; anything else is a new one.
+  attempt="$(sr_next_attempt "$lane" qa)" || return $?
+  if _sr_same_as_latest "$lane" qa "$outcome" "$url" "$gate" "$blocker" "$next"; then
+    prev="$(sr_latest "$lane" qa 2>/dev/null | jq -r '.head_sha // ""' 2>/dev/null)"
+    [ "$prev" = "$head" ] && attempt=$((attempt - 1))
+  fi
+  rpath="$(printf 'outcome: %s\nurl: %s\ngate: %s\nblocker: %s\nnext stage: %s\n' \
+             "$outcome" "$url" "$gate" "$blocker" "$next" \
+           | sr_record "$lane" qa "$attempt" "" "" "cckit qa verdict" "read-only" "$head")" || return $?
+  echo "[qa $lane] $verdict recorded against $head (attempt $attempt)" >&2
+  if [ -n "$_QA_V_PRHEAD" ] && [ "$_QA_V_PRHEAD" != "$head" ]; then
+    echo "[qa $lane] PR #$_QA_V_PR is at $_QA_V_PRHEAD on GitHub — this verdict reads stale against it until $head is pushed" >&2
+  fi
+
+  # The comment body carries no timestamp and no attempt number, so repeating a verdict is a
+  # byte-identical edit and not timeline churn.
+  if [ -n "$_QA_V_PR" ]; then
+    d="$(qa_lane_dir "$lane")"; file="$d/verdict.txt"
+    if mkdir -p "$d" 2>/dev/null; then
+      {
+        printf 'verdict: %s\ncommit:  %s\nlane:    %s\n' "$verdict" "$head" "$lane"
+        [ -z "$notes" ] || printf '\nnotes:\n%s\n' "$notes"
+        if [ "$nshots" -gt 0 ]; then
+          printf '\nscreenshots (one comment each, below):\n'
+          while IFS= read -r shot; do
+            [ -n "$shot" ] || continue
+            i=$((i + 1)); printf '  QA screenshot %s: %s\n' "$i" "$(basename "$shot")"
+          done <<EOF
+$shots
+EOF
+        fi
+        printf '\nA push after %s makes this verdict stale.\n' "$head"
+      } > "$file"
+      pr_attach_evidence "$_QA_V_PR" "$file" "QA verdict"
+      comment="${PR_EVIDENCE_LAST_RESULT:-post-failed}"
+      i=0
+      while IFS= read -r shot; do
+        [ -n "$shot" ] || continue
+        i=$((i + 1)); pr_attach_evidence "$_QA_V_PR" "$shot" "QA screenshot $i"
+      done <<EOF
+$shots
+EOF
+    else
+      comment="post-failed"; echo "[qa $lane] cannot create $d — nothing posted to PR #$_QA_V_PR" >&2
+    fi
+  else
+    echo "[qa $lane] no pull request found for lane $lane — the verdict is recorded locally and posted nowhere (--pr <n> names one)" >&2
+  fi
+
+  if [ "$verdict" = fail ]; then
+    target="${to:-$_QA_V_BRANCH}"
+    if [ -z "$target" ]; then
+      echo "[qa $lane] no builder branch to mail — the notes reached nobody; name one with --to <branch>" >&2
+      rc=1
+    elif msg_send "$target" --steer "QA FAIL on $head (lane $lane${_QA_V_PR:+, PR #$_QA_V_PR}). Fix this before anything else:
+$notes"; then
+      mailed=true
+    else
+      echo "[qa $lane] the mail to $target was not written — the notes reached nobody" >&2
+      rc=1
+    fi
+  fi
+
+  emit_event op.done qa.verdict "$(jq -cn --arg lane "$lane" --arg verdict "$verdict" --arg head "$head" \
+    --arg pr "$_QA_V_PR" --argjson attempt "$attempt" --arg comment "$comment" --argjson mailed "$mailed" \
+    '{lane: $lane, verdict: $verdict, head: $head, pr: ($pr | tonumber? // null), attempt: $attempt,
+      comment: $comment, mailed: $mailed}' 2>/dev/null)"
+  if [ "${CCKIT_OUTPUT:-human}" = json ]; then
+    jq -cn --arg lane "$lane" --arg verdict "$verdict" --arg head "$head" --arg pr "$_QA_V_PR" \
+      --argjson attempt "$attempt" --arg receipt "$rpath" --arg comment "$comment" --argjson mailed "$mailed" \
+      '{lane: $lane, verdict: $verdict, head: $head, pr: ($pr | tonumber? // null), attempt: $attempt,
+        receipt: $receipt, comment: $comment, mailed: $mailed}'
+  else
+    printf '%s\n' "$rpath"
+  fi
+  return "$rc"
+}
+
+# qa_verdict_show <lane> [<pr>] [<head>] — print how the lane's verdict reads against its head
+# now (qa_verdict_state's word; an object under --llm). rc 0 only for a fresh pass.
+qa_verdict_show() {
+  local lane="$1" state="" rc=0 got="" rhead=""
+  command -v jq >/dev/null 2>&1 || { echo "cckit qa: jq is required" >&2; return 3; }
+  _qa_verdict_resolve "$lane" "${2:-}" "${3:-}" || return $?
+  state="$(qa_verdict_state "$lane" "$_QA_V_HEAD")" || rc=1
+  got="$(sr_latest "$lane" qa 2>/dev/null)" || got=""
+  rhead="$(printf '%s' "$got" | jq -r '.head_sha // ""' 2>/dev/null)"
+  case "$state" in
+    none)  echo "[qa $lane] no verdict recorded — cckit qa verdict <pass|fail>" >&2 ;;
+    stale) echo "[qa $lane] the verdict was recorded against ${rhead:-no commit}; the lane is at $_QA_V_HEAD now — review it again" >&2 ;;
+    *)     echo "[qa $lane] $state against $_QA_V_HEAD" >&2 ;;
+  esac
+  if [ "${CCKIT_OUTPUT:-human}" = json ]; then
+    jq -cn --arg lane "$lane" --arg state "$state" --arg head "$_QA_V_HEAD" --arg rhead "$rhead" \
+      '{lane: $lane, state: $state, head: $head, verdict_head: (if $rhead == "" then null else $rhead end)}'
+  else
+    printf '%s\n' "$state"
+  fi
+  return "$rc"
+}
+
 # qa_cli <args> — the `cckit qa` verb.
 qa_cli() {
   # Every local gets a value: bin/cckit runs under `set -u`, and a bare `local x` is UNSET.
   local sub="${1:-}" lane="" limit="" pid="" d="" rc=0 pr="" route="" only=0 penv=""
+  local verdict="" head="" notes="" nfile="" to="" shots=""
   case "$sub" in
-    up|ready|open|stop) shift ;;
+    up|ready|open|stop|verdict) shift ;;
     ''|-h|--help|help)
       cat >&2 <<'EOF'
 cckit qa up    [--lane <n>] [--timeout <s>]   launch the declared stack command with this lane's
@@ -767,6 +1003,11 @@ cckit qa open  [--lane <n>] [--pr <n>] [--route </path>] [--port-env <NAME>] [--
                                               open the screen the change touched on a usable lane
 cckit qa stop  [--lane <n>]                   stop the lane's stack: supervisors first, then
                                               whatever still listens on the lane's ports
+cckit qa verdict <pass|fail> [--lane <n>] [--pr <n>] [--head <sha>] [--note <text>]
+                 [--notes-file <file>] [--shot <file>]… [--to <branch>]
+                                              record the verdict against the reviewed commit
+cckit qa verdict [--lane <n>] [--pr <n>] [--head <sha>]
+                                              read it back: pass · fail · stale · none
 
 The lane is the issue number in the current branch, or --lane. Exit 0 only when the stack is
 USABLE: every qa.readiness probe answered 2xx/3xx in one round (a redirect to sign-in is up).
@@ -781,9 +1022,17 @@ stop resolves who listens on each of the lane's ports (lsof, else ss) and stops 
 before the listeners, so nothing respawns. It reports only the processes that are actually gone.
 Exit 0 when the ports are free, including on a lane that was already down; exit 1 names the pid
 still listening.
+
+verdict writes a `qa` receipt (cckit receipt show <lane> qa) bound to the reviewed commit: --head,
+else the local tip of the lane's branch, else the PR's head. It upserts ONE comment on the lane's
+PR (a second verdict edits it) plus one per --shot; a screenshot is a path reference unless
+KIT_EVIDENCE_URL_BASE is set, because gh cannot upload an image. A fail needs notes and mails them
+to the builder's branch as a steer (--to names another branch); exit 1 when they reached nobody.
+With no pass|fail it prints how the verdict reads against the lane's head now and exits 0 only for
+a pass on that commit — a push since the verdict reads `stale`.
 EOF
       return 2 ;;
-    *) echo "cckit qa: unknown subcommand '$sub' — cckit qa <up|ready|open|stop>" >&2; return 2 ;;
+    *) echo "cckit qa: unknown subcommand '$sub' — cckit qa <up|ready|open|stop|verdict>" >&2; return 2 ;;
   esac
   while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -791,12 +1040,35 @@ EOF
       --lane=*)    lane="${1#*=}"; shift ;;
       --timeout)   limit="${2:-}"; shift; [ "$#" -gt 0 ] && shift ;;
       --timeout=*) limit="${1#*=}"; shift ;;
-      --pr|--route|--port-env|--print|--pr=*|--route=*|--port-env=*)
+      pass|fail)
+        [ "$sub" = verdict ] && [ -z "$verdict" ] || { echo "cckit qa $sub: unknown argument '$1'" >&2; return 2; }
+        verdict="$1"; shift ;;
+      --head|--note|--notes-file|--shot|--to|--head=*|--note=*|--notes-file=*|--shot=*|--to=*)
+        [ "$sub" = verdict ] || { echo "cckit qa $sub: '${1%%=*}' belongs to cckit qa verdict" >&2; return 2; }
+        case "$1" in
+          --head)         head="${2:-}"; shift; [ "$#" -gt 0 ] && shift ;;
+          --head=*)       head="${1#*=}"; shift ;;
+          --note)         notes="${2:-}"; shift; [ "$#" -gt 0 ] && shift ;;
+          --note=*)       notes="${1#*=}"; shift ;;
+          --notes-file)   nfile="${2:-}"; shift; [ "$#" -gt 0 ] && shift ;;
+          --notes-file=*) nfile="${1#*=}"; shift ;;
+          --to)           to="${2:-}"; shift; [ "$#" -gt 0 ] && shift ;;
+          --to=*)         to="${1#*=}"; shift ;;
+          --shot)         shots="$shots${2:-}
+"; shift; [ "$#" -gt 0 ] && shift ;;
+          --shot=*)       shots="$shots${1#*=}
+"; shift ;;
+        esac ;;
+      --pr|--pr=*)
+        case "$sub" in open|verdict) ;; *) echo "cckit qa $sub: '--pr' belongs to cckit qa open and verdict" >&2; return 2 ;; esac
+        case "$1" in
+          --pr)   pr="${2:-}"; shift; [ "$#" -gt 0 ] && shift ;;
+          --pr=*) pr="${1#*=}"; shift ;;
+        esac ;;
+      --route|--port-env|--print|--route=*|--port-env=*)
         [ "$sub" = open ] || { echo "cckit qa $sub: '${1%%=*}' belongs to cckit qa open" >&2; return 2; }
         case "$1" in
           --print)      only=1; shift ;;
-          --pr)         pr="${2:-}"; shift; [ "$#" -gt 0 ] && shift ;;
-          --pr=*)       pr="${1#*=}"; shift ;;
           --route)      route="${2:-}"; shift; [ "$#" -gt 0 ] && shift ;;
           --route=*)    route="${1#*=}"; shift ;;
           --port-env)   penv="${2:-}"; shift; [ "$#" -gt 0 ] && shift ;;
@@ -810,6 +1082,25 @@ EOF
     [ -z "$limit" ] || { echo "cckit qa stop: --timeout belongs to up and ready — the stop grace is QA_STOP_GRACE" >&2; return 2; }
     command -v jq >/dev/null 2>&1 || { echo "cckit qa: jq is required" >&2; return 3; }
     qa_stop "$lane"
+    return $?
+  fi
+  if [ "$sub" = verdict ]; then
+    [ -z "$limit" ] || { echo "cckit qa verdict: --timeout belongs to up and ready" >&2; return 2; }
+    case "$pr" in *[!0-9]*) echo "cckit qa verdict: --pr takes a pull request number, got '$pr'" >&2; return 2 ;; esac
+    if [ -z "$verdict" ]; then
+      if [ -n "$notes$nfile$to$shots" ]; then
+        echo "cckit qa verdict: say pass or fail to record one — notes, screenshots and --to belong to a recorded verdict" >&2
+        return 2
+      fi
+      qa_verdict_show "$lane" "$pr" "$head"
+      return $?
+    fi
+    if [ -n "$nfile" ]; then
+      [ -z "$notes" ] || { echo "cckit qa verdict: --note and --notes-file are two sources for one text — pass one" >&2; return 2; }
+      [ -f "$nfile" ] || { echo "cckit qa verdict: --notes-file '$nfile' is not a file" >&2; return 2; }
+      notes="$(cat "$nfile")"
+    fi
+    qa_verdict "$lane" "$verdict" "$pr" "$head" "$notes" "$to" "$shots"
     return $?
   fi
   if [ "$sub" = open ]; then
