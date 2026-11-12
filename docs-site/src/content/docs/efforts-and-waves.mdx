@@ -275,7 +275,9 @@ KIT_BASE_BRANCH=effort/42-auth cckit orchestrate 44 45
 
 Without it the sub's worktree is cut from the base branch and is missing the effort's earlier
 commits. Nothing fails; the agent works against older code. `orchestrate` prints the base it used
-and, when it came from the environment, a second line saying so. Push the effort branch first: the
+and, when it came from the environment, a second line saying so. Each agent pane is started with
+the same override, whether or not a tmux or Herdr server was already running, so the `cckit pr` the
+agent runs opens the sub's PR against the effort branch. Push the effort branch first: the
 base is fetched from origin. Details:
 [overriding the base branch](/config-and-permissions/#overriding-the-base-branch-for-one-command).
 

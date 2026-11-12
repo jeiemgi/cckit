@@ -44,6 +44,22 @@ The second line appears only when the two differ. An empty `KIT_BASE_BRANCH` cou
 | --- | --- |
 | `KIT_BASE_BRANCH` | The base in effect: the environment value when one is set, otherwise the config's. |
 | `KIT_BASE_BRANCH_CONFIG` | What the config says (`github.baseBranch` → `integrationBranch` → `flow` → `main`), whether or not it was overridden. |
+| `KIT_BASE_BRANCH_DEFAULTED` | The value cckit exported when it fell back to the config; empty when the caller overrode it. Internal: do not set it. |
+
+cckit exports the base it resolved, so a process it starts inherits `KIT_BASE_BRANCH`. That
+inherited value is not an override: a later `cckit` in another project compares it with
+`KIT_BASE_BRANCH_DEFAULTED`, finds them equal, and reads its own config. One limit follows: inside
+an environment cckit already exported into, an override that names that same exported value is read
+as the default.
+
+`orchestrate` hands an override to each agent it starts, so `cckit pr` inside the pane targets the
+same branch the worktree was cut from. On tmux the agent's command line becomes
+`env KIT_BASE_BRANCH='<branch>' <agent> …`; on Herdr the workspace and each tab are created with
+`--env KIT_BASE_BRANCH=<branch>`. A pane's environment comes from the tmux or Herdr server, not from
+the `orchestrate` process, so the variable alone would reach the pane only when `orchestrate`
+happened to start the server. `orchestrate` also starts a tmux server without `KIT_BASE_BRANCH` in
+its environment and removes one an earlier run left there, so panes opened later on other projects
+do not inherit it.
 
 Two things to know before using it:
 

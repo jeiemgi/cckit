@@ -113,7 +113,10 @@ sub's worktree from the effort branch instead of the base. `orchestrate` then pr
 `base '<branch>' comes from KIT_BASE_BRANCH in the environment (the config says '<base>')`. The
 branch must exist on origin (`wt_start` fetches it). Every verb that loads the config reads the same
 variable — `cckit start` cuts from it and `cckit pr` targets it — so set it per command, not with a
-shell-wide `export`.
+shell-wide `export`. `orchestrate` passes an override on to each agent pane (tmux: `env KIT_BASE_BRANCH=…`
+on the agent's command line; Herdr: `--env`), so `cckit pr` in the pane targets the branch the
+worktree was cut from. The base cckit resolved from a config is not an override in a child process:
+a `cckit` run in another project reads its own config.
 
 ## The agent loop (reference)
 

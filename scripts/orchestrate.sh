@@ -236,14 +236,14 @@ fi
 # The profile's argv on the tmux path. Herdr got it as an argv array above; tmux types a command
 # LINE into the pane's shell, so the quoting lives in or_tmux_agent_cmd beside the Herdr launcher —
 # both runtimes answer the same question and neither may drop the args the resolution line promised.
-AGENT_CMD="$(or_tmux_agent_cmd "$AGENT" "$AGENT_ARGS_NL")"
+AGENT_CMD="$(or_tmux_agent_cmd "$AGENT" "$AGENT_ARGS_NL" "$(or_base_override)")"
 
 tmux kill-session -t "$SESSION" 2>/dev/null || true
 first=1
 for entry in "${ENTRIES[@]}"; do
   wt="${entry%%|*}"; rest="${entry#*|}"; branch="${rest%%|*}"; num="${rest##*|}"
   if [ "$first" -eq 1 ]; then
-    tmux new-session -d -s "$SESSION" -n flows -c "$wt"
+    or_tmux_new_session "$SESSION" flows "$wt"
     pane="$(tmux display -p -t "$SESSION:flows" '#{pane_id}')"
     first=0
   else

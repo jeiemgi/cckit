@@ -20,7 +20,7 @@ base_branch_for() {
   printf '%s' "$json" > "$d/cckit.config.json"
   # env -u: an exported KIT_BASE_BRANCH is an override now (#352), so one inherited from the shell
   # that runs this file directly would answer for the config in every fallback case below.
-  env -u KIT_BASE_BRANCH KIT_CONFIG="$d/cckit.config.json" bash -c "source '$LIB/kit-config.sh'; load_kit_config >/dev/null 2>&1; printf '%s' \"\$KIT_BASE_BRANCH\""
+  env -u KIT_BASE_BRANCH -u KIT_BASE_BRANCH_DEFAULTED KIT_CONFIG="$d/cckit.config.json" bash -c "source '$LIB/kit-config.sh'; load_kit_config >/dev/null 2>&1; printf '%s' \"\$KIT_BASE_BRANCH\""
 }
 
 # baseBranch is canonical and wins over the alternate keys.
@@ -61,6 +61,29 @@ t "no override: both name the config value" \
 d2="$(mktemp -d "$tmp/twice.XXXXXX")"; printf '%s' '{"github":{"baseBranch":"develop"}}' > "$d2/cckit.config.json"
 t "override survives a second load" \
   "$(KIT_BASE_BRANCH=effort/9-x KIT_CONFIG="$d2/cckit.config.json" bash -c "source '$LIB/kit-config.sh'; load_kit_config; load_kit_config; printf '%s|%s' \"\$KIT_BASE_BRANCH\" \"\$KIT_BASE_BRANCH_CONFIG\"" 2>/dev/null)" "effort/9-x|develop"
+
+# cckit's OWN export is not an override. load_kit_config exports the base it resolved, so a process
+# cckit starts (an agent, a hook, a nested cckit) inherits it; loaded again in ANOTHER project, that
+# inherited value used to beat the second project's config — project A's `develop` became the base
+# of project B, whose config says `main`. The first load records what it defaulted to, and an
+# inherited value equal to the record is not the caller speaking.
+dA="$(mktemp -d "$tmp/projA.XXXXXX")"; printf '%s' '{"github":{"baseBranch":"develop"}}' > "$dA/cckit.config.json"
+dB="$(mktemp -d "$tmp/projB.XXXXXX")"; printf '%s' '{"github":{"baseBranch":"main"}}' > "$dB/cckit.config.json"
+# two_projects <env assignment or ''> <inner assignment or ''> — load A, then a child process loads B.
+two_projects() {
+  env -u KIT_BASE_BRANCH -u KIT_BASE_BRANCH_DEFAULTED ${1:+"$1"} KIT_CONFIG="$dA/cckit.config.json" bash -c "
+    source '$LIB/kit-config.sh'; load_kit_config
+    ${2:+$2 }KIT_CONFIG='$dB/cckit.config.json' bash -c \"source '$LIB/kit-config.sh'; load_kit_config; printf '%s|%s' \\\"\\\$KIT_BASE_BRANCH\\\" \\\"\\\$KIT_BASE_BRANCH_CONFIG\\\"\"" 2>/dev/null
+}
+t "project A's exported default does not override project B's config" \
+  "$(two_projects '' '')" "main|main"
+t "an override set inside the inherited environment still wins" \
+  "$(two_projects '' 'KIT_BASE_BRANCH=effort/9-x')" "effort/9-x|main"
+t "a caller override is inherited by a child load (cckit pr inside an orchestrated agent)" \
+  "$(two_projects 'KIT_BASE_BRANCH=effort/9-x' '')" "effort/9-x|main"
+# An override equal to the config value, then a second load in the same process: still that value.
+t "override equal to the config value survives a second load" \
+  "$(KIT_BASE_BRANCH=develop KIT_CONFIG="$dA/cckit.config.json" bash -c "source '$LIB/kit-config.sh'; load_kit_config; load_kit_config; printf '%s' \"\$KIT_BASE_BRANCH\"" 2>/dev/null)" "develop"
 
 # ── #244 · effort.wipLimit is exported as KIT_EFFORT_WIP_LIMIT ────────────────────────────────
 # The effort WIP gate reads this env var when EFFORT_WIP_LIMIT is unset. An UNSET key must export
