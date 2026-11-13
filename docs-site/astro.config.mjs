@@ -6,6 +6,7 @@ import starlightDocSearch from '@astrojs/starlight-docsearch';
 import react from '@astrojs/react';
 import sitemap from '@astrojs/sitemap';
 import rehypeExternalLinks from 'rehype-external-links';
+import marketingWords from './src/integrations/marketing-words.mjs';
 
 // .env files are NOT injected into process.env inside astro.config.mjs. Vercel DOES populate
 // process.env from the project's env vars at build, so prefer that; locally, fall back to parsing
@@ -75,9 +76,21 @@ export default defineConfig({
     }),
   },
   integrations: [
+    // Stops `astro build` when a Marketing page says worktree, branch or PR.
+    marketingWords(),
     react(),
     starlight({
       title: 'cckit',
+      // Two languages, one translated section. English is served at the root; Spanish under /es/.
+      // Only the 7 Marketing pages exist in Spanish (src/content/docs/es/marketing/). Starlight
+      // still builds an English fallback copy of every other page under /es/; those copies are
+      // kept out of the sitemap below and marked noindex by the route middleware, and the language
+      // picker is rendered on Marketing pages only (src/components/LanguageSelect.astro).
+      defaultLocale: 'root',
+      locales: {
+        root: { label: 'English', lang: 'en' },
+        es: { label: 'Español', lang: 'es' },
+      },
       // Algolia DocSearch (when ALGOLIA_* env vars are set); otherwise the default Pagefind search.
       plugins: HAS_DOCSEARCH
         ? [starlightDocSearch({ appId: ALGOLIA.appId, apiKey: ALGOLIA.apiKey, indexName: ALGOLIA.indexName })]
@@ -95,6 +108,10 @@ export default defineConfig({
         // Head override swaps the single global og.png for a per-page generated card
         // (/og/<id>.png). Its per-page og:image/twitter:image replace the global ones below.
         Head: './src/components/Head.astro',
+        // SiteTitle override appends the Software / Marketing switch to the top bar.
+        SiteTitle: './src/components/SiteTitle.astro',
+        // LanguageSelect override shows the picker on Marketing pages only.
+        LanguageSelect: './src/components/LanguageSelect.astro',
         ...(DEV ? { PageSidebar: './src/components/DevAnnotate.astro' } : {}),
       },
       description: 'Be the architect — cckit runs the mechanics. The full GitHub work lifecycle as a CLI that turns your Git into retrievable, efficient context, drivable by Claude Code and any agent.',
@@ -135,84 +152,63 @@ export default defineConfig({
       // The Designer owns the visual theme — this file is the single hook (elegant + sober,
       // never Claude/Anthropic colors). Placeholder until the Designer's spec lands.
       customCss: ['./src/styles/theme.css'],
-      // Split by subject with a clear separation of concerns:
-      //   Get started — orient + set up · Concepts — how it works · Guides — how to do things ·
-      //   Reference — look things up. Each group is one kind of content, not a stage.
+      // Per-track sidebars: this one array holds the entries of both tracks, and the route
+      // middleware keeps only the entries of the track a page belongs to (src/routeData.ts).
+      routeMiddleware: './src/routeData.ts',
+      // Software: 20 entries in 4 groups, grouped by the job the reader is doing. Every other
+      // Software page stays reachable by search and from the "All tutorials" / "All guides" pages.
       sidebar: [
-        { label: 'Get started', items: [
-          { label: 'The idea', slug: 'philosophy', badge: { text: 'Human-written', variant: 'tip' } },
+        { label: 'Start', items: [
           { label: 'Overview', slug: 'index' },
-          { label: 'How to read this guide', slug: 'how-to-read' },
           { label: 'Quickstart', slug: 'getting-started', badge: { text: 'Start here', variant: 'success' } },
-          { label: 'Install cckit', slug: 'install' },
-          { label: 'Install & update matrix', slug: 'install-matrix' },
-          { label: 'Update a project', slug: 'update' },
-          { label: 'Check your platform', slug: 'check-your-platform' },
-          { label: 'Initialize cckit', slug: 'initialize' },
-          { label: 'Set up memory', slug: 'memory', badge: { text: 'Optional', variant: 'note' } },
-          { label: 'Adopting cckit on a repo', slug: 'adoption' },
-          { label: 'Showcase', slug: 'showcase' },
+          { label: 'Install', slug: 'install' },
+          { label: 'Initialize', slug: 'initialize' },
         ]},
-        { label: 'Tutorials', items: [
-          { label: 'All tutorials', slug: 'tutorials' },
-          { label: 'Set up cckit in a repo', slug: 'tutorials/set-up-cckit-in-a-repo' },
-          { label: 'Add cckit to an existing repo', slug: 'tutorials/adopt-cckit-in-an-existing-repo' },
-          { label: 'Use cckit with Codex', slug: 'tutorials/use-cckit-with-codex' },
-          { label: 'Issue → merged PR', slug: 'tutorials/take-a-github-issue-to-a-merged-pr' },
-          { label: 'Break a feature into an effort', slug: 'tutorials/break-a-feature-into-an-effort' },
-          { label: 'Agent review before a merge', slug: 'tutorials/have-an-agent-review-before-a-merge' },
-          { label: 'Run a wave in parallel', slug: 'tutorials/run-issues-in-parallel-with-a-wave' },
-          { label: 'Run Claude Code unattended', slug: 'tutorials/run-claude-code-unattended' },
-          { label: 'Run one objective unattended', slug: 'tutorials/run-one-objective-unattended' },
-          { label: 'Drive Claude Code headless in CI', slug: 'tutorials/drive-claude-code-headless-in-ci' },
-          { label: 'Stop Claude committing secrets', slug: 'tutorials/stop-claude-committing-secrets' },
-          { label: 'Keep private data out of AI commits', slug: 'tutorials/keep-private-data-out-of-ai-commits' },
-          { label: 'Control what Claude Code can do', slug: 'tutorials/control-what-claude-code-can-do' },
-          { label: 'Give Claude Code persistent memory', slug: 'tutorials/give-claude-code-persistent-memory' },
-          { label: 'Give Claude Code a code graph', slug: 'tutorials/find-code-with-a-code-graph' },
-          { label: 'Summarize long files locally', slug: 'tutorials/summarize-long-files-with-a-local-model' },
-          { label: 'Add your own integration', slug: 'tutorials/add-your-own-integration' },
-          { label: 'Run checks with cckit hooks', slug: 'tutorials/run-checks-with-cckit-hooks' },
-          { label: 'Debug a web page with Claude Code', slug: 'tutorials/debug-a-web-page-with-claude-code' },
-          { label: 'Extend Claude Code with skills', slug: 'tutorials/extend-claude-code-with-skills' },
-        ]},
-        { label: 'Concepts', items: [
+        { label: 'Ship one issue', items: [
           { label: 'The GitHub cycle', slug: 'github-cycle' },
-          { label: 'Efforts, waves & worktrees', slug: 'efforts-and-waves' },
+          { label: 'Issue to merged PR', slug: 'tutorials/take-a-github-issue-to-a-merged-pr' },
+          { label: 'Review gates', slug: 'review-gates' },
           { label: 'Hooks', slug: 'hooks' },
-          { label: 'Adapters', slug: 'adapters' },
-          { label: 'Multi-session safety', slug: 'multi-session' },
+          { label: 'Security and secret guard', slug: 'security' },
         ]},
-        { label: 'Guides', items: [
-          { label: 'All guides', slug: 'guides' },
-          { label: 'Wave', slug: 'wave' },
-          { label: 'QA lane', slug: 'qa-lane' },
-          { label: 'Review pages', slug: 'review-pages' },
-          { label: 'Light tasks', slug: 'light-tasks' },
-          { label: 'Driving cckit from agents', slug: 'agents' },
-          { label: 'Integrations', slug: 'integrations' },
-          { label: 'Cookbook', slug: 'cookbook' },
-          { label: 'Browser debug', slug: 'debug' },
-        ]},
-        { label: 'Reference', items: [
-          { label: 'CLI reference', slug: 'cli-reference' },
-          { label: 'Documentation benchmark', slug: 'benchmark' },
-          { label: 'Benchmark results', slug: 'benchmark-results' },
-          { label: 'Skills cckit ships', slug: 'skills' },
-          { label: 'Rules cckit ships', slug: 'rules' },
-          { label: 'Tags directory', slug: 'tags' },
-          { label: 'Config & permissions', slug: 'config-and-permissions' },
+        { label: 'Ship many at once', items: [
+          { label: 'Efforts, waves and worktrees', slug: 'efforts-and-waves' },
+          { label: 'Break a feature into an effort', slug: 'tutorials/break-a-feature-into-an-effort' },
+          { label: 'Run a wave in parallel', slug: 'tutorials/run-issues-in-parallel-with-a-wave' },
+          { label: 'Run unattended', slug: 'tutorials/run-claude-code-unattended' },
           { label: 'Releasing', slug: 'releasing' },
-          { label: 'Security & secret guard', slug: 'security' },
-          { label: 'Codified review gates', slug: 'review-gates' },
-          { label: '"Built with cckit" badge', slug: 'badge' },
-          { label: 'Disclaimer & trademarks', slug: 'disclaimer' },
+        ]},
+        { label: 'Look it up', items: [
+          { label: 'CLI reference', slug: 'cli-reference' },
+          { label: 'Config and permissions', slug: 'config-and-permissions' },
+          { label: 'Skills cckit ships', slug: 'skills' },
+          { label: 'Driving cckit from agents', slug: 'agents' },
+          { label: 'All tutorials', slug: 'tutorials' },
+          { label: 'All guides', slug: 'guides' },
+        ]},
+        // Marketing: 7 pages for a reader who never opens a terminal. The middleware shows these
+        // as a flat list, without the group heading, on every page under /marketing/.
+        { label: 'Marketing', translations: { es: 'Marketing' }, items: [
+          { label: 'What cckit does for you', translations: { es: 'Qué hace cckit por ti' }, slug: 'marketing' },
+          { label: 'Get set up', translations: { es: 'Prepara todo' }, slug: 'marketing/get-set-up' },
+          { label: 'Your first piece', translations: { es: 'Tu primera pieza' }, slug: 'marketing/your-first-piece' },
+          { label: 'Set your brand voice', translations: { es: 'Define tu voz de marca' }, slug: 'marketing/brand-voice' },
+          { label: 'Plan and run a campaign', translations: { es: 'Planea y lleva una campaña' }, slug: 'marketing/campaigns' },
+          { label: 'Who does what', translations: { es: 'Quién hace qué' }, slug: 'marketing/who-does-what' },
+          { label: 'Words you will hear', translations: { es: 'Palabras que vas a escuchar' }, slug: 'marketing/words-you-will-hear' },
         ]},
       ],
     }),
     // Starlight uses this sitemap integration instead of its default when one is present. Keep the
     // /social/ export templates (IG feed + story cards) out of the sitemap — they're internal
-    // manual-post assets, not pages we want crawled or indexed.
-    sitemap({ filter: (page) => !page.includes('/social/') }),
+    // manual-post assets, not pages we want crawled or indexed. Under /es/ only the Marketing pages
+    // are Spanish; every other /es/ URL is an English fallback copy and stays out too.
+    sitemap({
+      filter: (page) => {
+        const path = new URL(page).pathname;
+        if (path.includes('/social/')) return false;
+        return !path.startsWith('/es/') || path.startsWith('/es/marketing/');
+      },
+    }),
   ],
 });

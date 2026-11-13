@@ -120,6 +120,20 @@ Hold the order. Title, then the one-liner, then the picture, then the words, the
   the basics because they were assumed away.
 - Mark the entry point. If a section is "start here for total beginners", say so in the heading.
 
+## Marketing pages
+
+Pages under `docs-site/src/content/docs/marketing/` are for a reader who never opens a terminal.
+They follow every rule above, and four more:
+
+- **Say draft, review and approved.** The words "worktree", "branch" and "PR" are not allowed
+  outside `words-you-will-hear.mdx`; `astro build` fails on them.
+- **Show what to say to Claude, not what to type in a terminal.** A command appears only in the
+  section written for the technical person who does the setup.
+- **Write the Spanish twin in the same change**, under `es/marketing/` with the same file name.
+  Write it in Spanish for that reader; do not translate line by line. Product, command and button
+  names stay in English.
+- **A link into a Software page from a Spanish page says "(en inglés)".**
+
 ## Before you finish — checklist
 
 - [ ] Title is plain; the one-line description says what the page delivers.

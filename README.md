@@ -568,6 +568,15 @@ prompt** you can paste straight into Claude Code — start exactly where you are
 [cookbook](https://cckit.dev/cookbook/) holds lifecycle recipes, and the
 [CLI reference](https://cckit.dev/cli-reference/) covers every verb.
 
+The site has two tracks, switched from the top bar. **Software** is for developers: its sidebar
+lists 20 pages in four groups (Start, Ship one issue, Ship many at once, Look it up), and every
+other page is linked from [All guides](https://cckit.dev/guides/) or
+[All tutorials](https://cckit.dev/tutorials/). **[Marketing](https://cckit.dev/marketing/)** is
+seven pages for a marketing team that works by talking to Claude and never opens a terminal; the
+same seven pages are in Spanish at [cckit.dev/es/marketing](https://cckit.dev/es/marketing/).
+`pnpm build` in `docs-site/` fails when a Marketing page says "worktree", "branch" or "PR" outside
+its glossary page.
+
 ## Project layout
 
 ```

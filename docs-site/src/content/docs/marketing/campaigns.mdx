@@ -1,0 +1,125 @@
+---
+title: Plan and run a campaign
+description: Turn one marketing goal into a campaign plan, break it into pieces of work, and take every piece to approved.
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+A campaign is one goal and several pieces that serve it: a landing page, three emails, five social
+posts. cckit keeps them together under one plan, so you can see what is done and what is left.
+
+**Before you start:** you have taken [one piece to approved](/marketing/your-first-piece/), and
+your [brand voice](/marketing/brand-voice/) is set.
+
+<Steps>
+
+1. **State the goal.**
+
+   <div class="cckit-prompt">
+
+   ```text title="Say this to Claude"
+   Plan a campaign. The goal is 200 sign-ups for our spring workshop by April 15. The audience is small-business owners in our newsletter and on Instagram.
+   ```
+
+   </div>
+
+   One goal, one audience and one date are enough to start. Claude asks for what is missing.
+
+2. **Read the plan.** Claude proposes the campaign: the message, the pieces, the order and what
+   each piece is for. The plan opens as a page in your browser where you can comment and answer.
+   When no browser is available, it is shown in the conversation.
+
+3. **Change it until it is right.** Remove pieces you will not make. Add the ones it missed. Nothing
+   has been created yet.
+
+4. **Approve the plan.**
+
+   <div class="cckit-prompt">
+
+   ```text title="Say this to Claude"
+   The plan is good. Create the campaign and its pieces.
+   ```
+
+   </div>
+
+   Claude records the campaign and one piece of work for each piece in the plan. Nothing is
+   recorded before you say yes. How the pieces are recorded and reviewed depends on where your
+   project keeps its task list: see [Two ways a campaign is tracked](#two-ways-a-campaign-is-tracked).
+
+5. **Work through the pieces.** You write each piece the way you wrote
+   [your first one](/marketing/your-first-piece/): outline, draft, edits.
+
+   <div class="cckit-prompt">
+
+   ```text title="Say this to Claude"
+   What is next in the campaign? Let's write it.
+   ```
+
+   </div>
+
+6. **Ask for a review.** With the task list in the project, ask when each piece is ready, as you
+   did for your first piece. With the task list on GitHub, ask once, when every piece is written:
+
+   <div class="cckit-prompt">
+
+   ```text title="Say this to Claude"
+   The campaign is ready. Ask for the review.
+   ```
+
+   </div>
+
+   That one review covers all the pieces, so the approver reads them side by side and can check
+   that they tell one story.
+
+7. **Approved.** With the task list in the project, finish each piece when its review is approved.
+   With the task list on GitHub, once the campaign review says approved:
+
+   <div class="cckit-prompt">
+
+   ```text title="Say this to Claude"
+   The campaign review is approved. Finish the campaign.
+   ```
+
+   </div>
+
+   Claude makes the approved pieces part of the shared version and marks the campaign and every
+   piece under it done.
+
+</Steps>
+
+## Two ways a campaign is tracked
+
+The marketing setup keeps the task list in the project. The technical person can switch it to
+GitHub. To find out which one yours uses, ask Claude: "Does this project keep its task list in the
+project or on GitHub?"
+
+| | Task list in the project | Task list on GitHub |
+| --- | --- | --- |
+| **When you approve the plan** | The plan and the list of its pieces go into one review. Once that review is approved, every piece is on the shared list as not started. | The campaign appears on GitHub with each piece under it. |
+| **How the pieces are reviewed** | One at a time. Each piece has its own draft and its own review. | Together. The pieces share one draft and get one review at the end. |
+| **How many at once** | No limit. | Two campaigns in progress is the default limit. The technical person can change it. |
+
+## See where a campaign stands
+
+<div class="cckit-prompt">
+
+```text title="Say this to Claude"
+Where are we on the campaign? What is done, what is in draft and what is waiting for someone?
+```
+
+</div>
+
+## Good to know
+
+- **Finish a campaign only when every piece is written.** With the task list on GitHub, finishing
+  the campaign marks every piece under it done, including one nobody wrote. With the task list in
+  the project, each piece is finished on its own, so an unwritten piece stays on the list.
+- **Research before you plan.** Ask Claude to look at what competitors are saying, or to check a
+  claim, before the plan is written. It reports its sources.
+
+<Aside type="note">
+Sending the emails and scheduling the posts are outside cckit. The campaign ends when its pieces
+are approved.
+</Aside>
+
+Next: [Who does what](/marketing/who-does-what/)

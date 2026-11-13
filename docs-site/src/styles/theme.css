@@ -38,6 +38,11 @@
 	--sl-color-bg-inline-code: var(--sl-color-gray-6);
 	--sl-color-bg-accent: var(--sl-color-accent);
 
+	/* One colour per docs track, constant on every page (the dots of the top-bar switch, the
+	   two doors on the home page). Each equals that track's link colour. */
+	--cckit-track-software: #7ecdda;
+	--cckit-track-marketing: #f08a9b;
+
 	/* Hairlines — tighter and quieter than the default black-on-black */
 	--sl-color-hairline-light: #2f383c;
 	--sl-color-hairline: #232b2f;
@@ -89,6 +94,9 @@
 	--sl-color-bg-inline-code: var(--sl-color-gray-6);
 	--sl-color-bg-accent: var(--sl-color-accent);
 
+	--cckit-track-software: #0a5666;
+	--cckit-track-marketing: #9a1b36;
+
 	/* Hairlines */
 	--sl-color-hairline-light: #eef2f3;
 	--sl-color-hairline: #dde5e7;
@@ -99,6 +107,31 @@
 	--sl-shadow-sm: 0 1px 1px hsla(198, 24%, 24%, 0.07), 0 2px 1px hsla(198, 24%, 24%, 0.05);
 	--sl-shadow-md: 0 2px 2px hsla(198, 24%, 24%, 0.06), 0 4px 6px hsla(198, 24%, 24%, 0.08);
 	--sl-shadow-lg: 0 4px 8px hsla(198, 24%, 24%, 0.06), 0 12px 24px hsla(198, 24%, 24%, 0.1);
+}
+
+/* ── Marketing track — crimson accent ─────────────────────────────────── */
+/* Pages under /marketing/ carry <meta name="cckit-track" content="marketing"> (src/routeData.ts).
+   Only the accent changes between the two tracks: neutrals, type and layout are shared. The red is
+   a crimson at hue ~350°, on the blue side of red, so it stays clear of the rust-orange this theme
+   excludes. Measured WCAG 2.x contrast ratios (AA needs 4.5:1 for text):
+     dark   link #f08a9b on page #0e1316 7.85 · on nav #0b1013 8.03 · on inline code #1a2125 6.84
+            page ink #0e1316 on accent #e25a73 5.29 · accent #e25a73 on accent-low #3d101b 4.61
+     light  link #9a1b36 on page #fbfdfd 7.96 · on nav #f4f8f8 7.60 · on inline code #eef2f3 7.21
+            paper #fbfdfd on accent #b3203f 6.44 · accent #b3203f on accent-low #fbe1e6 5.33
+   Two alternates that pass the same checks, should the owner prefer one (low/accent/high/link):
+     signal red, hue 0°   dark #3b1212 #e65c5c #f6b5b5 #f28c8c · light #fbe2e2 #b42424 #5e1010 #9c1c1c
+     ruby, hue 340°       dark #3a1022 #de5a8c #f3b2cb #ee88ae · light #fbe1eb #ac1f57 #590f2d #941a4a */
+:root:has(meta[name='cckit-track'][content='marketing']) {
+	--sl-color-accent-low: #3d101b;
+	--sl-color-accent: #e25a73;
+	--sl-color-accent-high: #f5b3bf;
+	--sl-color-text-accent: #f08a9b;
+}
+:root[data-theme='light']:has(meta[name='cckit-track'][content='marketing']) {
+	--sl-color-accent-low: #fbe1e6;
+	--sl-color-accent: #b3203f;
+	--sl-color-accent-high: #5c0f20;
+	--sl-color-text-accent: #9a1b36;
 }
 
 /* ── Restrained polish ────────────────────────────────────────────────── */
@@ -181,8 +214,7 @@ body {
 	border-radius: 999px;
 }
 
-/* Action links below the banner: one centered row, the accent lives on the
-   primary "Get started" button only (≤10% accent budget). */
+/* Secondary links below the two doors: one centered row. */
 .hero-actions {
 	display: flex;
 	flex-wrap: wrap;
@@ -192,20 +224,67 @@ body {
 	margin-top: 1.75rem;
 }
 
-/* Disabled "coming soon" pill — the future cckit.dev domain isn't live yet, so it
-   reads as an inert, muted chip beside the real action buttons (no href, no accent). */
-.coming-soon {
-	display: inline-flex;
-	align-items: center;
-	gap: 0.4em;
-	padding: 0.4rem 0.85rem;
+/* The two doors on the home page: one entry per docs track. Each door is one link; its top edge
+   and its label take that track's colour (blue for Software, red for Marketing) on every theme. */
+.doors {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+	gap: 1rem;
+	margin-top: 2rem;
+}
+.sl-markdown-content .door {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	padding: 1.25rem 1.4rem 1.4rem;
+	color: var(--sl-color-text);
+	text-decoration: none;
+	background: var(--sl-color-bg-sidebar);
+	border: 1px solid var(--sl-color-hairline-light);
+	border-top: 3px solid var(--door);
+	border-radius: 0.75rem;
+	box-shadow: var(--sl-shadow-sm);
+	transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.door[data-track='software'] { --door: var(--cckit-track-software); }
+.door[data-track='marketing'] { --door: var(--cckit-track-marketing); }
+.sl-markdown-content .door:hover {
+	border-color: var(--door);
+	box-shadow: var(--sl-shadow-md);
+}
+.door:focus-visible {
+	outline: 2px solid var(--door);
+	outline-offset: 3px;
+}
+.door-kicker {
+	font-size: var(--sl-text-sm);
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--door);
+}
+.door-title {
+	font-size: var(--sl-text-h4);
+	font-weight: 600;
+	line-height: 1.25;
+	color: var(--sl-color-white);
+}
+.door-text { line-height: 1.6; }
+.door-go {
+	margin-top: auto;
+	padding-top: 0.5rem;
+	font-weight: 600;
+	color: var(--door);
+}
+.door-go::after { content: ' \2192'; }
+/* The line under the doors that points Spanish readers at /es/marketing/. */
+.sl-markdown-content .doors-note {
+	margin-top: 0.75rem;
+	text-align: end;
 	font-size: var(--sl-text-sm);
 	color: var(--sl-color-gray-3);
-	border: 1px dashed var(--sl-color-hairline);
-	border-radius: 999px;
-	cursor: not-allowed;
-	user-select: none;
 }
+
 
 /* Header version badge — a quiet, monospace pill before the social icons. Tells readers which
    cckit version these docs describe; links to the releases list for older versions. */
@@ -551,7 +630,7 @@ h1 .cckit-tag, h2 .cckit-tag, h3 .cckit-tag { font-size: 0.65em; }
 
 /* ── Sidebar group icons ──────────────────────────────────────────────── */
 /* Starlight sidebar entries don't take an icon, so we paint one before each top-level GROUP label
-   (Get started / Tutorials / Concepts / Guides / Reference) via a CSS mask — a line icon tinted with
+   (Start / Ship one issue / Ship many at once / Look it up) via a CSS mask — a line icon tinted with
    the accent. Matched by group order (the sidebar config order is stable); keep these in sync when a
    group is added or reordered, or the last group renders as an empty square. */
 .top-level > li > details > summary .group-label { display: flex; align-items: center; }
@@ -565,23 +644,19 @@ h1 .cckit-tag, h2 .cckit-tag, h3 .cckit-tag { font-size: 0.65em; }
 	-webkit-mask: var(--cckit-nav-icon) center / contain no-repeat;
 	mask: var(--cckit-nav-icon) center / contain no-repeat;
 }
-/* 1 · Get started — rocket */
+/* 1 · Start — rocket */
 .top-level > li:nth-child(1) > details > summary .group-label {
 	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z'/%3E%3Cpath d='M12 15l-3-3a22 22 0 0 1 8-10c3 0 5 2 5 5a22 22 0 0 1-10 8z'/%3E%3Cpath d='M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0'/%3E%3Cpath d='M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5'/%3E%3C/svg%3E");
 }
-/* 2 · Tutorials — graduation cap */
+/* 2 · Ship one issue — circle with a dot (one open issue) */
 .top-level > li:nth-child(2) > details > summary .group-label {
-	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z'/%3E%3Cpath d='M22 10v6'/%3E%3Cpath d='M6 12.5V16a6 3 0 0 0 12 0v-3.5'/%3E%3C/svg%3E");
+	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Ccircle cx='12' cy='12' r='2'/%3E%3C/svg%3E");
 }
-/* 3 · Concepts — layers */
+/* 3 · Ship many at once — layers */
 .top-level > li:nth-child(3) > details > summary .group-label {
 	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 2 2 7l10 5 10-5-10-5z'/%3E%3Cpath d='M2 17l10 5 10-5'/%3E%3Cpath d='M2 12l10 5 10-5'/%3E%3C/svg%3E");
 }
-/* 4 · Guides — open book */
+/* 4 · Look it up — list */
 .top-level > li:nth-child(4) > details > summary .group-label {
-	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 7v14'/%3E%3Cpath d='M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z'/%3E%3C/svg%3E");
-}
-/* 5 · Reference — list */
-.top-level > li:nth-child(5) > details > summary .group-label {
 	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 6h13'/%3E%3Cpath d='M8 12h13'/%3E%3Cpath d='M8 18h13'/%3E%3Cpath d='M3 6h.01'/%3E%3Cpath d='M3 12h.01'/%3E%3Cpath d='M3 18h.01'/%3E%3C/svg%3E");
 }

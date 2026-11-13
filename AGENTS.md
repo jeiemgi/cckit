@@ -199,6 +199,25 @@ Validation refuses an undeclared profile, a missing `kind`, an unknown stage, or
 `agents.default` **before** a worktree or pane exists. See
 [Agent profiles](https://cckit.dev/config-and-permissions/#agent-profiles).
 
+## Editing the docs site
+
+`docs-site/` (Astro + Starlight) has two tracks. A page under `src/content/docs/marketing/` is
+Marketing; every other page is Software. The track sets the sidebar, the accent colour and the
+current entry of the top-bar switch (`docs-site/src/lib/tracks.ts`, `docs-site/src/routeData.ts`).
+
+- **The sidebar is curated.** `sidebar` in `docs-site/astro.config.mjs` lists 20 Software pages in
+  four groups and the 7 Marketing pages. A new Software page is not added to it by default: link it
+  from `guides.mdx` or `tutorials/index.mdx`.
+- **A Marketing page has a Spanish twin** with the same file name under
+  `src/content/docs/es/marketing/`. Change both in one commit. Links from a Spanish page into a
+  Software page say the target is in English.
+- **Marketing pages use plain words.** `astro build` fails when a page under `marketing/` or
+  `es/marketing/` says "worktree", "branch" or "PR"; `words-you-will-hear.mdx` is the one
+  exemption (`docs-site/src/integrations/marketing-words.mjs`, tested by
+  `scripts/docs-marketing-words-test.sh`).
+- **No page URL changes without a redirect** in `redirects` in `docs-site/astro.config.mjs`, and
+  the `expect` paths in `benchmarks/*.jsonl` follow a moved file in the same commit.
+
 ## Paste-ready agent prompt
 
 Drop this verbatim into your agent's system prompt (or the first message of a session) to make it

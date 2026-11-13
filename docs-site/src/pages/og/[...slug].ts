@@ -1,5 +1,6 @@
 import { getCollection } from 'astro:content';
 import { OGImageRoute } from 'astro-og-canvas';
+import { trackOf } from '../../lib/tracks';
 
 // One generated 1200×630 social card per docs page. The Head override points each page's og:image /
 // twitter:image at /og/<id>.png. Tutorials fold their eyebrow (Tutorial · <tag> · <difficulty> ·
@@ -23,7 +24,8 @@ export const { getStaticPaths, GET } = await OGImageRoute({
         [11, 14, 18],
         [14, 22, 28],
       ],
-      border: { color: [42, 179, 166], width: 10, side: 'inline-start' },
+      // The card's edge takes the page's track colour: crimson for Marketing, cyan for Software.
+      border: { color: trackOf(_id) === 'marketing' ? [226, 90, 115] : [42, 179, 166], width: 10, side: 'inline-start' },
       padding: 60,
       font: {
         title: { color: [240, 246, 246], size: 62, weight: 'Bold', lineHeight: 1.1 },

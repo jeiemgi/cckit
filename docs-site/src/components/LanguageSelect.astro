@@ -1,0 +1,10 @@
+---
+// LanguageSelect override — the language picker shows on Marketing pages only: they are the pages
+// that exist in Spanish. On a Software page the picker would lead to an English fallback copy.
+import Default from '@astrojs/starlight/components/LanguageSelect.astro';
+import { trackOf } from '../lib/tracks';
+
+const show = trackOf(Astro.url.pathname) === 'marketing';
+---
+
+{show && <Default><slot /></Default>}

@@ -1,0 +1,100 @@
+---
+// The top-bar switch between the two tracks of the docs: Software and Marketing. Two plain links
+// inside a labelled <nav>, so it works with the keyboard (Tab, Enter) and without JavaScript; the
+// entry of the track the current page belongs to carries aria-current. The track comes from the
+// page's path (src/lib/tracks.ts).
+import { trackOf } from '../lib/tracks';
+
+// The home page is the door to both tracks, so neither entry is current there.
+const current = Astro.url.pathname === '/' ? undefined : trackOf(Astro.url.pathname);
+
+// On a Spanish page the Marketing entry stays in Spanish, and the Software entry says that its
+// target is in English: Software pages are not translated.
+const es = Astro.locals.starlightRoute.locale === 'es';
+const tracks = [
+  {
+    id: 'software',
+    label: 'Software',
+    href: '/getting-started/',
+    name: es ? 'Software (en inglés)' : undefined,
+    hreflang: es ? 'en' : undefined,
+  },
+  { id: 'marketing', label: 'Marketing', href: es ? '/es/marketing/' : '/marketing/' },
+] as const;
+---
+
+<nav class="track-switch print:hidden" aria-label={es ? 'Sección de la documentación' : 'Documentation track'}>
+  {
+    tracks.map((t) => (
+      <a
+        href={t.href}
+        data-track={t.id}
+        aria-current={t.id === current ? 'true' : undefined}
+        aria-label={'name' in t ? t.name : undefined}
+        title={'name' in t ? t.name : undefined}
+        hreflang={'hreflang' in t ? t.hreflang : undefined}
+      >
+        <span class="dot" aria-hidden="true" />
+        {t.label}
+      </a>
+    ))
+  }
+</nav>
+
+<style>
+  .track-switch {
+    display: flex;
+    flex: none;
+    gap: 0.125rem;
+    padding: 0.125rem;
+    margin-inline-start: 0.75rem;
+    border: 1px solid var(--sl-color-hairline-light);
+    border-radius: 999px;
+    background: var(--sl-color-bg);
+  }
+  a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+    padding: 0.2rem 0.65rem;
+    border-radius: 999px;
+    font-size: var(--sl-text-sm);
+    font-weight: 500;
+    line-height: 1.5;
+    white-space: nowrap;
+    text-decoration: none;
+    color: var(--sl-color-gray-2);
+  }
+  a:hover {
+    color: var(--sl-color-white);
+  }
+  a[aria-current] {
+    color: var(--sl-color-white);
+    background: var(--sl-color-gray-6);
+    box-shadow: inset 0 0 0 1px var(--sl-color-gray-5);
+  }
+  a:focus-visible {
+    outline: 2px solid var(--sl-color-text-accent);
+    outline-offset: 2px;
+  }
+  /* Each entry carries its own track colour, on every page: blue for Software, red for Marketing. */
+  .dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    flex: none;
+  }
+  a[data-track='software'] .dot { background: var(--cckit-track-software); }
+  a[data-track='marketing'] .dot { background: var(--cckit-track-marketing); }
+
+  /* Narrow screens: the title, the switch, search and the menu button share one row. */
+  @media (max-width: 30rem) {
+    .track-switch { margin-inline-start: 0.5rem; }
+    a { padding: 0.15rem 0.45rem; font-size: var(--sl-text-xs); }
+    .dot { display: none; }
+  }
+  @media (max-width: 22rem) {
+    .track-switch { margin-inline-start: 0.35rem; }
+    a { padding: 0.15rem 0.3rem; }
+  }
+</style>
