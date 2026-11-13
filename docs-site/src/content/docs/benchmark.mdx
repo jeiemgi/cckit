@@ -99,6 +99,12 @@ The repository scores its own docs site. `benchmarks/` holds the questions over
   reads as `NONE`. An abstain record whose latency equals `BENCH_TIMEOUT_SECS` passed on a timeout,
   not on an answer.
 
+- **A quality score is one judge call.** The judge is a model and the same answer can be scored
+  differently on a second call: `qual-08` was recorded at 0.1 in the run at `4f885c2`, three more
+  judge calls on that saved answer each returned 0.8, and a later run of the claim scored 1.0. Read
+  one claim's score with `--answers` before treating it as a docs regression. `--answers` needs a
+  directory; without one the runner exits 2.
+
 Recorded runs of the retrieval, adversarial and abstain tiers are in `benchmarks/runs/`, one JSON
 file per run. A quality run is not recorded there yet.
 

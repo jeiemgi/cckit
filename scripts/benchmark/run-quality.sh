@@ -34,8 +34,10 @@ while [ "$#" -gt 0 ]; do
     --set=*)      ONE_SET="${1#*=}"; shift ;;
     --dir)        BENCH_DIR="$2"; export BENCH_DIR; shift 2 ;;
     --dir=*)      BENCH_DIR="${1#*=}"; export BENCH_DIR; shift ;;
-    --answers)    ANSWERS_DIR="${2:-}"; shift 2 ;;
-    --answers=*)  ANSWERS_DIR="${1#*=}"; shift ;;
+    --answers)    [ "$#" -ge 2 ] || { echo "run-quality.sh: --answers needs a directory" >&2; exit 2; }
+                  ANSWERS_DIR="$2"; shift 2 ;;
+    --answers=*)  ANSWERS_DIR="${1#*=}"; shift
+                  [ -n "$ANSWERS_DIR" ] || { echo "run-quality.sh: --answers needs a directory" >&2; exit 2; } ;;
     -h|--help)    sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *)            echo "run-quality.sh: unknown arg '$1'" >&2; exit 2 ;;
   esac
@@ -60,6 +62,11 @@ fi
 
 [ "${#SETS[@]}" -ge 1 ] || { echo "run-quality.sh: no quality sets found in $DIR" >&2; exit 2; }
 
+if [ -n "$ANSWERS_DIR" ] && [ "$DRY" -eq 0 ]; then
+  mkdir -p "$ANSWERS_DIR" 2>/dev/null \
+    || { echo "run-quality.sh: cannot create the --answers directory: $ANSWERS_DIR" >&2; exit 2; }
+fi
+
 N=0; SUM="0"; FAILN=0
 RESULTS_JSON="[]"
 
@@ -80,7 +87,10 @@ for file in "${SETS[@]}"; do
 
     answer="$(bench_answer "$claim" "$KDIR")"
     if [ -n "$ANSWERS_DIR" ]; then
-      mkdir -p "$ANSWERS_DIR" && printf '%s\n' "$answer" > "$ANSWERS_DIR/$id.txt"
+      # A reply left by an earlier run into the same directory is not this run's: drop it first, so
+      # a claim that reaches no judge now is not read next to a stale <id>.judge.txt.
+      rm -f "$ANSWERS_DIR/$id.judge.txt"
+      printf '%s\n' "$answer" > "$ANSWERS_DIR/$id.txt"
     fi
     # No answer (backend failed or timed out) covers no point. Do not spend a judge call on it.
     if [ -n "$answer" ]; then

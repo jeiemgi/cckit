@@ -135,6 +135,17 @@ STUBEOF
 q_mean="$(PATH="$QSTUB:$PATH" BENCH_BACKEND=claude bash "$HERE/run-quality.sh" --json 2>/dev/null | jq -r '.mean == 0 and .count == 1')"
 t "quality: an empty answer scores 0" "$q_mean" "true"
 
+# --answers with no directory is refused. It used to loop forever: `shift 2` with one argument left
+# shifts nothing, so the parser saw --answers again. The watchdog turns a regression into a failure.
+perl -e 'alarm 20; exec @ARGV' bash "$HERE/run-quality.sh" --dry --answers >/dev/null 2>&1
+t "quality: --answers without a directory exits 2" "$?" "2"
+bash "$HERE/run-quality.sh" --dry --answers= >/dev/null 2>&1
+t "quality: an empty --answers= exits 2" "$?" "2"
+# The empty-answer run above wrote into no directory; with one, a judge reply left by an earlier run
+# is removed, because this run's answer never reached the judge.
+PATH="$QSTUB:$PATH" BENCH_BACKEND=claude bash "$HERE/run-quality.sh" --json --answers "$FIX/answers" >/dev/null 2>&1
+[ ! -e "$FIX/answers/q1.judge.txt" ]; t "quality: a stale judge reply is removed" "$?" "0"
+
 # ---- 13. cckit's own sets point at pages that exist --------------------------
 # benchmarks/ scores cckit's own docs. A renamed or deleted page turns its questions into
 # guaranteed failures that read as a retrieval regression, so the paths are checked offline here.
