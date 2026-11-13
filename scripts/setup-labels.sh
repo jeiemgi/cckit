@@ -13,6 +13,9 @@ source "$(dirname "$0")/lib/effort.sh" 2>/dev/null || true   # for EFFORT_FLOWS 
 source "$(dirname "$0")/lib/kinds.sh" 2>/dev/null || true    # for KIT_KINDS (the kind:* vocabulary)
 
 ensure_label() { # name color description
+  # KIT_LABELS_LIST=1: print `name<TAB>color<TAB>description` and call nothing — `cckit init` reads
+  # this list to create only the labels a repository lacks (#456).
+  if [ "${KIT_LABELS_LIST:-0}" = "1" ]; then printf '%s\t%s\t%s\n' "$1" "$2" "$3"; return 0; fi
   gh label create "$1" --repo "$KIT_REPO" --color "$2" --description "$3" --force >/dev/null 2>&1 \
     && echo "  ✓ $1" || echo "  • $1 (exists)"
 }
