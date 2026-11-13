@@ -121,7 +121,54 @@ t "llm: no efforts is [] not null" "$(run_status_llm | jq -c '.next_efforts')" "
 t "llm: unreadable efforts is null" "$(GH_EFFORTS_FAIL=1 run_status_llm | jq -c '.next_efforts')" "null"
 t "llm: the pre-existing keys are all still there" \
   "$(printf '%s' "$jse" | jq -r 'keys | join(",")')" \
-  "ai_review_expected,cleanup,deps,instruction_budget,local_undone,next_efforts,prs,prs_read,worktrees"
+  "ai_review_expected,cleanup,deps,instruction_budget,light_tasks,local_undone,next_efforts,prs,prs_read,worktrees"
+
+# ── light tasks (#487) ──────────────────────────────────────────────────────────────────────────
+# A project with no light task: no section, and `light_tasks` is null.
+no "no light task: no section" "$(run_status "$tmp/empty.json")" "## Light tasks"
+t  "no light task: llm is null" "$(run_status_llm | jq -c '.light_tasks')" "null"
+
+# Three tasks waiting for review, two not started, one only in this checkout. The states come from
+# git alone: a `light/<id>-…` branch whose copy says done is `review`; a file on the base branch is
+# `todo`; an untracked file is `draft`.
+lt="$tmp/light"; mkdir -p "$lt/tasks"; ( cd "$lt" && git init -q && git symbolic-ref HEAD refs/heads/main )
+printf '{"kitVersion":"9.9.9","project":{"name":"lt"},"github":{"repo":"octo/light","owner":"octo","baseBranch":"main"},"tasks":{"default":"light"}}' > "$lt/cckit.config.json"
+task_file() { printf 'id: %s\ntitle: %s\nstatus: %s\npriority: p2\nkind: post\ncreated: 2026-11-13\n' "$1" "$2" "$3" > "$lt/tasks/$1.md"; }
+for i in ta01 ta02 ta03 tb01 tb02; do task_file "$i" "Piece $i" todo; done
+( cd "$lt" && git add -A && git -c user.name=t -c user.email=t@t commit -q -m base
+  for i in ta01 ta02 ta03; do
+    git checkout -q -b "light/$i-piece" main
+    sed 's/^status: todo/status: done/' "tasks/$i.md" > t.tmp && mv t.tmp "tasks/$i.md"
+    git -c user.name=t -c user.email=t@t commit -q -am "finish $i"
+  done
+  git checkout -q main )
+task_file tc01 "Local only" todo
+: > "$tmp/gh.log"
+cat > "$stub/gh-logged" <<SH
+#!/usr/bin/env bash
+printf '%s\\n' "\$*" >> "$tmp/gh.log"
+exec "$stub/gh" "\$@"
+SH
+chmod +x "$stub/gh-logged"; mkdir -p "$tmp/logbin"; ln -s "$stub/gh-logged" "$tmp/logbin/gh"
+lt_status() { ( cd "$lt" && KIT_CONFIG="$lt/cckit.config.json" PATH="$tmp/logbin:$PATH" GH_ISSUES="$tmp/empty.json" bash "$ROOT/scripts/status.sh" "$@" 2>&1 ); }
+out_lt="$(lt_status)"
+has "light tasks: the section is there" "$out_lt" "## Light tasks"
+has "light tasks: counts by state" "$out_lt" "review: 3   doing: 0   todo: 2   draft: 1   shared: 0   done: 0"
+has "light tasks: a review row names its branch" "$out_lt" '| `ta01` | **review** | Piece ta01 | waiting for review: its pull request is open from light/ta01-piece |'
+has "light tasks: a draft row says what to do" "$out_lt" '| `tc01` | **draft** | Local only | only in this checkout; start it (cckit task start tc01)'
+no  "light tasks: a todo task is counted, not listed" "$out_lt" '| `tb01` |'
+has "light tasks: the board line is still printed" "$out_lt" "open issues: 0   blocked: 0"
+js_lt="$(lt_status --llm 2>/dev/null)"
+t "light tasks llm: counts" "$(printf '%s' "$js_lt" | jq -c '.light_tasks.counts')" \
+  '{"draft":1,"todo":2,"shared":0,"doing":0,"review":3,"done":0,"dropped":0}'
+t "light tasks llm: attention rows, review first" "$(printf '%s' "$js_lt" | jq -r '[.light_tasks.attention[] | .id + ":" + .state] | join(" ")')" \
+  "ta01:review ta02:review ta03:review tc01:draft"
+# No GitHub call is made FOR the tasks: every gh call of the run is one the other sections make.
+t "light tasks: no gh call names a task" "$(grep -cE 'light/|tasks|ta0|tb0|tc0' "$tmp/gh.log" | tr -d ' ')" "0"
+calls_with="$(grep -c . "$tmp/gh.log" | tr -d ' ')"
+rm -rf "$lt/tasks"; ( cd "$lt" && git checkout -q -- . 2>/dev/null; rm -rf tasks; git branch -q -D light/ta01-piece light/ta02-piece light/ta03-piece; git rm -q -r tasks; git -c user.name=t -c user.email=t@t commit -q -m "no tasks" )
+: > "$tmp/gh.log"; lt_status >/dev/null; lt_status --llm >/dev/null 2>&1
+t "light tasks: the same number of gh calls with and without tasks" "$(grep -c . "$tmp/gh.log" | tr -d ' ')" "$calls_with"
 
 [ "$fail" -eq 0 ] && echo "ALL OK (status)" || echo "status: FAILURES"
 exit "$fail"

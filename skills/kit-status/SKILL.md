@@ -42,9 +42,9 @@ mistake this skill exists to prevent.
 ## Execution
 
 ```bash
-cckit status          # the board, the next effort per flow, the three buckets — as markdown
+cckit status          # the board, the light tasks, the next effort per flow, the three buckets — as markdown
 cckit status --llm    # the same verdicts as JSON, for an agent: local_undone, worktrees, prs,
-                      # cleanup, next_efforts
+                      # cleanup, next_efforts, light_tasks
 ```
 
 Read-only. It writes nothing, deletes nothing, and pushes nothing.
@@ -62,6 +62,17 @@ rules without a `paths:` frontmatter load into every session, against Claude Cod
 the three largest files. It is not a fourth bucket — nothing in it is pending work — and it is
 absent when the project has no instruction files. Relay it as printed;
 `scripts/instruction-budget-lint.sh --report` lists every file.
+
+## Light tasks
+
+In a project that tracks work with `cckit task`, the report prints a **Light tasks** section after
+the board: one line of counts by state (`review`, `doing`, `todo`, `draft`, `shared`, `done`), then
+a table of the tasks somebody has to act on — `review` (its pull request is waiting), `doing`,
+`draft` (only in this checkout) and `shared`. A `todo` task is counted, not listed. It is read from
+local git, with no `gh` call and no fetch. In `--llm` output it is `light_tasks`
+(`{counts, attention: [{id, state, title, needs}]}`), `null` when the project has no light task.
+Relay the rows before the buckets: in such a project they are the answer to "what is waiting",
+and the board line above them reads `open issues: 0`.
 
 ## Next effort per flow
 

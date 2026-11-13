@@ -373,6 +373,81 @@ EOF
   fi
 }
 
+# ── light tasks (#487) ─────────────────────────────────────────────────────────────────────────
+# A project whose work is tracked with `cckit task` has no GitHub issue per task, so the board
+# section reads "open issues: 0" while five tasks are open. These read the task source
+# (task-source.sh) — local git only: no fetch, no gh call.
+
+# status_light_task_rows — every light task as the source's TSV rows
+# (`id<TAB>state<TAB>priority<TAB>kind<TAB>created<TAB>branch<TAB>title`). Empty when the project
+# has none, when it is not a git repository, or when task-source.sh is not there to load.
+status_light_task_rows() {
+  if ! command -v task_source_call >/dev/null 2>&1; then
+    local _ks_dir
+    _ks_dir="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" >/dev/null 2>&1 && pwd)"
+    # shellcheck source=task-source.sh
+    [ -f "$_ks_dir/task-source.sh" ] && . "$_ks_dir/task-source.sh"
+  fi
+  command -v task_source_call >/dev/null 2>&1 || return 0
+  git rev-parse --show-toplevel >/dev/null 2>&1 || return 0
+  task_source_call list 2>/dev/null || true
+}
+
+# status_light_task_counts — stdin: those rows. stdout: one line,
+# `draft<TAB>todo<TAB>shared<TAB>doing<TAB>review<TAB>done<TAB>dropped`.
+status_light_task_counts() {
+  awk -F'\t' '
+    NF >= 2 { n[$2]++ }
+    END { printf "%d\t%d\t%d\t%d\t%d\t%d\t%d\n", n["draft"], n["todo"], n["shared"], n["doing"], n["review"], n["done"], n["dropped"] }'
+}
+
+# status_light_task_attention — stdin: those rows. stdout: `id<TAB>state<TAB>title<TAB>needs` for
+# the tasks somebody has to act on: review first (a pull request is waiting), then doing, then
+# draft and shared (not on the shared list yet). `todo` is only counted: nothing is wrong with it.
+status_light_task_attention() {
+  awk -F'\t' '
+    BEGIN { r["review"] = 1; r["doing"] = 2; r["draft"] = 3; r["shared"] = 4 }
+    ($2 in r) {
+      if ($2 == "review")      needs = "waiting for review: its pull request is open from " $6
+      else if ($2 == "doing")  needs = "in progress on " $6 "; when ready: cckit task finish " $1 " \"<summary>\" --all"
+      else if ($2 == "draft")  needs = "only in this checkout; start it (cckit task start " $1 ") or share the list (cckit task share)"
+      else                     needs = "in a share pull request (" $6 ") that has not merged"
+      print r[$2] "\t" $1 "\t" $2 "\t" $7 "\t" needs
+    }' | sort -t "$(printf '\t')" -k1,1n -k2,2 | cut -f2-
+}
+
+# status_light_tasks_md — the section as markdown; prints nothing when the project has no light task.
+status_light_tasks_md() {
+  local rows counts c_draft c_todo c_shared c_doing c_review c_done c_dropped att id state title needs
+  rows="$(status_light_task_rows)"
+  [ -n "$rows" ] || return 0
+  counts="$(printf '%s\n' "$rows" | status_light_task_counts)"
+  IFS="$(printf '\t')" read -r c_draft c_todo c_shared c_doing c_review c_done c_dropped <<EOF
+$counts
+EOF
+  echo "## Light tasks"
+  echo ""
+  printf 'review: %s   doing: %s   todo: %s   draft: %s   shared: %s   done: %s\n' \
+    "$c_review" "$c_doing" "$c_todo" "$c_draft" "$c_shared" "$c_done"
+  echo ""
+  att="$(printf '%s\n' "$rows" | status_light_task_attention)"
+  if [ -n "$att" ]; then
+    echo "| task | state | title | what it needs |"
+    echo "| --- | --- | --- | --- |"
+    while IFS="$(printf '\t')" read -r id state title needs; do
+      [ -n "$id" ] || continue
+      printf '| `%s` | **%s** | %s | %s |\n' "$id" "$state" "$title" "$needs"
+    done <<EOF
+$att
+EOF
+  elif [ "$c_todo" -gt 0 ]; then
+    echo "_Nothing is waiting on anyone. \`cckit next\` names the task to take._"
+  else
+    echo "_Every task is done._"
+  fi
+  echo ""
+}
+
 # ── the three-bucket report ────────────────────────────────────────────────────────────────────
 
 # status_buckets_md [root] — the three buckets as markdown on stdout. Each bucket states its own
@@ -516,8 +591,15 @@ status_buckets_json() {
   case "$budget_limit"    in ''|*[!0-9]*) budget_limit=0 ;; esac
   local ne_rows ne_rc=0
   ne_rows="$(status_next_efforts_rows)" || ne_rc=$?
+  local lt_rows lt_counts="" lt_att=""
+  lt_rows="$(status_light_task_rows)"
+  if [ -n "$lt_rows" ]; then
+    lt_counts="$(printf '%s\n' "$lt_rows" | status_light_task_counts)"
+    lt_att="$(printf '%s\n' "$lt_rows" | status_light_task_attention)"
+  fi
 
   jq -n \
+    --arg lt_counts "$lt_counts" --arg lt_att "$lt_att" \
     --arg ne_rows "$ne_rows" \
     --argjson ne_read "$([ "$ne_rc" -eq 0 ] && echo true || echo false)" \
     --arg local_rows "$rows" \
@@ -546,6 +628,12 @@ status_buckets_json() {
                         ctx: (if .[2] == "-" then null else .[2] end),
                         title: (if .[3] == "-" then null else .[3] end),
                         waiting: (.[4] | tonumber? // 0)})) else null end),
+      # null = the project has no light task. `attention` holds the tasks somebody has to act on
+      # (review, doing, draft, shared); `todo` and `done` are only counted. Read from local git.
+      light_tasks: (if $lt_counts == "" then null else
+        ($lt_counts | split("\t") | map(tonumber? // 0)) as $c
+        | { counts: { draft: $c[0], todo: $c[1], shared: $c[2], doing: $c[3], review: $c[4], done: $c[5], dropped: $c[6] },
+            attention: (rows($lt_att) | map({id: .[0], state: .[1], title: .[2], needs: .[3]})) } end),
       ai_review_expected: ($ai_expected == 1),
       # `prs_read: false` means the PR bucket is UNKNOWN, not empty — never treat its `[]` as "none".
       prs_read: $prs_read,
