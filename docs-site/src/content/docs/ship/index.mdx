@@ -84,18 +84,25 @@ above, a stale branch reads as clean and is merged as it stands. Bringing the br
 step for whoever merges: [Merge, close and clean up](/ship/merge-and-close/) has the commands.
 </Aside>
 
-## The verbs
+## What you say, and what runs
 
-| Verb | What it is for |
+Shipping is a conversation with your agent in the chat. These are the sentences you will use on the
+Bakery site, and the command your agent runs for each.
+
+<div data-table="grid">
+
+| What you say | What runs |
 | --- | --- |
-| `cckit merge [<pr>]` | Merge one pull request, close its issues, remove its branch and working folder |
-| `cckit effort close <slug\|N>` | Merge an effort's one pull request and close the parent and every sub-issue |
-| `cckit watch [--merge] [--loop]` | The captain: read every open pull request, merge the ones that are ready |
-| `cckit close <issue> "<summary>"` | Close an issue that no merge closed |
-| `cckit gc` | Report which branches and working folders can go. Deletes nothing |
-| `cckit cleanup [--yes]` | Show the cleanup plan, and with `--yes` carry it out |
-| `cckit hotfix <pr\|sha>` | Carry one merged change to the release branch |
-| `cckit release --next` | Print the version the commits since the last tag imply |
+| "Merge the menu page pull request." (merges one pull request, closes its issues, removes its branch and working folder) | `cckit merge [<pr>]` |
+| "The launch effort is reviewed. Land it." (merges an effort's one pull request and closes the parent and every sub-issue) | `cckit effort close <slug\|N>` |
+| "Merge every pull request that is ready." (the captain reads every open pull request and merges the ones that are ready) | `cckit watch [--merge] [--loop]` |
+| "That issue ended without code. Close it." (closes an issue that no merge closed) | `cckit close <issue> "<summary>"` |
+| "What branches and working folders can go?" (reports; deletes nothing) | `cckit gc` |
+| "Show me the cleanup plan." Then: "Do it." (shows the plan, and with `--yes` carries it out) | `cckit cleanup [--yes]` |
+| "Carry that fix to the release branch." (carries one merged change to the release branch) | `cckit hotfix <pr\|sha>` |
+| "What version do the commits since the last release make?" (prints the version the commits since the last tag imply) | `cckit release --next` |
+
+</div>
 
 Every flag is in the [CLI reference](/cli-reference/).
 

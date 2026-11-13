@@ -17,6 +17,8 @@ import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components'
 import TagRow from '../../../components/TagRow.astro';
 import TutorialMeta from '../../../components/TutorialMeta.astro';
 import TutorialSchema from '../../../components/TutorialSchema.astro';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
 
 <TagRow kinds={["flow", "agent"]} />
 
@@ -31,49 +33,54 @@ prints data: JSON for a single result, TOON (a compact table format) for a list.
 the board, the stack and the plan as data, picks the highest-priority unblocked issue and drives
 it.
 
+Each step starts with what you say to the agent that runs in the job. Below it are the commands it
+runs. The example is the Bakery site, with a nightly job that reads the board.
+
 **What you will have at the end:** an agent in a job with no person attached that reads the
 board as data and works one issue through, with small hand-offs to any sub-agent it starts.
 
 ## Steps
 
-<Steps>
+### 1. Prime the headless agent and consume every verb as data
 
-1. **Prime the headless agent.** Tell it there's no human and to consume data, not prose.
+Tell it there is no human and to consume data, not prose.
 
-   <div class="cckit-prompt">
+<Chat
+  title="priming the nightly Bakery site job"
+  say="You're running headless: no human watching. Work the board through to merged on your own: read state as structured data, pick the highest-priority unblocked issue, and drive it start to finish. Keep token use lean when you hand context to sub-agents."
+  ran={['cckit sync --llm', 'cckit scan --llm', 'cckit plan --llm']}
+  means="`sync` returns the board and what is unblocked as TOON, `scan` the stack and kit state as JSON, `plan` the session-fit wave plan as TOON."
+>
+  I read the board, the stack and the plan as data. The highest-priority unblocked issue is the one I
+  will drive.
+</Chat>
 
-   ```text frame="terminal" title="Prompt to paste"
-   You're running headless — no human watching. Work the board through to merged on your own: read
-   state as structured data, pick the highest-priority unblocked issue, and drive it start to finish.
-   Keep token use lean when you hand context to sub-agents.
-   ```
+### 2. Compact context for sub-agents
 
-   </div>
+Pipe uniform arrays through `encode-context` so hand-offs stay token-lean.
 
-2. **Consume every verb as data.**
+<Chat
+  title="handing the board to a sub-agent in compact form"
+  say="Hand the board to the sub-agent in compact form."
+  ran={'echo "$json" | cckit encode-context'}
+  means="Uniform arrays become TOON, a denser encoding than raw JSON."
+>
+  I compacted the board before the hand-off, so the sub-agent gets fewer tokens.
+</Chat>
 
-   ```bash frame="terminal"
-   cckit sync --llm          # board state + what's unblocked, as TOON
-   cckit scan --llm          # repo stack + kit state, as JSON
-   cckit plan --llm          # the session-fit wave plan, as TOON
-   ```
-
-3. **Compact context for sub-agents.** Pipe uniform arrays through `encode-context` so hand-offs stay
-   token-lean:
-
-   ```bash frame="terminal"
-   echo "$json" | cckit encode-context   # compact uniform arrays into TOON for sub-agents
-   ```
-
-</Steps>
 
 ## Check it worked
 
-Run one verb in the job and parse it:
+Run one verb in the job and parse it.
 
-```bash frame="terminal"
-cckit scan --llm | jq .     # exits 0 and prints one JSON object
-```
+<Chat
+  title="checking that a verb prints data in the Bakery site job"
+  say="Is the scan readable as data?"
+  ran="cckit scan --llm | jq ."
+  means="It exits 0 and prints one JSON object."
+>
+  Yes. The scan printed one JSON object and it parsed.
+</Chat>
 
 In the job log, the agent's commands carry `--llm` and none of its decisions quote a
 human-formatted table.

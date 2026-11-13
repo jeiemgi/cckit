@@ -1,0 +1,116 @@
+---
+title: See where everything stands
+description: Ask your assistant what is in draft, what waits for a review, what is done and what is next, for the whole project or for one piece.
+tutorial:
+  job: see what is in draft, in review and done across the project
+  difficulty: beginner
+  time: "5 min"
+  prerequisites:
+    - { text: "The keys are given and the project is open in the chat with your assistant", link: "The keys are given", href: "/marketing/get-set-up/" }
+    - { text: "At least one piece has been handed over, or the lists are empty", link: "Hand over your first piece", href: "/marketing/your-first-piece/" }
+  ogTag: Marketing
+  related: [marketing/your-first-piece, marketing/ask-for-changes, marketing/campaigns]
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
+import TutorialMeta from '../../../components/TutorialMeta.astro';
+
+<TutorialMeta />
+
+Pieces pile up: a landing page waiting for a review, a post in draft, a menu page nobody has
+started. You do not keep that list. You ask your assistant, and it reads the project. The example
+is the Bakery site, a neighbourhood bakery's website, a few days after the landing page went to
+review.
+
+**Who does it:** you ask. Your assistant reads the project and answers. Nothing changes when you
+ask.
+
+**What you will have at the end:** you know what is yours to do next and what is waiting for
+someone else.
+
+<Steps>
+
+1. **Ask where things stand.** The answer is short: what is in progress, what waits for a review
+   and what needs cleaning up.
+
+   <Chat
+     title="asking where things stand on the Bakery site"
+     say="Where are we?"
+     means="A draft is yours alone. Waiting for a review means another person has to read it."
+   >
+     The Bakery site has one piece in draft, the Easter menu page, and one piece waiting for a
+     review, the landing page. Nothing else is open and there is nothing to clean up.
+   </Chat>
+
+2. **See every piece and where it is.**
+
+   <Chat
+     title="listing every piece of the Bakery site"
+     say="Show me all our pieces and where each one is."
+     means="Each piece has one state. Finished pieces appear only when you ask for them. The states are listed below."
+   >
+     Three open pieces. Landing page: waiting for a review. Easter menu page: in draft. Post about
+     the Easter loaf: not started.
+   </Chat>
+
+   <Outcomes title="All 7 states a piece can be in">
+
+   | What you hear | What it means |
+   | --- | --- |
+   | `draft` | The piece is written down on this computer only. The team has not seen it. |
+   | `todo` | The piece is on the shared list and nobody has started it. |
+   | `shared` | The piece was sent to the team in a review that is not approved yet. |
+   | `doing` | A draft for the piece has been started and is being worked on. |
+   | `review` | The draft is marked done and a review is open. A person has to read it. |
+   | `done` | The review was approved and the piece is part of the shared version. |
+   | `dropped` | The piece was cancelled. It is listed only when you ask for finished and cancelled pieces too. |
+
+   </Outcomes>
+
+3. **Ask what is next.**
+
+   <Chat
+     title="asking what to hand over next on the Bakery site"
+     say="What is next?"
+     means="It picks by priority first, then by the day the piece was recorded."
+   >
+     Next is the post about the Easter loaf. It is the highest priority among the pieces nobody
+     has started. Do you want me to start it?
+   </Chat>
+
+4. **Ask what is waiting for you.**
+
+   <Chat
+     title="asking what waits for a person on the Bakery site"
+     say="Is anything waiting for me?"
+     means="Pieces in review wait for an approver, and a draft waits for whoever wrote it."
+   >
+     The landing page is waiting for an approver. Nobody has read it yet. The Easter menu page is a
+     draft, so it is waiting for you to ask for a review.
+   </Chat>
+
+</Steps>
+
+<Outcomes title="For the technical person: what runs">
+
+<div data-table="grid">
+
+| What you say | What runs |
+| --- | --- |
+| "Where are we?" | `cckit status` |
+| "Show me all our pieces and where each one is." | `cckit task list` |
+| "Show me the finished ones too." | `cckit task list --all` |
+| "What is next?" | `cckit task next` |
+
+</div>
+
+`cckit status` counts the light tasks by state, lists the ones somebody has to act on (`review`,
+`doing`, `draft`, `shared`), and adds open reviews that wait for a person. `cckit task list` reads
+the state from git and makes no GitHub call. None of the four writes anything. The verbs are in
+the [CLI reference](/cli-reference/).
+
+</Outcomes>
+
+Next: [Ask for changes to a piece](/marketing/ask-for-changes/)

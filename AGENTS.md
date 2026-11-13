@@ -217,9 +217,24 @@ current entry of the top-bar switch (`docs-site/src/lib/tracks.ts`, `docs-site/s
   tutorials section: a step-by-step page is a guide in its area.
 - **The sidebar is curated.** `sidebar` in `docs-site/astro.config.mjs` lists 43 Software pages:
   one "Start here" link, eight area groups and a Reference group, every group collapsed except the
-  one holding the current page. The Marketing list is 10 pages, flat, in process order. A new
+  one holding the current page. The Marketing list is 14 pages in six groups (How it works, Get set up,
+  Plan, Make a piece, Review and approve, Look things up) after a "Start here" link, nested in the
+  `Marketing` entry; `src/routeData.ts` unwraps it and opens every group. The sidebar group icons in
+  `theme.css` apply to Software only. The site has 86 English pages (72 Software, 14 Marketing). A new
   Software page is not added to the sidebar by default: link a guide from its area's
   `more-guides.mdx` (`development/`, `review/`) and a reference page from `reference.mdx`.
+- **A guide step leads with a conversation window.** `<Chat>` (`docs-site/src/components/Chat.astro`)
+  shows what a person says in the agent's chat, the command it runs (`ran`, Software only), the
+  real output and the agent's reply, on one running example, the "Bakery site". `<Outcomes>`
+  (`Outcomes.astro`) is the collapsed block under it for outcome tables and exit codes. The prose
+  says "your agent" on Software pages and "your assistant" (Spanish "tu asistente") on Marketing
+  pages, and "in the chat" for the place; it names Claude Code or Codex only where a step is true
+  for that product alone. Truth rule: `ran` is a real command with real flags, with no literal
+  issue or task number; `output` is real (a Bakery run, a read-only verb run there, or a string a
+  test in `scripts/` asserts), trimmed only with a line `…` and `<project>` for a path, and is
+  omitted when none of those exists; the reply claims nothing the command did not do. A Marketing
+  window carries no `ran` and no `output` (the build fails if it does). Reference pages stay
+  command-first. Authoring notes: `docs-site/src/components/README-chat.md`.
 - **A Marketing page has a Spanish twin** with the same file name under
   `src/content/docs/es/marketing/`. Change both in one commit. Links from a Spanish page into a
   Software page say the target is in English.

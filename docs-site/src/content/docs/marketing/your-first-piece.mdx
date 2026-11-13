@@ -1,11 +1,22 @@
 ---
 title: Hand over your first piece
 description: Hand over one piece end to end with one sentence to your assistant, look at the review link, approve. Or write it together, step by step.
+tutorial:
+  job: hand over one piece end to end and take it to approved
+  difficulty: beginner
+  time: "20 min"
+  prerequisites:
+    - { text: "The keys are given and the project is open in the chat with your assistant", link: "The keys are given", href: "/marketing/get-set-up/" }
+  ogTag: Marketing
+  related: [marketing/brand-voice, marketing/campaigns, marketing/ask-for-changes, marketing/update-a-page]
 ---
 
 import { Steps, Aside } from '@astrojs/starlight/components';
 import Chat from '../../../components/Chat.astro';
 import Outcomes from '../../../components/Outcomes.astro';
+import TutorialMeta from '../../../components/TutorialMeta.astro';
+
+<TutorialMeta />
 
 The first time, hand over something small and complete: one landing page, one post, one section
 of a site. You describe it, your assistant builds it in the background and returns a review link,
@@ -199,7 +210,8 @@ Drafts survive closing the app. Open the project again and say:
 </Chat>
 
 <Aside type="note" title="Approved is not published">
-cckit stops at approved. See [after approval](/marketing/review-and-approval/#after-approval).
+cckit stops at approved. See [after approval](/marketing/review-and-approval/#after-approval), and
+[Put an approved piece online](/marketing/go-live/) for what to hand the person who publishes.
 </Aside>
 
 Next: [Several pieces, one goal](/marketing/campaigns/)

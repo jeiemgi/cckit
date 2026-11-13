@@ -13,10 +13,12 @@ tutorial:
   related: [review/stop-committing-secrets, development/checks-with-hooks, review/control-what-agents-can-do]
 ---
 
-import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 import TagRow from '../../../components/TagRow.astro';
 import TutorialMeta from '../../../components/TutorialMeta.astro';
 import TutorialSchema from '../../../components/TutorialSchema.astro';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
 
 <TagRow kinds={["concept", "hook"]} />
 
@@ -38,35 +40,40 @@ nothing project-specific is in the kit.
 
 ## Steps
 
-<Steps>
+### 1. Copy the example denylist
 
-1. **Copy the example denylist.** The target is gitignored, so your terms never get committed either.
+<Chat
+  title="creating the Bakery site's private list"
+  say="Create a private list for the Bakery site. It must never be committed."
+  ran="mkdir -p .cckit && cp privacy-denylist.example .cckit/privacy-denylist"
+  means="The target is gitignored, so your terms never get committed either. Run it from the primary checkout. From a worktree, use the commands in The secret guard."
+>
+  The list is in place and empty. From a worktree the commands in
+  [The secret guard](/review/secret-guard/#your-private-denylist) resolve the one shared `.cckit/`
+  folder.
+</Chat>
 
-   ```bash frame="terminal"
-   mkdir -p .cckit && cp privacy-denylist.example .cckit/privacy-denylist
-   ```
+### 2. List your private terms
 
-   Run it from the primary checkout. From a worktree, use the commands in
-   [The secret guard](/review/secret-guard/#your-private-denylist), which resolve the one shared
-   `.cckit/` folder.
+<Chat
+  title="adding the bakery's private terms"
+  say="Add my flour supplier's name, the supplier's login page and the owner's personal email to the private list."
+  ran="cat .cckit/privacy-denylist"
+  means="One per line: org names, hosts, emails, anything private to you. The file is named .cckit/privacy-denylist."
+>
+  I added three lines, one per term, and read the file back to check them.
+</Chat>
 
-2. **List your private terms.** One per line — org names, hosts, emails, anything private to you.
+### 3. Prove it blocks them
 
-   ```text frame="terminal" title=".cckit/privacy-denylist"
-   acme-internal
-   vpn.acme.example
-   jane@acme.example
-   ```
-
-3. **Prove it blocks them.** Stage a file that mentions a listed term and try to commit — the guard
-   fails the commit.
-
-   ```bash frame="terminal"
-   git add . && git commit -m "test"
-   # x secret-guard: private term 'acme-internal' present: <file>:<line>:<the matching line>
-   ```
-
-</Steps>
+<Chat
+  title="proving the guard blocks a private term"
+  say="Stage a file that mentions the supplier and try to commit it, so I can see the guard stop it."
+  ran='git add . && git commit -m "test"'
+  means="The guard prints x secret-guard: private term '<term>' present: followed by the file, the line and the matching line."
+>
+  The commit was blocked and nothing was committed. The staged file contains a term from the list.
+</Chat>
 
 ## How to check it worked
 

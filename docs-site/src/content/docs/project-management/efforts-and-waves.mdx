@@ -4,6 +4,8 @@ description: The six commands that create, order, start and close an effort, the
 ---
 
 import { Aside } from '@astrojs/starlight/components';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
 import EffortWaves from '../../../components/diagrams/EffortWaves';
 
 Some goals do not fit in one issue. A feature with a schema change, an API and a screen is three or
@@ -23,28 +25,88 @@ commands as a step-by-step guide with a prompt to paste.
 
 ## The six commands, in order
 
-1. **`cckit effort new`** writes the plan down. It creates the parent issue, with its goal, scope,
-   notes for agents and how the work will be verified, and one sub-issue per step. It checks every
-   title before it creates anything, so a refused name creates nothing.
+The Bakery site's launch is one goal with four steps: the landing page, the menu page, the opening
+hours and a contact form that sends mail. Each window below is one command of the effort.
 
-2. **`cckit effort chain <a> <b> <c>`** declares the order: each issue waits for the one before it.
-   GitHub records the "blocked by" link, and the issue body gets a matching `Depends on` line. Skip
-   it when the steps are independent.
+## 1. Write the plan down
 
-3. **`cckit effort plan`** and **`cckit plan`** show what can run now. `effort plan` packs the open
-   efforts into session-sized batches; `plan` shows the waves of issues.
+<Chat
+  title="writing the Bakery site launch down as an effort"
+  say="Launching the site is bigger than one issue. Make it an effort: landing page, menu page, opening hours and a contact form."
+  ran='cckit effort new "Launch the bakery site" "Landing page :: hero, three products with prices" "Menu page :: the full list of bakes" "Opening hours :: hours and holidays" "Contact form :: sends mail to the bakery"'
+  means="It checks every title before it creates anything, so a refused name creates nothing."
+>
+  The parent issue holds the goal, the scope, notes for agents and how the work will be verified.
+  Each of the four steps is a sub-issue linked to it.
+</Chat>
 
-4. **`cckit effort start <slug|N>`** creates the effort's branch and its own working folder, set up
-   like any other: env files copied, a port of its own, dependencies installed. The effort can be
-   named by its issue number or by its short name (the slug).
+## 2. Declare the order
 
-5. **`cckit effort pr`** opens the one pull request for the whole effort. Its title carries the
-   effort's number, and the command refuses a title without it.
+<Chat
+  title="saying the contact form comes after the landing page"
+  say="The contact form lives on the landing page, so it has to wait for it."
+  ran="cckit effort chain <landing-page-issue> <contact-form-issue>"
+  means="GitHub records the blocked-by link, and the issue body gets a matching Depends on line. Skip this when the steps are independent."
+>
+  The contact form now waits for the landing page.
+</Chat>
 
-6. **`cckit effort close <slug|N>`** merges that pull request, closes the parent and every
-   sub-issue, and removes the branch and folder. Before it merges it saves each step's diff, so the
-   record of what each sub-issue changed survives the merge. `cckit merge` refuses an effort pull
-   request for that reason and names this command.
+## 3. See what can run now
+
+<Chat
+  title="asking what can run now on the Bakery site"
+  say="What can run now, and how many efforts fit in one session?"
+  ran={["cckit effort plan", "cckit plan"]}
+  means="effort plan packs the open efforts into session-sized batches. plan shows the waves of issues."
+>
+  Here are the batches and the waves.
+</Chat>
+
+## 4. Start the effort
+
+<Chat
+  title="starting the Bakery site launch effort"
+  say="Start the launch effort."
+  ran="cckit effort start <slug|N>"
+  means="The effort can be named by its issue number or by its short name, the slug."
+>
+  The effort has its own branch and its own working folder, set up like any other: env files
+  copied, a port of its own, dependencies installed.
+</Chat>
+
+## 5. Open the one pull request
+
+<Chat
+  title="opening the pull request for the Bakery site launch"
+  say="The steps are built. Open the pull request for the whole effort."
+  ran="cckit effort pr"
+  means="The title carries the effort's number, and the command refuses a title without it."
+>
+  One pull request is open for the whole effort.
+</Chat>
+
+## 6. Close the effort
+
+<Chat
+  title="closing the Bakery site launch effort"
+  say="The review is done. Close the effort."
+  ran="cckit effort close <slug|N>"
+  means="cckit merge refuses an effort pull request for the reason below and names this command."
+>
+  The pull request is merged, the parent and every sub-issue are closed, and the branch and folder
+  are removed.
+</Chat>
+
+<Outcomes title="What cckit effort close does, in order">
+
+- It saves each step's diff before it merges, so the record of what each sub-issue changed
+  survives the merge.
+- It merges the pull request, closes the parent and every sub-issue, and removes the branch and
+  folder.
+- `cckit merge` refuses an effort pull request because its squash skips that snapshot, and names
+  this command.
+
+</Outcomes>
 
 A plan page before step 4 is recommended and not required: the `/kit-effort-new` skill shows the
 plan as a [page you answer](/project-management/plan-pages/) and records the approval on the parent
@@ -59,6 +121,16 @@ A team that starts everything finishes nothing. `cckit effort start` refuses a *
 `effort.wipLimit` are already in progress. The default is 2. An effort is in progress while its
 `effort/<N>-<slug>` branch exists, on your machine or on GitHub: `start` creates the branch and
 `close` deletes it.
+
+<Chat
+  title="starting a third effort while two are open"
+  say="Start the newsletter effort too."
+  ran="cckit effort start <slug|N>"
+  means="Close one open effort, or pass --force to start anyway."
+>
+  I could not start it. Two efforts are already in progress and the limit is 2, so I started
+  nothing. Do you want me to close one, or start anyway?
+</Chat>
 
 A refusal creates nothing and names the efforts that are open. Close one, or pass `--force` to
 start anyway. Starting a single issue with `cckit start <issue>` has no such limit. The exact

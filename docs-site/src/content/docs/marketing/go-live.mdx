@@ -1,0 +1,92 @@
+---
+title: Put an approved piece online
+description: cckit stops at approved and does not publish. This page says who puts a piece online and what to hand them.
+tutorial:
+  job: hand an approved piece to whoever puts it online
+  difficulty: beginner
+  time: "10 min"
+  prerequisites:
+    - { text: "The piece is approved and finished", link: "Review and approval", href: "/marketing/review-and-approval/" }
+    - "You know who puts your site online: the technical person or your hosting service"
+  ogTag: Marketing
+  related: [marketing/review-and-approval, marketing/update-a-page, marketing/where-things-stand]
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
+import TutorialMeta from '../../../components/TutorialMeta.astro';
+
+<TutorialMeta />
+
+**cckit does not publish.** An approved piece is part of the project's shared version and it
+builds, and that is where cckit stops. Putting it on a public address is done by the technical
+person or by your hosting service, the way your site is put online today. What you do is hand them
+the right information. The example is the Easter menu page of the Bakery site, a neighbourhood
+bakery's website.
+
+**Who does it:** you check that the piece is done and hand it over. The technical person or the
+hosting service puts it online. Your assistant writes the note and does not send it.
+
+**What you will have at the end:** a message to the person who publishes, with everything they
+need, and a piece you have seen at its public address.
+
+<Steps>
+
+1. **Check that the piece is done.** Only an approved and finished piece is ready to hand over.
+
+   <Chat
+     title="checking that the Easter menu page is done"
+     say="Where are we? Is the Easter menu page done?"
+     means="Done means approved and part of the shared version. A piece in review is not ready."
+   >
+     Yes. The Easter menu page is done: it was approved and it is part of the shared version.
+   </Chat>
+
+2. **Ask for the note to the person who publishes.** Say when it should be online.
+
+   <Chat
+     title="writing the note for whoever puts the Easter menu page online"
+     say="Write a note for the technical person: the Easter menu page is approved and ready to go online. Say which page it is, what changed and that I want it online by Thursday."
+     means="Your assistant writes the note. You send it. Nothing is published by writing it."
+   >
+     Here is the note. "The Easter menu page is approved and finished. It is the page 'Easter menu'
+     on the Bakery site. It adds the Easter loaf and its price and the ordering deadline. Please put
+     it online by Thursday and tell me when it is live." I have not sent it. I cannot put anything
+     online.
+   </Chat>
+
+3. **Send the note and the review link.** Send it the way you usually write to that person: email,
+   chat or a message. Add the link of the approved review, which shows exactly what was approved.
+
+4. **Look at the page at its public address.** When the technical person says it is live, open
+   the address yourself and read the page once, on a phone too. If something is off, it is a
+   change: see [Update a page that already exists](/marketing/update-a-page/).
+
+</Steps>
+
+## What to hand over
+
+| Give them | Why |
+| --- | --- |
+| The name of the piece and the page it belongs to | So they publish the right one. |
+| The link of the approved review | It shows exactly what was approved. |
+| The day and time it should be online | Some pieces have a date, such as an Easter menu. |
+| What to check once it is live | So you both know when it is done. |
+
+<Aside type="note" title="What cckit does not do here">
+It does not publish a page, send an email, schedule a post or measure how a piece performed. Those
+stay in the tools your team already uses, as in
+[after approval](/marketing/review-and-approval/#after-approval). Whether your site goes online by
+itself when a piece is approved depends on how it is hosted, and cckit does not know that.
+</Aside>
+
+<Outcomes title="For the technical person: what you are being handed">
+
+The approved piece is on the project's shared version (its main line on GitHub) and the project's
+check passed before the review opened. Publishing is outside cckit: do it the way this site is
+normally put online. Background on merging: [Why merging is a decision](/ship/).
+
+</Outcomes>
+
+Back to: [What you can hand over](/marketing/)

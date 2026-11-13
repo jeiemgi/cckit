@@ -3,6 +3,8 @@ title: "Review and approval"
 description: "For the person who was sent a review link: what you see, where you comment, what Approve and Request changes mean, why the writer never approves their own piece, and what happens after approval."
 ---
 
+import Chat from '../../../components/Chat.astro';
+
 Handing work over ends here: you get a link, you read what was built, and you decide. The
 review is the one step cckit never does for you. A piece is done when a person other than whoever
 asked for it has read it and said yes.
@@ -12,10 +14,10 @@ was ever approved.
 
 ## Who does it
 
-- **The writer**, the person who handed the work over, applies the changes with Claude.
+- **The writer**, the person who handed the work over, applies the changes with your assistant.
 - **The approver** reads, comments and decides. A GitHub account and a browser are enough.
-- **Claude** prepares the review, applies comments when asked and reports the ones it did not
-  apply. It never approves.
+- **Your assistant** prepares the review, applies comments when asked and reports the ones it did
+  not apply. It never approves.
 
 ## Someone sent you a review link
 
@@ -30,15 +32,15 @@ You are the approver. The link opens one page on GitHub, and that page is the re
    updates by itself. This repeats until your answer is **Approve**.
 
 The writer's side is shorter to tell: they hand the piece over, send you the link, and apply your
-comments with Claude. The exact words they say are on
+comments with their assistant. The exact words they say are on
 [Hand over your first piece](/marketing/your-first-piece/).
 
 ## What the two answers mean
 
 | Answer | Means | What happens next |
 | --- | --- | --- |
-| **Approve** | The piece can become part of the shared version as it is. | The writer tells Claude to finish the piece. |
-| **Request changes** | The piece is not ready. The comments say why. | The writer applies them with Claude; the approver reads again. |
+| **Approve** | The piece can become part of the shared version as it is. | The writer tells their assistant to finish the piece. |
+| **Request changes** | The piece is not ready. The comments say why. | The writer applies them with their assistant; the approver reads again. |
 
 A comment alone is not an answer. A piece with comments and no decision is still waiting.
 
@@ -59,13 +61,23 @@ piece and the approver of another.
   See [Set your brand voice](/marketing/brand-voice/).
 
 An automatic check can also run when a draft is saved, such as a check for a password left in a
-file. If one fails, Claude tells you "A check failed" and what failed. It is not an approval and
+file. If one fails, your assistant tells you "A check failed" and what failed. It is not an approval and
 does not replace the approver.
 
 ## After approval
 
-Once the review says **Approve**, the writer tells Claude: "The review is approved. Finish this
-piece." Three things happen:
+Once the review says **Approve**, the writer tells their assistant that it is approved:
+
+<Chat
+  title="finishing an approved Easter menu page"
+  say="The review is approved. Finish this piece."
+  means="This is the writer's step. The approver can also finish it from the review page."
+>
+  Done. The approved page is part of the shared version, the piece is marked done and I tidied up
+  the draft.
+</Chat>
+
+Three things happen:
 
 1. The approved draft becomes part of the shared version of the project.
 2. The piece is marked done on the task list.

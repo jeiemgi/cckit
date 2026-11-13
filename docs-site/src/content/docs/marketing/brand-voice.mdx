@@ -1,20 +1,33 @@
 ---
 title: Set your brand voice
-description: Write your brand voice, key messages and banned phrasings down once in the project, so every draft Claude writes follows them.
+description: Write your brand voice, key messages and banned phrasings down once in the project, so every draft your assistant writes follows them.
+tutorial:
+  job: write the brand voice down once so every draft follows it
+  difficulty: beginner
+  time: "15 min"
+  prerequisites:
+    - { text: "The keys are given and the project is open in the chat with your assistant", link: "The keys are given", href: "/marketing/get-set-up/" }
+    - "Two or three pieces that sound right to you, and one that sounds wrong"
+  ogTag: Marketing
+  related: [marketing/your-first-piece, marketing/campaigns]
 ---
 
 import { Steps, Aside } from '@astrojs/starlight/components';
+import Chat from '../../../components/Chat.astro';
+import TutorialMeta from '../../../components/TutorialMeta.astro';
+
+<TutorialMeta />
 
 The brand voice is what the work is written in once you have written it down. If it is not
 written down, every handed-over piece has to be corrected by whoever remembers it, and it has to
-be explained to Claude again in every conversation. Written once, every piece starts in the right
-voice.
+be explained to your assistant again in every conversation. Written once, every piece starts in
+the right voice. The example here is the Bakery site, a neighbourhood bakery's website.
 
-**Who does it:** the team decides the voice. Claude asks the questions and writes the answers
-down, and the editor assistant checks drafts against them.
+**Who does it:** the team decides the voice. Your assistant asks the questions and writes the
+answers down, and the editor assistant checks drafts against them.
 
-**What you will have at the end:** one approved file in the project, `brand/voice.md`, that
-Claude reads before it writes a draft or plans a campaign.
+**What you will have at the end:** one approved file in the project, `brand/voice.md`, that your
+assistant reads before it writes a draft or plans a campaign.
 
 This is the written voice only. Logo, color and visual identity are not part of it.
 
@@ -32,52 +45,82 @@ This is the written voice only. Logo, color and visual identity are not part of 
 
 1. **Start the conversation.**
 
-   <div class="cckit-prompt">
-
-   ```text title="Say this in the chat"
-   Help me set our brand voice for this project. Ask me what you need to know, one question at a time.
-   ```
-
-   </div>
+   <Chat
+     title="starting the brand voice for the bakery"
+     say="Help me set our brand voice for this project. Ask me what you need to know, one question at a time."
+     means="Your assistant reads the project first and asks only what the project does not answer."
+   >
+     Yes. I read what the project already has: the home page and the posts so far. My first
+     question: when a neighbour walks in, how do you talk to them at the counter?
+   </Chat>
 
 2. **Answer with examples.** Paste two or three pieces you think sound right, and one that sounds
-   wrong. Examples tell Claude more than adjectives do. Claude first reads what the project
-   already has, such as recent posts, and asks only for what that material does not answer.
+   wrong. Examples tell your assistant more than adjectives do.
 
-3. **Read what Claude wrote back.** It shows you the voice, the key messages and the banned
-   phrasings before it saves them. Correct anything that is off. A key message needs its proof: a
-   number, a customer, a fact. One without proof is recorded as unproven, and Claude does not
-   state it as fact in a draft.
+   <Chat
+     title="giving examples of the bakery voice"
+     say="These sound like us: “Come in, the bread is still warm.” and “Order by Thursday, collect on Saturday.” This one does not: “Experience our artisanal baking excellence!”"
+     means="One wrong example is as useful as the right ones."
+   >
+     Thank you. I hear short sentences, an invitation and no hype. One more question: do we say
+     "you" to the customer, or do we talk about "our guests"?
+   </Chat>
+
+3. **Read what your assistant wrote back.** It shows you the voice, the key messages and the
+   banned phrasings before it saves them. Correct anything that is off. A key message needs its
+   proof: a number, a customer, a fact. One without proof is recorded as unproven, and your
+   assistant does not state it as fact in a draft.
+
+   <Chat
+     title="reading the bakery voice before it is saved"
+     say="Show me what you have written down before you save it."
+     means="Nothing is saved until you say so. Correct what is off."
+   >
+     Voice: warm and plain, short sentences, we say "you". Key message: "Baked fresh every morning",
+     with its proof, that the ovens start at 5. Recorded as unproven: "Best bread in the
+     neighbourhood", because there is no proof for it yet, so I will not state it as a fact in a
+     draft. Banned: "artisanal", "excellence" and exclamation marks in headlines.
+   </Chat>
 
 4. **Send it for review.** The brand voice is content like any other: it goes through a draft and
    a review, so the team agrees on it before it applies to everyone.
 
-   <div class="cckit-prompt">
-
-   ```text title="Say this in the chat"
-   Save the brand voice and ask for a review.
-   ```
-
-   </div>
+   <Chat
+     title="sending the bakery voice for review"
+     say="Save the brand voice and ask for a review."
+     means="Once it is approved, every draft and every campaign plan in this project starts from it."
+   >
+     Saved as brand/voice.md in a draft of its own, and the review is open. Here is the link for the
+     person who approves.
+   </Chat>
 
 </Steps>
-
-Once it is approved, every draft and every campaign plan in this project starts from it.
 
 ## Check that it worked
 
 Open a new conversation and ask for a draft without describing the voice. If the draft sounds
 right and avoids the banned phrasings, the voice is in place.
 
+<Chat
+  title="checking that the voice is in place"
+  say="Write two lines announcing the Easter menu."
+  means="You did not describe the voice, so the draft came from the file."
+>
+  Easter loaves are in the oven. Order by Thursday, collect on Saturday. That follows the voice:
+  short sentences, "you" and none of the banned words.
+</Chat>
+
 To check one draft against it:
 
-<div class="cckit-prompt">
-
-```text title="Say this in the chat"
-Check this draft against our brand voice. List every sentence that breaks it and propose a fix for each.
-```
-
-</div>
+<Chat
+  title="checking a draft against the bakery voice"
+  say="Check this draft against our brand voice. List every sentence that breaks it and propose a fix for each."
+  means="The editor assistant does the check. You decide which fixes to keep."
+>
+  Two sentences break the voice. "Experience our artisanal baking" uses a banned word, so I
+  propose "Come in and smell the bread". The exclamation mark in the headline is banned, so I
+  propose a full stop.
+</Chat>
 
 ## Change it later
 

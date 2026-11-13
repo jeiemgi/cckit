@@ -15,10 +15,12 @@ tutorial:
   related: [design/annotate-the-ui, development/browser-debug, project-management/break-a-feature-into-an-effort]
 ---
 
-import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 import TagRow from '../../../components/TagRow.astro';
 import TutorialMeta from '../../../components/TutorialMeta.astro';
 import TutorialSchema from '../../../components/TutorialSchema.astro';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
 
 <TagRow kinds={["skill", "conversational"]} />
 
@@ -57,60 +59,85 @@ The audit has three lanes. Run one, or all three into the same report.
 In every lane a script finds the candidates and the UX agent judges them. The scripts call no
 model and need no API key.
 
-## Steps
+## 1. Preview the run
 
-<Steps>
+<Chat
+  title="previewing a UX audit of the Bakery site"
+  say="Before you run anything, show me what a UX audit of the Bakery site would cover."
+  ran="/kit-ux-audit --lane all --dry-run"
+  means="A dry run changes nothing. It only prints what the audit would do."
+>
+  The audit would cover all three lanes (flows, consistency and accessibility) on the Bakery site.
+  Nothing has been run.
+</Chat>
 
-1. **Preview the run.** In Claude Code, from the repository:
+<Outcomes title="What a dry run prints, and how to pick the app">
 
-   ```text frame="terminal"
-   /kit-ux-audit --lane all --dry-run
-   ```
+A dry run prints the lane, the app it would audit, where the map comes from and the checks it
+would run, then stops. In a repository with several front-end apps the skill asks which one; name
+it with `--app <name>` or `--path <dir>`.
 
-   A dry run prints the lane, the app it would audit, where the map comes from and the checks it
-   would run, then stops. In a repository with several front-end apps the skill asks which one;
-   name it with `--app <name>` or `--path <dir>`.
+</Outcomes>
 
-2. **Run the audit.** Drop `--dry-run`. You can also ask in plain words:
+## 2. Run the audit
 
-   <div class="cckit-prompt">
+<Chat
+  title="running a UX audit of the Bakery site"
+  say="Run a UX audit of the Bakery site: flows, design-system consistency and accessibility. Open the report when it is done and show me the top findings."
+  ran="/kit-ux-audit --lane all"
+  means="The report is one file in the app's directory. The audit files no issues."
+>
+  The audit is done and the report is open. The top finding is on the contact form: the message
+  field has no label.
+</Chat>
 
-   ```text frame="terminal" title="Prompt to paste"
-   Run a UX audit of this app: flows, design-system consistency and accessibility. Open the
-   report when it is done and show me the top findings.
-   ```
+For the `consistency` lane the skill needs to know where your shared components and theme live.
+Pass them, or let it ask:
 
-   </div>
+<Chat
+  title="pointing the consistency lane at the Bakery site's shared components"
+  say="Check the consistency lane again. The shared components are in the ui barrel and the theme is theme.css."
+  ran="/kit-ux-audit --lane consistency --primitives <ui-barrel> --css <theme.css>"
+  means="Without these two the lane reads the default location, packages/ui/src/index.ts, and may find little."
+>
+  The consistency lane ran against the barrel and the theme file you named.
+</Chat>
 
-   For the `consistency` lane the skill needs to know where your shared components and theme
-   live. Pass them, or let it ask:
+## 3. Read the report
 
-   ```text frame="terminal"
-   /kit-ux-audit --lane consistency --primitives <ui-barrel> --css <theme.css>
-   ```
+The skill opens `UX_FLOW_REPORT.html` and prints its `file://` address as the last line of the
+reply. Findings are grouped by severity, highest first. Each finding says where it is, why it slows
+people down, the evidence and the fix. A section named "Candidates for visual review" lists what
+the agent could not confirm from the source.
 
-3. **Read the report.** The skill opens `UX_FLOW_REPORT.html` and prints its `file://` address as
-   the last line of the reply. Findings are grouped by severity, highest first:
+<Outcomes title="The four severities">
 
-   | Severity | Meaning |
-   | --- | --- |
-   | `crit` | blocks a core task or risks data loss |
-   | `p1` | frequent friction |
-   | `p2` | a problem in one place |
-   | `p3` | polish |
+| Severity | Meaning |
+| --- | --- |
+| `crit` | blocks a core task or risks data loss |
+| `p1` | frequent friction |
+| `p2` | a problem in one place |
+| `p3` | polish |
 
-   Each finding says where it is, why it slows people down, the evidence and the fix. A section
-   named "Candidates for visual review" lists what the agent could not confirm from the source.
+</Outcomes>
 
-4. **Answer the open calls.** The skill ends by asking you about anything that is a decision:
-   which of two competing treatments wins, how to split the work. A visual decision goes to the
-   designer agent.
+## 4. Answer the open calls
 
-5. **Turn findings into work.** The audit files no issues. For a finding that spans many files,
-   plan an [effort](/project-management/break-a-feature-into-an-effort/). For one screen or one
-   component, start a single issue and fix it in its own working copy.
+The skill ends by asking you about anything that is a decision: which of two competing treatments
+wins, how to split the work. A visual decision goes to the designer agent.
 
-</Steps>
+## 5. Turn findings into work
+
+<Chat
+  title="turning the contact form findings into work"
+  say="The contact form findings touch several files. Plan them as one effort, with a step for the labels and a step for the error messages."
+  ran='cckit effort new "Fix the contact form" "Label the fields :: every input has a visible label" "Show form errors :: say what went wrong"'
+  means="The audit files no issues. For one screen or one component, start a single issue and fix it in its own working copy instead."
+>
+  The effort is created with one sub-issue for the labels and one for the error messages.
+  [Break a feature into an effort](/project-management/break-a-feature-into-an-effort/) takes it
+  from here.
+</Chat>
 
 ## Check it worked
 

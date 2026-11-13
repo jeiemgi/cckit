@@ -61,14 +61,21 @@ step in `cckit doctor`.
 
 MemPalace is one of the [integrations](/integrations/) cckit can install for you.
 
-## The commands
+## What you say, and what runs
 
-| Command | What it is for |
+Memory is a conversation with your agent in the chat. These are the sentences you will use on the
+Bakery site, and the command your agent runs for each.
+
+<div data-table="grid">
+
+| What you say | What runs |
 | --- | --- |
-| `cckit init --memory on` | Set up a project with memory on: the hooks, the rule and the config switch. |
-| `cckit doctor` | Install the MemPalace command-line tool after you say yes, and check the project's memory files. |
-| `cckit add mempalace` | Set `memory.enabled` in a project that already has the memory files. It adds no file. |
-| `cckit handoff "<note>"` | Leave a note for the next session. It needs no memory tool and works with memory off. |
+| "Set up the Bakery site with memory on." (sets up a project with memory on: the hooks, the rule and the config switch) | `cckit init --memory on` |
+| "Check that memory works, and install the tool if it is missing." (installs the MemPalace command-line tool after you say yes, and checks the project's memory files) | `cckit doctor` |
+| "Turn memory on in this project." (sets `memory.enabled` in a project that already has the memory files; it adds no file) | `cckit add mempalace` |
+| "Leave a note for the next session: the Christmas menu is half done." (needs no memory tool and works with memory off) | `cckit handoff "<note>"` |
+
+</div>
 
 ## Codex
 

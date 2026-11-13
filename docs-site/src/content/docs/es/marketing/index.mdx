@@ -5,6 +5,7 @@ description: Entrégale a cckit una página con contenido, una landing page, una
 
 import { CardGrid, LinkCard, Aside } from '@astrojs/starlight/components';
 import SearchStart from '../../../../components/SearchStart.astro';
+import Outcomes from '../../../../components/Outcomes.astro';
 
 <SearchStart kind="marketing-es" />
 
@@ -25,13 +26,23 @@ cuenta en breve, para que sepas en qué estás confiando.
 3. **Lee lo que regresó.** Una tarea delegada corre sin detenerse a preguntar. Donde tu párrafo
    podía entenderse de dos maneras elige una, y en la revisión ves cuál.
 4. **Aprueba.** Abres el enlace, lees y apruebas o pides cambios. Decide una persona, nunca
-   Claude. [Revisión y aprobación](/es/marketing/review-and-approval/)
+   tu asistente. [Revisión y aprobación](/es/marketing/review-and-approval/)
 
 ## Lo que recibes
 
 Un enlace a una versión del trabajo que puedes mirar y, cuando dices que sí, una versión aprobada.
 El proyecto recuerda tu voz de marca y, con la memoria opcional activada, las decisiones que
 tomaste en sesiones anteriores. Mira [Las herramientas que conectamos](/es/marketing/tools/).
+
+## Después de la primera pieza
+
+- [Mira cómo va todo](/es/marketing/where-things-stand/): borradores, piezas que esperan revisión,
+  piezas terminadas.
+- [Pide cambios en una pieza](/es/marketing/ask-for-changes/): cambia una pieza que está en
+  borrador o en revisión.
+- [Actualiza una página que ya existe](/es/marketing/update-a-page/): un cambio sobre una pieza ya
+  aprobada.
+- [Pon en línea una pieza aprobada](/es/marketing/go-live/): qué entregarle a quien publica.
 
 ## Lo que cckit no hace
 
@@ -56,6 +67,29 @@ pasó antes de abrir la revisión. La persona no editó código.
   <LinkCard title="Te mandaron un enlace de revisión" href="/es/marketing/review-and-approval/" description="Revisión y aprobación: cómo leer, comentar y decidir." />
   <LinkCard title="Varias piezas, un objetivo" href="/es/marketing/campaigns/" description="Delega una campaña: las piezas se planean juntas y se aprueban una por una." />
 </CardGrid>
+
+<Outcomes title="Para la persona técnica: qué corre cuando lo dices">
+
+<div data-table="grid">
+
+| Lo que dices | Lo que corre |
+| --- | --- |
+| "¿Cómo vamos?" | `cckit status` |
+| "Muéstrame mis borradores y lo que espera revisión." | `cckit task list` |
+| "¿Qué sigue?" | `cckit task next` |
+| "Registra una tarea nueva: …" | `cckit task new "<título>" --body "<lo que lleva la página>"` |
+| "Ejecútala." | `cckit task run <id>` |
+| "Empieza un borrador para esta pieza." | `cckit task start <id>` |
+| "Guárdalo y pide una revisión." | `cckit task finish <id> "<resumen>" --all` |
+| "La revisión está aprobada. Termina esta pieza." | `cckit merge <pr>` |
+| "Planea una campaña." | la habilidad de campañas; el plan se abre con `cckit page open <archivo-html>` y tu respuesta se guarda con `cckit page answer` |
+
+</div>
+
+Leer los comentarios de una revisión y editar un borrador lo hace el propio asistente, no un verbo
+de `cckit`. La lista completa de verbos está en la [referencia de la CLI](/cli-reference/) (en inglés).
+
+</Outcomes>
 
 Hay dos páginas de consulta: [Quién hace qué](/es/marketing/who-does-what/) enumera a las
 personas y a los asistentes, y [Palabras que vas a escuchar](/es/marketing/words-you-will-hear/)

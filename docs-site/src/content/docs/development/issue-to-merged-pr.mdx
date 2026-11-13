@@ -16,6 +16,8 @@ tutorial:
 import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 import TutorialMeta from '../../../components/TutorialMeta.astro';
 import TutorialSchema from '../../../components/TutorialSchema.astro';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
 
 <TutorialMeta />
 
@@ -24,73 +26,84 @@ base, keep the change apart from other work, open a pull request that names the 
 card on the board, close the issue and delete the branch afterwards. Done by hand, one of those
 steps gets skipped.
 
-In this guide an agent takes one issue the whole way, and each of those steps is one cckit
+In this guide your agent takes one issue the whole way, and each of those steps is one cckit
 command. The agent runs them in order and does not improvise the branch or the pull request.
+
+Each step starts with what you say to your agent in the chat. Below it is the command your agent
+runs for that sentence. The example is the Bakery site: the `/menu` page, from issue to merged.
 
 **What you will have at the end:** one issue closed, its change merged through a reviewed pull
 request, and no leftover branch or folder on your machine.
 
 ## Steps
 
-<Steps>
+### 1. Ask for the next ready issue
 
-1. **Ask for the next ready issue.** You do not name a number. The agent reads the board and
-   takes the first issue nothing is blocking.
+You do not name a number. The agent reads the board and takes the first issue nothing is blocking.
 
-   <div class="cckit-prompt">
+<Chat
+  title="taking the next ready issue on the Bakery site"
+  say="Check the board and pick the next issue that's ready. Take it all the way to a merged PR: work it on its own isolated branch, keep the change focused, and open the pull request. When it's merged, clean up and tell me the PR link."
+  ran={['cckit next', 'cckit start <issue>']}
+  means="Nothing is committed yet. The change will live in its own worktree, a separate folder with its own copy of the code, until the pull request merges."
+>
+  The next ready issue is the menu page, the `/menu` page with every bake and its price. I started it in
+  its own worktree on its own branch. When the project uses a GitHub board, the issue moves to In Progress.
+</Chat>
 
-   ```text frame="terminal" title="Prompt to paste"
-   Check the board and pick the next issue that's ready. Take it all the way to a merged PR —
-   work it on its own isolated branch, keep the change focused, and open the pull request.
-   When it's merged, clean up and tell me the PR link.
-   ```
+### 2. The agent makes the change
 
-   </div>
+It works in that folder and nothing else, and runs the project's checks until they pass.
 
-2. **The agent starts the issue.** It finds the issue, then creates a branch and a worktree for
-   it. A worktree is a separate folder with its own copy of the code:
+### 3. The agent opens the pull request
 
-   ```bash frame="terminal"
-   cckit next                       # the next unblocked issue and its start command
-   cckit start <issue>              # worktree + branch; the board moves to In Progress
-   ```
+<Chat
+  title="opening the pull request for the menu page"
+  say="The menu page is done. Open the pull request."
+  ran={'cckit pr <issue> "<summary>"'}
+  means="This is where you look at the work. The checks run on the pull request, and you or a reviewing agent read the change."
+>
+  The pull request for the menu page is open and links the issue with a `Closes` line. The checks are
+  running on it. When the project uses a board, the issue moves to In Review.
+</Chat>
 
-3. **The agent makes the change** in that folder, and nothing else. It runs the project's checks
-   until they pass.
+### 4. Merge, close and clean up
 
-4. **The agent opens the pull request.**
+Once the review passes, the agent first brings the branch onto the current base branch, shows you
+what the diff deletes and runs the gate again. `cckit merge` does not do that for a branch that is
+behind and has no conflict. The commands are in
+[Land one pull request](/ship/merge-and-close/#land-one-pull-request).
 
-   ```bash frame="terminal"
-   cckit pr <issue> "<summary>"     # commit, push, open the PR; the board moves to In Review
-   ```
+<Chat
+  title="merging the menu page and cleaning up"
+  say="The review passed. Merge it, close the issue and clean up."
+  ran="cckit merge"
+  means="The menu page is on the base branch, its issue is closed, and no leftover branch or folder remains."
+>
+  Merged. The issue is closed, and I removed the branch and the worktree.
+</Chat>
 
-   This is where you look at the work. The checks run on the pull request, and you or a reviewing
-   agent read the change.
+<Outcomes title="If the pull request was merged another way">
 
-5. **Merge, close and clean up.** Once the review passes, the agent first brings the branch onto
-   the current base branch, shows you what the diff deletes and runs the gate again. `cckit merge`
-   does not do that for a branch that is behind and has no conflict. The commands are in
-   [Land one pull request](/ship/merge-and-close/#land-one-pull-request). Then:
+If the pull request was merged another way, such as the button on GitHub, finish by hand:
 
-   ```bash frame="terminal"
-   cckit merge                      # merge the PR, close its issue, remove the branch and worktree
-   ```
+```bash frame="terminal"
+cckit close <issue> "<summary>"  # close the issue; the board moves to Done
+cckit gc --prune --yes           # remove merged branches and their worktrees
+```
 
-   If the pull request was merged another way, such as the button on GitHub, finish by hand:
-
-   ```bash frame="terminal"
-   cckit close <issue> "<summary>"  # close the issue; the board moves to Done
-   cckit gc --prune --yes           # remove merged branches and their worktrees
-   ```
-
-</Steps>
+</Outcomes>
 
 ## Check it worked
 
-```bash frame="terminal"
-cckit sync      # the issue is no longer in the open list
-cckit gc        # the report lists no branch or worktree for it
-```
+<Chat
+  title="checking that the menu page issue is gone and nothing is left over"
+  say="Is the menu page issue closed, and is anything left over from it?"
+  ran={['cckit sync', 'cckit gc']}
+  means="The issue is no longer in the open list, and the cleanup report names no branch or worktree for it."
+>
+  The menu page issue is no longer open, and the cleanup report lists nothing left over for it.
+</Chat>
 
 The pull request page on GitHub shows it merged and links the issue.
 

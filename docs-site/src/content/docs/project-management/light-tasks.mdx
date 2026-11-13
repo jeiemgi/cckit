@@ -3,9 +3,11 @@ title: Tasks without GitHub issues
 description: Plan and track work without GitHub issues — a task list that lives in the project as one file per task, with a worktree per task and a pull request for review.
 ---
 
-import { Steps, Aside } from '@astrojs/starlight/components';
+import { Aside } from '@astrojs/starlight/components';
 import Tag from '../../../components/Tag.astro';
 import TagRow from '../../../components/TagRow.astro';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
 
 <TagRow kinds={["flow", "command"]} />
 
@@ -39,59 +41,106 @@ person who approves it needs a GitHub account.
 
 ## The loop
 
-<Steps>
+The Bakery site tracks its Easter work this way, with no GitHub issues.
 
-1. **Create a task.**
+## 1. Create a task
 
-   ```bash
-   cckit task new "Write the spring newsletter"
-   ```
+<Chat
+  title="adding a menu page task to the Bakery site list"
+  say="Add a task: a menu page with the full list of bakes."
+  ran='cckit task new "Menu page with the full list of bakes"'
+  means="The id is what every later command takes."
+>
+  Added. cckit gave the task an id and wrote `tasks/<id>.md`, a file in the project.
+</Chat>
 
-   cckit prints the task's id (`t3f9a`) and writes `tasks/t3f9a.md`.
+## 2. See what is next
 
-2. **See what is next.**
+<Chat
+  title="asking what is next on the Bakery site list"
+  say="What is open, and what should I take next?"
+  ran={[
+    { cmd: "cckit task next", output: "(nothing to take — create a task with: cckit task new \"<title>\")" },
+    {
+      cmd: "cckit task list",
+      output: [
+        "ID      STATE   PRIO TITLE",
+        "tb643   review  p1   Rebuild the bakery landing page",
+        "tdf42   review  p2   Menu page with the full list of bakes",
+      ],
+    },
+  ]}
+  means="next prints the task to take next and the command that starts it. list prints every open task and its state."
+>
+  Nothing is waiting to be taken: both open tasks are already in review.
+</Chat>
 
-   ```bash
-   cckit task next        # the task to take next + the command that starts it
-   cckit task list        # every open task and its state
-   ```
+## 3. Take it
 
-3. **Take it.**
+<Chat
+  title="taking the menu page task"
+  say="I will take the menu page task."
+  ran="cckit task start <id>"
+  output={[
+    "[tdf42] started — the draft lives in <project>/.claude/worktrees/light+tdf42-menu-page-with-the-full-list-of-bakes",
+    "[tdf42] moved tasks/tdf42.md onto the task branch",
+    "[tdf42] the team's list now shows this task as in progress",
+    "[tdf42] when the draft is ready for review: cckit task finish tdf42 \"<summary>\" --all",
+  ]}
+  means="A worktree is a separate folder for this task, on a branch named light/<id>-<slug>. Do the work there."
+>
+  The task has its own folder. I will work there, and the team's list shows it as in progress.
+</Chat>
 
-   ```bash
-   cckit task start <id>
-   ```
+## 4. Finish it
 
-   cckit creates a worktree — a separate folder for this task — on a branch named
-   `light/<id>-<slug>`, and prints its path. Do the work there.
+<Chat
+  title="finishing the menu page task"
+  say="The menu page is ready for review."
+  ran='cckit task finish <id> "What was done, in one line"'
+  means="Files you created are listed but not included unless you add --all."
+>
+  I marked the task done on its branch, pushed it and opened a pull request for review.
+</Chat>
 
-4. **Finish it.**
+## 5. Review and merge
 
-   ```bash
-   cckit task finish <id> "What was done, in one line"
-   ```
-
-   cckit marks the task done on its branch, pushes, and opens a pull request. Files you created
-   are listed but not included unless you add `--all`.
-
-5. **Review and merge.** The reviewer approves the pull request on GitHub. When it merges, the
-   task is done for everyone: `cckit task list --all` shows it as `done`. In a project whose
-   config sets [`pr.bodyStyle: "content"`](/config-and-permissions/#content-work), the pull request
-   body carries a review checklist for a draft: read it through, facts and links checked, voice
-   matches the brand guide, only this piece's files changed.
-
-</Steps>
+The reviewer approves the pull request on GitHub. When it merges, the task is done for everyone:
+`cckit task list --all` shows it as `done`. In a project whose config sets
+[`pr.bodyStyle: "content"`](/config-and-permissions/#content-work), the pull request body carries a
+review checklist for a draft: read it through, facts and links checked, voice matches the brand
+guide, only this piece's files changed.
 
 `take` is the same verb as `start`, and `done` the same as `finish`. An id can be shortened to any
 prefix that matches one task.
 
 ## Hand a task to an agent
 
-`cckit task run` does steps 3 and 4 with a headless agent in between:
+`cckit task run` does steps 3 and 4 with a headless agent in between.
 
-```bash
-cckit task run <id> --check "<your gate command>"
-```
+<Chat
+  title="handing the menu page task to an agent"
+  say="Hand the menu page task to an agent. It has to pass the build and the lint, and do not merge it."
+  ran='cckit task run <id> --check "pnpm build && pnpm lint"'
+  output={[
+    "[tdf42] started — the draft lives in <project>/.claude/worktrees/light+tdf42-menu-page-with-the-full-list-of-bakes",
+    "…",
+    "[tdf42] the assistant is working on this task now (check before review: pnpm build && pnpm lint)",
+    "autopilot run: light/tdf42-menu-page-with-the-full-list-of-bakes · agent claude · max-iters 5 · max-seconds 900 · max-tokens none",
+    "autopilot run: round 1 (bound 900s)",
+    "autopilot run: stopped - reason=done rounds=1 elapsed=62s tokens=421592 (the agent exited 0 after round 1)",
+    "…",
+    "[task] ready for review — open the link and approve it there",
+    "…",
+    "exit 0",
+  ]}
+  means="Exit 0: the round changed files, the gate passed and the pull request is open. It does not merge."
+>
+  The menu page is built, the build and lint passed, and the pull request is open for you to
+  review. I did not merge it.
+</Chat>
+
+<Outcomes title="What cckit task run does, step by step">
 
 1. It starts the task, or reuses the task's worktree when it was started before.
 2. It runs ONE headless objective there through [`cckit autopilot run`](/development/run-one-objective-unattended/):
@@ -99,6 +148,10 @@ cckit task run <id> --check "<your gate command>"
 3. It runs the gate. The gate is `--check "<cmd>"`, else
    [`tasks.check`](/config-and-permissions/#light-tasks) in the config, else none.
 4. It finishes the task with `--all` and prints the pull request link. It does not merge.
+
+</Outcomes>
+
+<Outcomes of="cckit task run">
 
 | What happened | Exit | Pull request |
 | --- | --- | --- |
@@ -108,6 +161,10 @@ cckit task run <id> --check "<your gate command>"
 | the gate failed | 6 | none |
 | the agent failed (3), a limit was reached (4), the run was interrupted (130) | as listed | none |
 | the pull request could not be opened | 7 | none; run the same command again |
+
+</Outcomes>
+
+<Outcomes title="After a failure, and the flags of cckit task run">
 
 On a non-zero exit the last line on stderr names the reason, and the work so far stays on the
 task's branch. Running `cckit task run <id>` again starts over from the task record: a stopped
@@ -119,6 +176,8 @@ earlier run is discarded, not resumed.
   with no stop condition a run is one round.
 - `--agent-arg <arg>`, repeatable, passes one argument to the agent CLI. cckit adds no permission
   flag: an agent that must edit files gets its own flag here, or from the project's agent settings.
+
+</Outcomes>
 
 ## Check that it worked
 
@@ -139,16 +198,16 @@ cckit task default     # prints: light   or: issues
 With `light`, a bare `cckit next` prints what `cckit task next` prints. `cckit next` with an
 argument, and `cckit new` / `cckit start` / `cckit pr`, still act on GitHub issues.
 
-## Ask your agent instead
+## Work the list in one go
 
-Paste this into Claude Code (or any agent that runs a shell) in a project set up with cckit:
-
-```text
-Show me the light tasks in this project with `cckit task list` and what is next with
-`cckit task next`. I will pick one. Start the one I pick with `cckit task start <id>`, do the
-work in the worktree it prints, and when I say it is ready run
-`cckit task finish <id> "<summary>"` and give me the pull request link. Do not merge it.
-```
+<Chat
+  title="working the Bakery site task list in one go"
+  say="Show me the light tasks in this project and what is next. I will pick one. Start the one I pick, do the work in its folder, and when I say it is ready, send it for review and give me the pull request link. Do not merge it."
+  ran={["cckit task list", "cckit task next", "cckit task start <id>", 'cckit task finish <id> "<summary>"']}
+  means="Merging stays with the reviewer."
+>
+  Here is the list and what is next. Tell me which task to start.
+</Chat>
 
 ## Plain language
 

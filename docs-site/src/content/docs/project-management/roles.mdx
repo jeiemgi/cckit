@@ -4,6 +4,7 @@ description: "What the project manager agent, the tech lead agent and the captai
 ---
 
 import { Aside } from '@astrojs/starlight/components';
+import Chat from '../../../components/Chat.astro';
 
 When agents do the building, the open question on a team is who decides. An agent that plans,
 builds, approves and merges its own work has nobody checking it. An agent that asks a person
@@ -32,6 +33,27 @@ turning newly found scope into issues.
 It ships in every profile, as `.claude/agents/pm/AGENT.md` in a Claude Code project. The session
 calls it when someone asks for status, for the next plan, for what is blocked, or for an issue to
 be drafted.
+
+<Chat
+  title="asking the project manager agent where the Bakery site stands"
+  say="Where does the work on the bakery site stand?"
+  ran="cckit status"
+  output={[
+    "## Light tasks",
+    "",
+    "review: 2   doing: 0   todo: 0   draft: 0   shared: 0   done: 2",
+    "",
+    "| task | state | title | what it needs |",
+    "| --- | --- | --- | --- |",
+    "| `tb643` | **review** | Rebuild the bakery landing page | waiting for review: its pull request is open from light/tb643-rebuild-the-bakery-landing-page |",
+    "| `tdf42` | **review** | Menu page with the full list of bakes | waiting for review: its pull request is open from light/tdf42-menu-page-with-the-full-list-of-bakes |",
+    "…",
+  ]}
+  means="The state is read from the repository and GitHub every time, not from memory."
+>
+  Two tasks are done. Two are waiting for your review: the landing page rebuild and the menu page.
+  The next action is to review those two pull requests.
+</Chat>
 
 What it does:
 

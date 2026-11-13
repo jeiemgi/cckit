@@ -17,6 +17,8 @@ import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components'
 import TagRow from '../../../components/TagRow.astro';
 import TutorialMeta from '../../../components/TutorialMeta.astro';
 import TutorialSchema from '../../../components/TutorialSchema.astro';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
 
 <TagRow kinds={["flow", "conversational"]} />
 
@@ -25,6 +27,9 @@ import TutorialSchema from '../../../components/TutorialSchema.astro';
 A backlog of small, ready issues does not need you in the room. What it needs is a limit you set
 before you leave: which issues may run, how many at once, and when the run has to stop and wait
 for you.
+
+Each step starts with what you say to your agent in the chat. Below it is the command your agent
+runs. The example is the Bakery site, with its backlog of small ready issues.
 
 In this guide cckit launches each issue in its own worktree, a few at a time. The agent driving
 the run reviews and merges each pull request. You look at the launch plan before anything is
@@ -35,49 +40,48 @@ worked in its own worktree with a pull request, and a record of how every worker
 
 ## Steps
 
-<Steps>
+### 1. Read the board, then pick the work
 
-1. **Read the board, then pick the work.** Have the agent sync the board first and show you what's
-   ready — you choose which issues run, rather than naming numbers up front.
+Have the agent sync the board first and show you what is ready. You choose which issues run,
+rather than naming numbers up front.
 
-   <div class="cckit-prompt">
+<Chat
+  title="reading the Bakery site board before an unattended run"
+  say="Read the board and show me what's unblocked right now. I'll tell you which of those to run in parallel. Show me the launch plan before anything is created, then run them a few at a time."
+  ran="cckit sync --llm"
+  means="Decide from what is actually ready, not from numbers you remember."
+>
+  Three issues are unblocked: the opening hours, the contact form and the footer links. Tell me which
+  ones to run and I will show the launch plan first.
+</Chat>
 
-   ```text frame="terminal" title="Prompt to paste"
-   Read the board and show me what's unblocked right now. I'll tell you which of those to run in
-   parallel. Show me the launch plan before anything is created, then run them a few at a time.
-   ```
+### 2. Dry-run, then launch with a cap
 
-   </div>
+Pass the issues you picked. A dry run creates nothing.
 
-   ```bash frame="terminal"
-   cckit sync --llm                        # read the board; decide from what's actually ready
-   ```
+<Chat
+  title="launching two Bakery site issues with a cap"
+  say="Run the opening hours and the contact form. Show me the plan first, then launch at most 3 at a time."
+  ran={['cckit orchestrate --dry-run <issues…>', 'cckit orchestrate --cap 3 <issues…>']}
+  means="The dry run resolves the plan and prints what would launch. The launch runs at most 3 at once and the rest queue."
+>
+  The plan listed the two issues and no queue. I launched them: each has its own worktree and its own
+  agent.
+</Chat>
 
-2. **Dry-run, then launch with a cap.** Pass the issues *you* picked (a dry-run creates nothing):
+### 3. Or let autopilot pick the work
 
-   ```bash frame="terminal"
-   cckit orchestrate --dry-run <issues…>   # resolve + print the launch plan; create nothing
-   cckit orchestrate --cap 3 <issues…>     # launch, at most 3 concurrent; the rest queue
-   ```
+For a fully unattended run, autopilot picks ready issues itself, so there are no numbers to name.
 
-3. **Or let autopilot pick the work.** For a fully unattended run, autopilot auto-selects ready
-   issues itself — no numbers to name:
-
-   ```bash frame="terminal"
-   cckit autopilot --cap 3                 # auto-pick unblocked issues and drive them through
-   ```
-
-   <div class="cckit-prompt">
-
-   ```text frame="terminal" title="Prompt to paste"
-   Clear the unblocked backlog unattended, a few at a time. Sync the board, auto-pick what's ready,
-   and drive each to merged. Only stop and ping me on a genuine blocker — otherwise summarize what
-   merged.
-   ```
-
-   </div>
-
-</Steps>
+<Chat
+  title="letting autopilot clear the Bakery site backlog"
+  say="Clear the unblocked backlog unattended, a few at a time. Sync the board, auto-pick what's ready, and drive each to merged. Only stop and ping me on a genuine blocker, otherwise summarize what merged."
+  ran="cckit autopilot --cap 3"
+  means="Autopilot picks the unblocked issues and launches them through orchestrate, detached. Reviewing and merging each PR is the driving agent's job, not the script's."
+>
+  I started the run with at most 3 at a time. I will stop only on a genuine blocker and summarize what
+  merged when it finishes.
+</Chat>
 
 <Aside type="tip" title="Which verb for which case">
 Same board, three routes — let what's ready decide: one issue → the
@@ -88,13 +92,25 @@ a whole backlog with nobody watching → `cckit autopilot`.
 
 ## Check it worked
 
-```bash frame="terminal"
-cckit orchestrate --results     # how each worker ended: success, failure or interrupted
-cckit sync                      # what is still open
-```
+<Chat
+  title="checking how the unattended workers ended"
+  say="How did each worker end, and what is still open?"
+  ran={['cckit orchestrate --results', 'cckit sync']}
+  means="Each worker ends as success, failure or interrupted."
+>
+  I read the recorded results of the workers and the board. The merged issues are gone from the open
+  list.
+</Chat>
 
-`--results` exits 0 when every worker succeeded, 1 when any failed or was interrupted, and 3 when
-none failed and some are still running.
+<Outcomes of="cckit orchestrate --results">
+
+| Exit | Meaning |
+| --- | --- |
+| `0` | every worker succeeded |
+| `1` | any worker failed or was interrupted |
+| `3` | none failed and some are still running |
+
+</Outcomes>
 
 ## How it works
 

@@ -3,6 +3,8 @@ title: "The tools we plug in"
 description: "The tools cckit connects and what each does for you: Claude Code, GitHub, the task list, review pages, optional memory and the design skills. cckit connects them; other people make them."
 ---
 
+import Outcomes from '../../../components/Outcomes.astro';
+
 cckit does not build these tools. It connects ones that already exist, so that handing a piece
 over is one request and the process runs behind it. This page says what each tool does for you,
 who makes it, and whether your team has to do anything to get it. The technical person connects
@@ -12,14 +14,14 @@ them when the [keys are given](/marketing/get-set-up/).
 
 ### Claude Code: where you hand work over
 
-Claude Code is the app you talk to. You describe the piece, and it plans, writes and builds it,
-and keeps the task list up to date. It is made by Anthropic. Every writer needs it on their
+Claude Code is the app you talk to, and your assistant lives in it. You describe the piece, and
+your assistant plans, writes and builds it, and keeps the task list up to date. It is made by Anthropic. Every writer needs it on their
 computer; the desktop app is enough.
 
-The marketing setup adds three written methods that Claude follows: one for writing copy, one for
+The marketing setup adds three written methods that your assistant follows: one for writing copy, one for
 the [brand voice](/marketing/brand-voice/) and one for
 [planning a campaign](/marketing/campaigns/). It also adds the plain-language mode, in which
-Claude says "draft", "review" and "approve".
+your assistant says "draft", "review" and "approve".
 
 ### GitHub: where the work is kept and where you approve
 
@@ -31,7 +33,7 @@ access to the project. An approver needs nothing else: a browser is enough.
 
 The list of pieces is kept inside the project, in a folder named `tasks/`, one small file per
 piece. This part is cckit's own. Nothing has to be installed and no extra account is needed. You
-never open those files: you ask Claude "where are we?" or "what is next?".
+never open those files: you ask your assistant "where are we?" or "what is next?".
 
 A technical person can move the list to GitHub instead. The difference that matters to you is
 how a campaign is reviewed, and it is described on
@@ -39,19 +41,19 @@ how a campaign is reviewed, and it is described on
 
 ### Review pages: plans you answer in a browser
 
-A plan is hard to judge as a long message in a conversation. When Claude proposes a campaign
+A plan is hard to judge as a long message in a conversation. When your assistant proposes a campaign
 plan or asks you to choose between options, it opens a page in your browser where you can
 comment on each part and send your answer back.
 
 The tool behind those pages is Lavish, open-source software made by someone else. It is on by
 default and the page is served from your own computer. It needs Node.js there, which the
-technical person checks during setup. Without it, or when no browser is available, Claude shows
+technical person checks during setup. Without it, or when no browser is available, your assistant shows
 the same plan in the conversation, so nothing is lost. This is for plans and decisions. The review of a finished
 draft happens on GitHub.
 
 ### Memory: the project remembers your decisions
 
-Without memory, each conversation with Claude starts from what is written in the project: the
+Without memory, each conversation with your assistant starts from what is written in the project: the
 brand voice, the task list, the drafts. For most teams that is enough.
 
 MemPalace adds a memory that carries decisions and context from one session to the next, so you
@@ -86,7 +88,7 @@ No tool is connected for publishing, scheduling posts, sending email or analytic
 an approved piece, and those jobs stay in the tools your team already uses. See
 [after approval](/marketing/review-and-approval/#after-approval).
 
-## For the technical person
+<Outcomes title="For the technical person">
 
 These pages are written for developers.
 
@@ -94,5 +96,7 @@ These pages are written for developers.
 - The task list in the project: [Tasks without GitHub issues](/project-management/light-tasks/)
 - Review pages and how to turn them off: [Plans you answer on a page](/project-management/plan-pages/)
 - Turning memory on: [Why an agent team needs memory](/memory/)
+
+</Outcomes>
 
 Next: [Set your brand voice](/marketing/brand-voice/)

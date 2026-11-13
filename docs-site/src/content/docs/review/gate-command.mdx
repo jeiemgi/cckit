@@ -4,6 +4,8 @@ description: "The gate is one command that proves a change is sound. What goes i
 ---
 
 import { Aside } from '@astrojs/starlight/components';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
 
 An agent says a change works. The cheapest way to check that claim is to run something: the tests,
 the type check, the linters. If each person and each agent runs a different subset, "it passed"
@@ -15,39 +17,73 @@ name it and makes the agent run it.
 
 ## Steps
 
-1. **Write the command down.** Whatever proves your project is sound, joined into one line that
-   exits non-zero on any failure. For a JavaScript project that is often the test, type-check and
-   lint scripts:
+### 1. Write the command down
 
-   ```bash
-   pnpm test && pnpm typecheck && pnpm lint
-   ```
+<Chat
+  title="naming the check that proves a change to the Bakery site is sound"
+  say="What one command proves a change to the Bakery site is sound? It has to fail when anything is wrong."
+  ran="pnpm build && pnpm lint"
+  means="This is the gate. A change is ready for review when it exits 0, and not before."
+>
+  For this site the build and the linters are the check, joined into one line that exits non-zero
+  on any failure. That line is the gate.
+</Chat>
 
-   Many projects put it in a script, so the gate has one name. cckit's own gate is
-   `bash scripts/check.sh`.
+<Outcomes of="a gate command" title="Other examples of a gate command">
 
-2. **Tell cckit at setup.** Pass the command when you initialize the project:
+Whatever proves your project is sound, joined into one line that exits non-zero on any failure. For
+a JavaScript project that is often the test, type-check and lint scripts:
 
-   ```bash
-   cckit init --prepush "<your gate command>"
-   ```
+```bash
+pnpm test && pnpm typecheck && pnpm lint
+```
 
-   This writes `prePush.enabled` and `prePush.command` to the project config and installs the hook
-   `.claude/hooks/prepush_gate.sh`. From then on, when the agent types `git push`, the hook runs
-   the command first and stops the push if it fails.
+Many projects put it in a script, so the gate has one name. cckit's own gate is
+`bash scripts/check.sh`.
 
-3. **Run it in CI too.** The hook covers the agent's machine. A CI workflow that runs the same
-   command on every pull request covers everyone else, and gives the captain a check status to
-   read.
+</Outcomes>
 
-4. **Add cckit's lint scripts to it** when you want a reviewer's repeated findings to fail the
-   gate: [Turn repeated review findings into checks](/review/gates/).
+### 2. Tell cckit at setup
+
+<Chat
+  title="making the Bakery site run its check before every push"
+  say="Set up the Bakery site so every push runs the check first and stops if it fails."
+  ran='cckit init --prepush "pnpm build && pnpm lint"'
+  means="This is for the first cckit init of a project. In your own project, pass your gate command in place of the Bakery one."
+>
+  Done. The check is saved in the project config and the push hook is installed. From now on a
+  `git push` runs the check first and stops if it fails.
+</Chat>
+
+<Outcomes of="cckit init --prepush" title="What the flag writes">
+
+`cckit init --prepush "<your gate command>"` writes `prePush.enabled` and `prePush.command` to the
+project config and installs the hook `.claude/hooks/prepush_gate.sh`. From then on, when the agent
+types `git push`, the hook runs the command first and stops the push if it fails.
+
+</Outcomes>
+
+### 3. Run it in CI too
+
+The hook covers the agent's machine. A CI workflow that runs the same command on every pull request
+covers everyone else, and gives the captain a check status to read.
+
+### 4. Add cckit's lint scripts to it
+
+Add them when you want a reviewer's repeated findings to fail the gate: [Turn repeated review
+findings into checks](/review/gates/).
 
 ## Check it worked
 
-Ask the agent to push a branch with a failing test. The push is stopped and the agent reports the
-command's output.
-
+<Chat
+  title="proving the check stops a bad push on the Bakery site"
+  say="Push a branch where a test fails, so I can see the check stop it."
+  ran="git push"
+  means="If the push goes through, the hook is not installed. See Limits below."
+>
+  The push was stopped. The check failed, so the hook refused to send the branch. Here is the
+  command's output.
+</Chat>
 ## Limits
 
 - **The hook is installed by a first `cckit init`.** `cckit init --upgrade` keeps an existing

@@ -3,12 +3,14 @@ title: Words you will hear
 description: The developer words behind draft, review and approved, in plain language, each with the Software page that explains it in full.
 ---
 
+import Chat from '../../../components/Chat.astro';
+
 Sooner or later a developer tells you "I opened a PR", or a button on GitHub says "Merge", and
 you need to know whether that concerns you. This page is for that moment.
 
 cckit was built for software teams, and its tools use their words. With the marketing profile
-Claude speaks in plain language, but the developer words still appear on GitHub, in messages from
-developers and when you ask Claude for detail. This page maps each one to the word you already
+your assistant speaks in plain language, but the developer words still appear on GitHub, in messages from
+developers and when you ask your assistant for detail. This page maps each one to the word you already
 use.
 
 You do not need to learn them to do your work.
@@ -34,7 +36,7 @@ You do not need to learn them to do your work.
 | --- | --- | --- |
 | Project | repository, repo | The folder that holds your content and its whole history, kept on GitHub. More: [What you set up, and why](/getting-started/) |
 | The shared version | base branch, `main`, `develop` | The version everyone agrees on. Drafts start from it and return to it. More: [How one change is built](/development/) |
-| A draft's own folder | worktree | A separate folder on your computer for one draft, so two drafts never mix. Claude creates and removes it. More: [How one change is built](/development/) |
+| A draft's own folder | worktree | A separate folder on your computer for one draft, so two drafts never mix. Your assistant creates and removes it. More: [How one change is built](/development/) |
 | Saved change | commit | One saved step in a draft, with a note saying what changed. More: [How one change is built](/development/) |
 | Send to GitHub | push | Copy your saved changes from your computer to GitHub so others can see them. More: [How one change is built](/development/) |
 | Campaign | effort | Several pieces of work under one plan. "Effort" is the name when the task list is on GitHub; its pieces are then approved together. More: [Break a feature into an effort](/project-management/break-a-feature-into-an-effort/) |
@@ -44,8 +46,8 @@ You do not need to learn them to do your work.
 | The keys | setup, sign-in, credentials | The accounts and the project a technical person sets up once so cckit can work for you: Claude Code, a GitHub account and the project. More: [Install and check](/getting-started/install/) |
 | Memory | MemPalace | An optional tool that lets the project remember decisions between sessions. Off by default. More: [Why an agent team needs memory](/memory/) |
 | Setup | profile | The set of skills, roles and rules installed for a kind of team. Yours is the marketing profile. More: [Initialize a project](/getting-started/initialize/) |
-| A method Claude follows | skill | A written method Claude follows for one job, such as writing copy or planning a campaign. More: [Skills cckit ships](/skills/) |
-| Assistant | agent, sub-agent | A role Claude takes on for part of the work: planner, editor, designer, researcher. More: [Who does what](/marketing/who-does-what/) |
+| A method your assistant follows | skill | A written method your assistant follows for one job, such as writing copy or planning a campaign. More: [Skills cckit ships](/skills/) |
+| Assistant | agent, sub-agent | A role your assistant takes on for part of the work: planner, editor, designer, researcher. More: [Who does what](/marketing/who-does-what/) |
 | Automatic check | hook, gate | Something that runs by itself before a change is saved or approved, such as a check for passwords left in a file. More: [Hooks](/hooks/) |
 | Typed command | CLI, terminal | The text window developers type commands into. The technical person uses it during setup. More: [CLI reference](/cli-reference/) |
 
@@ -59,16 +61,19 @@ You do not need to learn them to do your work.
 | "Can you review my PR?" | "Please read my draft and approve it or tell me what to change." |
 | "It's merged." | "It is approved and part of the content now." |
 | "It's on a branch." | "It is still a draft." |
-| "There's a conflict." | "Two drafts changed the same lines. Ask Claude to sort it out, and read what it proposes." |
-| "CI is red." | "An automatic check failed. Ask Claude what failed and whether it can fix it." |
+| "There's a conflict." | "Two drafts changed the same lines. Ask your assistant to sort it out, and read what it proposes." |
+| "CI is red." | "An automatic check failed. Ask your assistant what failed and whether it can fix it." |
 
-## When Claude uses a word you do not know
+## When your assistant uses a word you do not know
 
-Say:
-
-```text
-Explain that in plain language.
-```
+<Chat
+  title="asking what a developer word means"
+  say="Explain that in plain language."
+  means="Your assistant says it again without the developer words."
+>
+  Of course. "Merged" means the approved draft is now part of the shared version of the project.
+  In other words, the Easter menu page is approved and finished.
+</Chat>
 
 The Software pages linked above are written for developers. Read them when you are curious, not
 because you have to.

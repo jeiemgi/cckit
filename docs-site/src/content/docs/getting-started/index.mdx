@@ -28,8 +28,8 @@ Set them up in that order. Each step checks the one before it.
 ## Who does it
 
 One person, once. It needs a terminal for a few minutes; after that the work can be done by talking
-to the agent. In Claude Code the same steps exist as `/kit-doctor` and `/kit-init`, so you can ask
-the agent to run them and answer its questions.
+to your agent in the chat. In Claude Code the same steps exist as the skills `/kit-doctor` and
+`/kit-init`, so your agent can run them and ask you its questions.
 
 No agent role is involved yet. The roles arrive with the profile:
 [The team: you and the agents](/philosophy/the-team/).
@@ -48,14 +48,18 @@ cckit is a set of bash scripts over tools you may already have. It builds none o
 
 ## The commands
 
-| Command | What it is for |
+<div data-table="grid">
+
+| What you say | What runs |
 | --- | --- |
-| `cckit doctor` | Check the machine: the required tools and the GitHub sign-in |
-| `cckit init` | Set a project up: the config, the profile, and the git and GitHub steps |
-| `cckit scan` | Report what a repository already contains, before anything is written |
-| `cckit adopt` | Record the cckit files a repository already has, without changing them |
-| `cckit update` | Say whether a project is behind the installed cckit |
-| `cckit init --upgrade` | Bring a project to the installed version |
+| "Check that this computer has what cckit needs." | `cckit doctor`: the required tools and the GitHub sign-in |
+| "Set up the Bakery site." | `cckit init`: the config, the profile, and the git and GitHub steps |
+| "What is already in this repository?" | `cckit scan`: what a repository contains, before anything is written |
+| "Take ownership of the cckit files already here." | `cckit adopt`: records the cckit files a repository already has, without changing them |
+| "Is the project behind the installed cckit?" | `cckit update`: says whether it is |
+| "Bring the project up to the installed version." | `cckit init --upgrade` |
+
+</div>
 
 Every flag of these commands is in the [CLI reference](/cli-reference/).
 

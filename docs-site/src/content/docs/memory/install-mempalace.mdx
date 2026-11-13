@@ -13,9 +13,11 @@ tutorial:
   related: [development/checks-with-hooks, getting-started/initialize, development/headless-in-ci]
 ---
 
-import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 import TutorialMeta from '../../../components/TutorialMeta.astro';
 import TutorialSchema from '../../../components/TutorialSchema.astro';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
 
 <TutorialMeta />
 
@@ -35,65 +37,78 @@ Memory is off in every profile until you do this. It runs on your machine and ne
 
 ## Steps
 
-<Steps>
+### 1. Switch memory on in the project
 
-1. **Switch memory on in the project.** Which command depends on where the project stands.
+Which command depends on where the project stands.
 
-   **The project is not set up yet.** Pass the flag to `cckit init`, or answer yes to the memory
-   question when you set up through the `/kit-init` command in Claude Code:
+**The project is not set up yet.** Pass the flag to `cckit init`, or answer yes to the memory
+question when you set up through the `/kit-init` command in Claude Code:
 
-   ```bash frame="terminal"
-   cckit init --profile software --memory on
-   ```
+<Chat
+  title="setting up the Bakery site with memory on"
+  say="Set up the Bakery site with memory on."
+  ran="cckit init --profile software --memory on"
+  means="The result is four hook scripts under .claude/hooks/, registered in .claude/settings.local.json, the rule file .claude/rules/mempalace.md, and the project's summary header, .claude/mempal-identity.<wing>.txt. A wing is MemPalace's name for one project's memory; <wing> is the project's short name."
+>
+  Done. The memory hooks, the rule and the summary header are in the project, and `memory.enabled`
+  is on. The tool itself comes in the next step.
+</Chat>
 
-   **You already ran `cckit init` without memory.** cckit has no command that adds only the memory
-   files. `cckit init` stops on a project that is already set up unless you pass `--force`, which
-   writes cckit's generated files again, the memory files included. Commit your work first, run it
-   with the profile the project uses, and read the diff afterwards:
+**You already ran `cckit init` without memory.** cckit has no command that adds only the memory
+files. `cckit init` stops on a project that is already set up unless you pass `--force`, which
+writes cckit's generated files again, the memory files included. Commit your work first, run it
+with the profile the project uses, and read the diff afterwards:
 
-   ```bash frame="terminal"
-   cckit init --profile <profile> --memory on --no-github --force
-   ```
+<Chat
+  title="adding memory to a Bakery site that was set up without it"
+  say="The Bakery site has no memory yet. Add it, and show me the diff afterwards."
+  ran="cckit init --profile <profile> --memory on --no-github --force"
+  means="Commit your work first. cckit init --upgrade does not add the memory files, and cckit add mempalace only sets memory.enabled in a project that already has them."
+>
+  The memory files are written again alongside cckit's other generated files. Read the diff before
+  you commit it.
+</Chat>
 
-   `cckit init --upgrade` does not add them, and `cckit add mempalace` only sets `memory.enabled`
-   in a project that already has the files.
+### 2. Let `cckit doctor` install the tool
 
-   Either way the result is four hook scripts under `.claude/hooks/`, registered in
-   `.claude/settings.local.json`, the rule file `.claude/rules/mempalace.md`, and the project's
-   summary header, `.claude/mempal-identity.<wing>.txt`. A **wing** is MemPalace's name for one
-   project's memory; `<wing>` is the project's short name.
+<Chat
+  title="installing the memory tool for the Bakery site"
+  say="Check the memory setup of the Bakery site, and install the tool if it is missing. Ask me first."
+  ran="cckit doctor"
+  means="The doctor sees that memory is on and asks before it installs anything. On your yes (or with --fix) it installs the MemPalace command-line tool into an isolated environment: pipx first, uv if pipx is not there."
+>
+  I asked, you said yes, and the tool is installed. The same run created the summary header, which
+  was missing, and refreshed an out-of-date session-start hook.
+</Chat>
 
-2. **Let `cckit doctor` install the tool.** The doctor sees that memory is on and asks before it
-   installs anything. On your yes (or with `--fix`) it installs the MemPalace command-line tool
-   into an isolated environment: `pipx` first, `uv` if `pipx` is not there.
+To install by hand, run `pipx install mempalace`, the first command the descriptor tries. The
+doctor then finds the tool and reports it installed. The commands live in
+`integrations/mempalace.json`; MemPalace is one of the [integrations](/integrations/) cckit
+installs this way.
 
-   ```bash frame="terminal"
-   cckit doctor
-   ```
+### 3. Connect the MCP server
 
-   The same run creates the summary header if it is missing and refreshes an out-of-date
-   session-start hook.
+<Chat
+  title="connecting memory search to the agent"
+  say="Connect memory search, so you can look things up during a session."
+  ran="mempalace mcp"
+  means="The hooks cover the start and the end of a session. Searching and saving during a session go through MemPalace's MCP server: the connection Claude Code uses to call a tool while it works. This command prints the line that registers it."
+>
+  That printed the line that registers the server with Claude Code. Run it, then restart Claude
+  Code.
+</Chat>
 
-   To install by hand, run `pipx install mempalace`, the first command the descriptor tries. The
-   doctor then finds the tool and reports it installed. The commands live in
-   `integrations/mempalace.json`; MemPalace is one of the [integrations](/integrations/) cckit
-   installs this way.
+### 4. Describe the project in the header
 
-3. **Connect the MCP server.** The hooks cover the start and the end of a session. Searching and
-   saving during a session go through MemPalace's MCP server: the connection Claude Code uses to
-   call a tool while it works. This command prints the line that
-   registers it with Claude Code:
-
-   ```bash frame="terminal"
-   mempalace mcp
-   ```
-
-   Run the line it prints, then restart Claude Code.
-
-4. **Describe the project in the header.** Open `.claude/mempal-identity.<wing>.txt` and edit its
-   `Stack:` line. This header is shown at the start of every session in this project.
-
-</Steps>
+<Chat
+  title="describing the Bakery site in its memory header"
+  say="Describe the Bakery site in its memory header: Next.js, a neighbourhood bakery, prices in euros."
+  ran="cat .claude/mempal-identity.<wing>.txt"
+  means="This header is shown at the start of every session in this project. The line to edit is the Stack: line."
+>
+  I edited the `Stack:` line and read the file back. Every session in this project now opens with
+  that description.
+</Chat>
 
 ## Check that it worked
 
@@ -125,8 +140,8 @@ bugs to its own issue tracker.
 step 1, then run `cckit doctor`. With no terminal attached it installs
 nothing unless you pass `--fix`.
 
-**Claude is not recalling anything.** Confirm the MCP server line from `mempalace mcp` is registered
-with Claude Code, and that `.claude/rules/mempalace.md` exists. That rule is what tells Claude to
+**Your agent is not recalling anything.** Confirm the MCP server line from `mempalace mcp` is registered
+with Claude Code, and that `.claude/rules/mempalace.md` exists. That rule is what tells the agent to
 search memory before it answers.
 
 **Memories from another repository showed up.** Memory is scoped per wing, one per project. Check
@@ -153,7 +168,7 @@ See [Under Codex](/memory/how-cckit-uses-it/#under-codex).
   ]}
   faqs={[
     { q: "doctor didn't install MemPalace", a: 'It only installs when memory is on. Switch memory on as in step 1, then run cckit doctor. With no terminal attached it installs nothing unless you pass --fix.' },
-    { q: "Claude isn't recalling anything", a: 'Confirm the MCP server line from mempalace mcp is wired into Claude Code and that .claude/rules/mempalace.md exists — it teaches Claude to recall before answering.' },
+    { q: "Your agent isn't recalling anything", a: 'Confirm the MCP server line from mempalace mcp is wired into Claude Code and that .claude/rules/mempalace.md exists — it teaches the agent to recall before answering.' },
     { q: 'Memories from another repo showed up', a: 'Memory is scoped per wing (one per project). Check you are in the right repo and its wing name is unique.' },
   ]}
 />

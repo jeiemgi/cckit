@@ -15,10 +15,12 @@ tutorial:
   related: [design/ux-audit, development/browser-debug, development/extend-with-skills]
 ---
 
-import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 import TagRow from '../../../components/TagRow.astro';
 import TutorialMeta from '../../../components/TutorialMeta.astro';
 import TutorialSchema from '../../../components/TutorialSchema.astro';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
 
 <TagRow kinds={["skill", "conversational"]} />
 
@@ -49,84 +51,115 @@ Claude Code session that pulls the notes you leave, fixes each one and marks it 
 - **It runs in development only.** The toolbar is behind a development check and is not part of a
   production build.
 
-## Steps
+## 1. Ask for the setup
 
-<Steps>
+<Chat
+  title="asking for visual annotation on the Bakery site"
+  say="Set up visual annotation for this app. Show me the plan first, and ask before you install anything or edit a file."
+  ran='"${CLAUDE_PLUGIN_ROOT}/scripts/annotate-setup.sh" --dry-run'
+  means="A dry run installs nothing and writes nothing. The slash command /kit-annotate setup does the same."
+>
+  The Bakery site is a Next.js app that uses pnpm. Here is the plan. I have installed nothing.
+</Chat>
 
-1. **Ask for the setup.** In Claude Code, from the root of the React project:
+## 2. Read the plan
 
-   <div class="cckit-prompt">
+The skill runs its setup script as a dry run and shows what it found and what it would do. The plan stays in the chat, and you read it before saying yes.
 
-   ```text frame="terminal" title="Prompt to paste"
-   Set up visual annotation for this app. Show me the plan first, and ask before you install
-   anything or edit a file.
-   ```
+<Outcomes title="The plan for a Next.js app using pnpm">
 
-   </div>
+For a Next.js app using pnpm, the plan is shaped like this:
 
-   The slash command `/kit-annotate setup` does the same.
+```text
+React        : yes (v19.0.0)
+Framework    : next
+Entry file   : app/layout.tsx
+Pkg manager  : pnpm
 
-2. **Read the plan.** The skill runs its setup script as a dry run and shows what it found and
-   what it would do. For a Next.js app using pnpm, the plan is shaped like this:
+Would:
+  1. pnpm add -D agentation
+  2. claude mcp add agentation -- npx -y agentation-mcp server
+  3. write .claude/rules/react-annotate.md
+  4. merge .annotate into .claude/kit.config.json
+  5. wire the dev-only toolbar into app/layout.tsx
+```
 
-   ```text
-   React        : yes (v19.0.0)
-   Framework    : next
-   Entry file   : app/layout.tsx
-   Pkg manager  : pnpm
+Nothing is installed or written by the dry run.
 
-   Would:
-     1. pnpm add -D agentation
-     2. claude mcp add agentation -- npx -y agentation-mcp server
-     3. write .claude/rules/react-annotate.md
-     4. merge .annotate into .claude/kit.config.json
-     5. wire the dev-only toolbar into app/layout.tsx
-   ```
+</Outcomes>
 
-   Nothing is installed or written by the dry run.
+## 3. Say yes to the install
 
-3. **Say yes to the install.** The skill asks: install, preview only, or skip. On install it adds
-   `agentation` as a dev dependency with your package manager, registers the `agentation` MCP
-   server for Claude Code, writes the rule file `.claude/rules/react-annotate.md` and records the
-   setup under `annotate` in `.claude/kit.config.json`.
+<Chat
+  title="installing the annotation toolbar on the Bakery site"
+  say="Yes, install it."
+  ran={[
+    "pnpm add -D agentation",
+    "claude mcp add agentation -- npx -y agentation-mcp server",
+  ]}
+  means="The skill asks first: install, preview only, or skip."
+>
+  Installed. I also wrote the rule file `.claude/rules/react-annotate.md` and recorded the setup
+  under `annotate` in `.claude/kit.config.json`.
+</Chat>
 
-4. **Approve the one source edit.** The toolbar is one line in your app's entry file. The skill
-   shows the diff and waits for your OK. For Next.js it looks like this:
+## 4. Approve the one source edit
 
-   ```tsx title="app/layout.tsx"
-   import { Agentation } from "agentation";
+<Chat
+  title="approving the toolbar line in the Bakery site's layout"
+  say="Show me the edit to the layout, then go ahead."
+  ran="git diff app/layout.tsx"
+  means="Keep the endpoint prop. Without it the toolbar saves notes in the browser only and your agent never sees them."
+>
+  The toolbar is one line in `app/layout.tsx`, shown only in development. This is the diff. Say
+  the word and I keep it.
+</Chat>
 
-   // inside <body>, after {children}
-   {process.env.NODE_ENV === "development" && <Agentation endpoint="http://localhost:4747" />}
-   ```
+<Outcomes title="The toolbar line, per framework">
 
-   Vite and React Router use `import.meta.env.DEV` as the check, in `src/main.tsx` and
-   `app/root.tsx`. Keep the `endpoint` prop: without it the toolbar saves notes in the browser
-   only and Claude Code never sees them.
+For Next.js it looks like this:
 
-5. **Restart Claude Code and start your dev server.** The restart loads the new MCP server.
-   Then check the connection:
+```tsx title="app/layout.tsx"
+import { Agentation } from "agentation";
 
-   ```bash frame="terminal"
-   npx agentation-mcp doctor
-   ```
+// inside <body>, after {children}
+{process.env.NODE_ENV === "development" && <Agentation endpoint="http://localhost:4747" />}
+```
 
-6. **Annotate, then hand over the batch.** Open the app, click the elements you want changed and
-   leave a note on each. When you are done:
+Vite and React Router use `import.meta.env.DEV` as the check, in `src/main.tsx` and
+`app/root.tsx`. Keep the `endpoint` prop: without it the toolbar saves notes in the browser
+only and Claude Code never sees them.
 
-   <div class="cckit-prompt">
+</Outcomes>
 
-   ```text frame="terminal" title="Prompt to paste"
-   I left notes on the app. Pull them all and fix them.
-   ```
+## 5. Restart Claude Code and start your dev server
 
-   </div>
+The restart loads the new MCP server. Then check the connection:
 
-   Claude Code works through the notes one at a time. In the toolbar each note moves to
-   acknowledged, then to resolved with a one-line summary of the change. Refresh the page to see
-   the fixes.
+<Chat
+  title="checking the annotation connection on the Bakery site"
+  say="Is the annotation server connected?"
+  ran="npx agentation-mcp doctor"
+  means="Run it after the restart and with the dev server up. Nothing to fix means the toolbar and the MCP server are talking."
+>
+  I ran the check after the restart. Open the Bakery site in the browser: the toolbar is in the
+  bottom-right corner.
+</Chat>
 
-</Steps>
+## 6. Annotate, then hand over the batch
+
+Open the app, click the elements you want changed and leave a note on each. On the Bakery site the
+owner clicks the hero and writes "the tagline is too small on my phone". When you are done:
+
+<Chat
+  title="handing over the Bakery site's annotations"
+  say="I left notes on the app. Pull them all and fix them."
+  ran="git diff --stat"
+  means="Your agent reads the notes through the agentation MCP server. In the toolbar each note moves to acknowledged, then to resolved with a one-line summary. Refresh the page to see the fixes."
+>
+  I worked through the notes one at a time and marked each resolved. `git diff --stat` lists the
+  files I changed.
+</Chat>
 
 ## Check it worked
 
@@ -201,7 +234,7 @@ toolbar line, or the browser tab predates the setup. Add the prop as in step 4 a
     { name: 'Say yes to the install', text: 'On install the skill adds agentation as a dev dependency, registers the agentation MCP server for Claude Code, writes .claude/rules/react-annotate.md and records the setup in .claude/kit.config.json.' },
     { name: 'Approve the one source edit', text: 'The toolbar is one development-only line in the app entry file. Keep the endpoint prop.' },
     { name: 'Restart Claude Code and start your dev server', text: 'The restart loads the MCP server. Check the connection with npx agentation-mcp doctor.' },
-    { name: 'Annotate, then hand over the batch', text: 'Click elements in the running app, leave notes, then ask Claude Code to pull them all and fix them.' },
+    { name: 'Annotate, then hand over the batch', text: 'Click elements in the running app, leave notes, then ask your agent to pull them all and fix them.' },
   ]}
   faqs={[
     { q: 'Does annotation work outside React?', a: 'No. The kit-annotate skill covers React apps: Next.js, Vite and React Router are wired for you, and other React setups need the toolbar line added by hand.' },

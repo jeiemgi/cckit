@@ -5,6 +5,8 @@ description: cckit debug gives an agent screenshots, console and network logs th
 
 import { Steps, Aside } from '@astrojs/starlight/components';
 import TagRow from '../../../components/TagRow.astro';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
 
 <TagRow kinds={["command"]} />
 
@@ -35,49 +37,53 @@ nobody watching is never failed by a missing optional tool.
 
 ## Use it on a page
 
+Each step starts with what you say to your agent in the chat. Below it is the command your agent
+runs. The example is the Bakery site, where the tagline looks too small on a phone.
+
 **What you will have at the end:** an agent that can take a screenshot of a page, read its
 console and act on what it finds.
 
-<Steps>
+### 1. Check whether it is available
 
-1. **Check whether it is available.** This runs nothing in the browser:
+This runs nothing in the browser.
 
-   ```bash frame="terminal"
-   cckit debug --check
-   ```
+<Chat
+  title="checking that the agent can open a browser on the Bakery site"
+  say="Can you look at the Bakery site in a browser from here?"
+  ran="cckit debug --check"
+  output="cckit debug: AVAILABLE via 'npx -y chrome-devtools-axi' (Chrome detected)"
+  means="With Node, `npx` and Chrome present, it reports the capability as available and names the command it will use."
+>
+  Yes. The browser bridge is available through `npx`, and Chrome was detected.
+</Chat>
 
-   With Node, `npx` and Chrome present, it reports the capability as available and names the
-   command it will use.
+### 2. Enable the bridge if the check says it is not available
 
-2. **Enable the bridge if the check says it is not available.** Install it, or rely on `npx`
-   when Node is present:
+Install it, or rely on `npx` when Node is present.
 
-   ```bash frame="terminal"
-   npm i -g chrome-devtools-axi      # or: npx -y chrome-devtools-axi
-   ```
+<Chat
+  title="installing the browser bridge"
+  say="Install the browser bridge so you can look at pages."
+  ran="npm i -g chrome-devtools-axi"
+  means="`npx -y chrome-devtools-axi` also works when Node is present, with no install."
+>
+  The bridge is installed. Run the check again to confirm it.
+</Chat>
 
-3. **Ask the agent to look.** Start your app, then:
+### 3. Ask your agent to look
 
-   <div class="cckit-prompt">
+Start your app, then ask.
 
-   ```text frame="terminal" title="Prompt to paste"
-   Open the page you just changed with cckit debug. Take a screenshot and read the console.
-   Tell me what you see, and fix any error before you report back.
-   ```
+<Chat
+  title="looking at the changed Bakery site page"
+  say="Open the page you just changed with cckit debug. Take a screenshot and read the console. Tell me what you see, and fix any error before you report back."
+  ran="cckit debug <axi-args...>"
+  means="Everything after `cckit debug` is passed to the bridge unchanged. cckit keeps no list of the bridge's subcommands; they are documented in the chrome-devtools-axi repository."
+>
+  I opened the page, took a screenshot and read the console. I describe what is on the page and quote
+  any console error, and I fix it before I report back.
+</Chat>
 
-   </div>
-
-   The agent runs commands of this form:
-
-   ```bash frame="terminal"
-   cckit debug <axi-args...>
-   ```
-
-   Everything after `cckit debug` is passed to the bridge unchanged. cckit keeps no list of the
-   bridge's subcommands; they are documented in the
-   [chrome-devtools-axi repository](https://github.com/kunchenguid/chrome-devtools-axi).
-
-</Steps>
 
 ## Check it worked
 

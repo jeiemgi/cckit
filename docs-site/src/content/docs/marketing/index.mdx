@@ -5,6 +5,7 @@ description: Hand cckit a content-driven page, a landing page, a small app or a 
 
 import { CardGrid, LinkCard, Aside } from '@astrojs/starlight/components';
 import SearchStart from '../../../components/SearchStart.astro';
+import Outcomes from '../../../components/Outcomes.astro';
 
 <SearchStart kind="marketing" />
 
@@ -25,13 +26,21 @@ tells them briefly, so you know what you are trusting.
 3. **Read what came back.** A handed-over task runs without stopping to ask. Where your paragraph
    could be read two ways it picks one, and you see which in the review.
 4. **Approve.** You open the link, read, and approve or ask for changes. A person decides, never
-   Claude. [Review and approval](/marketing/review-and-approval/)
+   your assistant. [Review and approval](/marketing/review-and-approval/)
 
 ## What you get
 
 A link to a version of the work you can look at, and an approved version once you say yes. The
 project remembers your brand voice and, with the optional memory turned on, the decisions you made
 in earlier sessions. See [The tools we plug in](/marketing/tools/).
+
+## After the first piece
+
+- [See where everything stands](/marketing/where-things-stand/): drafts, pieces waiting for a
+  review, pieces done.
+- [Ask for changes to a piece](/marketing/ask-for-changes/): change a piece that is in draft or in review.
+- [Update a page that already exists](/marketing/update-a-page/): a change to a piece that was approved.
+- [Put an approved piece online](/marketing/go-live/): what to hand the person who publishes.
 
 ## What cckit does not do
 
@@ -56,6 +65,29 @@ opened. The person did not edit code.
   <LinkCard title="Someone sent you a review link" href="/marketing/review-and-approval/" description="Review and approval: how to read, comment and decide." />
   <LinkCard title="Several pieces, one goal" href="/marketing/campaigns/" description="Hand over a campaign: the pieces are planned together and approved one by one." />
 </CardGrid>
+
+<Outcomes title="For the technical person: what runs when you say it">
+
+<div data-table="grid">
+
+| What you say | What runs |
+| --- | --- |
+| "Where are we?" | `cckit status` |
+| "Show me my drafts and anything waiting for a review." | `cckit task list` |
+| "What is next?" | `cckit task next` |
+| "Record a new task: …" | `cckit task new "<title>" --body "<what goes on the page>"` |
+| "Run it." | `cckit task run <id>` |
+| "Start a draft for this piece." | `cckit task start <id>` |
+| "Save it and ask for a review." | `cckit task finish <id> "<summary>" --all` |
+| "The review is approved. Finish this piece." | `cckit merge <pr>` |
+| "Plan a campaign." | the campaign skill; the plan opens with `cckit page open <html-file>` and your answer is saved with `cckit page answer` |
+
+</div>
+
+Reading review comments and editing a draft are done by the assistant itself, not by a `cckit`
+verb. The full verb list is in the [CLI reference](/cli-reference/).
+
+</Outcomes>
 
 Two pages are for looking things up: [Who does what](/marketing/who-does-what/) lists the people
 and the assistants, and [Words you will hear](/marketing/words-you-will-hear/) translates the

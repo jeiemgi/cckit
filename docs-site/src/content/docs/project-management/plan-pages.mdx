@@ -3,8 +3,10 @@ title: Plans you answer on a page
 description: A plan, a decision with options or a grilling round opens as a page you annotate and answer — on by default, terminal output where there is no browser, and the answer written back to the issue or to a file.
 ---
 
-import { Steps, Aside } from '@astrojs/starlight/components';
+import { Aside } from '@astrojs/starlight/components';
 import TagRow from '../../../components/TagRow.astro';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
 
 <TagRow kinds={["flow", "command"]} />
 
@@ -57,43 +59,61 @@ so an unattended run does not stop on it.
 
 ## The loop
 
-<Steps>
+The Bakery site's launch plan is the example: the owner answers it on a page.
 
-1. **The agent asks whether a page can open.**
+## 1. The agent asks whether a page can open
 
-   ```bash
-   cckit page mode
-   ```
+<Chat
+  title="checking whether the Bakery site launch plan can open as a page"
+  say="Put the launch plan on a page so I can answer it there."
+  ran="cckit page mode"
+  output="page"
+  means="page: this session can open one. On every other session it prints terminal and the reason, and the plan is printed in the chat instead."
+>
+  This session has a browser, so I will show the plan on a page.
+</Chat>
 
-2. **On `page`, it writes the page and opens it.** The HTML goes under `.lavish/`, with the same
-   content as markdown beside it:
+## 2. On `page`, it writes the page and opens it
 
-   ```bash
-   cckit page open .lavish/<name>.html --fallback .lavish/<name>.md
-   ```
+<Chat
+  title="opening the Bakery site launch plan page"
+  say="Go ahead and open it."
+  ran="cckit page open .lavish/<name>.html --fallback .lavish/<name>.md"
+  means="The HTML goes under .lavish/, with the same content as markdown beside it. If the page tool exits non-zero, open prints the markdown and still exits 0."
+>
+  The plan is open in your browser. The same text is saved as markdown next to it.
+</Chat>
 
-   If the page tool exits non-zero, `open` prints the markdown and still exits 0. Flags after `--`
-   go to the page tool (`cckit page open <file> -- --reopen`). The first open
-   adds `.lavish/` to the repository's local exclude file (`.git/info/exclude`), so pages never
-   show in `git status`; that file is not tracked and not pushed.
+<Outcomes title="Flags and what the first open writes">
 
-3. **It waits for your answer.**
+Flags after `--` go to the page tool (`cckit page open <file> -- --reopen`). The first open
+adds `.lavish/` to the repository's local exclude file (`.git/info/exclude`), so pages never
+show in `git status`; that file is not tracked and not pushed.
 
-   ```bash
-   cckit page poll .lavish/<name>.html
-   ```
+</Outcomes>
 
-   `poll`, `reply` and `end` hand their arguments to the page tool unchanged.
+## 3. It waits for your answer
 
-4. **It writes the answer back.**
+<Chat
+  title="waiting for the owner's answer on the Bakery site plan"
+  say="I will answer on the page. Tell me when you have it."
+  ran="cckit page poll .lavish/<name>.html"
+  means="poll, reply and end hand their arguments to the page tool unchanged."
+>
+  I am waiting for your answer on the page.
+</Chat>
 
-   ```bash
-   cckit page answer --kind decision --title "<what was decided>" --issue <issue> --body-file <file>
-   ```
+## 4. It writes the answer back
 
-   This step runs on the terminal path too.
-
-</Steps>
+<Chat
+  title="recording the Bakery site plan answer"
+  say="I picked the option with the contact form last. Record it."
+  ran='cckit page answer --kind plan --title "<what was decided>" --issue <issue> --body-file <file>'
+  means="This step runs on the terminal path too."
+>
+  Your answer is recorded as a comment on the issue, with the kind and the title, so it outlasts
+  this session.
+</Chat>
 
 On `terminal`, step 2 is "print it in the terminal" and step 3 is the conversation.
 

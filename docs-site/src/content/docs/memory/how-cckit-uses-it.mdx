@@ -5,6 +5,8 @@ description: "The four session hooks, one wing per project and a diary wing per 
 
 import { Aside } from '@astrojs/starlight/components';
 import TagRow from '../../../components/TagRow.astro';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
 
 <TagRow kinds={["flow", "concept"]} />
 
@@ -27,6 +29,17 @@ is [MemPalace](https://github.com/MemPalace/mempalace).
 | The conversation is about to be compressed | The session so far is filed first | the `PreCompact` hook |
 | The session finishes | The finished session is filed | the `Stop` hook |
 | The session closes with work not pushed | A "resume here" note is written and filed | the `SessionEnd` hook |
+
+<Chat
+  title="starting a session a month after the Bakery site launched"
+  say="I'm back. Add the Christmas menu to the Bakery site."
+  ran="mempalace wake-up --wing <wing>"
+  means="You do not type this. The SessionStart hook runs it when the session opens, and its output is the project's summary and recent decisions."
+>
+  The project's summary and its recent decisions were loaded before you typed. What was decided at
+  launch, such as the price format or the brand voice, is in that record, so I search it before I
+  answer and do not ask you again.
+</Chat>
 
 ## The four hooks
 
@@ -97,9 +110,14 @@ With no terminal attached and no `--fix`, the doctor reports and changes nothing
 
 One piece of "where did we stop" needs no MemPalace:
 
-```bash
-cckit handoff "<what is pending, the next step, the issue or pull request it belongs to>"
-```
+<Chat
+  title="leaving a note for the next session on the Bakery site"
+  say="Leave a note for the next session: the Christmas menu has its prices, the photos are still to add."
+  ran='cckit handoff "Christmas menu: prices done, photos still to add"'
+  means="The note is saved to .cckit/handoff.md. It works with memory off and under any agent."
+>
+  Saved. The next session starts from this note, and it is replaced by the next one you leave.
+</Chat>
 
 This saves a note to `.cckit/handoff.md`. The file is local, ignored by git, and shared by the
 main checkout and every worktree of the repository. Running `cckit` with no verb prints it, so the

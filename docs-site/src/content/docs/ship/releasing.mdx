@@ -3,7 +3,9 @@ title: Cut a release
 description: How the version is read from commit titles, how work is promoted to the release branch, how to add release-please to your project, and how a hotfix reaches the release branch.
 ---
 
-import { Steps, Aside } from '@astrojs/starlight/components';
+import { Aside } from '@astrojs/starlight/components';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
 
 Merging a change and shipping it to users are two decisions. If every merge shipped, a half-built
 feature would reach users as soon as its first pull request landed. If a release needed someone to
@@ -56,32 +58,47 @@ release-please reads every Conventional Commit since the last tag and picks the 
 This assumes the usual two-branch setup: work integrates on a base branch such as `develop`, and
 releases are cut from `main`.
 
-<Steps>
+### 1. Merge work into the base branch all week
 
-1. **Merge work into the base branch all week.** Every pull request `cckit pr` opens has a title
-   release-please can read. Nothing ships.
+<Chat
+  title="opening a pull request whose title carries the version"
+  say="The opening hours section is done. Open the pull request."
+  ran='cckit pr <issue> "<summary>"'
+  means="Every pull request cckit pr opens has a title release-please can read. Nothing ships."
+>
+  The pull request for the hours section is open. Its title is a Conventional Commit subject, so
+  the version can be read from it later.
+</Chat>
 
-2. **Promote a batch.** From a branch cut from the base branch, open the pull request against the
-   release branch:
+### 2. Promote a batch
 
-   ```bash
-   cckit pr <issue> "<summary>" --base main
-   ```
+<Chat
+  title="promoting the week's work to the release branch"
+  say="That is enough for the launch. Open the pull request that promotes develop to main."
+  ran='cckit pr <issue> "<summary>" --base main'
+  means="From a branch cut from the base branch. An explicit --base wins over github.baseBranch, and the labels, milestone and board steps run as for any other pull request. Setting KIT_BASE_BRANCH=main in the environment does not do this: the config file is read after it."
+>
+  The promotion pull request is open against `main`.
+</Chat>
 
-   An explicit `--base` wins over `github.baseBranch`, and the labels, milestone and board steps
-   run as for any other pull request. Setting `KIT_BASE_BRANCH=main` in the environment does not do
-   this: the config file is read after it.
+### 3. Let release-please keep the release pull request
 
-3. **Let release-please keep the release pull request.** Add its GitHub Action to your repository,
-   following [release-please's own instructions](https://github.com/googleapis/release-please), in
-   a workflow that runs on every push to the release branch. It opens one release pull request and
-   rewrites it as more work lands. A workflow file is a change a person reviews and merges; no
-   agent merges it alone.
+Add its GitHub Action to your repository, following
+[release-please's own instructions](https://github.com/googleapis/release-please), in a workflow
+that runs on every push to the release branch. It opens one release pull request and rewrites it as
+more work lands. A workflow file is a change a person reviews and merges; no agent merges it alone.
 
-4. **Merge the release pull request.** That merge is the release: release-please tags the version
-   and writes the GitHub Release.
+### 4. Merge the release pull request
 
-</Steps>
+<Chat
+  title="releasing version 1.0.0 of the Bakery site"
+  say="The bakery goes online today. Merge the release pull request."
+  ran="cckit merge <pr>"
+  means="That merge is the release: release-please tags the version and writes the GitHub Release."
+>
+  The release pull request is merged. release-please tags the version and writes the GitHub
+  Release.
+</Chat>
 
 **How to check it worked:** the tag exists on the release branch and the GitHub Release lists the
 changes since the last one.
@@ -95,11 +112,21 @@ the same tag.
 A fix that cannot wait for the next `develop` → `main` promotion goes to `main` on its own. It lands
 on `develop` first, through the normal flow; then one command carries it across:
 
-```sh
-cckit hotfix <pr>                     # a merged PR, by number
-cckit hotfix <sha>                    # or a commit
-cckit hotfix <pr> --base release/1.x  # a release branch other than main
-```
+<Chat
+  title="carrying a price fix to the release branch"
+  say="The menu price fix is merged on develop. Carry it to the release branch too."
+  ran={[
+    "cckit hotfix <pr>",
+    "cckit hotfix <sha>",
+    "cckit hotfix <pr> --base release/1.x",
+  ]}
+  means="The first takes a merged pull request by number, the second a commit, the third a release branch other than main."
+>
+  The fix is picked onto a branch cut from the release branch, and a pull request against it is
+  open.
+</Chat>
+
+<Outcomes of="cckit hotfix">
 
 | Step | What happens |
 | --- | --- |
@@ -108,6 +135,8 @@ cckit hotfix <pr> --base release/1.x  # a release branch other than main
 | Pick | `git cherry-pick -x`, with `-m 1` for a merge commit, so the branch carries the source commit's diff and its message records where it came from. A PR that was rebase-merged has no single commit carrying it (GitHub reports its last rebased commit as the merge commit), so each of its commits is picked, oldest first. It is recognized by the PR's commit subjects sitting unchanged under that commit; a PR whose commits cannot be read is refused, and a commit sha still works as the source. |
 | Push | `git push`, with `KIT_PR_BASE=<base>` in the environment of the git pre-push hook. |
 | PR | Opened against `<base>`, titled after the source PR (or the commit subject without its `(#N)` suffix), body `Cherry-pick of #N`. It has no `Closes` line: the issue was closed by the source PR. |
+
+</Outcomes>
 
 The command is re-runnable. A commit already picked is not picked again, and a PR already open for
 the branch is reported instead of re-created. If the pick conflicts, nothing is pushed: resolve it

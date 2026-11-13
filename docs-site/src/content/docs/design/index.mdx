@@ -27,7 +27,7 @@ question word for word with its context (the screen, the token name, the current
 returns the designer's answer to you. Tokens are the named values for colour, spacing and type
 that the project reuses.
 
-**Try it.** Ask in plain words: "the spacing under the card title looks tight, what should it be?"
+**Try it.** Say it in the chat in plain words: "the spacing under the card title looks tight, what should it be?"
 The session hands the question to the designer and comes back with its answer.
 
 What counts as a design question:
@@ -85,12 +85,16 @@ No outside design tool is wired in: see [Limits](#limits).
 
 Design has no `cckit` verb of its own. The work runs through two skills and one verb:
 
-| You want | Run |
+<div data-table="grid">
+
+| What you say | What runs |
 | --- | --- |
-| A design decision | Ask in plain words. The rule routes it to the designer. |
-| To point at the running app and leave notes | `/kit-annotate` |
-| A review of flows, consistency or accessibility | `/kit-ux-audit` |
-| A screenshot or the console of a page, for an agent | `cckit debug` |
+| "The spacing under the card title looks tight. What should it be?" | Nothing: the rule routes the question to the designer agent. |
+| "I want to point at the running app and leave notes." | `/kit-annotate` |
+| "Review the flows, consistency and accessibility of the app." | `/kit-ux-audit` |
+| "Show me a screenshot and the console of this page." | `cckit debug` |
+
+</div>
 
 Every skill is listed on [Skills](/skills/), and the rule on [Rules](/rules/).
 

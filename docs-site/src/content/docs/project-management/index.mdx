@@ -4,6 +4,7 @@ description: "Why every change starts from an issue, and the three units (issue,
 ---
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import Chat from '../../../components/Chat.astro';
 
 Agents write code faster than a team can keep track of it. Once several run at the same time, the
 slow part is no longer the typing. It is knowing what to work on next, what is already done, and
@@ -30,8 +31,16 @@ visible until its own work is done.
 
 ## What to do first
 
-Ask the agent: "sync the board and show me what is ready, and I will pick." Or run `cckit next`,
-which prints the next issue that nothing blocks and the command that starts it.
+<Chat
+  title="asking what is ready on the Bakery site's board"
+  say="Sync the board and show me what is ready, and I will pick."
+  ran={["cckit sync", "cckit next"]}
+  means="Both only read. The board is the open issues, or a GitHub Projects board if you use one."
+>
+  Here is what nothing blocks. Tell me which one to start.
+</Chat>
+
+`cckit next` prints the next issue that nothing blocks and the command that starts it.
 
 ## If you know Scrum
 
@@ -84,16 +93,20 @@ looking for them.
 
 ## The commands
 
-| You want to | Run |
+<div data-table="grid">
+
+| What you say | What runs |
 | --- | --- |
-| See the board and what is unblocked | `cckit sync` |
-| Get the next issue and the command that starts it | `cckit next` |
-| File one issue | `cckit new --role <role> "<title>"` |
-| See the open issues ordered into waves | `cckit plan` |
-| Create an effort with its sub-issues | `cckit effort new "<name>" "<sub> :: <description>" …` |
-| Declare which issue comes before which | `cckit effort chain <a> <b> …` |
-| See the open efforts packed into sessions | `cckit effort plan` |
-| Ask where the project stands | `cckit status` |
+| "Show me the board and what is unblocked." | `cckit sync` |
+| "What should I work on next?" | `cckit next` |
+| "File an issue: …" | `cckit new --role <role> "<title>"` |
+| "Order the open issues into waves." | `cckit plan` |
+| "Make this an effort with these steps." | `cckit effort new "<name>" "<sub> :: <description>" …` |
+| "Step B comes after step A." | `cckit effort chain <a> <b> …` |
+| "Pack the open efforts into sessions." | `cckit effort plan` |
+| "Where does the project stand?" | `cckit status` |
+
+</div>
 
 Every flag is in the [CLI reference](/cli-reference/).
 [Efforts and waves in practice](/project-management/efforts-and-waves/) walks through the effort

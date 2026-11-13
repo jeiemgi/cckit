@@ -1,0 +1,105 @@
+---
+title: Update a page that already exists
+description: "Change a page that was approved earlier: record the change as a new piece, read the review of exactly what changed, approve it."
+tutorial:
+  job: change a page that was approved earlier
+  difficulty: beginner
+  time: "15 min"
+  prerequisites:
+    - { text: "The page is part of the project and was approved earlier", link: "Hand over your first piece", href: "/marketing/your-first-piece/" }
+    - { text: "You know how a review is read and approved", link: "Review and approval", href: "/marketing/review-and-approval/" }
+  ogTag: Marketing
+  related: [marketing/ask-for-changes, marketing/review-and-approval, marketing/go-live]
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
+import TutorialMeta from '../../../components/TutorialMeta.astro';
+
+<TutorialMeta />
+
+An approved page is finished. When the bakery changes its Easter hours or its prices, the change
+is a new piece of work with its own review, so the person who approves reads only what changed.
+The example is the Easter menu page of the Bakery site, a neighbourhood bakery's website, two
+weeks after it was approved.
+
+**Who does it:** you describe the change and approve it. Your assistant builds it in the
+background. A person other than you approves.
+
+**What you will have at the end:** the updated page as an approved version in the project, and the
+change recorded as its own piece.
+
+<Steps>
+
+1. **Name the page and say what changes.** Say which page it is and list every change. Your
+   assistant records it as a new piece of work and starts it.
+
+   <Chat
+     title="handing over an update to the Easter menu page"
+     say="Record a new task: update the Easter menu page. Add Good Friday opening hours, 8 to 12, and change the Easter loaf price to 6. Then run it."
+     means="Nothing is public. The page that was approved stays as it is until this change is approved."
+   >
+     Recorded as "Update the Easter menu page", and I have started it. It works from the page as it
+     is in the project now. I will tell you when there is a link to review.
+   </Chat>
+
+2. **Wait for the link.**
+
+   <Chat
+     title="waiting for the Easter menu update"
+     say="How is the Easter menu update coming along?"
+     means="The project's check passes before a review opens. When it fails, or when nothing changed, no review opens and your assistant says why."
+   >
+     It is ready. The project's check passed and I opened a review. Here is the link to look at it.
+   </Chat>
+
+3. **Read what changed.** The review shows the changes, with new text in green, and not the whole
+   page. If you want it in plain words first, ask.
+
+   <Chat
+     title="asking what changed on the Easter menu page"
+     say="List what changed on the Easter menu page, in plain words."
+     means="Check the list against the review. The review is the one that counts."
+   >
+     Two changes. The Easter loaf price went from 7 to 6. A line was added with the Good Friday
+     opening hours, 8 to 12.
+   </Chat>
+
+4. **Approve and finish.** The approver reads the review as described in
+   [Review and approval](/marketing/review-and-approval/). Once it says approved:
+
+   <Chat
+     title="finishing the Easter menu update"
+     say="The review is approved. Finish this piece."
+     means="Approved is not online. Putting the page on a public address is a separate step."
+   >
+     Done. The updated page is part of the shared version and the update is marked done.
+   </Chat>
+
+</Steps>
+
+A page that was not made through cckit works the same way, as long as it is part of the project:
+name the page and say what changes.
+
+<Aside type="note" title="Approved is not published">
+The updated page is not online until someone puts it there. See
+[Put an approved piece online](/marketing/go-live/).
+</Aside>
+
+<Outcomes title="For the technical person: the two commands behind step 1">
+
+```text
+cckit task new "Update the Easter menu page" --body "<the page and every change>"
+cckit task run <id>
+```
+
+`cckit task new` prints the task's id, and `<id>` is that id. `cckit task run` builds one
+objective from the task's title and notes, so the notes must name the page. The task's gate is
+`--check`, else `tasks.check` in the project config. A failing gate opens no review. The earlier
+task for the page is done, and `cckit task start` refuses a done task, which is why the change is
+a new task.
+
+</Outcomes>
+
+Next: [Put an approved piece online](/marketing/go-live/)

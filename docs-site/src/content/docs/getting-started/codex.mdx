@@ -15,7 +15,9 @@ tutorial:
   related: [getting-started/initialize, development/run-a-wave-in-parallel, development/run-one-objective-unattended]
 ---
 
-import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
 import TutorialMeta from '../../../components/TutorialMeta.astro';
 import TutorialSchema from '../../../components/TutorialSchema.astro';
 
@@ -30,95 +32,143 @@ writes them where Codex looks.
 `cckit init --adapter codex` writes `AGENTS.md`, the skills and rules under `.agents/`, and the
 guard hooks under `.codex/`. After that, the commands that launch an agent take `--agent codex`.
 
+The Bakery site, the example project of these guides, is here worked in Codex. Each step starts with
+the sentence you say to your agent in the chat, then the command it runs.
+
 Steps 1 to 4 are the setup. Steps 5 to 7 are three ways to work once it is in place; stop after
 any of them.
 
 ## Steps
 
-<Steps>
+### 1 · Preview what the adapter writes
 
-1. **Preview what the adapter writes.** A dry run prints the plan and writes nothing:
+<Chat
+  title="previewing the Codex adapter for the Bakery site"
+  say="Show me what the Codex setup would add to the Bakery site. Do not write anything yet."
+  ran="cckit init --profile software --adapter codex --dry-run"
+  means="A dry run prints the plan and writes nothing."
+>
+  I ran the dry run. It lists `cckit.config.json`, `AGENTS.md`, `.agents/rules/`, `.agents/skills/`,
+  `.codex/hooks/`, `.codex/hooks.json` and `.codex/agents/` under `Would write:`, and no `.claude/`
+  directory, because a Codex-only install writes none.
+</Chat>
 
-   ```bash frame="terminal"
-   cckit init --profile software --adapter codex --dry-run
-   ```
+### 2 · Install it
 
-   Under `Would write:` you should see `cckit.config.json`, `AGENTS.md`, `.agents/rules/`,
-   `.agents/skills/`, `.codex/hooks/`, `.codex/hooks.json` and `.codex/agents/`. A Codex-only
-   install writes no `.claude/` directory.
+<Chat
+  title="installing the Codex adapter in the Bakery site"
+  say="That looks right. Install the Codex setup. The repository already runs cckit with Claude Code, so keep those files as they are."
+  ran="cckit init --upgrade --adapter codex"
+  means="The upgrade form adds Codex and leaves the Claude Code files as they are."
+>
+  I added the Codex adapter and left the Claude Code files untouched.
+</Chat>
 
-2. **Install it.** Pick the line that matches the repo:
+<Outcomes of="cckit init" title="Which install line fits which repo">
 
-   ```bash frame="terminal"
-   cckit init --profile software --adapter codex   # a repo with no cckit yet
-   cckit init --upgrade --adapter codex            # a repo that already runs cckit with Claude Code
-   cckit init --profile software --adapter both    # a new repo that will use both agents
-   ```
+Pick the line that matches the repo:
 
-   The upgrade form adds Codex and leaves the Claude Code files as they are.
+```bash frame="terminal"
+cckit init --profile software --adapter codex   # a repo with no cckit yet
+cckit init --upgrade --adapter codex            # a repo that already runs cckit with Claude Code
+cckit init --profile software --adapter both    # a new repo that will use both agents
+```
 
-3. **Check the CLI and the hooks.**
+The upgrade form adds Codex and leaves the Claude Code files as they are.
 
-   ```bash frame="terminal"
-   cckit doctor --agents
-   ```
+</Outcomes>
 
-   You should see a `codex` row with the CLI version and a `codex hooks` row reading
-   `registered in .codex/hooks.json`. The command makes no network call and exits 1 when the
-   Codex CLI is not on `PATH`.
+### 3 · Check the CLI and the hooks
 
-4. **Trust the hooks, then commit them.** Codex skips a project hook until you approve it. Open
-   Codex in the repo, run `/hooks`, and trust the entries cckit registered. Then commit `.codex/`,
-   `.agents/` and `AGENTS.md` so every worktree cut from the base branch carries them.
+<Chat
+  title="checking the Codex CLI and hooks for the Bakery site"
+  say="Is Codex installed here, and are the cckit hooks registered for it?"
+  ran="cckit doctor --agents"
+  means="The command makes no network call and exits 1 when the Codex CLI is not on PATH."
+>
+  The doctor shows a `codex` row with the CLI version and a `codex hooks` row reading
+  `registered in .codex/hooks.json`.
+</Chat>
 
-5. **Work one issue.** Start Codex in the repo and hand it the loop:
+### 4 · Trust the hooks, then commit them
 
-   <div class="cckit-prompt">
+Codex skips a project hook until you approve it. Open Codex in the repo, run `/hooks`, and trust
+the entries cckit registered. That step is yours: the doctor cannot read the trust state.
 
-   ```text frame="terminal" title="Prompt to paste"
-   Read AGENTS.md. Sync the board with cckit and show me what is unblocked. I will pick one issue;
-   start it with cckit, work in the worktree it prints, and open the pull request with cckit when
-   the project's gate passes. Do not merge.
-   ```
+<Chat
+  title="committing the Codex adapter files of the Bakery site"
+  say="Commit the Codex files so every worktree cut from the base branch carries them."
+  ran={["git add .codex .agents AGENTS.md", 'git commit -m "chore: add the cckit Codex adapter"']}
+  means="A worktree cut from a branch that lacks these files has no `.codex/` directory."
+>
+  I committed `.codex/`, `.agents/` and `AGENTS.md`.
+</Chat>
 
-   </div>
+### 5 · Work one issue
 
-6. **Run several issues in parallel.** `cckit wave` prints the launch commands for the adapter,
-   and `orchestrate` creates one worktree and one Codex session per issue:
+Start Codex in the repo and hand it the loop:
 
-   ```bash frame="terminal"
-   cckit wave --adapter codex                                # the wave, with Codex launch commands
-   cckit orchestrate --agent codex --dry-run <issues…>       # print the launch plan; create nothing
-   cckit orchestrate --agent codex --detach <issues…>        # launch, at most 4 at once
-   cckit orchestrate --results --wait 3600                   # how each worker ended
-   ```
+<Chat
+  title="working one Bakery site issue in Codex"
+  say="Read AGENTS.md. Sync the board with cckit and show me what is unblocked. I will pick one issue; start it with cckit, work in the worktree it prints, and open the pull request with cckit when the project's gate passes. Do not merge."
+  ran={["cckit sync", "cckit start <issue>", 'cckit pr <issue> "<summary>"']}
+  means="You pick the issue and Codex does not merge. Merging stays a decision for a person."
+>
+  I synced the board and listed what is unblocked. Once you pick one, I start it, work in its
+  worktree and open the pull request when the gate passes.
+</Chat>
 
-   The dry run prints `DRY RUN - would launch <n> flow(s)` and creates no worktree and no pane.
+### 6 · Run several issues in parallel
 
-7. **Run one objective with no terminal.** `cckit autopilot run` starts `codex exec` one round at
-   a time and stops on limits checked by cckit, from inside the issue's worktree:
+<Chat
+  title="running three Bakery site issues at once in Codex"
+  say="Run the issues I picked in parallel with Codex, one worktree each. Show me the plan first, then launch, and tell me how each one ended."
+  ran={[
+    "cckit wave --adapter codex",
+    "cckit orchestrate --agent codex --dry-run <issues…>",
+    "cckit orchestrate --agent codex --detach <issues…>",
+    "cckit orchestrate --results --wait 3600",
+  ]}
+  means="`orchestrate` creates one worktree and one Codex session per issue, at most 4 at once."
+>
+  I printed the launch plan, launched one Codex session per issue, and waited for the results. The
+  dry run prints `DRY RUN - would launch <n> flow(s)` and creates no worktree and no pane.
+</Chat>
 
-   ```bash frame="terminal"
-   cckit autopilot run --agent codex --agent-arg -s --agent-arg workspace-write \
-     --objective "make the failing tests pass" --until "<your test command>" --dry-run
-   ```
+`cckit wave` prints the launch commands for the adapter, `orchestrate --dry-run` prints the plan,
+`--detach` launches, and `orchestrate --results` reads how each worker ended.
 
-   The dry run prints the command it would start, `'codex' exec --json '-s' 'workspace-write' -`,
-   and the limits. cckit adds no permission flag of its own: the sandbox mode is yours to name
-   with `--agent-arg`.
+### 7 · Run one objective with no terminal
 
-</Steps>
+<Chat
+  title="running one Bakery site objective with Codex"
+  say="Make the failing tests pass, unattended, with Codex. Preview the run first."
+  ran={[{
+    cmd: 'cckit autopilot run --agent codex --agent-arg -s --agent-arg workspace-write --objective "make the failing tests pass" --until "<your test command>" --dry-run',
+    output: "'codex' exec --json '-s' 'workspace-write' -",
+  }]}
+  means="cckit adds no permission flag of its own: the sandbox mode is yours to name with `--agent-arg`."
+>
+  I ran the preview. It prints the command it would start and the limits, and starts nothing.
+</Chat>
+
+`cckit autopilot run` starts `codex exec` one round at a time and stops on limits checked by cckit,
+from inside the issue's worktree.
 
 ## Check it worked
 
-```bash frame="terminal"
-cckit doctor --agents
-```
+<Chat
+  title="confirming the Codex setup of the Bakery site"
+  say="Is the Codex setup healthy?"
+  ran="cckit doctor --agents"
+  means="It exits 0 when both rows are there. The doctor cannot read whether Codex trusts the hooks."
+>
+  The `codex` row shows the CLI version and the `codex hooks` row reads
+  `registered in .codex/hooks.json`.
+</Chat>
 
-It exits 0 and prints a `codex` row with the CLI version and a `codex hooks` row reading
-`registered in .codex/hooks.json`. The doctor cannot read whether Codex trusts the hooks. To see
-that for yourself, try a commit on the base branch from a Codex session: the guard should refuse
-it.
+To see for yourself that the hooks are trusted, try a commit on the base branch from a Codex
+session: the guard should refuse it.
 
 ## How it works
 

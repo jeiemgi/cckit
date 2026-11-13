@@ -4,6 +4,8 @@ description: "What stops two sessions from working on the same issue, branch or 
 ---
 
 import { Aside } from '@astrojs/starlight/components';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
 
 Once agents are useful, you run more than one: a session fixing a bug, another building a
 feature, a wave of workers in the background. They all share one repository on one machine, and
@@ -108,11 +110,25 @@ two worktrees, but the second `cckit start` found the worktree already there, re
 worktree", and both sessions wrote one tree. `cckit start` now records a **claim** and checks for
 one first.
 
-```bash
-cckit start <issue>            # refused (exit 1) while another live session holds the issue
-cckit start --force <issue>    # start anyway and take the claim over
-cckit claims                   # list the live claims: issue, session pid, start time, branch, worktree
-```
+<Chat
+  title="starting an issue that another session already holds"
+  say="Start the contact form issue on the Bakery site."
+  ran="cckit start <issue>"
+  means="The start is refused with exit 1 while another live session holds the issue. `cckit start --force <issue>` starts anyway and takes the claim over."
+>
+  Another session already holds that issue, so I did not start it. No branch and no worktree were made.
+  Do you want me to take the claim over, or pick another issue?
+</Chat>
+
+<Chat
+  title="listing which sessions hold which Bakery site issues"
+  say="Which sessions are working on which issue right now?"
+  ran="cckit claims"
+  output="(no live claims)"
+  means="With a live session, each claim is a row: issue, session pid, start time, branch and worktree."
+>
+  Nothing is claimed right now, so no other session is working on an issue.
+</Chat>
 
 - **The record.** One JSON file per issue at `<git-common-dir>/kit-sessions/issue-<N>.json`:
   issue, branch, worktree, session pid, host, start time. It lives in the shared git dir, so every

@@ -18,6 +18,8 @@ import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components'
 import TagRow from '../../../components/TagRow.astro';
 import TutorialMeta from '../../../components/TutorialMeta.astro';
 import TutorialSchema from '../../../components/TutorialSchema.astro';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
 
 <TagRow kinds={["flow"]} />
 
@@ -35,108 +37,122 @@ reads it to install the tool after a yes.
 This guide writes that file for a tool cckit does not ship. The example is `shfmt`, a shell
 formatter. Replace it with your tool.
 
+Each step that runs a command starts with what you say to your agent in the chat. Below it is the
+command your agent runs. The example is a technical helper adding `shfmt` to the Bakery site.
+
 **What you will have at the end:** a descriptor that passes validation, your tool switched on
 and installed in one of your projects, and the steps to propose it to cckit.
 
 ## Steps
 
-<Steps>
+### 1. Get a cckit checkout to write in
 
-1. **Get a cckit checkout to write in.** Descriptors live in the `integrations/` directory of the
-   cckit source, next to the schema that checks them:
+Descriptors live in the `integrations/` directory of the cckit source, next to the schema that
+checks them.
 
-   ```bash frame="terminal"
-   git clone https://github.com/jeiemgi/cckit
-   cd cckit
-   bash scripts/lib/integrations.sh --list
-   ```
+<Chat
+  title="getting a cckit checkout to write the shfmt descriptor"
+  say="Get a copy of cckit so we can write a descriptor for shfmt, and list the integrations it ships."
+  ran={['git clone https://github.com/jeiemgi/cckit', 'cd cckit', 'bash scripts/lib/integrations.sh --list']}
+  means="You should see the ids that ship: `graft`, `mempalace`, `mlx-lm`."
+>
+  I cloned cckit and listed the descriptors that ship.
+</Chat>
 
-   You should see the ids that ship: `graft`, `mempalace`, `mlx-lm`.
+### 2. Write the descriptor
 
-2. **Write the descriptor.** Create `integrations/shfmt.json`. The file name without `.json` must
-   equal `id`:
+Create `integrations/shfmt.json`. The file name without `.json` must equal `id`:
 
-   ```json title="integrations/shfmt.json"
-   {
-     "id": "shfmt",
-     "label": "shfmt",
-     "summary": "Shell formatter: one layout for every script in the repo.",
-     "config": { "key": "shellFormat.provider", "value": "shfmt" },
-     "appliesWhen": { "anyExtension": [".sh", ".bash"] },
-     "detect": { "run": "shfmt --version" },
-     "install": [
-       { "manager": "brew", "run": "brew install shfmt" }
-     ],
-     "verify": { "run": "shfmt --version" },
-     "docs": "https://github.com/mvdan/sh#shfmt",
-     "attribution": {
-       "author": "Daniel Martí",
-       "license": "BSD-3-Clause",
-       "homepage": "https://github.com/mvdan/sh",
-       "affiliated": false,
-       "notice": "shfmt is open-source software by Daniel Martí. cckit is not affiliated with its author."
-     }
-   }
-   ```
+```json title="integrations/shfmt.json"
+{
+  "id": "shfmt",
+  "label": "shfmt",
+  "summary": "Shell formatter: one layout for every script in the repo.",
+  "config": { "key": "shellFormat.provider", "value": "shfmt" },
+  "appliesWhen": { "anyExtension": [".sh", ".bash"] },
+  "detect": { "run": "shfmt --version" },
+  "install": [
+    { "manager": "brew", "run": "brew install shfmt" }
+  ],
+  "verify": { "run": "shfmt --version" },
+  "docs": "https://github.com/mvdan/sh#shfmt",
+  "attribution": {
+    "author": "Daniel Martí",
+    "license": "BSD-3-Clause",
+    "homepage": "https://github.com/mvdan/sh",
+    "affiliated": false,
+    "notice": "shfmt is open-source software by Daniel Martí. cckit is not affiliated with its author."
+  }
+}
+```
 
-   Three choices in that file are checked by the validator:
+Three choices in that file are checked by the validator:
 
-   | Field | Rule |
-   | --- | --- |
-   | `config.key` | Names the capability, not the vendor: `shellFormat.provider`, never `shfmt.enabled`. |
-   | `install[].manager` | One of `brew`, `pipx`, `uv`, `npm`, `pnpm`, `npx`, `curl`. Candidates are tried in the order written. |
-   | `attribution` | Required. `affiliated` is a boolean, and `notice` is the sentence `cckit add` prints. |
+| Field | Rule |
+| --- | --- |
+| `config.key` | Names the capability, not the vendor: `shellFormat.provider`, never `shfmt.enabled`. |
+| `install[].manager` | One of `brew`, `pipx`, `uv`, `npm`, `pnpm`, `npx`, `curl`. Candidates are tried in the order written. |
+| `attribution` | Required. `affiliated` is a boolean, and `notice` is the sentence `cckit add` prints. |
 
-3. **Validate it.**
+### 3. Validate it
 
-   ```bash frame="terminal"
-   bash scripts/lib/integrations.sh --validate
-   ```
+<Chat
+  title="validating the shfmt descriptor"
+  say="Check that the shfmt descriptor is valid."
+  ran="bash scripts/lib/integrations.sh --validate"
+  means="A clean registry prints nothing and exits 0. A problem prints one line and exits 1."
+>
+  The registry is clean: the validator printed nothing and exited 0.
+</Chat>
 
-   A clean registry prints nothing and exits 0. A problem prints one line and exits 1:
+<Outcomes title="What the validator prints for a problem">
 
-   ```text
-   shfmt: attribution: required field is missing
-   shfmt: install[1].manager: must be one of brew, pipx, uv, npm, pnpm, npx, curl
-   shfmt: config.key: names the tool (shfmt.enabled) — name the capability, e.g. <capability>.provider
-   ```
+```text
+shfmt: attribution: required field is missing
+shfmt: install[1].manager: must be one of brew, pipx, uv, npm, pnpm, npx, curl
+shfmt: config.key: names the tool (shfmt.enabled) — name the capability, e.g. <capability>.provider
+```
 
-4. **Try it on one of your repos.** Point cckit at the directory you just edited, then preview
-   from inside a project:
+</Outcomes>
 
-   ```bash frame="terminal"
-   export KIT_INTEGRATIONS_DIR=/path/to/cckit/integrations
-   cd /path/to/your/project
-   cckit add                       # the list now shows shfmt  [off]
-   KIT_DRY_RUN=1 cckit add shfmt   # the config diff and the install plan; nothing written
-   ```
+### 4. Try it on one of your repos
 
-   The plan names each candidate, whether its package manager is on `PATH`, and whether consent
-   is recorded:
+Point cckit at the directory you just edited, then preview from inside a project.
 
-   ```text
-   shfmt: not installed. Candidates, tried in this order until one works:
-     1. brew install shfmt   (brew is available)
-     consent: NOT recorded in …/.cckit/consent — nothing installs without it
-   ```
+<Chat
+  title="previewing shfmt on the Bakery site"
+  say="Preview switching on shfmt in the Bakery site, using the descriptor we just wrote."
+  ran={['export KIT_INTEGRATIONS_DIR=/path/to/cckit/integrations', 'cd /path/to/your/project', 'cckit add', 'KIT_DRY_RUN=1 cckit add shfmt']}
+  output={[
+    "shfmt: not installed. Candidates, tried in this order until one works:",
+    "  1. brew install shfmt   (brew is available)",
+    "  consent: NOT recorded in …/.cckit/consent — nothing installs without it",
+  ]}
+  means="The list now shows shfmt as `[off]`. The plan names each candidate, whether its package manager is on `PATH`, and whether consent is recorded."
+>
+  The preview shows the config change and the install plan for shfmt. I wrote nothing.
+</Chat>
 
-5. **Switch it on and install it.** Keep `KIT_INTEGRATIONS_DIR` exported for both commands:
+### 5. Switch it on and install it
 
-   ```bash frame="terminal"
-   cckit add shfmt      # sets shellFormat.provider = shfmt, prints the attribution notice
-   cckit doctor         # asks, then installs on yes; --fix skips the prompt
-   ```
+Keep `KIT_INTEGRATIONS_DIR` exported for both commands.
 
-   After `cckit add` you should see `shfmt is on: shellFormat.provider = "shfmt". Nothing was
-   installed.` The doctor then prints a `shfmt` row under **Integrations**: `missing` before the
-   install, `installed` after it.
+<Chat
+  title="switching on and installing shfmt on the Bakery site"
+  say="Switch on shfmt for the Bakery site and install it."
+  ran={['cckit add shfmt', 'cckit doctor']}
+  output={['shfmt is on: shellFormat.provider = "shfmt". Nothing was installed.']}
+  means="`cckit doctor` asks, then installs on yes; `--fix` skips the prompt. The doctor prints a `shfmt` row under Integrations: `missing` before the install, `installed` after it."
+>
+  shfmt is on for the project. The doctor installed it after your yes, and its row now reads `installed`.
+</Chat>
 
-6. **Propose it.** To ship the descriptor to everyone, open a pull request against cckit from the
-   checkout you edited. Add the config key to `kit.config.schema.json` and a row for the tool,
-   with its credit and not-affiliated notice, to the Integrations page of the docs in the same
-   pull request.
+### 6. Propose it
 
-</Steps>
+To ship the descriptor to everyone, open a pull request against cckit from the checkout you
+edited. Add the config key to `kit.config.schema.json` and a row for the tool, with its credit and
+not-affiliated notice, to the Integrations page of the docs in the same pull request.
+
 
 ## Check it worked
 

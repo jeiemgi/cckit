@@ -3,12 +3,14 @@ title: Palabras que vas a escuchar
 description: Las palabras de desarrollo detrás de borrador, revisión y aprobado, explicadas con palabras sencillas, cada una con la página de Software que la explica completa.
 ---
 
+import Chat from '../../../../components/Chat.astro';
+
 Tarde o temprano alguien de desarrollo te dice "abrí un PR", o un botón de GitHub dice "Merge",
 y necesitas saber si eso te toca a ti. Esta página es para ese momento.
 
 cckit nació para equipos de software, y sus herramientas usan sus palabras. Con el perfil de
-marketing Claude habla con palabras sencillas, pero las palabras de desarrollo siguen apareciendo
-en GitHub, en los mensajes de la gente de desarrollo y cuando le pides detalle a Claude. Esta
+marketing tu asistente habla con palabras sencillas, pero las palabras de desarrollo siguen apareciendo
+en GitHub, en los mensajes de la gente de desarrollo y cuando le pides detalle a tu asistente. Esta
 página relaciona cada una con la palabra que ya usas.
 
 No necesitas aprenderlas para hacer tu trabajo. Casi todas se usan en inglés, también en equipos
@@ -35,7 +37,7 @@ que hablan español. Las páginas de Software enlazadas en cada fila están en i
 | --- | --- | --- |
 | Proyecto | repository, repo (repositorio) | La carpeta que guarda tu contenido y todo su historial, alojada en GitHub. Más (en inglés): [What you set up, and why](/getting-started/) |
 | La versión compartida | base branch, `main`, `develop` | La versión en la que todo el equipo está de acuerdo. Los borradores salen de ella y vuelven a ella. Más (en inglés): [How one change is built](/development/) |
-| La carpeta de un borrador | worktree | Una carpeta aparte en tu computadora para un solo borrador, para que dos borradores no se mezclen. Claude la crea y la quita. Más (en inglés): [How one change is built](/development/) |
+| La carpeta de un borrador | worktree | Una carpeta aparte en tu computadora para un solo borrador, para que dos borradores no se mezclen. Tu asistente la crea y la quita. Más (en inglés): [How one change is built](/development/) |
 | Cambio guardado | commit | Un paso guardado dentro de un borrador, con una nota que dice qué cambió. Más (en inglés): [How one change is built](/development/) |
 | Enviar a GitHub | push | Copiar tus cambios guardados de tu computadora a GitHub para que otras personas los vean. Más (en inglés): [How one change is built](/development/) |
 | Campaña | effort | Varias piezas de trabajo bajo un mismo plan. Se llama "effort" cuando la lista de tareas está en GitHub; ahí sus piezas se aprueban juntas. Más (en inglés): [Break a feature into an effort](/project-management/break-a-feature-into-an-effort/) |
@@ -45,8 +47,8 @@ que hablan español. Las páginas de Software enlazadas en cada fila están en i
 | Las llaves | setup, sign-in, credentials | Las cuentas y el proyecto que una persona técnica deja listos una vez para que cckit trabaje por ti: Claude Code, una cuenta de GitHub y el proyecto. Más (en inglés): [Install and check](/getting-started/install/) |
 | Memoria | MemPalace | Una herramienta opcional que permite que el proyecto recuerde decisiones entre sesiones. Apagada por defecto. Más (en inglés): [Why an agent team needs memory](/memory/) |
 | Preparación | profile (perfil) | El conjunto de habilidades, roles y reglas que se instala para un tipo de equipo. El tuyo es el perfil de marketing. Más (en inglés): [Initialize a project](/getting-started/initialize/) |
-| Algo que Claude sabe hacer | skill (habilidad) | Un método escrito que Claude sigue para una tarea, como redactar o planear una campaña. Más (en inglés): [Skills cckit ships](/skills/) |
-| Asistente | agent, sub-agent (agente) | Un rol que Claude toma para una parte del trabajo: planeación, edición, diseño, investigación. Más: [Quién hace qué](/es/marketing/who-does-what/) |
+| Algo que tu asistente sabe hacer | skill (habilidad) | Un método escrito que tu asistente sigue para una tarea, como redactar o planear una campaña. Más (en inglés): [Skills cckit ships](/skills/) |
+| Asistente | agent, sub-agent (agente) | Un rol que tu asistente toma para una parte del trabajo: planeación, edición, diseño, investigación. Más: [Quién hace qué](/es/marketing/who-does-what/) |
 | Comprobación automática | hook, gate | Algo que corre solo antes de que un cambio se guarde o se apruebe, como revisar que no quedó una contraseña en un archivo. Más (en inglés): [Hooks](/hooks/) |
 | Comando escrito | CLI, terminal | La ventana de texto donde la gente de desarrollo escribe comandos. La persona técnica la usa durante la preparación. Más (en inglés): [CLI reference](/cli-reference/) |
 
@@ -60,16 +62,19 @@ que hablan español. Las páginas de Software enlazadas en cada fila están en i
 | "¿Me revisas mi PR?" | "Por favor lee mi borrador y apruébalo o dime qué cambiar." |
 | "Ya está mergeado." | "Está aprobado y ya es parte del contenido." |
 | "Está en un branch." | "Todavía es un borrador." |
-| "Hay un conflicto." | "Dos borradores cambiaron las mismas líneas. Pídele a Claude que lo resuelva y lee lo que propone." |
-| "El CI está en rojo." | "Falló una comprobación automática. Pregúntale a Claude qué falló y si lo puede arreglar." |
+| "Hay un conflicto." | "Dos borradores cambiaron las mismas líneas. Pídele a tu asistente que lo resuelva y lee lo que propone." |
+| "El CI está en rojo." | "Falló una comprobación automática. Pregúntale a tu asistente qué falló y si lo puede arreglar." |
 
-## Cuando Claude usa una palabra que no conoces
+## Cuando tu asistente usa una palabra que no conoces
 
-Dile:
-
-```text
-Explícamelo con palabras sencillas.
-```
+<Chat
+  title="preguntar qué significa una palabra de desarrollo"
+  say="Explícamelo con palabras sencillas."
+  means="Tu asistente lo dice otra vez sin las palabras de desarrollo."
+>
+  Claro. "Merged" quiere decir que el borrador aprobado ya es parte de la versión compartida del
+  proyecto. Es decir, la página del menú de Pascua está aprobada y terminada.
+</Chat>
 
 Las páginas de Software enlazadas arriba están escritas para gente de desarrollo. Léelas cuando
 tengas curiosidad, no por obligación.

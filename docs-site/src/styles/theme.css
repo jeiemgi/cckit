@@ -736,9 +736,10 @@ h1 .cckit-tag, h2 .cckit-tag, h3 .cckit-tag { font-size: 0.65em; }
 /* Starlight sidebar entries don't take an icon, so we paint one before each top-level GROUP label
    (Philosophy … Reference) via a CSS mask — a line icon tinted with
    the accent. Matched by group order (the sidebar config order is stable); keep these in sync when a
-   group is added or reordered, or the last group renders as an empty square. */
-.top-level > li > details > summary .group-label { display: flex; align-items: center; }
-.top-level > li > details > summary .group-label::before {
+   group is added or reordered, or the last group renders as an empty square. Software only: the
+   Marketing groups carry no icon (the base rules below are scoped off that track). */
+:root:not(:has(meta[name='cckit-track'][content='marketing'])) .top-level > li > details > summary .group-label { display: flex; align-items: center; }
+:root:not(:has(meta[name='cckit-track'][content='marketing'])) .top-level > li > details > summary .group-label::before {
 	content: '';
 	width: 1.1em;
 	height: 1.1em;

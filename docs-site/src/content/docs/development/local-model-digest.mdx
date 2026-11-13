@@ -18,6 +18,8 @@ import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components'
 import TagRow from '../../../components/TagRow.astro';
 import TutorialMeta from '../../../components/TutorialMeta.astro';
 import TutorialSchema from '../../../components/TutorialSchema.astro';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
 
 <TagRow kinds={["flow"]} />
 
@@ -34,73 +36,87 @@ agent works from the digest and opens the original only for a detail.
 The runtime is mlx-lm, third-party software that cckit adopts and does not build. It runs on
 Apple silicon only.
 
+Each step starts with what you say to your agent in the chat. Below it is the command your agent
+runs. The example is the Bakery site, with a long build log to read.
+
 **What you will have at the end:** a model server on your Mac, and one verb, `cckit digest`,
 that the agent runs before a long read.
 
 ## Steps
 
-<Steps>
+### 1. Switch the local layer on
 
-1. **Switch the local layer on.** `cckit add mlx-lm` asks one question and, on yes, sets
-   `local.enabled` to `true` in the project config:
+`cckit add mlx-lm` asks one question and, on yes, sets `local.enabled` to `true` in the project
+config.
 
-   ```bash frame="terminal"
-   KIT_DRY_RUN=1 cckit add mlx-lm   # preview: the config diff and the install commands
-   cckit add mlx-lm
-   ```
+<Chat
+  title="switching on the local model for the Bakery site"
+  say="Switch on the local model for the Bakery site."
+  ran={['KIT_DRY_RUN=1 cckit add mlx-lm', 'cckit add mlx-lm']}
+  means="The first line is the preview: the config diff and the install commands. Nothing is installed by this step. On a machine that is not Darwin and arm64 the command declines, exits 0 and writes nothing."
+>
+  The local layer is on in the project config. Nothing is installed yet.
+</Chat>
 
-   Nothing is installed by this step. On a machine that is not `Darwin` + `arm64` the command
-   declines, exits 0 and writes nothing.
+### 2. Let the doctor install the runtime and start the server
 
-2. **Let the doctor install the runtime and start the server.**
+<Chat
+  title="installing the local model runtime"
+  say="Install the local model and start its server."
+  ran={['cckit doctor', 'cckit doctor --fix']}
+  means="`cckit doctor` asks in a terminal, then installs on yes. `cckit doctor --fix` installs without the prompt."
+>
+  The runtime is installed. Under Integrations the doctor shows an `mlx-lm` row reading `installed`,
+  and under Local model layer it starts `mlx_lm.server` in the background and reports its state.
+</Chat>
 
-   ```bash frame="terminal"
-   cckit doctor         # in a terminal: asks, then installs on yes
-   cckit doctor --fix   # installs without the prompt
-   ```
+<Outcomes of="cckit doctor (Local model layer)">
 
-   Under **Integrations** you should see an `mlx-lm` row reading `installed`. Under **Local model
-   layer** the doctor starts `mlx_lm.server` in the background and reports one of three states:
+| Row | Meaning |
+| --- | --- |
+| `started @ :8080` or `alive @ :8080` | The server answers. Go to step 4. |
+| `starting (pid …) — model still downloading/loading` | The first start downloads the model, about 4.5 GB. Go to step 3. |
+| `failed to start — see <log>` | Read the log named in the row: `~/.claude/kit-local-server.log`. |
 
-   | Row | Meaning |
-   | --- | --- |
-   | `started @ :8080` or `alive @ :8080` | The server answers. Go to step 4. |
-   | `starting (pid …) — model still downloading/loading` | The first start downloads the model, about 4.5 GB. Go to step 3. |
-   | `failed to start — see <log>` | Read the log named in the row: `~/.claude/kit-local-server.log`. |
+</Outcomes>
 
-3. **Wait for the model, then confirm the server answers.**
+### 3. Wait for the model, then confirm the server answers
 
-   ```bash frame="terminal"
-   curl -sf http://127.0.0.1:8080/v1/models
-   ```
+<Chat
+  title="checking that the local model server answers"
+  say="Is the local model server up yet?"
+  ran="curl -sf http://127.0.0.1:8080/v1/models"
+  means="It prints a JSON list of models and exits 0 once the server is up. While the model is still downloading it prints nothing and exits non-zero."
+>
+  The server answers once this prints the model list. Until then the model is still downloading.
+</Chat>
 
-   The command prints a JSON list of models and exits 0 once the server is up. While the model is
-   still downloading it prints nothing and exits non-zero.
+### 4. Digest a long input
 
-4. **Digest a long input.**
+<Chat
+  title="digesting a long Bakery site build log"
+  say="The build log is long. Digest it and tell me what matters."
+  ran={['cckit digest build.log --lang en', 'cckit digest https://example.com/long-article --lang en --focus "breaking changes"']}
+  means="You get a heading `# Digest (local: <model>) — <source>`, the bullets, and a last line naming the original with its word count. `--focus` weights the digest toward one topic. `--lang` takes `es` or `en`; without it the digest is written in Spanish."
+>
+  Here is the digest of the log: the few lines that matter, and a pointer to the original for the
+  detail.
+</Chat>
 
-   ```bash frame="terminal"
-   cckit digest build.log --lang en
-   cckit digest https://example.com/long-article --lang en --focus "breaking changes"
-   ```
+### 5. Have your agent use it
 
-   You should see a heading `# Digest (local: <model>) — <source>`, the bullets, and a last line
-   naming the original with its word count. `--focus` weights the digest toward one topic.
-   `--lang` takes `es` or `en`; without it the digest is written in Spanish.
+In Claude Code the `kit-digest` skill runs the same verb before a long read.
 
-5. **Have the agent use it.** In Claude Code the `kit-digest` skill runs the same verb before a
-   long read:
+<Chat
+  title="working from a digest instead of the whole log"
+  say="Before you read the CI log I am about to give you, digest it with the local model and work from the digest. Open the original only for the lines you need to quote."
+  ran="cckit digest <log file>"
+  means="The agent pays for the short digest, not for every line, and has more room left for the fix."
+>
+  I digested the log on the local model and I am working from the digest. I will open the original only
+  for the lines I need to quote.
+</Chat>
 
-   <div class="cckit-prompt">
-
-   ```text frame="terminal" title="Prompt to paste"
-   Before you read the CI log I am about to give you, digest it with the local model and work from
-   the digest. Open the original only for the lines you need to quote.
-   ```
-
-   </div>
-
-</Steps>
 
 ## Check it worked
 
@@ -116,11 +132,15 @@ from its subtitles and needs `yt-dlp` on `PATH`.
 
 The exit code tells the caller what to do:
 
+<Outcomes of="cckit digest">
+
 | Exit code | Meaning | What the caller does |
 | --- | --- | --- |
 | `0` | The digest was printed. | Read the digest. |
 | `2` | The local server is down. | Read the original directly. |
 | `1` | A usage or input error: no such file, a failed fetch, an empty input, an unknown flag. | Fix the argument. |
+
+</Outcomes>
 
 Nothing depends on the server being up. Every caller of the local layer treats a failure as "use
 the path that was there before".

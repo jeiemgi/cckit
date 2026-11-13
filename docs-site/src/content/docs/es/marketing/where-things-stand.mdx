@@ -1,0 +1,115 @@
+---
+title: Mira cómo va todo
+description: Pregúntale a tu asistente qué está en borrador, qué espera una revisión, qué está terminado y qué sigue, en todo el proyecto o en una sola pieza.
+tutorial:
+  job: ver qué está en borrador, en revisión y terminado en todo el proyecto
+  difficulty: beginner
+  time: "5 min"
+  prerequisites:
+    - { text: "Las llaves están entregadas y el proyecto está abierto en el chat con tu asistente", link: "Las llaves están entregadas", href: "/es/marketing/get-set-up/" }
+    - { text: "Ya delegaste al menos una pieza, o las listas estarán vacías", link: "Delega tu primera pieza", href: "/es/marketing/your-first-piece/" }
+  ogTag: Marketing
+  related: [marketing/your-first-piece, marketing/ask-for-changes, marketing/campaigns]
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import Chat from '../../../../components/Chat.astro';
+import Outcomes from '../../../../components/Outcomes.astro';
+import TutorialMeta from '../../../../components/TutorialMeta.astro';
+
+<TutorialMeta />
+
+Las piezas se acumulan: una landing page que espera revisión, una publicación en borrador, una
+página de menú que nadie ha empezado. No llevas esa lista tú. Se la preguntas a tu asistente, y él
+lee el proyecto. El ejemplo es el sitio de la panadería, la página web de una panadería de barrio,
+unos días después de que la landing page pasó a revisión.
+
+**Quién lo hace:** tú preguntas. Tu asistente lee el proyecto y responde. Al preguntar no cambia
+nada.
+
+**Lo que vas a tener al final:** sabes qué te toca hacer a ti y qué espera a otra persona.
+
+<Steps>
+
+1. **Pregunta cómo van las cosas.** La respuesta es corta: qué está en curso, qué espera revisión
+   y qué hay que limpiar.
+
+   <Chat
+     title="preguntar cómo va el sitio de la panadería"
+     say="¿Cómo vamos?"
+     means="Un borrador es solo tuyo. Esperar revisión quiere decir que otra persona tiene que leerlo."
+   >
+     El sitio de la panadería tiene una pieza en borrador, la página del menú de Pascua, y una pieza
+     que espera revisión, la landing page. No hay nada más abierto y no hay nada que limpiar.
+   </Chat>
+
+2. **Mira todas las piezas y en qué punto está cada una.**
+
+   <Chat
+     title="listar todas las piezas del sitio de la panadería"
+     say="Muéstrame todas nuestras piezas y en qué punto está cada una."
+     means="Cada pieza tiene un estado. Las piezas terminadas solo aparecen cuando las pides. Los estados están abajo."
+   >
+     Tres piezas abiertas. Landing page: espera revisión. Página del menú de Pascua: en borrador.
+     Publicación sobre la rosca de Pascua: sin empezar.
+   </Chat>
+
+   <Outcomes title="Los 7 estados en que puede estar una pieza">
+
+   | Lo que escuchas | Qué significa |
+   | --- | --- |
+   | `draft` | La pieza está escrita solo en esta computadora. El equipo todavía no la ve. |
+   | `todo` | La pieza está en la lista compartida y nadie la ha empezado. |
+   | `shared` | La pieza se mandó al equipo en una revisión que todavía no está aprobada. |
+   | `doing` | Ya se empezó un borrador de la pieza y se está trabajando en él. |
+   | `review` | El borrador está marcado como terminado y hay una revisión abierta. Una persona tiene que leerlo. |
+   | `done` | La revisión se aprobó y la pieza ya es parte de la versión compartida. |
+   | `dropped` | La pieza se canceló. Solo aparece cuando pides también las piezas terminadas y canceladas. |
+
+   </Outcomes>
+
+3. **Pregunta qué sigue.**
+
+   <Chat
+     title="preguntar qué sigue en el sitio de la panadería"
+     say="¿Qué sigue?"
+     means="Elige primero por prioridad y después por el día en que se registró la pieza."
+   >
+     Sigue la publicación sobre la rosca de Pascua. Es la de mayor prioridad entre las piezas que
+     nadie ha empezado. ¿Quieres que la empiece?
+   </Chat>
+
+4. **Pregunta qué está esperando por ti.**
+
+   <Chat
+     title="preguntar qué espera a una persona en el sitio de la panadería"
+     say="¿Hay algo esperando por mí?"
+     means="Las piezas en revisión esperan a quien aprueba, y un borrador espera a quien lo escribió."
+   >
+     La landing page espera a quien aprueba. Nadie la ha leído todavía. La página del menú de Pascua
+     es un borrador, así que espera que pidas una revisión.
+   </Chat>
+
+</Steps>
+
+<Outcomes title="Para la persona técnica: qué corre">
+
+<div data-table="grid">
+
+| Lo que dices | Lo que corre |
+| --- | --- |
+| "¿Cómo vamos?" | `cckit status` |
+| "Muéstrame todas nuestras piezas y en qué punto está cada una." | `cckit task list` |
+| "Muéstrame también las terminadas." | `cckit task list --all` |
+| "¿Qué sigue?" | `cckit task next` |
+
+</div>
+
+`cckit status` cuenta las tareas ligeras por estado, enumera las que alguien tiene que atender
+(`review`, `doing`, `draft`, `shared`) y agrega las revisiones abiertas que esperan a una persona.
+`cckit task list` lee el estado desde git y no hace ninguna llamada a GitHub. Ninguno de los cuatro
+escribe nada. Los verbos están en la [referencia de la CLI](/cli-reference/) (en inglés).
+
+</Outcomes>
+
+Siguiente: [Pide cambios en una pieza](/es/marketing/ask-for-changes/)

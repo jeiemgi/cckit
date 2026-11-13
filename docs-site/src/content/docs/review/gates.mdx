@@ -4,6 +4,8 @@ description: Three lint scripts you add to your gate command, so a defect a revi
 ---
 
 import { Aside } from '@astrojs/starlight/components';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
 
 A reviewer, human or AI, finds the same kinds of defect again and again: a code fence with no
 language, a pattern the project agreed to stop using. Each finding is written in a pull-request
@@ -35,24 +37,57 @@ forces a repo-wide fix.
 
 ## Use them
 
-1. **See where the project stands.** Each gate has a report mode that never fails:
+### 1. See where the project stands
 
-   ```bash
-   scripts/review-lint.sh --report
-   scripts/skill-frontmatter-lint.sh --report
-   scripts/instruction-budget-lint.sh --report
-   ```
+<Chat
+  title="seeing what the three checks find on the Bakery site"
+  say="Show me what the three review checks find on the Bakery site. Don't fail anything yet."
+  ran={[
+    "scripts/review-lint.sh --report",
+    "scripts/skill-frontmatter-lint.sh --report",
+    "scripts/instruction-budget-lint.sh --report",
+  ]}
+  means="Each gate has a report mode that never fails, so this is safe to run at any time."
+>
+  I ran the report mode of all three. A new project starts green: what each report lists is the
+  baseline, and the gates only fail on something new.
+</Chat>
 
-2. **Run the gates.** With no flag each one exits non-zero on a new or grown hit:
+### 2. Run the gates
 
-   ```bash
-   scripts/review-lint.sh && scripts/skill-frontmatter-lint.sh && scripts/instruction-budget-lint.sh
-   ```
+<Chat
+  title="running all three checks on the Bakery site"
+  say="Run the three checks the way the gate would."
+  ran="scripts/review-lint.sh && scripts/skill-frontmatter-lint.sh && scripts/instruction-budget-lint.sh"
+  means="With no flag each one exits non-zero on a new or grown hit."
+>
+  All three exited 0, so nothing new and nothing grown.
+</Chat>
 
-3. **Add them to your gate command**, so they run before every push and in CI.
+### 3. Add them to your gate command
 
-4. **When a reviewer repeats a finding, write the rule.** Add a block to
-   `scripts/review-rules.conf`, as described below.
+<Chat
+  title="adding the three checks to the Bakery gate"
+  say="Add the three checks to the Bakery site's gate, so they run before every push and in CI."
+  ran="jq .prePush .claude/kit.config.json"
+  means="The gate is the command from Choose your gate command, with the three scripts joined on."
+>
+  I added the three scripts to `prePush.command` in the project config and read it back. A push now
+  runs the build, the linters and the three checks first. CI runs them once its workflow uses the
+  same command.
+</Chat>
+
+### 4. When a reviewer repeats a finding, write the rule
+
+<Chat
+  title="turning a repeated finding into a rule on the Bakery site"
+  say="The reviewer keeps finding images with no alt text on the Bakery site. Make that a rule so the gate fails on it."
+  ran="scripts/review-lint.sh --rule <ID>"
+  means="The rule is a new block in scripts/review-rules.conf. Running --rule prints every hit with context."
+>
+  I added a block to `scripts/review-rules.conf` and ran the rule on its own. Every hit it found is
+  listed with its context.
+</Chat>
 
 **How to check it worked:** run `scripts/review-lint.sh --rule <ID>` for the rule you added. It
 prints every hit with context. Then run the gate: it passes on the baseline and fails when you add

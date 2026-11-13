@@ -1,0 +1,104 @@
+---
+title: Pide cambios en una pieza
+description: Cambia una pieza que sigue en borrador o en revisión, con palabras sencillas, y pásale a tu asistente los comentarios de quien revisa. Nada queda aprobado hasta que una persona lo dice.
+tutorial:
+  job: cambiar una pieza que está en borrador o en revisión y pasar los comentarios de quien revisa
+  difficulty: beginner
+  time: "10 min"
+  prerequisites:
+    - { text: "Una pieza está en borrador o espera revisión", link: "Mira cómo va todo", href: "/es/marketing/where-things-stand/" }
+    - { text: "Sabes cómo se revisa una pieza", link: "Revisión y aprobación", href: "/es/marketing/review-and-approval/" }
+  ogTag: Marketing
+  related: [marketing/where-things-stand, marketing/update-a-page, marketing/review-and-approval]
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+import Chat from '../../../../components/Chat.astro';
+import Outcomes from '../../../../components/Outcomes.astro';
+import TutorialMeta from '../../../../components/TutorialMeta.astro';
+
+<TutorialMeta />
+
+Una pieza casi nunca queda bien a la primera. El precio no es el correcto, el eslogan es muy
+largo, quien revisa quiere mover una línea. Dices qué cambiar con palabras sencillas y tu
+asistente lo cambia. El ejemplo es la página del menú de Pascua del sitio de la panadería, la
+página web de una panadería de barrio, mientras su revisión está abierta.
+
+**Quién lo hace:** tú dices qué cambiar. Tu asistente hace el cambio y actualiza la revisión.
+Aprueba una persona distinta de ti.
+
+**Lo que vas a tener al final:** la misma revisión, actualizada, y una persona que puede volver a
+leerla.
+
+<Steps>
+
+1. **Di qué cambiar.** Di qué pieza y qué quieres, como se lo dirías a un colega.
+
+   <Chat
+     title="cambiar el precio y la fecha límite en la página del menú de Pascua"
+     say="En la página del menú de Pascua, cambia el precio de la rosca a 6 y mueve la fecha límite para pedir al viernes. Actualiza la revisión."
+     means="Tú no editas nada. El enlace de la revisión sigue siendo el mismo."
+   >
+     Listo. La rosca de Pascua ahora cuesta 6 y la fecha límite para pedir es el viernes. Actualicé
+     la revisión, y el enlace es el que ya mandaste.
+   </Chat>
+
+2. **Mira antes de cambiar.** Si no estás segura o seguro, pide opciones primero. No cambia nada
+   hasta que elijas una.
+
+   <Chat
+     title="pedir otros eslóganes para la página del menú de Pascua"
+     say="Muéstrame dos eslóganes distintos para la página del menú de Pascua. Todavía no cambies nada."
+     means="Pedir opciones no cambia nada. Di cuál quieres cuando estés lista o listo."
+   >
+     Dos opciones: "Horneado esta mañana, en tu mesa para Pascua" y "Pan de Pascua, todavía tibio".
+     La página conserva su eslogan actual hasta que elijas.
+   </Chat>
+
+3. **Pasa los comentarios de quien revisa.** Cuando quien aprueba pidió cambios, tu asistente lee
+   sus comentarios y los aplica. Te dice cuáles no aplicó.
+
+   <Chat
+     title="aplicar los comentarios de quien revisa la página del menú de Pascua"
+     say="Lee los comentarios de la revisión de la página del menú de Pascua y aplícalos. Dime cuáles no aplicaste y por qué."
+     means="Tú decides qué cambiar. Tu asistente avisa de cada comentario que dejó sin aplicar."
+   >
+     Apliqué el comentario sobre la frase de apertura y el del precio. Dejé uno sin aplicar: pide
+     una foto de la rosca de Pascua, y todavía no hay ninguna foto en el proyecto. Mándame una y la
+     agrego.
+   </Chat>
+
+4. **Avísale a quien aprueba.** Mándale un mensaje corto diciendo que el mismo enlace ya está
+   actualizado. La página se actualiza sola y quien aprueba vuelve a leerla. Esto se repite hasta
+   que la respuesta sea **Approve**. Después,
+   [termina la pieza](/es/marketing/review-and-approval/#después-de-la-aprobación).
+
+</Steps>
+
+<Aside type="caution" title="Una pieza terminada está cerrada">
+Una vez que una pieza está aprobada y terminada, queda cerrada. Un cambio sobre ella es una pieza
+nueva, con su propia revisión: mira
+[Actualiza una página que ya existe](/es/marketing/update-a-page/).
+</Aside>
+
+<Outcomes title="Para la persona técnica: qué corre">
+
+<div data-table="grid">
+
+| Lo que dices | Lo que corre |
+| --- | --- |
+| "Actualiza la revisión." | `cckit task finish <id> "<resumen>" --all` |
+| Volver a trabajar en la pieza | `cckit task start <id>` |
+
+</div>
+
+`cckit task finish` guarda los cambios de los archivos que ya sigue el proyecto, los envía y, si ya
+hay una revisión abierta, la reporta en vez de crear una segunda. `--all` agrega también los
+archivos nuevos. `cckit task start` reutiliza la carpeta del borrador si existe y rechaza una tarea
+que ya está terminada. Aquí no se usa `cckit task run`: una tarea que ya está en revisión no
+arranca ningún agente. Leer los comentarios de quien revisa y editar el borrador lo hace el propio
+asistente, no un verbo de `cckit`.
+
+</Outcomes>
+
+Siguiente: [Actualiza una página que ya existe](/es/marketing/update-a-page/)

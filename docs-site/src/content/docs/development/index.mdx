@@ -46,7 +46,7 @@ to happen. The work becomes a **pull request**, and **review** either merges it 
 </Steps>
 
 <Aside type="tip" title="You do not type these by hand">
-An agent runs each step. Read this page to know what is happening behind the commands.
+Your agent runs each step when you ask in the chat. Read this page to know what is happening behind the commands.
 </Aside>
 
 ## Why every change gets its own copy
@@ -102,24 +102,34 @@ list of optional tools, with who makes each one, is on [Integrations](/integrati
 
 ## The commands
 
+Each row is a sentence you can say to your agent in the chat, and the command your agent runs for it.
+
 For one change:
 
-| Step | Command |
+<div data-table="grid">
+
+| What you say | What runs |
 | ---- | ------- |
-| See the board | `cckit sync` |
-| Find what is next | `cckit next` |
-| Start the work | `cckit start <issue>` |
-| Open the request | `cckit pr <issue> "<summary>"` |
-| Close an issue that needed no change | `cckit close <issue> "<reason>"` |
+| "What is on the board?" | `cckit sync` |
+| "What should I work on next?" | `cckit next` |
+| "Start the next issue." | `cckit start <issue>` |
+| "Open the pull request." | `cckit pr <issue> "<summary>"` |
+| "That issue needs no change, close it." | `cckit close <issue> "<reason>"` |
+
+</div>
 
 For many at once:
 
-| Step | Command |
+<div data-table="grid">
+
+| What you say | What runs |
 | ---- | ------- |
-| Propose the next batch of unblocked issues | `cckit wave` |
-| Launch one agent per issue | `cckit orchestrate <issues…>` |
-| Check and merge the finished requests | `cckit watch --merge` |
-| See which session holds which issue | `cckit claims` |
+| "What can run in parallel right now?" | `cckit wave` |
+| "Run these issues in parallel." | `cckit orchestrate <issues…>` |
+| "Check the finished pull requests and merge the clean ones." | `cckit watch --merge` |
+| "Which session is working on which issue?" | `cckit claims` |
+
+</div>
 
 Every flag is in the [CLI reference](/cli-reference/).
 

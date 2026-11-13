@@ -3,6 +3,8 @@ title: "Las herramientas que conectamos"
 description: "Las herramientas que cckit conecta y lo que cada una hace por ti: Claude Code, GitHub, la lista de tareas, las páginas de revisión, la memoria opcional y las habilidades de diseño. cckit las conecta; las hacen otras personas."
 ---
 
+import Outcomes from '../../../../components/Outcomes.astro';
+
 cckit no construye estas herramientas. Conecta las que ya existen, para que delegar una pieza sea
 una sola petición y el proceso corra por detrás. Esta página dice qué hace cada herramienta por
 ti, quién la hace y si tu equipo tiene que hacer algo para tenerla. La persona técnica las conecta
@@ -12,14 +14,14 @@ cuando se [entregan las llaves](/es/marketing/get-set-up/).
 
 ### Claude Code: donde delegas el trabajo
 
-Claude Code es la app con la que hablas. Le describes la pieza y él la planea, la escribe, la
-construye y mantiene al día la lista de tareas. La hace Anthropic. Cada persona que escribe la
+Claude Code es la app con la que hablas, y tu asistente vive en ella. Le describes la pieza y tu
+asistente la planea, la escribe, la construye y mantiene al día la lista de tareas. La hace Anthropic. Cada persona que escribe la
 necesita en su computadora; basta con la app de escritorio.
 
-La preparación de marketing agrega tres métodos escritos que Claude sigue: uno para escribir
+La preparación de marketing agrega tres métodos escritos que tu asistente sigue: uno para escribir
 textos, uno para la [voz de marca](/es/marketing/brand-voice/) y uno para
 [planear una campaña](/es/marketing/campaigns/). También agrega el modo de lenguaje sencillo, en
-el que Claude dice "borrador", "revisión" y "aprobar".
+el que tu asistente dice "borrador", "revisión" y "aprobar".
 
 ### GitHub: donde se guarda el trabajo y donde apruebas
 
@@ -31,7 +33,7 @@ con acceso al proyecto. Quien aprueba no necesita nada más: basta un navegador.
 
 La lista de piezas se guarda dentro del proyecto, en una carpeta llamada `tasks/`, con un archivo
 pequeño por pieza. Esta parte es de cckit. No hay que instalar nada ni abrir otra cuenta. Nunca
-abres esos archivos: le preguntas a Claude "¿cómo vamos?" o "¿qué sigue?".
+abres esos archivos: le preguntas a tu asistente "¿cómo vamos?" o "¿qué sigue?".
 
 Una persona técnica puede pasar la lista a GitHub. La diferencia que te importa es cómo se revisa
 una campaña, y está descrita en
@@ -39,19 +41,19 @@ una campaña, y está descrita en
 
 ### Páginas de revisión: planes que respondes en el navegador
 
-Un plan es difícil de juzgar como un mensaje largo en una conversación. Cuando Claude propone el
+Un plan es difícil de juzgar como un mensaje largo en una conversación. Cuando tu asistente propone el
 plan de una campaña o te pide elegir entre opciones, abre una página en tu navegador donde puedes
 comentar cada parte y mandar tu respuesta.
 
 La herramienta detrás de esas páginas es Lavish, software de código abierto hecho por otra
 persona. Viene activada por defecto y la página se sirve desde tu propia computadora. Necesita
 Node.js ahí, que la persona técnica comprueba durante la preparación. Sin ella, o si no hay
-navegador, Claude muestra el mismo plan en la conversación, así que no se pierde nada. Esto es
+navegador, tu asistente muestra el mismo plan en la conversación, así que no se pierde nada. Esto es
 para planes y decisiones. La revisión de un borrador terminado ocurre en GitHub.
 
 ### Memoria: el proyecto recuerda tus decisiones
 
-Sin memoria, cada conversación con Claude parte de lo que está escrito en el proyecto: la voz de
+Sin memoria, cada conversación con tu asistente parte de lo que está escrito en el proyecto: la voz de
 marca, la lista de tareas, los borradores. Para la mayoría de los equipos eso alcanza.
 
 MemPalace agrega una memoria que lleva decisiones y contexto de una sesión a la siguiente, para
@@ -87,7 +89,7 @@ No hay ninguna herramienta conectada para publicar, programar publicaciones, man
 analítica. cckit termina en una pieza aprobada, y esas tareas siguen en las herramientas que tu
 equipo ya usa. Mira [después de la aprobación](/es/marketing/review-and-approval/#después-de-la-aprobación).
 
-## Para la persona técnica
+<Outcomes title="Para la persona técnica">
 
 Estas páginas están en inglés y escritas para gente de desarrollo.
 
@@ -95,5 +97,7 @@ Estas páginas están en inglés y escritas para gente de desarrollo.
 - La lista de tareas en el proyecto: [Tasks without GitHub issues](/project-management/light-tasks/) (en inglés)
 - Las páginas de revisión y cómo apagarlas: [Plans you answer on a page](/project-management/plan-pages/) (en inglés)
 - Encender la memoria: [Why an agent team needs memory](/memory/) (en inglés)
+
+</Outcomes>
 
 Siguiente: [Define tu voz de marca](/es/marketing/brand-voice/)

@@ -18,6 +18,8 @@ import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components'
 import TagRow from '../../../components/TagRow.astro';
 import TutorialMeta from '../../../components/TutorialMeta.astro';
 import TutorialSchema from '../../../components/TutorialSchema.astro';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
 
 <TagRow kinds={["flow"]} />
 
@@ -33,80 +35,113 @@ does not build. cckit switches it on, installs it after your yes, and writes the
 the agent which question goes to which Graft command. The index is built by parsing your files on
 your machine: no model is called and no API key is needed.
 
+Each step starts with what you say to your agent in the chat. Below it is the command your agent
+runs. The example is the Bakery site, a Next.js project.
+
 **What you will have at the end:** a local index in `graft/`, and an agent that queries it
 before it searches file by file.
 
 ## Steps
 
-<Steps>
+### 1. See what this repo can add
 
-1. **See what this repo can add.** With no name, `cckit add` lists every integration and marks
-   each one `on` or `off`:
+With no name, `cckit add` lists every integration and marks each one `on` or `off`.
 
-   ```bash frame="terminal"
-   cckit add
-   ```
+<Chat
+  title="listing the tools the Bakery site can add"
+  say="Which optional tools can the Bakery site switch on?"
+  ran="cckit add"
+  output={[
+    "Integrations — optional third-party tools (cckit add <name>):",
+    "  graft  Graft — Code-graph retrieval: agents ask an index where code lives, who calls a symbol and what a diff reaches, instead of grepping the tree.  [off]",
+    "…",
+  ]}
+  means="You should see a `graft` row ending in `[off]`."
+>
+  Graft, the code graph, is available and switched off. Nothing has changed.
+</Chat>
 
-   You should see a `graft` row ending in `[off]`.
+### 2. Preview the change
 
-2. **Preview the change.** A dry run writes nothing and installs nothing:
+A dry run writes nothing and installs nothing.
 
-   ```bash frame="terminal"
-   KIT_DRY_RUN=1 cckit add graft
-   ```
+<Chat
+  title="previewing the code graph on the Bakery site"
+  say="Show me what switching on the code graph would change, without doing it."
+  ran="KIT_DRY_RUN=1 cckit add graft"
+  means="It prints the config diff (one new key, `codeGraph.provider`), the rule file it would write, the install commands in the order they would be tried, and the command that wires Graft into the repo."
+>
+  This is the plan. One config key would change and one rule file would be written. I wrote nothing.
+</Chat>
 
-   It prints the config diff (one new key, `codeGraph.provider`), the rule file it would write,
-   the install commands in the order they would be tried, and the command that wires Graft into
-   the repo.
+### 3. Switch it on
 
-3. **Switch it on.** `cckit add graft` asks one question. On yes it sets the key and writes one
-   rule file:
+`cckit add graft` asks one question. On yes it sets the key and writes one rule file.
 
-   ```bash frame="terminal"
-   cckit add graft
-   ```
+<Chat
+  title="switching on the code graph for the Bakery site"
+  say="Switch on the code graph for the Bakery site."
+  ran="cckit add graft"
+  output={[
+    'Graft is on: codeGraph.provider = "graft". Nothing was installed.',
+    "rule written: <project>/.claude/rules/code-retrieval.md",
+  ]}
+  means="This records a choice. It does not install anything."
+>
+  The code graph is on for this project, and the rule that tells me which question goes to which Graft
+  command is written. Graft itself is not installed yet.
+</Chat>
 
-   You should see `Graft is on: codeGraph.provider = "graft". Nothing was installed.` and
-   `rule written: …/.claude/rules/code-retrieval.md`.
+### 4. Install it
 
-4. **Install it.** The doctor prints one row per integration that is switched on, and asks before
-   it installs a missing one:
+The doctor prints one row per integration that is switched on, and asks before it installs a
+missing one.
 
-   ```bash frame="terminal"
-   cckit doctor         # in a terminal: asks, then installs on yes
-   cckit doctor --fix   # installs without the prompt
-   ```
+<Chat
+  title="installing Graft on this machine"
+  say="Install Graft."
+  ran={['cckit doctor', 'cckit doctor --fix']}
+  means="`cckit doctor` asks in a terminal, then installs on yes. `cckit doctor --fix` installs without the prompt."
+>
+  Graft is installed. Under Integrations the doctor shows a `Graft` row reading `installed`, and your
+  yes is recorded as the line `install:graft` in `.cckit/consent`.
+</Chat>
 
-   Under **Integrations** you should see a `Graft` row reading `installed`. Your yes is recorded
-   as the line `install:graft` in `.cckit/consent`, at the root of the repo. `cckit init` adds
-   `.cckit/` to `.gitignore`. In a project where `git check-ignore .cckit/` prints nothing, add
-   the line `.cckit/` yourself so the file is never committed.
+`.cckit/consent` is at the root of the repo. `cckit init` adds `.cckit/` to `.gitignore`. In a
+project where `git check-ignore .cckit/` prints nothing, add the line `.cckit/` yourself so the
+file is never committed.
 
-5. **Wire it into the repo.** The doctor leaves this step to you and prints the command:
+### 5. Wire it into the repo
 
-   ```bash frame="terminal"
-   graft init --agents claude --no-statusline --no-global
-   ```
+The doctor leaves this step to you and prints the command.
 
-   It writes its hooks, a skill and an MCP entry inside the repo, builds the graph into `graft/`
-   and adds `graft/` to `.gitignore`. Then restart Claude Code so the new session loads them.
+<Chat
+  title="wiring Graft into the Bakery site"
+  say="Wire Graft into this repo."
+  ran="graft init --agents claude --no-statusline --no-global"
+  means="It writes its hooks, a skill and an MCP entry inside the repo, builds the graph into `graft/` and adds `graft/` to `.gitignore`. Then restart Claude Code so the new session loads them."
+>
+  Graft is wired in and the graph is built in `graft/`. Restart the session so it loads the new hooks.
+</Chat>
 
-6. **Check the graph, then use it.**
+### 6. Check the graph, then use it
 
-   ```bash frame="terminal"
-   graft check          # exit 0: the graph matches the code
-   ```
+<Chat
+  title="checking that the code graph matches the Bakery site code"
+  say="Is the code graph up to date with the code?"
+  ran="graft check"
+  means="Exit 0 means the graph matches the code."
+>
+  The graph matches the code.
+</Chat>
 
-   <div class="cckit-prompt">
+Then ask your agent a where-is question:
 
-   ```text frame="terminal" title="Prompt to paste"
-   Using the code graph, tell me where this repo handles authentication and what calls it. Say
-   which graft command you ran for each answer.
-   ```
+```text frame="terminal" title="Say this in the chat"
+Using the code graph, tell me where this repo handles authentication and what calls it. Say
+which graft command you ran for each answer.
+```
 
-   </div>
-
-</Steps>
 
 ## Check it worked
 

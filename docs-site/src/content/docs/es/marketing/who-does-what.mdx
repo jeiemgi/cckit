@@ -1,19 +1,21 @@
 ---
 title: Quién hace qué
-description: Las personas de un equipo de marketing que usa cckit, los cuatro asistentes que trae Claude y quién decide cada cosa.
+description: Las personas de un equipo de marketing que usa cckit, los cuatro asistentes que trae el proyecto y quién decide cada cosa.
 ---
+
+import Chat from '../../../../components/Chat.astro';
 
 Cuando delegas trabajo, los asistentes preparan y las personas conservan las decisiones. Esta
 página dice quién hace cada parte, para que una pieza siempre esté en manos de alguien.
 
-Participan dos grupos: las personas de tu equipo y los asistentes que Claude trae al
+Participan dos grupos: las personas de tu equipo y los asistentes que trae el
 proyecto. Las personas deciden. Los asistentes preparan.
 
 ## Personas
 
 | Persona | Qué hace | Qué necesita |
 | --- | --- | --- |
-| **Quien escribe** (tú) | Dice qué hay que hacer, responde las preguntas de Claude y manda el enlace de revisión. | Claude Code y una cuenta de GitHub. |
+| **Quien escribe** (tú) | Dice qué hay que hacer, responde las preguntas de tu asistente y manda el enlace de revisión. | Claude Code y una cuenta de GitHub. |
 | **Quien aprueba** | Lee la revisión, comenta, aprueba o pide cambios. | Una cuenta de GitHub. Con un navegador basta. |
 | **La persona técnica** | Prepara el proyecto una vez. Resuelve problemas de acceso. | Una terminal. Mira [Entrega las llaves](/es/marketing/get-set-up/). |
 
@@ -22,9 +24,17 @@ La razón está en [Revisión y aprobación](/es/marketing/review-and-approval/)
 
 ## Asistentes
 
-El perfil de marketing le da a Claude cuatro roles. No hace falta llamarlos por su nombre; Claude
-le pasa el trabajo al que corresponde. También puedes pedir uno directamente: "que el investigador
-verifique esta cifra".
+El perfil de marketing le da a tu asistente cuatro roles. No hace falta llamarlos por su nombre;
+tu asistente le pasa el trabajo al que corresponde. También puedes pedir uno directamente:
+
+<Chat
+  title="pedirle al investigador que verifique un dato de la entrada de Pascua"
+  say="Que el investigador verifique esta frase para la entrada de Pascua: “Los hot cross buns se comen tradicionalmente el Viernes Santo.” Dame las fuentes."
+  means="El investigador se encarga de los datos y las fuentes. Tú decides si la frase se queda en la entrada."
+>
+  Se lo pasé al investigador. Va a volver con lo que encontró, de dónde sale cada dato y lo que no
+  pudo confirmar.
+</Chat>
 
 | Asistente | De qué se encarga | Qué pedirle |
 | --- | --- | --- |
@@ -42,8 +52,8 @@ diseño.
 | Decisión | Quién |
 | --- | --- |
 | Qué se hace | Quien escribe, o quien fija las prioridades del equipo. |
-| Qué dice un borrador | Quien escribe. Claude propone; tú aceptas o cambias. |
-| Si una pieza queda aprobada | Quien aprueba. Nunca Claude. |
+| Qué dice un borrador | Quien escribe. Tu asistente propone; tú aceptas o cambias. |
+| Si una pieza queda aprobada | Quien aprueba. Nunca tu asistente. |
 | La voz de marca | El equipo, con una revisión. Mira [Define tu voz de marca](/es/marketing/brand-voice/). |
 | Cuándo y dónde se publica | Tu equipo, fuera de cckit. |
 

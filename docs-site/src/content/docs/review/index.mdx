@@ -107,15 +107,22 @@ records what they said.
 - **Your project's own start command.** The QA lane launches the command you declare. It does not
   guess how your project boots.
 
-## The verbs
+## What you say, and what runs
 
-| Verb | What it is for |
+Review is a conversation with your agent in the chat. These are the sentences you will use on the
+Bakery site, and the command your agent runs for each.
+
+<div data-table="grid">
+
+| What you say | What runs |
 | --- | --- |
-| `cckit qa up` · `open` · `verdict` · `stop` | Start the project for one change, open the changed screen, record pass or fail, free the ports |
-| `cckit qa lanes` | List every change that has a running stack or a verdict |
-| `cckit watch` | One captain pass: read every open pull request, send the ready ones to the reviewer |
-| `cckit receipt list <issue>` · `cckit receipt show <issue> review` | Read back what a reviewer or a QA pass recorded |
-| `cckit status` | Open pull requests waiting on a person, with their unresolved review threads |
+| "Start the Bakery site for this change, open the screen it touched, and I will tell you pass or fail." Then, when you have looked: "Pass." or "Fail, the button stays disabled." Then: "Stop it, I am done." (starts the project for one change, opens the changed screen, records pass or fail, frees the ports) | `cckit qa up` · `open` · `verdict` · `stop` |
+| "Which changes have a running stack or a verdict?" | `cckit qa lanes` |
+| "Check the open pull requests and send the ready ones to the reviewer." (one captain pass: reads every open pull request) | `cckit watch` |
+| "What did the reviewer say about this change?" or "Did QA pass it?" (reads back what a reviewer or a QA pass recorded) | `cckit receipt list <issue>` · `cckit receipt show <issue> review` |
+| "Which pull requests are waiting on me?" (open pull requests waiting on a person, with their unresolved review threads) | `cckit status` |
+
+</div>
 
 Every flag is in the [CLI reference](/cli-reference/).
 

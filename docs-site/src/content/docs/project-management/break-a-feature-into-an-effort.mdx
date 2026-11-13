@@ -12,10 +12,12 @@ tutorial:
   related: [development/issue-to-merged-pr, development/run-a-wave-in-parallel, development/run-unattended]
 ---
 
-import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 import TagRow from '../../../components/TagRow.astro';
 import TutorialMeta from '../../../components/TutorialMeta.astro';
 import TutorialSchema from '../../../components/TutorialSchema.astro';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
 
 <TagRow kinds={["flow", "concept"]} />
 
@@ -39,60 +41,86 @@ plan, so the agent reads the issue and no separate document.
 **Who does it:** you describe the goal and approve the plan. The agent drafts the sub-issues,
 builds them, and opens the pull request. You, or the captain on an approved plan, close the effort.
 
-## Steps
+## 1. Ask your agent to make it an effort
 
-<Steps>
+Describe the goal and say it is too big for one pull request. On the Bakery site the goal is the
+whole launch.
 
-1. **Ask Claude to make it an effort.** Describe the goal and say it is too big for one pull
-   request.
+<Chat
+  title="asking for the Bakery site launch as an effort"
+  say="Launching the bakery site is too big for one pull request. Turn it into a tracked effort: a sub-task for the landing page, the menu page, the opening hours and the contact form. Size the work first, then build the pieces, in parallel where they don't touch the same files, and open a single pull request for the whole effort once they are done."
+  ran="cckit effort plan"
+  means="Sizing reads the open efforts first. Nothing is created until you approve the plan in step 2."
+>
+  I read the open efforts and drafted four steps. Before I create anything, here is the plan.
+</Chat>
 
-   <div class="cckit-prompt">
+## 2. Read the plan and approve it
 
-   ```text frame="terminal" title="Prompt to paste"
-   This work is too big for one PR — turn it into a tracked effort. Break it into a sub-task for each
-   independent piece, size the work first, then build the pieces (in parallel where they don't touch
-   the same files) and open a single PR for the whole effort once they're done.
-   ```
+In Claude Code the `/kit-effort-new` skill shows the parent issue and its sub-issues before it
+creates anything, as a [page you answer](/project-management/plan-pages/) where the session has a
+browser and in the terminal where it does not. Change a step or the order here. The page is
+recommended, not required: `cckit effort start` checks for no approval.
 
-   </div>
+<Chat
+  title="answering the Bakery site launch plan on a page"
+  say="Show me the plan on a page. I want to move the contact form to the end."
+  ran="cckit page mode"
+  output="page"
+  means="page means this session can open one. On a machine with no browser it prints terminal and the reason, and the plan is printed in the chat."
+>
+  This session can open a page, so I will show the plan on one. Move the contact form there and
+  send your answer.
+</Chat>
 
-2. **Read the plan and approve it.** In Claude Code the `/kit-effort-new` skill shows the parent
-   issue and its sub-issues before it creates anything, as a
-   [page you answer](/project-management/plan-pages/) where the session has a browser and in the
-   terminal where it does not. Change a step or the order here. The page is recommended, not
-   required: `cckit effort start` checks for no approval.
+## 3. The agent creates the effort
 
-3. **The agent creates the effort.** `<N>` below is the number of the parent issue this prints.
+`<N>` below is the number of the parent issue this prints.
 
-   ```bash frame="terminal"
-   cckit effort new "Auth rework" "<step> :: <one-line description>" "<step> :: <one-line description>"
-   ```
+<Chat
+  title="creating the Bakery site launch effort"
+  say="That plan is right. Create the effort."
+  ran='cckit effort new "Launch the bakery site" "<step> :: <one-line description>" "<step> :: <one-line description>"'
+  means="The parent issue gets four sections (Goal, Scope, For agents, Verification), and each step becomes a sub-issue linked to it."
+>
+  The parent issue and the four sub-issues are created and linked.
+</Chat>
 
-   The parent issue gets four sections (Goal, Scope, For agents, Verification), and each step
-   becomes a sub-issue linked to it.
+## 4. The agent starts it and builds the steps
 
-4. **The agent starts it and builds the steps.**
+<Chat
+  title="starting the Bakery site launch effort"
+  say="Start building it."
+  ran="cckit effort start <N>"
+  means="Steps that follow one another are committed on the effort branch, one commit per sub-issue. Steps that touch different files can be built at the same time, each in a worktree of its own, and merged back into the effort branch."
+>
+  The effort branch and its worktree exist. I am building the steps on it.
+</Chat>
 
-   ```bash frame="terminal"
-   cckit effort start <N>
-   ```
+## 5. Run the project's checks on the effort branch
 
-   This creates the branch and the worktree. Steps that follow one another are committed on that
-   branch, one commit per sub-issue. Steps that touch different files can be built at the same
-   time, each in a worktree of its own, and merged back into the effort branch.
+Each step passing on its own does not show that they pass together. Run the checks once every step
+is on the branch, before the pull request opens. No cckit command runs them for you here.
 
-5. **Run the project's checks on the effort branch.** Each step passing on its own does not show
-   that they pass together. Run the checks once every step is on the branch, before the pull
-   request opens. No cckit command runs them for you here.
+<Chat
+  title="running the Bakery site checks on the effort branch"
+  say="All four steps are on the branch. Run the checks before you open the pull request."
+  ran="pnpm build && pnpm lint"
+  means="These are the Bakery site's own checks, the ones its recipe set. Use your project's."
+>
+  The checks ran on the effort branch with every step in it.
+</Chat>
 
-6. **Ship it as one pull request.**
+## 6. Ship it as one pull request
 
-   ```bash frame="terminal"
-   cckit effort pr <N>       # one pull request: the effort branch into the base branch
-   cckit effort close <N>    # after review: squash-merge, close the parent and every sub-issue, clean up
-   ```
-
-</Steps>
+<Chat
+  title="shipping the Bakery site launch as one pull request"
+  say="Open the pull request for the whole effort. After the review, close it."
+  ran={["cckit effort pr <N>", "cckit effort close <N>"]}
+  means="effort pr opens one pull request, the effort branch into the base branch. effort close runs after review: squash-merge, close the parent and every sub-issue, clean up."
+>
+  One pull request is open for the whole launch. When the review is done I close the effort.
+</Chat>
 
 ## Check that it worked
 
@@ -144,7 +172,7 @@ a *blocked-by* link between them; cckit will schedule the dependent one in a lat
 
 <TutorialSchema
   steps={[
-    { name: 'Ask Claude to make it an effort', text: 'Describe the goal and that it is too big for one PR. Ask to break it into a sub-task per independent piece and size the work first.' },
+    { name: 'Ask your agent to make it an effort', text: 'Describe the goal and that it is too big for one PR. Ask to break it into a sub-task per independent piece and size the work first.' },
     { name: 'Read the plan and approve it', text: 'The kit-effort-new skill shows the parent issue and its sub-issues before it creates anything, as a page or in the terminal. Change a step or the order here.' },
     { name: 'The agent creates the effort', text: 'cckit effort new creates the parent issue with its four sections and one linked sub-issue per step.' },
     { name: 'The agent starts it and builds the steps', text: 'cckit effort start makes the effort branch and worktree; sequential steps are one commit each on that branch, parallel steps use their own worktrees and merge back.' },

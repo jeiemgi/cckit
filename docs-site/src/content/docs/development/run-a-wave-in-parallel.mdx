@@ -16,13 +16,15 @@ tutorial:
 import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 import TutorialMeta from '../../../components/TutorialMeta.astro';
 import TutorialSchema from '../../../components/TutorialSchema.astro';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
 
 <TutorialMeta />
 
 Once a plan is split into issues, several of them are ready at the same moment. Taking them one
 at a time leaves the rest of the plan waiting on a queue that did not need to exist.
 
-In this guide every ready issue gets its own agent, in its own copy of the code. `cckit wave`
+In this guide every ready issue gets its own agent, in its own copy of the code. The example is the Bakery site, where the opening hours and the contact form are ready at once. `cckit wave`
 works out which issues nothing is blocking and writes the instructions for the agents. Each agent
 opens a pull request. The captain, here the command `cckit watch`, then checks those pull requests
 and merges the ones that pass. Merging frees the issues that were waiting, and the next wave starts.
@@ -32,44 +34,50 @@ fix, and the next wave proposed.
 
 ## Steps
 
-<Steps>
+### 1. Ask your agent to clear the next wave
 
-1. **Ask the agent to clear the next wave.** You name no issue numbers; the board decides.
+You name no issue numbers; the board decides. `cckit wave` writes the instructions for the first
+wave, one task per issue. The agent spawns one subagent per issue, and each opens a pull request.
+`cckit watch --merge` is one pass that gates the open pull requests, squash-merges the clean ones and
+shows the next wave.
 
-   <div class="cckit-prompt">
+<Chat
+  title="clearing the next wave of the Bakery site"
+  say="Clear the next wave of ready work. Fan the unblocked issues out so they're worked in parallel, then gate the resulting PRs and merge the ones that pass. Advance to the next wave and keep going until the board is drained."
+  ran={['cckit wave', 'cckit watch --merge']}
+  means="Nothing waits in a queue that did not need to exist: the two issues run at the same time, and only clean pull requests merge."
+>
+  The wave had two issues, the opening hours and the contact form. I started one subagent for each and
+  both opened a pull request. I gated them: the ones that passed are merged, and I listed what to fix on
+  the others.
+</Chat>
 
-   ```text frame="terminal" title="Prompt to paste"
-   Clear the next wave of ready work. Fan the unblocked issues out so they're worked in parallel,
-   then gate the resulting PRs and merge the ones that pass. Advance to the next wave and keep going
-   until the board is drained.
-   ```
+### 2. Let it advance
 
-   </div>
+Each `cckit watch --merge` is one pass: it merges every PR that passes its gate and prints the next
+wave. The agent then runs `cckit wave` and `cckit watch --merge` again for that wave, and stops when
+`cckit wave` has nothing left to propose.
 
-2. **cckit fans out the wave and gates the PRs.**
-
-   ```bash frame="terminal"
-   cckit wave             # write the instructions for the first wave, one task per issue
-   # …the agent spawns one subagent per issue, each opens a PR…
-   cckit watch --merge    # one pass: gate open PRs, squash-merge the clean ones, show the next wave
-   ```
-
-3. **Let it advance.** Each `cckit watch --merge` is one pass: it merges every PR that passes its
-   gate and prints the next wave. The agent then runs `cckit wave` and `cckit watch --merge` again
-   for that wave, and stops when `cckit wave` has nothing left to propose. While workers are still
-   finishing, `cckit watch --merge --loop` repeats passes until one merges nothing, or after 10.
-
-</Steps>
+<Chat
+  title="waiting for the workers of the wave to finish"
+  say="Some workers are still finishing. Keep checking until nothing else merges."
+  ran="cckit watch --merge --loop"
+  means="It repeats passes until one merges nothing, or after 10."
+>
+  I am repeating the pass. When a pass merges nothing I stop and report what merged and what is held.
+</Chat>
 
 ## Check it worked
 
-```bash frame="terminal"
-cckit sync      # what is still open, and what the merges unblocked
-cckit wave      # the next wave, or nothing left to propose
-```
-
-A wave is done when each of its pull requests is merged or named in the captain's output with the
-reason it was held.
+<Chat
+  title="checking what the wave left on the Bakery site board"
+  say="What is still open, and is there another wave?"
+  ran={['cckit sync', 'cckit wave']}
+  means="A wave is done when each of its pull requests is merged or named in the captain's output with the reason it was held."
+>
+  I read the board and asked for the next wave. Either the merges unblocked more issues, or there is
+  nothing left to propose.
+</Chat>
 
 `cckit watch --merge` merges and does not close issues. If `cckit sync` still lists the issue of a
 merged pull request, your base branch is not the repository's default branch on GitHub, so GitHub

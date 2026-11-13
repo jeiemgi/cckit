@@ -16,6 +16,8 @@ import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components'
 import TagRow from '../../../components/TagRow.astro';
 import TutorialMeta from '../../../components/TutorialMeta.astro';
 import TutorialSchema from '../../../components/TutorialSchema.astro';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
 
 <TagRow kinds={["hook"]} />
 
@@ -27,40 +29,57 @@ happen every time attaches it to the moment itself.
 
 A hook is that attachment: a script the agent runtime runs when something happens, such as a
 session starting, a command about to run, or a session ending. cckit installs a small set at
-`init`. You never call a hook. Claude Code fires it on the event.
+`init`. You never call a hook. Your agent's runtime fires it on the event.
+
+Each step starts with what you say to your agent in the chat. Below it is the command your agent
+runs. The example is the Bakery site.
 
 **What you will have at the end:** five hooks that run without being asked, and, if you choose
 it, a sixth that runs your tests before a push.
 
 ## Steps
 
-<Steps>
+### 1. Scaffold the hooks
 
-1. **Scaffold the hooks.** `cckit init` installs the always-on set into `.claude/hooks/`.
+`cckit init` installs the always-on set into `.claude/hooks/`.
 
-   ```bash frame="terminal"
-   cckit init
-   ```
+<Chat
+  title="setting up the checks on the Bakery site"
+  say="Set up the checks that run on their own in the Bakery site."
+  ran="cckit init"
+  means="You get five by default: a session-start repo-hygiene report (stale branches, worktrees, stashes), a quiet version check, a base-branch commit guard that blocks a commit made straight to the base branch so work always goes through a branch and a PR, a raw-git guard that blocks a raw `gh issue create` or `gh pr create` and prints the cckit verb to run instead, and the session-mail hook."
+>
+  The five hooks are installed in `.claude/hooks/`. They run on their own from now on.
+</Chat>
 
-   You get five by default: a session-start **repo-hygiene** report (stale branches, worktrees,
-   stashes), a quiet **version check**, a **base-branch commit guard** that blocks a commit made
-   straight to the base branch — so work always goes through a branch and a PR — a **raw-git
-   guard** that blocks a raw `gh issue create` or `gh pr create` and prints the cckit verb to run
-   instead, and the **session-mail** hook.
+### 2. Confirm they are healthy
 
-2. **Confirm they're healthy.** `cckit doctor` checks the machine's dependencies and the GitHub
-   sign-in; with `--fix`, or a yes at its prompt, it refreshes a stale memory session-start hook. It
-   does not read the hook registrations: check those in `.claude/settings.local.json`.
+`cckit doctor` checks the machine's dependencies and the GitHub sign-in; with `--fix`, or a yes at
+its prompt, it refreshes a stale memory session-start hook. It does not read the hook
+registrations: check those in `.claude/settings.local.json`.
 
-   ```bash frame="terminal"
-   cckit doctor
-   ```
+<Chat
+  title="checking the Bakery site setup is healthy"
+  say="Is everything the Bakery site needs in place?"
+  ran="cckit doctor"
+  output={[
+    "  Tier 1 — hard deps",
+    "  ✓  git                          2.55.0",
+    "  ✓  gh                           2.104.0 (Projects v2 ok)",
+    "  ✓  jq                           jq-1.8.2",
+    "…",
+  ]}
+  means="With no terminal and no `--fix` the doctor only reports: nothing is installed and no file is written."
+>
+  The required tools are present. I changed nothing.
+</Chat>
 
-3. **Turn on feature hooks as you need them.** Enabling the pre-push gate at `init` adds a hook that
-   runs your project's tests/lint before a `git push`, so a red branch never reaches the remote.
-   Memory adds four more (see [persistent memory](/memory/install-mempalace/)).
+### 3. Turn on feature hooks as you need them
 
-</Steps>
+Enabling the pre-push gate at `init` adds a hook that runs your project's tests and lint before a
+`git push`, so a red branch never reaches the remote. Memory adds four more (see
+[persistent memory](/memory/install-mempalace/)).
+
 
 ## Check it worked
 
@@ -82,7 +101,7 @@ Every one is a **no-op** when its tool isn't installed. Events map to moments:
 for wrap-up.
 
 <Aside type="tip" title="You don't trigger these">
-Claude Code fires hooks on an event — you never call one. The commit guard, for example, runs the
+Your agent's runtime fires hooks on an event — you never call one. The commit guard, for example, runs the
 instant a commit is attempted.
 </Aside>
 

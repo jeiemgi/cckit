@@ -279,20 +279,36 @@ export default defineConfig({
           { label: 'Rules cckit ships', slug: 'rules' },
           { label: 'All reference pages', slug: 'reference' },
         ]},
-        // Marketing: 10 pages in the order of the process, for a reader who never opens a terminal.
-        // The middleware shows these as a flat list, without the group heading, on every page
-        // under /marketing/.
+        // Marketing: 14 pages in six groups, in the order of the process, for a reader who never opens
+        // a terminal. The middleware drops the outer group heading, shows the inner groups at the top
+        // level and opens them all, on every page under /marketing/.
         { label: 'Marketing', translations: { es: 'Marketing' }, items: [
-          { label: 'What you can hand over', translations: { es: 'Qué puedes delegar' }, slug: 'marketing' },
-          { label: 'What happens after you hand it over', translations: { es: 'Qué pasa después de que lo delegas' }, slug: 'marketing/how-we-work' },
-          { label: 'Who does what', translations: { es: 'Quién hace qué' }, slug: 'marketing/who-does-what' },
-          { label: 'Give the keys', translations: { es: 'Entrega las llaves' }, slug: 'marketing/get-set-up' },
-          { label: 'The tools we plug in', translations: { es: 'Las herramientas que conectamos' }, slug: 'marketing/tools' },
-          { label: 'Set your brand voice', translations: { es: 'Define tu voz de marca' }, slug: 'marketing/brand-voice' },
-          { label: 'Hand over your first piece', translations: { es: 'Delega tu primera pieza' }, slug: 'marketing/your-first-piece' },
-          { label: 'Several pieces, one goal', translations: { es: 'Varias piezas, un objetivo' }, slug: 'marketing/campaigns' },
-          { label: 'Review and approval', translations: { es: 'Revisión y aprobación' }, slug: 'marketing/review-and-approval' },
-          { label: 'Words you will hear', translations: { es: 'Palabras que vas a escuchar' }, slug: 'marketing/words-you-will-hear' },
+          { label: 'Start here: what you can hand over', translations: { es: 'Empieza aquí: qué puedes delegar' }, slug: 'marketing' },
+          { label: 'How it works', translations: { es: 'Cómo funciona' }, items: [
+            { label: 'What happens after you hand it over', translations: { es: 'Qué pasa después de que lo delegas' }, slug: 'marketing/how-we-work' },
+            { label: 'Who does what', translations: { es: 'Quién hace qué' }, slug: 'marketing/who-does-what' },
+          ]},
+          { label: 'Get set up', translations: { es: 'Preparación' }, items: [
+            { label: 'Give the keys', translations: { es: 'Entrega las llaves' }, slug: 'marketing/get-set-up' },
+            { label: 'The tools we plug in', translations: { es: 'Las herramientas que conectamos' }, slug: 'marketing/tools' },
+            { label: 'Set your brand voice', translations: { es: 'Define tu voz de marca' }, slug: 'marketing/brand-voice' },
+          ]},
+          { label: 'Plan', translations: { es: 'Planear' }, items: [
+            { label: 'Several pieces, one goal', translations: { es: 'Varias piezas, un objetivo' }, slug: 'marketing/campaigns' },
+            { label: 'See where everything stands', translations: { es: 'Mira cómo va todo' }, slug: 'marketing/where-things-stand' },
+          ]},
+          { label: 'Make a piece', translations: { es: 'Crear una pieza' }, items: [
+            { label: 'Hand over your first piece', translations: { es: 'Delega tu primera pieza' }, slug: 'marketing/your-first-piece' },
+            { label: 'Ask for changes to a piece', translations: { es: 'Pide cambios en una pieza' }, slug: 'marketing/ask-for-changes' },
+            { label: 'Update a page that already exists', translations: { es: 'Actualiza una página que ya existe' }, slug: 'marketing/update-a-page' },
+          ]},
+          { label: 'Review and approve', translations: { es: 'Revisar y aprobar' }, items: [
+            { label: 'Review and approval', translations: { es: 'Revisión y aprobación' }, slug: 'marketing/review-and-approval' },
+            { label: 'Put an approved piece online', translations: { es: 'Pon en línea una pieza aprobada' }, slug: 'marketing/go-live' },
+          ]},
+          { label: 'Look things up', translations: { es: 'Consulta' }, items: [
+            { label: 'Words you will hear', translations: { es: 'Palabras que vas a escuchar' }, slug: 'marketing/words-you-will-hear' },
+          ]},
         ]},
       ],
     }),
