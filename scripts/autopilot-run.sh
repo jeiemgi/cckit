@@ -208,6 +208,9 @@ fi
 ARGS_NL=""
 [ "${#AGENT_ARGS[@]}" -gt 0 ] && ARGS_NL="$(printf '%s\n' "${AGENT_ARGS[@]}")"
 AGENT_CMD="$(al_headless_cmd "$AGENT" json "$ARGS_NL")" || exit 2
+# No reader is in a headless run: `cckit page` in the agent's shell reads this and prints to the
+# terminal instead of opening a review page (#451).
+export CCKIT_HEADLESS=1
 
 if [ "$DRYRUN" = "1" ]; then
   echo "autopilot run (dry-run): branch $BRANCH${ISSUE:+ (issue #$ISSUE)} in $WORKTREE"

@@ -70,6 +70,9 @@ The slug is a *derived* convenience, not a second source of truth. `--slug` only
   `cckit.config.json` / `.claude/kit.config.json` — e.g. `"effort": { "flows": ["Growth", "Checkout"] }`.
   Unset, it defaults to `Core UI API Docs Infra Auth Data Web App`; an explicit `EFFORT_FLOWS` env
   var still overrides both for one invocation.
+- **A plan page first is recommended, not required.** `/kit-effort-new` shows the plan as a
+  [review page](/review-pages/) (terminal output where there is no browser) and records the approval
+  on the parent issue. `cckit effort start` checks for neither.
 - **`cckit effort start`** gives the effort's worktree the **same full setup as `cckit start`**:
   it copies your gitignored env files, assigns a per-worktree dev port, and installs dependencies
   **where the project actually declares any** (opt out entirely with `KIT_WT_INSTALL=0`; see

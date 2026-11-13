@@ -1,6 +1,6 @@
 ---
 title: Integrations
-description: The optional third-party tools cckit can switch on, install and re-check — MemPalace, mlx-lm and Graft — and what each step asks of you.
+description: The optional third-party tools cckit can switch on, install and re-check — MemPalace, mlx-lm, Graft and Lavish — and what each step asks of you.
 ---
 
 import { Steps, Aside } from '@astrojs/starlight/components';
@@ -13,8 +13,10 @@ Each one is a JSON file, `integrations/<id>.json`: its config key, its install c
 they are tried, the command that proves it works, and who makes it. `cckit add`, `cckit doctor` and
 the monthly check all read that file, and none of them holds a tool's recipe in code.
 
-Every integration is off until you switch it on. With its key unset, no row is printed, nothing is
-installed and no exit code changes.
+Every integration but one is off until you switch it on. With its key unset, no row is printed,
+nothing is installed and no exit code changes. The exception is `lavish`, which is **on by default**
+(`config.default: true` in its descriptor): with `reviewPages.enabled` unset the doctor prints its
+row, installs nothing and changes no exit code, and `cckit add lavish --set enable=no` turns it off.
 
 ## The integrations that ship
 
@@ -23,6 +25,7 @@ installed and no exit code changes.
 | `mempalace` | Persistent per-project memory: sessions wake up with context and file their work back. | `memory.enabled` | any repo, any machine | [MemPalace](https://github.com/MemPalace/mempalace) |
 | `mlx-lm` | A local model runtime: digest, summarize and classify run on this Mac through `mlx_lm.server`. | `local.enabled` | Apple silicon only (`Darwin` + `arm64`) | [Apple, ml-explore](https://github.com/ml-explore/mlx-lm) |
 | `graft` | Code-graph retrieval: agents ask an index where code lives and who calls a symbol. | `codeGraph.provider` = `graft` | a repo with at least one file in a language Graft indexes | [NanoNets / Trail](https://github.com/trailhq/Trail-Code) |
+| `lavish` | [Review pages](/review-pages/): a plan, a decision or a grilling round opens as a page you annotate and answer. | `reviewPages.enabled` — on unless `false` | any repo, any machine; a session with no browser prints to the terminal | [Kun Chen](https://github.com/kunchenguid/lavish-axi) |
 
 `cckit add` with no name prints this list for the repo you are in, each row marked `on` or `off`,
 and says which ones do not apply here.
@@ -51,11 +54,12 @@ and says which ones do not apply here.
    ```
 
    With no terminal and no `--fix`, the doctor installs nothing, reports the tool missing and
-   exits 1.
+   exits 1. A missing tool that is on only by default (`lavish`, with `reviewPages.enabled` unset)
+   is a skip row instead: not installed even with `--fix`, and not a failure.
 
 3. **Finish the step the doctor names.** After an install the doctor prints the one step it leaves
    to you: `mempalace mcp` for MemPalace, `graft init --agents claude --no-statusline --no-global`
-   for Graft. mlx-lm has none.
+   for Graft. mlx-lm and Lavish have none.
 
 </Steps>
 
@@ -91,6 +95,7 @@ later candidates never run. If the tool is already detectable, nothing runs, so 
 | `mempalace` | `pipx install mempalace`, then `uv tool install mempalace` | `brew install pipx` |
 | `mlx-lm` | `uv tool install mlx-lm`, then `pipx install mlx-lm` | `brew install uv` |
 | `graft` | `npm install -g @nanonets/graft`, then `pnpm add -g @nanonets/graft` | nothing: the install fails |
+| `lavish` | `npm install -g lavish-axi`, then `brew install node` — reached only when neither `lavish-axi` nor `npx` is on `PATH`, and only when the config sets `reviewPages.enabled: true` | nothing: the install fails |
 
 Installing by hand with any of those commands works too: the doctor detects the tool and reports it
 installed.
@@ -146,6 +151,19 @@ Graft is open-source software (MIT) by [NanoNets / Trail](https://github.com/tra
 installed from its public npm package. cckit is not affiliated with either. Per the vendor README,
 Graft makes a daily npm version check and one batched anonymous usage ping;
 `graft telemetry disable` or `DO_NOT_TRACK=1` turns the ping off. cckit sets neither.
+</Aside>
+
+### Lavish
+
+The page tool behind [review pages](/review-pages/). cckit runs it through `npx -y lavish-axi`, so
+nothing stays installed, and no API key is read. `cckit add lavish` also writes
+`.claude/rules/review-pages.md`; every profile already ships that rule. What opens a page, the
+terminal fallback and where answers are written: [Review pages](/review-pages/).
+
+<Aside type="note" title="Not affiliated">
+Lavish (`lavish-axi`) is open-source software (MIT) by [Kun Chen](https://github.com/kunchenguid/lavish-axi),
+run from its public npm package. cckit is not affiliated with its author and vendors none of its
+code.
 </Aside>
 
 ## Add a tool of your own

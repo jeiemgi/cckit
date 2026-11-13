@@ -52,7 +52,8 @@ kit_interview_catalog_file() {
 # kit_interview_integration_catalog <descriptor> -> a catalog JSON derived from one integration
 # descriptor: ONE select question, `enable`. `yes` sets the descriptor's `config.key` to its ON
 # value (`config.value`, or boolean true when the descriptor names none); `no` carries no `set`,
-# so declining writes nothing. The shape is the one modules/*.json uses, which is why render and
+# so declining writes nothing — except for a descriptor that is on by default (`config.default`),
+# where `no` writes the off value (`false`, or `"none"` for a named key). The shape is the one modules/*.json uses, which is why render and
 # apply need no integration-specific branch.
 kit_interview_integration_catalog() {
   _kit_iv_require || return 1
@@ -74,7 +75,13 @@ kit_interview_integration_catalog() {
                          value: (if $t == "string" then $on else ($on | tojson) end),
                          valtype: (if $t == "string" then "string" elif $t == "boolean" then "bool"
                                    elif $t == "number" then "number" else "json" end) } ] },
-              { label: "No", value: "no", description: "Leave it off. Nothing is written." }
+              (if $c.default == true
+               then { label: "No", value: "no",
+                      description: "Turn it off: it is on by default, so the config records the off value.",
+                      set: [ { path: $c.key,
+                               value: (if $t == "boolean" then "false" else "none" end),
+                               valtype: (if $t == "boolean" then "bool" else "string" end) } ] }
+               else { label: "No", value: "no", description: "Leave it off. Nothing is written." } end)
             ] }
         ] }' "$f" 2>/dev/null || { kit_warn "kit-interview: cannot read integration descriptor $f"; return 1; }
 }

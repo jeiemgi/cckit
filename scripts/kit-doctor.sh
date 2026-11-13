@@ -19,7 +19,8 @@
 #   Tier 2  node + pnpm, vercel, turbo  — project-specific, auto-install if applicable
 #   Agents  the runtime binary of each adapter the project selected (`adapters` in the config),
 #           plus whether the Codex hooks are registered in .codex/hooks.json when codex is selected
-#   Integr. one row per descriptor in integrations/ whose config key is on — installed by the
+#   Integr. one row per descriptor in integrations/ that is on (its config key, or on by default
+#           with the key absent — a missing default-on tool is reported, not failed) — installed by the
 #           shared runner (scripts/lib/integration-install.sh), only with recorded consent
 #   Local   mlx_lm.server auto-start (when .local.enabled)
 #   Auth    gh auth status + scope:project, git config name/email
@@ -501,6 +502,13 @@ doctor_integration() {
     row "$MARK_SKIP" "$label" "needs $(integration_applies_needs "$f") — skipping install"
     return 0
   fi
+  # On by default and never chosen by this project: its callers fall back without the tool, so a
+  # missing one is reported, does not fail the run, and is NOT installed — a yes to installs covers
+  # what the project switched on. `cckit add <id>` writes the key, and then the rows below apply.
+  if integration_default_on "$f" && ! integration_explicit "$f" "$_kitcfg"; then
+    row "$MARK_SKIP" "$label" "not installed — on by default, falls back without it. By hand: $recipe  (or 'cckit add $id', then 'cckit doctor --fix')"
+    return 0
+  fi
   if [[ $DRY_RUN -eq 1 || $NO_INSTALL -eq 1 ]]; then
     st="$(KIT_DRY_RUN=1 integration_install "$f" "$_ig_target" 2>/dev/null || true)"
   else
@@ -542,7 +550,7 @@ if has_cmd jq && [[ -f "$_kitcfg" ]]; then
     _ig_f="$(integration_file "$_ig_id")" || continue
     integration_enabled "$_ig_f" "$_kitcfg" || continue
     if [[ $_ig_shown -eq 0 ]]; then
-      printf '  %s%sIntegrations (optional tools this project switched on)%s\n' "$C_BOLD" "" "$C_RESET"
+      printf '  %s%sIntegrations (optional tools that are on in this project)%s\n' "$C_BOLD" "" "$C_RESET"
       _ig_shown=1
     fi
     doctor_integration "$_ig_f"
