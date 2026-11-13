@@ -190,6 +190,7 @@ export default defineConfig({
         { label: 'Reference', items: [
           { label: 'CLI reference', slug: 'cli-reference' },
           { label: 'Documentation benchmark', slug: 'benchmark' },
+          { label: 'Benchmark results', slug: 'benchmark-results' },
           { label: 'Skills cckit ships', slug: 'skills' },
           { label: 'Rules cckit ships', slug: 'rules' },
           { label: 'Tags directory', slug: 'tags' },
