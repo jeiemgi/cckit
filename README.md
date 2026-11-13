@@ -459,6 +459,10 @@ well an agent finds and uses your own canonical docs (retrieval / adversarial / 
 tiers). Run `cckit bench report` after a docs or kit-version change to catch findability regressions;
 see the [benchmark guide](https://cckit.dev/benchmark/).
 
+cckit's own sets are in `benchmarks/`: 55 retrieval, adversarial and abstain questions and 12 judged
+quality claims over `docs-site/src/content/docs`. Recorded runs of the first three tiers are under
+`benchmarks/runs/`.
+
 ## Built with cckit
 
 Using cckit in your project? Add a badge (optional, but appreciated):

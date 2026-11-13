@@ -12,7 +12,8 @@
 #   --dry      validate every record has a claim + a non-empty `must` rubric; call NO model; exit 0.
 #   --set      run one quality set; else every tier:"quality" set in benchmark.config.json (or
 #              every *quality*.jsonl in the dir).
-#   --answers  keep each graded answer as <dir>/<id>.txt, to read why a claim scored what it did.
+#   --answers  keep each graded answer as <dir>/<id>.txt and the judge's reply to it as
+#              <dir>/<id>.judge.txt, to read why a claim scored what it did.
 #
 # A record may carry extra keys (`source`: the page its rubric was written from). Only `claim` and
 # `must` are read here.
@@ -83,6 +84,7 @@ for file in "${SETS[@]}"; do
     fi
     # No answer (backend failed or timed out) covers no point. Do not spend a judge call on it.
     if [ -n "$answer" ]; then
+      [ -z "$ANSWERS_DIR" ] || export BENCH_JUDGE_RAW="$ANSWERS_DIR/$id.judge.txt"
       score="$(bench_judge "$claim" "$answer" "$must")"
     else
       score="0"

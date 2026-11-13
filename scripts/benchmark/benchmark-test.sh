@@ -124,6 +124,7 @@ chmod +x "$QSTUB/claude"
 q_mean="$(PATH="$QSTUB:$PATH" BENCH_BACKEND=claude bash "$HERE/run-quality.sh" --json --answers "$FIX/answers" 2>/dev/null | jq -r '.mean == 1')"
 t "quality: the judge sees the whole answer" "$q_mean" "true"
 t "quality: --answers keeps the graded answer" "$(wc -l < "$FIX/answers/q1.txt" 2>/dev/null | tr -d ' ')" "2"
+t "quality: --answers keeps the judge's reply" "$(cat "$FIX/answers/q1.judge.txt" 2>/dev/null)" "1"
 
 # An empty answer (backend failed or timed out) scores 0 and never reaches the judge.
 cat > "$QSTUB/claude" <<'STUBEOF'
