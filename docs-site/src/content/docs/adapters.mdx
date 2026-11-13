@@ -65,18 +65,10 @@ is being implemented; shell access alone does not establish behavioral parity.
 ### Choosing adapters at install
 
 `cckit init --adapter <claude|codex|both>` selects what is installed. The default is `claude`.
-
-| | `claude` | `codex` |
-| --- | --- | --- |
-| Instruction file | `CLAUDE.md` | `AGENTS.md` |
-| Skills | `.claude/skills/<name>/SKILL.md` | `.agents/skills/<name>/SKILL.md` |
-| Rules | `.claude/rules/*.md` | `.agents/rules/*.md`, listed by path in `AGENTS.md` |
-| Specialist agents | `.claude/agents/<role>/AGENT.md` | `.codex/agents/<role>.toml` |
-| Hooks and guards | `.claude/hooks/`, registered in `.claude/settings*.json` | `.codex/hooks/`, registered in `.codex/hooks.json` ([details](/hooks/#codex)) |
-| Memory hooks | `.claude/hooks/mempal_*.sh` (with `--memory on`) | not installed |
-| Statusline, settings | `.claude/statusline.sh`, `.claude/settings*.json` | not installed |
-| Config (when it is the only adapter) | `.claude/kit.config.json` | `cckit.config.json` |
-| Ownership manifest (when it is the only adapter) | `.claude/kit.manifest.json` | `.cckit/kit.manifest.json` |
+The file-by-file comparison — which paths a Claude Code install writes and which a Codex-only
+install writes — is in the
+[install matrix](/install-matrix/#what-cckit-init-writes-claude-code-codex-or-both). What follows
+is how the two are kept in step.
 
 - **One source.** Both instruction files render from `templates/instructions.md.tmpl`, and both
   skill and rule trees from `templates/skills/` and `templates/rules/`. The adapter decides the
