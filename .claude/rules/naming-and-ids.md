@@ -42,11 +42,11 @@ have to be true, the human-facing text carries the token and the machine-readabl
 Two concrete cases, both of which a token would break:
 
 - **The `## Relations` mirror — `- Depends on #N`.** `_eff_relations_add`
-  (`scripts/lib/effort-ops.sh:66`) is the one formatter for that line, and it matches an existing
-  one with `want = "- Depends on #" dep` (line 68). `effort_chain` re-checks it with
-  `grep -qE "^[[:space:]]*- Depends on #${prev}[[:space:]]*$"` (line 400) before writing through the
+  (`scripts/lib/effort-ops.sh:84`) is the one formatter for that line, and it matches an existing
+  one with `want = "- Depends on #" dep` (line 86). `effort_chain` re-checks it with
+  `grep -qE "^[[:space:]]*- Depends on #${prev}[[:space:]]*$"` (line 445) before writing through the
   same formatter. That literal match is what makes a re-run idempotent instead of appending a
-  duplicate line — a tested behavior (`effort-ops-test.sh:194`, "relations_add is idempotent (same
+  duplicate line — a tested behavior (`effort-ops-test.sh:370`, "relations_add is idempotent (same
   line twice)"). The blocker is often an effort, so a chained effort body legitimately contains a
   bare `#N` pointing at one.
 - **GitHub's own syntax — `Closes #N`, `blocked_by`.** GitHub parses these to link and auto-close;
@@ -61,14 +61,15 @@ parenthetical is GitHub's, not a person's, and it stays as GitHub writes it.
 ## Why `E241.2` and not the sub's own number
 
 `E241.2` is derivable from what you are already looking at. The sub's title says effort 241,
-step 2 — so you can act on it without first resolving `#243`. That is the whole point: the
-identifier you read is the identifier you type.
+step 2 — so you can act on it without first resolving `#243`. The identifier you read is the
+identifier you type.
 
 ```shell
 cckit start E241.2      # not: cckit start 243
 ```
 
-Both resolve to the same worktree. The number still works; `E241.2` is what you can remember.
+That is this rule's target, not today's CLI: `wt_start` (`scripts/lib/worktree-start.sh`) passes its
+argument to `gh issue view` as the issue number and parses no token. Until it does, type `243`.
 
 ## PR titles
 
@@ -132,8 +133,6 @@ segment before the first `-` is `e241.2`, not digits — and a branch with no is
 **no `gc` issue-open protection** — `cckit gc` would classify a live branch as SAFE to delete.
 That regression has happened before in this repo; see the comment block in
 `scripts/lib/worktree-issue.sh` explaining why sub-branch parsing exists at all.
-
-The token belongs where humans read. Branch names are where tooling parses safety.
 
 ## Chains
 

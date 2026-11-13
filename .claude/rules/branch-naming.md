@@ -145,7 +145,7 @@ If the project adopts the kit's PR-automation workflows, these labels are applie
 
 One branch = one issue = one PR = **deleted on merge**. A branch is a short-lived container, not a place work lives.
 
-- **No long-lived uncommitted work.** Don't let a working tree sit dirty across sessions. Commit + PR, or discard. A branch sitting many commits behind the base with uncommitted work can silently revert merged work on a bad rebase — exactly the class of problem this section exists to prevent.
+- **No long-lived uncommitted work.** Don't let a working tree sit dirty across sessions. Commit + PR, or discard. A branch sitting many commits behind the base with uncommitted work can silently revert merged work on a bad rebase.
 - **Never work directly on the base branch (`main`/`develop`).** The `guard-base-branch-commit.sh` hook blocks commits there; start every change with `/kit-task-start <issue>` (it branches from a *fresh* base).
 - **Delete on merge.** `/kit-task-pr-merge` removes the worktree and deletes the local + remote branch automatically. Never leave a merged branch or its worktree lingering.
 - **One worktree per branch; remove it when its PR merges.** Parallel agents must use worktrees (never share a checkout).
@@ -156,10 +156,10 @@ One branch = one issue = one PR = **deleted on merge**. A branch is a short-live
 
 Local hooks + skills are **fast feedback**; the **durable, everyone-applies enforcement** belongs on GitHub. Move guardrails there as they mature — they then enforce for humans, CI agents (Auto-Dev), and the Claude Action alike, regardless of anyone's local setup.
 
-- **Do first (1 toggle):** repo Settings → **"Automatically delete head branches"** — eliminates remote-branch buildup entirely.
+- **Do first (1 toggle):** repo Settings → **"Automatically delete head branches"** — GitHub then deletes each remote branch when its PR merges.
 - **Branch protection** on the base branch: require PR, required CI checks, linear history, no direct pushes.
 - **Stale-branch / stale-PR Action** (scheduled) to flag/close abandoned branches + PRs.
 - **Scheduled sweep** that flags "PR merged but issue still open" and "branch merged but not deleted".
 - Extend any adopted `pr-labeler` / `pr-deps` / `pr-automerge` workflows as the enforcement surface.
 
-Principle: **prefer migrating enforcement to GitHub** as it matures; keep only the genuinely local concerns (worktrees, stale base, dirty tree) in hooks.
+Principle: keep only the local concerns (worktrees, stale base, dirty tree) in hooks.
