@@ -91,6 +91,10 @@ in GitHub issues (`tasks.default` is `light` in `{{CONFIG_REL}}`). Review is sti
 | 3. Start | `cckit task start <id>` | A separate folder and branch for this task; work there |
 | 4. Send for review | `cckit task finish <id> "<summary>" --all` | Opens the pull request; report the link and stop |
 
+To hand a whole task to an agent in one step, `cckit task run <id>` does steps 3 and 4: it starts the
+task, runs one unattended round on it behind the project's check (`tasks.check`, or `--check "<cmd>"`),
+and opens the pull request. It opens none when the check fails or the round changed nothing.
+
 `--all` includes the files created for the task. Without it `finish` sends only files that already
 existed and lists the new ones it left out, so a new draft would not reach the reviewer.
 
