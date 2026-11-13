@@ -223,13 +223,13 @@ rp_answer() {
   local kind="" title="" issue="" bfile="" dest tmp body id marker label repo out dir root rel slug f n today
   while [ $# -gt 0 ]; do
     case "$1" in
-      --kind)      kind="${2:-}"; shift ;;
-      --title)     title="${2:-}"; shift ;;
-      --issue)     issue="${2:-}"; shift ;;
-      --body-file) bfile="${2:-}"; shift ;;
+      --kind)      kind="${2:-}";  [ $# -gt 1 ] && shift ;;
+      --title)     title="${2:-}"; [ $# -gt 1 ] && shift ;;
+      --issue)     issue="${2:-}"; [ $# -gt 1 ] && shift ;;
+      --body-file) bfile="${2:-}"; [ $# -gt 1 ] && shift ;;
       *) kit_warn "page answer: unknown argument '$1'"; return 2 ;;
     esac
-    shift || true
+    shift
   done
   case "$kind" in plan|decision|grill) ;; *) kit_warn "page answer: --kind is one of plan, decision, grill"; return 2 ;; esac
   [ -n "$title" ] || { kit_warn "page answer: --title is required"; return 2; }
@@ -286,17 +286,19 @@ rp_answer() {
   root="$(git rev-parse --show-toplevel 2>/dev/null)" || root="$PWD"
   slug="$(_rp_slug "$title")"; [ -n "$slug" ] || slug="answer"
   rel="$dir/$today-$kind-$slug"
+  # The marker is looked up in every file of the directory, not only today's: the file name starts
+  # with the date, so the same answer recorded on a later day would otherwise be written twice.
+  f=""
+  [ -d "$root/$dir" ] && f="$(grep -lF -- "$marker" "$root/$dir"/*.md 2>/dev/null | head -n 1)"
+  if [ -n "$f" ]; then
+    rm -f "$tmp" "$body"
+    kit_say "page answer: already recorded in $f — nothing written"
+    if _rp_json; then jq -cn --arg f "$f" '{ok: true, where: "file", file: $f, written: false}'
+    else printf 'file %s (already recorded)\n' "$f"; fi
+    return 0
+  fi
   f="$root/$rel.md"; n=1
-  while [ -e "$f" ]; do
-    if grep -qF -- "$marker" "$f" 2>/dev/null; then
-      rm -f "$tmp" "$body"
-      kit_say "page answer: already recorded in $f — nothing written"
-      if _rp_json; then jq -cn --arg f "$f" '{ok: true, where: "file", file: $f, written: false}'
-      else printf 'file %s (already recorded)\n' "$f"; fi
-      return 0
-    fi
-    n=$((n + 1)); f="$root/$rel-$n.md"
-  done
+  while [ -e "$f" ]; do n=$((n + 1)); f="$root/$rel-$n.md"; done
   { printf '# %s answer: %s\n\n%s\n\n' "$label" "$title" "$marker"
     printf -- '- Recorded: %s\n- Kind: %s\n' "$today" "$kind"
     [ -n "$issue" ] && printf -- '- Issue: #%s\n' "$issue"

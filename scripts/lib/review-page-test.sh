@@ -254,6 +254,11 @@ yes "same file answer again: nothing written" "$out" "(already recorded)"
 t "same file answer again: still one file" "$(find "$NOGH/docs/answers" -type f | wc -l | tr -d ' ')" "1"
 page "$NOGH" -- answer --kind decision --title "Launch: week 12, not 14!" --body-file "$TMP/answer2.md" >/dev/null
 t "a different answer under the same title gets its own file" "$([ -f "${want%.md}-2.md" ] && echo yes || echo no)" "yes"
+# The file name starts with the date: the same answer on a later day is still one record.
+mv "$want" "$NOGH/docs/answers/2020-01-01-decision-launch-week-12-not-14.md"
+out="$(page "$NOGH" -- answer --kind decision --title "Launch: week 12, not 14!" --body-file "$TMP/answer.md")"
+yes "same file answer on a later day: nothing written" "$out" "docs/answers/2020-01-01-decision-launch-week-12-not-14.md (already recorded)"
+t "…and no file dated today appears" "$([ -e "$want" ] && echo made || echo none)" "none"
 out="$(page "$NOGH" -- answer --kind plan --title "Q3 plan" --issue 9 --body-file "$TMP/answer.md")"
 yes "no GitHub repo in the config: an --issue still goes to a file" "$out" "file $NOGH/docs/answers/$today-plan-q3-plan.md"
 yes "…and the file records the issue" "$(cat "$NOGH/docs/answers/$today-plan-q3-plan.md")" "- Issue: #9"
@@ -280,6 +285,14 @@ page "$GH" -- answer --kind verdict --title x --body-file "$TMP/answer.md" >/dev
 page "$GH" -- answer --kind plan --body-file "$TMP/answer.md" >/dev/null; t "no title -> rc 2" "$?" "2"
 page "$GH" -- answer --kind plan --title x --issue abc --body-file "$TMP/answer.md" >/dev/null; t "non-numeric issue -> rc 2" "$?" "2"
 page "$GH" -- answer --kind plan --title x --body-file "$TMP/absent.md" >/dev/null; t "missing body file -> rc 2" "$?" "2"
+page "$GH" -- answer --title x --kind >/dev/null; t "a flag with no value -> rc 2" "$?" "2"
+ABS="$(project abs "{\"reviewPages\":{\"answersDir\":\"$TMP/abs-out\"}}")"
+page "$ABS" -- answer --kind decision --title "Pick" --body-file "$TMP/answer.md" >/dev/null
+t "an absolute answersDir -> rc 2" "$?" "2"
+t "…and nothing is written there" "$([ -e "$TMP/abs-out" ] && echo made || echo none)" "none"
+reset
+page "$GH" -- reply .lavish/plan.html --agent-reply "noted" >/dev/null
+t "reply reaches the tool with its arguments" "$(calls)" "lavish-axi reply .lavish/plan.html --agent-reply noted|"
 
 # ── 12. the same answers under zsh (scripts/lib is sourced by both shells) ─────────────────────
 if command -v zsh >/dev/null 2>&1; then
@@ -293,6 +306,10 @@ if command -v zsh >/dev/null 2>&1; then
       CLAUDECODE=1 CLAUDE_CODE_ENTRYPOINT=cli DISPLAY=:0 "$ZSH" -c ". '$LIBF'; rp_open .lavish/plan.html; rp_answer --kind plan --title 'Z plan' --issue 3 --body-file '$TMP/answer.md'" </dev/null >/dev/null 2>&1 )
   yes "zsh: open runs the tool" "$(calls)" "lavish-axi .lavish/plan.html|"
   yes "zsh: answer comments on the issue" "$(calls)" "gh issue comment 3 --repo o/r"
+  zerr="$( cd "$NOGH" && env -i HOME="$TMP/home" PATH="$STUB:$SEALED" KIT_CONFIG="$NOGH/.claude/kit.config.json" \
+      "$ZSH" -c ". '$LIBF'; rp_answer --kind grill --title 'Z round' --body-file '$TMP/answer.md'; rp_answer --title x --kind" </dev/null 2>&1 >/dev/null )"
+  t "zsh: a file answer is written" "$([ -f "$NOGH/docs/answers/$today-grill-z-round.md" ] && echo yes || echo no)" "yes"
+  no "zsh: a flag with no value prints no shell error" "$zerr" "shift count"
 else
   echo "ok: zsh absent — the zsh cases are skipped"
 fi
