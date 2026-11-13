@@ -124,10 +124,10 @@ The parent carries the rich narrative; the **PR** carries the human-facing revie
 |------|------|
 | `effort-new` | parent issue (4-section body **filled** + `ctx/kind/priority/role/flow` labels) + native sub-issues, every title linted; optional `--slug` sets the handle |
 | `cckit effort chain <a> <b> …` | declare a running order over EXISTING issues: each successor `blocked_by` its predecessor + a `- Depends on #<predecessor>` line. Idempotent, additive, cycle-refusing (nothing is written on a refusal) |
-| `effort-start [--force] <slug\|N>` | `effort/<N>` branch + worktree; board → In Progress. **WIP-limited** — see below |
+| `effort-start [--force] <slug\|N>` | `effort/<N>` branch + worktree; board → In Progress. Creating the branch stamps the start time for the metrics record. **WIP-limited** — see below |
 | orchestrate | sub-issues in own worktrees (file-disjoint) → merge into `effort/<N>`; each closes + board Done as it lands |
 | `effort-pr <slug\|N>` | ONE PR `effort/<N>` → develop (rich body + `## For agents`) |
-| `effort-close <slug\|N>` | **snapshot sub-diffs pre-squash** → re-target open PRs based on the effort branch (refuses if one fails) → merge → close parent + subs → board Done(all) → GC prune → kit-sync drift check |
+| `effort-close <slug\|N>` | **snapshot sub-diffs pre-squash** → append the metrics record (`build_seconds` and `tokens_real` each name their source; with no source the field is `null`, never an estimate) → re-target open PRs based on the effort branch (refuses if one fails) → merge → close parent + subs → board Done(all) → GC prune → kit-sync drift check |
 
 Board + record state are correct **by construction** — the close op owns them. Never rely on a
 separate, skippable "mark done" step.

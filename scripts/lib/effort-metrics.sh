@@ -6,9 +6,27 @@
 # sync (#811) flushes the buffer to the Postgres graph (schema #810) when the engine is connected.
 # The record shape below IS that schema.
 #
-#   record_effort_start <num>            — stamp start epoch + write the pre-build estimate (#808)
+#   record_effort_start <num>            — stamp start epoch + write the pre-build estimate (#808).
+#                                          Called by effort_start when it creates the branch (#453).
 #   capture_effort_metrics <num> [base]  — at close: build-time + signals + token/cost actuals (#807)
 #                                          + reconcile vs the estimate → append the record
+#
+# Where each measured field comes from (#453). A field with no source is null and the record says why:
+#   build_seconds   close time minus <num>.start (build_source "effort-start"); with no stamp, close
+#                   time minus the author time of the oldest commit in <base>..HEAD ("first-commit");
+#                   null when the branch has neither.
+#   tokens_real     1. sessions listed in <git-common-dir>/kit-usage.jsonl, summed from their Claude
+#                      transcripts (tokens_source "transcripts", cost at list price). cckit ships no
+#                      writer for that log; a project that keeps one gets this path.
+#                   2. else the `cckit autopilot run` state files of the effort branch and its
+#                      sub/<N><letter> branches — the usage the runtime printed (tokens_source
+#                      "autopilot-run", cost_source "runtime" when the runtime printed a cost).
+#                      Interactive sessions are not in that figure.
+#                   3. else null, with tokens_null_reason: "no-usage-source" (no usage log, no
+#                      autopilot run), "no-session-matched" (a usage log with no session for this
+#                      effort), "autopilot-usage-unknown" (a run whose rounds printed no usage — a
+#                      partial sum would be an undercount).
+# No figure is estimated: a null stays null.
 #
 # Cost = metered API; retroactively $ is computed from current Opus-4.8 list price (no per-call bill
 # access here) → cost_source="list-price". bash 3.2 compatible. Requires: git, jq.
@@ -46,8 +64,9 @@ record_effort_start() {
   [[ -n "$num" ]] || return 0
   d="$(_em_dir)" || return 0
   mkdir -p "$d" 2>/dev/null || return 0
-  date -u +%s > "$d/$num.start" 2>/dev/null || true
-  estimate_effort "$num" || true
+  # Keep an existing stamp: a re-run of `effort start` must not move the start forward.
+  [[ -s "$d/$num.start" ]] || date -u +%s > "$d/$num.start" 2>/dev/null || true
+  [[ -f "$d/$num.est" ]] || estimate_effort "$num" || true
 }
 
 # estimate_effort <num> — pre-build prediction from estimator.json + the effort's scope (#808).
@@ -161,7 +180,51 @@ _em_token_sum() {
   echo "$tin $tout $tcr $tcw"
 }
 
+# _em_usage_log — absolute path of the session usage log (it may not exist).
+_em_usage_log() {
+  local c; c="$(git rev-parse --git-common-dir 2>/dev/null)" || return 1
+  case "$c" in /*) : ;; *) c="$PWD/$c" ;; esac
+  printf '%s/kit-usage.jsonl' "$c"
+}
+
+# _em_autopilot_usage <num> <branch> — "<tokens> <cost-usd> <runs>" from the `cckit autopilot run`
+# state files (<state-dir>/autopilot/*.json, scripts/autopilot-run.sh) whose branch is <branch> or a
+# sub/<num><letter>-… branch of the effort. Those hold what the runtime itself printed (al_usage).
+#   tokens  a sum · `unknown` when any matching run reads unknown · `none` when no run matched
+#   cost    a sum · `unknown` when any matching run printed no cost
+# A run with zero rounds spent nothing and is skipped.
+_em_autopilot_usage() {
+  local num="$1" branch="$2" sdir f out
+  local files=()
+  if ! command -v kit_state_dir >/dev/null 2>&1; then
+    # shellcheck source=/dev/null
+    [[ -f "$_EM_LIB_DIR/kit-state.sh" ]] && . "$_EM_LIB_DIR/kit-state.sh"
+  fi
+  command -v kit_state_dir >/dev/null 2>&1 || { echo "none unknown 0"; return 0; }
+  sdir="$(kit_state_dir 2>/dev/null)/autopilot"
+  [[ -d "$sdir" ]] || { echo "none unknown 0"; return 0; }
+  # find, not a glob: an unmatched glob is an error under zsh.
+  while IFS= read -r f; do [[ -n "$f" ]] && files+=("$f"); done \
+    < <(find "$sdir" -maxdepth 1 -type f -name '*.json' 2>/dev/null)
+  (( ${#files[@]} > 0 )) || { echo "none unknown 0"; return 0; }
+  out="$(jq -rs --arg b "$branch" --arg n "$num" '
+    [ .[] | objects
+      | select((.branch? // "") as $x
+               | ($b != "" and $x == $b) or ($x | test("^sub/" + $n + "[a-z]-")))
+      | select((.rounds? // 0) > 0) ] as $runs
+    | if ($runs | length) == 0 then "none unknown 0" else
+        ( if any($runs[]; (.usage.tokens? | type) != "number") then "unknown"
+          else ([$runs[].usage.tokens] | add) end ) as $tok
+        | ( if any($runs[]; (.usage.cost_usd? | type) != "number") then "unknown"
+            else ([$runs[].usage.cost_usd] | add) end ) as $cost
+        | "\($tok) \($cost) \($runs | length)"
+      end' "${files[@]}" 2>/dev/null)"
+  [[ -n "$out" ]] || out="none unknown 0"
+  echo "$out"
+}
+
 capture_effort_metrics() {
+  local build_src tokens_src null_reason ap ap_tok ap_cost ap_runs first ulog
   local num="$1" base="${2:-origin/${KIT_BASE_BRANCH:-main}}" d start now build_s shortstat files added removed commits churn diff_auto branch
   local toks tin tout tcr tcw tokens_real cost_real cost_source tokens_est cost_est rec
   local IFS=' '   # force space-split for `set --` below (ambient IFS may carry a NUL)
@@ -169,13 +232,26 @@ capture_effort_metrics() {
   command -v jq >/dev/null 2>&1 || return 0
   d="$(_em_dir)" || return 0; mkdir -p "$d" 2>/dev/null || return 0
 
-  now="$(date -u +%s 2>/dev/null)"; build_s="null"
+  # build time (#453): the stamp effort_start wrote, else the oldest commit on the branch (below,
+  # once the base is fetched). Never a guess: with neither, build_seconds stays null.
+  now="$(date -u +%s 2>/dev/null)"; build_s="null"; build_src="null"; start=""
   if [[ -f "$d/$num.start" ]]; then
     start="$(cat "$d/$num.start" 2>/dev/null)"
-    [[ "$start" =~ ^[0-9]+$ && "$now" =~ ^[0-9]+$ ]] && build_s=$(( now - start ))
+    if [[ "$start" =~ ^[0-9]+$ && "$now" =~ ^[0-9]+$ ]] && (( now >= start )); then
+      build_s=$(( now - start )); build_src='"effort-start"'
+    else
+      start=""
+    fi
   fi
 
   git fetch origin --quiet 2>/dev/null || true
+  if [[ "$build_s" == "null" && "$now" =~ ^[0-9]+$ ]]; then
+    # Author time, not committer time: a rebase rewrites the second and keeps the first.
+    first="$(git log --format=%at "$base"..HEAD 2>/dev/null | sort -n | head -1)"
+    if [[ "$first" =~ ^[0-9]+$ ]] && (( now >= first )); then
+      start="$first"; build_s=$(( now - first )); build_src='"first-commit"'
+    fi
+  fi
   shortstat="$(git diff --shortstat "$base"...HEAD 2>/dev/null)"
   files=$(printf '%s' "$shortstat"   | grep -oE '[0-9]+ file'      | grep -oE '[0-9]+' | head -1)
   added=$(printf '%s' "$shortstat"   | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+' | head -1)
@@ -200,9 +276,19 @@ capture_effort_metrics() {
     cost_real=$(awk -v i="$tin" -v o="$tout" -v cr="$tcr" -v cw="$tcw" \
       -v pi="$_EM_PRICE_IN" -v po="$_EM_PRICE_OUT" -v pcr="$_EM_PRICE_CACHE_READ" -v pcw="$_EM_PRICE_CACHE_WRITE" \
       'BEGIN{printf "%.4f", (i*pi + o*po + cr*pcr + cw*pcw)/1000000}')
-    cost_source='"list-price"'
+    cost_source='"list-price"'; tokens_src='"transcripts"'; null_reason=null
   else
-    tokens_real=null; cost_real=null; cost_source=null
+    tokens_real=null; cost_real=null; cost_source=null; tokens_src=null
+    ulog="$(_em_usage_log 2>/dev/null)"
+    if [[ -n "$ulog" && -f "$ulog" ]]; then null_reason='"no-session-matched"'; else null_reason='"no-usage-source"'; fi
+    # No transcript figure: read what `cckit autopilot run` recorded for this effort's branches (#453).
+    ap="$(_em_autopilot_usage "$num" "$branch")"; read -r ap_tok ap_cost ap_runs <<< "$ap"
+    if [[ "$ap_tok" =~ ^[0-9]+$ ]]; then
+      tokens_real="$ap_tok"; tokens_src='"autopilot-run"'; null_reason=null
+      if [[ "$ap_cost" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then cost_real="$ap_cost"; cost_source='"runtime"'; fi
+    elif [[ "$ap_tok" == "unknown" ]]; then
+      null_reason='"autopilot-usage-unknown"'
+    fi
   fi
 
   # estimate (#808) for reconciliation.
@@ -216,17 +302,19 @@ capture_effort_metrics() {
         --argjson build "$build_s" --argjson files "$files" --argjson added "$added" \
         --argjson removed "$removed" --argjson commits "$commits" \
         --argjson tokens_real "$tokens_real" --argjson cost_real "$cost_real" --argjson cost_source "$cost_source" \
-        --argjson tokens_est "$tokens_est" --argjson cost_est "$cost_est" --argjson diff "$diff_auto" '
-    {effort:$num, branch:$branch, captured_at:$at, build_seconds:$build,
+        --argjson tokens_est "$tokens_est" --argjson cost_est "$cost_est" --argjson diff "$diff_auto" \
+        --argjson build_src "$build_src" --argjson tokens_src "$tokens_src" --argjson null_reason "$null_reason" '
+    {effort:$num, branch:$branch, captured_at:$at, build_seconds:$build, build_source:$build_src,
      signals:{files:$files, added:$added, removed:$removed, commits:$commits},
-     tokens_real:$tokens_real, cost_real_usd:$cost_real, cost_source:$cost_source,
+     tokens_real:$tokens_real, tokens_source:$tokens_src, tokens_null_reason:$null_reason,
+     cost_real_usd:$cost_real, cost_source:$cost_source,
      tokens_est:$tokens_est, cost_est_usd:$cost_est,
      difficulty_auto:$diff, score_auto:null, difficulty_judge:null, score_judge:null,
      synced_to_graph:false}' 2>/dev/null)" || return 0
   [[ -n "$rec" ]] || return 0
   printf '%s\n' "$rec" >> "$d/records.jsonl"
   rm -f "$d/$num.start" "$d/$num.est" 2>/dev/null || true
-  echo "[#$num] metrics: build=${build_s}s files=$files +$added/-$removed commits=$commits diff=$diff_auto tokens_real=$tokens_real cost_real=$cost_real est_tokens=$tokens_est → records.jsonl" >&2
+  echo "[#$num] metrics: build=${build_s}s (source=${build_src//\"/}) files=$files +$added/-$removed commits=$commits diff=$diff_auto tokens_real=$tokens_real (source=${tokens_src//\"/} reason=${null_reason//\"/}) cost_real=$cost_real est_tokens=$tokens_est → records.jsonl" >&2
   # Self-improving estimator (#812): recalibrate the medians/ratios from the now-larger dataset so the
   # next effort's pre-build estimate reflects reality (flips tokens_calibrated once ≥5 real-token rows).
   recalibrate_estimator >/dev/null 2>&1 || true
@@ -515,7 +603,12 @@ recalibrate_estimator() {
         median_commits: med([$rows[].commits]),
         median_build_seconds: med([$rows[]|select(.build!=null)|.build]),
         tokens_per_changed_line: (if $nrt>=$min then (([$rt[].tok]|add)/([$rt[].lines]|add)) else null end),
-        cost_per_changed_line_usd: (if $nrt>=$min then (([$rt[]|(.cost|tonumber? // 0)]|add)/([$rt[].lines]|add)) else null end),
+        cost_per_changed_line_usd: (
+          # Only rows that carry a cost: an autopilot-run row from a runtime that prints none has
+          # tokens and a null cost (#453), and counting it as 0 would lower the ratio.
+          ($rt | map(select(.cost != null))) as $rc
+          | if $nrt>=$min and ($rc|length) > 0 and ([$rc[].lines]|add) > 0
+            then (([$rc[]|(.cost|tonumber? // 0)]|add)/([$rc[].lines]|add)) else null end),
         recalibrated_at:$stamp }' "$f")"
   [[ -n "$model" ]] || { echo "effort-metrics: recalibrate produced nothing" >&2; return 1; }
   if [[ -f "$est" ]]; then
