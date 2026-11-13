@@ -1,5 +1,5 @@
 ---
-title: How to use cckit with Codex
+title: Use cckit with Codex
 description: Install cckit's Codex adapter in a repo, confirm the CLI and the hooks with the doctor, trust the hooks in Codex, then run issues in parallel and one headless objective with Codex as the agent.
 tutorial:
   job: use cckit with Codex
@@ -20,9 +20,17 @@ import TutorialSchema from '../../../components/TutorialSchema.astro';
 
 <TutorialMeta />
 
-**What you'll set up:** the same lifecycle verbs, with Codex as the agent that runs them.
+The process does not depend on which agent runs it. A team that works in Codex needs the same
+things a Claude Code team gets: the instructions, the rules, the skills and the guards that stop a
+commit on the base branch. Codex reads them from different files, so cckit has an adapter that
+writes them where Codex looks.
+
+**What you will have at the end:** a repository where Codex follows the same process.
 `cckit init --adapter codex` writes `AGENTS.md`, the skills and rules under `.agents/`, and the
-guard hooks under `.codex/`. After that, the verbs that launch an agent take `--agent codex`.
+guard hooks under `.codex/`. After that, the commands that launch an agent take `--agent codex`.
+
+Steps 1 to 4 are the setup. Steps 5 to 7 are three ways to work once it is in place; stop after
+any of them.
 
 ## Steps
 
@@ -100,6 +108,17 @@ guard hooks under `.codex/`. After that, the verbs that launch an agent take `--
 
 </Steps>
 
+## Check it worked
+
+```bash frame="terminal"
+cckit doctor --agents
+```
+
+It exits 0 and prints a `codex` row with the CLI version and a `codex hooks` row reading
+`registered in .codex/hooks.json`. The doctor cannot read whether Codex trusts the hooks. To see
+that for yourself, try a commit on the base branch from a Codex session: the guard should refuse
+it.
+
 ## How it works
 
 Both adapters render from one set of templates, so a rule or a skill says the same thing to both
@@ -141,10 +160,10 @@ the worktree was cut from does not contain them. Commit them on the base branch.
 **The repo already had an `AGENTS.md`.** A fresh init keeps an existing `AGENTS.md`. Pass
 `--force` to replace it, or merge the generated content by hand.
 
-## Related tutorials
+## Related guides
 
 <CardGrid>
-  <LinkCard title="Set up cckit in a Git repo" href="/getting-started/initialize/" description="The init step, in full." />
+  <LinkCard title="Initialize a project" href="/getting-started/initialize/" description="The init step, in full." />
   <LinkCard title="Run a wave of issues in parallel" href="/development/run-a-wave-in-parallel/" description="The wave loop the Codex launch commands plug into." />
   <LinkCard title="Run one objective unattended" href="/development/run-one-objective-unattended/" description="Every limit and stop reason of the headless run." />
 </CardGrid>

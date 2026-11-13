@@ -1,17 +1,27 @@
 ---
 title: Update a project
-description: "Bring a project scaffolded by an older cckit to the installed version: check the version, preview the change, apply it, and confirm — with what the update changes and what it never touches."
+description: "Bring a project set up by an older cckit to the installed version: check the version, preview the change, apply it and confirm. With what the update changes and what it never touches."
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-A project records the cckit version that scaffolded it as `kitVersion` in its config. Updating the
-cckit install does not change the project; the four steps below do. Run them from the project
-root. Every command on this page is run, in this order, by `scripts/update-path-test.sh` against a
-project built the way an older cckit left it.
+cckit moves forward: new rules, new guards, fixed hooks. A project set up months ago still has the
+files it was given that day, and it also has your edits to them. An update has to bring the new
+files in without undoing your edits, and you should be able to see what it will change before it
+changes anything.
+
+A project records the cckit version that set it up as `kitVersion` in its config. Updating the
+cckit install does not change the project; the four steps below do.
+
+**What you will have at the end:** the project on the installed version, the files it was missing
+added, every file you edited kept, and one diff to review and commit.
+
+**Who does it:** one person, from the project root, on a clean working tree. Every command on this
+page is run, in this order, by `scripts/update-path-test.sh` against a project built the way an
+older cckit left it.
 
 This page is about the project. Moving the install itself forward is in the
-[install & update matrix](/install-matrix/).
+[install and update matrix](/install-matrix/).
 
 ## 1. Check which version the project is on
 
@@ -151,9 +161,9 @@ is restarted.
   of a rule or script, delete it and commit before step 3.
 - **`cckit doctor` is not part of this path.** It checks the machine, not the project's files. Run
   with no terminal and no `--fix` it installs nothing and writes no file; `cckit doctor --fix`
-  installs. See [Check your platform](/getting-started/install/).
+  installs. See [Install and check](/getting-started/install/).
 
 ## In Claude Code
 
-`/kit-update` runs the same two commands — the dry run, then the upgrade after you confirm — and
+`/kit-update` runs the same two commands: the dry run, then the upgrade after you confirm. It
 summarizes the changelog between the two versions first.

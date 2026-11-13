@@ -1,9 +1,9 @@
 ---
-// TutorialMeta — the header block under a tutorial's title. Read entirely from the page's `tutorial:`
+// TutorialMeta — the header block under a guide's title. Read entirely from the page's `tutorial:`
 // frontmatter (via Starlight route data) so an author drops <TutorialMeta /> in with no props:
 //   1. a "prompt bar" (Clerk-quickstart style) with a Copy-as-Markdown button,
 //   2. a "Before you start" card for cold traffic that may not know what cckit / Claude Code is,
-//   3. a "This tutorial" card: difficulty · read-time · prerequisites.
+//   3. a "This guide" card: difficulty · read-time · prerequisites.
 // The two cards use Starlight's own <CardGrid>/<Card> so their layout, equal height, and content
 // spacing come from the design system (no hand-rolled grid). The copied prompt links the docs
 // (agent contract, CLI reference, install) and this page's URL so Claude reads them and learns the
@@ -21,16 +21,16 @@ const pageUrl = new URL(Astro.url.pathname, Astro.site ?? DOCS).href;
 const copyMarkdown = t
   ? `I want to: ${t.job}.
 
-Follow this cckit tutorial and do it in my repo, step by step:
+Follow this cckit guide and do it in my repo, step by step:
 ${pageUrl}
 
 cckit is a CLI that drives the whole GitHub work lifecycle from Claude Code. If you don't already
-know its commands, read these first, then follow the tutorial above:
+know its commands, read these first, then follow the guide above:
 - Agent contract (the command grammar): ${DOCS}/agents/
 - CLI reference: ${DOCS}/cli-reference/
 - Install cckit: ${DOCS}/getting-started/install/
 
-Read the board with \`cckit sync\` before acting, use the exact commands from the tutorial, and run
+Read the board with \`cckit sync\` before acting, use the exact commands from the guide, and run
 them as we go — telling me what each one did.
 `
   : '';
@@ -45,7 +45,7 @@ them as we go — telling me what each one did.
           <span>Copy a prompt that links the cckit docs so Claude learns the CLI, then follows these steps.</span>
         </div>
       </div>
-      <button type="button" class="tut-copy" data-copy-md={copyMarkdown} aria-label="Copy this tutorial as a Claude Code prompt">
+      <button type="button" class="tut-copy" data-copy-md={copyMarkdown} aria-label="Copy this guide as a Claude Code prompt">
         <svg class="tut-copy-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
           <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
@@ -58,10 +58,10 @@ them as we go — telling me what each one did.
       <Card title="Before you start" icon="rocket">
         <div class="tut-links">
           <a href="/getting-started/install/">Install cckit</a>
-          <a href="/getting-started/">Quickstart: your first lifecycle</a>
+          <a href="/getting-started/">Getting started</a>
         </div>
       </Card>
-      <Card title="This tutorial" icon="open-book">
+      <Card title="This guide" icon="open-book">
         <div class="tut-meta" data-difficulty={t.difficulty}>
           <span class="tut-badge tut-diff">{diffLabel[t.difficulty] ?? t.difficulty}</span>
           <span class="tut-badge tut-time">{t.time} read</span>

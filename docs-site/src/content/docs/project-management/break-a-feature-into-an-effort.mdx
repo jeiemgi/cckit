@@ -1,5 +1,5 @@
 ---
-title: How to break a big feature into a tracked effort with Claude Code
+title: Break a feature into an effort
 description: Turn a feature that's too big for one PR into a cckit effort — a parent issue plus native sub-issues — sized, built in parallel where safe, and shipped as a single pull request.
 tutorial:
   job: break a big feature into a tracked effort
@@ -20,16 +20,30 @@ import TutorialSchema from '../../../components/TutorialSchema.astro';
 
 <TutorialMeta />
 
-**What you'll do:** turn one goal that's too big for a single PR into a tracked **effort** — a parent
-issue with a sub-issue for each independent piece. The parent issue *is* the plan, so the agent reads
-it instead of a separate doc. You build the pieces in parallel where they don't touch the same files,
-then ship the whole thing as one pull request.
+A feature that is too big for one pull request tends to go one of two ways. It becomes a single
+huge pull request nobody can review, or it becomes five small ones opened from the same starting
+point, where each goes stale as the one before it merges. In both cases the list of what the
+feature needs lives in someone's head.
+
+A team splits the feature into steps, writes each step down as its own issue, builds the steps on
+one shared branch, and ships them together. cckit calls that an **effort**. The parent issue is the
+plan, so the agent reads the issue and no separate document.
+
+**What you will have at the end:**
+
+- one parent issue with a sub-issue for each step, all on the board;
+- one branch and one worktree, `effort/<N>-<slug>`, holding the work of every step;
+- one merged pull request, with the parent and every sub-issue closed.
+
+**Who does it:** you describe the goal and approve the plan. The agent drafts the sub-issues,
+builds them, and opens the pull request. You, or the captain on an approved plan, close the effort.
 
 ## Steps
 
 <Steps>
 
-1. **Ask Claude to make it an effort.** Describe the goal and that it's too big for one PR.
+1. **Ask Claude to make it an effort.** Describe the goal and say it is too big for one pull
+   request.
 
    <div class="cckit-prompt">
 
@@ -41,30 +55,65 @@ then ship the whole thing as one pull request.
 
    </div>
 
-2. **cckit creates and runs the effort.**
+2. **Read the plan and approve it.** In Claude Code the `/kit-effort-new` skill shows the parent
+   issue and its sub-issues before it creates anything, as a
+   [page you answer](/project-management/plan-pages/) where the session has a browser and in the
+   terminal where it does not. Change a step or the order here. The page is recommended, not
+   required: `cckit effort start` checks for no approval.
+
+3. **The agent creates the effort.** `<N>` below is the number of the parent issue this prints.
 
    ```bash frame="terminal"
-   cckit effort plan              # session-fit plan over open efforts
-   cckit effort new "Auth rework" # parent issue + native sub-issues, all on the board
-   cckit effort start <N>         # integration branch effort/<N> + worktree
-   # …build sub-issues on the effort branch (sequential) or in worktrees (parallel)…
-   cckit effort pr <N>            # ONE PR: effort/<N> → base branch
-   cckit effort close <N>         # squash-merge, close parent + all subs, garbage-collect
+   cckit effort new "Auth rework" "<step> :: <one-line description>" "<step> :: <one-line description>"
    ```
 
-3. **Ship it as one PR.** `effort pr` opens a single pull request for the whole effort; `effort close`
-   squash-merges it and closes the parent and every sub-issue together.
+   The parent issue gets four sections (Goal, Scope, For agents, Verification), and each step
+   becomes a sub-issue linked to it.
+
+4. **The agent starts it and builds the steps.**
+
+   ```bash frame="terminal"
+   cckit effort start <N>
+   ```
+
+   This creates the branch and the worktree. Steps that follow one another are committed on that
+   branch, one commit per sub-issue. Steps that touch different files can be built at the same
+   time, each in a worktree of its own, and merged back into the effort branch.
+
+5. **Run the project's checks on the effort branch.** Each step passing on its own does not show
+   that they pass together. Run the checks once every step is on the branch, before the pull
+   request opens. No cckit command runs them for you here.
+
+6. **Ship it as one pull request.**
+
+   ```bash frame="terminal"
+   cckit effort pr <N>       # one pull request: the effort branch into the base branch
+   cckit effort close <N>    # after review: squash-merge, close the parent and every sub-issue, clean up
+   ```
 
 </Steps>
+
+## Check that it worked
+
+- `cckit effort plan` no longer lists the effort: it reads the open efforts, and this one is
+  closed.
+- On GitHub the parent issue is closed and shows every sub-issue completed.
+- `cckit gc` reports no branch or worktree left over from the effort.
 
 ## How it works
 
 `cckit effort new` fills the parent's four-section body (Goal / Scope / For agents / Verification),
-applies the `ctx/kind/priority/role/flow` labels, and lints every title up front — so a bad sub name
+applies the `ctx/kind/priority/role/flow` labels, and lints every title up front, so a bad sub name
 fails before anything is created. cckit reads the sub-issues' *blocked-by* links and sorts them into
-**waves**: everything unblocked runs together, dependents wait their turn. Each effort also gets a
+**waves**: everything unblocked runs together, dependents wait their turn. `cckit effort plan`
+shows the open efforts packed into session-sized batches. Each effort also gets a
 **slug** handle (`effort/<N>-<slug>`), so `start`, `pr`, and `close` accept the slug or the
 number.
+
+`cckit effort start` refuses a new effort when two are already in progress (`effort.wipLimit`,
+default 2). Close one first, or pass `--force`.
+[Efforts and waves in practice](/project-management/efforts-and-waves/) has the detail behind each
+command.
 
 <Aside type="note" title="The number stays canonical">
 The slug is a convenience; the GitHub issue number is still what the sub-issues, PRs, and labels all
@@ -84,7 +133,7 @@ a *blocked-by* link between them; cckit will schedule the dependent one in a lat
 `--priority` wherever they occur and refuses an unknown flag. On an older version, pass them
 **before** the effort name, not after the sub list.
 
-## Related tutorials
+## Related guides
 
 <CardGrid>
   <LinkCard title="Take a GitHub issue to a merged PR" href="/development/issue-to-merged-pr/" description="The single-issue lifecycle an effort is built from." />
@@ -95,8 +144,11 @@ a *blocked-by* link between them; cckit will schedule the dependent one in a lat
 <TutorialSchema
   steps={[
     { name: 'Ask Claude to make it an effort', text: 'Describe the goal and that it is too big for one PR. Ask to break it into a sub-task per independent piece and size the work first.' },
-    { name: 'cckit creates and runs the effort', text: 'cckit effort new creates the parent issue and native sub-issues; effort start makes the integration branch and worktree; build the subs on the branch or in worktrees.' },
-    { name: 'Ship it as one PR', text: 'cckit effort pr opens a single pull request for the whole effort; effort close squash-merges it and closes the parent and every sub-issue together.' },
+    { name: 'Read the plan and approve it', text: 'The kit-effort-new skill shows the parent issue and its sub-issues before it creates anything, as a page or in the terminal. Change a step or the order here.' },
+    { name: 'The agent creates the effort', text: 'cckit effort new creates the parent issue with its four sections and one linked sub-issue per step.' },
+    { name: 'The agent starts it and builds the steps', text: 'cckit effort start makes the effort branch and worktree; sequential steps are one commit each on that branch, parallel steps use their own worktrees and merge back.' },
+    { name: 'Run the checks on the effort branch', text: 'Run the project checks once every step is on the effort branch, before the pull request opens.' },
+    { name: 'Ship it as one pull request', text: 'cckit effort pr opens a single pull request for the whole effort; cckit effort close squash-merges it and closes the parent and every sub-issue together.' },
   ]}
   faqs={[
     { q: 'A sub title was rejected', a: 'cckit lints every title up front (<= 6 words, no jargon) and aborts before creating a half-effort. Shorten the failing sub name; detail belongs in the body.' },

@@ -1,27 +1,74 @@
 ---
-title: Getting started
-description: The steps to go from zero to shipping your first issue with cckit — plus an optional memory layer.
+title: What you set up, and why
+description: The three things a project needs before agents can work in it (the cckit command, GitHub access, a profile of roles) and the order to set them up.
 ---
 
-import { Card, CardGrid } from '@astrojs/starlight/components';
-import Tag from '../../../components/Tag.astro';
-import TagRow from '../../../components/TagRow.astro';
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-<TagRow kinds={["flow"]} />
+An agent that opens your repository for the first time knows nothing about how your team works. It
+does not know which branch you integrate on, who owns a design question, or that work starts from
+an issue. Ask it for a fix and it will edit files wherever it happens to be standing.
 
-Three steps take you from zero to shipping your first issue — then an optional memory layer. Work through the cards in order.
+Setup is where you write that down, once. After it, every session starts from the same description
+of the project, and every piece of work can go through the same steps.
+
+## The three things a project needs
+
+1. **The `cckit` command on your machine.** It is the one tool that runs each step: start a piece
+   of work, open its pull request, clean up after the merge. You install it once per machine.
+2. **Access to GitHub.** The plan and the record of the work live there, as issues and pull
+   requests. cckit reaches GitHub through your own signed-in `gh` session and stores no token of
+   its own.
+3. **A profile of roles in the project.** A profile is the description of your team: which agents
+   exist, which rules they follow, which skills they have. `cckit init` writes it into the
+   repository, once per project.
+
+Set them up in that order. Each step checks the one before it.
+
+## Who does it
+
+One person, once. It needs a terminal for a few minutes; after that the work can be done by talking
+to the agent. In Claude Code the same steps exist as `/kit-doctor` and `/kit-init`, so you can ask
+the agent to run them and answer its questions.
+
+No agent role is involved yet. The roles arrive with the profile:
+[The team: you and the agents](/philosophy/the-team/).
+
+## The tools that plug in
+
+cckit is a set of bash scripts over tools you may already have. It builds none of them.
+
+- **`git`, `gh` and `jq`** are required. `gh` is GitHub's command-line tool; `jq` reads JSON.
+- **Claude Code or Codex** is the agent. You choose one or both at setup.
+- **MemPalace**, for memory between sessions, is optional and off by default. It has its own area:
+  [Memory](/memory/).
+
+`cckit doctor` reports which of these are missing and asks before it installs anything.
+
+## The commands
+
+| Command | What it is for |
+| --- | --- |
+| `cckit doctor` | Check the machine: the required tools and the GitHub sign-in |
+| `cckit init` | Set a project up: the config, the profile, and the git and GitHub steps |
+| `cckit scan` | Report what a repository already contains, before anything is written |
+| `cckit adopt` | Record the cckit files a repository already has, without changing them |
+| `cckit update` | Say whether a project is behind the installed cckit |
+| `cckit init --upgrade` | Bring a project to the installed version |
+
+Every flag of these commands is in the [CLI reference](/cli-reference/).
+
+## The guides
+
+Start with the first two, in order. The other three are for when you need them.
 
 <CardGrid>
-  <Card title="<a href='/getting-started/install/'>1 · Install cckit</a>" icon="cloud-download">
-    One script puts the `cckit` command on your PATH — one-liner, Homebrew, npm, or from source.
-  </Card>
-  <Card title="<a href='/getting-started/install/#check-your-platform'>2 · Check your platform</a>" icon="approve-check-circle">
-    Confirm cckit runs on your system, install its dependencies with `cckit doctor`, and sign in to GitHub.
-  </Card>
-  <Card title="<a href='/getting-started/initialize/'>3 · Initialize cckit</a>" icon="rocket">
-    Run `cckit init` in your repo, or `cckit init <folder>` for a new project: it asks what is missing, can start the project from a recipe, and sets up git and GitHub after one confirmation — then let Claude surface your first real task and run it end to end.
-  </Card>
-  <Card title="<a href='/memory/'>Set up memory</a>" icon="open-book">
-    Optional — give your agent persistent, per-project memory with [MemPalace](/memory/). Why it helps and how to turn it on.
-  </Card>
+  <LinkCard title="1 · Install and check" href="/getting-started/install/" description="Put cckit on your machine, then let cckit doctor confirm the tools and the GitHub sign-in." />
+  <LinkCard title="2 · Initialize a project" href="/getting-started/initialize/" description="Run cckit init, pick the profile that matches your team, and run a first real task." />
+  <LinkCard title="Add cckit to an existing repo" href="/getting-started/existing-repo/" description="For a project that already has its own structure, or cckit files copied in by hand." />
+  <LinkCard title="Use cckit with Codex" href="/getting-started/codex/" description="The same process with Codex as the agent." />
+  <LinkCard title="Update a project" href="/getting-started/update/" description="Bring a project set up by an older cckit to the installed version." />
 </CardGrid>
+
+When the project is set up, the next step of the process is planning the work:
+[Project management](/project-management/).

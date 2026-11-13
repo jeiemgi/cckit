@@ -1,5 +1,5 @@
 ---
-title: How to control what Claude Code is allowed to do
+title: Control what agents may do
 description: Understand cckit's permission gate — read verbs that change nothing, a preview and a question before a config file is written, recorded consent before a third-party tool installs, and a separate confirmation for destructive operations.
 tutorial:
   job: control what Claude Code is allowed to do
@@ -20,10 +20,16 @@ import TutorialSchema from '../../../components/TutorialSchema.astro';
 
 <TutorialMeta />
 
-**What you'll understand:** cckit asks before it changes anything in a repo it hasn't worked in
-before. This tutorial walks the permission gate — what is asked each time, what is recorded, what always runs
-regardless, and what needs a separate confirmation — so you know what an agent driving cckit
-can and can't do on your behalf.
+Handing a repository to an agent raises one question before any other: what can it change
+without asking me? A tool that writes config, installs software and pushes code on its own is hard
+to trust, and a tool that asks about everything is slower than doing the work by hand.
+
+cckit sorts what it does into four kinds and treats each differently: reading is free, a file it
+would write is shown first, an install needs a yes that is written down, and anything that cannot
+be undone asks every time.
+
+**What you will have at the end:** you will have watched each of the four happen in your own
+project, and you will know where the one recorded yes is stored and how to withdraw it.
 
 ## Steps
 
@@ -61,6 +67,12 @@ can and can't do on your behalf.
 
 </Steps>
 
+## How to check it worked
+
+- After step 1 and step 2, `git status --short` prints nothing: neither run wrote a file.
+- After step 3, `.cckit/consent` holds one `install:<id>` line per tool you said yes to, and
+  `git status --short .cckit` prints nothing because the folder is gitignored.
+
 ## How it works
 
 cckit resolves its config by walking up from where you invoke it (nearest wins: `$KIT_CONFIG`, then
@@ -85,14 +97,14 @@ stored as `install:<id>` in `.cckit/consent`.
 require explicit confirmation, whatever is recorded in `.cckit/consent`.
 
 **The guard blocked a commit even though I consented.** Consent doesn't bypass the secret/privacy
-guard — that always runs. See [stop Claude committing secrets](/review/stop-committing-secrets/).
+guard — that always runs. See [Stop agents committing secrets](/review/stop-committing-secrets/).
 
-## Related tutorials
+## Related guides
 
 <CardGrid>
-  <LinkCard title="Stop Claude Code from committing secrets" href="/review/stop-committing-secrets/" description="The guard that runs regardless of consent." />
-  <LinkCard title="Keep private & company data out of AI commits" href="/review/keep-private-data-out/" description="Your local denylist, stored in .cckit/." />
-  <LinkCard title="Run checks automatically with cckit hooks" href="/development/checks-with-hooks/" description="The guards that fire before a command runs." />
+  <LinkCard title="Stop agents committing secrets" href="/review/stop-committing-secrets/" description="The guard that runs regardless of consent." />
+  <LinkCard title="Keep private data out" href="/review/keep-private-data-out/" description="Your local denylist, stored in .cckit/." />
+  <LinkCard title="Run checks with hooks" href="/development/checks-with-hooks/" description="The guards that fire before a command runs." />
 </CardGrid>
 
 <TutorialSchema

@@ -1,6 +1,6 @@
 ---
-title: How to take a GitHub issue to a merged PR with Claude Code
-description: Drive one GitHub issue through its whole lifecycle with cckit — isolated worktree, focused change, pull request, close, and cleanup — each step one command.
+title: Take an issue to merged
+description: "Step by step: one GitHub issue through start, change, pull request, close and cleanup."
 tutorial:
   job: take a GitHub issue to a merged PR
   difficulty: beginner
@@ -20,17 +20,23 @@ import TutorialSchema from '../../../components/TutorialSchema.astro';
 
 <TutorialMeta />
 
-**What you'll do:** take a single issue from the board all the way to a merged pull request — on its
-own isolated branch and worktree, with the change kept focused on that one issue. Each step is one
-cckit verb, correct by construction: the agent runs them in order and never improvises branch or PR
-plumbing.
+A single fix involves more bookkeeping than code. Someone has to make a branch from a current
+base, keep the change apart from other work, open a pull request that names the issue, move the
+card on the board, close the issue and delete the branch afterwards. Done by hand, one of those
+steps gets skipped.
+
+In this guide an agent takes one issue the whole way, and each of those steps is one cckit
+command. The agent runs them in order and does not improvise the branch or the pull request.
+
+**What you will have at the end:** one issue closed, its change merged through a reviewed pull
+request, and no leftover branch or folder on your machine.
 
 ## Steps
 
 <Steps>
 
-1. **Pick the next ready issue.** Ask Claude to read the board and take the top unblocked issue all
-   the way to merged.
+1. **Ask for the next ready issue.** You do not name a number. The agent reads the board and
+   takes the first issue nothing is blocking.
 
    <div class="cckit-prompt">
 
@@ -42,63 +48,102 @@ plumbing.
 
    </div>
 
-2. **cckit runs the lifecycle.** Each verb moves the board and the git state together:
+2. **The agent starts the issue.** It finds the issue, then creates a branch and a worktree for
+   it. A worktree is a separate folder with its own copy of the code:
 
    ```bash frame="terminal"
-   cckit next                       # find the next unblocked issue + its start command
-   cckit start <issue>              # worktree + branch, board → In Progress
-   # …agent makes the focused change in the new worktree…
-   cckit pr <issue> "<summary>"     # commit, push, open the PR, board → In Review
-   cckit close <issue> "<summary>"  # close the issue, board → Done
-   cckit gc --prune --yes           # remove the merged branch + worktree
+   cckit next                       # the next unblocked issue and its start command
+   cckit start <issue>              # worktree + branch; the board moves to In Progress
    ```
 
-3. **Confirm and clean up.** When the PR merges, `gc` prunes the branch and worktree so nothing is
-   left behind. `cckit sync` at any point shows the current board and what's unblocked next.
+3. **The agent makes the change** in that folder, and nothing else. It runs the project's checks
+   until they pass.
+
+4. **The agent opens the pull request.**
+
+   ```bash frame="terminal"
+   cckit pr <issue> "<summary>"     # commit, push, open the PR; the board moves to In Review
+   ```
+
+   This is where you look at the work. The checks run on the pull request, and you or a reviewing
+   agent read the change.
+
+5. **Merge, close and clean up.** Once the review passes:
+
+   ```bash frame="terminal"
+   cckit merge                      # merge the PR, close its issue, remove the branch and worktree
+   ```
+
+   If the pull request was merged another way, such as the button on GitHub, finish by hand:
+
+   ```bash frame="terminal"
+   cckit close <issue> "<summary>"  # close the issue; the board moves to Done
+   cckit gc --prune --yes           # remove merged branches and their worktrees
+   ```
 
 </Steps>
 
+## Check it worked
+
+```bash frame="terminal"
+cckit sync      # the issue is no longer in the open list
+cckit gc        # the report lists no branch or worktree for it
+```
+
+The pull request page on GitHub shows it merged and links the issue.
+
 ## How it works
 
-Starting an issue creates an isolated worktree and branch, so the change can't collide with
-anything else you're running. The PR, the board columns, and the branch
-all reference the same issue number — you never wire them up by hand, which is what "correct by
-construction" means here.
+Starting an issue creates an isolated worktree and branch, so the change cannot collide with
+anything else you are running. The pull request, the board columns and the branch all carry the
+same issue number, and no step wires them together by hand. The board steps apply when the
+project uses a GitHub Projects board.
+
+Whether an agent may merge on its own is your decision, not the tool's. By default the agent
+stops after opening the pull request. The [Review](/review/) area covers who approves, and
+[Merge, close and clean up](/ship/merge-and-close/) covers the last step in detail.
 
 <Aside type="tip" title="One issue, one worktree">
-`cckit start` makes the branch and the worktree in one step. The change lives in its own copy of the
-repo until the PR merges — see [Efforts, waves & worktrees](/project-management/efforts-and-waves/).
+`cckit start` makes the branch and the worktree in one step. The change lives in its own copy of
+the repository until the pull request merges. See
+[How one change is built](/development/).
 </Aside>
 
 ## Troubleshooting
 
-**A verb errored.** cckit is quiet by design — it prints little and just does each step. So when a
-verb errors, it usually means something is off (a missing dependency, a dirty tree, an auth
-gap). Read the message before retrying.
+**A verb errored.** cckit prints little when a step succeeds. An error means something is off: a
+missing dependency, uncommitted changes, a GitHub sign-in that expired. Read the message before
+retrying.
 
-**The change touched more than the issue.** Keep the worktree focused on the one issue. If scope
-grew, split it into an [effort](/project-management/break-a-feature-into-an-effort/) with sub-issues instead.
+**`cckit start` refused the issue.** Another live session already holds it. `cckit claims` shows
+which one. See [Many sessions, one repository](/development/many-sessions/).
 
-**`gc` didn't remove the branch.** `gc --prune` only removes branches whose PR has merged. If the PR
-is still open, finish the merge first, then run cleanup.
+**The change touched more than the issue.** Keep the worktree to the one issue. If the scope
+grew, split it into an [effort](/project-management/break-a-feature-into-an-effort/) with
+sub-issues.
 
-## Related tutorials
+**`gc` did not remove the branch.** `gc --prune` removes a branch only once its pull request has
+merged and its issue is closed. Finish the merge and the close first, then run cleanup.
+
+## Related guides
 
 <CardGrid>
   <LinkCard title="Set up cckit in a repo" href="/getting-started/initialize/" description="Get the board and config ready first." />
-  <LinkCard title="Break a big feature into an effort" href="/project-management/break-a-feature-into-an-effort/" description="When one issue is too big for a single PR." />
-  <LinkCard title="Run issues in parallel with a wave" href="/development/run-a-wave-in-parallel/" description="Clear a whole wave of ready work at once." />
+  <LinkCard title="Break a feature into an effort" href="/project-management/break-a-feature-into-an-effort/" description="When one issue is too big for a single pull request." />
+  <LinkCard title="Run a wave in parallel" href="/development/run-a-wave-in-parallel/" description="Clear a whole batch of ready work at once." />
 </CardGrid>
 
 <TutorialSchema
   steps={[
-    { name: 'Pick the next ready issue', text: 'Ask Claude to read the board and take the top unblocked issue to merged on its own isolated branch, keeping the change focused.' },
-    { name: 'cckit runs the lifecycle', text: 'cckit next finds the issue; start makes the worktree and branch; pr commits, pushes and opens the PR; close closes the issue; gc --prune removes the merged branch and worktree.' },
-    { name: 'Confirm and clean up', text: 'When the PR merges, gc prunes the branch and worktree. cckit sync shows the current board and what is unblocked next.' },
+    { name: 'Ask for the next ready issue', text: 'Ask the agent to read the board and take the first unblocked issue to merged on its own isolated branch, keeping the change focused.' },
+    { name: 'The agent starts the issue', text: 'cckit next finds the issue; cckit start <issue> makes the worktree and branch.' },
+    { name: 'The agent makes the change', text: 'The change is made in the new worktree and the project checks are run until they pass.' },
+    { name: 'The agent opens the pull request', text: 'cckit pr <issue> "<summary>" commits, pushes and opens the pull request.' },
+    { name: 'Merge, close and clean up', text: 'cckit merge merges the pull request, closes its issue and removes the branch and worktree. After a merge made another way, cckit close closes the issue and cckit gc --prune --yes removes merged branches.' },
   ]}
   faqs={[
-    { q: 'A cckit verb errored', a: 'cckit is quiet by design, so an error usually means something is off — a missing dependency, a dirty tree, or an auth gap. Read the message before retrying.' },
-    { q: 'The change touched more than the issue', a: 'Keep the worktree focused on one issue. If scope grew, split it into an effort with sub-issues.' },
-    { q: "gc didn't remove the branch", a: 'gc --prune only removes branches whose PR has merged. Finish the merge first, then run cleanup.' },
+    { q: 'A cckit verb errored', a: 'cckit prints little when a step succeeds, so an error means something is off: a missing dependency, uncommitted changes, or a GitHub sign-in that expired. Read the message before retrying.' },
+    { q: 'The change touched more than the issue', a: 'Keep the worktree to one issue. If the scope grew, split it into an effort with sub-issues.' },
+    { q: "gc didn't remove the branch", a: 'gc --prune removes a branch only once its pull request has merged and its issue is closed. Finish the merge and the close first, then run cleanup.' },
   ]}
 />

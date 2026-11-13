@@ -1,11 +1,11 @@
 ---
-title: How to keep private and company data out of AI commits
+title: Keep private data out
 description: Declare a private denylist so cckit's secret guard blocks any commit containing your org names, internal hosts, or emails — nothing project-specific is ever hardcoded in the kit.
 tutorial:
   job: keep private and company data out of AI commits
   difficulty: beginner
   time: "5 min"
-  prerequisites: [git, "cckit installed and initialized"]
+  prerequisites: [git, "the secret guard wired as a pre-commit hook"]
   ogTag: Security
   keywords: [ai commit private data, denylist secrets, keep company data out of git]
   related: [review/stop-committing-secrets, development/checks-with-hooks, review/control-what-agents-can-do]
@@ -20,10 +20,19 @@ import TutorialSchema from '../../../components/TutorialSchema.astro';
 
 <TutorialMeta />
 
-**What you'll set up:** cckit's secret guard already blocks keys and `.env` files. This adds *your*
-private terms — org names, internal hostnames, emails, anything specific to you — so the guard fails
-any commit that contains them. cckit ships the list **empty**: it never guesses what's yours, so
-nothing project-specific is baked into the kit.
+A scanner can recognise an API key by its shape. It cannot know that a client's name, an internal
+hostname or a colleague's email is private to you, and neither can an agent writing a commit
+message or a fixture.
+
+So you tell the guard. You write the terms in a list that stays on your machine, and the guard
+blocks any commit that contains one.
+
+**What you will have at the end:** a private list at `.cckit/privacy-denylist` that the secret
+guard checks on every commit. cckit ships the list **empty**: it never guesses what is yours, and
+nothing project-specific is in the kit.
+
+**Before you start:** the guard has to be in the project with its hook on.
+[Stop agents committing secrets](/review/stop-committing-secrets/) does both.
 
 ## Steps
 
@@ -32,8 +41,12 @@ nothing project-specific is baked into the kit.
 1. **Copy the example denylist.** The target is gitignored, so your terms never get committed either.
 
    ```bash frame="terminal"
-   cp privacy-denylist.example .cckit/privacy-denylist
+   mkdir -p .cckit && cp privacy-denylist.example .cckit/privacy-denylist
    ```
+
+   Run it from the primary checkout. From a worktree, use the commands in
+   [The secret guard](/review/secret-guard/#your-private-denylist), which resolve the one shared
+   `.cckit/` folder.
 
 2. **List your private terms.** One per line — org names, hosts, emails, anything private to you.
 
@@ -53,6 +66,11 @@ nothing project-specific is baked into the kit.
 
 </Steps>
 
+## How to check it worked
+
+The commit in step 3 printed `secret-guard: private term` with the file and line, and no commit was
+made. `git status --short .cckit` prints nothing, because the list is gitignored.
+
 ## How it works
 
 On every commit the pre-commit hook passes the staged files to the guard, and your denylist is
@@ -61,7 +79,7 @@ checked alongside the built-in rules for keys and env files. The list lives in
 
 <Aside type="tip" title="This pairs with the built-in guard">
 The denylist extends the same guard that already blocks keys, `.pem`/`.key` files, JWTs, and
-secret-looking assignments — see [Stop Claude from committing secrets](/review/stop-committing-secrets/).
+secret-looking assignments — see [Stop agents committing secrets](/review/stop-committing-secrets/).
 </Aside>
 
 ## Troubleshooting
@@ -69,19 +87,20 @@ secret-looking assignments — see [Stop Claude from committing secrets](/review
 **My denylist file got committed.** It shouldn't — `.cckit/privacy-denylist` is gitignored by
 default. If you copied it elsewhere, move it back to that path so it's ignored.
 
-**A term matches too broadly.** The guard matches the literal term. Choose specific strings (a full
+**A term matches too broadly.** The guard matches the literal term, and upper and lower case
+count as different. Choose specific strings (a full
 hostname rather than a common word) so it doesn't trip on unrelated text.
 
 **Nothing was blocked.** Confirm the file is at `.cckit/privacy-denylist`, the terms are one per line,
 and the [pre-commit hook is enabled](/review/stop-committing-secrets/) with
 `git config core.hooksPath githooks`.
 
-## Related tutorials
+## Related guides
 
 <CardGrid>
-  <LinkCard title="Stop Claude Code from committing secrets" href="/review/stop-committing-secrets/" description="Turn on the guard that this denylist extends." />
-  <LinkCard title="Run checks automatically with cckit hooks" href="/development/checks-with-hooks/" description="Where the guard runs at commit time." />
-  <LinkCard title="Control what Claude Code is allowed to do" href="/review/control-what-agents-can-do/" description="The permission model around the guard." />
+  <LinkCard title="Stop agents committing secrets" href="/review/stop-committing-secrets/" description="Turn on the guard that this denylist extends." />
+  <LinkCard title="Run checks with hooks" href="/development/checks-with-hooks/" description="Where the guard runs at commit time." />
+  <LinkCard title="Control what agents may do" href="/review/control-what-agents-can-do/" description="The permission model around the guard." />
 </CardGrid>
 
 <TutorialSchema

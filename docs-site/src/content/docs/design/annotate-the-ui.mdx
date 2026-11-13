@@ -1,6 +1,208 @@
 ---
 title: "Annotate the running interface"
 description: "Set up click-to-annotate in a React app with Agentation and have Claude Code read and resolve the notes."
+tutorial:
+  job: annotate a running React interface and have Claude Code fix the notes
+  difficulty: beginner
+  time: "8 min"
+  prerequisites: ["cckit installed and initialized", "a React app with a dev server", "Claude Code", "jq and perl"]
+  ogTag: Design
+  keywords: [claude code ui feedback, click to annotate react, agentation claude code]
+  related: [design/ux-audit, development/browser-debug, development/extend-with-skills]
 ---
 
-TODO-E493
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import TagRow from '../../../components/TagRow.astro';
+import TutorialMeta from '../../../components/TutorialMeta.astro';
+import TutorialSchema from '../../../components/TutorialSchema.astro';
+
+<TagRow kinds={["skill", "conversational"]} />
+
+<TutorialMeta />
+
+Feedback on an interface is hard to put into words. "The second card, the padding under the
+title, it is too tight" makes the agent guess which card, which file and which value. A person
+reviewing a screen wants to point at the thing.
+
+This guide sets up pointing. You click an element in your running dev app and leave a note. Claude
+Code receives the note together with the element's CSS selector, its React component and a source
+file path, finds the code and fixes it.
+
+The capture tool is [Agentation](https://www.npmjs.com/package/agentation), third-party software
+that cckit adopts and does not build. The `kit-annotate` skill installs it into your project and
+wires it to Claude Code.
+
+**What you will have at the end:** a toolbar in the bottom-right corner of your dev app, and a
+Claude Code session that pulls the notes you leave, fixes each one and marks it resolved.
+
+## Before you start
+
+- **It is for React apps.** Next.js, Vite and React Router v7 are wired for you. Another React
+  setup (Create React App, Gatsby) is installed and registered, and you add the toolbar line
+  yourself. A project with no `react` in its `package.json` is refused.
+- **It is for Claude Code.** cckit wires and maintains the Claude Code path only. Agentation can
+  serve other agents through its own tooling; cckit does not set that up.
+- **It runs in development only.** The toolbar is behind a development check and is not part of a
+  production build.
+
+## Steps
+
+<Steps>
+
+1. **Ask for the setup.** In Claude Code, from the root of the React project:
+
+   <div class="cckit-prompt">
+
+   ```text frame="terminal" title="Prompt to paste"
+   Set up visual annotation for this app. Show me the plan first, and ask before you install
+   anything or edit a file.
+   ```
+
+   </div>
+
+   The slash command `/kit-annotate setup` does the same.
+
+2. **Read the plan.** The skill runs its setup script as a dry run and shows what it found and
+   what it would do. For a Next.js app using pnpm, the plan is shaped like this:
+
+   ```text
+   React        : yes (v19.0.0)
+   Framework    : next
+   Entry file   : app/layout.tsx
+   Pkg manager  : pnpm
+
+   Would:
+     1. pnpm add -D agentation
+     2. claude mcp add agentation -- npx -y agentation-mcp server
+     3. write .claude/rules/react-annotate.md
+     4. merge .annotate into .claude/kit.config.json
+     5. wire the dev-only toolbar into app/layout.tsx
+   ```
+
+   Nothing is installed or written by the dry run.
+
+3. **Say yes to the install.** The skill asks: install, preview only, or skip. On install it adds
+   `agentation` as a dev dependency with your package manager, registers the `agentation` MCP
+   server for Claude Code, writes the rule file `.claude/rules/react-annotate.md` and records the
+   setup under `annotate` in `.claude/kit.config.json`.
+
+4. **Approve the one source edit.** The toolbar is one line in your app's entry file. The skill
+   shows the diff and waits for your OK. For Next.js it looks like this:
+
+   ```tsx title="app/layout.tsx"
+   import { Agentation } from "agentation";
+
+   // inside <body>, after {children}
+   {process.env.NODE_ENV === "development" && <Agentation endpoint="http://localhost:4747" />}
+   ```
+
+   Vite and React Router use `import.meta.env.DEV` as the check, in `src/main.tsx` and
+   `app/root.tsx`. Keep the `endpoint` prop: without it the toolbar saves notes in the browser
+   only and Claude Code never sees them.
+
+5. **Restart Claude Code and start your dev server.** The restart loads the new MCP server.
+   Then check the connection:
+
+   ```bash frame="terminal"
+   npx agentation-mcp doctor
+   ```
+
+6. **Annotate, then hand over the batch.** Open the app, click the elements you want changed and
+   leave a note on each. When you are done:
+
+   <div class="cckit-prompt">
+
+   ```text frame="terminal" title="Prompt to paste"
+   I left notes on the app. Pull them all and fix them.
+   ```
+
+   </div>
+
+   Claude Code works through the notes one at a time. In the toolbar each note moves to
+   acknowledged, then to resolved with a one-line summary of the change. Refresh the page to see
+   the fixes.
+
+</Steps>
+
+## Check it worked
+
+- The toolbar shows in the bottom-right corner of the dev app.
+- `npx agentation-mcp doctor` flags nothing to fix.
+- After step 6, every note in the toolbar is resolved or dismissed with a reason, and
+  `git status` in the project shows the files Claude Code changed.
+
+## How it works
+
+The MCP server receives notes from the toolbar over HTTP on port `4747` and hands them to Claude
+Code. The port is stored as `annotate.mcp.httpPort` in the project config.
+
+The rule file `.claude/rules/react-annotate.md` holds the loop the agent follows. It applies when
+the agent works on a `.tsx` or `.jsx` file. For each note the agent acknowledges it, finds the
+code, makes the fix and resolves the note with a summary. It dismisses a note it cannot act on,
+with the reason, or replies to ask you a question.
+
+By default the agent waits for you to finish and takes the whole batch. Ask it to "watch" if you
+want notes picked up one by one as you leave them. `/kit-annotate status` prints the stored setup
+and the active annotation sessions.
+
+A note is about a design decision as often as it is about a bug. The
+[design-routing rule](/design/) still applies: a note that asks for a new visual value goes to the
+designer agent before code changes.
+
+<Aside type="note" title="Agentation is not part of cckit">
+Agentation is source-available software under the PolyForm Shield 1.0.0 license. It is installed
+from its public npm package as your project's own dev dependency. cckit copies none of its code
+and does not maintain it.
+</Aside>
+
+## Limits
+
+- **A note identifies an element, not its data.** The agent receives the selector, the component
+  name and a source path. It does not receive the values of props or state, so it searches the
+  repository to find the exact code. A file and line are not guaranteed.
+- **Server-rendered components give less.** A React Server Component is identified by its CSS
+  selector only. Client components carry the full record.
+- **The agent receives less than the toolbar shows.** If a detail is missing, press Copy in the
+  toolbar and paste the result into the conversation.
+
+## Troubleshooting
+
+**Claude Code has no annotation tools.** The MCP server loads when Claude Code starts. Restart it,
+then run `npx agentation-mcp doctor`.
+
+**Connected, and zero sessions while you annotate.** The `endpoint` prop is missing from the
+toolbar line, or the browser tab predates the setup. Add the prop as in step 4 and reload the tab.
+
+**The setup stops with "No React app detected".** The project's `package.json` does not list
+`react`. The skill does not cover other stacks.
+
+**The setup could not register the MCP server.** Run the command it prints yourself:
+`claude mcp add agentation -- npx -y agentation-mcp server`.
+
+**You want it gone.** Delete `.claude/rules/react-annotate.md`, run
+`claude mcp remove agentation`, and remove the toolbar line from the entry file.
+
+## Related guides
+
+<CardGrid>
+  <LinkCard title="Run a UX audit" href="/design/ux-audit/" description="A structural review of the whole app, where annotation covers one screen at a time." />
+  <LinkCard title="Let the agent see the page" href="/development/browser-debug/" description="Screenshots and console logs for the agent, with no person pointing." />
+  <LinkCard title="Why design has one owner" href="/design/" description="Where a note that asks for a design decision goes." />
+</CardGrid>
+
+<TutorialSchema
+  steps={[
+    { name: 'Ask for the setup', text: 'In Claude Code, from the root of the React project, ask to set up visual annotation, or run /kit-annotate setup.' },
+    { name: 'Read the plan', text: 'The skill runs its setup script as a dry run and prints the framework, the entry file, the package manager and the five things it would do. Nothing is written.' },
+    { name: 'Say yes to the install', text: 'On install the skill adds agentation as a dev dependency, registers the agentation MCP server for Claude Code, writes .claude/rules/react-annotate.md and records the setup in .claude/kit.config.json.' },
+    { name: 'Approve the one source edit', text: 'The toolbar is one development-only line in the app entry file. Keep the endpoint prop.' },
+    { name: 'Restart Claude Code and start your dev server', text: 'The restart loads the MCP server. Check the connection with npx agentation-mcp doctor.' },
+    { name: 'Annotate, then hand over the batch', text: 'Click elements in the running app, leave notes, then ask Claude Code to pull them all and fix them.' },
+  ]}
+  faqs={[
+    { q: 'Does annotation work outside React?', a: 'No. The kit-annotate skill covers React apps: Next.js, Vite and React Router are wired for you, and other React setups need the toolbar line added by hand.' },
+    { q: 'Does it work with Codex?', a: 'cckit wires and maintains the Claude Code path only.' },
+    { q: 'Connected, and zero sessions while I annotate', a: 'The endpoint prop is missing from the toolbar line, or the browser tab is stale. Add the prop and reload the tab.' },
+    { q: 'Is the toolbar in my production build?', a: 'No. The toolbar line is behind a development check.' },
+  ]}
+/>

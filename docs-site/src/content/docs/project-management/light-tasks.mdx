@@ -1,5 +1,5 @@
 ---
-title: Light tasks
+title: Tasks without GitHub issues
 description: Plan and track work without GitHub issues — a task list that lives in the project as one file per task, with a worktree per task and a pull request for review.
 ---
 
@@ -9,14 +9,28 @@ import TagRow from '../../../components/TagRow.astro';
 
 <TagRow kinds={["flow", "command"]} />
 
-A **light task** is a unit of work that is not a GitHub issue. The list lives in the project, in a
-`tasks/` folder, one file per task. `cckit task` creates tasks, shows what is next, gives each task
-its own worktree and branch, and opens the pull request that reviews it.
+Not every team plans in GitHub issues. A marketing team planning posts and pages may have no
+GitHub habit at all, and asking it to learn labels, milestones and a board before it can write
+down "draft the spring newsletter" stops the work before it starts. The team still needs what a
+board gives: one list, an order, and a way to tell what is in progress from what is done.
 
-Use light tasks when the team does not track its work in GitHub issues — a marketing team planning
-posts and pages, for example. Use [issues](/development/) and [efforts](/project-management/efforts-and-waves/) when
-it does. Both can live in one project: `cckit new`, `cckit start` and `cckit pr` act on issues;
-`cckit task …` acts on light tasks.
+A **light task** gives that without an issue. The list lives in the project, in a `tasks/` folder,
+one file per task. `cckit task` creates tasks, shows what is next, gives each task its own worktree
+and branch, and opens the pull request that reviews it.
+
+**What you get:** a task list anyone on the team can read in the project folder, where each task
+has a state worked out from git, and each finished task is reviewed in a pull request.
+
+**Who does it:** anyone on the team adds tasks. A person or an agent takes one and finishes it. A
+reviewer approves the pull request.
+
+**Tools that plug in:** none for the list itself, which is part of cckit. Review uses GitHub pull
+requests.
+
+Use light tasks when the team does not track its work in GitHub issues. Use
+[issues](/development/) and [efforts](/project-management/efforts-and-waves/) when it does. Both
+can live in one project: `cckit new`, `cckit start` and `cckit pr` act on issues; `cckit task …`
+acts on light tasks.
 
 <Aside type="note" title="What still needs GitHub">
 The task list needs no GitHub account. Review does: finishing a task opens a pull request, and the
@@ -70,6 +84,13 @@ person who approves it needs a GitHub account.
 
 `take` is the same verb as `start`, and `done` the same as `finish`. An id can be shortened to any
 prefix that matches one task.
+
+## Check that it worked
+
+- `cckit task list` shows the task as `doing` after `cckit task start`, and as `review` after
+  `cckit task finish`.
+- Once the pull request merges, `cckit task list --all` shows it as `done`. The task is done when
+  the pull request merges; `cckit task finish` never merges.
 
 ## Making light tasks the default
 

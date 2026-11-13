@@ -1,6 +1,6 @@
 ---
-title: QA lane
-description: Review agent-built work on a running stack — cckit launches the command your project declared, waits until it is usable, opens the changed screen, records a verdict against the reviewed commit, and can hold the merge on it.
+title: QA on a running stack
+description: cckit qa starts the project, opens the changed screen, records a pass or fail against the reviewed commit, and can hold the merge on it.
 ---
 
 import { Steps, Aside } from '@astrojs/starlight/components';
@@ -9,12 +9,22 @@ import TagRow from '../../../components/TagRow.astro';
 
 <TagRow kinds={["flow", "command"]} />
 
-`cckit qa` takes a reviewer from "an agent says it is done" to the changed screen on a running
-stack, and from there to a verdict the captain can read.
+Tests pass and the diff reads well, and the save button still does nothing when a person clicks
+it. Some defects only show on the running product. With several agents each building a change,
+trying each one by hand means stopping your own server, switching branches, installing, starting
+again, and remembering which commit you looked at.
 
-cckit does **not** boot your project by guessing and does **not** write a boot script. It asks
-once how the review stack boots, saves the answers under `qa` in the kit config, and owns the
-rest: the ports, the readiness check, the URL, the stop, the verdict.
+The QA lane removes that work. `cckit qa` starts the project for one change on its own ports,
+waits until it answers, opens the screen the change touched, and writes down your pass or fail
+against the exact commit you tried. The captain can then refuse to merge until that pass exists.
+
+**Who does it:** a person. The verdict is your judgement of the running result; an agent builds
+the change and names the screen to open.
+
+**What plugs in:** your project's own start command. cckit does **not** boot your project by
+guessing and does **not** write a boot script. It asks once how the review stack boots, saves the
+answers under `qa` in the kit config, and owns the rest: the ports, the readiness check, the URL,
+the stop, the verdict.
 
 <Aside type="note" title="What a lane is">
 A **lane** is one review stack, keyed by an **issue number**: the number in the current branch
@@ -55,6 +65,11 @@ one stack for the whole effort PR, not one per sub-issue agent. Every `cckit qa`
    ```
 
 </Steps>
+
+**How to check it worked:** `cckit qa verdict` with no argument prints `pass` and exits `0`, and
+the pull request carries one `QA verdict` comment.
+
+The sections below are the detail of each step: read the one you need.
 
 ## Declare how the project boots
 

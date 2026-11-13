@@ -3,4 +3,46 @@ title: "More development guides"
 description: "The list of every other development guide, one line each."
 ---
 
-TODO-E493
+The sidebar shows the guide most people need first,
+[Take an issue to merged](/development/issue-to-merged-pr/). The rest are here, grouped by what
+you are trying to do. Each one is a step-by-step page: what you will have at the end, the steps,
+and how to check it worked.
+
+## Run more than one thing at a time
+
+- [Run a wave in parallel](/development/run-a-wave-in-parallel/). Hand every unblocked issue to
+  its own agent and let the captain merge the pull requests that pass.
+- [Run agents unattended overnight](/development/run-unattended/). Clear an unblocked backlog
+  with nobody watching, a few issues at a time, including night mode under a token budget.
+
+## Run with nobody at the keyboard
+
+- [Run one objective unattended](/development/run-one-objective-unattended/). Give an agent one
+  objective on one branch. Code stops it on a passing check, a round count, a time limit or a
+  token ceiling.
+- [Drive cckit from CI](/development/headless-in-ci/). Run cckit from a CI job or a scheduled
+  run and read each verb's output as data.
+
+## Help the agent read less
+
+- [Find code with a code graph](/development/code-graph/). Switch on the Graft integration so
+  the agent asks an index where code lives before it searches file by file.
+- [Summarize long files locally](/development/local-model-digest/). Switch on the mlx-lm
+  integration and turn a long log or page into a short digest with `cckit digest`. Apple silicon
+  only.
+
+## Shape how the agent works
+
+- [Run checks with hooks](/development/checks-with-hooks/). Have the right check run at session
+  start, at commit and before a push, without anyone remembering to run it.
+- [Extend the agent with skills](/development/extend-with-skills/). Run the packaged skills by
+  slash command or plain description, and add your own.
+- [Add your own integration](/development/add-your-own-integration/). Describe a third-party
+  tool in one JSON file so cckit can switch it on and install it after a yes.
+
+## In other areas
+
+- [Annotate the running interface](/design/annotate-the-ui/) and
+  [Run a UX audit](/design/ux-audit/) are in Design.
+- Guides about secrets, permissions and private data are in
+  [More review guides](/review/more-guides/).

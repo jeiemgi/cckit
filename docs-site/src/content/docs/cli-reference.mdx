@@ -9,7 +9,10 @@ import TagRow from '../../components/TagRow.astro';
 
 <TagRow kinds={["command", "agent"]} />
 
-Every cckit verb, with one line on what it does.
+Open this page when you know which verb you want and need its exact flags, or when you want to
+see everything cckit can do in one place. It lists every cckit verb, with one line on what it does.
+To learn when and why to use a verb, start from its area: each area page in the
+[Software track](/software/) names its verbs and links here for the flags.
 
 cckit is a thin bash dispatcher over a git-mechanics bundle. Every verb reads from `cckit.config.json` — no org or repo is hardcoded. Append `--llm` to any verb for machine-readable output an agent can parse.
 
@@ -303,7 +306,7 @@ A hand-written delegation brief drops whatever its author forgot, and what gets 
 Every section that cannot be filled says so on its own line. A brief that silently omits a section is the failure this verb exists to remove, so an empty file list reads "the issue names no paths — ask before starting" rather than nothing at all.
 
 ```bash
-cckit brief 226           # the brief for issue #226
+cckit brief <issue>       # the brief for that issue
 ```
 
 Reading the issue is the verb's one hard dependency: a `gh` failure propagates rather than yielding a brief with an empty issue in it.

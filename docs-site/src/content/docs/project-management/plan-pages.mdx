@@ -1,5 +1,5 @@
 ---
-title: Review pages
+title: Plans you answer on a page
 description: A plan, a decision with options or a grilling round opens as a page you annotate and answer — on by default, terminal output where there is no browser, and the answer written back to the issue or to a file.
 ---
 
@@ -8,9 +8,30 @@ import TagRow from '../../../components/TagRow.astro';
 
 <TagRow kinds={["flow", "command"]} />
 
-Three kinds of agent output are for comparing, annotating and answering, and read badly as terminal
-prose. cckit sends them to a **review page**: an HTML page the agent writes and opens in your
-browser.
+A plan that scrolls past in a terminal is hard to judge. You cannot set two options side by side,
+you cannot mark the one line you disagree with, and the answer you type is gone when the session
+ends. Then the agent builds from a plan nobody really read, and a week later nobody can say what
+was approved.
+
+So for the moments when a person has to decide, the agent stops printing and opens a **review
+page**: an HTML page in your browser where you read the plan, compare the options, annotate, and
+answer. The answer is then written to the issue, or to a file in the repository, where it outlasts
+the session.
+
+**What you get:** a plan or a decision you answered on a page, and a record of that answer on the
+issue it belongs to.
+
+**Who does it:** the agent writes and opens the page. You answer it. The agent records the answer.
+
+**The tool that plugs in:** the page tool is
+[Lavish](https://github.com/kunchenguid/lavish-axi), third-party software that cckit runs through
+`npx`. It is described by `integrations/lavish.json`, like every other
+[integration](/integrations/). cckit does not build a page tool. Review pages are **on by default
+in every project**.
+
+## What opens as a page
+
+Three kinds of agent output are for comparing, annotating and answering:
 
 | Kind | When the agent opens one |
 | --- | --- |
@@ -19,11 +40,6 @@ browser.
 | `grill` | a grilling round: the questions that stress-test a plan or an idea |
 
 Everything else stays in the terminal: status, a one-line answer, a diff.
-
-Review pages are **on by default in every project**. The page tool is
-[Lavish](https://github.com/kunchenguid/lavish-axi), third-party software that cckit runs through
-`npx`; it is described by `integrations/lavish.json`, like every other
-[integration](/integrations/).
 
 ## The two paths
 
@@ -80,6 +96,13 @@ so an unattended run does not stop on it.
 </Steps>
 
 On `terminal`, step 2 is "print it in the terminal" and step 3 is the conversation.
+
+## Check that it worked
+
+- `cckit page mode` prints `page` in the session where you expect a page, or `terminal: <reason>`
+  with the reason it will not open one.
+- After you answer, the issue has one new comment carrying the kind and the title, or
+  `docs/answers/` has one new file. `cckit page answer` exits `0`.
 
 ## When a session has no page
 

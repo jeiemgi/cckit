@@ -18,7 +18,7 @@ export async function getStaticPaths() {
 
 const { data } = Astro.props;
 const t = data.tutorial;
-const eyebrow = ['Tutorial', t.ogTag, `${t.difficulty} · ${t.time}`].filter(Boolean).join('  ·  ');
+const eyebrow = ['Guide', t.ogTag, `${t.difficulty} · ${t.time}`].filter(Boolean).join('  ·  ');
 ---
 
 <html lang="en">
@@ -93,7 +93,7 @@ const eyebrow = ['Tutorial', t.ogTag, `${t.difficulty} · ${t.time}`].filter(Boo
   </head>
   <body>
     <p class="hint">
-      <b>Instagram &amp; Stories graphics</b> for this tutorial. Instagram doesn't read OG tags, so
+      <b>Instagram &amp; Stories graphics</b> for this guide. Instagram doesn't read OG tags, so
       export each card below to PNG and post it manually. Screenshot the <code>[data-card]</code>
       region at 1× — e.g. <code>cckit debug</code> against the dev server, or your browser's
       element-capture. The 1200×630 link card (LinkedIn / X / Facebook) is generated automatically at

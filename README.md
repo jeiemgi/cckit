@@ -80,7 +80,7 @@ cd cckit && ./scripts/install.sh    # symlinks bin/cckit onto your PATH
 | Linux | ✅ native |
 | Windows | ✅ via WSL or Git Bash (not native cmd/PowerShell) |
 
-Requirements: `bash` 4+, `git`, and `gh` (GitHub CLI) authenticated. `jq` recommended.
+Requirements: `bash` 3.2+, `git`, `gh` (GitHub CLI) authenticated, `jq` and `perl`. `cckit doctor` checks each one.
 
 ## Quick start
 

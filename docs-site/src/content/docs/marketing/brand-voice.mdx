@@ -5,9 +5,17 @@ description: Write your brand voice, key messages and banned phrasings down once
 
 import { Steps, Aside } from '@astrojs/starlight/components';
 
-A brand voice that lives in someone's head has to be explained again in every conversation. With
-the marketing profile you write it down once, in the project. Claude reads it before it writes or
-plans anything.
+If the voice is not written down, every draft has to be corrected by whoever remembers it, and it
+has to be explained to Claude again in every conversation. Writing it down once lets every draft
+start in the right voice.
+
+**Who does it:** the team decides the voice. Claude asks the questions and writes the answers
+down, and the editor assistant checks drafts against them.
+
+**What you will have at the end:** one approved file in the project, `brand/voice.md`, that
+Claude reads before it writes a draft or plans a campaign.
+
+This is the written voice only. Logo, color and visual identity are not part of it.
 
 ## What gets recorded
 
@@ -32,10 +40,13 @@ plans anything.
    </div>
 
 2. **Answer with examples.** Paste two or three pieces you think sound right, and one that sounds
-   wrong. Examples tell Claude more than adjectives do.
+   wrong. Examples tell Claude more than adjectives do. Claude first reads what the project
+   already has, such as recent posts, and asks only for what that material does not answer.
 
 3. **Read what Claude wrote back.** It shows you the voice, the key messages and the banned
-   phrasings before it saves them. Correct anything that is off.
+   phrasings before it saves them. Correct anything that is off. A key message needs its proof: a
+   number, a customer, a fact. One without proof is recorded as unproven, and Claude does not
+   state it as fact in a draft.
 
 4. **Send it for review.** The brand voice is content like any other: it goes through a draft and
    a review, so the team agrees on it before it applies to everyone.
@@ -52,7 +63,12 @@ plans anything.
 
 Once it is approved, every draft and every campaign plan in this project starts from it.
 
-## Check that a draft follows it
+## Check that it worked
+
+Open a new conversation and ask for a draft without describing the voice. If the draft sounds
+right and avoids the banned phrasings, the voice is in place.
+
+To check one draft against it:
 
 <div class="cckit-prompt">
 

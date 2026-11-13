@@ -1,6 +1,6 @@
 ---
-title: How to summarize long files with a local model
-description: Switch on cckit's optional mlx-lm integration on an Apple silicon Mac, let the doctor start the model server, and turn a long log, transcript or web page into a short digest with cckit digest.
+title: "Summarize long files locally"
+description: "Step by step: switch on the mlx-lm integration and turn a long log or page into a short digest with cckit digest."
 tutorial:
   job: summarize long files with a local model before Claude Code reads them
   difficulty: intermediate
@@ -20,11 +20,19 @@ import TutorialSchema from '../../../components/TutorialSchema.astro';
 
 <TutorialMeta />
 
-**What you'll set up:** a model server on your own Mac, and one verb that uses it. `cckit digest`
-reads a long file, URL or video transcript, summarizes it on the local model, and prints a digest
-of at most about 1,500 tokens plus a pointer to the original. The agent reads the digest and opens
-the original only when it needs a detail. The runtime is mlx-lm, a third-party tool that runs on
+A long CI log holds a handful of lines that matter. An agent that reads the whole log to find
+them pays for every line, and has less room left for the fix.
+
+The answer is to shorten the input before the agent reads it, on a model that runs on your own
+machine. `cckit digest` reads a long file, URL or video transcript, summarizes it on the local
+model, and prints a digest of at most about 1,500 tokens plus a pointer to the original. The
+agent works from the digest and opens the original only for a detail.
+
+The runtime is mlx-lm, third-party software that cckit adopts and does not build. It runs on
 Apple silicon only.
+
+**What you will have at the end:** a model server on your Mac, and one verb, `cckit digest`,
+that the agent runs before a long read.
 
 ## Steps
 
@@ -91,6 +99,12 @@ Apple silicon only.
 
 </Steps>
 
+## Check it worked
+
+- `curl -sf http://127.0.0.1:8080/v1/models` exits 0.
+- `cckit digest <a long file> --lang en` exits 0 and prints a heading that starts with
+  `# Digest (local:`.
+
 ## How it works
 
 `cckit digest` splits the input into chunks of about 2,500 words, summarizes each chunk on the
@@ -137,12 +151,12 @@ not running. Start it with `cckit doctor --fix`, or silence the notice with
 
 **The digest came back in Spanish.** That is the default. Pass `--lang en`.
 
-## Related tutorials
+## Related guides
 
 <CardGrid>
-  <LinkCard title="Give Claude Code a code graph with Graft" href="/development/code-graph/" description="Another integration, switched on with the same two verbs." />
-  <LinkCard title="Add your own tool as an integration" href="/development/add-your-own-integration/" description="Describe a tool that is not in the list, and let the doctor install it." />
-  <LinkCard title="Give Claude Code persistent project memory" href="/memory/install-mempalace/" description="The memory integration." />
+  <LinkCard title="Find code with a code graph" href="/development/code-graph/" description="Another integration, switched on with the same two verbs." />
+  <LinkCard title="Add your own integration" href="/development/add-your-own-integration/" description="Describe a tool that is not in the list, and let the doctor install it." />
+  <LinkCard title="Install MemPalace" href="/memory/install-mempalace/" description="The memory integration." />
 </CardGrid>
 
 <TutorialSchema

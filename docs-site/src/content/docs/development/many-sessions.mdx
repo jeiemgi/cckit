@@ -1,16 +1,27 @@
 ---
-title: Multi-session safety
+title: Many sessions, one repository
 description: "What stops two sessions from working on the same issue, branch or checkout: the session claim cckit start writes, the orchestrate branch lease, the guards, and the three habits the shared-checkout rule adds."
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-Run two agent sessions on one repository and they can collide in three places: both start the same
-issue, both write the same branch, or one moves the checkout the other is reading. cckit refuses
-the first two. `cckit start` records a [session claim](#session-claims) per issue and refuses a
-second live session, and `cckit orchestrate` leases each branch of a wave to one writer. The third
-is left to a rule: the [`shared-checkout` rule](/rules/#shared-checkout), which every profile
-installs.
+Once agents are useful, you run more than one: a session fixing a bug, another building a
+feature, a wave of workers in the background. They all share one repository on one machine, and
+git was not designed for that. It has no lock that stops one session from changing the files
+another is reading.
+
+Two sessions can collide in three places:
+
+1. **Both start the same issue.** cckit refuses this. `cckit start` records a
+   [session claim](#session-claims) per issue and refuses a second live session.
+2. **Both write the same branch.** cckit refuses this too. `cckit orchestrate` leases each branch
+   of a wave to one writer.
+3. **One moves the checkout the other is reading.** No command catches this. It is left to three
+   habits, written down in the [`shared-checkout` rule](/rules/#shared-checkout), which every
+   profile installs so every agent reads it.
+
+If you read one section, read [the three habits](#the-three-habits). The rest of the page is the
+detail behind each mechanism, for the day something refuses to start.
 
 ## What every session shares
 

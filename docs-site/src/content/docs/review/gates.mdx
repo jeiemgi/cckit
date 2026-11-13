@@ -1,21 +1,62 @@
 ---
-title: Codified review gates
-description: Three ratchets that keep an AI reviewer's mechanical findings, a skill listing's context cost, and the instruction files every session loads, from coming back.
+title: Review gates
+description: The lint gates that turn a reviewer's repeated findings, and the size of what every session loads, into checks that fail.
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-An AI reviewer finds the same classes of defect over and over, and its findings live in pull-request
-threads and die there. `scripts/review-lint.sh` is where the mechanical slice of that stream goes to
-stay fixed; `scripts/skill-frontmatter-lint.sh` does the same job for a cost that no reviewer sees at
-all — the bytes a skill listing occupies in every session. `scripts/instruction-budget-lint.sh` is the
-same idea one level up: `CLAUDE.md` and the rules themselves. `scripts/check.sh` runs all three, and
-`cckit init` scaffolds all three into your project. A fourth gate, `scripts/agent-skills-lint.sh`, resolves
-every `skills:` entry in the kit's agent templates; it is described [below](#agent-skills-lint--every-agent-skill-resolves).
+A reviewer, human or AI, finds the same kinds of defect again and again: a code fence with no
+language, a pattern the project agreed to stop using. Each finding is written in a pull-request
+thread, fixed once, and forgotten. The next pull request brings it back and somebody has to find it
+again.
 
-All three are **ratchets, not caps**: today's offenders are recorded in a baseline and allowed to stay,
-but nothing may grow past its recorded size and nothing new may land dirty. Adding a rule therefore
-never forces a repo-wide fix.
+The team's answer is to move a finding out of the thread and into the gate. Once a defect is a
+rule, the gate fails on it and no reviewer has to notice it a second time. The same idea covers two
+costs no reviewer sees at all: the text every session loads before any work starts.
+
+## What you get
+
+| Gate | What it stops from coming back |
+| --- | --- |
+| `scripts/review-lint.sh` | A mechanical defect a reviewer already reported once |
+| `scripts/skill-frontmatter-lint.sh` | A skill description that grows and is paid for in every session |
+| `scripts/instruction-budget-lint.sh` | `CLAUDE.md` and the rules growing past what a session loads well |
+| `scripts/agent-skills-lint.sh` | An agent template naming a skill that does not exist (the kit's own templates only) |
+
+`cckit init` copies the first three into your project and seeds a baseline for each, so a new
+project starts green. In cckit's own repository `scripts/check.sh` runs all four; in your project,
+add the three to the command you use as your gate.
+
+The first three are **ratchets, not caps**: today's offenders are recorded in a baseline and
+allowed to stay, but nothing may grow past its recorded size and nothing new may land dirty. Adding
+a rule therefore never forces a repo-wide fix.
+
+## Use them
+
+1. **See where the project stands.** Each gate has a report mode that never fails:
+
+   ```bash
+   scripts/review-lint.sh --report
+   scripts/skill-frontmatter-lint.sh --report
+   scripts/instruction-budget-lint.sh --report
+   ```
+
+2. **Run the gates.** With no flag each one exits non-zero on a new or grown hit:
+
+   ```bash
+   scripts/review-lint.sh && scripts/skill-frontmatter-lint.sh && scripts/instruction-budget-lint.sh
+   ```
+
+3. **Add them to your gate command**, so they run before every push and in CI.
+
+4. **When a reviewer repeats a finding, write the rule.** Add a block to
+   `scripts/review-rules.conf`, as described below.
+
+**How to check it worked:** run `scripts/review-lint.sh --rule <ID>` for the rule you added. It
+prints every hit with context. Then run the gate: it passes on the baseline and fails when you add
+one more hit.
+
+The rest of this page is the detail of each gate.
 
 ## review-lint — findings that became a gate
 

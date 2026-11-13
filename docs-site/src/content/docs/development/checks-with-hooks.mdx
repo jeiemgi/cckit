@@ -1,6 +1,6 @@
 ---
-title: How to run checks automatically with cckit hooks
-description: Scaffold cckit's hooks so the right check runs at the right moment — repo hygiene at session start, a base-branch commit guard, and an optional pre-push test gate — without you remembering to run anything.
+title: "Run checks with hooks"
+description: "Step by step: set up the hooks so the right check runs at session start, at commit and before a push."
 tutorial:
   job: run checks automatically with cckit hooks
   difficulty: beginner
@@ -20,10 +20,16 @@ import TutorialSchema from '../../../components/TutorialSchema.astro';
 
 <TutorialMeta />
 
-**What you'll set up:** a hook is a script Claude Code runs automatically when something happens — a
-session starts, a command is about to run, a session ends. cckit scaffolds a few at `init` so the
-right check fires at the right moment without you remembering to run it. You never call a hook; Claude
-Code fires it on an event.
+A rule that depends on someone remembering it gets skipped. "Never commit straight to the base
+branch" holds until the one busy afternoon when an agent does. A team that wants a check to
+happen every time attaches it to the moment itself.
+
+A hook is that attachment: a script the agent runtime runs when something happens, such as a
+session starting, a command about to run, or a session ending. cckit installs a small set at
+`init`. You never call a hook. Claude Code fires it on the event.
+
+**What you will have at the end:** five hooks that run without being asked, and, if you choose
+it, a sixth that runs your tests before a push.
 
 ## Steps
 
@@ -55,7 +61,18 @@ Code fires it on an event.
 
 </Steps>
 
+## Check it worked
+
+- `ls .claude/hooks/` lists the hook scripts.
+- Start a new Claude Code session in the project. When the repository has stale branches,
+  worktrees or stashes, the repo-hygiene report prints at the start. A clean repository prints
+  nothing.
+- Ask the agent to commit while on the base branch. The commit guard stops it with a line that
+  starts `BLOCKED: direct commit to`.
+
 ## How it works
+
+The full list, with the event each one runs on, is the [Hooks reference](/hooks/).
 
 Hooks are plain scripts under `.claude/hooks/`, registered in `.claude/settings.local.json` (the
 raw-git guard and the mail hook in the tracked `.claude/settings.json`) — yours to read and edit.
@@ -80,10 +97,10 @@ and the mail hook: `.claude/settings.json`). `cckit doctor` does not re-register
 **The pre-push gate blocks a valid push.** It runs your project's check; a failing test or lint is the
 gate doing its job. Fix the finding, or adjust the check the gate runs.
 
-## Related tutorials
+## Related guides
 
 <CardGrid>
-  <LinkCard title="Give Claude Code persistent memory" href="/memory/install-mempalace/" description="The four hooks the memory layer adds." />
+  <LinkCard title="Install MemPalace" href="/memory/install-mempalace/" description="The four hooks the memory layer adds." />
   <LinkCard title="Stop Claude Code from committing secrets" href="/review/stop-committing-secrets/" description="The secret guard that runs as a pre-commit hook." />
   <LinkCard title="Control what Claude Code is allowed to do" href="/review/control-what-agents-can-do/" description="The permission gate around mutating operations." />
 </CardGrid>

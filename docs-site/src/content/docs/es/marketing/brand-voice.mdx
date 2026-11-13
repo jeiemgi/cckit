@@ -5,9 +5,17 @@ description: Escribe una vez en el proyecto tu voz de marca, tus mensajes clave 
 
 import { Steps, Aside } from '@astrojs/starlight/components';
 
-Una voz de marca que vive en la cabeza de alguien hay que explicarla de nuevo en cada conversación.
-Con el perfil de marketing la escribes una vez, en el proyecto. Claude la lee antes de escribir o
-planear cualquier cosa.
+Si la voz no está escrita, cada borrador lo tiene que corregir quien la recuerda, y hay que
+explicársela a Claude de nuevo en cada conversación. Escribirla una vez hace que todos los
+borradores empiecen en la voz correcta.
+
+**Quién lo hace:** el equipo decide la voz. Claude hace las preguntas y deja las respuestas por
+escrito, y el asistente de edición compara los borradores con ellas.
+
+**Lo que vas a tener al final:** un archivo aprobado en el proyecto, `brand/voice.md`, que Claude
+lee antes de escribir un borrador o planear una campaña.
+
+Esto cubre solo la voz escrita. El logo, el color y la identidad visual no entran aquí.
 
 ## Qué se registra
 
@@ -32,10 +40,13 @@ planear cualquier cosa.
    </div>
 
 2. **Responde con ejemplos.** Pega dos o tres piezas que para ti suenan bien y una que suena mal.
-   Los ejemplos le dicen más a Claude que los adjetivos.
+   Los ejemplos le dicen más a Claude que los adjetivos. Claude lee primero lo que el proyecto ya
+   tiene, como las entradas recientes, y solo pregunta lo que ese material no responde.
 
 3. **Lee lo que Claude escribió.** Te muestra la voz, los mensajes clave y las frases prohibidas
-   antes de guardarlos. Corrige lo que no esté bien.
+   antes de guardarlos. Corrige lo que no esté bien. Un mensaje clave necesita su prueba: una
+   cifra, un cliente, un hecho. El que no la tiene queda registrado como no comprobado, y Claude
+   no lo afirma como un hecho en un borrador.
 
 4. **Envíala a revisión.** La voz de marca es contenido como cualquier otro: pasa por un borrador y
    una revisión, para que el equipo esté de acuerdo antes de que aplique para todos.
@@ -53,7 +64,12 @@ planear cualquier cosa.
 Una vez aprobada, todos los borradores y todos los planes de campaña de este proyecto parten de
 ella.
 
-## Comprueba que un borrador la sigue
+## Comprueba que funcionó
+
+Abre una conversación nueva y pide un borrador sin describir la voz. Si el borrador suena bien y
+evita las frases prohibidas, la voz ya está en su lugar.
+
+Para comparar un borrador con ella:
 
 <div class="cckit-prompt">
 

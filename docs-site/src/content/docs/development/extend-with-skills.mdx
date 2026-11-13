@@ -1,6 +1,6 @@
 ---
-title: How to extend Claude Code with cckit skills
-description: Run cckit's packaged skills from Claude Code — /kit-next, /kit-ship, /kit-effort-new and more — trigger them by slash command or plain description, and add your own with kit-customize.
+title: "Extend the agent with skills"
+description: "Step by step: run the packaged skills by slash command or plain description, and add your own."
 tutorial:
   job: extend Claude Code with cckit skills
   difficulty: beginner
@@ -20,10 +20,16 @@ import TutorialSchema from '../../../components/TutorialSchema.astro';
 
 <TutorialMeta />
 
-**What you'll do:** a skill is a packaged instruction set Claude Code can run. cckit installs a set
-covering the whole lifecycle — the everyday loop, one-issue tasks, efforts, maintenance, and
-authoring. You run each with a `/` slash command, and many also trigger when you just describe the
-task in plain words.
+A team repeats the same jobs: pick up the next issue, ship a fix, plan a feature, tidy old
+branches. Explaining the job to an agent from scratch each time gives a slightly different result
+each time.
+
+A skill is the job written down once: a packaged set of instructions the agent follows. cckit
+installs a set that covers the whole process, from the everyday loop to maintenance. You run one
+with a `/` slash command, and many also start when you describe the job in plain words.
+
+**What you will have at the end:** you can list the installed skills, start one two ways, and
+you know where to add one of your own.
 
 ## Steps
 
@@ -51,6 +57,11 @@ task in plain words.
 
 </Steps>
 
+## Check it worked
+
+Type `/` in Claude Code: the list shows entries that start with `kit-`. Run `/kit-next` and the
+agent reads the board and names the next unblocked issue.
+
 ## How it works
 
 Every skill maps to a job in the lifecycle: `kit-next` picks up the next unblocked issue, `kit-ship`
@@ -75,12 +86,12 @@ command directly (`/kit-contribute`) instead of relying on phrasing.
 **I want a project-specific skill.** Use `kit-customize` to add one in the project; it lives alongside
 the shipped skills and you can send it upstream with `kit-contribute`.
 
-## Related tutorials
+## Related guides
 
 <CardGrid>
-  <LinkCard title="Let Claude Code debug a web page" href="/development/browser-debug/" description="A command-driven capability skills build on." />
-  <LinkCard title="Take a GitHub issue to a merged PR" href="/development/issue-to-merged-pr/" description="What /kit-ship runs end to end." />
-  <LinkCard title="Break a big feature into an effort" href="/project-management/break-a-feature-into-an-effort/" description="What /kit-effort-new sets up." />
+  <LinkCard title="Let the agent see the page" href="/development/browser-debug/" description="A command-driven capability skills build on." />
+  <LinkCard title="Take an issue to merged" href="/development/issue-to-merged-pr/" description="What /kit-ship runs end to end." />
+  <LinkCard title="Break a feature into an effort" href="/project-management/break-a-feature-into-an-effort/" description="What /kit-effort-new sets up." />
 </CardGrid>
 
 <TutorialSchema

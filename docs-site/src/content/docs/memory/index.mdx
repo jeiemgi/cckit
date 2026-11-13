@@ -1,74 +1,97 @@
 ---
-title: Set up memory with MemPalace
-description: Give your coding agent persistent, per-project memory — why it helps, how cckit wires it in, and how to turn it on.
+title: Why an agent team needs memory
+description: What a team of agents loses between sessions, what a session starts with once memory is on, and why memory in cckit is optional, off by default and provided by MemPalace.
 ---
 
-import { Steps, Aside } from '@astrojs/starlight/components';
-import Tag from '../../../components/Tag.astro';
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 import TagRow from '../../../components/TagRow.astro';
 
-<TagRow kinds={["flow"]} />
+<TagRow kinds={["flow", "concept"]} />
 
-Persistent memory is an **optional** add-on, powered by [**MemPalace**](https://github.com/MemPalace/mempalace) — a local, no-API-key engine that mines your projects and conversations into a searchable "palace," scoped per project (a *wing*). Turn it on and cckit wires four hooks (SessionStart / Stop / PreCompact / SessionEnd) so each session wakes up with the right context and files its work back on its own.
+A coding agent starts every session knowing nothing about yesterday. It has the files in the
+repository and whatever you type. It does not have the reason the team chose one database over
+another, the approach that was tried last week and dropped, or what the previous session left half
+done.
 
-## Why it's worth turning on
+On a team of agents that gap costs more than it does for one person. Each session asks again what
+was already answered and decides again what was already settled, and two sessions can settle the
+same question two different ways. The person running the team ends up carrying the memory for all
+of them.
 
-Coding agents are **stateless** — every session starts from zero. Without memory, you re-explain the same architecture, re-derive decisions you already made, and watch the *why* behind past choices evaporate the moment the context window compacts. You become the agent's memory.
+## What the team does about it
 
-With memory on, the agent **wakes up already knowing your project**:
+The team keeps a shared record outside any single session, and every session does two things with
+it:
 
-- **Continuity across sessions.** Pick up where you (or another agent) left off, instead of rebuilding context each time.
-- **Decisions that stick.** ADRs, trade-offs, and "we tried that, it didn't work" persist — so settled choices don't get re-litigated a week later.
-- **A small wake-up.** The wake-up is ~600–900 tokens, leaving 95%+ of the window for actual work.
-- **A searchable record.** Everything mined is queryable by you and by future agents.
+1. **Reads it at the start.** The session opens with a short summary of the project and its recent
+   decisions. The summary is about 600 to 900 tokens, which leaves more than 95% of the context
+   window for the work.
+2. **Writes to it at the end.** The finished session is filed back, so the next one can search it.
 
-## How cckit embraces it
+What that buys:
 
-Turn it on and you never have to say "remember this":
+- **Continuity.** A session picks up where the last one stopped, whether that was you or another
+  agent.
+- **Decisions that stay decided.** An architecture decision, a trade-off, a "we tried that and it
+  failed" is still there a week later.
+- **A record you can search.** Everything filed can be queried by you and by later sessions.
 
-- **Four hooks wire it into every session automatically** — `SessionStart` loads a wing-scoped wake-up (identity header + recent decisions), `Stop` files the finished session, `PreCompact` sweeps to memory before the window compresses, and `SessionEnd` catches any unsynced work if a session ends abruptly.
-- **One wing per project.** Memories never bleed across repos, and each specialist agent gets its own diary wing for its notes.
-- **A scaffolded protocol.** `.claude/rules/mempalace.md` teaches Claude to *recall before it answers* and *record after it decides*.
-- **Kept healthy by `cckit doctor`.** It installs the CLI once you say yes, seeds this project's wake-up header, and refreshes a stale session-start hook.
+## Memory is optional, and off until you switch it on
 
-## Turn it on
+Every profile cckit ships (`software`, `content`, `marketing`, `research`, `automation`, `minimal`)
+sets memory to off. A project works without it: issues, pull requests and the docs in the
+repository already hold most of what a team has to remember. Turn memory on when sessions keep
+asking for context that lives in conversations and not in the repository.
 
-<Steps>
+## Who does it
 
-1. **Enable memory when you initialize** — say *yes* to memory at `cckit init`, or pass it explicitly:
+Nobody has "memory" as a job. With memory on:
 
-   ```bash
-   cckit init --profile software --memory on
-   ```
+- **Every session** reads the summary at the start and files its work at the end, through four
+  hooks that run without being asked.
+- **Each specialist agent** (the project manager, the tech lead and the others in your profile)
+  keeps a diary of its own sessions and saves project decisions to the shared record.
+- **You** switch it on once, and edit one line that describes the project.
 
-2. **Install the MemPalace CLI** — `cckit doctor` sees that memory is on and, once you answer yes at its prompt (or pass `--fix`), installs it into an isolated venv (pipx, falling back to uv), then points you at the MCP wiring. The recipe is data: `integrations/mempalace.json`, one of the [integrations](/integrations/) cckit installs the same way.
+## The tool that plugs in
 
-   ```bash
-   cckit doctor     # asks, then installs mempalace + seeds this project's wake-up header
-   mempalace mcp    # print the MCP-server setup line for Claude Code
-   ```
+cckit does not build a memory tool. It adopts [MemPalace](https://github.com/MemPalace/mempalace),
+open-source software that runs on your machine and needs no API key. MemPalace stores the record,
+searches it and serves it to the agent. cckit adds the parts that connect it to a project: the four
+session hooks, one rule file that tells the agent when to read and when to write, and the install
+step in `cckit doctor`.
 
-   Rather do it by hand? `pipx install mempalace` — the first command the descriptor tries. The doctor then detects the CLI and reports it installed.
+MemPalace is one of the [integrations](/integrations/) cckit installs from a descriptor, here
+`integrations/mempalace.json`.
 
-   Memory already scaffolded and only the switch is off? `cckit add mempalace` sets `memory.enabled`.
+## The commands
 
-3. **That's it** — every session now loads a wing-scoped wake-up header (`.claude/mempal-identity.<wing>.txt`, seeded by `init`/`doctor`) plus your project's recent decisions. The full read/write protocol lives in the scaffolded `.claude/rules/mempalace.md`.
-
-</Steps>
+| Command | What it is for |
+| --- | --- |
+| `cckit init --memory on` | Set up a project with memory on: the hooks, the rule and the config switch. |
+| `cckit doctor` | Install the MemPalace command-line tool after you say yes, and check the project's memory files. |
+| `cckit add mempalace` | Set `memory.enabled` in a project that already has the memory files. |
+| `cckit handoff "<note>"` | Leave a note for the next session. It needs no memory tool and works with memory off. |
 
 ## Codex
 
-The automatic half of memory is Claude Code only. The `Stop` and `PreCompact` hooks run
-`mempalace mine ~/.claude/projects/<project>/ --mode convos`, which reads Claude Code's transcript
-store; a Codex session writes nothing there, and no Codex transcript format has been validated
-against `mempalace mine`. So `cckit init --adapter codex` installs no memory hook, even with
-`--memory on`, and says so in its output and in the generated `AGENTS.md`.
+The automatic half of memory is Claude Code only. `cckit init --adapter codex` installs no memory
+hook, even with `--memory on`, and says so in its output and in the generated `AGENTS.md`. A
+MemPalace MCP server you configure yourself still works when called explicitly. The reason and the
+details are in [How cckit uses memory](/memory/how-cckit-uses-it/#under-codex).
 
-What still works in Codex: a MemPalace MCP server you configure yourself, called explicitly. With
-`--adapter both`, Claude Code sessions keep all four hooks.
+## Guides
 
-<Aside type="tip" title="Built on MemPalace — credit where it's due">
-The memory engine, palace format, and MCP server are all the work of the open-source **[MemPalace](https://github.com/MemPalace/mempalace)** project (maintainer [@milla-jovovich](https://github.com/MemPalace)) — *"give your AI a memory: mine projects and conversations into a searchable palace. No API key required."* cckit only scaffolds the hooks and the per-wing header; MemPalace does the remembering. If it's useful, **star the repo, file issues, and follow along** at [github.com/MemPalace/mempalace](https://github.com/MemPalace/mempalace).
+<CardGrid>
+  <LinkCard title="Install MemPalace" href="/memory/install-mempalace/" description="Switch memory on, install the tool, connect it to Claude Code and check that a session starts with context." />
+  <LinkCard title="How cckit uses memory" href="/memory/how-cckit-uses-it/" description="The four hooks, where each kind of note goes, the rule the agent follows, and what does not work under Codex." />
+</CardGrid>
 
-**Not affiliated.** cckit is not a maintainer of MemPalace and has no affiliation with or endorsement from the project or its authors — we're simply users who find it excellent. MemPalace is independent software under its own license; install and use it at your own discretion. Please direct MemPalace bugs and questions to [its own issue tracker](https://github.com/MemPalace/mempalace/issues), not to cckit.
+<Aside type="note" title="Not affiliated">
+The memory engine, the palace format and the MCP server are the work of the open-source
+[MemPalace](https://github.com/MemPalace/mempalace) project (maintainer
+[@milla-jovovich](https://github.com/MemPalace)). cckit is not a maintainer of MemPalace and has no
+affiliation with or endorsement from the project or its authors. MemPalace is independent software
+under its own license. Send MemPalace bugs and questions to
+[its own issue tracker](https://github.com/MemPalace/mempalace/issues), not to cckit.
 </Aside>

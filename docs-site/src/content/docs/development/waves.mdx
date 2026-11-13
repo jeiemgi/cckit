@@ -1,6 +1,6 @@
 ---
-title: Wave
-description: cckit wave reads your open efforts and proposes the incoming waves of work — parallel agent tasks that gate and merge themselves.
+title: Run work in parallel waves
+description: What cckit wave proposes, how the work is dispatched to parallel agents, and how results are collected.
 ---
 
 import { Card, CardGrid, Steps, Aside } from '@astrojs/starlight/components';
@@ -10,19 +10,41 @@ import TagRow from '../../../components/TagRow.astro';
 
 <TagRow kinds={["flow", "command"]} />
 
-`cckit wave` reads your open efforts and proposes the incoming waves of work.
+A plan with twelve issues does not have to take twelve turns. Some of those issues wait on
+others, and the rest are ready now and touch different files. Working the ready ones one after
+another wastes the time an agency saves by putting several people on a project.
+
+The risk in doing them together is collision: two agents in one folder, or two agents pushing to
+one branch. A wave is how cckit runs the ready work at the same time and keeps every agent in its
+own copy of the code.
 
 <CopilotFanout client:only="react" />
 
 ## What a wave is
 
-An **effort** is a goal broken into many issues. Some issues block others, so they can't all start
-at once. A **wave** is the set of issues that are unblocked *right now* — everything ready to be
-worked in parallel.
+An **effort** is a goal broken into many issues. Some issues block others, so they cannot all
+start at once. A **wave** is the set of issues that are unblocked right now: everything ready to
+be worked in parallel.
 
 `cckit wave` looks at your open efforts, works out that set, and writes a **brief**: one task per
-issue, each scoped to its own isolated worktree so the parallel work can't collide. It doesn't run
-anything itself — it hands the brief to the agent, and the agent does the work.
+issue, each scoped to its own isolated worktree so the parallel work cannot collide. It runs
+nothing itself. It hands the brief to the agent, and the agent does the work.
+
+## Who does what
+
+- **You** decide that a wave runs, and you can read the brief first.
+- **The driving agent** is the session you are talking to. It reads the brief and starts the
+  workers.
+- **The workers** are one agent per issue. Each implements its issue in its own worktree and opens
+  a pull request.
+- **The captain** is `cckit watch`, a process and not an agent. It checks the pull requests the
+  workers opened and merges the clean ones.
+
+The tools underneath are the agent runtime (Claude Code or Codex) and, when cckit launches the
+workers itself, a terminal multiplexer: tmux by default, or Herdr with `--runtime herdr`. cckit
+builds neither.
+
+## How the three parts fit
 
 - **One wave → many agents.** The brief lists each unblocked issue as a self-contained task. The
   driving agent starts one worker per task — how depends on the runtime, see
@@ -69,9 +91,9 @@ anything itself — it hands the brief to the agent, and the agent does the work
 </Steps>
 
 <Aside type="tip" title="Why 'captain'?">
-The subagents are a fleet — each one off in its own worktree, opening its own pull request. The
-**captain** is the one process watching over all of them: `cckit watch` polls every PR, merges the
-ones that are ready, and calls out the ones that aren't.
+The workers are a fleet, each one in its own worktree, opening its own pull request. The
+**captain** is the one process watching over all of them: `cckit watch` polls every pull request,
+merges the ones that are ready, and names the ones that are not.
 </Aside>
 
 <Aside type="note" title="Why a brief, not a launcher">
@@ -113,7 +135,7 @@ agent under `scripts/wave-worker.sh`, which keeps the agent in the foreground of
 writes its exit to cckit's shared state directory.
 
 ```sh
-cckit orchestrate --detach --cap 2 11 12 13
+cckit orchestrate --detach --cap 2 <issues…>
 cckit orchestrate --results --wait 600      # add --llm for JSON
 ```
 
@@ -181,9 +203,17 @@ permanently either.
 | See every lane's ports, listeners and verdict | `cckit qa lanes` |
 
 
-## Links to learn more
+Every flag of these verbs is in the [CLI reference](/cli-reference/#plan-and-drive-a-wave).
 
-- [Efforts, waves & worktrees](/project-management/efforts-and-waves/) — where the waves come from.
-- [QA lane](/review/qa-lane/) — review a lane on a running stack and record the verdict the captain reads.
-- [Driving cckit from agents](/agents/) — the full agent-facing surface.
+## Guides and related pages
+
+- [Run a wave in parallel](/development/run-a-wave-in-parallel/): the steps, with the prompt to
+  paste.
+- [Run agents unattended overnight](/development/run-unattended/): the same loop with nobody
+  watching.
+- [Efforts and waves in practice](/project-management/efforts-and-waves/): where the waves come
+  from.
+- [QA on a running stack](/review/qa-lane/): review a lane on a running app and record the
+  verdict the captain reads.
+- [Driving cckit from agents](/agents/): everything an agent can call.
 

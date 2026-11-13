@@ -1,6 +1,6 @@
 ---
-title: Initialize cckit
-description: Set cckit up in a project with one command — then let Claude surface your first real task and run it end to end.
+title: Initialize a project
+description: Run cckit init in a repository or a new folder, pick the profile that matches your team, and have Claude surface a first real task to run end to end.
 ---
 
 import { Steps, Tabs, TabItem, Aside, FileTree } from '@astrojs/starlight/components';
@@ -9,10 +9,22 @@ import TagRow from '../../../components/TagRow.astro';
 
 <TagRow kinds={["command", "conversational"]} />
 
-You've installed cckit. Now set it up in a project — and, even if that project has no issues or notes
-yet, give yourself a real first task to run through the kit.
+The tool is on your machine, and the project still tells an agent nothing: not which branch the
+team integrates on, not which roles exist, not which rules apply. `cckit init` writes that
+description into the repository, once, and sets up the GitHub side the process depends on.
 
-## 1 · Initialize the kit on a project
+You do not need to know git or GitHub to answer what it asks. init says what it found, asks in
+plain language, and every question has one answer marked **(Recommended)**: press Enter to take it.
+
+**What you will have at the end:** a project with its config and its team of agents written down,
+a GitHub repository with the labels and the base branch the work uses, and one real task taken
+from start to merged.
+
+**Before you start:** [install cckit](/getting-started/install/) and get a clean `cckit doctor`.
+
+## Steps
+
+### 1 · Run cckit init
 
 In a terminal, from the folder you want to work in, or naming the folder a new project should get:
 
@@ -21,8 +33,168 @@ cckit init            # this folder
 cckit init my-app     # a new project in ./my-app (created for you)
 ```
 
-You do not need to know git or GitHub to answer what it asks. init says what it found, asks in plain
-language, and every question has one answer marked **(Recommended)**: press Enter to take it.
+Before it writes anything, init looks at the folder and tells you what it found: a repository, a
+project with no git yet, or an empty folder. A new project can start from a recipe (a ready-made
+web app) and can add a database. Each of those is a question with a recommended answer.
+[What init does, in order](#what-init-does-in-order) has every case.
+
+<Aside type="tip" title="Want to see what is already there first?">
+Run `cckit scan` before `init`. It reports the repository's stack and whether any cckit files
+already exist. For a repository that has some, follow
+[Add cckit to an existing repo](/getting-started/existing-repo/).
+</Aside>
+
+### 2 · Pick the profile
+
+init asks "What kind of work is this project?". The answer is a **profile**: the team of agents,
+the rules and the skills the project starts with. For a software product, pick `software`: it
+installs the eight roles described in [The team](/philosophy/the-team/). The other profiles are
+listed under [Profiles](#profiles).
+
+### 3 · Confirm the git and GitHub steps
+
+init lists what it is about to do on the git and GitHub side and asks once. After you say yes it
+saves the first version, creates the GitHub repository (private unless you pass `--public`),
+creates the base branch `develop`, adds the labels and milestones the process uses, and protects
+the base branch. A step that is already done is skipped.
+
+The run ends with one result line: how many steps were done, skipped and failed. A failed step does
+not stop the later ones. Fix it and run `cckit init` again; finished steps are skipped.
+The full list of steps is under [What init does, in order](#what-init-does-in-order).
+
+### 4 · Have Claude find a first real task
+
+A fresh board is empty. Instead of inventing a task, point Claude at the code and let it surface
+**real** work, then open an issue for each finding, so you have something concrete to run.
+
+Pick an angle and paste the prompt into Claude Code:
+
+<Tabs syncKey="first-task">
+  <TabItem label="Security review">
+    <div class="cckit-prompt">
+
+    ```text frame="terminal" title="Prompt to paste"
+    Analyze this repository for security threats: injection, auth gaps, secret handling, and
+    unsafe dependencies.
+
+    For each real finding, open a cckit issue (use the kit-task-new skill) with a clear title, the
+    file, and a concrete fix. Skip anything speculative.
+    ```
+
+    </div>
+  </TabItem>
+  <TabItem label="Best-practice audit">
+    <div class="cckit-prompt">
+
+    ```text frame="terminal" title="Prompt to paste"
+    Review this repository for code-quality and best-practice gaps: dead code, missing tests,
+    inconsistent error handling, risky patterns.
+
+    For each actionable item, open a cckit issue with a clear title and the fix you'd make.
+    ```
+
+    </div>
+  </TabItem>
+</Tabs>
+
+Claude reads the repository and the `kit-task-new` skill files one issue per finding. That is a
+<Tag kind="conversational" text>conversational</Tag> trigger: you described the job and named no
+command. Your board now has real, scoped work to practice on.
+
+### 5 · Run one, end to end
+
+With issues on the board, the everyday loop is short. Run it on one finding to learn how it feels:
+
+<Steps>
+
+1. **See what is unblocked.** `cckit next` picks the issue to start and prints its start command.
+
+2. **Start it.** `cckit start <issue>` makes an isolated worktree and branch, so the change stays
+   separate from everyone else's work.
+
+3. **Make the change.** Implement the fix and run your checks until they pass.
+
+4. **Open the pull request.** `cckit pr <issue> "what changed"` commits, pushes and opens it.
+
+5. **Merge and clean up.** Merge the pull request with `cckit merge`, which also closes the issue.
+   Then `cckit gc` reports the merged branch and worktree as prunable and `cckit cleanup` removes
+   them.
+
+</Steps>
+
+```bash
+cckit next                          # the next issue, and how to start it
+cckit start <issue>                 # isolated worktree and branch for that issue
+cckit pr <issue> "fix the thing"    # commit, push, open the pull request
+cckit gc                            # report prunable merged branches and worktrees
+```
+
+The loop in full, with what to check at each step:
+[Take an issue to merged](/development/issue-to-merged-pr/). When you have many issues at once,
+[Run work in parallel waves](/development/waves/) sends a whole batch to parallel agents.
+
+## Check it worked
+
+```bash
+cckit doctor   # the tools and the GitHub sign-in
+cckit scan     # the detected stack, and the state of the cckit files
+cckit status   # where the project stands
+```
+
+`doctor` prints a green check for `git`, `gh` (authenticated) and `jq`. `scan` prints the detected
+language and framework. If both look right, cckit is live in the repository. `cckit status` lists
+local work that is not finished, pull requests waiting on a person, and cleanup that is available;
+after step 5 it should list nothing for the task you ran.
+
+## Set it up by asking Claude Code
+
+You can have the agent run the setup. You describe the goal and name no command:
+
+<div class="cckit-prompt">
+
+```text frame="terminal" title="Prompt to paste"
+Set up cckit in this repository and confirm it's ready to use. Scaffold its config,
+check my GitHub access, and show me what it detected about the stack.
+```
+
+</div>
+
+Under the hood it runs three commands:
+
+```bash frame="terminal"
+cckit init     # write cckit.config.json and .claude/
+cckit doctor   # check the tools and the GitHub sign-in
+cckit scan     # show the detected stack and the state of the cckit files
+```
+
+An agent has no terminal to answer questions on, so the git and GitHub steps do not run unless the
+command carries `--yes`. The last lines of the output name what was left undone and the command
+for it. See [Without a terminal](#without-a-terminal).
+
+cckit has no company, framework or repository baked in. Everything it needs comes from
+`cckit.config.json`, which `init` writes and every other command reads. That is why setup is
+"write the config, check the tools, confirm": once the config exists and your tools are present,
+every later command resolves against it.
+
+<Aside type="tip" title="Your own files are left alone">
+`init` only adds cckit's own files. Your existing project layout is left exactly as it is.
+</Aside>
+
+## Troubleshooting
+
+**`doctor` says `gh` isn't authenticated.** Run `gh auth login` once, then re-run the setup prompt.
+cckit uses your existing GitHub CLI session; it never stores a token of its own.
+
+**`scan` detected the wrong stack.** The detection is a starting point you can correct — open
+`cckit.config.json` and adjust the project fields; every verb will pick up the change.
+
+**`jq` is missing.** cckit runs without the optional tools, but `jq` is required for the
+JSON paths. Install it (`brew install jq` / your package manager) and re-run `doctor`.
+
+## The details
+
+The rest of this page is for looking things up: every case init handles, the flags for a run with
+no terminal, the profiles, and the files it writes.
 
 ### What init does, in order
 
@@ -162,10 +334,10 @@ account. Setting the project up needs a terminal once.
 
 `cckit init` writes two things:
 
-- **`cckit.config.json`** — your repo, owner, and base branch. Nothing is hardcoded; every verb reads from here.
-- **`.claude/`** — agents, hooks, rules, and settings, so Claude Code and cckit know how to drive *this* project.
+- **`cckit.config.json`**: your repository, owner and base branch. Nothing is hardcoded; every command reads from here.
+- **`.claude/`**: agents, hooks, rules and settings, so Claude Code and cckit know how to drive *this* project.
 
-Afterwards your repo looks roughly like this — your own files are untouched, cckit just adds its own:
+Afterwards your repository looks roughly like this. Your own files are untouched; cckit adds its own:
 
 <FileTree>
 - your-repo/
@@ -224,10 +396,6 @@ files. Every path each adapter writes:
 [install matrix](/install-matrix/#what-cckit-init-writes-claude-code-codex-or-both). How the
 adapters work and their current limits: [Adapters](/adapters/#choosing-adapters-at-install).
 
-<Aside type="tip" title="Want to see what's already there first?">
-Run `cckit scan` before `init` — it reports the repo's stack and whether any kit-shaped files already exist.
-</Aside>
-
 <Aside type="note" title="Where those rules and skills come from">
 `.claude/rules/*.md` and `.claude/skills/*/SKILL.md` are copies of the kit's own
 `templates/rules/` and `templates/skills/`, selected by your profile and filled in with your project's
@@ -241,127 +409,3 @@ kind of file, open it with `paths:` (a list of globs) so it loads only when a ma
 `scripts/instruction-budget-lint.sh`, scaffolded with the rules, fails the gate when the resident
 set passes 150k or a rule grows past 200 lines. See [Codified review gates](/review/gates/).
 </Aside>
-
-## 2 · No issues yet? Have Claude find your first one
-
-A fresh board is empty. Instead of inventing a task, point Claude at the code and let it surface
-**real** work — then open a cckit issue for each finding, so you have something concrete to run.
-
-Pick an angle and paste the prompt into Claude Code:
-
-<Tabs syncKey="first-task">
-  <TabItem label="Security review">
-    <div class="cckit-prompt">
-
-    ```text frame="terminal" title="Prompt to paste"
-    Analyze this repository for security threats — injection, auth gaps, secret handling, and
-    unsafe dependencies.
-
-    For each real finding, open a cckit issue (use the task-new skill) with a clear title, the
-    file, and a concrete fix. Skip anything speculative.
-    ```
-
-    </div>
-  </TabItem>
-  <TabItem label="Best-practice audit">
-    <div class="cckit-prompt">
-
-    ```text frame="terminal" title="Prompt to paste"
-    Review this repository for code-quality and best-practice gaps — dead code, missing tests,
-    inconsistent error handling, risky patterns.
-
-    For each actionable item, open a cckit issue with a clear title and the fix you'd make.
-    ```
-
-    </div>
-  </TabItem>
-</Tabs>
-
-Claude reads the repo and the **task-new** skill files one issue per finding — that's a
-<Tag kind="conversational" text>conversational</Tag> trigger, you just described the job. Your board
-now has real, scoped work to practice on.
-
-## 3 · Run one, end to end
-
-With issues on the board, the everyday loop is short. Run it on one finding to learn the ergonomics:
-
-<Steps>
-
-1. **See what's unblocked** — `cckit next` picks the issue to start and prints its start command.
-
-2. **Start it** — `cckit start <issue>` makes an isolated worktree and branch, so the change stays separate from `main`.
-
-3. **Make the change** — implement the fix; run your checks until they pass.
-
-4. **Open the pull request** — `cckit pr <issue> "what changed"` commits, pushes, and opens the PR.
-
-5. **Merge and clean up** — merge the PR, then `cckit gc` reports the merged branch and worktree as prunable and `cckit cleanup` removes them.
-
-</Steps>
-
-```bash
-cckit next                 # the next issue + how to start it
-cckit start 1              # isolated worktree + branch for issue #1
-cckit pr 1 "fix the thing" # commit, push, open the PR
-cckit gc                   # report prunable merged branches + worktrees
-```
-
-When you've got many issues at
-once, [Wave](/development/waves/) fans a whole batch out to parallel agents and merges them for you.
-
-## Set it up by asking Claude Code
-
-**What you'll set up:** cckit reads everything from a single `cckit.config.json`. In three commands
-it scaffolds that config and a `.claude/` folder, preflights your dependencies and GitHub auth, and
-shows you the stack it detected — so you know it's ready before you run any real work. You describe
-the goal; Claude Code triggers the commands.
-
-### Steps
-
-<Steps>
-
-1. **Ask Claude to set it up.** You don't name the commands — describe the intent.
-
-   <div class="cckit-prompt">
-
-   ```text frame="terminal" title="Prompt to paste"
-   Set up cckit in this repository and confirm it's ready to use. Scaffold its config,
-   check my GitHub access, and show me what it detected about the stack.
-   ```
-
-   </div>
-
-2. **cckit scaffolds the config.** Under the hood it runs:
-
-   ```bash frame="terminal"
-   cckit init     # scaffold cckit.config.json + .claude/
-   cckit doctor   # preflight: deps + gh auth
-   cckit scan     # show the detected stack + kit state
-   ```
-
-3. **Verify it's ready.** `doctor` prints a green check for `git`, `gh` (authenticated), and `jq`;
-   `scan` prints the detected language and framework. If both look right, cckit is live in the repo.
-
-</Steps>
-
-### How it works
-
-cckit is portable by design — no company, framework, or repo is baked in. Everything it needs comes
-from `cckit.config.json`, which `init` scaffolds and every other verb reads. That's why setup is just
-"scaffold, preflight, confirm": once the config exists and your tools are present, every later
-command resolves against it.
-
-<Aside type="tip" title="Nothing above the kit is touched">
-`init` only adds cckit's own files. Your existing project layout is left exactly as it is.
-</Aside>
-
-### Troubleshooting
-
-**`doctor` says `gh` isn't authenticated.** Run `gh auth login` once, then re-run the setup prompt.
-cckit uses your existing GitHub CLI session; it never stores a token of its own.
-
-**`scan` detected the wrong stack.** The detection is a starting point you can correct — open
-`cckit.config.json` and adjust the project fields; every verb will pick up the change.
-
-**`jq` is missing.** cckit runs without optional tools, but `jq` is required for the
-JSON paths. Install it (`brew install jq` / your package manager) and re-run `doctor`.

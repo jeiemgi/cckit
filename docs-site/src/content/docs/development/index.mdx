@@ -1,82 +1,156 @@
 ---
-title: The GitHub cycle
-description: How one piece of work travels from an issue to merged code, step by step.
+title: How one change is built
+description: The path of one piece of work from issue to merged code, why each piece gets its own worktree, and which agents do the building.
 ---
 
 import { CardGrid, LinkCard, Steps, Aside } from '@astrojs/starlight/components';
 import GitHubCycle from '../../../components/diagrams/GitHubCycle';
-import Tag from '../../../components/Tag.astro';
 import TagRow from '../../../components/TagRow.astro';
 
 <TagRow kinds={["flow"]} />
 
-How one piece of work travels from an idea to merged code.
+Building is the part of the process where several agents touch the same repository at the same
+time. Two of them editing one folder overwrite each other's files, and git has no lock that stops
+it. A change made straight on the shared branch reaches everyone before anyone has looked at it.
+
+An agency avoids both with one habit: every piece of work gets its own copy of the code, and it
+comes back as a pull request that someone reviews. cckit runs that habit for you. This area shows
+how one change travels from an issue to a pull request, and how many travel at once without
+colliding.
+
+## The path of one change
 
 <GitHubCycle client:only="react" />
 
-Every change cckit makes follows this same path. Read it left to right: an **issue** says what to
-do, a **branch** gives the work a private place to happen, the work becomes a **pull request**,
-and **review** either merges it or sends it back. cckit gives you one command for each step.
-
-<Aside type="tip" title="You don't do this by hand">
-cckit runs each of these steps for you. Read this to understand what's happening behind the
-commands.
-</Aside>
-
-## The steps
+Read it left to right. An **issue** says what to do. A **branch** gives the work a private place
+to happen. The work becomes a **pull request**, and **review** either merges it or sends it back.
 
 <Steps>
 
-1. **Issue** — a short note of one thing to do. It has a number (like `#42`) that follows the work
-   the whole way through.
+1. **Issue.** A short note of one thing to do. Its number follows the work the whole way through.
 
-2. **Branch** — a private copy of the code to change, so your work never disturbs anyone else's.
-   `cckit start 42` makes the branch and an isolated worktree for issue #42.
+2. **Start.** `cckit start <issue>` makes a branch and a worktree for that issue, cut from a
+   freshly fetched base branch. A worktree is a second folder on your disk holding its own copy of
+   the code, so this work cannot disturb anyone else's.
 
-3. **Work** — make the change. Run `bash scripts/check.sh` (or your project's checks) until it
-   passes.
+3. **Work.** The agent makes the change inside that folder and runs the project's checks until
+   they pass.
 
-4. **Pull request** — propose the change back to the main code. `cckit pr 42 "<summary>"` opens it
-   and links it to issue #42, so merging the request closes the issue.
+4. **Pull request.** `cckit pr <issue> "<summary>"` commits, pushes and opens the request. It
+   links the request to the issue with a `Closes` line.
 
-5. **Review** — automated checks run, and a person or an agent takes a look. If it's good, it
-   **merges** into `main`. If not, it comes back as **changes** and you return to step 3.
+5. **Review.** Automated checks run, and a person or an agent looks at the change. If it is good
+   it merges into the base branch. If not, it comes back and the work returns to step 3. How that
+   decision is made is the [Review](/review/) area; merging and tidying up is
+   [Ship](/ship/merge-and-close/).
 
 </Steps>
 
-## The pull request carries its own proof
-
-A pull request shouldn't just *claim* the checks passed — it should show them. So cckit ships
-a helper, `pr_attach_evidence` (`scripts/lib/pr-evidence.sh`), that attaches the actual output as a
-comment after the request opens: the build log, the typecheck log, a
-screenshot of the working screen. That's the **evidence** on the request, and it's what lets a
-reviewer (a person or an agent) trust step 5 without re-running everything by hand.
-
-Each piece of evidence gets its own comment, named by its caption — one for `build`, one for
-`typecheck`, one for a screenshot. Attach again and cckit **updates that same comment in place**
-rather than adding a second one, so a request that took ten pushes still shows one current build
-log instead of ten stale ones.
-
-<Aside type="caution" title="Evidence never breaks your work">
-By default, a comment that fails to post warns and gets out of the way — a lost log line should
-never fail the request it was only annotating. A caller that needs the evidence to
-exist can ask for the opposite (`--strict`, or `PR_EVIDENCE_STRICT=1`) and have the failure stop the run. Either way the failure is
-printed, never silently reported as success.
+<Aside type="tip" title="You do not type these by hand">
+An agent runs each step. Read this page to know what is happening behind the commands.
 </Aside>
 
-Image evidence has one limit: GitHub has no supported way to upload a file to a comment from
-the command line, so a screenshot is **referenced by its path** with instructions, not embedded.
-Drag it into the comment box yourself, or host the file, set `KIT_EVIDENCE_URL_BASE`, and cckit embeds it.
+## Why every change gets its own copy
 
-## The commands, in order
+One issue, one branch, one worktree, one pull request. The rule buys three things:
+
+- **Nothing collides.** Each agent writes in its own folder, so several can build at once on
+  one machine.
+- **Nothing lands unseen.** The base branch only changes through a pull request. A hook blocks an
+  agent's commit made directly on the base branch.
+- **Everything is traceable.** The branch name, the pull request and the board all carry the
+  issue number, so you can go from a line of merged code back to the request that asked for it.
+
+One exception is deliberate. An [effort](/project-management/efforts-and-waves/) is a larger goal
+with several sub-issues, and it ships as one branch and one pull request for all of them.
+
+What still needs care when several sessions share one repository is on
+[Many sessions, one repository](/development/many-sessions/).
+
+## Who does the building
+
+The agents that write code come from the profile you chose at setup. The `software` profile
+installs a backend agent (API, data model, server logic), a frontend agent (everything the user
+sees and touches), a devops agent (pipelines and deployment) and a tech lead (toolchain and
+architecture decisions), alongside QA and security. The `minimal` and `automation` profiles
+install a generalist instead.
+
+Three other roles shape a build without writing it:
+
+- **The designer** answers every visual question before the frontend agent writes it. See
+  [Design](/design/).
+- **The captain** is not an agent. It is whoever drives a batch of work to merged: the command
+  `cckit watch --merge`, or a session you told to run an approved plan.
+- **You** pick the work, approve the plan and decide what merges.
+
+Every role and what it owns is on [The team](/philosophy/the-team/).
+
+## Which tools plug in
+
+cckit adopts tools for building and writes none of them. Each one is optional, and cckit works
+without it.
+
+| Tool | What it gives the agent | How you reach it |
+| --- | --- | --- |
+| chrome-devtools-axi | screenshots, console and network logs of a web page | [`cckit debug`](/development/browser-debug/) |
+| Graft | an index that answers where code lives and what calls it | [`cckit add graft`](/development/code-graph/) |
+| mlx-lm | a local model that shortens a long file before it is read | [`cckit digest`](/development/local-model-digest/) |
+| tmux or Herdr | one terminal pane per parallel agent | [`cckit orchestrate`](/development/waves/) |
+
+mlx-lm runs on Apple silicon only. The agent itself is Claude Code or Codex. GitHub is reached through the `gh` command. The full
+list of optional tools, with who makes each one, is on [Integrations](/integrations/).
+
+## The commands
+
+For one change:
 
 | Step | Command |
 | ---- | ------- |
+| See the board | `cckit sync` |
+| Find what is next | `cckit next` |
 | Start the work | `cckit start <issue>` |
 | Open the request | `cckit pr <issue> "<summary>"` |
-| Close a no-op | `cckit close <issue> "<reason>"` |
-| See the board | `cckit sync` |
-| What's next | `cckit next` |
+| Close an issue that needed no change | `cckit close <issue> "<reason>"` |
 
-Each command is explained in the [CLI reference](/cli-reference/).
+For many at once:
 
+| Step | Command |
+| ---- | ------- |
+| Propose the next batch of unblocked issues | `cckit wave` |
+| Launch one agent per issue | `cckit orchestrate <issues…>` |
+| Check and merge the finished requests | `cckit watch --merge` |
+| See which session holds which issue | `cckit claims` |
+
+Every flag is in the [CLI reference](/cli-reference/).
+
+## The pull request carries its own proof
+
+A pull request should show that the checks passed, not claim it. cckit ships a helper,
+`pr_attach_evidence` (`scripts/lib/pr-evidence.sh`), that attaches the output as a comment after
+the request opens: the build log, the typecheck log, a screenshot of the working screen. A
+reviewer, person or agent, can then trust the result without running everything again.
+
+Each piece of evidence gets its own comment, named by its caption: one for `build`, one for
+`typecheck`, one for a screenshot. Attach again and cckit updates that same comment in place, so
+a request that took ten pushes shows one current build log and not ten stale ones.
+
+<Aside type="caution" title="Evidence never breaks your work">
+By default, a comment that fails to post prints a warning and the run continues. A caller that
+needs the evidence to exist asks for the opposite with `--strict` or `PR_EVIDENCE_STRICT=1`, and
+the failure stops the run. Either way the failure is printed and never reported as success.
+</Aside>
+
+Image evidence has one limit. GitHub has no supported way to upload a file to a comment from the
+command line, so a screenshot is referenced by its path, with instructions. Drag it into the
+comment box yourself, or host the file, set `KIT_EVIDENCE_URL_BASE`, and cckit embeds it.
+
+## Guides
+
+Start with the first one. It is the path on this page, run for real.
+
+<CardGrid>
+  <LinkCard title="Take an issue to merged" href="/development/issue-to-merged-pr/" description="One issue through start, change, pull request, close and cleanup." />
+  <LinkCard title="Run work in parallel waves" href="/development/waves/" description="How a batch of unblocked issues is handed to parallel agents." />
+  <LinkCard title="Let the agent see the page" href="/development/browser-debug/" description="Give an agent screenshots and logs of a running page." />
+  <LinkCard title="More development guides" href="/development/more-guides/" description="Unattended runs, CI, code search, local models, hooks, skills and integrations." />
+</CardGrid>

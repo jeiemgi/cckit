@@ -1,5 +1,5 @@
 ---
-title: How to have an agent review a PR before it merges
+title: Agent review before a merge
 description: Turn on cckit's review stage so the captain sends each pull request it would merge to a read-only reviewer agent first, records the verdict against the reviewed commit, and refuses to merge on a fail.
 tutorial:
   job: have an agent review a pull request before the captain merges it
@@ -20,10 +20,19 @@ import TutorialSchema from '../../../components/TutorialSchema.astro';
 
 <TutorialMeta />
 
-**What you'll set up:** a second agent that reads a pull request before `cckit watch --merge` lands
-it. The captain pipes a brief to the reviewer, the reviewer answers with a short report, and that
-report is stored as a receipt tied to the commit it read. A `gate: fail` blocks the merge until a
-new commit is pushed and reviewed. The stage is off until you configure it.
+The agent that wrote a change reads it with the same assumptions it wrote it with. A second
+reader with no stake in the change catches what the first one cannot. On a human team that is code
+review. When the captain merges on its own, nobody is doing it unless you give that job to a second
+agent.
+
+**What you will have at the end:** a reviewer agent that reads each pull request before
+`cckit watch --merge` lands it. The captain pipes a brief to the reviewer, the reviewer answers
+with a short report, and that report is stored as a receipt tied to the commit it read. A
+`gate: fail` blocks the merge until a new commit is pushed and reviewed.
+
+**Who does it:** the reviewer is an agent profile that lists the `review` stage and may not write
+to a branch. It runs on the `claude` or `codex` CLI you already have, or on any command you name.
+The stage is off until you configure it.
 
 ## Steps
 
@@ -88,6 +97,13 @@ new commit is pushed and reviewed. The stage is off until you configure it.
    verdict no longer counts, pass or fail, and the next `cckit watch` reviews the new head.
 
 </Steps>
+
+## How to check it worked
+
+- `cckit receipt show <issue> review` prints a receipt whose `gate` line is `pass` or `fail`.
+- The same report is a comment on the issue.
+- `cckit watch --merge` merges a pull request with a pass on its current head and reports
+  `REVIEW_FAILING` or `REVIEW_MISSING` for one without.
 
 ## How it works
 
@@ -158,12 +174,12 @@ short prompt and check that its reply ends with the five lines above.
 **You disagree with a `REVIEW_FAILING` verdict.** No setting turns a recorded fail off. Push a
 commit: that makes the verdict stale and the next pass reviews the new head.
 
-## Related tutorials
+## Related guides
 
 <CardGrid>
-  <LinkCard title="Run a wave of issues in parallel" href="/development/run-a-wave-in-parallel/" description="The captain loop the review stage sits inside." />
+  <LinkCard title="Run a wave in parallel" href="/development/run-a-wave-in-parallel/" description="The captain loop the review stage sits inside." />
   <LinkCard title="Run one objective unattended" href="/development/run-one-objective-unattended/" description="The builder side: one headless agent with limits." />
-  <LinkCard title="Control what Claude Code is allowed to do" href="/review/control-what-agents-can-do/" description="The permission settings a reviewer runs under." />
+  <LinkCard title="Control what agents may do" href="/review/control-what-agents-can-do/" description="The permission settings a reviewer runs under." />
 </CardGrid>
 
 <TutorialSchema

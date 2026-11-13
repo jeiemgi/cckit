@@ -1,6 +1,6 @@
 ---
-title: How to give Claude Code a code graph with Graft
-description: Switch on cckit's optional Graft integration so Claude Code asks an index where code lives and who calls a symbol. Four commands, one consent, and what each one prints.
+title: "Find code with a code graph"
+description: "Step by step: switch on the Graft integration so an agent asks an index where code lives."
 tutorial:
   job: give Claude Code a code graph with Graft
   difficulty: intermediate
@@ -20,10 +20,18 @@ import TutorialSchema from '../../../components/TutorialSchema.astro';
 
 <TutorialMeta />
 
-**What you'll set up:** a local index of your code that the agent queries before it greps. Graft
-is a third-party tool; cckit switches it on, installs it after your yes, and writes the rule that
-tells the agent which question goes to which Graft verb. The index is built by parsing your files
-on your machine: no model is called and no API key is needed.
+An agent new to a repository finds code the slow way. It searches for a word, opens the matches,
+follows an import, searches again. Each file it opens to find out it was the wrong one uses up
+room it needs for the work.
+
+A code graph is an index of the repository that answers the question directly: where is this
+handled, and what calls it. The tool here is Graft, third-party software that cckit adopts and
+does not build. cckit switches it on, installs it after your yes, and writes the rule that tells
+the agent which question goes to which Graft command. The index is built by parsing your files on
+your machine: no model is called and no API key is needed.
+
+**What you will have at the end:** a local index in `graft/`, and an agent that queries it
+before it searches file by file.
 
 ## Steps
 
@@ -97,6 +105,12 @@ on your machine: no model is called and no API key is needed.
 
 </Steps>
 
+## Check it worked
+
+- `graft check` exits 0.
+- `cckit doctor` shows a `Graft` row reading `installed` under **Integrations**.
+- The agent's answer to the prompt in step 6 names the Graft command it ran for each part.
+
 ## How it works
 
 `cckit add graft` records a choice; it does not install. The install runs from the doctor, from
@@ -142,12 +156,12 @@ install with `npm install -g @nanonets/graft`, the command the doctor tries firs
 `.claude/rules/code-retrieval.md` exists. For a file in a language Graft does not index, grep is
 the expected behaviour.
 
-## Related tutorials
+## Related guides
 
 <CardGrid>
-  <LinkCard title="Add your own tool as an integration" href="/development/add-your-own-integration/" description="Describe a tool that is not in the list, and let the doctor install it." />
-  <LinkCard title="Give Claude Code persistent project memory" href="/memory/install-mempalace/" description="The memory integration, switched on the same way." />
-  <LinkCard title="Summarize long files with a local model" href="/development/local-model-digest/" description="The local model integration, for Apple silicon." />
+  <LinkCard title="Add your own integration" href="/development/add-your-own-integration/" description="Describe a tool that is not in the list, and let the doctor install it." />
+  <LinkCard title="Install MemPalace" href="/memory/install-mempalace/" description="The memory integration, switched on the same way." />
+  <LinkCard title="Summarize long files locally" href="/development/local-model-digest/" description="The local model integration, for Apple silicon." />
 </CardGrid>
 
 <TutorialSchema

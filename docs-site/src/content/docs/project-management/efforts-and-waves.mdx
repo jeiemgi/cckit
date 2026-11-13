@@ -1,6 +1,6 @@
 ---
-title: Efforts, waves & worktrees
-description: How cckit runs many issues at once without the changes colliding.
+title: Efforts and waves in practice
+description: The verbs that create, order, start and close an effort, the limit on efforts in progress, and how waves and worktrees keep parallel work apart.
 ---
 
 import { CardGrid, LinkCard, Steps, Aside } from '@astrojs/starlight/components';
@@ -11,13 +11,33 @@ import TagRow from '../../../components/TagRow.astro';
 
 <TagRow kinds={["flow", "concept"]} />
 
-How cckit runs many issues at once without the changes colliding.
+Some goals do not fit in one issue. A feature with a schema change, an API and a screen is three or
+four changes, and if four agents start on them with no plan, two things go wrong: they edit the
+same files, and the one that needs the schema starts before the schema exists.
+
+A team handles this by splitting the goal into steps, writing down which step waits for which, and
+running at the same time only the steps that are independent. cckit's units for that are the
+**effort** and the **wave**. [Units of work](/project-management/) sets them beside the Scrum terms;
+this page is how the commands behave.
 
 <EffortWaves client:only="react" />
 
 A big piece of work is an **effort**. cckit breaks it into **sub-issues**, then sorts them into
 **waves** so the ones that don't depend on each other run together, and the ones that do wait their
 turn.
+
+## The commands, in the order you use them
+
+1. `cckit effort new` creates the parent issue and its sub-issues.
+2. `cckit effort chain` declares which issue comes before which.
+3. `cckit effort plan` and `cckit plan` show what can run now.
+4. `cckit effort start` creates the effort's branch and worktree.
+5. `cckit effort pr` opens the one pull request.
+6. `cckit effort close` merges it and closes the parent and every sub-issue.
+
+For a first run through these, follow
+[Break a feature into an effort](/project-management/break-a-feature-into-an-effort/). The sections
+below are the detail behind each command; the flags are in the [CLI reference](/cli-reference/).
 
 <Aside type="tip" title="You don't do this by hand">
 cckit plans the waves and isolates the worktrees for you. Read this to understand how parallel work
@@ -43,7 +63,7 @@ and dependencies all reference it. But a bare number is hard to remember, so eve
 
 ```bash
 cckit effort new "Slug handles for efforts" --slug slug-handles   # optional explicit handle
-cckit effort start slug-handles                                   # identical to: cckit effort start 93
+cckit effort start slug-handles                                   # identical to: cckit effort start <N>
 cckit effort pr slug-handles
 cckit effort close slug-handles
 ```
@@ -294,7 +314,7 @@ p0 work lands in the first batch rather than wherever it happened to fall.
 `cckit effort chain` declares a whole running order in one command:
 
 ```bash
-cckit effort chain 241 242 243     # 242 blocked_by 241 · 243 blocked_by 242
+cckit effort chain <a> <b> <c>     # <b> blocked_by <a> · <c> blocked_by <b>
 ```
 
 Every issue after the first gets two things: the native GitHub **`blocked_by`** edge on its
@@ -314,7 +334,7 @@ A chained set therefore lands one issue per wave, in the order you gave.
   than written because the wave layering cannot order a cyclic graph.
 
 <Aside type="note" title="Numbers, with or without the hash">
-`cckit effort chain 241 242` and `cckit effort chain '#241' '#242'` are the same command. Unlike
+`cckit effort chain <a> <b>` takes each number with or without the hash: `12 13` and `'#12' '#13'` name the same two issues. Unlike
 `start` / `pr` / `close`, `chain` takes issue **numbers** only — not slug handles — because it wires
 plain issues, not just efforts.
 </Aside>
@@ -385,7 +405,7 @@ A sub-issue builds on what its effort has already landed, and those commits are 
 orchestrate a sub:
 
 ```bash
-KIT_BASE_BRANCH=effort/42-auth cckit orchestrate 44 45
+KIT_BASE_BRANCH=effort/<N>-<slug> cckit orchestrate <sub> <sub>
 ```
 
 Without it the sub's worktree is cut from the base branch and is missing the effort's earlier

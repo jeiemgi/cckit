@@ -3,4 +3,241 @@ title: "Merge, close and clean up"
 description: "The verbs that land work and tidy after it: merge, watch, effort close, close, gc and cleanup."
 ---
 
-TODO-E493
+import { Steps, Aside } from '@astrojs/starlight/components';
+import TagRow from '../../../components/TagRow.astro';
+
+<TagRow kinds={["flow", "command"]} />
+
+Landing a change is four small jobs: merge the pull request, close the issue, delete the branch,
+remove the working folder. Done by hand, one of them gets skipped. The issue stays open after the
+merge, or the branch stays for months, and the board stops matching the code.
+
+cckit puts the four jobs behind one verb, so they happen together or not at all. Which verb depends
+on what you are landing. Why merging is treated as a decision is on
+[the area's first page](/ship/).
+
+## Pick the verb
+
+| You are landing | Use | Skill in Claude Code |
+| --- | --- | --- |
+| One pull request for one issue | `cckit merge <pr>` | `/kit-task-pr-merge` |
+| An effort: one pull request covering several sub-issues | `cckit effort close <slug\|N>` | `/kit-effort-close` |
+| Every ready pull request of a plan the owner approved | `cckit watch --merge` | none: CLI only |
+
+Then two verbs tidy up: `cckit close` for an issue no merge closed, and `cckit cleanup` for
+branches and working folders left behind.
+
+## Land one pull request
+
+**What you will have at the end:** the change on the base branch, its issue closed, its branch
+deleted and its working folder removed.
+
+<Steps>
+
+1. **Bring the branch onto the current base.** Run this in the branch's own worktree. `<base>` is
+   your base branch, for example `develop`.
+
+   ```bash frame="terminal"
+   git fetch origin <base>
+   git rev-list --count HEAD..origin/<base>    # anything but 0: the branch is behind
+   git rebase origin/<base>                    # or: git merge origin/<base>
+   ```
+
+   Merge in place of rebasing when other branches are cut from this one, such as an effort branch
+   with live sub-branches: a rebase rewrites the commits they sit on.
+
+2. **Read what the diff deletes.**
+
+   ```bash frame="terminal"
+   git diff --stat origin/<base>...HEAD
+   ```
+
+   A file or a block the issue never asked to remove, showing as deleted, means the branch is
+   undoing somebody else's merge. Stop and restore it before pushing.
+
+3. **Run your gate on that tree, then push.**
+
+   ```bash frame="terminal"
+   git push --force-with-lease     # a plain `git push` after a merge
+   ```
+
+4. **Merge.**
+
+   ```bash frame="terminal"
+   cckit merge <pr>
+   ```
+
+   With no number it takes the open pull request of the current branch.
+
+</Steps>
+
+**How to check it worked:** the verb prints `✓ PR #<pr> merged`, one `✓ Closed issue` line per
+linked issue and `✓ Removed worktree`. `gh issue view <issue>` shows the issue closed. Read the
+issue's state there; do not infer it from the merged pull request.
+
+What `cckit merge` does, in order:
+
+- It refuses to start with uncommitted changes in the folder it is run from.
+- It refuses a pull request whose head is an `effort/*` branch and names `cckit effort close`.
+  `KIT_FORCE=1` merges anyway, with a warning that no per-sub-issue record was taken.
+- When GitHub reports the pull request as conflicting, and you ran the verb from that pull
+  request's own branch, it rebases onto the base and pushes with `--force-with-lease`. A branch
+  that is behind but has no conflict is merged as it stands, which is why steps 1 to 3 are yours.
+- It squash-merges. `--merge` and `--rebase` pick the other two methods.
+- It closes every open issue the pull request links.
+- It removes the branch and its worktree. The base branch, the pull request's own base, `main`,
+  `master` and `develop` are never rebased, force-pushed or deleted.
+
+After every merge, the other open pull requests are behind again. Repeat from step 1 for the next
+one; do not merge a batch that was current only before the first of them landed.
+
+## Land an effort
+
+An effort collects several sub-issues on one branch and opens one pull request
+([Efforts and waves in practice](/project-management/efforts-and-waves/)).
+
+<Steps>
+
+1. **Run the gate on the effort branch** once the last sub-issue is in. A green gate on every
+   sub-branch is not a green gate on all of them together. No cckit verb runs it for you.
+
+2. **Open the one pull request.**
+
+   ```bash frame="terminal"
+   cckit effort pr <slug|N>
+   ```
+
+3. **Bring the effort branch onto the current base**, as in steps 1 to 3 above.
+
+4. **Close the effort.**
+
+   ```bash frame="terminal"
+   cckit effort close <slug|N>
+   ```
+
+</Steps>
+
+**How to check it worked:** the parent issue and every sub-issue are closed, the effort branch is
+gone, and `<git-common-dir>/effort-metrics/records.jsonl` has one new line for the effort.
+
+`cckit effort close` does more than a merge, in this order:
+
+1. Runs `effort.preCloseHook` if the project set one. A non-zero exit refuses the close.
+2. Saves each sub-issue's diff, because the squash erases the per-sub-issue commits. With no record
+   captured it refuses to merge; `KIT_FORCE=1` overrides.
+3. Re-targets every open pull request based on the effort branch to the base branch. GitHub closes
+   a pull request, unmerged, when its base branch is deleted. If a re-target fails, the close
+   refuses and merges nothing.
+4. Squash-merges, closes the parent and every sub-issue, and marks each done on the board.
+5. Removes the worktree and the branch, including the effort's `sub/…` branches.
+
+It also appends one metrics record for the effort. The hooks are in [Effort close hooks](/config-and-permissions/#effort-close-hooks), and the fields
+of the record in [Efforts and waves in practice](/project-management/efforts-and-waves/).
+
+## Let the captain merge an approved plan
+
+When the owner has approved a plan, the captain lands its pull requests without asking for each
+one.
+
+```bash frame="terminal"
+cckit watch              # one pass: report every open pull request, merge nothing
+cckit watch --merge      # one pass: merge the ready ones, then show the next wave
+cckit watch --merge --loop   # repeat until a pass merges nothing
+```
+
+`--loop` stops after 10 passes; `--max-passes <M>` changes that.
+
+Each pull request gets one verdict and one action:
+
+| Verdict | The captain's action | Meaning |
+| --- | --- | --- |
+| `CLEAN` | merge | No conflict, no failing or pending check, nothing below applies |
+| `CONFLICTING` | rebase | It conflicts with its base |
+| `CHECKS_FAILING` | fix | A check ran and failed |
+| `CHECKS_PENDING` | wait | A check is still running |
+| `CHECKS_MISSING` | verify | No check ran at all, and `requireChecks` is on |
+| `REVIEW_FAILING` · `REVIEW_MISSING` | fix · verify | The agent reviewer failed it, or has not read this commit |
+| `QA_FAILING` · `QA_MISSING` | fix · verify | A person failed it, or a required pass is missing for this commit |
+| `DRAFT` | wait | It is a draft |
+| `HELD` | hold | It touches a workflow file, a lockfile or a security path, or carries the `hold` label |
+| `BLOCKED` | skip | Anything else GitHub will not merge, including a branch it reports as behind |
+
+Only `CLEAN` is merged. The captain rebases nothing: a `CONFLICTING` or behind pull request is
+left for its author.
+
+The captain merges and does not close issues. When the base branch is not the repository's default
+branch on GitHub, the issue of each merged pull request stays open: close it with
+`cckit close <issue> "<summary>"` ([below](#close-an-issue-no-merge-closed)).
+
+<Aside type="caution" title="Behind is only reported if GitHub is told to">
+GitHub reports a branch as behind only when the base branch's protection has *Require branches to
+be up to date before merging* turned on. With it off, a stale branch reads `CLEAN` and the captain
+merges it. Turn the setting on for your base branch.
+</Aside>
+
+The policy keys are in [Captain merge policy](/config-and-permissions/#captain-merge-policy). The
+loop the captain runs between waves is in [Run work in parallel waves](/development/waves/).
+
+## Close an issue no merge closed
+
+Use this after a merge made on the GitHub page or with `gh pr merge`, or for an issue that ends
+without code.
+
+```bash frame="terminal"
+cckit close <issue> "<summary>"
+cckit close <issue> "<summary>" --reason not-planned
+cckit close <issue> "<summary>" --duplicate-of <other-issue>
+cckit close <issue> "<summary>" --superseded-by <other-issue>
+```
+
+The verb comments the summary, closes with the reason (`completed`, `not-planned` or `duplicate`)
+and marks the issue done on the board. In Claude Code: `/kit-task-close`.
+
+## Clean up what is left
+
+Branches pile up for ordinary reasons: a session ended early, a pull request was merged on the
+GitHub page, an agent's working folder was left behind.
+
+<Steps>
+
+1. **Read the report.** It deletes nothing.
+
+   ```bash frame="terminal"
+   cckit gc
+   ```
+
+2. **Read the plan.**
+
+   ```bash frame="terminal"
+   cckit cleanup
+   ```
+
+3. **Carry it out.**
+
+   ```bash frame="terminal"
+   cckit cleanup --yes
+   ```
+
+</Steps>
+
+Each branch and working folder gets one of these labels:
+
+| Label | Meaning | With `--yes` |
+| --- | --- | --- |
+| `SAFE` | Its own pull request merged | Deleted |
+| `LANDED` | No pull request of its own, and its work is already on the base branch | Deleted |
+| `ZOMBIE` | A working folder whose directory is gone and whose git record remains | Record pruned, after any staged work is committed to its branch |
+| `PROTECTED` | Its issue is still open | Kept |
+| `ORPHAN` | Work that is on no pull request and not on the base branch | Kept |
+| `UNKNOWN` | A GitHub read failed, so no verdict could be reached | Kept |
+
+Stashes are listed and never deleted. A `SAFE` working folder with uncommitted changes is skipped
+with a warning.
+
+**How to check it worked:** run `cckit gc` again. The `SAFE` and `LANDED` rows are gone, and what
+remains is work somebody still has to look at.
+
+In Claude Code, `/kit-gc` gives the report and `/kit-cleanup` runs the sweep after you confirm. The
+weekly rhythm cckit prints is Monday `cckit plan`, daily `cckit next`, Friday `cckit gc`. The exact
+rules behind each label are in the
+[CLI reference](/cli-reference/#housekeeping-and-output).

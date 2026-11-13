@@ -3,4 +3,119 @@ title: "Why nothing merges unreviewed"
 description: "The layers of review in order (automatic gates, agent reviewer, QA on a running stack, human approval), who performs each, and what always needs a human."
 ---
 
-TODO-E493
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+An agent finishes a change and reports that it works. That report is a claim. The agent that wrote
+the code is the one least able to see what is wrong with it, and it writes changes faster than a
+person can read them.
+
+A software team answers this with layers. Cheap checks run first and catch what a machine can
+catch. A second reader looks at what is left. A person opens the running result. Only then does
+somebody decide to merge. Each layer leaves a record tied to the commit it looked at, so "it
+passed" always means "this exact commit passed".
+
+## The layers, in order
+
+1. **The gate.** One command that proves a change is sound: the project's tests, its type check,
+   its linters. The builder runs it before pushing, and the output goes on the pull request as
+   evidence. cckit adds lint gates of its own to that command, so a defect a reviewer found once
+   fails the gate the next time.
+2. **The secret guard.** A scan of what is about to be committed for keys, env files and the
+   private terms you list. It runs at commit time, before anything leaves the machine.
+3. **A second agent's read.** A read-only reviewer agent reads the pull request and answers
+   `gate: pass` or `gate: fail`. A fail blocks the merge until a new commit is pushed and reviewed.
+4. **A person trying it.** The QA lane starts the project on its own ports, opens the screen the
+   change touched, and records a pass or a fail with notes.
+5. **The decision to merge.** A person, or the captain on a plan the owner approved. That step is
+   the [Ship](/ship/) area.
+
+## Who does each one
+
+| Layer | Who does it | Where the result is kept |
+| --- | --- | --- |
+| Gate | The agent that built the change, then CI | The gate's log on the pull request, and the check status |
+| Secret guard | A git hook, on every commit | The commit is blocked; there is nothing to keep |
+| Agent review | A reviewer profile: a second agent that may not write to the branch | A `review` receipt and a comment on the issue |
+| QA | A person. The `qa` agent of the software profile writes the tests; it does not record this verdict for you | A `qa` receipt and one comment on the pull request |
+| Merge | The owner, or the captain on an approved plan | The merged pull request and the closed issue |
+
+The `security` agent of the software profile is a specialist you call for an audit. The
+`/kit-security-sweep` skill sends it through the project and files what it finds as issues. It is
+not a step every pull request passes.
+
+The roles are described in [The team](/philosophy/the-team/).
+
+## What is on, and what you turn on
+
+Most of these layers are off in a new project. This is deliberate: a repository with no CI, read
+by one person, is a legitimate setup, and a check that holds every merge without saying why is
+worse than no check. Turn each one on when you want it.
+
+| Layer | In a new project | How to turn it on |
+| --- | --- | --- |
+| Lint gates | The three scripts are copied in by `cckit init`, each with a baseline | Add them to your gate command: [Review gates](/review/gates/) |
+| Gate before the push | Off | `cckit init --prepush "<command>"` |
+| Secret guard | Not copied into your project | [The secret guard](/review/secret-guard/) |
+| Agent review | Off | Set `review.headless` or `review.command`: [Agent review before a merge](/review/agent-review/) |
+| QA required to merge | Off | `captain.mergePolicy.requireQa`: [QA on a running stack](/review/qa-lane/) |
+| Holding risky files for a person | On | See below |
+
+## What always needs a person
+
+The captain is the one place cckit merges without a person watching. It refuses to merge a pull
+request on its own when the change touches any of these, and reports it as `HELD`:
+
+- a file under `.github/workflows/`;
+- a lockfile or dependency file: `pnpm-lock.yaml`, `package.json`, `package-lock.json`,
+  `yarn.lock`, `turbo.json`;
+- a security-sensitive path: `*.pem`, `*.key`, `.env`, `.env.*`, or a `secret` or `secrets`
+  folder;
+- any pull request that is a draft or carries the `hold` label.
+
+These floors are on by default (`captain.mergePolicy.floors`). You can add your own paths with
+`captain.mergePolicy.protectedGlobs`. The full table is in
+[Captain merge policy](/config-and-permissions/#captain-merge-policy).
+
+<Aside type="note" title="Review tiers by risk are optional">
+cckit ships a rule that sorts pull requests into `risk:low`, `risk:med` and `risk:high` and says
+which tier a person must read. No profile installs it. Copy
+`templates/rules/risk-tiered-review.md` into `.claude/rules/` to adopt it. The rule that every
+profile does install is [`gate-and-review`](/rules/#gate-and-review): the gate blocks the push, and
+every finding from an AI reviewer is fixed or answered before the merge.
+</Aside>
+
+## The tools that plug in
+
+cckit does not build a reviewer, a test runner or a CI service. It connects the ones you have and
+records what they said.
+
+- **Your gate command.** Whatever proves your project is sound. cckit runs it before a push when
+  you ask it to; it does not choose it for you.
+- **GitHub checks.** The captain reads the check status GitHub reports. Branch protection on
+  GitHub is where "a person must approve" and "every review thread must be resolved" are enforced.
+- **Claude Code or Codex as the reviewer.** The review stage runs `claude -p` or `codex exec -`
+  for you, or any command you name that reads a brief and prints a verdict.
+- **Your project's own start command.** The QA lane launches the command you declare. It does not
+  guess how your project boots.
+
+## The verbs
+
+| Verb | What it is for |
+| --- | --- |
+| `cckit qa up` · `open` · `verdict` · `stop` | Start the project for one change, open the changed screen, record pass or fail, free the ports |
+| `cckit qa lanes` | List every change that has a running stack or a verdict |
+| `cckit watch` | One captain pass: read every open pull request, send the ready ones to the reviewer |
+| `cckit receipt list <issue>` · `cckit receipt show <issue> review` | Read back what a reviewer or a QA pass recorded |
+| `cckit status` | Open pull requests waiting on a person, with their unresolved review threads |
+
+Every flag is in the [CLI reference](/cli-reference/).
+
+## Guides in this area
+
+<CardGrid>
+  <LinkCard title="Review gates" href="/review/gates/" description="Turn a reviewer's repeated findings into checks that fail." />
+  <LinkCard title="QA on a running stack" href="/review/qa-lane/" description="Start the project, open the changed screen, record a verdict." />
+  <LinkCard title="The secret guard" href="/review/secret-guard/" description="What is blocked from a commit, and your own private list." />
+  <LinkCard title="Agent review before a merge" href="/review/agent-review/" description="A read-only second agent passes or fails each pull request." />
+  <LinkCard title="More review guides" href="/review/more-guides/" description="Secrets, private data and what an agent is allowed to do." />
+</CardGrid>

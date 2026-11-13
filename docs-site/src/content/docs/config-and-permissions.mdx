@@ -9,7 +9,11 @@ import TagRow from '../../components/TagRow.astro';
 
 <TagRow kinds={["concept"]} />
 
-How cckit finds its config, reads what kind of project it is pointed at, and asks before it changes anything.
+Open this page when a guide names a config key and you need its exact name, default and
+environment override, or when you want to know what cckit will ask before it writes, installs or
+merges. It covers how cckit finds its config, reads what kind of project it is pointed at, and asks
+before it changes anything. Each section is linked from the area page that uses it, so the page is
+long on purpose and meant to be searched, not read through.
 
 ## Config resolution (nearest wins)
 
@@ -37,7 +41,7 @@ Codex-only. Neither file moves when the second adapter is enabled later.
 environment wins over it:
 
 ```bash
-KIT_BASE_BRANCH=effort/42-auth cckit orchestrate 44
+KIT_BASE_BRANCH=effort/<N>-<slug> cckit orchestrate <sub>
 ```
 
 ```text
@@ -130,7 +134,7 @@ cckit asks before it changes anything in a repo it has not worked in before.
 
 - **A config or `.claude/` file is proposed before it is written.** `cckit add <module>` and `cckit migrate` go through one machine (`scripts/lib/kit-operate.sh`): show the change, ask, apply, record. `KIT_DRY_RUN=1` previews and writes nothing; `KIT_ASSUME_YES=1` skips the question, and still keeps a file you edited. `cckit init --dry-run` prints the scaffold plan and writes nothing.
 - **A third-party tool installs only with recorded consent.** Your yes to `cckit doctor` (its prompt, or `--fix`) is written as one `install:<id>` line in `.cckit/consent` (gitignored). That file holds install consent and nothing else: no other verb reads or writes it. See [Integrations](/integrations/#what-your-yes-records).
-- **The secret and privacy guard always runs** before anything is committed or published. It is not optional and no consent bypasses it — see [Security](/review/secret-guard/).
+- **Where the secret and privacy guard is wired in, no consent bypasses it.** It runs as a git pre-commit hook (`githooks/pre-commit`) and inside the gate of cckit's own repository. `cckit init` does not copy it into your project: [Stop agents committing secrets](/review/stop-committing-secrets/) has the commands, and [The secret guard](/review/secret-guard/) says what it blocks.
 - **Destructive or irreversible operations** (force-push, repo create, history rewrite) always require a separate, explicit confirmation.
 
 ## Captain merge policy
@@ -933,9 +937,12 @@ The grant is one comment on the plan parent issue:
 Tonight: run the two approved waves. I accept the lockfile floor.
 
 ```json
-{ "budget": "+2000k", "waves": [[12], [15]], "waivers": ["lockfile"], "stopCommand": null }
+{ "budget": "+2000k", "waves": [[<effort>], [<effort>]], "waivers": ["lockfile"], "stopCommand": null }
 ```
 ````
+
+Replace each `<effort>` with the number of an effort from your own board; each inner list is one
+wave.
 
 **Only the owner's grant counts.** A grant sets the budget, the waivers and a shell `stopCommand`,
 and anyone can comment on a public repository. `night-grant.sh read` therefore keeps a marker

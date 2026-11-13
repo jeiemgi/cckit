@@ -1,6 +1,6 @@
 ---
-title: How to give Claude Code persistent project memory
-description: Turn on cckit's optional memory layer so Claude Code wakes up already knowing your project — decisions, context, and history persist across sessions instead of being re-explained every time.
+title: Install MemPalace
+description: Switch memory on in a project, let cckit doctor install the MemPalace command-line tool after your yes, connect its MCP server to Claude Code, and check that a session starts with the project's context.
 tutorial:
   job: give Claude Code persistent project memory
   difficulty: intermediate
@@ -20,67 +20,111 @@ import TutorialSchema from '../../../components/TutorialSchema.astro';
 
 <TutorialMeta />
 
-**What you'll set up:** coding agents are stateless — every session starts from zero, so you keep
-re-explaining the same architecture and re-deriving decisions you already made. cckit's optional
-memory layer (powered by the open-source **MemPalace**) wires four hooks so each session wakes up
-already knowing your project and files its work back on its own. The wake-up costs ~600–900 tokens,
-leaving 95%+ of the window for real work.
+An agent session starts with no knowledge of the sessions before it. This guide connects
+[MemPalace](https://github.com/MemPalace/mempalace), the memory tool cckit adopts, so each Claude
+Code session in one project starts with that project's recent decisions and files its own work back
+when it ends. [Why an agent team needs memory](/memory/) covers the reasons; this page is the setup.
+
+**What you will have at the end:**
+
+- memory switched on in the project config (`memory.enabled: true`);
+- the `mempalace` command-line tool installed in its own isolated environment;
+- the MemPalace MCP server connected to Claude Code;
+- a session that opens with a short summary of the project, about 600 to 900 tokens.
+
+Memory is off in every profile until you do this. It runs on your machine and needs no API key.
 
 ## Steps
 
 <Steps>
 
-1. **Enable memory when you initialize.** Say *yes* to memory at `cckit init`, or pass it explicitly:
+1. **Switch memory on when you set up the project.** Pass the flag to `cckit init`, or answer yes
+   to the memory question when you set up through the `/kit-init` command in Claude Code:
 
    ```bash frame="terminal"
    cckit init --profile software --memory on
    ```
 
-2. **Let doctor install the engine.** `cckit doctor` sees memory is on, asks, and on your yes installs
-   the MemPalace CLI into an isolated environment, then points you at the MCP wiring:
+   This writes four hook scripts under `.claude/hooks/`, registers them in
+   `.claude/settings.local.json`, adds the rule file `.claude/rules/mempalace.md`, and creates the
+   project's summary header, `.claude/mempal-identity.<wing>.txt`.
+
+   If the project already has those files and only the switch is off, `cckit add mempalace` sets
+   `memory.enabled` and installs nothing.
+
+2. **Let `cckit doctor` install the tool.** The doctor sees that memory is on and asks before it
+   installs anything. On your yes (or with `--fix`) it installs the MemPalace command-line tool
+   into an isolated environment: `pipx` first, `uv` if `pipx` is not there.
 
    ```bash frame="terminal"
-   cckit doctor     # asks, then installs mempalace + seeds this project's wake-up header
-   mempalace mcp    # print the MCP-server setup line for Claude Code
+   cckit doctor
    ```
 
-   Prefer to do it by hand? `pipx install mempalace`. MemPalace is one of cckit's
-   [integrations](/integrations/): the same commands live in `integrations/mempalace.json`.
+   The same run creates the summary header if it is missing and refreshes an out-of-date
+   session-start hook.
 
-3. **Confirm the wake-up loads.** Every session now loads a wing-scoped wake-up header plus your project's recent
-   decisions. The full recall/record protocol lives in the scaffolded `.claude/rules/mempalace.md` —
-   you never have to say "remember this".
+   To install by hand, run `pipx install mempalace`, the first command the descriptor tries. The
+   doctor then finds the tool and reports it installed. The commands live in
+   `integrations/mempalace.json`; MemPalace is one of the [integrations](/integrations/) cckit
+   installs this way.
+
+3. **Connect the MCP server.** The hooks cover the start and the end of a session. Searching and
+   saving during a session go through MemPalace's MCP server. This command prints the line that
+   registers it with Claude Code:
+
+   ```bash frame="terminal"
+   mempalace mcp
+   ```
+
+   Run the line it prints, then restart Claude Code.
+
+4. **Describe the project in the header.** Open `.claude/mempal-identity.<wing>.txt` and edit its
+   `Stack:` line. This header is shown at the start of every session in this project.
 
 </Steps>
 
-## How it works
+## Check that it worked
 
-Four hooks wire memory into every session:
-`SessionStart` loads a wing-scoped wake-up, `Stop` files the finished session, `PreCompact` sweeps to
-memory before the window compresses, and `SessionEnd` catches unsynced work if a session ends
-abruptly. Each project gets **one wing**, so memories never bleed across repos.
+1. Run `cckit doctor`. The Integrations section reports the `mempalace` CLI as installed, and the
+   **Memory (MemPalace)** section reports the identity header as wing-scoped and the session-start
+   hook as current.
+2. Start a new Claude Code session in the project. Its context opens with the header you edited,
+   followed by recent entries from this project's wing. A project with nothing filed yet shows the
+   header alone.
+3. Finish a session, start another, and ask about something the first one decided. The rule file
+   tells the agent to search memory before it answers, so the answer should cite the earlier
+   session.
 
-<Aside type="tip" title="Built on MemPalace — credit where it's due">
-The memory engine, palace format, and MCP server are the work of the open-source
-[MemPalace](https://github.com/MemPalace/mempalace) project. cckit only scaffolds the hooks and the
-per-wing header — MemPalace does the remembering. cckit is not affiliated with the project; direct
-MemPalace bugs to its own issue tracker.
+Every session after this loads the header and the project's recent decisions. The rule file
+`.claude/rules/mempalace.md` tells the agent when to read and when to write, so you do not have to
+say "remember this". [How cckit uses memory](/memory/how-cckit-uses-it/) describes each hook and
+where each kind of note goes.
+
+<Aside type="tip" title="Built on MemPalace">
+The memory engine, the palace format and the MCP server are the work of the open-source
+[MemPalace](https://github.com/MemPalace/mempalace) project. cckit adds the hooks and the per-wing
+header; MemPalace does the remembering. cckit is not affiliated with the project. Send MemPalace
+bugs to its own issue tracker.
 </Aside>
 
 ## Troubleshooting
 
-**`doctor` didn't install MemPalace.** It only installs it when memory is on. Re-run `cckit init` with
-`--memory on` (or answer yes), then `cckit doctor`. With no terminal attached it installs nothing
-unless you pass `--fix`.
+**`doctor` did not install MemPalace.** It installs it only when memory is on. Re-run `cckit init`
+with `--memory on` (or answer yes), then `cckit doctor`. With no terminal attached it installs
+nothing unless you pass `--fix`.
 
-**Claude isn't recalling anything.** Confirm the MCP server line from `mempalace mcp` is wired into
-Claude Code, and that `.claude/rules/mempalace.md` exists — it's what teaches Claude to recall before
-answering.
+**Claude is not recalling anything.** Confirm the MCP server line from `mempalace mcp` is registered
+with Claude Code, and that `.claude/rules/mempalace.md` exists. That rule is what tells Claude to
+search memory before it answers.
 
-**Memories from another repo showed up.** They shouldn't — memory is scoped per wing (one per
-project). Check you're in the right repo and that its wing name in the config is unique.
+**Memories from another repository showed up.** Memory is scoped per wing, one per project. Check
+that you are in the right repository and that `memory.wing` in the project config is not shared
+with another project.
 
-## Related tutorials
+**You use Codex.** `cckit init --adapter codex` installs no memory hook, even with `--memory on`.
+See [Under Codex](/memory/how-cckit-uses-it/#under-codex).
+
+## Related guides
 
 <CardGrid>
   <LinkCard title="Run checks automatically with cckit hooks" href="/development/checks-with-hooks/" description="The hook system memory plugs into." />
@@ -90,9 +134,10 @@ project). Check you're in the right repo and that its wing name in the config is
 
 <TutorialSchema
   steps={[
-    { name: 'Enable memory when you initialize', text: 'Say yes to memory at cckit init, or pass it explicitly with cckit init --profile software --memory on.' },
-    { name: 'Let doctor install the engine', text: 'cckit doctor asks, then installs the MemPalace CLI into an isolated environment and seeds the wake-up header; mempalace mcp prints the MCP-server setup line for Claude Code.' },
-    { name: 'Confirm the wake-up loads', text: 'Every session now loads a wing-scoped wake-up header plus recent decisions. The recall/record protocol lives in .claude/rules/mempalace.md.' },
+    { name: 'Switch memory on when you set up the project', text: 'Pass --memory on to cckit init, for example cckit init --profile software --memory on. It writes the four hook scripts, the rule file and the summary header.' },
+    { name: 'Let cckit doctor install the tool', text: 'cckit doctor asks, then installs the MemPalace CLI into an isolated environment (pipx, then uv) and creates the summary header if it is missing.' },
+    { name: 'Connect the MCP server', text: 'mempalace mcp prints the line that registers the MemPalace MCP server with Claude Code. Run it and restart Claude Code.' },
+    { name: 'Describe the project in the header', text: 'Edit the Stack line of .claude/mempal-identity.<wing>.txt. Every session then loads that header plus recent decisions; the read and write rule lives in .claude/rules/mempalace.md.' },
   ]}
   faqs={[
     { q: "doctor didn't install MemPalace", a: 'It only installs when memory is on. Re-run cckit init with --memory on (or answer yes), then cckit doctor. With no terminal attached it installs nothing unless you pass --fix.' },

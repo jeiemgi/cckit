@@ -1,6 +1,6 @@
 ---
-title: How to add your own tool as a cckit integration
-description: Describe a third-party tool in one JSON file so cckit add can switch it on and cckit doctor can install it after a yes. Write the descriptor, validate it, try it on a repo, then propose it.
+title: "Add your own integration"
+description: "Step by step: describe a third-party tool in one JSON file so cckit can switch it on and install it after a yes."
 tutorial:
   job: add a tool that is not in cckit's integration list
   difficulty: advanced
@@ -20,10 +20,20 @@ import TutorialSchema from '../../../components/TutorialSchema.astro';
 
 <TutorialMeta />
 
-**What you'll build:** one file, `integrations/<id>.json`, that tells cckit how to detect, install
-and verify a tool it did not ship with. `cckit add` and `cckit doctor` read that file; neither
-holds a tool's install recipe in code. The example adds `shfmt`, a shell formatter. Replace it
-with your tool.
+Every team has a tool it wants on each project and on each machine: a formatter, a linter, a
+search index. Installing it by hand works once. The next project or the next teammate starts
+without it, and nobody notices until the output differs.
+
+cckit handles outside tools the same way for all of them. It does not build the tool and holds
+no install recipe in code. One file, `integrations/<id>.json`, says how to detect, install and
+verify the tool. `cckit add` reads it to switch the tool on for a project, and `cckit doctor`
+reads it to install the tool after a yes.
+
+This guide writes that file for a tool cckit does not ship. The example is `shfmt`, a shell
+formatter. Replace it with your tool.
+
+**What you will have at the end:** a descriptor that passes validation, your tool switched on
+and installed in one of your projects, and the steps to propose it to cckit.
 
 ## Steps
 
@@ -125,6 +135,12 @@ with your tool.
 
 </Steps>
 
+## Check it worked
+
+- `bash scripts/lib/integrations.sh --validate` prints nothing and exits 0.
+- `cckit add` lists your tool as `on`.
+- `cckit doctor` shows its row under **Integrations** reading `installed`.
+
 ## How it works
 
 The descriptor is data and one runner executes it. For a tool that is missing and has consent
@@ -171,12 +187,12 @@ value, or the doctor ran without `KIT_INTEGRATIONS_DIR` and read the shipped reg
 **`cckit add shfmt` says "not offered here".** An `appliesWhen` condition does not hold for this
 repo or machine. `bash scripts/lib/integrations.sh --applies shfmt .` exits 0 when it holds.
 
-## Related tutorials
+## Related guides
 
 <CardGrid>
-  <LinkCard title="Give Claude Code a code graph with Graft" href="/development/code-graph/" description="A shipped integration with a wire step, end to end." />
-  <LinkCard title="Summarize long files with a local model" href="/development/local-model-digest/" description="A shipped integration limited to one platform." />
-  <LinkCard title="Give Claude Code persistent project memory" href="/memory/install-mempalace/" description="The memory integration." />
+  <LinkCard title="Find code with a code graph" href="/development/code-graph/" description="A shipped integration with a wire step, end to end." />
+  <LinkCard title="Summarize long files locally" href="/development/local-model-digest/" description="A shipped integration limited to one platform." />
+  <LinkCard title="Install MemPalace" href="/memory/install-mempalace/" description="The memory integration." />
 </CardGrid>
 
 <TutorialSchema

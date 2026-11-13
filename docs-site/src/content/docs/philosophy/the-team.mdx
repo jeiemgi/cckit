@@ -3,4 +3,110 @@ title: "The team: you and the agents"
 description: "The roles a software profile gives you (project manager, tech lead, designer, devops, backend, frontend, QA, security), what each owns, and the area of these docs where each one works."
 ---
 
-TODO-E493
+import { Aside } from '@astrojs/starlight/components';
+
+An agency gives every kind of question one owner. Infrastructure goes to one person, the look of a
+screen to another, and nobody has to guess who decides. A single agent asked to do everything has
+no such split: it answers a design question, a database question and a security question in the
+same breath, and its answers do not stay consistent with each other.
+
+cckit gives the project a team instead. `cckit init` installs one agent per role, each with a
+written charter: what it owns, and what it must hand to another role. You stay the owner of the
+project.
+
+## What stays with you
+
+The agents do the work. These decisions are yours:
+
+- **What gets built.** No agent files or closes an issue without your confirmation. The project
+  manager drafts one and shows it to you first.
+- **The plan.** A plan an agent proposed and nobody approved is not a plan. Work starts on the plan
+  you approved.
+- **The merge.** An agent stops after it opens the pull request. Merging is your decision, unless
+  you approved a plan that says the work may be merged as it passes.
+- **The changes that are always a person's.** Even inside an approved plan, the run stops and asks
+  before a new dependency or lockfile change, an edit to auth, secrets or security, an edit under
+  `.github/workflows/`, and any destructive step the plan did not name.
+- **Your keys.** You type secret values yourself. cckit reads none of them back and puts none in a
+  commit.
+
+## The eight roles of a software project
+
+The `software` profile installs these. Each row names what the role owns and the area of these docs
+where its work happens.
+
+| Role | Owns | Works in |
+| --- | --- | --- |
+| Project manager (`pm`) | The state of the work: reads GitHub, reports what changed and what is blocked, drafts issues. It makes no design or technical decision. | [Project management](/project-management/) |
+| Tech lead (`tech-lead`) | The foundation the other roles build on: build and tooling config, the toolchain, architecture decision records, lint rules, scaffolding. | [Project management](/project-management/roles/) and [Development](/development/) |
+| Designer (`designer`) | Every visual and UX decision: color, spacing, type, layout, motion, component states, microcopy. | [Design](/design/) |
+| DevOps (`devops`) | What runs in the cloud and what delivers the software: infrastructure, CI/CD workflows, deploy scripts, releases, the migration runner. | [Ship](/ship/) |
+| Backend (`backend`) | The server side: API routes, data model and migrations, background jobs, auth, server-side logic. | [Development](/development/) |
+| Frontend (`frontend`) | What the user sees and touches: UI components, the app shell, client state, the calls to the API. It uses the designer's tokens and does not invent values. | [Development](/development/) |
+| QA (`qa`) | The proof that it works: end-to-end tests, acceptance checks, regression runs, the release gate. It writes no feature code. | [Review](/review/) |
+| Security (`security`) | The threat model: audits, auth hardening, input validation, dependency scanning, secrets hygiene. | [Review](/review/) |
+
+## How a piece of work reaches a role
+
+1. Every issue carries a `role:` label, such as `role:backend`.
+2. The label says which agent owns the work. Your main session, the orchestrator, hands the issue
+   to that agent and does not do the work itself.
+3. A design question is a special case: the `design-routing` rule sends every visual decision to
+   the designer, however small the change.
+4. When the pull request opens, `cckit pr` signs it with the role, so the history shows which role
+   did the work. See [Role identity](/agents/#role-identity).
+
+## Two roles that are not agents
+
+- **The orchestrator** is the session you are talking to. It reads the board, picks the role and
+  reports back to you.
+- **The captain** is whoever drives a plan you approved: `cckit watch --merge`, the `/kit-autopilot`
+  skill, or an orchestrating session. It checks each pull request, merges the ones that pass and
+  moves to the next batch. No agent file is installed for it.
+  [Tech lead, PM and captain](/project-management/roles/) covers the three roles that run a plan.
+
+## Other profiles, other teams
+
+The profile you pick at setup decides the team. Every profile has a project manager.
+
+| Profile | Roles |
+| --- | --- |
+| `software` | PM, Tech Lead, Designer, DevOps, Backend, Frontend, QA, Security |
+| `content` and `marketing` | PM, Editor, Designer, Researcher |
+| `research` | PM, Researcher, Analyst |
+| `automation` | PM, Automation, Generalist |
+| `minimal` | PM, Generalist |
+
+[Initialize a project](/getting-started/initialize/#profiles) says what else a profile sets.
+
+## The tools behind the team
+
+cckit does not include a model. The agents run in **Claude Code** or **Codex**, whichever you
+selected at setup, and each role is a file you can open and edit:
+
+- Claude Code reads `.claude/agents/<role>/AGENT.md`.
+- Codex reads `.codex/agents/<role>.toml`.
+
+Both come from one source, `templates/agents/<role>.md` in the kit, so a role says the same thing
+to either agent. Once written they are yours: an upgrade keeps a file that already exists.
+[Specialist agents, per runtime](/agents/#specialist-agents-per-runtime) lists what differs between
+the two.
+
+## Limits
+
+- **The tech lead ships only in the `software` profile.** The other profiles have no agent for
+  build and architecture decisions.
+- **A role's tool allowlist is enforced by Claude Code only.** For Codex it is written into the
+  agent file as a comment.
+- **The designer's three design skills are not shipped.** Its charter names `emil-design-eng`,
+  `impeccable` and `web-design-guidelines`; all three are third-party and optional, so a new
+  project's designer runs without them until you install them.
+- **A UX agent exists and no profile installs it.** `templates/agents/ux.md` is used by the
+  `/kit-ux-audit` skill. Day to day, design has one agent: the designer.
+- **Two more templates are in no profile:** `auto-dev`, for a CI run started by the `agent:auto`
+  label, and `local-delegate`, for text chores sent to a local model.
+
+<Aside type="note" title="Not a software team?">
+The Marketing track describes the same idea for a content team, in plain words:
+[Who does what](/marketing/who-does-what/).
+</Aside>

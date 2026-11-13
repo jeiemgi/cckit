@@ -5,6 +5,11 @@ description: Every rule file cckit ships into a project's .claude/rules/ — wha
 
 import { Aside } from '@astrojs/starlight/components';
 
+An agent starts every session knowing nothing about how your team works: how branches are named,
+when a merge is safe, what a summary should look like. Rules are how the team writes those
+conventions down once, so every session starts with them. Open this page to see which rules a
+profile installs, what each one governs and when it loads.
+
 A rule is a markdown file under `.claude/rules/`. Claude Code loads it into every session in the
 project, unless the rule is [path-scoped](#resident-and-path-scoped-rules): then it loads only when
 a matching file is read. `cckit init` copies the rules from the kit's `templates/rules/`, picks the

@@ -3,4 +3,88 @@ title: "Revisión y aprobación"
 description: "Cómo alguien del equipo lee y comenta en un solo lugar, qué significan aprobar y pedir cambios, por qué quien escribe nunca aprueba su propia pieza, y que la publicación ocurre en tus propias herramientas después de la aprobación."
 ---
 
-TODO-E493
+Quien escribe no ve sus propios errores. Sabe lo que la frase quería decir, así que lee eso y no
+lo que dice. Una pieza está terminada cuando alguien distinto de quien la escribió la leyó y dijo
+que sí.
+
+La revisión también falla de una forma conocida: los comentarios llegan por un chat, por un
+correo y en el pasillo, y nadie sabe si la pieza llegó a aprobarse. En este método la revisión
+tiene un lugar, un enlace y uno de dos finales.
+
+## Quién la hace
+
+- **Quien escribe** pide la revisión y aplica los cambios, con Claude.
+- **Quien aprueba** lee, comenta y decide. Le basta una cuenta de GitHub y un navegador.
+- **Claude** prepara la revisión, aplica los comentarios cuando se lo piden y avisa cuáles no
+  aplicó. Nunca aprueba.
+
+## Cómo corre una revisión
+
+1. **Quien escribe la pide.** "Ya está listo. Guárdalo y pide una revisión." Claude guarda el
+   borrador, lo envía a GitHub y devuelve un enlace.
+2. **Quien escribe le manda el enlace a quien aprueba.** Ese enlace es la revisión: una página
+   que muestra lo que dice la pieza.
+3. **Quien aprueba lee y comenta.** En esa página abre la pestaña **Files changed** y comenta
+   cualquier línea.
+4. **Quien aprueba decide.** Hace clic en **Review changes** y elige **Approve** (aprobar) o
+   **Request changes** (pedir cambios). GitHub muestra esos botones en inglés.
+5. **Si hay cambios, quien escribe los aplica** y la página se actualiza sola. Quien aprueba la
+   vuelve a leer. Esto se repite hasta que la respuesta sea **Approve**.
+
+Los mismos pasos desde el lado de quien escribe, con las palabras exactas para decirle a Claude,
+están en [Una pieza, de la idea a la aprobación](/es/marketing/your-first-piece/).
+
+## Qué significan las dos respuestas
+
+| Respuesta | Qué significa | Qué sigue |
+| --- | --- | --- |
+| **Approve** (aprobar) | La pieza puede pasar a la versión compartida tal como está. | Quien escribe le dice a Claude que termine la pieza. |
+| **Request changes** (pedir cambios) | La pieza no está lista. Los comentarios dicen por qué. | Quien escribe los aplica con Claude; quien aprueba vuelve a leer. |
+
+Un comentario solo no es una respuesta. Una pieza con comentarios y sin decisión sigue esperando.
+
+## Por qué quien escribe nunca aprueba su propia pieza
+
+GitHub lo impide: la persona que pidió la revisión no puede aprobarla. La regla existe por la
+razón que abre esta página. Además, así cada pieza aprobada tiene una segunda lectura con nombre,
+y el historial del proyecto muestra de quién fue.
+
+En un equipo de dos, cada quien aprueba las piezas de la otra persona. Una misma persona puede
+escribir una pieza y aprobar otra.
+
+## Qué más se revisa
+
+- **El plan de una campaña.** Antes de escribir cualquier pieza, el plan se abre como una página
+  en tu navegador donde comentas y respondes. Mira
+  [Planea y lleva una campaña](/es/marketing/campaigns/).
+- **La voz de marca.** Un cambio en la voz se revisa como una pieza, porque aplica para todo el
+  equipo. Mira [Define tu voz de marca](/es/marketing/brand-voice/).
+
+También puede correr una comprobación automática cuando se guarda un borrador, por ejemplo una
+que busca una contraseña olvidada en un archivo. Si falla, Claude te dice "Falló una
+comprobación" y qué falló. No es una aprobación y no reemplaza a quien aprueba.
+
+## Después de la aprobación
+
+Cuando la revisión dice **Approve**, quien escribe le dice a Claude: "La revisión está aprobada.
+Termina esta pieza." Pasan tres cosas:
+
+1. El borrador aprobado pasa a formar parte de la versión compartida del proyecto.
+2. La pieza queda marcada como terminada en la lista de tareas.
+3. El borrador se limpia.
+
+Quien aprueba también puede terminarla desde la página de la revisión con el botón verde
+**Merge pull request**, que en algunos proyectos dice **Squash and merge**.
+
+El texto aprobado ya es un archivo del proyecto, y la versión compartida es el único lugar de
+donde hay que copiarlo.
+
+**cckit no publica.** No sube la pieza a tu sitio, no envía el correo, no programa la publicación
+y no te dice cómo le fue. Eso lo hace tu equipo en las herramientas que ya usa, como hasta hoy.
+No hay ninguna herramienta de publicación, de programación ni de analítica conectada.
+
+Con una campaña hay un paso más que puedes dar después. Cuando pase la fecha del objetivo, dile a
+Claude la cifra que mediste y la registra en el plan de la campaña. Una campaña sin cifra queda
+registrada como no medida.
+
+Siguiente: [Palabras que vas a escuchar](/es/marketing/words-you-will-hear/)

@@ -1,116 +1,116 @@
 ---
-title: Browser debug
-description: Optional, auto-detected browser debugging via chrome-devtools-axi.
+title: Let the agent see the page
+description: cckit debug gives an agent screenshots, console and network logs through chrome-devtools-axi, with the steps to use it on a page.
 ---
 
-import { CardGrid, LinkCard, Steps, Aside } from '@astrojs/starlight/components';
-import Tag from '../../../components/Tag.astro';
+import { Steps, Aside } from '@astrojs/starlight/components';
 import TagRow from '../../../components/TagRow.astro';
 
 <TagRow kinds={["command"]} />
 
-Give an agent a token-efficient, scriptable way to debug a web page — screenshots, accessibility snapshots, console and network logs, [Lighthouse](https://developer.chrome.com/docs/lighthouse/overview).
+An agent that changes a web page cannot see the result. It edits the code, the tests pass, and
+the button still sits under the header. Finding out normally takes a person: open the browser,
+click around, read the console, report back.
 
-`cckit debug` drives [chrome-devtools-axi](https://github.com/kunchenguid/chrome-devtools-axi) (Kun Chen), which runs a self-contained [Chrome DevTools](https://developer.chrome.com/docs/devtools/) bridge and emits [TOON](/agents/#the-verbs-an-agent-uses-most)-encoded output. TOON is a compact text format, so results stay small in an agent's context.
+`cckit debug` gives the agent its own way to look. It exposes the browser's developer tools as
+commands the agent can run and read: a screenshot, an accessibility snapshot, the console log, the
+network log, a [Lighthouse](https://developer.chrome.com/docs/lighthouse/overview) report. The
+agent checks its own work before it asks you to.
 
-<Aside type="tip" title="Built on chrome-devtools-axi">
-The browser layer is **[chrome-devtools-axi](https://github.com/kunchenguid/chrome-devtools-axi)** by Kun Chen — a self-contained Chrome bridge for agents. cckit only wraps and auto-detects it; all credit for the browser tooling goes there. If it helps you, ⭐ the repo.
+## The tool behind it
+
+The browser layer is [chrome-devtools-axi](https://github.com/kunchenguid/chrome-devtools-axi) by
+Kun Chen, a self-contained [Chrome DevTools](https://developer.chrome.com/docs/devtools/) bridge
+built for agents. cckit wraps it and detects whether it is available. It adds nothing to the
+browser tooling, and the credit for that tooling belongs to its author.
+
+Results come back in [TOON](/agents/#the-verbs-an-agent-uses-most), a compact text format, so a
+result takes little room in the agent's context.
+
+<Aside type="note" title="It is optional">
+cckit itself is bash. The bridge needs Node and Chrome, so it is not a hard dependency. With
+either one missing, `cckit debug` prints how to enable the capability and exits `0`. A run with
+nobody watching is never failed by a missing optional tool.
 </Aside>
 
-<Aside type="note" title="New here? Why this exists">
-Debugging a web page normally means a person clicking around a browser. An agent cannot do that. `cckit debug` exposes the same browser tools as plain commands an agent can run and read, so the agent can see what is on the page.
-</Aside>
+## Use it on a page
 
-## Optional + auto-detected
-
-cckit is pure bash; axi needs Node and Chrome. So this is **not a hard dependency** — cckit detects it at call time:
-
-- **Node/npx and Chrome present** → `cckit debug` drives axi.
-- **Otherwise** → it prints how to enable the capability and exits `0`. An unattended run is never hard-failed by a missing optional tool.
-
-Check availability without running anything:
-
-```bash
-cckit debug --check
-```
-
-## Enabling it
-
-```bash
-npm i -g chrome-devtools-axi      # or rely on `npx -y chrome-devtools-axi` (Node present)
-```
-
-Override the command cckit invokes with an environment variable — useful for a pinned version or a wrapper:
-
-```bash
-export CCKIT_AXI=<command>
-```
-
-## Usage
-
-Everything after `cckit debug` is forwarded verbatim to axi, so cckit does not track axi's subcommands:
-
-```bash
-cckit debug <axi-args...>         # passed straight through — see the axi docs for subcommands
-```
-
-## Debug a page, step by step
-
-**What you'll set up:** debugging a web page normally means a person clicking around a browser — an
-agent can't do that. `cckit debug` exposes the same browser tools (screenshots, accessibility
-snapshots, console and network logs, Lighthouse) as plain commands an agent can run and read. Output
-is [TOON](/agents/)-encoded, so results stay small in the agent's context.
-
-### Steps
+**What you will have at the end:** an agent that can take a screenshot of a page, read its
+console and act on what it finds.
 
 <Steps>
 
-1. **Check availability first.** cckit is pure bash; the browser bridge needs Node and Chrome. Check
-   without running anything:
+1. **Check whether it is available.** This runs nothing in the browser:
 
    ```bash frame="terminal"
    cckit debug --check
    ```
 
-   If Node/npx and Chrome are present, `cckit debug` drives the bridge. Otherwise it prints how to
-   enable it and exits `0` — an unattended run is never hard-failed by a missing optional tool.
+   With Node, `npx` and Chrome present, it reports the capability as available and names the
+   command it will use.
 
-2. **Enable the bridge.** Install [chrome-devtools-axi](https://github.com/kunchenguid/chrome-devtools-axi),
-   or rely on `npx` if Node is present:
+2. **Enable the bridge if the check says it is not available.** Install it, or rely on `npx`
+   when Node is present:
 
    ```bash frame="terminal"
    npm i -g chrome-devtools-axi      # or: npx -y chrome-devtools-axi
    ```
 
-3. **Let the agent drive it.** Everything after `cckit debug` is forwarded verbatim to the bridge, so
-   the agent can take a screenshot, read the console, or run Lighthouse and act on the result:
+3. **Ask the agent to look.** Start your app, then:
+
+   <div class="cckit-prompt">
+
+   ```text frame="terminal" title="Prompt to paste"
+   Open the page you just changed with cckit debug. Take a screenshot and read the console.
+   Tell me what you see, and fix any error before you report back.
+   ```
+
+   </div>
+
+   The agent runs commands of this form:
 
    ```bash frame="terminal"
-   cckit debug <axi-args...>         # passed straight through — see the axi docs
+   cckit debug <axi-args...>
    ```
+
+   Everything after `cckit debug` is passed to the bridge unchanged. cckit keeps no list of the
+   bridge's subcommands; they are documented in the
+   [chrome-devtools-axi repository](https://github.com/kunchenguid/chrome-devtools-axi).
 
 </Steps>
 
-### How it works
+## Check it worked
 
-`cckit debug` wraps chrome-devtools-axi (by Kun Chen), a self-contained Chrome DevTools bridge for
-agents. cckit detects it and forwards to it; it keeps no list of the bridge's subcommands, so args
-pass straight through. With Node or Chrome missing, `cckit debug` prints how to enable the bridge and
-exits `0`.
+`cckit debug --check` prints `AVAILABLE` and the command it resolved. After step 3, the agent's
+reply describes what is on the page and quotes the console, which it could not do before.
 
-<Aside type="tip" title="Pin or wrap the command">
-Override what cckit invokes with `export CCKIT_AXI=<command>` — useful for a pinned version or a
-wrapper script.
-</Aside>
+## How cckit finds the bridge
 
-### Troubleshooting
+`cckit debug` looks for the command in this order:
 
-**`cckit debug --check` says it's unavailable.** Node/npx or Chrome is missing. Install Node and
-Chrome, then re-check; cckit won't hard-fail without them.
+1. the command named in the `CCKIT_AXI` environment variable
+2. `chrome-devtools-axi` on `PATH`
+3. `npx -y chrome-devtools-axi`, when Node and `npx` are present
 
-**The agent's context filled with output.** Results are TOON-encoded to stay compact, but a broad
-capture (full network log) is still large. Ask for the specific artifact — one screenshot, the
-console only — rather than everything.
+Set `CCKIT_AXI` to use a pinned version or a wrapper script:
 
-**A subcommand isn't recognized.** cckit forwards args verbatim to the bridge; the subcommands
-are the bridge's, not cckit's. Check the [axi docs](https://github.com/kunchenguid/chrome-devtools-axi).
+```bash
+export CCKIT_AXI=<command>
+```
+
+## Troubleshooting
+
+**`cckit debug --check` says the capability is not available.** Node, `npx` or Chrome is missing.
+Install them and check again. cckit does not fail without them.
+
+**The agent's context filled with output.** Results are compact, and a broad capture such as a
+full network log is still large. Ask for one thing: one screenshot, or the console only.
+
+**A subcommand is not recognized.** The subcommands belong to the bridge, not to cckit. Check the
+[chrome-devtools-axi documentation](https://github.com/kunchenguid/chrome-devtools-axi).
+
+## Related
+
+- [Annotate the running interface](/design/annotate-the-ui/): a person points at the page and the
+  agent fixes what was marked.
+- [QA on a running stack](/review/qa-lane/): a person reviews the running app before a merge.

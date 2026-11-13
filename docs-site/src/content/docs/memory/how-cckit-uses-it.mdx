@@ -3,4 +3,123 @@ title: "How cckit uses memory"
 description: "The four session hooks, one wing per project and a diary wing per agent, the recall-before-answer rule, cckit handoff for unfinished work, and what does not work under Codex."
 ---
 
-TODO-E493
+import { Aside } from '@astrojs/starlight/components';
+import TagRow from '../../../components/TagRow.astro';
+
+<TagRow kinds={["flow", "concept"]} />
+
+A memory tool helps only when every session uses it the same way. If saving depends on someone
+typing "remember this", the record has holes exactly where the work was busiest. So cckit does not
+ask the agent to remember to remember. With memory on, the reading and the filing happen at fixed
+points of every session, and one rule file covers the judgement calls in between.
+
+This page describes what happens once memory is on. To switch it on, follow
+[Install MemPalace](/memory/install-mempalace/). cckit builds none of the storage or search: that
+is [MemPalace](https://github.com/MemPalace/mempalace).
+
+## What happens in a session
+
+| Moment | What happens | Who does it |
+| --- | --- | --- |
+| The session starts | The project's summary and recent decisions are loaded into the context | the `SessionStart` hook |
+| A question touches past work | The agent searches memory before it answers | the agent, following the rule |
+| A decision is made | The agent saves it, word for word | the agent, following the rule |
+| The conversation is about to be compressed | The session so far is filed first | the `PreCompact` hook |
+| The session finishes | The finished session is filed | the `Stop` hook |
+| The session closes with work not pushed | A "resume here" note is written and filed | the `SessionEnd` hook |
+
+## The four hooks
+
+`cckit init --memory on` writes four scripts into `.claude/hooks/` and registers them in
+`.claude/settings.local.json`. All four exit without doing anything when the `mempalace`
+command-line tool is not installed, so a teammate without MemPalace is not blocked.
+
+- **`SessionStart` runs `mempal_session_start.sh`.** It calls `mempalace wake-up --wing <wing>` and
+  hands the output to the session: about 600 to 900 tokens. It replaces MemPalace's global identity
+  header with this project's own, `.claude/mempal-identity.<wing>.txt`. Edit the `Stack:` line of
+  that file to describe the project. Delete the file and the global header comes back.
+- **`Stop` runs `mempal_save.sh`.** It files the finished session into the project's wing by mining
+  Claude Code's transcript folder for this project
+  (`mempalace mine ~/.claude/projects/<project>/ --mode convos`).
+- **`PreCompact` runs `mempal_precompact.sh`.** It runs the same sweep before Claude Code compresses
+  a long conversation, so detail that compression drops is already filed.
+- **`SessionEnd` runs `mempal_followup.sh`.** When the current branch has uncommitted changes or
+  commits that are not pushed, it writes a short note (the branch, the unpushed commits, the changed
+  files, any open pull request) and files it. With everything pushed it does nothing. The same
+  state is recorded once, not once per session.
+
+The [hooks reference](/hooks/) lists these four beside every other hook cckit installs.
+
+## Where things are filed
+
+MemPalace organises memory into **wings**, and inside a wing into **rooms**.
+
+- **One wing per project.** The wing name is `memory.wing` in the project config. Every hook and
+  every instruction in the rule names that wing, so one project's memory does not show up in
+  another's.
+- **A diary wing per specialist agent**, named `agent-<name>` (`agent-pm`, `agent-tech-lead`). An
+  agent reads its own diary when it is called and writes to it after significant work. Project
+  content still goes to the project's wing.
+- **Six rooms in the project's wing:** `decisions`, `architecture`, `planning`, `technical`,
+  `problems` and `general`.
+
+## The rule the agent follows
+
+`.claude/rules/mempalace.md` is installed with memory on. It tells the agent four things:
+
+1. **At the start**, read the overview, and search the project's wing for the topic at hand.
+2. **Before answering about a past decision or earlier work**, search memory first. The context
+   window alone is not the record.
+3. **After a decision, a discovery or a conclusion**, save it word for word in the matching room.
+4. **When you say the session is over**, write a diary entry, save the key decisions, and, if work
+   is not committed or not pushed, leave a "resume here" entry in the `planning` room.
+
+The fourth step and the `SessionEnd` hook cover the same case from two sides. The agent's entry is
+the considered summary. The hook is the fallback for a session that closed without one.
+
+The rule also lists the MemPalace commands for bulk work, such as `mempalace mine` to file a folder
+and `mempalace sync` to drop entries whose source files are gone. Those are MemPalace's commands,
+documented in [its own README](https://github.com/MemPalace/mempalace#readme).
+
+## What `cckit doctor` keeps in order
+
+With `memory.enabled` true, `cckit doctor` prints a **Memory (MemPalace)** section and checks two
+things besides the tool itself:
+
+- the project's identity header exists. If it is missing, the doctor creates a starter after your
+  yes or with `--fix`, and warns otherwise;
+- the session-start hook is the current version. An older one cannot apply the project's header,
+  and the doctor rewrites it from the template under the same condition.
+
+With no terminal attached and no `--fix`, the doctor reports and changes nothing.
+
+## Unfinished work without a memory tool: `cckit handoff`
+
+One piece of "where did we stop" needs no MemPalace:
+
+```bash
+cckit handoff "<what is pending, the next step, the issue or pull request it belongs to>"
+```
+
+This saves a note to `.cckit/handoff.md`. The file is local, ignored by git, and shared by the
+main checkout and every worktree of the repository. Running `cckit` with no verb prints it, so the
+next session starts from that note. It works with memory off and under any agent.
+
+The two do different jobs. A handoff is one note, replaced by the next one, about the work in
+progress. Memory is the searchable record of decisions over the life of the project.
+
+## Under Codex
+
+The automatic half of memory is Claude Code only. The `Stop` and `PreCompact` hooks run
+`mempalace mine ~/.claude/projects/<project>/ --mode convos`, which reads Claude Code's transcript
+store. A Codex session writes nothing there, and no Codex transcript format has been validated
+against `mempalace mine`. So `cckit init --adapter codex` installs no memory hook, even with
+`--memory on`, and says so in its output and in the generated `AGENTS.md`.
+
+What still works in Codex: a MemPalace MCP server you configure yourself, called explicitly, and
+`cckit handoff`. With `--adapter both`, Claude Code sessions keep all four hooks.
+
+<Aside type="note" title="Not affiliated">
+MemPalace is independent open-source software by the MemPalace project. cckit is not a maintainer
+of it and has no affiliation with or endorsement from its authors.
+</Aside>

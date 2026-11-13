@@ -1,6 +1,6 @@
 ---
-title: How to run one objective unattended with hard limits
-description: Hand Claude Code or Codex one objective on one branch with no terminal attached. cckit autopilot run starts the agent a round at a time and stops it in code on a completion check, a round count, a time limit or a token ceiling.
+title: "Run one objective unattended"
+description: "Step by step: hand an agent one objective on one branch, stopped in code by a check, a round count, a time limit or a token ceiling."
 tutorial:
   job: run one objective unattended with hard limits
   difficulty: advanced
@@ -20,10 +20,17 @@ import TutorialSchema from '../../../components/TutorialSchema.astro';
 
 <TutorialMeta />
 
-**What you'll run:** one agent, one branch, one objective, and nobody watching. `cckit autopilot
-run` starts the agent with no terminal (`claude -p` or `codex exec`), one round at a time. After
-every round, code decides whether another round starts. Nothing the agent says ends or extends the
-run, and the run never merges and never closes an issue.
+Some work has a clear finish line and no need for conversation: make the failing tests pass,
+clear the lint errors, finish a migration. Leaving an agent alone on it raises one worry. An
+agent that decides for itself when it is done can stop early, or never stop.
+
+`cckit autopilot run` takes that decision away from the agent. It starts the agent with no
+terminal (`claude -p` or `codex exec`), one round at a time. After every round, code decides
+whether another round starts: a command you chose passed, or a limit you set was reached. Nothing
+the agent says ends or extends the run, and the run never merges and never closes an issue.
+
+**What you will have at the end:** a branch where your completion check passes, optionally with
+its pull request open, or a stopped run whose exit code tells you which limit ended it.
 
 ## Steps
 
@@ -106,6 +113,12 @@ run, and the run never merges and never closes an issue.
 
 </Steps>
 
+## Check it worked
+
+The exit code is `0` and the stop reason is `done`. Run your completion check by hand in the
+worktree: it passes now, where it failed in step 2. The state file under `.cckit/autopilot/`
+records the reason, the round count and the usage.
+
 ## How it works
 
 The state of a run is one JSON file per branch under `.cckit/autopilot/`, written at every stop
@@ -152,12 +165,12 @@ ceiling could not be read. Remove `--max-tokens` and bound the run with `--max-i
 **A start is refused because an earlier agent is still alive.** A previous run's agent process is
 still running on this branch. Wait for it to exit, or stop that process yourself, then resume.
 
-## Related tutorials
+## Related guides
 
 <CardGrid>
-  <LinkCard title="Run Claude Code unattended overnight" href="/development/run-unattended/" description="Many issues at once, in panes, under a concurrency cap." />
+  <LinkCard title="Run agents unattended overnight" href="/development/run-unattended/" description="Many issues at once, in panes, under a concurrency cap." />
   <LinkCard title="Use cckit with Codex" href="/getting-started/codex/" description="Install the Codex adapter the --agent codex form needs." />
-  <LinkCard title="Take a GitHub issue to a merged PR" href="/development/issue-to-merged-pr/" description="The same loop with a person at the keyboard." />
+  <LinkCard title="Take an issue to merged" href="/development/issue-to-merged-pr/" description="The same loop with a person at the keyboard." />
 </CardGrid>
 
 <TutorialSchema

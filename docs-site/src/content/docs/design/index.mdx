@@ -3,4 +3,113 @@ title: "Why design has one owner"
 description: "Every design question goes to the designer agent, what the designer and the UX agent each judge, and which outside design tools cckit plugs in today."
 ---
 
-TODO-E493
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+A team of agents builds an interface one issue at a time. The agent fixing a form picks a spacing
+value. The agent adding a screen picks another. Each choice is reasonable alone, and after ten
+issues the product has three button styles and two ways to show an error.
+
+An agency solves this with one person who owns the look and feel. cckit does the same: one agent
+answers every design question, and the other agents ask it before they decide. This area also
+covers the second half of design work with agents, which is letting them see the interface that
+is running and take feedback on it.
+
+## Why one owner
+
+Decisions made by one agent stay consistent with each other. A visual call made somewhere else can
+contradict a direction the designer already set, and nobody notices until the screens sit side by
+side.
+
+The `design-routing` rule turns that into a habit. The `software`, `content` and `marketing`
+profiles install it, and it is read in every session. It says: a design decision or adjustment is
+never answered by the agent that happens to be working. That agent starts the designer, passes the
+question word for word with its context (the screen, the token name, the current state), and
+returns the designer's answer to you.
+
+What counts as a design question:
+
+- colour, typography, spacing, layout and hierarchy
+- components: variants and states such as hover, disabled, loading, error and empty
+- motion: easing and durations
+- icons, illustration and imagery
+- brand: logo, palette, tone
+- navigation and the order of screens
+- the words in the interface
+- accessibility that changes the interface: contrast, focus states, tap targets
+- responsive behaviour
+- any adjustment to an existing screen, however small
+
+One exception: a question that asks for a fact and not a decision, such as where the design
+system is saved, is answered directly.
+
+## Who does it
+
+**The designer agent** owns the design system, the brand, the screens, motion and the wording of
+the interface. It reads the project's design system and tokens before it decides, shows a change
+as a diff or an annotated snippet, and specifies a new component's variants and states before any
+code is written. It does not decide backend, infrastructure or build questions, and it does not
+file an issue without your confirmation. The `software`, `content` and `marketing` profiles
+install it.
+
+**The UX agent** judges structure, not looks: how screens connect, where the same data can be
+edited, how heavy a form is, whether shared components are used the same way everywhere, and
+whether the markup is accessible. It reads and reports. It routes a visual decision to the
+designer and an implementation to the frontend agent. No profile installs the UX agent: it runs
+when you start a [UX audit](/design/ux-audit/).
+
+**The frontend agent** writes the interface code, using the tokens and patterns the designer set.
+
+**You** make the calls that are a matter of taste or business: which of two treatments wins, what
+the brand is. The designer proposes with its reasoning; you choose.
+
+The full list of roles is on [The team](/philosophy/the-team/).
+
+## Which tools plug in
+
+cckit adopts tools for this work and builds none of them. Two are wired in today, and both are
+about the running interface:
+
+- **Agentation**, a click-to-annotate toolbar for React apps. You click an element in your dev
+  app and leave a note; Claude Code reads the note with the component and its source path, and
+  fixes the code. The `kit-annotate` skill installs and wires it.
+  See [Annotate the running interface](/design/annotate-the-ui/).
+- **chrome-devtools-axi**, a browser bridge. `cckit debug` gives an agent screenshots, console
+  and network logs of a page. See [Let the agent see the page](/development/browser-debug/).
+
+<Aside type="caution" title="No outside design tool is wired in">
+cckit has no integration with a design canvas or mockup tool such as Figma. `integrations/` holds
+four descriptors (`graft`, `lavish`, `mempalace`, `mlx-lm`) and none of them is a design tool.
+The designer agent works in the code: the tokens, the components and the running app. If your
+designs live in an outside tool, a person carries them across.
+</Aside>
+
+Three more limits to know before you rely on this area:
+
+- **The designer's craft skills are not shipped.** The designer's role file lists six skills
+  (`emil-design-eng`, `impeccable`, `web-design-guidelines`, `gsap-core`, `gsap-timeline`,
+  `gsap-performance`). All six come from third-party skill packs and are optional. In a fresh
+  project the designer runs without them, on its role instructions alone.
+- **Annotation is narrow.** It covers React apps (Next.js, Vite, React Router) and Claude Code
+  only.
+- **The UX audit reads source, not pixels.** It reasons over the structure of the app. A purely
+  visual critique of one screen goes to the designer.
+
+## The commands
+
+Design has no `cckit` verb of its own. The work runs through two skills and one verb:
+
+| You want | Run |
+| --- | --- |
+| A design decision | Ask in plain words. The rule routes it to the designer. |
+| To point at the running app and leave notes | `/kit-annotate` |
+| A review of flows, consistency or accessibility | `/kit-ux-audit` |
+| A screenshot or the console of a page, for an agent | `cckit debug` |
+
+Every skill is listed on [Skills](/skills/), and the rule on [Rules](/rules/).
+
+## Guides
+
+<CardGrid>
+  <LinkCard title="Annotate the running interface" href="/design/annotate-the-ui/" description="Click an element in your React dev app, leave a note, and have Claude Code fix it." />
+  <LinkCard title="Run a UX audit" href="/design/ux-audit/" description="A report on confusing flows, inconsistent components and inaccessible markup." />
+</CardGrid>
