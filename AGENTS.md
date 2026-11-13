@@ -216,6 +216,12 @@ current entry of the top-bar switch (`docs-site/src/lib/tracks.ts`, `docs-site/s
   `es/marketing/` says "worktree", "branch" or "PR"; `words-you-will-hear.mdx` is the one
   exemption (`docs-site/src/integrations/marketing-words.mjs`, tested by
   `scripts/docs-marketing-words-test.sh`).
+- **A wide table renders as record cards.** Write a Markdown table as usual. One with three or
+  more columns and a cell over 60 characters becomes a list of cards: the first cell is the
+  heading, every other cell a labelled line (a leading `#` index column is folded into the
+  heading). Smaller tables stay tables. To keep a grid, wrap the table in
+  `<div data-table="grid">` (`docs-site/src/lib/rehype-record-tables.mjs`, tested by
+  `scripts/docs-record-tables-test.sh`).
 - **No page URL changes without a redirect** in `redirects` in `docs-site/astro.config.mjs`, and
   the `expect` paths in `benchmarks/*.jsonl` follow a moved file in the same commit.
 

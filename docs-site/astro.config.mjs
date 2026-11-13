@@ -7,6 +7,7 @@ import react from '@astrojs/react';
 import sitemap from '@astrojs/sitemap';
 import rehypeExternalLinks from 'rehype-external-links';
 import marketingWords from './src/integrations/marketing-words.mjs';
+import rehypeRecordTables from './src/lib/rehype-record-tables.mjs';
 
 // .env files are NOT injected into process.env inside astro.config.mjs. Vercel DOES populate
 // process.env from the project's env vars at build, so prefer that; locally, fall back to parsing
@@ -72,7 +73,11 @@ export default defineConfig({
   // still applies. `markdown.rehypePlugins` is the deprecated spelling of exactly this.
   markdown: {
     processor: unified({
-      rehypePlugins: [[rehypeExternalLinks, { target: '_blank', rel: ['noopener', 'noreferrer'] }]],
+      rehypePlugins: [
+        [rehypeExternalLinks, { target: '_blank', rel: ['noopener', 'noreferrer'] }],
+        // A table of records (3+ columns, a long cell) renders as record cards, not a grid (#494).
+        rehypeRecordTables,
+      ],
     }),
   },
   integrations: [
