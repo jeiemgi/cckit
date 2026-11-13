@@ -1,0 +1,125 @@
+---
+title: Tu primera pieza, de la idea a la aprobación
+description: Una entrada de blog, de la idea a la aprobación, con cckit y hablando con Claude. Sin terminal.
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+Esta página sigue una entrada de blog desde la idea hasta el momento en que queda aprobada.
+Cualquier otra pieza, sea una landing page o la descripción de un producto, avanza igual.
+
+**Antes de empezar:** el proyecto ya está [preparado](/es/marketing/get-set-up/) y abierto en
+Claude Code.
+
+<Steps>
+
+1. **Dile a Claude qué quieres hacer.**
+
+   <div class="cckit-prompt">
+
+   ```text title="Dile esto a Claude"
+   Quiero escribir una entrada de blog para anunciar nuestro taller de primavera. Regístrala como una pieza de trabajo nueva y abre un borrador para ella.
+   ```
+
+   </div>
+
+   Claude agrega la pieza a la lista de tareas que comparte tu equipo, con un título y una
+   descripción corta, y empieza un borrador para ella. Un borrador es tu propia copia para
+   trabajar. Nada de lo que hay en él cambia la versión compartida hasta que la pieza se aprueba.
+
+2. **Pónganse de acuerdo en el esquema.**
+
+   <div class="cckit-prompt">
+
+   ```text title="Dile esto a Claude"
+   Propón un esquema para esta entrada. Quien la lee tiene un negocio pequeño y no nos conoce. Lo único que quiero que haga es inscribirse al taller.
+   ```
+
+   </div>
+
+   Cambia el esquema hasta que quede bien. Di qué quitar, qué mover y qué falta.
+
+3. **Escriban el borrador.**
+
+   <div class="cckit-prompt">
+
+   ```text title="Dile esto a Claude"
+   Escribe el primer borrador a partir de ese esquema. Sigue nuestra voz de marca.
+   ```
+
+   </div>
+
+   Claude escribe la entrada como un archivo del proyecto y te dice dónde está. Edítenla juntos:
+   "acorta el inicio", "este párrafo suena a anuncio", "agrega la fecha y el precio". Si tu equipo
+   ya [definió su voz de marca](/es/marketing/brand-voice/), Claude la lee antes de escribir.
+
+4. **Pide una revisión.**
+
+   <div class="cckit-prompt">
+
+   ```text title="Dile esto a Claude"
+   Ya está listo. Guárdalo y pide una revisión.
+   ```
+
+   </div>
+
+   Claude guarda el borrador, lo envía a GitHub y te da un enlace. Ese enlace es la revisión: una
+   página que muestra lo que dice la entrada y donde tu equipo puede comentar.
+
+5. **Alguien de tu equipo la revisa.** Envíale el enlace a quien aprueba. En esa página puede
+   comentar cualquier línea y después elegir **Approve** (aprobar) o **Request changes** (pedir
+   cambios). GitHub muestra esos botones en inglés.
+
+6. **Aplica los cambios, si los hay.**
+
+   <div class="cckit-prompt">
+
+   ```text title="Dile esto a Claude"
+   Lee los comentarios de la revisión de esta entrada y aplícalos. Dime cuáles no aplicaste y por qué.
+   ```
+
+   </div>
+
+   La página de la revisión se actualiza sola. Quien revisa la vuelve a leer.
+
+7. **Aprobada.** Cuando la revisión diga que está aprobada:
+
+   <div class="cckit-prompt">
+
+   ```text title="Dile esto a Claude"
+   La revisión está aprobada. Termina esta pieza.
+   ```
+
+   </div>
+
+   Claude hace que el borrador aprobado pase a la versión compartida, marca la pieza como
+   terminada y limpia el borrador. Quien aprueba puede hacer lo mismo desde la página de la
+   revisión con el botón verde **Merge**.
+
+</Steps>
+
+<Aside type="note" title="Aprobado no es publicado">
+cckit llega hasta la aprobación. Llevar la entrada a tu sitio se hace como hasta hoy.
+</Aside>
+
+## Retomar una pieza
+
+Los borradores no se pierden al cerrar la aplicación. Abre el proyecto otra vez y di:
+
+<div class="cckit-prompt">
+
+```text title="Dile esto a Claude"
+¿En qué vamos? Muéstrame mis borradores y lo que esté esperando revisión.
+```
+
+</div>
+
+Después di cuál quieres continuar.
+
+## Lo que queda en manos de las personas
+
+- **Aprobar.** Alguien de tu equipo aprueba en la página de la revisión. Claude termina una pieza
+  solo después de que le dices que la revisión está aprobada.
+- **Publicar.** Eso queda fuera de cckit.
+
+Siguiente: [Define tu voz de marca](/es/marketing/brand-voice/) · [Planea y lleva una campaña](/es/marketing/campaigns/)

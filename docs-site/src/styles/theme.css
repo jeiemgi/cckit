@@ -277,6 +277,13 @@ body {
 	color: var(--door);
 }
 .door-go::after { content: ' \2192'; }
+/* The line under the doors that points Spanish readers at /es/marketing/. */
+.sl-markdown-content .doors-note {
+	margin-top: 0.75rem;
+	text-align: end;
+	font-size: var(--sl-text-sm);
+	color: var(--sl-color-gray-3);
+}
 
 
 /* Header version badge — a quiet, monospace pill before the social icons. Tells readers which

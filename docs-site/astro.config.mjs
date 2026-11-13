@@ -78,6 +78,16 @@ export default defineConfig({
     react(),
     starlight({
       title: 'cckit',
+      // Two languages, one translated section. English is served at the root; Spanish under /es/.
+      // Only the 7 Marketing pages exist in Spanish (src/content/docs/es/marketing/). Starlight
+      // still builds an English fallback copy of every other page under /es/; those copies are
+      // kept out of the sitemap below and marked noindex by the route middleware, and the language
+      // picker is rendered on Marketing pages only (src/components/LanguageSelect.astro).
+      defaultLocale: 'root',
+      locales: {
+        root: { label: 'English', lang: 'en' },
+        es: { label: 'Español', lang: 'es' },
+      },
       // Algolia DocSearch (when ALGOLIA_* env vars are set); otherwise the default Pagefind search.
       plugins: HAS_DOCSEARCH
         ? [starlightDocSearch({ appId: ALGOLIA.appId, apiKey: ALGOLIA.apiKey, indexName: ALGOLIA.indexName })]
@@ -97,6 +107,8 @@ export default defineConfig({
         Head: './src/components/Head.astro',
         // SiteTitle override appends the Software / Marketing switch to the top bar.
         SiteTitle: './src/components/SiteTitle.astro',
+        // LanguageSelect override shows the picker on Marketing pages only.
+        LanguageSelect: './src/components/LanguageSelect.astro',
         ...(DEV ? { PageSidebar: './src/components/DevAnnotate.astro' } : {}),
       },
       description: 'Be the architect — cckit runs the mechanics. The full GitHub work lifecycle as a CLI that turns your Git into retrievable, efficient context, drivable by Claude Code and any agent.',
@@ -173,20 +185,27 @@ export default defineConfig({
         ]},
         // Marketing: 7 pages for a reader who never opens a terminal. The middleware shows these
         // as a flat list, without the group heading, on every page under /marketing/.
-        { label: 'Marketing', items: [
-          { label: 'What cckit does for you', slug: 'marketing' },
-          { label: 'Get set up', slug: 'marketing/get-set-up' },
-          { label: 'Your first piece', slug: 'marketing/your-first-piece' },
-          { label: 'Set your brand voice', slug: 'marketing/brand-voice' },
-          { label: 'Plan and run a campaign', slug: 'marketing/campaigns' },
-          { label: 'Who does what', slug: 'marketing/who-does-what' },
-          { label: 'Words you will hear', slug: 'marketing/words-you-will-hear' },
+        { label: 'Marketing', translations: { es: 'Marketing' }, items: [
+          { label: 'What cckit does for you', translations: { es: 'Qué hace cckit por ti' }, slug: 'marketing' },
+          { label: 'Get set up', translations: { es: 'Prepara todo' }, slug: 'marketing/get-set-up' },
+          { label: 'Your first piece', translations: { es: 'Tu primera pieza' }, slug: 'marketing/your-first-piece' },
+          { label: 'Set your brand voice', translations: { es: 'Define tu voz de marca' }, slug: 'marketing/brand-voice' },
+          { label: 'Plan and run a campaign', translations: { es: 'Planea y lleva una campaña' }, slug: 'marketing/campaigns' },
+          { label: 'Who does what', translations: { es: 'Quién hace qué' }, slug: 'marketing/who-does-what' },
+          { label: 'Words you will hear', translations: { es: 'Palabras que vas a escuchar' }, slug: 'marketing/words-you-will-hear' },
         ]},
       ],
     }),
     // Starlight uses this sitemap integration instead of its default when one is present. Keep the
     // /social/ export templates (IG feed + story cards) out of the sitemap — they're internal
-    // manual-post assets, not pages we want crawled or indexed.
-    sitemap({ filter: (page) => !page.includes('/social/') }),
+    // manual-post assets, not pages we want crawled or indexed. Under /es/ only the Marketing pages
+    // are Spanish; every other /es/ URL is an English fallback copy and stays out too.
+    sitemap({
+      filter: (page) => {
+        const path = new URL(page).pathname;
+        if (path.includes('/social/')) return false;
+        return !path.startsWith('/es/') || path.startsWith('/es/marketing/');
+      },
+    }),
   ],
 });

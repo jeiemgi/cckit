@@ -1,0 +1,84 @@
+---
+title: Prepara todo
+description: La preparación de cckit para un equipo de marketing, que se hace una sola vez. Una persona técnica hace la primera parte; tú compruebas que funcionó.
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+La preparación se hace una vez por proyecto. Tiene dos partes: una para alguien con perfil técnico
+y otra para ti.
+
+## Qué necesitas
+
+- **Un proyecto en GitHub** donde vive o va a vivir tu contenido. cckit parte de un proyecto que ya
+  existe; no crea un sitio web.
+- **Una cuenta de GitHub** para cada persona que escribe o aprueba, con acceso a ese proyecto.
+- **Claude Code** en tu computadora. Con la aplicación de escritorio basta.
+- **Una persona técnica durante una media hora**: alguien de desarrollo en tu equipo, tu contacto
+  en la agencia, un freelance.
+
+## Parte 1: para la persona técnica
+
+Esta parte usa una terminal. Si no eres tú, envíale esta sección a quien la vaya a hacer. Las
+páginas enlazadas aquí están en inglés.
+
+<Steps>
+
+1. **Instala cckit e inicia sesión en GitHub** en la computadora de quien va a escribir:
+   [Install cckit](/install/) (en inglés) y después
+   [Check your platform](/check-your-platform/) (en inglés).
+
+2. **Abre el proyecto en Claude Code y corre la preparación con el perfil de marketing:**
+
+   ```text
+   /kit-init marketing
+   ```
+
+   El perfil de marketing instala las habilidades de redacción, voz de marca y campañas, los cuatro
+   roles (planeación, edición, diseño e investigación) y el modo de lenguaje sencillo, en el que
+   Claude dice "borrador", "revisión" y "aprobar" y deja los términos de desarrollo fuera de la
+   conversación salvo que se los pidan. Desde una terminal, la misma preparación es
+   `cckit init --profile marketing`. Lo que la preparación escribe y pregunta está en
+   [Initialize cckit](/initialize/) (en inglés).
+
+3. **Da acceso al proyecto en GitHub** a todas las personas que escriben o aprueban.
+
+</Steps>
+
+<Aside type="tip" title="Aprobaciones">
+Decidan desde ahora quién aprueba. Con una persona que escribe y otra que aprueba ya se puede
+trabajar desde el primer día.
+</Aside>
+
+## Parte 2: para ti
+
+<Steps>
+
+1. **Abre el proyecto en Claude Code.** La primera vez, la persona técnica te muestra dónde está.
+
+2. **Pregúntale a Claude cómo van las cosas:**
+
+   ```text
+   ¿En qué vamos?
+   ```
+
+   Claude responde con lo que está en curso, lo que espera revisión y lo que hay que limpiar. En
+   un proyecto nuevo la lista es corta o está vacía. Si responde, la preparación funciona.
+
+3. **Pregunta qué puedes hacer:**
+
+   ```text
+   Soy del equipo de marketing y no uso herramientas de desarrollo. ¿Qué te puedo pedir en este proyecto?
+   ```
+
+</Steps>
+
+## Si algo no sale bien
+
+| Lo que ves | Qué hacer |
+| --- | --- |
+| Claude dice que no puede conectarse a GitHub, o te pide iniciar sesión | Pídele a la persona técnica que repita el paso 1 de la Parte 1. |
+| Claude responde con términos de desarrollo que no conoces | Dile "Explícamelo con palabras sencillas". Las palabras están en [Palabras que vas a escuchar](/es/marketing/words-you-will-hear/). |
+| Claude pide permiso para ejecutar algo | Lee lo que dice que va a hacer. Crear un borrador, guardar tu trabajo y pedir una revisión es lo esperado. Si dudas, di que no y pídele que te explique. |
+
+Siguiente: [Tu primera pieza, de la idea a la aprobación](/es/marketing/your-first-piece/).

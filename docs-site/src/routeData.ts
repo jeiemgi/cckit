@@ -30,6 +30,27 @@ export const onRequest = defineRouteMiddleware((context) => {
 	if (route.pagination.prev && !hrefs.has(route.pagination.prev.href)) route.pagination.prev = undefined;
 	if (route.pagination.next && !hrefs.has(route.pagination.next.href)) route.pagination.next = undefined;
 
+	// The site title always leads to the one home page. Without this, a Spanish page would link to
+	// /es/, an English fallback copy of the home page.
+	route.siteTitleHref = '/';
+
+	// Starlight emits an hreflang alternate per locale on every page. Only Marketing pages have a
+	// Spanish version, so the alternates are dropped everywhere else.
+	if (track !== 'marketing') {
+		route.head = route.head.filter((t) => !(t.tag === 'link' && t.attrs?.rel === 'alternate' && t.attrs?.hreflang));
+	}
+	// An English fallback copy under /es/ is not a page of its own: keep it out of search engines
+	// and point its canonical at the English original.
+	if (route.isFallback && route.locale) {
+		const original = context.url.pathname.replace(new RegExp(`^/${route.locale}(?=/)`), '');
+		for (const t of route.head) {
+			if (t.tag === 'link' && t.attrs?.rel === 'canonical' && context.site) {
+				t.attrs.href = new URL(original, context.site).href;
+			}
+		}
+		route.head.push({ tag: 'meta', attrs: { name: 'robots', content: 'noindex, follow' } });
+	}
+
 	// The track as a <meta> tag: theme.css keys the Marketing accent on it.
 	route.head.push({ tag: 'meta', attrs: { name: 'cckit-track', content: track } });
 });

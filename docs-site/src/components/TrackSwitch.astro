@@ -7,16 +7,33 @@ import { trackOf } from '../lib/tracks';
 
 // The home page is the door to both tracks, so neither entry is current there.
 const current = Astro.url.pathname === '/' ? undefined : trackOf(Astro.url.pathname);
+
+// On a Spanish page the Marketing entry stays in Spanish, and the Software entry says that its
+// target is in English: Software pages are not translated.
+const es = Astro.locals.starlightRoute.locale === 'es';
 const tracks = [
-  { id: 'software', label: 'Software', href: '/getting-started/' },
-  { id: 'marketing', label: 'Marketing', href: '/marketing/' },
+  {
+    id: 'software',
+    label: 'Software',
+    href: '/getting-started/',
+    name: es ? 'Software (en inglés)' : undefined,
+    hreflang: es ? 'en' : undefined,
+  },
+  { id: 'marketing', label: 'Marketing', href: es ? '/es/marketing/' : '/marketing/' },
 ] as const;
 ---
 
-<nav class="track-switch print:hidden" aria-label="Documentation track">
+<nav class="track-switch print:hidden" aria-label={es ? 'Sección de la documentación' : 'Documentation track'}>
   {
     tracks.map((t) => (
-      <a href={t.href} data-track={t.id} aria-current={t.id === current ? 'true' : undefined}>
+      <a
+        href={t.href}
+        data-track={t.id}
+        aria-current={t.id === current ? 'true' : undefined}
+        aria-label={'name' in t ? t.name : undefined}
+        title={'name' in t ? t.name : undefined}
+        hreflang={'hreflang' in t ? t.hreflang : undefined}
+      >
         <span class="dot" aria-hidden="true" />
         {t.label}
       </a>
