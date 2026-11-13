@@ -181,6 +181,7 @@ export default defineConfig({
           { label: 'All guides', slug: 'guides' },
           { label: 'Wave', slug: 'wave' },
           { label: 'QA lane', slug: 'qa-lane' },
+          { label: 'Light tasks', slug: 'light-tasks' },
           { label: 'Driving cckit from agents', slug: 'agents' },
           { label: 'Integrations', slug: 'integrations' },
           { label: 'Cookbook', slug: 'cookbook' },

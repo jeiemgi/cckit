@@ -28,7 +28,8 @@ if [[ "$branch" == "main" || "$branch" == "develop" ]]; then
   WARN+=("• On '$branch' directly — start work with /task-start <issue> (no direct commits to the base branch).")
 # 2. Non-conventional branch name (not <kind>/<issue>-<slug> and not a bot branch)?
 elif [[ ! "$branch" =~ ^(feat|fix|task|chore|security|scaffold|ci|adr|spike|plan)/[0-9]+- ]] \
-   && [[ ! "$branch" =~ ^(agent|claude)/ ]]; then
+   && [[ ! "$branch" =~ ^(agent|claude)/ ]] \
+   && [[ ! "$branch" =~ ^light/[a-z][a-z0-9]+- ]]; then
   WARN+=("• Branch '$branch' doesn't match <kind>/<issue>-<slug> — see the branch-naming rule.")
 fi
 

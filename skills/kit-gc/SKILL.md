@@ -59,6 +59,7 @@ Classify every branch/worktree (issue-open protection wins over everything excep
 | Bucket | Rule | Action |
 | --- | --- | --- |
 | **Protected (open issue)** | `wt_protected_reason` non-empty — associated issue **#N still OPEN** | **keep** — never prune, even with no PR / merged PR |
+| **Protected (open light task)** | branch `light/<id>-<slug>` whose task is not `done`/`dropped` on the base branch — **light task <id> still OPEN** | **keep** — the task source answers, no issue is read |
 | **Safe to delete** | PR `MERGED`, level with its remote (no unpushed commits), **and** issue closed/absent | prune |
 | **Active** | open PR, or the base branch, or a worktree branch with an open PR | keep |
 | **Landed** | **no PR of its own**, but its work is already on base — either check suffices: (a) *content*: every file it changed since its merge base has the same content on `origin/<base>`; (b) *lineage*: its name (`sub/<N>…`, `effort/<N>…`) or a `[#N]` / `(#N)` in a commit subject names an issue that is **closed with a merged PR** — found in the 200-PR index by head `<kind>/<N>-…`, or, when that PR has scrolled out of the window, through the issue's own `closedByPullRequestsReferences`; a sub-issue with no closing PR (subs close through `effort close`) is resolved once through its **parent**'s closing PR (sub-issues API). One lookup per issue per run, cached | prune, under the same dirty-worktree / unpushed guards as SAFE |

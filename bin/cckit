@@ -20,6 +20,15 @@
 #               [--superseded-by N]  close the issue with a reason + summary comment; board Done
 #   cckit new [--role R --kind K --priority P --milestone M --blocked-by "#1" --body B|--body-file F] "<title>"
 #                                   file ONE issue: labels + board (Todo) in one step (never raw gh issue create)
+#   cckit task <new|list|next|start|finish|share>   light tasks: work tracked in the project, no GitHub issue
+#     task new [--priority pN --kind K --body B|--body-file F] "<title>"   record a task (one file
+#         under tasks/; a draft in this checkout until it is started or shared)
+#     task list [--all] · task next   every open task and its state · the one to take next
+#     task start [--force] [--no-push] <id>   worktree + branch light/<id>-<slug> from the base (alias: take)
+#     task finish [<id>] "<summary>" [--all]  mark it done on its branch, push, open the pull request;
+#         the task is done when that PR merges (alias: done). --all also commits new files
+#     task share ["<summary>"]        one pull request that adds this checkout's drafts to the base;
+#         they list as shared until it merges. Re-run to retry a share whose push or PR failed
 #   cckit merge [<pr>] [--merge|--rebase]   merge the PR (squash by default; rebases on conflict), close
 #                                   its issues, GC the branch, update the PR's base (develop or effort/<N>);
 #                                   refuses an effort/* head: that PR merges with cckit effort close <N>
@@ -294,6 +303,21 @@ case "$cmd" in
       exit "$rc"
     fi
     kto_task_new "$n_title" "$n_role" "$n_kind" "$n_prio" "$n_ms" "$n_plan" "$n_blocked" "$n_body"; echo
+    ;;
+  task)
+    # Light tasks (#450): work tracked through a task source (the `file` source: one tracked file
+    # per task) and not through GitHub issues. One dispatcher in the lib, as `qa` and `receipt` do.
+    # kit-task-ops.sh is loaded for kto_pr_title only, so the PR title is built by the same code
+    # `cckit pr` uses.
+    # shellcheck source=/dev/null
+    source "$LIB/kit-config.sh" && load_kit_config
+    # shellcheck source=/dev/null
+    source "$LIB/worktree-issue.sh"; source "$LIB/worktree-start.sh"
+    # shellcheck source=/dev/null
+    source "$LIB/commitlint.sh"; source "$LIB/kit-task-ops.sh"
+    # shellcheck source=/dev/null
+    source "$LIB/light-task.sh"
+    lt_cli "$@"
     ;;
   merge)
     # Merge (squash by default, --merge / --rebase, #376) through kto_task_pr_merge: rebase on conflict, close the PR's linked issues (native
