@@ -36,7 +36,7 @@ One issue becomes one branch, one worktree, one PR. These verbs walk that path.
 
 | Verb | Purpose |
 | --- | --- |
-| `cckit next [--effort N]` | The unblocked set + how to start the top issue. Human output ends with the weekly cadence line: Monday `cckit plan`, daily `cckit next`, Friday `cckit gc`. `--llm` rows stay `{number,ctx,title}`. |
+| `cckit next [--effort N]` | The unblocked set + how to start the top issue. In a project whose `tasks.default` is `light`, a bare `cckit next` prints what `cckit task next` prints; with `--effort N` it asks about issues as before. Human output ends with the weekly cadence line: Monday `cckit plan`, daily `cckit next`, Friday `cckit gc`. `--llm` rows stay `{number,ctx,title}`. |
 | `cckit start <issue> [slug]` | Create an isolated worktree + branch for an issue, [bootstrapped](/config-and-permissions/#worktree-bootstrap) — env files copied, dev port assigned, deps installed at the selected targets (`worktree.installPaths` if set — those dirs regardless of their manifests — else a root that declares dependencies or is a workspace root with members, else nothing). [Claim-checked](#session-claims): refused when another live session already holds the issue, unless `--force` / `KIT_FORCE=1`. |
 | `cckit claims` | List the live [session claims](#session-claims) — issue, session pid, start time, branch, worktree. Read-only. `--llm` returns a JSON array. |
 | `cckit pr <issue> <summary> [--base <branch>]` | Commit, push, and open the PR. `--base <branch>` opens it against a branch other than the configured base — a release PR from `develop` to `main`, or a hotfix to the release branch — with the same labels, milestone and board steps. The push exports the target as `KIT_PR_BASE`, so a git pre-push hook can compare against the branch the PR targets. |
@@ -116,7 +116,9 @@ and a `light/<id>-<slug>` branch per task, a pull request for review. Guide:
 | `cckit task finish [<id>] "<summary>" [--all]` | Set the task to `done` on its branch, commit the tracked changes (`--all` also commits new files; without it they are listed and left), push, and open the pull request against the base branch. The title is a Conventional Commits subject ending in `[<id>]`; the body has no `Closes` line. An open pull request for the branch is reported, not re-created. Inside the task's worktree the id may be omitted. The task reads `done` once the pull request merges. Never merges. `--llm` returns `{verb, ok, url, detail}`. Alias: `done`. |
 | `cckit task share ["<summary>"]` | One pull request, from a `light/share-<timestamp>` branch, that adds every draft in the current checkout to the base branch as `todo`. The drafts are removed from the checkout once committed, and list as `shared` until the pull request merges. With no drafts: if an earlier share's branch is still in this repository and unmerged, it pushes that branch and opens its pull request (an open one is reported, not re-created), which is how a share that failed is retried; otherwise it prints a notice and exits 0. `--llm` returns `{verb, ok, url, detail}`. |
 
-Exit codes: 0 done · 1 refused or a failed step · 2 usage. `tasks.source` and `tasks.dir` are in
+| `cckit task default` | Print `light` or `issues`: which list is the project's default (`tasks.default` in the config; `issues` when unset). Reads the config only. `--llm` returns `{verb, ok, default}`. |
+
+Exit codes: 0 done · 1 refused or a failed step · 2 usage. `tasks.default`, `tasks.source` and `tasks.dir` are in
 [Config & permissions](/config-and-permissions/#light-tasks).
 
 ## Verb ↔ skill map

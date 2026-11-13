@@ -103,6 +103,7 @@ The skills above ship with the plugin. `cckit init` also copies these into the p
 | `morning-briefing` | software, content, research, automation | What is active, what is blocked, what to focus on today. |
 | `copywriting` | content | Write or rewrite a page meant to persuade: homepage, landing, pricing, feature, headline, call to action. The `editor` agent lists it in `skills:`, so the Editor follows it for marketing copy. |
 | [`brand-voice`](#brand-voice) | no profile yet | Record the brand's voice, key messages and banned phrasings in `brand/voice.md`; check a draft against it. `copywriting` reads the file before it writes. |
+| [`campaign`](#campaign) | no profile yet | Turn one goal into a campaign plan, get it approved, then record its pieces as light tasks or as an effort's sub-issues. |
 | `speckit` | software | Install or identify Spec Kit and drive the spec-driven lifecycle. |
 | `feature-build-refine` | software | Build strategy for a Next.js + RefineDev project; applies only when the stack matches. |
 | `supabase-patterns` | software | Supabase access conventions; applies only when the project uses Supabase. |
@@ -123,6 +124,26 @@ it:
 The file has seven sections — Audience, Voice, Key messages, Banned phrasings, Words we use,
 Examples, Changes. `copywriting` reads the middle four before it writes and does not ask you to
 decide them again. A key message with no proof is recorded as `unproven` and is not stated as fact.
+
+### campaign
+
+One goal, one plan file, and the pieces that deliver it. The skill does not write the pieces.
+
+1. Reads `brand/voice.md`, the plans folder and the open work.
+2. Fills a five-line brief — goal (one number with a date), audience, message, channels,
+   approver — asking one question at a time.
+3. Writes the plan to the plans folder from `references/plan-template.md`. Its **Pieces** table
+   has one row per piece, at most eight, each with a kind, one reader action and an order.
+4. Shows the plan for approval, as a [review page](/review-pages/) where there is a browser.
+   Nothing is recorded before the approver says yes.
+5. Records the pieces in the list `cckit task default` names:
+
+| `cckit task default` prints | Pieces become | The plan is reviewed as |
+| --- | --- | --- |
+| `light` | one [light task](/light-tasks/) per piece, created inside the plan task's folder | one pull request carrying the plan file and every piece's task file (`cckit task finish <id> "<summary>" --all`) |
+| `issues` | one sub-issue per piece of an effort (`cckit effort new … --kind campaign`) | the effort's one pull request |
+
+`tasks.default` in the config decides which; see [Light tasks](/config-and-permissions/#light-tasks).
 
 <Aside type="note" title="Running a skill">
 In Claude Code, type `/` and the skill name (for example `/kit-next`). A

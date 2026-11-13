@@ -264,5 +264,23 @@ t "a second source is reached through the dispatcher alone" "$out" "light task t
 t "tasks.dir is read from the config" "$(cd "$tmp/mate" && git checkout -q develop 2>/dev/null; jq '.tasks.dir = "work/todo"' cckit.config.json > c.tmp && mv c.tmp cckit.config.json
   id="$("$CCKIT" task new "Elsewhere" --llm | jq -r .id)"; [ -f "work/todo/$id.md" ] && echo yes)" "yes"
 
+# ── tasks.default: which list is the project's default (#422) ───────────────────────────────────
+cd "$tmp/mate" || exit 1
+t "task default: issues when the key is absent" "$("$CCKIT" task default)" "issues"
+jq '.tasks.default = "light"' cckit.config.json > c.tmp && mv c.tmp cckit.config.json
+t "task default: light when the config says so" "$("$CCKIT" task default)" "light"
+t "task default --llm" "$("$CCKIT" task default --llm | jq -r '[.verb, .default] | join(" ")')" "task default light"
+want="$(KIT_TASK_FETCH=0 "$CCKIT" task next)"
+t "a bare cckit next answers from the light list" "$(KIT_TASK_FETCH=0 "$CCKIT" next 2>/dev/null)" "$want"
+has "…and names the command that starts the task" "$want" "start: cckit task start "
+t "cckit next --llm is the light task object" "$(KIT_TASK_FETCH=0 "$CCKIT" next --llm 2>/dev/null | jq -r 'has("start")')" "true"
+: > "$GH_LOG"
+KIT_TASK_FETCH=0 "$CCKIT" next >/dev/null 2>&1
+t "the light next makes no gh call" "$(grep -c . "$GH_LOG" | tr -d ' ')" "0"
+jq '.tasks.default = "sometimes"' cckit.config.json > c.tmp && mv c.tmp cckit.config.json
+out="$("$CCKIT" task default 2>"$tmp/default.err")"
+t "an unknown tasks.default reads as issues" "$out" "issues"
+has "…with a warning naming the value" "$(cat "$tmp/default.err")" "tasks.default 'sometimes' is neither 'light' nor 'issues'"
+
 [ "$fail" -eq 0 ] && echo "PASS light-task-test" || echo "FAIL light-task-test"
 exit "$fail"

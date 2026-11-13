@@ -387,6 +387,9 @@ cckit task share "Q1 backlog"                  # one PR that adds this checkout'
 - **Sources.** Tasks are read through one interface (`scripts/lib/task-source.sh`). The `file`
   source ships; another store plugs in as `scripts/lib/task-source-<name>.sh` plus
   `tasks.source: "<name>"`.
+- **Default list.** `tasks.default: "light"` makes a bare `cckit next` answer from this list;
+  `cckit task default` prints `light` or `issues`. The `campaign` skill reads it to record a
+  campaign's pieces as light tasks or as an effort's sub-issues.
 
 Guide: [Light tasks](https://cckit.dev/light-tasks/).
 

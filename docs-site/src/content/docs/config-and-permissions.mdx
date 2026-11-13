@@ -479,11 +479,12 @@ The kit carries no project's layout. Both keys are config, and the fallback is a
 
 ## Light tasks
 
-[`cckit task`](/light-tasks/) tracks work without GitHub issues. Two keys, both optional:
+[`cckit task`](/light-tasks/) tracks work without GitHub issues. Three keys, all optional:
 
 ```json
 {
   "tasks": {
+    "default": "light",
     "source": "file",
     "dir": "tasks"
   }
@@ -492,6 +493,7 @@ The kit carries no project's layout. Both keys are config, and the fallback is a
 
 | Key | Default | What it does |
 | --- | --- | --- |
+| `tasks.default` | `issues` | Which list is the project's default: `issues` (GitHub issues) or `light` (the `cckit task` list). With `light`, a bare `cckit next` prints what `cckit task next` prints, and the `campaign` skill records a campaign's pieces as light tasks. `cckit next` with any argument still asks about issues, and both lists stay usable whatever the value. `cckit task default` prints it. A value that is neither is read as `issues`, with a warning. |
 | `tasks.source` | `file` | Where task records live. `file` is the one source cckit ships: one tracked file per task. Another name `<name>` loads `scripts/lib/task-source-<name>.sh`; a name with no such file is refused with exit 1. `KIT_TASKS_SOURCE` overrides it per invocation. |
 | `tasks.dir` | `tasks` | The tracked directory the `file` source keeps tasks in, relative to the project root. An absolute path, or one that climbs out of the project, is ignored with a warning and `tasks` is used. `KIT_TASKS_DIR` overrides it per invocation. |
 

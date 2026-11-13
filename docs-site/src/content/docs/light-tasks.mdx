@@ -71,6 +71,18 @@ person who approves it needs a GitHub account.
 `take` is the same verb as `start`, and `done` the same as `finish`. An id can be shortened to any
 prefix that matches one task.
 
+## Making light tasks the default
+
+A project that tracks all its work this way sets
+[`tasks.default`](/config-and-permissions/#light-tasks) to `light`:
+
+```bash
+cckit task default     # prints: light   or: issues
+```
+
+With `light`, a bare `cckit next` prints what `cckit task next` prints. `cckit next` with an
+argument, and `cckit new` / `cckit start` / `cckit pr`, still act on GitHub issues.
+
 ## Ask your agent instead
 
 Paste this into Claude Code (or any agent that runs a shell) in a project set up with cckit:

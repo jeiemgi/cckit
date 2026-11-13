@@ -121,6 +121,12 @@
           "default": "file",
           "description": "The task source `cckit task` and `cckit gc` read. `file` (default, the one source shipped): one tracked file per task under `tasks.dir`. Another name loads `scripts/lib/task-source-<name>.sh`, which must define `task_<name>_list`, `_get`, `_create`, `_on_start`, `_on_finish` and `_state`. KIT_TASKS_SOURCE overrides it per invocation."
         },
+        "default": {
+          "type": "string",
+          "enum": ["issues", "light"],
+          "default": "issues",
+          "description": "Which task list is this project's default. issues (default): GitHub issues, through `cckit new` / `cckit start` / `cckit pr`. light: the `cckit task` list. With light, a bare `cckit next` prints what `cckit task next` prints, and the campaign skill records a campaign's pieces as light tasks instead of sub-issues. Both lists stay usable whatever the value. `cckit task default` prints it. The marketing profile sets light."
+        },
         "dir": {
           "type": "string",
           "default": "tasks",

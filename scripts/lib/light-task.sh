@@ -11,6 +11,7 @@
 #          the base branch, pushed so the team sees the task is taken        (alias: take)
 #   finish mark the task done ON ITS BRANCH, commit, push, open the pull request. The task is done
 #          when that pull request merges — review stays a pull request       (alias: done)
+#   default  print `light` or `issues`: which list is the project's default (tasks.default)
 #   share  one pull request that adds this checkout's drafts to the base branch, for a backlog
 #          nobody has started yet. The tasks list as `shared` until it merges; run again with no
 #          new drafts, it retries a share whose push or pull request failed
@@ -62,6 +63,7 @@ cckit task next
 cckit task start [--force] [--no-push] <id>          (alias: take)
 cckit task finish [<id>] "<summary>" [--all]         (alias: done)
 cckit task share ["<summary>"]
+cckit task default                                    light | issues (tasks.default in the config)
 EOF
 }
 
@@ -454,6 +456,10 @@ lt_cli() {
         return "$rc"
       fi
       "lt_$sub" "$@" ;;
+    default)
+      # Which list is this project's default (tasks.default). Read-only; no fetch, no gh.
+      out="$(task_default_name)"
+      if cckit_is_json; then cckit_json verb "task default" ok true default "$out"; else printf '%s\n' "$out"; fi ;;
     -h|--help|help) _lt_usage; return 0 ;;
     *) _lt_usage; return 2 ;;
   esac
