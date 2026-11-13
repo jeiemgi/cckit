@@ -17,6 +17,15 @@ Creates the **parent issue** (the plan) + **N native sub-issues** for one effort
 `rules/effort-model.md` for the model and the parent-issue template. GitHub is the single source of
 truth — the parent issue IS the plan (no separate plan file).
 
+## Before creating — show the plan
+
+The parent issue is the plan, and nothing is created until the owner has seen it. When
+`cckit page mode` prints `page`, present the Goal, the sub-issue list and the open choices as a
+review page (`/kit-page`, kind `plan`) and collect the approval there; when it prints `terminal`,
+show the same in the terminal. After the effort exists, record the approval and any choice made on
+the way with `cckit page answer --kind plan --issue <parent>`. The page is recommended, not a
+gate: `cckit effort start` checks nothing.
+
 ## Inputs
 
 | Field        | Required | Notes                                                                                       |

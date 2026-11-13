@@ -208,6 +208,10 @@ kit_add_integration() {
   _kit_op_diff "$tmp" "$cfg"
   if [ -n "${KIT_DRY_RUN:-}" ]; then
     rm -f "$tmp"; kit_say "  [dry-run] would write $cfg"
+    # Declining a default-on integration writes the off value: no rule and no install plan follow.
+    if ! printf '%s' "$merged" | jq -e --slurpfile d "$f" '
+        ($d[0].config) as $c | (if ($c | has("value")) then $c.value else true end) as $on
+        | (try getpath($c.key | split(".")) catch null) == $on' >/dev/null 2>&1; then return 0; fi
     _kit_add_rules "$f" "$(_kit_add_root "$cfg")" "$id"
     # What `cckit doctor` would then install, and the wire command, for this repo. Runs nothing.
     integration_install_plan "$f" "$target"
@@ -219,6 +223,11 @@ kit_add_integration() {
   verdict="$(cd "$root" && kit_manifest_verify "$rel" 2>/dev/null || true)"
   mv "$tmp" "$cfg" || { rm -f "$tmp"; kit_die "failed to write $cfg"; }
   [ "$verdict" = "intact" ] && ( cd "$root" && kit_manifest_record "$rel" A "add:$id" ) >/dev/null 2>&1
+  if ! integration_enabled "$f" "$cfg"; then
+    # A descriptor that is on by default is the one case where declining writes: the off value.
+    kit_say "$label is off: $key = $(jq -c --arg k "$key" 'getpath($k | split("."))' "$cfg"). Turn it back on with 'cckit add $id'."
+    return 0
+  fi
   kit_say "$label is on: $key = $(jq -c --arg k "$key" 'getpath($k | split("."))' "$cfg"). Nothing was installed."
   _kit_add_rules "$f" "$root" "$id"
   kit_say "$(jq -r '"\(.attribution.notice)  Docs: \(.docs)"' "$f")"

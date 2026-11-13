@@ -18,7 +18,10 @@
 #                                         machine
 #   integration_applies_needs <file>      the descriptor's conditions in words, for a decline message
 #   integration_config_key <file>         the dotted config key that turns it on
-#   integration_enabled <file> [config]   rc 0 when that key holds the descriptor's ON value
+#   integration_enabled <file> [config]   rc 0 when that key holds the descriptor's ON value, or
+#                                         is absent and the descriptor is on by default
+#   integration_default_on <file>         rc 0 when the descriptor sets `config.default: true`
+#   integration_explicit <file> [config]  rc 0 when the config holds the key at all
 # CLI:        integrations.sh --list
 #             integrations.sh --validate [id|file]
 #             integrations.sh --applies <id|file> [dir]
@@ -182,8 +185,9 @@ integration_config_key() {
 }
 
 # integration_enabled <file> [config] -> rc 0 when the project config holds the descriptor's ON
-# value at its key (`config.value`, or boolean true when the descriptor names none). An unset key,
-# another value, or no config file at all is rc 1 — off is the default, never an error.
+# value at its key (`config.value`, or boolean true when the descriptor names none). Another value
+# or no config file at all is rc 1. An unset key is rc 1 too — off is the default, never an error —
+# unless the descriptor sets `config.default: true`, which makes the unset key ON.
 integration_enabled() {
   _kit_ig_require || return 1
   local f="${1:-}" cfg="${2:-}"
@@ -193,7 +197,28 @@ integration_enabled() {
   jq -e --slurpfile d "$f" '
     ($d[0].config) as $c
     | (if ($c | has("value")) then $c.value else true end) as $on
-    | (try getpath($c.key | split(".")) catch null) == $on' "$cfg" >/dev/null 2>&1
+    | (try getpath($c.key | split(".")) catch null) as $v
+    | if $v == null then ($c.default == true) else $v == $on end' "$cfg" >/dev/null 2>&1
+}
+
+# integration_default_on <file> -> rc 0 when the descriptor is on by default (`config.default`
+# is true): on wherever the config does not hold its key.
+integration_default_on() {
+  _kit_ig_require || return 1
+  [ -f "${1:-}" ] || return 1
+  jq -e '.config.default == true' "$1" >/dev/null 2>&1
+}
+
+# integration_explicit <file> [config] -> rc 0 when the project config HOLDS the descriptor's key,
+# whatever its value. rc 1 for an absent key or no config: the difference between a project that
+# chose the tool and one that only inherits a default.
+integration_explicit() {
+  _kit_ig_require || return 1
+  local f="${1:-}" cfg="${2:-}"
+  [ -f "$f" ] || return 1
+  [ -n "$cfg" ] || cfg="$(kit_config_path 2>/dev/null)" || return 1
+  [ -n "$cfg" ] && [ -f "$cfg" ] || return 1
+  jq -e --slurpfile d "$f" '(try getpath($d[0].config.key | split(".")) catch null) != null' "$cfg" >/dev/null 2>&1
 }
 
 # _kit_ig_arg <id|file> -> a descriptor path from either form.

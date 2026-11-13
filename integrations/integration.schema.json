@@ -39,6 +39,10 @@
         },
         "value": {
           "description": "The value at `key` that means ON. Omitted = boolean true."
+        },
+        "default": {
+          "type": "boolean",
+          "description": "true = the integration is ON in a project whose config does not hold `key` at all; only an explicit other value turns it off (`false` for a boolean key, `\"none\"` for a named one). Omitted or false = off until `cckit add <id>` writes the key. A default-on tool must have a fallback: `cckit doctor` reports it missing without failing, because the project never asked for it."
         }
       }
     },

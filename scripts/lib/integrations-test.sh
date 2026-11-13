@@ -209,6 +209,28 @@ printf '{"memory":{"enabled":true}}'  > "$tmp/mem-on.json"
 printf '{"memory":{"enabled":false}}' > "$tmp/mem-off.json"
 integration_enabled "$tmp/bool.json" "$tmp/mem-on.json";  rc "boolean key true -> enabled" "$?" "0"
 integration_enabled "$tmp/bool.json" "$tmp/mem-off.json"; rc "boolean key false -> not enabled" "$?" "1"
+# `config.default: true` (#451) = on wherever the config does not hold the key; only an explicit
+# other value turns it off. No config file is still "not enabled": there is no project to be on in.
+jq '.config = {"key":"memory.enabled","default":true}' "$good" > "$tmp/defon.json"
+# Validated under the fixture's own file name: the id must match the stem.
+mkdir -p "$tmp/defon" "$tmp/defbad"; cp "$tmp/defon.json" "$tmp/defon/fixture-tool.json"
+integration_validate "$tmp/defon/fixture-tool.json" >/dev/null 2>&1; rc "config.default is a valid field" "$?" "0"
+integration_enabled "$tmp/defon.json" "$tmp/unset.json";   rc "default-on, key unset -> enabled" "$?" "0"
+integration_enabled "$tmp/defon.json" "$tmp/mem-on.json";  rc "default-on, key true -> enabled" "$?" "0"
+integration_enabled "$tmp/defon.json" "$tmp/mem-off.json"; rc "default-on, key false -> not enabled" "$?" "1"
+integration_enabled "$tmp/defon.json" "$tmp/nope.json";    rc "default-on, no config file -> not enabled" "$?" "1"
+integration_default_on "$tmp/defon.json"; rc "integration_default_on: a default-on descriptor" "$?" "0"
+integration_default_on "$tmp/bool.json";  rc "integration_default_on: an opt-in descriptor" "$?" "1"
+integration_explicit "$tmp/defon.json" "$tmp/unset.json";   rc "integration_explicit: key absent" "$?" "1"
+integration_explicit "$tmp/defon.json" "$tmp/mem-off.json"; rc "integration_explicit: key present and false" "$?" "0"
+jq '.config = {"key":"memory.enabled","default":"yes"}' "$good" > "$tmp/defbad/fixture-tool.json"
+has "config.default must be a boolean" "$(integration_validate "$tmp/defbad/fixture-tool.json" 2>&1)" "config.default: expected boolean"
+lav="$ROOT/integrations/lavish.json"
+integration_validate "$lav" >/dev/null 2>&1; rc "lavish validates" "$?" "0"
+t "lavish: turned off by reviewPages.enabled" "$(integration_config_key "$lav")" "reviewPages.enabled"
+integration_default_on "$lav"; rc "lavish: on by default" "$?" "0"
+t "lavish: ships the review-pages rule" "$(jq -c '.rules' "$lav")" '["review-pages"]'
+t "lavish: its rule template exists" "$([ -f "$ROOT/templates/rules/review-pages.md" ] && echo yes || echo no)" "yes"
 
 # ── 7. the CLI form other scripts call ─────────────────────────────────────────────────────────
 t "--list" "$(bash "$LIB/integrations.sh" --list)" "fixture-tool"
@@ -243,7 +265,7 @@ done
 
 # The two tools that used to be hardcoded in scripts/kit-doctor.sh (E303.4), one unit test each.
 # They are unlike on purpose: the format has to carry both shapes.
-t "shipped descriptors" "$(integrations_list | tr '\n' ' ')" "graft mempalace mlx-lm "
+t "shipped descriptors" "$(integrations_list | tr '\n' ' ')" "graft lavish mempalace mlx-lm "
 mp="$ROOT/integrations/mempalace.json"; mlx="$ROOT/integrations/mlx-lm.json"
 integration_validate "$mp" >/dev/null 2>&1;  rc "mempalace validates" "$?" "0"
 t "mempalace: turned on by memory.enabled" "$(integration_config_key "$mp")" "memory.enabled"

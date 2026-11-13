@@ -172,6 +172,28 @@ if [ -n "${KIT_ADD_TEST_INNER:-}" ]; then
   t "second add restores a missing rule" "$([ -f "$tsg/.claude/rules/code-retrieval.md" ] && echo yes || echo no)" "yes"
   rm -f "$reg/graft.json"
 
+  # --- on by default (#451): the shipped lavish descriptor. Declining is the one case that
+  # writes — the off value — and it writes no rule; switching it back on restores the default.
+  cp "$dir/../integrations/lavish.json" "$reg/lavish.json"
+  lv="$ws/lavish-proj"; mkdir -p "$lv/.claude"
+  printf '{"project":{"name":"l"}}\n' > "$lv/.claude/kit.config.json"
+  t "lavish: listed as enabled with no key in the config" \
+    "$( (cd "$lv" && CCKIT_OUTPUT=json "$ADD" 2>/dev/null) | jq -c '.integrations[] | select(.id == "lavish") | [.key, .enabled]')" '["reviewPages.enabled",true]'
+  out="$(KIT_DRY_RUN=1 "$ADD" lavish --dir "$lv" --set enable=no 2>&1)"; t "lavish off dry-run rc" "$?" "0"
+  t "lavish off dry-run: nothing written" "$(jq -c . "$lv/.claude/kit.config.json")" '{"project":{"name":"l"}}'
+  t "lavish off dry-run: no rule is announced" "$(printf '%s' "$out" | grep -c 'review-pages.md')" "0"
+  out="$("$ADD" lavish --dir "$lv" --set enable=no 2>&1)"; t "lavish off rc" "$?" "0"
+  t "lavish off: the config records false" "$(jq -c .reviewPages "$lv/.claude/kit.config.json")" '{"enabled":false}'
+  has "lavish off: says it is off and how to turn it on" "$out" "Lavish is off: reviewPages.enabled = false. Turn it back on with 'cckit add lavish'."
+  t "lavish off: no rule written" "$([ -e "$lv/.claude/rules/review-pages.md" ] && echo made || echo none)" "none"
+  t "lavish off: listed as not enabled" \
+    "$( (cd "$lv" && CCKIT_OUTPUT=json "$ADD" 2>/dev/null) | jq -c '.integrations[] | select(.id == "lavish") | .enabled')" 'false'
+  out="$("$ADD" lavish --dir "$lv" 2>&1)"; t "lavish on rc" "$?" "0"
+  t "lavish on: the config records true" "$(jq -c .reviewPages "$lv/.claude/kit.config.json")" '{"enabled":true}'
+  t "lavish on: the rule is the template, verbatim" "$(cmp -s "$dir/../templates/rules/review-pages.md" "$lv/.claude/rules/review-pages.md" && echo same || echo differs)" "same"
+  has "lavish on: the attribution notice" "$out" "cckit is not affiliated with its author"
+  rm -f "$reg/lavish.json"
+
   # a module wins a name it shares with an integration
   desc software '{"key":"codeGraph.provider","value":"clash"}' null
   mkdir -p "$ws/clash"

@@ -29,6 +29,7 @@ cckit init --dry-run
 | [`gate-and-review`](#gate-and-review) | the gate blocks the push and its output goes on the PR; every AI-reviewer finding is fixed or rebutted before the merge | all five | every session |
 | [`authoring`](#authoring) | docs and README updated in the same change, no issue numbers in pasted prompts, summaries that name the work without machine flags | all five | every session |
 | [`shared-checkout`](#shared-checkout) | the primary checkout is shared by every session: never move it by hand, work in a worktree, call a freshly merged verb from a current worktree | all five | every session |
+| [`review-pages`](#review-pages) | a plan, a decision with options or a grilling round opens as a review page; terminal output where there is no browser; the answer is written back | all five | every session |
 | `mempalace` | the persistent-memory protocol — written only when memory is on | all five | every session |
 | `knowledge-base` | frontmatter and the index for the project's knowledge docs | software, content, research, automation | every session |
 | `plan-output-format` | a plan is a file with a `## Deliverables` table | software, content, research, automation | every session |
@@ -198,6 +199,17 @@ What each one asks for in practice:
   a PR body or a changelog still cites the real number: those describe one repository's history.
 - **Summaries.** A command belongs in a summary when you are going to run it next, written exactly
   as typed. A flag that is evidence in a PR body — the command that ran and its exit code — stays.
+
+### review-pages
+
+`templates/rules/review-pages.md` — which output goes to a [review page](/review-pages/) and how.
+
+| Part | What it says |
+| --- | --- |
+| Three kinds | `plan` (before implementation), `decision` (two or more options), `grill` (a grilling round). Everything else stays in the terminal |
+| Ask first | `cckit page mode` prints `page` or `terminal: <reason>`; on `terminal` the agent writes no HTML and prints instead |
+| Write back | `cckit page answer` records every answer, on both paths: a comment on the issue, or a file under `docs/answers/` to commit with the change |
+| Limits | never in an unattended run; a page before `cckit effort start` is recommended and checked by nothing; `reviewPages.enabled: false` turns pages off |
 
 ### shared-checkout
 

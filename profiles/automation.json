@@ -23,7 +23,8 @@
     "gate-and-review",
     "authoring",
     "shared-checkout",
-    "task-management"
+    "task-management",
+    "review-pages"
   ],
   "roles": [
     "PM",

@@ -45,6 +45,9 @@ trap 'finish interrupted 129; exit 129' HUP
 trap 'finish interrupted 130; exit 130' INT
 trap 'finish interrupted 143; exit 143' TERM
 
+# A wave pane runs with no reader: `cckit page` in the agent's shell reads this and prints to the
+# terminal instead of opening a review page (#451).
+export CCKIT_HEADLESS=1
 "$@"
 rc=$?
 finish "$(wr_classify_rc "$rc")" "$rc"

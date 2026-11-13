@@ -38,6 +38,7 @@ effort-model rendered
 issue-lifecycle rendered
 merge-safety rendered
 naming-and-ids verbatim
+review-pages verbatim
 shared-checkout rendered'
 
 # INSTALLED_HOOKS: the hook scripts under .claude/hooks/, same "<name> <mode>" form. A hook cckit
