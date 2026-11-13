@@ -186,7 +186,9 @@ _wt_slot_alloc() {
 _wt_slot_for() {
   local root="$1" num="$2" wt="$3" f lock out locked=0
   f="$(_wt_slots_file "$root")" || { printf '%s' $(( $(_wt_num_hash "$num") % 40 )); return 0; }
-  [[ -f "$f" ]] || : > "$f" 2>/dev/null || { printf '%s' $(( $(_wt_num_hash "$num") % 40 )); return 0; }
+  # `>>`, not `>`: this line runs BEFORE the lock, so a truncating create could empty a ledger that
+  # another process created and wrote to between the test and the redirection.
+  [[ -f "$f" ]] || : >> "$f" 2>/dev/null || { printf '%s' $(( $(_wt_num_hash "$num") % 40 )); return 0; }
 
   lock="$f.lock"
   if _wt_lock "$lock"; then locked=1; else
