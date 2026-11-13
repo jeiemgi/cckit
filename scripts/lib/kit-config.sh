@@ -123,6 +123,10 @@ load_kit_config() {
   # always map to a branch prefix and a commit type (kinds.sh); this key only decides the labels.
   export KIT_CONTENT_KINDS_ON="$(jq -r '.kinds.content // false' "$cfg")"
 
+  # Plain language (#420). plainLanguage.enabled: true installs the plain-language rule at init and
+  # makes `cckit task` word its progress lines without worktree, branch and pull request.
+  export KIT_PLAIN_LANGUAGE="$(jq -r '.plainLanguage.enabled // false' "$cfg")"
+
   # Apply per-folder .claudekit/ overrides (no-op when none exist).
   _kit_apply_claudekit_overlays "$cfg"
 }

@@ -37,6 +37,7 @@ cckit init --dry-run
 | `effort-model` | the effort as the unit of work: parent issue, sub-issues, one PR | software | every session |
 | `delegation-brief` | what every delegated agent is handed up front | software | every session |
 | `skill-gaps` | proposing a skill when the same gap shows up twice | software | every session |
+| [`plain-language`](#plain-language) | the agent says draft, review and approve, and names worktree, branch and pull request only when asked — written only while `plainLanguage.enabled` is true | none by default — `cckit init --plain-language on` | every session |
 | `naming-and-ids` | the `E241` / `E241.2` / `#209` / `PR 268` tokens | none — copy it in | every session |
 | `risk-tiered-review` | which PRs need a human read | none — copy it in | every session |
 | `plan-next` | the forward-planning verb's output | none — copy it in | every session |
@@ -85,6 +86,34 @@ To scope a rule of your own, add a `paths:` list to its frontmatter:
 Resident rules count against the 150k characters of instruction files Claude Code loads per
 session. [`instruction-budget-lint`](/review-gates/#instruction-budget-lint--what-every-session-loads)
 is the gate on that total; its `--report` lists the resident and the path-scoped files separately.
+
+## plain-language
+
+`templates/rules/plain-language.md` — for a project whose people do not use git. cckit still runs
+the work on worktrees, branches and pull requests; the rule decides what the agent **says**.
+
+| cckit does | The agent says |
+| --- | --- |
+| records a task | "I added it to the task list." |
+| creates a worktree and a branch | "I started the draft." |
+| commits and pushes | "I saved the draft." |
+| opens a pull request | "The draft is ready for review." Then the link. |
+| the pull request merges | "It is approved and part of the shared version." |
+
+It names the mechanics when the person uses one of those words or asks how it works, reports a
+failure as a failure with the command and its error on one line, and changes no command, no commit
+message, no pull request title or body, and no text a program reads.
+
+The rule follows a config switch, not a profile list:
+
+```bash
+cckit init --profile content --plain-language on --no-github
+```
+
+writes `"plainLanguage": {"enabled": true}` and the rule. `--plain-language off` leaves both out.
+On `cckit init --upgrade` the stored switch wins: a project that set it to `false` and deleted the
+rule does not get the rule back, and one whose switch is on gets a missing rule file restored. The
+same switch rewords the progress lines of [`cckit task`](/light-tasks/#plain-language).
 
 ## Rules that came from a correction
 

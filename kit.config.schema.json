@@ -128,6 +128,13 @@
         }
       }
     },
+    "plainLanguage": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "enabled": { "type": "boolean", "default": false, "description": "Plain language mode. `cckit init` installs the `plain-language` rule while this is true: the agent says draft, review and approve, and names worktree, branch and pull request only when asked. `cckit task` words its progress lines the same way (its `--llm` output and its stdout are unchanged). The marketing profile turns it on; `cckit init --plain-language on|off` sets it for any profile. On `--upgrade` the stored value wins over the profile default." }
+      }
+    },
     "kinds": {
       "type": "object",
       "additionalProperties": true,

@@ -506,6 +506,7 @@ add them by hand.
 | Key | Default | What it does |
 | --- | --- | --- |
 | `pr.bodyStyle` | `code` | `content` gives generated pull request bodies draft-and-review wording. Details below. |
+| `plainLanguage.enabled` | `false` | `true` installs the [`plain-language`](/rules/#plain-language) rule at `cckit init` and rewords the progress lines of `cckit task`. Set by `cckit init --plain-language on\|off`; the `content` profile leaves it off. On `--upgrade` the stored value wins over the profile default. |
 | `kinds.content` | `false` | `true` makes `scripts/setup-labels.sh` — and the label step of `cckit init` — provision the four content kind labels: `kind:post`, `kind:campaign`, `kind:brand`, `kind:research`. The kinds work without the key; it only decides whether the labels are created. |
 
 A content kind is a label, never a branch prefix. `cckit start` maps it onto the closed set of

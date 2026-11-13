@@ -47,6 +47,13 @@ type cckit_is_json >/dev/null 2>&1 || cckit_is_json() { [ "${CCKIT_OUTPUT:-human
 
 _LT_TAB="$(printf '\t')"
 
+# _lt_say <technical> <plain> — one progress line, worded for the reader (#420). With
+# plainLanguage.enabled (KIT_PLAIN_LANGUAGE=true) the plain wording is printed: no worktree, branch
+# or pull request. Only human progress lines go through here; stdout contracts and --llm do not.
+_lt_say() {
+  if [ "${KIT_PLAIN_LANGUAGE:-false}" = "true" ]; then printf '%s\n' "$2"; else printf '%s\n' "$1"; fi
+}
+
 _lt_usage() {
   cat >&2 <<'EOF'
 cckit task new [--priority p0|p1|p2|p3] [--kind K] [--body B|--body-file F] "<title>"
@@ -124,7 +131,8 @@ lt_new() {
   fi
   echo "✓ task $id · $title"
   if [ "$(task_source_name)" = "file" ]; then
-    echo "  file:  $dir/$id.md (a draft: only in this checkout until it is started or shared)"
+    _lt_say "  file:  $dir/$id.md (a draft: only in this checkout until it is started or shared)" \
+            "  file:  $dir/$id.md (only on this computer until you start it or share the list)"
   fi
   echo "  start: cckit task start $id"
 }
@@ -232,7 +240,8 @@ EOF
     wt="$root/.claude/worktrees/$(printf '%s' "$branch" | tr '/' '+')"
     git -C "$root" worktree add --no-track -b "$branch" "$wt" "$base_ref" >/dev/null 2>&1 \
       || { echo "✗ task start: worktree add failed for $branch" >&2; return 1; }
-    echo "[$id] created worktree $wt (branch $branch from $base_ref)" >&2
+    _lt_say "[$id] created worktree $wt (branch $branch from $base_ref)" \
+            "[$id] started — the draft lives in $wt" >&2
     if type wt_bootstrap >/dev/null 2>&1; then wt_bootstrap "$root" "$wt" "$id" >&2 || true; fi
   fi
 
@@ -240,12 +249,15 @@ EOF
 
   if [ "$push" = 1 ] && git -C "$root" remote get-url origin >/dev/null 2>&1; then
     if KIT_PR_BASE="$base" git -C "$wt" push --quiet -u origin "$branch" >/dev/null 2>&1; then
-      echo "[$id] pushed $branch — the team's list now shows the task as doing" >&2
+      _lt_say "[$id] pushed $branch — the team's list now shows the task as doing" \
+              "[$id] the team's list now shows this task as in progress" >&2
     else
-      echo "[$id] ⚠ could not push $branch; the task shows as doing on this machine only" >&2
+      _lt_say "[$id] ⚠ could not push $branch; the task shows as doing on this machine only" \
+              "[$id] ⚠ could not reach the shared copy; the task shows as in progress on this computer only" >&2
     fi
   fi
-  echo "[$id] when the work is ready: cckit task finish $id \"<summary>\"" >&2
+  _lt_say "[$id] when the work is ready: cckit task finish $id \"<summary>\"" \
+          "[$id] when the draft is ready for review: cckit task finish $id \"<summary>\"" >&2
   echo "$wt|$branch|$id"
 }
 
@@ -277,7 +289,8 @@ _lt_open_pr() {
     url="$(gh pr list --repo "$repo" --head "$branch" --state open --json url --jq '.[0].url // empty' 2>/dev/null || true)"
   fi
   if [ -n "$url" ]; then
-    echo "[task] a pull request is already open for $branch" >&2
+    _lt_say "[task] a pull request is already open for $branch" \
+            "[task] this draft is already waiting for review" >&2
     echo "✓ $url"; return 0
   fi
   if cckit_gh_rest; then
@@ -290,6 +303,7 @@ _lt_open_pr() {
     echo "✗ could not open the pull request for $branch — the branch is pushed; run the same command again to retry" >&2
     return 1
   fi
+  [ "${KIT_PLAIN_LANGUAGE:-false}" = "true" ] && echo "[task] ready for review — open the link and approve it there" >&2
   echo "✓ $url"
 }
 

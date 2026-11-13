@@ -91,6 +91,7 @@ An agent or a script has no terminal to answer on. Three flags cover it:
 cckit init my-app --dry-run --recipe nextjs-shadcn --database supabase   # print every step; write nothing
 cckit init my-app --answers answers.json --yes                           # answers from a file; setup confirmed
 cckit init --profile software --no-github                                # the kit files only
+cckit init --profile content --plain-language on --no-github             # + the plain-language rule
 ```
 
 - `--answers <file>` is a JSON object keyed by question: `new_project` (`yes` / `no`), `folder_use`

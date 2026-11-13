@@ -82,6 +82,21 @@ work in the worktree it prints, and when I say it is ready run
 `cckit task finish <id> "<summary>"` and give me the pull request link. Do not merge it.
 ```
 
+## Plain language
+
+With [`plainLanguage.enabled`](/config-and-permissions/#content-work) set to `true`, the lines
+`cckit task` prints while it works leave out worktree, branch and pull request:
+
+| Verb | Default line | Plain line |
+| --- | --- | --- |
+| `new` | `file: tasks/<id>.md (a draft: only in this checkout until it is started or shared)` | `file: tasks/<id>.md (only on this computer until you start it or share the list)` |
+| `start` | `created worktree <path> (branch light/<id>-<slug> from origin/<base>)` | `started — the draft lives in <path>` |
+| `start` | `pushed light/<id>-<slug> — the team's list now shows the task as doing` | `the team's list now shows this task as in progress` |
+| `finish` | — | `ready for review — open the link and approve it there` |
+
+What a program reads is the same in both: `start` still prints `<worktree>|<branch>|<id>` on
+stdout, `finish` still prints `✓ <url>`, and `--llm` output does not change.
+
 ## States
 
 `cckit task list` derives each task's state from where its file is and what it says. Nothing else

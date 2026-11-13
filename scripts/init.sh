@@ -27,6 +27,8 @@
 #   --plans-dir <dir>         where plans live                     (default: per format)
 #   --memory <on|off>         enable MemPalace memory + hooks      (default: profile default)
 #   --speckit <on|off>        add the Spec-Driven Development flow  (default: off)
+#   --plain-language <on|off> install the plain-language rule: the agent says draft, review and
+#                             approve, and names git mechanics only when asked (default: profile default)
 #   --prepush "<command>"     install an opt-in pre-push gate that runs <command> before
 #                             `git push` and blocks on failure     (default: none -> no gate)
 #   --local <on|off>          local model layer (mlx_lm.server) for NL chores at $0 API cost
@@ -260,6 +262,7 @@ fi
 _INIT_ARGS=("$@")   # as typed — the --upgrade dry run replays them against a copy (#448)
 PROFILE=""; TARGET="$PWD"; NAME=""; SLUG=""; REPO=""; GH_OWNER=""; OWNER_NAME=""
 PROJECT_NUMBER=""; PLANS_FORMAT=""; PLANS_DIR=""; MEMORY=""; LANG_PREF="English"; FORCE=0
+PLAIN_LANGUAGE=""
 SPECKIT=""; PREPUSH_CMD=""; LOCAL_LAYER=""; LOCAL_EXPLICIT=0; DRY_RUN=0; UPGRADE=0
 ADAPTER_ARG=""    # --adapter as typed; resolved to ADAPTERS below (stored selection wins on upgrade)
 # Guided setup (#456): the folder as typed, the git + GitHub steps, the advisor's answers.
@@ -280,6 +283,7 @@ while [[ $# -gt 0 ]]; do
     --plans-dir) PLANS_DIR="$2"; shift 2 ;;
     --memory) MEMORY="$2"; shift 2 ;;
     --speckit) SPECKIT="$2"; shift 2 ;;
+    --plain-language) PLAIN_LANGUAGE="$2"; shift 2 ;;
     --prepush) PREPUSH_CMD="$2"; shift 2 ;;
     --local) LOCAL_LAYER="$2"; LOCAL_EXPLICIT=1; shift 2 ;;
     --lang) LANG_PREF="$2"; shift 2 ;;
@@ -293,7 +297,7 @@ while [[ $# -gt 0 ]]; do
     --answers) INIT_ANSWERS="$2"; shift 2 ;;
     --recipe) RECIPE_ARG="$2"; shift 2 ;;
     --database) DATABASE_ARG="$2"; shift 2 ;;
-    -h|--help) sed -n '2,40p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,41p' "$0"; exit 0 ;;
     -*) echo "x unknown flag: $1" >&2; exit 1 ;;
     *) if [[ $FOLDER_GIVEN -eq 1 ]]; then echo "x one folder only (got '$TARGET' and '$1')" >&2; exit 1; fi
        TARGET="$1"; FOLDER_GIVEN=1; shift ;;
@@ -376,6 +380,9 @@ if [[ $UPGRADE -eq 1 ]]; then
   [[ -z "$MEMORY" ]]       && MEMORY="$(jq -r 'if .memory.enabled then "on" else "off" end' "$UP_CFG")"
   [[ -z "$SPECKIT" ]]      && SPECKIT="$(jq -r 'if (.specKit.enabled // false) then "on" else "off" end' "$UP_CFG")"
   [[ -z "$LOCAL_LAYER" ]]  && LOCAL_LAYER="$(jq -r 'if (.local.enabled // false) then "on" else "off" end' "$UP_CFG")"
+  # The stored switch is the truth on upgrade: a project that turned plain language off keeps it
+  # off whatever its profile defaults to.
+  [[ -z "$PLAIN_LANGUAGE" ]] && PLAIN_LANGUAGE="$(jq -r 'if (.plainLanguage.enabled // false) then "on" else "off" end' "$UP_CFG")"
   # A config with NO plans key at all deliberately runs without plan files — upgrade must not
   # resurrect the profile default (and with it the plans rule + config block) (#149).
   [[ -z "$PLANS_FORMAT" ]] && PLANS_FORMAT="$(jq -r 'if has("plans") then (.plans.format // "") else "none" end' "$UP_CFG")"
@@ -490,7 +497,10 @@ fi
 CONTENT_KINDS="$(jq -r '.defaults.content_kinds // "off"' "$PROFILE_FILE")"
 #   pr_body content   -> pr.bodyStyle: "content" (draft-and-review wording in generated PR bodies)
 case "$CONTENT_KINDS" in on|true|yes) CONTENT_KINDS_ON="true";; *) CONTENT_KINDS_ON="false";; esac
+#   plain_language on -> plainLanguage.enabled: true + the plain-language rule (--plain-language wins)
 PR_BODY_STYLE="$(jq -r '.defaults.pr_body // "code"' "$PROFILE_FILE")"
+[[ -z "$PLAIN_LANGUAGE" ]] && PLAIN_LANGUAGE="$(jq -r '.defaults.plain_language // "off"' "$PROFILE_FILE")"
+case "$PLAIN_LANGUAGE" in on|true|yes) PLAIN_ON="true";; *) PLAIN_ON="false";; esac
 [[ "$PR_BODY_STYLE" == "content" ]] || PR_BODY_STYLE="code"
 if [[ -z "$PLANS_DIR" ]]; then
   case "$PLANS_FORMAT" in
@@ -612,9 +622,16 @@ _rule_enabled() {  # <rule> -> 0 unless its feature is off for this project
     mempalace)          [[ "$MEMORY_BOOL" == "true" ]] || return 1 ;;
     design-routing)     [[ "$DESIGN_ON"   == "true" ]] || return 1 ;;
     plan-output-format) [[ "$PLANS_ON"    == "true" ]] || return 1 ;;
+    plain-language)     [[ "$PLAIN_ON"    == "true" ]] || return 1 ;;
   esac
   return 0
 }
+# The plain-language rule follows its switch, not the profile list: a profile that lists it gets it
+# only while the switch is on, and `--plain-language on` adds it to a profile that does not list it.
+if [[ "$PLAIN_ON" == "true" ]] && ! printf '%s\n' "$RULES" | grep -qx 'plain-language'; then
+  RULES="$RULES
+plain-language"
+fi
 RULE_LIST=""
 for r in $RULES; do
   _rule_enabled "$r" && [[ -f "$KIT_ROOT/templates/rules/$r.md" ]] || continue
@@ -787,6 +804,7 @@ if [[ $DRY_RUN -eq 1 ]]; then
   echo "  Spec Kit: $SPECKIT_ON   Pre-push gate: $PREPUSH_ENABLED   Local model: $LOCAL_ON   kitVersion: $PLUGIN_VERSION"
   [[ "$CONTENT_KINDS_ON" == "true" ]] && echo "  Content : kind labels post · campaign · brand · research"
   [[ "$PR_BODY_STYLE" == "content" ]] && echo "  PR text : content (draft and review wording)"
+  [[ "$PLAIN_ON" == "true" ]] && echo "  Wording : plain language (draft, review, approve)"
   echo ""
   if [[ $UPGRADE -eq 1 ]]; then
     # An upgrade's dry run is the upgrade itself, run on a temporary copy of the kit-managed paths
@@ -955,7 +973,7 @@ jq -n \
   --argjson speckit "$SPECKIT_JSON" \
   --argjson ppen "$PREPUSH_ENABLED" --arg ppcmd "$PREPUSH_CMD" \
   --argjson localon "$LOCAL_ON" \
-  --argjson ckinds "$CONTENT_KINDS_ON" --arg prbody "$PR_BODY_STYLE" \
+  --argjson ckinds "$CONTENT_KINDS_ON" --arg prbody "$PR_BODY_STYLE" --argjson plain "$PLAIN_ON" \
   '{kitVersion:$kitver,
     adapters:$adapters,
     project:{name:$name,slug:$slug,owner:$owner,language:$lang,path:$path},
@@ -972,6 +990,7 @@ jq -n \
    # software project does not gain keys it never reads (E415).
    | if $ckinds then .kinds = {content:true} else . end
    | if $prbody == "content" then .pr = {bodyStyle:"content"} else . end
+   | if $plain then .plainLanguage = {enabled:true} else . end
    # A Codex-only config is the tracked root file, so it carries no absolute machine path.
    | if ($adapters | index("claude")) then . else del(.project.path) end' \
   > "$KITCFG.kit-new"
@@ -992,7 +1011,7 @@ if [[ $UPGRADE -eq 1 && -f "$KITCFG" ]]; then
       else $h end;
     .[1] as $have
     | (.[0] | with_entries(.key as $k | select(
-        (["plans","specKit","prePush","local","memory","adapters"] | index($k)) == null
+        (["plans","specKit","prePush","local","memory","adapters","plainLanguage"] | index($k)) == null
         or ($have | has($k))))) as $tmpl
     | fill($have; $tmpl) | .kitVersion = $kitver' "$KITCFG.kit-new" "$KITCFG" \
     > "$KITCFG.merged"
