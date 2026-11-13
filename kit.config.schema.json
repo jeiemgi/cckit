@@ -44,7 +44,7 @@
         "slug": { "type": "string" },
         "owner": { "type": "string" },
         "language": { "type": "string", "description": "Comms language, e.g. en, es, mixed." },
-        "path": { "type": "string" }
+        "path": { "type": "string", "description": "Deprecated: no longer written by cckit init. It held an absolute machine path and nothing reads it; delete it from a config that still has it." }
       }
     },
     "profile": { "type": "string", "description": "Active role profile (minimal, software, content, research, automation, ...)." },

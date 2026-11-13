@@ -1063,8 +1063,8 @@ jq -n \
    | if $prbody == "content" then .pr = {bodyStyle:"content"} else . end
    | if $plain then .plainLanguage = {enabled:true} else . end
    | if $tasksdef == "light" then .tasks = {default:"light"} else . end
-   # A Codex-only config is the tracked root file, so it carries no absolute machine path.
-   | if ($adapters | index("claude")) then . else del(.project.path) end' \
+   # The config is committed by the guided setup, so it carries no absolute machine path (#490).
+   | del(.project.path)' \
   > "$KITCFG.kit-new"
 if [[ $UPGRADE -eq 1 && -f "$KITCFG" ]]; then
   # deep-merge: existing values win (preserve user choices), new REQUIRED keys added, version
