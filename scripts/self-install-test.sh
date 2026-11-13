@@ -59,6 +59,7 @@ SKIPPED_SKILLS='campaign :: plans a marketing campaign from brand/voice.md; ccki
 brand-voice :: records a brand voice in brand/voice.md for copywriting to read; cckit has no brand file and does not install copywriting, its reader
 copywriting :: not declared by any profile cckit uses (content profile only); cckit ships no marketing copy
 feature-build-refine :: stack-gated on a @refinedev/* dependency; cckit has no package.json dependencies at all
+page-design :: coordinates three third-party design skills for a page built through `cckit task run`; cckit is a bash CLI whose one site (docs-site/) is written by hand, has no light task list and installs none of the three skills
 morning-briefing :: reads .claude/kit.config.json, which this repo does not have, and cckit answers the same question with `cckit status` + skills/kit-status
 speckit :: the software profile ships it with defaults.speckit = "off", so init would not install it either
 supabase-patterns :: cckit has no Supabase; the only matches for "supabase" in the repo are the kit machinery that scaffolds this skill'

@@ -37,6 +37,8 @@ done
 t "recipes: exactly one is recommended" "$rec" "1"
 # A recipe may carry project config keys (#496): the web recipe names the gate `cckit task run` uses.
 t "recipe nextjs-shadcn: sets tasks.check" "$(jq -r '.config.tasks.check' "$(recipe_file nextjs-shadcn)")" "pnpm build && pnpm lint"
+# …and that its tasks are page tasks, which is also what installs the page-design skill (#504).
+t "recipe nextjs-shadcn: sets tasks.design" "$(jq -r '.config.tasks.design' "$(recipe_file nextjs-shadcn)")" "true"
 bad="$(mktemp -d)"; jq '.config = "pnpm build"' "$(recipe_file nextjs-shadcn)" > "$bad/nextjs-shadcn.json"
 t "a recipe whose config is not an object is invalid" "$(recipe_validate "$bad/nextjs-shadcn.json" 2>&1)" "nextjs-shadcn: config: an object of project config keys"
 rm -rf "$bad"

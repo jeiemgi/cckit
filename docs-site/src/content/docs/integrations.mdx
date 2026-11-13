@@ -1,6 +1,6 @@
 ---
 title: Integrations
-description: The optional third-party tools cckit can switch on, install and re-check — MemPalace, mlx-lm, Graft and Lavish — and what each step asks of you.
+description: The optional third-party tools cckit can switch on, install and re-check — MemPalace, mlx-lm, Graft, Lavish and three design skills — and what each step asks of you.
 ---
 
 import { Steps, Aside } from '@astrojs/starlight/components';
@@ -25,6 +25,9 @@ row, installs nothing and changes no exit code, and `cckit add lavish --set enab
 | `mempalace` | Persistent per-project memory: sessions wake up with context and file their work back. | `memory.enabled` | any repo, any machine | [MemPalace](https://github.com/MemPalace/mempalace) |
 | `mlx-lm` | A local model runtime: digest, summarize and classify run on this Mac through `mlx_lm.server`. | `local.enabled` | Apple silicon only (`Darwin` + `arm64`) | [Apple, ml-explore](https://github.com/ml-explore/mlx-lm) |
 | `graft` | Code-graph retrieval: agents ask an index where code lives and who calls a symbol. | `codeGraph.provider` = `graft` | a repo with at least one file in a language Graft indexes | [NanoNets / Trail](https://github.com/trailhq/Trail-Code) |
+| `impeccable` | Design direction for a page: plan it, set type, layout and colour, flag the look of a generated page. Step 1 of [`page-design`](/skills/#page-design). | `designDirection.provider` = `impeccable` | any repo; installed for Claude Code | [pbakaus](https://github.com/pbakaus/impeccable) |
+| `emil-design-eng` | Interaction and motion rules for a chosen design. Step 2 of `page-design`. | `designMotion.provider` = `emil-design-eng` | any repo; installed for Claude Code | [Emil Kowalski](https://github.com/emilkowalski/skills) |
+| `web-design-guidelines` | An audit of a finished page's code: accessibility, focus, reduced motion. Step 3 of `page-design`. | `designAudit.provider` = `web-design-guidelines` | any repo; installed for Claude Code; needs network on every run | [Vercel](https://github.com/vercel-labs/agent-skills) |
 | `lavish` | [Review pages](/review-pages/): a plan, a decision or a grilling round opens as a page you annotate and answer. | `reviewPages.enabled` — on unless `false` | any repo, any machine; a session with no browser prints to the terminal | [Kun Chen](https://github.com/kunchenguid/lavish-axi) |
 
 `cckit add` with no name prints this list for the repo you are in, each row marked `on` or `off`,
@@ -59,7 +62,8 @@ and says which ones do not apply here.
 
 3. **Finish the step the doctor names.** After an install the doctor prints the one step it leaves
    to you: `mempalace mcp` for MemPalace, `graft init --agents claude --no-statusline --no-global`
-   for Graft. mlx-lm and Lavish have none.
+   for Graft. mlx-lm and Lavish have none. For each of the three design skills: reload the agent
+   session so it lists the skill, and commit the files the install wrote.
 
 </Steps>
 
@@ -95,6 +99,9 @@ later candidates never run. If the tool is already detectable, nothing runs, so 
 | `mempalace` | `pipx install mempalace`, then `uv tool install mempalace` | `brew install pipx` |
 | `mlx-lm` | `uv tool install mlx-lm`, then `pipx install mlx-lm` | `brew install uv` |
 | `graft` | `npm install -g @nanonets/graft`, then `pnpm add -g @nanonets/graft` | nothing: the install fails |
+| `impeccable` | `npx -y impeccable install --providers=claude --scope=project` | nothing: the install fails |
+| `emil-design-eng` | `npx -y skills@latest add emilkowalski/skills --skill emil-design-eng -a claude-code -y` | nothing: the install fails |
+| `web-design-guidelines` | `npx -y skills@latest add vercel-labs/agent-skills --skill web-design-guidelines -a claude-code -y` | nothing: the install fails |
 | `lavish` | `npm install -g lavish-axi`, then `brew install node` — reached only when neither `lavish-axi` nor `npx` is on `PATH`, and only when the config sets `reviewPages.enabled: true` | nothing: the install fails |
 
 Installing by hand with any of those commands works too: the doctor detects the tool and reports it
@@ -164,6 +171,52 @@ terminal fallback and where answers are written: [Review pages](/review-pages/).
 Lavish (`lavish-axi`) is open-source software (MIT) by [Kun Chen](https://github.com/kunchenguid/lavish-axi),
 run from its public npm package. cckit is not affiliated with its author and vendors none of its
 code.
+</Aside>
+
+### The design skills
+
+Three skills that [`page-design`](/skills/#page-design), cckit's own skill, applies in a fixed
+order when a page is built. A skill is files, not a program: each descriptor detects its skill by
+the file `.claude/skills/<id>/SKILL.md` in the project, or `~/.claude/skills/<id>/SKILL.md`, and
+`verify` is the same file check. None needs an API key or a paid product. cckit copies none of
+their content.
+
+```bash
+cckit add impeccable && cckit add emil-design-eng && cckit add web-design-guidelines
+cckit doctor --fix
+```
+
+| Skill | Licence, and where it was read | What installing and running it does beyond writing files |
+| --- | --- | --- |
+| `impeccable` | Apache-2.0: the `LICENSE` file of [pbakaus/impeccable](https://github.com/pbakaus/impeccable) | Runs an engine binary that ships with the skill or is downloaded once into `~/.impeccable/bin/`. A new design fetches visual directions from the impeccable.style catalogue, with telemetry on or off. The installer can add a design hook that runs on every UI file the agent edits; in Claude Code that hook runs outside the model's permission checks. Its live mode can start the agent CLI with permission checks off: `page-design` never uses it in an unattended run. |
+| `emil-design-eng` | MIT: the `LICENSE` file of [emilkowalski/skills](https://github.com/emilkowalski/skills) | Nothing stated by its author. It is one skill of a pack of 19; only this one is installed. |
+| `web-design-guidelines` | MIT as stated in the README of [vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills), which holds no `LICENSE` file. The rules it fetches come from [vercel-labs/web-interface-guidelines](https://github.com/vercel-labs/web-interface-guidelines), which has an MIT `LICENSE` file | Fetches its rules from GitHub on every run: it does not work offline, and the rules can change between two runs. With no network `page-design` reports the audit as not run. |
+
+All three were read on 2026-11-13.
+
+**Where each installs.** Into the project, for Claude Code. `impeccable` is passed
+`--scope=project --providers=claude`. The other two go through the third-party `skills` CLI
+(`npx skills`, Node.js 22.20 or later), which installs into the current project unless given `-g`:
+per its documentation, a copy under `.agents/skills/<id>/`, a link at `.claude/skills/<id>`, and an
+entry in `skills-lock.json`. Commit what the install wrote. A Codex-only project is not covered:
+the descriptors install and detect the Claude Code location only.
+
+<Aside type="caution" title="Not verified by a run">
+The three install commands were assembled from each project's documentation and were not run by
+cckit's authors. Unverified: that `npx impeccable install --providers=claude --scope=project`
+asks nothing when there is no terminal, and whether it adds its design hook without being asked;
+and the exact files the `skills` CLI writes for `-a claude-code`. The pack's own README documents
+only the whole-pack install; `--skill` is an option of the `skills` CLI. The
+[monthly check](#the-recipes-are-re-checked-every-month) is what runs these commands. Installing
+`impeccable` as a Claude Code plugin (`/plugin marketplace add pbakaus/impeccable`) works too, and
+the doctor then still reports it missing, because a plugin leaves no file in `.claude/skills/`.
+</Aside>
+
+<Aside type="note" title="Not affiliated">
+Impeccable is published by the GitHub account [pbakaus](https://github.com/pbakaus/impeccable),
+`emil-design-eng` by [Emil Kowalski](https://github.com/emilkowalski/skills), and
+`web-design-guidelines` by [Vercel](https://github.com/vercel-labs/agent-skills). cckit is not
+affiliated with any of them.
 </Aside>
 
 ## Add a tool of your own

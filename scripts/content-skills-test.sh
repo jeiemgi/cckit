@@ -22,7 +22,7 @@ fail=0
 t()   { if [ "$2" = "$3" ]; then echo "ok: $1"; else echo "FAIL: $1 -> got '[$2]' want '[$3]'"; fail=1; fi; }
 has() { case "$2" in *"$3"*) echo "ok: $1" ;; *) echo "FAIL: $1 -> lacks '[$3]'"; fail=1 ;; esac; }
 
-CONTENT_SKILLS="brand-voice campaign"
+CONTENT_SKILLS="brand-voice campaign page-design"
 
 # _field <file> <key> — a frontmatter scalar, folded (`key: >`) or inline, on one line.
 _field() {
@@ -99,6 +99,36 @@ eo="$(cat "$ROOT/scripts/lib/effort-ops.sh")"
 for fl in --kind --goal --scope --verification; do
   has "effort new parses $fl" "$eo" "      $fl)"
 done
+# ── page-design names its three skills and never claims a missing one (#504) ────────────────────
+pd="$ROOT/templates/skills/page-design/SKILL.md"; pdr="$ROOT/templates/skills/page-design/references"
+for f in design-file-template.md generic-page-patterns.md minimum-rules.md; do
+  t "page-design: ships references/$f" "$([ -f "$pdr/$f" ] && echo yes)" "yes"
+  has "page-design: SKILL.md points at references/$f" "$(cat "$pd")" "references/$f"
+done
+for sk in impeccable emil-design-eng web-design-guidelines; do
+  t "page-design: $sk has an integration descriptor" "$([ -f "$ROOT/integrations/$sk.json" ] && echo yes)" "yes"
+  has "page-design: names how to add $sk" "$(cat "$pd")" "cckit add $sk"
+  has "page-design: a missing $sk is written as not installed" "$(cat "$pd")" "\`$sk: not installed\`"
+  has "page-design: the design file has a row for $sk" "$(cat "$pdr/design-file-template.md")" "| \`$sk\` | present / not installed |"
+done
+t "page-design: the order is direction, motion, audit" \
+  "$(grep -oE '^## [0-9] · .*' "$pd" | tr '\n' '|')" \
+  '## 0 · Find out what is installed, and where you are running|## 1 · The brief, before any code|## 2 · Direction — `impeccable`|## 3 · Interaction and motion — `emil-design-eng`|## 4 · Audit — `web-design-guidelines`|## 5 · Self-review against the brief|'
+has "page-design: no live mode in an unattended run" "$(cat "$pd")" "Never its live mode in an unattended run."
+has "page-design: reads CCKIT_HEADLESS, which autopilot run exports" "$(cat "$pd")" "CCKIT_HEADLESS"
+has "autopilot run exports CCKIT_HEADLESS" "$(cat "$ROOT/scripts/autopilot-run.sh")" "export CCKIT_HEADLESS=1"
+has "page-design: an audit with no network is not run" "$(cat "$pd")" "audit: not run (the rules could not be"
+has "page-design: and is never reported as passed" "$(cat "$pd")" "Never write that the audit passed"
+has "page-design: the brief names what the page refuses to look like" "$(cat "$pd")" "Refuses to look like"
+has "page-design: the brief asks for ONE visual idea" "$(cat "$pd")" "The one visual idea"
+has "page-design: the design file path is the one task run names" "$(cat "$pd")" 'docs/design/<task-id>.md'
+has "task run names the same design file path" "$(cat "$ROOT/scripts/lib/light-task.sh")" "printf 'docs/design/%s.md'"
+for sec in Direction Motion Audit; do
+  has "page-design: minimum rules have a section for $sec" "$(cat "$pdr/minimum-rules.md")" "## $sec — when"
+done
+# The skill holds none of the third-party text: it is not vendored under templates/.
+t "no third-party design skill is vendored" "$(ls -d "$ROOT/templates/skills/impeccable" "$ROOT/templates/skills/emil-design-eng" "$ROOT/templates/skills/web-design-guidelines" 2>/dev/null | grep -c . || true)" "0"
+
 # Every kind the skills tell the agent to pass is a kind `--kind` accepts.
 # shellcheck source=/dev/null
 . "$ROOT/scripts/lib/kinds.sh"

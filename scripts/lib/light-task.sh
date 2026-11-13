@@ -13,7 +13,9 @@
 #          when that pull request merges — review stays a pull request       (alias: done)
 #   default  print `light` or `issues`: which list is the project's default (tasks.default)
 #   run    start + ONE headless objective built from the task record + finish: hands a task to an
-#          agent and prints the review link. Never merges (#496)
+#          agent and prints the review link. Never merges (#496). For a page task (kind `page`, or
+#          `tasks.design: true` in the config) the objective names the `page-design` skill and the
+#          review lists the skills the run loaded (#504)
 #   share  one pull request that adds this checkout's drafts to the base branch, for a backlog
 #          nobody has started yet. The tasks list as `shared` until it merges; run again with no
 #          new drafts, it retries a share whose push or pull request failed
@@ -68,6 +70,8 @@ cckit task start [--force] [--no-push] <id>          (alias: take)
 cckit task finish [<id>] "<summary>" [--all]         (alias: done)
 cckit task run <id> [--check "<cmd>"] [--max-iters N] [--max-seconds N] [--agent <cmd>] [--agent-arg <arg>]… [--no-finish]
 cckit task share ["<summary>"]
+  a page task: --kind page, or tasks.design: true in the config. `task run` then names the
+  page-design skill to the agent, and the review lists the skills the run loaded
 cckit task default                                    light | issues (tasks.default in the config)
 EOF
 }
@@ -328,7 +332,7 @@ _lt_open_pr() {
 # ── finish ──────────────────────────────────────────────────────────────────────────────────────
 lt_finish() {
   local all=0 a p1="" p2="" npos=0 want="" summary="" row id state prio kind created br title
-  local root branch wt cur dir pr_title body
+  local root branch wt cur dir pr_title body page_check design
   for a in "$@"; do
     case "$a" in
       --all)     all=1 ;;
@@ -373,15 +377,28 @@ EOF
   fi
 
   dir="$(task_source_dir)"
+  # A page task (#504): the reviewer is asked to open the page, and the body says which design
+  # skills the run loaded.
+  page_check=""; design=""
+  if _lt_page_task "$kind"; then
+    page_check='- [ ] Open the page in a browser and compare it with the design brief'
+    design="$(_lt_design_section "$id" "$wt" "$branch")"
+  fi
   if type kto_pr_body_style >/dev/null 2>&1 && [ "$(kto_pr_body_style)" = "content" ]; then
     # pr.bodyStyle = content (#418): the reviewer is not a developer — say what approving does and
     # what to check, without "diff".
     body="$(printf '## Task\n\n`%s` · %s\n\n## Summary\n\n%s\n\n## Review\n\n%s\n\nApproving and merging this pull request marks the task done: it changes the task record `%s/%s.md` to `status: done`. No GitHub issue is linked.\n' \
-      "$id" "$title" "$summary" "$(kto_content_review_checklist)" "$dir" "$id")"
+      "$id" "$title" "$summary" "$(kto_content_review_checklist)${page_check:+
+$page_check}" "$dir" "$id")"
   else
-    body="$(printf '## Light task\n\n`%s` · %s\n\n## Summary\n\n%s\n\n## Review\n\nMerging this pull request is what marks the task done: its diff carries the task record with `status: done` (`%s/%s.md` with the file source). No GitHub issue is linked.\n' \
-      "$id" "$title" "$summary" "$dir" "$id")"
+    body="$(printf '## Light task\n\n`%s` · %s\n\n## Summary\n\n%s\n\n## Review\n\n%sMerging this pull request is what marks the task done: its diff carries the task record with `status: done` (`%s/%s.md` with the file source). No GitHub issue is linked.\n' \
+      "$id" "$title" "$summary" "${page_check:+$page_check
+
+}" "$dir" "$id")"
   fi
+  if [ -n "$design" ]; then body="$body
+
+$design"; fi
   _lt_open_pr "$wt" "$branch" "$pr_title" "$body"
 }
 
@@ -389,14 +406,90 @@ EOF
 # _lt_check_default — `tasks.check` of the project config (the gate `task run` uses with no
 # --check), or nothing. The config is the one kit_config_path resolves.
 _lt_check_default() {
+  local cfg
+  cfg="$(_lt_config_file)"
+  [ -n "$cfg" ] || return 0
+  jq -r '.tasks.check // empty | strings' "$cfg" 2>/dev/null || true
+}
+
+# _lt_config_file — the project config kit_config_path resolves, or nothing.
+_lt_config_file() {
   local cfg=""
   if ! command -v kit_config_path >/dev/null 2>&1 && [ -f "$_LT_LIB_DIR/config-path.sh" ]; then
     # shellcheck source=config-path.sh
     . "$_LT_LIB_DIR/config-path.sh"
   fi
   if command -v kit_config_path >/dev/null 2>&1; then cfg="$(kit_config_path 2>/dev/null || true)"; fi
-  [ -n "$cfg" ] && [ -f "$cfg" ] || return 0
-  jq -r '.tasks.check // empty | strings' "$cfg" 2>/dev/null || true
+  if [ -n "$cfg" ] && [ -f "$cfg" ]; then printf '%s\n' "$cfg"; fi
+  return 0
+}
+
+# ── page tasks (#504) ───────────────────────────────────────────────────────────────────────────
+# The design skills a page is built with: cckit's own `page-design`, then the three third-party
+# skills it coordinates (integrations/impeccable.json, emil-design-eng.json,
+# web-design-guidelines.json).
+_LT_DESIGN_SKILLS="page-design impeccable emil-design-eng web-design-guidelines"
+
+# _lt_page_task <kind> — rc 0 when the task builds or changes a page. The rule is two facts, read
+# from the record and the config, never guessed from the title or the notes:
+#   1. the task's kind is `page`  (cckit task new --kind page "<title>"), or
+#   2. `tasks.design` is true in the project config: every task of the project is a page task
+#      (the nextjs-shadcn recipe writes it).
+_lt_page_task() {
+  local cfg
+  [ "${1:-}" = "page" ] && return 0
+  cfg="$(_lt_config_file)"
+  [ -n "$cfg" ] || return 1
+  jq -e '.tasks.design == true' "$cfg" >/dev/null 2>&1
+}
+
+# _lt_run_state_file <worktree> <branch> — the state file `cckit autopilot run` keeps for a branch.
+_lt_run_state_file() {
+  ( cd "$1" 2>/dev/null && . "$_LT_LIB_DIR/kit-state.sh" && printf '%s/autopilot/%s.json' "$(kit_state_dir)" \
+      "$(printf '%s' "$2" | tr -c 'A-Za-z0-9._-' '_')" ) || true
+}
+
+# _lt_design_brief <id> — where page-design writes the brief and the self-review of a task.
+_lt_design_brief() { printf 'docs/design/%s.md' "$1"; }
+
+# _lt_design_section <id> <worktree> <branch> — the `## Design` section of a page task's review.
+# The skill list is the one the run recorded from the agent CLI's own event output
+# (autopilot-run.sh --record-skills → state `.skills`). It is never taken from the agent's account
+# of itself, and a list this code cannot stand behind is reported as not known, not as empty.
+_lt_design_section() {
+  local id="$1" wt="$2" branch="$3" sfile brief
+  sfile="$(_lt_run_state_file "$wt" "$branch")"
+  brief="$(_lt_design_brief "$id")"
+  printf '## Design\n\n'
+  if [ -n "$sfile" ] && [ -f "$sfile" ]; then
+    jq -r --arg want "$_LT_DESIGN_SKILLS" '
+      def base: split(":") | last;
+      ($want | split(" ")) as $w
+      | if (.skills | type) != "object" then
+          "Which skills were loaded is not known: the last run on this task did not record them."
+        elif .skills.complete != true then
+          "Which skills were loaded is not known: the agent CLI printed no event output in at least one round of the run."
+        else
+          (.skills.loaded // []) as $l
+          | [ $w[] as $x | $l[] | select(base == $x) ] as $d
+          | ($w | map(select(. as $x | any($d[]; base == $x) | not))) as $m
+          | ($l - $d) as $o
+          | (if ($d | length) == 0 then "No design skill was loaded in this run."
+             else "Design skills loaded in this run: \($d | join(", "))." end),
+            (if ($m | length) > 0 then "Design skills not loaded in this run: \($m | join(", "))." else empty end),
+            (if ($o | length) > 0 then "Other skills loaded in this run: \($o | join(", "))." else empty end),
+            "Read from the events the agent CLI (\(.skills.source)) printed during the run: a skill is listed when its call returned without an error. What the agent wrote about itself is not used."
+        end' "$sfile" 2>/dev/null \
+      || printf 'Which skills were loaded is not known: the run record %s could not be read.\n' "$sfile"
+  else
+    printf 'Which skills were loaded is not known: no `cckit task run` is recorded for this task.\n'
+  fi
+  printf '\n'
+  if [ -f "$wt/$brief" ]; then
+    printf 'Design brief and self-review: `%s`.\n' "$brief"
+  else
+    printf 'No design brief is in this change: `%s` was not written.\n' "$brief"
+  fi
 }
 
 # lt_run <id> [flags] — delegate ONE task end to end (#496): lt_start (reusing the task's worktree),
@@ -417,7 +510,7 @@ _lt_check_default() {
 #   could not be started · 2 usage
 lt_run() {
   local want="" check="" check_set=0 iters="" secs="" agent="" finish=1 line id wt branch rest
-  local row state prio kind created br title dir body objective rc sfile reason detail summary
+  local row state prio kind created br title dir body objective rc sfile reason detail summary page=0
   local -a pass
   pass=()
   while [ "$#" -gt 0 ]; do
@@ -458,13 +551,25 @@ EOF
   fi
 
   dir="$(task_source_dir)"
+  if _lt_page_task "$kind"; then
+    page=1
+    if [ ! -f "$wt/.claude/skills/page-design/SKILL.md" ] && [ ! -f "$wt/.agents/skills/page-design/SKILL.md" ]; then
+      echo "⚠ task $id is a page task and the page-design skill is not in this project — add it with: cckit init --upgrade (with tasks.design: true in the config, or the marketing profile)" >&2
+    fi
+  fi
   body=""
   if task_source_has body; then body="$(task_source_call body "$id" "$wt" || true)"; fi
   objective="$(printf 'Do this task: %s\n' "$title"
     if [ -n "$body" ]; then printf '\nNotes from the task record:\n%s\n' "$body"; fi
-    printf '\nThe task is recorded in %s/%s.md. Leave that file as it is: cckit marks the task done when the work goes to review.\n' "$dir" "$id")"
+    printf '\nThe task is recorded in %s/%s.md. Leave that file as it is: cckit marks the task done when the work goes to review.\n' "$dir" "$id"
+    if [ "$page" = 1 ]; then
+      printf '\nThis task builds or changes a page. Before writing any code, load the `page-design` skill (in Claude Code with the Skill tool; otherwise read `.claude/skills/page-design/SKILL.md` or `.agents/skills/page-design/SKILL.md`) and follow it.\n'
+      printf 'Write the design brief to %s before the first line of code, and add the self-review to the same file after the build.\n' "$(_lt_design_brief "$id")"
+      printf 'This run is unattended: do not start the live mode of `impeccable`, and do not report a skill you could not load as used.\n'
+    fi)"
 
   pass+=(--objective "$objective" --fresh)
+  if [ "$page" = 1 ]; then pass+=(--record-skills); fi
   if [ -n "$check" ]; then pass+=(--check "$check"); fi
   if [ -n "$iters" ]; then pass+=(--max-iters "$iters"); fi
   if [ -n "$secs" ];  then pass+=(--max-seconds "$secs" --round-seconds "$secs"); fi
@@ -478,8 +583,7 @@ EOF
     # Say why in one line of our own: the run's "resume with" hint does not apply here, because a
     # re-run of `task run` starts over from the task record.
     reason=""; detail=""
-    sfile="$(cd "$wt" && . "$_LT_LIB_DIR/kit-state.sh" && printf '%s/autopilot/%s.json' "$(kit_state_dir)" \
-      "$(printf '%s' "$branch" | tr -c 'A-Za-z0-9._-' '_')")" || sfile=""
+    sfile="$(_lt_run_state_file "$wt" "$branch")"
     if [ -n "$sfile" ] && [ -f "$sfile" ]; then
       reason="$(jq -r '.reason // ""' "$sfile" 2>/dev/null || true)"
       detail="$(jq -r '.detail // ""' "$sfile" 2>/dev/null || true)"

@@ -1,0 +1,41 @@
+{
+  "id": "impeccable",
+  "label": "Impeccable",
+  "summary": "Design direction for a page: commands that plan the page, set type, layout and colour, and rules that flag the look of a generated page. The first skill `page-design` applies.",
+  "why": "No API key and no paid product. Installing runs `npx impeccable install`, which writes the skill into this project. The skill runs an engine binary that ships next to it or is downloaded once into ~/.impeccable/bin/. When a new design starts, the skill fetches a set of visual directions from the impeccable.style catalogue. Its installer can add a design hook that runs on every UI file the agent edits; in Claude Code that hook runs outside the model's permission checks. Its live mode can start the agent CLI with permission checks off: `page-design` never uses live mode in an unattended run.",
+  "config": { "key": "designDirection.provider", "value": "impeccable" },
+  "detect": {
+    "run": "test -f .claude/skills/impeccable/SKILL.md || test -f \"$HOME/.claude/skills/impeccable/SKILL.md\"",
+    "bin": "npx"
+  },
+  "install": [
+    {
+      "manager": "npx",
+      "run": "npx -y impeccable install --providers=claude --scope=project",
+      "note": "`--providers` and `--scope` are the flags the vendor README gives for scripts (read 2026-11-13, commit c4cd1924c3). Not run by cckit's authors: whether this form asks nothing on a terminal-less run, and whether it adds the design hook without being asked, is unverified. The runner gives the installer no stdin, so a prompt ends the install as failed, not as accepted. The Claude Code plugin route (`/plugin marketplace add pbakaus/impeccable`) also works, and leaves no file this descriptor's detect can see."
+    }
+  ],
+  "verify": {
+    "run": "test -f .claude/skills/impeccable/SKILL.md || test -f \"$HOME/.claude/skills/impeccable/SKILL.md\"",
+    "failsOn": "The skill file is in neither this project nor ~/.claude/skills. A file check only: it does not start the engine binary."
+  },
+  "afterInstall": "reload the agent session so it lists the skill, read the hook the installer may have added to .claude/settings.json, and commit .claude/skills/impeccable",
+  "recheck": {
+    "cadence": "monthly",
+    "drifts": [
+      "the package name impeccable on npm",
+      "the installer flags --providers and --scope",
+      "that a project install for Claude Code lands in .claude/skills/impeccable/",
+      "the command names page-design uses: init, shape, typeset, layout, colorize, live, generate"
+    ]
+  },
+  "docs": "https://impeccable.style/docs",
+  "attribution": {
+    "author": "pbakaus",
+    "license": "Apache-2.0",
+    "homepage": "https://github.com/pbakaus/impeccable",
+    "affiliated": false,
+    "notice": "Impeccable is open-source software published by the GitHub account pbakaus, installed from its public npm package under its own Apache-2.0 licence (LICENSE read from the repository on 2026-11-13). cckit is not affiliated with its author and vendors none of its content.",
+    "telemetry": "Per the vendor README: a new design fetches visual directions from the impeccable.style catalogue, and that request is made with telemetry on or off. Telemetry itself is an anonymous record of which directions were shown and picked; `npx impeccable telemetry off`, DO_NOT_TRACK=1 or `\"telemetry\": false` in .impeccable/config.json turns it off. cckit sets none of them."
+  }
+}

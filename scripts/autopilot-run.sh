@@ -26,6 +26,10 @@
 #   --round-seconds <s>         wall-clock allowed per round (default 900)
 #   --max-tokens <n>            token ceiling, checked BETWEEN rounds from the runtime's own usage
 #                               output; a round that reports no usage stops the run
+#   --record-skills             record which skills each round LOADED, read from the agent CLI's own
+#                               event output (never from what the agent says): state `.skills`.
+#                               Claude is started with `--output-format stream-json --verbose`
+#                               for it; Codex prints events already
 #   --publish --summary "<s>"   on success open the PR with `cckit pr <issue> "<s>"`, unless the
 #                               branch already has an open one
 #   --resume                    continue the stopped run on this branch; counters carry over
@@ -65,7 +69,7 @@ is_uint() { case "${1:-}" in ''|*[!0-9]*) return 1 ;; esac; return 0; }
 
 ISSUE="" OBJECTIVE="" PROMPT_FILE="" AGENT="" AGENT_SET=0 PROFILE="" UNTIL="" CHECK=""
 MAX_ITERS="" MAX_SECONDS="" ROUND_SECONDS="" MAX_TOKENS="" PUBLISH="" SUMMARY=""
-RESUME=0 FRESH=0 DRYRUN=0
+RESUME=0 FRESH=0 DRYRUN=0 RECORD_SKILLS=0
 AGENT_ARGS=()
 
 need() { [ "$#" -ge 2 ] || die "$1 needs a value"; }
@@ -84,12 +88,13 @@ while [ "$#" -gt 0 ]; do
     --max-tokens)    need "$@"; MAX_TOKENS="$2"; shift 2 ;;
     --summary)       need "$@"; SUMMARY="$2"; shift 2 ;;
     --publish)       PUBLISH=1; shift ;;
+    --record-skills) RECORD_SKILLS=1; shift ;;
     --resume)        RESUME=1; shift ;;
     --fresh)         FRESH=1; shift ;;
     --dry-run)       DRYRUN=1; shift ;;
     --notify|--notify=*|--plan|--plan=*)
       die "'${1%%=*}' is not supported: no code path delivers a notification or runs a plan from here (see docs: agent-compatibility, unattended limits)" ;;
-    -h|--help) sed -n '2,51p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,55p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     [0-9]*) [ -z "$ISSUE" ] || die "one issue at a time (got '$ISSUE' and '$1')"; ISSUE="$1"; shift ;;
     *) die "unknown arg '$1'" ;;
   esac
@@ -120,6 +125,9 @@ sget() { jq -r "$1" "$STATE" 2>/dev/null; }
 # --- an existing run on this branch --------------------------------------------------------------
 PREV_ROUNDS=0 PREV_ELAPSED=0 TOK_IN=0 TOK_OUT=0 TOK_KNOWN=1 COST=0 COST_KNOWN=1 PR_URL="" USAGE_SRC="none"
 PREV_OPEN_AGENT=""
+# Skills the rounds loaded (--record-skills): one name per line. SK_KNOWN drops to 0 when a round's
+# output held no event, because a list that leaves a round out is not the run's list.
+SK_LIST="" SK_KNOWN=1
 if [ -f "$STATE" ]; then
   prev_status="$(sget '.status // ""')"; prev_pid="$(sget '.pid // ""')"; prev_reason="$(sget '.reason // ""')"
   if [ "$prev_status" = "running" ] && is_uint "$prev_pid" && kill -0 "$prev_pid" 2>/dev/null \
@@ -157,6 +165,11 @@ if [ -f "$STATE" ]; then
     [ -n "$MAX_TOKENS" ]    || MAX_TOKENS="$(sget '.limits.max_tokens // "" | tostring' | sed 's/^null$//')"
     [ -n "$PUBLISH" ]       || { [ "$(sget '.publish // false')" = "true" ] && PUBLISH=1; }
     [ -n "$SUMMARY" ]       || SUMMARY="$(sget '.summary // ""')"
+    if [ "$(sget '.skills | type')" = "object" ]; then
+      RECORD_SKILLS=1
+      SK_LIST="$(sget '.skills.loaded // [] | .[]')"
+      [ "$(sget '.skills.complete')" = "true" ] || { [ "$(sget '.rounds // 0')" = "0" ] || SK_KNOWN=0; }
+    fi
     PREV_ROUNDS="$(sget '.rounds // 0')"; PREV_ELAPSED="$(sget '.elapsed_seconds // 0')"
     PR_URL="$(sget '.pr_url // ""')"; USAGE_SRC="$(sget '.usage.source // "none"')"
     TOK_IN="$(sget '.usage.known_input_tokens // 0')"; TOK_OUT="$(sget '.usage.known_output_tokens // 0')"
@@ -209,7 +222,8 @@ fi
 
 ARGS_NL=""
 [ "${#AGENT_ARGS[@]}" -gt 0 ] && ARGS_NL="$(printf '%s\n' "${AGENT_ARGS[@]}")"
-AGENT_CMD="$(al_headless_cmd "$AGENT" json "$ARGS_NL")" || exit 2
+AL_MODE=json; [ "$RECORD_SKILLS" = "1" ] && AL_MODE=events
+AGENT_CMD="$(al_headless_cmd "$AGENT" "$AL_MODE" "$ARGS_NL")" || exit 2
 # No reader is in a headless run: `cckit page` in the agent's shell reads this and prints to the
 # terminal instead of opening a review page (#451).
 export CCKIT_HEADLESS=1
@@ -221,6 +235,7 @@ if [ "$DRYRUN" = "1" ]; then
   echo "  until   : ${UNTIL:-<the agent exits 0 after a round that changed something>}"
   echo "  check   : ${CHECK:-<none>}"
   echo "  publish : $([ -n "$PUBLISH" ] && echo "cckit pr $ISSUE" || echo no)"
+  [ "$RECORD_SKILLS" = "1" ] && echo "  skills  : recorded from the agent CLI's event output"
   echo "  state   : $STATE"
   exit 0
 fi
@@ -254,7 +269,8 @@ save() {
     --argjson mi "$MAX_ITERS" --argjson ms "$MAX_SECONDS" --argjson rs "$ROUND_SECONDS" --arg mt "$MAX_TOKENS" \
     --arg tok "$tok" --argjson tin "$TOK_IN" --argjson tout "$TOK_OUT" --arg cost "$cost" --arg kcost "$COST" \
     --arg src "$USAGE_SRC" --arg pr "$PR_URL" --arg pid "$$" --arg host "$(hostname 2>/dev/null)" \
-    --arg started "$STARTED_AT" --arg updated "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg open "$ROUND_OPEN" '
+    --arg started "$STARTED_AT" --arg updated "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg open "$ROUND_OPEN" \
+    --arg skon "$RECORD_SKILLS" --arg sklist "$SK_LIST" --arg skknown "$SK_KNOWN" '
     def num: if . == "unknown" or . == "" then "unknown" else (tonumber * 1000000 | round / 1000000) end;
     { run: $run, issue: $issue, branch: $branch, worktree: $worktree,
       agent: $agent, agent_args: ($args | split("\n") | map(select(. != ""))),
@@ -266,6 +282,12 @@ save() {
                 max_tokens: (if $mt == "" then null else ($mt | tonumber) end) },
       usage: { tokens: ($tok | num), known_input_tokens: $tin, known_output_tokens: $tout,
                cost_usd: ($cost | num), known_cost_usd: ($kcost | num), source: $src },
+      # null without --record-skills. `complete` is false until a round ran, and after any round
+      # whose output held no event: `loaded` is then a partial list.
+      skills: (if $skon == "1"
+               then { loaded: ($sklist | split("\n") | map(select(. != "")) | unique),
+                      complete: ($skknown == "1" and $rounds > 0), source: $agent }
+               else null end),
       pr_url: $pr, pid: ($pid | tonumber), host: $host,
       started_at: $started, updated_at: $updated,
       resume: (if $reason == "done" or $status == "running" then "" else "cckit autopilot run --resume" end) }' \
@@ -285,6 +307,15 @@ account_round() {
   fi
   if [ "$u_cost" = "unknown" ]; then COST_KNOWN=0
   else COST="$(awk -v a="$COST" -v b="$u_cost" 'BEGIN{printf "%.6f", a + b}')"; fi
+  if [ "$RECORD_SKILLS" = "1" ]; then
+    local sk
+    if sk="$(al_skills "$1" "$SDIR/$KEY.round-$2.out")"; then
+      [ -z "$sk" ] || SK_LIST="${SK_LIST:+$SK_LIST
+}$sk"
+    else
+      SK_KNOWN=0
+    fi
+  fi
   ROUND_OPEN=0
 }
 
