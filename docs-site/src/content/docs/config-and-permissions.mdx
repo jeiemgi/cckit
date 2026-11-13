@@ -561,6 +561,11 @@ refused by the validator.
 `<id>: <field>: <problem>` line per problem; `--list` prints the ids; `--applies <id> [dir]` exits
 0 when the tool can work on the repo at `dir`.
 
+The registry is the `integrations/` directory of the cckit install. `KIT_INTEGRATIONS_DIR` names
+another directory for one invocation: it replaces the registry and does not add to it, and it must
+also hold `integration.schema.json`. Walkthrough:
+[Add your own tool as an integration](/tutorials/add-your-own-integration/).
+
 ### Switching one on: `cckit add`
 
 `cckit add` with no name lists every descriptor in `integrations/`, each marked `on` or `off` for

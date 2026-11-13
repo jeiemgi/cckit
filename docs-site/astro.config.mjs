@@ -168,6 +168,7 @@ export default defineConfig({
           { label: 'Give Claude Code persistent memory', slug: 'tutorials/give-claude-code-persistent-memory' },
           { label: 'Give Claude Code a code graph', slug: 'tutorials/find-code-with-a-code-graph' },
           { label: 'Summarize long files locally', slug: 'tutorials/summarize-long-files-with-a-local-model' },
+          { label: 'Add your own integration', slug: 'tutorials/add-your-own-integration' },
           { label: 'Run checks with cckit hooks', slug: 'tutorials/run-checks-with-cckit-hooks' },
           { label: 'Debug a web page with Claude Code', slug: 'tutorials/debug-a-web-page-with-claude-code' },
           { label: 'Extend Claude Code with skills', slug: 'tutorials/extend-claude-code-with-skills' },
