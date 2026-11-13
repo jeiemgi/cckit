@@ -703,7 +703,7 @@ h1 .cckit-tag, h2 .cckit-tag, h3 .cckit-tag { font-size: 0.65em; }
 
 /* ── Sidebar group icons ──────────────────────────────────────────────── */
 /* Starlight sidebar entries don't take an icon, so we paint one before each top-level GROUP label
-   (Start / Ship one issue / Ship many at once / Look it up) via a CSS mask — a line icon tinted with
+   (Philosophy … Reference) via a CSS mask — a line icon tinted with
    the accent. Matched by group order (the sidebar config order is stable); keep these in sync when a
    group is added or reordered, or the last group renders as an empty square. */
 .top-level > li > details > summary .group-label { display: flex; align-items: center; }
@@ -717,19 +717,40 @@ h1 .cckit-tag, h2 .cckit-tag, h3 .cckit-tag { font-size: 0.65em; }
 	-webkit-mask: var(--cckit-nav-icon) center / contain no-repeat;
 	mask: var(--cckit-nav-icon) center / contain no-repeat;
 }
-/* 1 · Start — rocket */
-.top-level > li:nth-child(1) > details > summary .group-label {
+/* The first entry (Start here) is a link, not a group, so groups start at the second item. */
+/* 2 · Philosophy — lightbulb */
+.top-level > li:nth-child(2) > details > summary .group-label {
+	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5'/%3E%3Cpath d='M9 18h6'/%3E%3Cpath d='M10 22h4'/%3E%3C/svg%3E");
+}
+/* 3 · Getting started — rocket */
+.top-level > li:nth-child(3) > details > summary .group-label {
 	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z'/%3E%3Cpath d='M12 15l-3-3a22 22 0 0 1 8-10c3 0 5 2 5 5a22 22 0 0 1-10 8z'/%3E%3Cpath d='M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0'/%3E%3Cpath d='M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5'/%3E%3C/svg%3E");
 }
-/* 2 · Ship one issue — circle with a dot (one open issue) */
-.top-level > li:nth-child(2) > details > summary .group-label {
-	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Ccircle cx='12' cy='12' r='2'/%3E%3C/svg%3E");
-}
-/* 3 · Ship many at once — layers */
-.top-level > li:nth-child(3) > details > summary .group-label {
+/* 4 · Project management — layers */
+.top-level > li:nth-child(4) > details > summary .group-label {
 	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 2 2 7l10 5 10-5-10-5z'/%3E%3Cpath d='M2 17l10 5 10-5'/%3E%3Cpath d='M2 12l10 5 10-5'/%3E%3C/svg%3E");
 }
-/* 4 · Look it up — list */
-.top-level > li:nth-child(4) > details > summary .group-label {
+/* 5 · Design — pen */
+.top-level > li:nth-child(5) > details > summary .group-label {
+	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 20h9'/%3E%3Cpath d='M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z'/%3E%3C/svg%3E");
+}
+/* 6 · Development — code */
+.top-level > li:nth-child(6) > details > summary .group-label {
+	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m16 18 6-6-6-6'/%3E%3Cpath d='m8 6-6 6 6 6'/%3E%3C/svg%3E");
+}
+/* 7 · Review — check */
+.top-level > li:nth-child(7) > details > summary .group-label {
+	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='m9 12 2 2 4-4'/%3E%3C/svg%3E");
+}
+/* 8 · Ship — paper plane */
+.top-level > li:nth-child(8) > details > summary .group-label {
+	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m22 2-7 20-4-9-9-4Z'/%3E%3Cpath d='M22 2 11 13'/%3E%3C/svg%3E");
+}
+/* 9 · Memory — database */
+.top-level > li:nth-child(9) > details > summary .group-label {
+	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cellipse cx='12' cy='5' rx='9' ry='3'/%3E%3Cpath d='M3 5v14a9 3 0 0 0 18 0V5'/%3E%3Cpath d='M3 12a9 3 0 0 0 18 0'/%3E%3C/svg%3E");
+}
+/* 10 · Reference — list */
+.top-level > li:nth-child(10) > details > summary .group-label {
 	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 6h13'/%3E%3Cpath d='M8 12h13'/%3E%3Cpath d='M8 18h13'/%3E%3Cpath d='M3 6h.01'/%3E%3Cpath d='M3 12h.01'/%3E%3Cpath d='M3 18h.01'/%3E%3C/svg%3E");
 }
