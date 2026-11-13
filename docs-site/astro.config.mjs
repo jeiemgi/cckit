@@ -160,6 +160,7 @@ export default defineConfig({
           { label: 'Use cckit with Codex', slug: 'tutorials/use-cckit-with-codex' },
           { label: 'Issue → merged PR', slug: 'tutorials/take-a-github-issue-to-a-merged-pr' },
           { label: 'Break a feature into an effort', slug: 'tutorials/break-a-feature-into-an-effort' },
+          { label: 'Agent review before a merge', slug: 'tutorials/have-an-agent-review-before-a-merge' },
           { label: 'Run a wave in parallel', slug: 'tutorials/run-issues-in-parallel-with-a-wave' },
           { label: 'Run Claude Code unattended', slug: 'tutorials/run-claude-code-unattended' },
           { label: 'Run one objective unattended', slug: 'tutorials/run-one-objective-unattended' },
