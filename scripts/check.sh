@@ -90,7 +90,8 @@ bash scripts/review-lint.sh || fail=1
 note "==> agent skill references"
 bash scripts/agent-skills-lint.sh || fail=1
 
-# 8. Behavioral tests - run every *-test.sh through the test runner.
+# 8. Behavioral tests - run every *-test.sh through the test runner (several files at a time;
+# TEST_JOBS=1 for one at a time).
 note "==> behavioral tests"
 bash scripts/test.sh || fail=1
 

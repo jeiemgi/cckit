@@ -22,6 +22,11 @@
 #
 # Run:  bash scripts/lib/worktree-ports-test.sh
 # errors: strict — rc 1 on any failed assertion
+#
+# test-runner: serial
+# scripts/test.sh reads the marker above and runs this file alone, after the parallel phase. Its
+# section 6 starts eight allocations at once and has failed under CPU load on CI (#449, cause not
+# yet named); beside seven other test files it would meet that load on every run.
 
 set -uo pipefail
 dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
