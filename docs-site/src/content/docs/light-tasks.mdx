@@ -104,6 +104,7 @@ With [`plainLanguage.enabled`](/config-and-permissions/#content-work) set to `tr
 | `new` | `file: tasks/<id>.md (a draft: only in this checkout until it is started or shared)` | `file: tasks/<id>.md (only on this computer until you start it or share the list)` |
 | `start` | `created worktree <path> (branch light/<id>-<slug> from origin/<base>)` | `started — the draft lives in <path>` |
 | `start` | `pushed light/<id>-<slug> — the team's list now shows the task as doing` | `the team's list now shows this task as in progress` |
+| `start` | `when the work is ready: cckit task finish <id> "<summary>"` | `when the draft is ready for review: cckit task finish <id> "<summary>" --all` |
 | `finish` | — | `ready for review — open the link and approve it there` |
 
 What a program reads is the same in both: `start` still prints `<worktree>|<branch>|<id>` on

@@ -90,6 +90,9 @@ has "campaign asks which list the project uses" "$(cat "$cp")" 'cckit task defau
 has "campaign has the light lane" "$(cat "$cp")" 'cckit task new --kind campaign "Campaign plan: <name>"'
 has "campaign has the effort lane" "$(cat "$cp")" 'cckit effort new "<name>"'
 has "campaign waits for approval" "$(cat "$cp")" "Record nothing"
+# Every `cckit task finish` the skill names carries --all: a piece's draft is a new file, and
+# without --all the review opens without it.
+t "campaign: no task finish line without --all" "$(grep -c 'cckit task finish' "$cp")" "$(grep -c 'cckit task finish <id> "[^"]*" --all' "$cp")"
 has "cckit task has the default verb" "$help" "cckit task default"
 # The effort lane's flags are ones `effort new` parses.
 eo="$(cat "$ROOT/scripts/lib/effort-ops.sh")"

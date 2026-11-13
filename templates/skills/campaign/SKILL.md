@@ -107,8 +107,9 @@ effort when one title fails, and creates nothing. Commit the plan file on the ef
 ## 6 · After
 
 - Each piece is taken, drafted and sent for review on its own (`cckit task start <id>` …
-  `cckit task finish <id> "<summary>"`, or the sub-issue flow). Fill the plan's `## Deliverables`
-  row when a piece's review opens.
+  `cckit task finish <id> "<summary>" --all`, or the sub-issue flow). `--all` includes the draft
+  file the piece created; without it the review opens without the draft. Fill the plan's
+  `## Deliverables` row when a piece's review opens.
 - When the goal's date passes, add the measured number to `## Result`. A campaign with no measured
   result is recorded as *not measured*, never as a success.
 

@@ -51,6 +51,8 @@ _LT_TAB="$(printf '\t')"
 # _lt_say <technical> <plain> — one progress line, worded for the reader (#420). With
 # plainLanguage.enabled (KIT_PLAIN_LANGUAGE=true) the plain wording is printed: no worktree, branch
 # or pull request. Only human progress lines go through here; stdout contracts and --llm do not.
+# The plain finish hint names --all: a draft is a file the task created, and without --all
+# `finish` opens the review without it.
 _lt_say() {
   if [ "${KIT_PLAIN_LANGUAGE:-false}" = "true" ]; then printf '%s\n' "$2"; else printf '%s\n' "$1"; fi
 }
@@ -259,7 +261,7 @@ EOF
     fi
   fi
   _lt_say "[$id] when the work is ready: cckit task finish $id \"<summary>\"" \
-          "[$id] when the draft is ready for review: cckit task finish $id \"<summary>\"" >&2
+          "[$id] when the draft is ready for review: cckit task finish $id \"<summary>\" --all" >&2
   echo "$wt|$branch|$id"
 }
 
