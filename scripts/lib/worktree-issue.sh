@@ -99,7 +99,7 @@ wt_issue_state() {
     [[ -n "$repo" ]] && args+=(--repo "$repo")
     out="$(gh "${args[@]}" 2>&1)" || { _wt_issue_state_failed "$out"; return 0; }
   fi
-  printf '%s\n' "$out" | tr '[:upper:]' '[:lower:]' | grep -E -x 'open|closed' | head -1
+  printf '%s\n' "$out" | tr '[:upper:]' '[:lower:]' | grep -E -x 'open|closed' | sed -n 1p
   return 0
 }
 
@@ -107,7 +107,7 @@ wt_issue_state() {
 # answer (REST 404, GraphQL "Could not resolve to an Issue") is a definite absence and stays empty;
 # every other failure is `unknown`.
 _wt_issue_state_failed() {
-  if printf '%s' "$1" | grep -qiE 'HTTP 404|Could not resolve to an? (Issue|PullRequest)'; then return 0; fi
+  if grep -qiE 'HTTP 404|Could not resolve to an? (Issue|PullRequest)' <<<"$1"; then return 0; fi
   printf 'unknown\n'
 }
 
@@ -146,7 +146,7 @@ wt_task_state() {
   fi
   command -v task_source_call >/dev/null 2>&1 || { printf 'unknown\n'; return 0; }
   out="$(task_source_call state "$id" "$ref" 2>/dev/null)" || { printf 'unknown\n'; return 0; }
-  printf '%s\n' "$out" | grep -E -x 'open|closed|unknown' | head -1
+  printf '%s\n' "$out" | grep -E -x 'open|closed|unknown' | sed -n 1p
   return 0
 }
 

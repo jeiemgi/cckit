@@ -47,7 +47,7 @@ _tedos_scan() {
 }
 if _tedos_scan >/dev/null 2>&1; then
   note "x found 'tedos' references - cckit must be tedos-free:"
-  _tedos_scan | head -20 >&2
+  _tedos_scan | sed -n 1,20p >&2
   fail=1
 fi
 

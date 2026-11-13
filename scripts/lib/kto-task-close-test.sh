@@ -35,7 +35,7 @@ project_find_item_by_issue() { echo "ITEM-$1"; }
 project_set_single_select()  { echo "$*" >> "$BOARD_LOG"; }
 
 run() { : > "$GH_LOG"; : > "$BOARD_LOG"; kto_task_close "$@" >/dev/null 2>"$tmp/err"; echo $?; }
-closed() { grep -E '^issue close ' "$GH_LOG" | head -1; }
+closed() { grep -E '^issue close ' "$GH_LOG" | sed -n 1p; }
 
 t  "default close succeeds"                      "$(run 5 "Shipped in #9.")" 0
 tc "$GH_LOG" '^issue close 5 --repo o/r --reason completed --comment Shipped in #9\.$' "default reason is completed, with the summary"

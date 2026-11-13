@@ -437,8 +437,16 @@ A worktree's block is `base + slot * stride`, and the **slot** comes from a ledg
 offset used to be `issue % 40`, which hands two issues 40 apart byte-identical ports.
 
 Choosing a slot reads the ledger and writes it back, so the whole transaction runs under an
-exclusive lock: the directory `kit-portslots.tsv.lock`, since `flock(1)` is absent on a stock macOS.
+exclusive lock: the file `kit-portslots.tsv.lock`, created with the shell's noclobber redirection
+(`set -C`, an `O_EXCL` open), since `flock(1)` is absent on a stock macOS.
 Unserialized, eight concurrent `cckit start` runs produced as few as 3 distinct ports out of 24.
+
+The lock was a directory made with `mkdir` until cckit issue 449. On Ubuntu 26.04 `mkdir` is the
+uutils coreutils build, which exits 0 for every process that races to create the same directory,
+so two `cckit start` runs could hold the lock together and be given the same ports. The branch
+lease that `cckit orchestrate` takes (`branch-owners.tsv.lock`) used the same primitive and changed
+with it. A lock directory left by an older cckit still blocks, and is broken after a minute like
+any abandoned lock.
 
 A lock held by a live process is waited out for `_WT_LOCK_WAIT` seconds; one untouched for a minute
 is treated as abandoned and broken, so a process killed mid-allocation cannot wedge later starts.

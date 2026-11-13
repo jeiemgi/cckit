@@ -17,16 +17,17 @@
 #      RECORDED under the git-common-dir, so uniqueness is by construction and an issue keeps its
 #      slot for as long as its worktree lives.
 #
+#   4. A LOCK THAT DID NOT EXCLUDE (#449).  The ledger lock was `mkdir`. The `mkdir` of uutils
+#      coreutils 0.10.0 (Ubuntu 26.04, GitHub's `ubuntu-latest`) exits 0 for the loser of a race, so
+#      two allocations ran together and took the same slot: 4 of 70 runs of this file on that
+#      runner, 52 of 100 runs of section 6 in an Ubuntu 26.04 container. Section 7 races the
+#      primitive itself.
+#
 # The bar: N worktrees over arbitrary issue numbers, in either config layout, produce N disjoint
 # port sets — and re-running for a live issue never renumbers it.
 #
 # Run:  bash scripts/lib/worktree-ports-test.sh
 # errors: strict — rc 1 on any failed assertion
-#
-# test-runner: serial
-# scripts/test.sh reads the marker above and runs this file alone, after the parallel phase. Its
-# section 6 starts eight allocations at once and has failed under CPU load on CI (#449, cause not
-# yet named); beside seven other test files it would meet that load on every run.
 
 set -uo pipefail
 dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
@@ -96,7 +97,7 @@ after="$(ports_of "$W" | tr '\n' ' ')"
 slot7="$(wt_port_slot "$P" 7 "$W" 2>/dev/null)"
 stride7="$(wt_port_stride "$P/cckit.config.json")"
 [ "$stride7" = 10 ] && ok || bad "wt_port_stride default: got '$stride7', want 10"
-first7="$(ports_of "$W" | head -1)"
+first7="$(ports_of "$W" | sed -n 1p)"
 [ "$first7" = "$(( 3001 + slot7 * stride7 ))" ] && ok || bad "wt_port_slot disagrees with the assigned port: slot '$slot7' stride '$stride7' port '$first7'"
 [ "$(wt_port_slot "$P" 7 "$W" 2>/dev/null)" = "$slot7" ] && ok || bad "wt_port_slot renumbered a live issue"
 printf '%s' '{"worktree":{"devPortStride":25}}' > "$TMP/stride.json"
@@ -138,7 +139,7 @@ for num in $RACE_NUMS; do
     while [ "$(lines_in "$barrier")" -lt "$RACE_N" ] && [ "$waited" -lt 50 ]; do
       sleep 0.1; waited=$(( waited + 1 ))
     done
-    wt_assign_ports "$W" "$num" "$P" >/dev/null 2>&1
+    wt_assign_ports "$W" "$num" "$P" >/dev/null 2>"$P/.err.$num"
   ) &
   pids="$pids $!"
 done
@@ -153,13 +154,46 @@ race_uniq="$(printf '%s' "$race" | sort -u | grep -c .)"
 [ "$race_total" = 24 ] && ok || bad "parallel: expected 24 ports over 8 concurrent worktrees, got $race_total"
 if [ "$race_total" = "$race_uniq" ]; then ok; else
   bad "parallel port collision: $race_total ports but only $race_uniq distinct ($(printf '%s' "$race" | sort | uniq -d | tr '\n' ' '))"
+  # The evidence, not only the verdict: what the ledger recorded and what the allocator said on
+  # stderr (a lock that timed out warns there). Without these a collision cannot be traced (#449).
+  echo "  ledger:";           sed 's/^/    /' "$P/.git/kit-portslots.tsv" 2>&1
+  echo "  allocator stderr:"; cat "$P"/.err.* 2>/dev/null | grep -v ' PORT=' | sed 's/^/    /'
 fi
 
-# The lock is released on the way out — a leftover lock directory wedges every later start until
-# the one-minute abandonment window elapses.
+# The lock is released on the way out — a leftover lock wedges every later start until the
+# one-minute abandonment window elapses.
 race_gcd="$(git -C "$P" rev-parse --git-common-dir 2>/dev/null)"
 case "$race_gcd" in /*) : ;; *) race_gcd="$(cd "$P" && cd "$race_gcd" && pwd)" ;; esac
-[ ! -d "$race_gcd/kit-portslots.tsv.lock" ] && ok || bad "the port-slot lock was left behind after allocation"
+[ ! -e "$race_gcd/kit-portslots.tsv.lock" ] && ok || bad "the port-slot lock was left behind after allocation"
+
+# ── 7. the lock primitive excludes: of N simultaneous attempts exactly one wins (#449) ────────
+# Section 6 only fails when two allocations happen to overlap. This one asks the primitive
+# directly: eight processes make ONE attempt each on the same lock, released together by a start
+# file, and the winners are counted. A primitive that checks and then creates (uutils `mkdir`)
+# reports several winners in most rounds, so 25 rounds do not pass by luck.
+LOCK_ROUNDS=25; lock_bad=0; lock_detail=""
+L="$TMP/prim.lock"; go="$TMP/prim.go"; won="$TMP/prim.won"
+r=0
+while [ "$r" -lt "$LOCK_ROUNDS" ]; do
+  r=$((r+1)); rm -rf "$L" "$go"; : > "$won"; pids=""
+  for k in 1 2 3 4 5 6 7 8; do
+    (
+      waited=0
+      while [ ! -e "$go" ] && [ "$waited" -lt 20000 ]; do waited=$((waited+1)); done   # spin: a sleep would spread the attempts out
+      _wt_lock_try "$L" && echo "$k" >> "$won"
+    ) &
+    pids="$pids $!"
+  done
+  : > "$go"
+  for pid in $pids; do wait "$pid"; done
+  winners="$(lines_in "$won")"
+  [ "$winners" = 1 ] || { lock_bad=$((lock_bad+1)); lock_detail="$lock_detail $winners"; }
+done
+[ "$lock_bad" = 0 ] && ok || bad "the lock primitive let $lock_bad of $LOCK_ROUNDS rounds end without exactly one winner (winners per bad round:$lock_detail)"
+_wt_unlock "$L"; [ ! -e "$L" ] && ok || bad "_wt_unlock left the lock in place"
+# A cckit from before #449 leaves a lock DIRECTORY at the same path: it must still block.
+mkdir "$L"; if _wt_lock_try "$L"; then bad "a lock directory from an older cckit did not block"; else ok; fi
+_wt_unlock "$L"; [ ! -e "$L" ] && ok || bad "_wt_unlock left an older lock directory in place"
 
 echo "worktree-ports-test: $n assertion(s), $([ "$fail" = 0 ] && echo "all passed" || echo "FAILURES")"
 exit "$fail"

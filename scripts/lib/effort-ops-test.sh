@@ -351,7 +351,7 @@ case "$close_out" in *"project-owned.md"*) echo "FAIL: wave kit-sync warning nam
 # init.sh writes .claude/rules/<name>.md only for a templates/rules/<name>.md, so the regex lists
 # those basenames instead of matching the directory. The list is hand-written; this is what fails
 # when a template is added or removed without it.
-_re_hit() { printf '%s\n' "$1" | grep -qE "$_EO_KIT_MANAGED_RE" && echo yes || echo no; }
+_re_hit() { grep -qE "$_EO_KIT_MANAGED_RE" <<<"$1" && echo yes || echo no; }
 t "a project-owned rule is not kit-managed"        "$(_re_hit .claude/rules/admin-ui-conventions.md)" "no"
 t "a shipped rule is kit-managed"                  "$(_re_hit .claude/rules/effort-model.md)"         "yes"
 t "a shipped rule name with a suffix is not"       "$(_re_hit .claude/rules/effort-model.md.bak)"     "no"
@@ -728,7 +728,7 @@ cd "$tmp/work" || exit 1
 #     it. `cckit effort plan` therefore answered "no open efforts found" for every effort ever
 #     made, in every repo, with no error anywhere. A static check because the failure mode is
 #     silence — there is nothing at runtime to notice.
-plan_label="$(sed -n 's/.*gh issue list [^|]*--label \([a-z][a-z-]*\).*/\1/p' "$LIB/effort-plan.sh" | head -1)"
+plan_label="$(sed -n 's/.*gh issue list [^|]*--label \([a-z][a-z-]*\).*/\1/p' "$LIB/effort-plan.sh" | sed -n 1p)"
 t "plan queries a label at all" "${plan_label:-MISSING}" "effort"
 t "effort_new applies the label plan queries" \
   "$(grep -c "labels=\"$plan_label," "$LIB/effort-ops.sh" | tr -d ' ')" "1"

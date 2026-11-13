@@ -351,13 +351,13 @@ else
   sup30="$(cat "$KIT_STATE_DIR/qa/30/pid" 2>/dev/null)"; PIDS="$PIDS $sup30"
   t "the lane was launched on the free port" "$(sed -n 's/^WEB_PORT=//p' "$KIT_STATE_DIR/qa/30/ports")" "$port30"
   wait_listen "$port30"
-  lis30="$(qa_port_pids "$port30" | head -n 1)"
+  lis30="$(qa_port_pids "$port30" | sed -n 1p)"
   t "the fixture listener holds the port" "$(listening "$port30")" "yes"
   # The supervisor really respawns: kill the listener alone and the port is held again.
   kill "$lis30" 2>/dev/null; sleep 0.5; wait_listen "$port30"
   t "killing the listener alone does not free the port" "$(listening "$port30")" "yes"
   no "the respawned listener is a new process" " $(qa_port_pids "$port30" | tr '\n' ' ')" " $lis30 "
-  lis30="$(qa_port_pids "$port30" | head -n 1)"
+  lis30="$(qa_port_pids "$port30" | sed -n 1p)"
 
   stops="$(events qa.stop)"
   err="$(qa_cli stop --lane 30 2>&1 >/dev/null)"; rc=$?
@@ -442,7 +442,7 @@ else
     printf '%s\n' "$sup35" > "$KIT_STATE_DIR/qa/35/pid"
     printf 'WEB_PORT=%s\n' "$port35" > "$KIT_STATE_DIR/qa/35/ports"
     wait_listen "$port35"
-    lis35="$(qa_port_pids "$port35" | head -n 1)"
+    lis35="$(qa_port_pids "$port35" | sed -n 1p)"
     err="$(zsh -c "cd '$P'; . '$ROOT/scripts/lib/qa-lane.sh'; qa_stop 35" 2>&1 >/dev/null)"; rc=$?
     t "zsh: stop returns 0" "$rc" "0"
     sleep 0.5

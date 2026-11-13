@@ -30,7 +30,7 @@ for a in "$@"; do case "$a" in
 esac; done
 
 [ -n "$VERSION" ] || { echo "usage: scripts/publish.sh <version> [--publish] [--no-npm] [--no-brew] [--skip-bench-check]" >&2; exit 2; }
-echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo "version must be X.Y.Z" >&2; exit 2; }
+grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' <<<"$VERSION" || { echo "version must be X.Y.Z" >&2; exit 2; }
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
 repo="jeiemgi/cckit"

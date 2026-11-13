@@ -194,7 +194,7 @@ effort_plan() {
         if [[ -z "$rows" ]]; then
           fellback="planSource $src printed no rows"
         else
-          age="$(printf '%s\n' "$srcout" | sed -n 's/^#[[:space:]]*age:[[:space:]]*//p' | head -1)"
+          age="$(printf '%s\n' "$srcout" | sed -n 's/^#[[:space:]]*age:[[:space:]]*//p' | sed -n 1p)"
           srcline="planSource $src"
           [[ -n "$age" ]] && srcline="$srcline · age $age"
         fi

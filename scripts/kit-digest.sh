@@ -64,11 +64,11 @@ print(re.sub(r"\s+", " ", " ".join(out)))'
 
 if [[ "$INPUT" =~ ^https?://(www\.)?(youtube\.com|youtu\.be)/ ]]; then
   command -v yt-dlp >/dev/null 2>&1 || { echo "kit-digest: yt-dlp required for YouTube URLs (brew install yt-dlp)" >&2; exit 1; }
-  TITLE="$(yt-dlp --skip-download --print '%(title)s' "$INPUT" 2>/dev/null | head -1 || true)"
+  TITLE="$(yt-dlp --skip-download --print '%(title)s' "$INPUT" 2>/dev/null | sed -n 1p || true)"
   SOURCE_DESC="${TITLE:-$INPUT} ($INPUT)"
   yt-dlp --skip-download --write-auto-subs --write-subs --sub-langs "en.*,es.*" --sub-format vtt \
     -o "$WORK/yt" "$INPUT" >/dev/null 2>&1 || true
-  VTT="$(ls "$WORK"/yt*.vtt 2>/dev/null | head -1 || true)"
+  VTT="$(ls "$WORK"/yt*.vtt 2>/dev/null | sed -n 1p || true)"
   [[ -z "$VTT" ]] && { echo "kit-digest: no subtitles found for $INPUT" >&2; exit 1; }
   vtt_to_text < "$VTT" > "$TEXT"
 elif [[ "$INPUT" =~ ^https?:// ]]; then

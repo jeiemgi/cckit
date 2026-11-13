@@ -69,7 +69,7 @@ cckit task default                                    light | issues (tasks.defa
 EOF
 }
 
-_lt_root() { git worktree list --porcelain 2>/dev/null | awk '/^worktree /{ print substr($0, 10); exit }'; }
+_lt_root() { git worktree list --porcelain 2>/dev/null | awk '/^worktree / && !hit { print substr($0, 10); hit = 1 }'; }
 _lt_top()  { git rev-parse --show-toplevel 2>/dev/null; }
 _lt_base() { printf '%s' "${KIT_BASE_BRANCH:-main}"; }
 _lt_repo() { printf '%s' "${KIT_TASK_REPO:-${KIT_REPO:-}}"; }
@@ -164,7 +164,7 @@ lt_list() {
 lt_next() {
   local row id state prio kind created br title
   _lt_fetch
-  row="$(task_source_call list | awk -F'\t' '$2 == "todo" || $2 == "draft"' | head -1)" || true
+  row="$(task_source_call list | awk -F'\t' '$2 == "todo" || $2 == "draft"' | sed -n 1p)" || true
   if [ -z "$row" ]; then
     if cckit_is_json; then echo 'null'; else echo '(nothing to take — create a task with: cckit task new "<title>")'; fi
     return 0
@@ -210,8 +210,8 @@ EOF
       return 1 ;;
   esac
 
-  lbr="$(git -C "$root" for-each-ref --format='%(refname:short)' "refs/heads/light/$id-*" 2>/dev/null | head -1)"
-  rbr="$(git -C "$root" for-each-ref --format='%(refname:short)' "refs/remotes/origin/light/$id-*" 2>/dev/null | head -1)"
+  lbr="$(git -C "$root" for-each-ref --format='%(refname:short)' "refs/heads/light/$id-*" 2>/dev/null | sed -n 1p)"
+  rbr="$(git -C "$root" for-each-ref --format='%(refname:short)' "refs/remotes/origin/light/$id-*" 2>/dev/null | sed -n 1p)"
   if [ -n "$lbr" ]; then
     branch="$lbr"
     wt="$(_lt_worktree_of "$root" "$branch")"
@@ -338,7 +338,7 @@ lt_finish() {
 $row
 EOF
   case "$state" in done|dropped) echo "✗ task $id is already $state" >&2; return 1 ;; esac
-  branch="$(git -C "$root" for-each-ref --format='%(refname:short)' "refs/heads/light/$id-*" 2>/dev/null | head -1)"
+  branch="$(git -C "$root" for-each-ref --format='%(refname:short)' "refs/heads/light/$id-*" 2>/dev/null | sed -n 1p)"
   [ -n "$branch" ] || { echo "✗ task $id has not been started here — run: cckit task start $id" >&2; return 1; }
   wt="$(_lt_worktree_of "$root" "$branch")"
   [ -n "$wt" ] && [ -d "$wt" ] || { echo "✗ task $id: branch $branch has no worktree — run: cckit task start $id" >&2; return 1; }
@@ -401,7 +401,7 @@ lt_share() {
     # Nothing new. A share branch of this repository whose tasks are not on the base branch yet is
     # an earlier share: its push or its pull request may have failed, so run that step again. An
     # open pull request is reported, not re-created.
-    branch="$(printf '%s\n' "$rows" | awk -F'\t' '$2 == "shared" && $6 ~ /^light\/share-/ { print $6; exit }')"
+    branch="$(printf '%s\n' "$rows" | awk -F'\t' '$2 == "shared" && $6 ~ /^light\/share-/ && !hit { print $6; hit = 1 }')"
     wt=""
     if [ -n "$branch" ]; then wt="$(_lt_worktree_of "$root" "$branch")"; fi
     if [ -z "$wt" ] || [ ! -d "$wt" ]; then echo "(no drafts to share in this checkout)"; return 0; fi

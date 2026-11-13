@@ -19,7 +19,7 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 LIB="$ROOT/scripts/lib"
 fail=0
 t()    { if [ "$2" = "$3" ]; then echo "ok: $1"; else echo "FAIL: $1 -> got '[$2]' want '[$3]'"; fail=1; fi; }
-has()  { case "$2" in *"$3"*) echo "ok: $1" ;; *) echo "FAIL: $1 -> '$(printf '%s' "$2" | head -3)' lacks '$3'"; fail=1 ;; esac; }
+has()  { case "$2" in *"$3"*) echo "ok: $1" ;; *) echo "FAIL: $1 -> '$(printf '%s' "$2" | sed -n 1,3p)' lacks '$3'"; fail=1 ;; esac; }
 hasnt(){ case "$2" in *"$3"*) echo "FAIL: $1 -> unexpectedly contains '$3'"; fail=1 ;; *) echo "ok: $1" ;; esac; }
 ne()   { if [ "$2" != "$3" ]; then echo "ok: $1"; else echo "FAIL: $1 -> both are '[$2]', want different"; fail=1; fi; }
 
@@ -54,7 +54,7 @@ ne  "markers differ per caption"        "$m_build" "$(_pr_evidence_marker typech
 # ── 3. the body: marker first, deterministic (pure) ────────────────────────────────────────────
 printf 'compiled 3 files\nno errors\n' > "$tmp/build.log"
 body="$(_pr_evidence_compose build "$tmp/build.log")"
-t     "body starts with the marker"      "$(printf '%s\n' "$body" | head -1)" "$m_build"
+t     "body starts with the marker"      "$(printf '%s\n' "$body" | sed -n 1p)" "$m_build"
 has   "body still carries the caption"   "$body" '## Evidence — build'
 has   "body still inlines the log"       "$body" 'compiled 3 files'
 hasnt "body has no other caption marker" "$body" "$(_pr_evidence_marker typecheck)"
@@ -110,7 +110,7 @@ if [ "${1:-}" = api ]; then
     id="${path##*/}"
     echo "edit $id" >> "$GH_LOG"
     [ "${GH_FAIL_WRITE:-0}" = 1 ] && exit 1
-    cut -f1 "$idx" | grep -qx "$id" || exit 1   # 404 on an unknown comment, like the real API
+    grep -qx "$id" <<<"$(cut -f1 "$idx")" || exit 1   # 404 on an unknown comment, like the real API
     cp "$bodyfile" "$GH_STATE/body.$id"
     exit 0
   fi

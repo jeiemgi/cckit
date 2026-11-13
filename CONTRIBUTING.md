@@ -33,6 +33,20 @@ cckit pr <issue> "<summary>" # open the PR
   `--serial` runs one at a time and `--timings` lists wall seconds per file. A new test file keeps
   its fixtures under its own `mktemp -d` and binds no fixed port, because it runs beside others; if
   it cannot, put `# test-runner: serial` in its first 30 lines and it runs alone after the rest.
+- **No pipe into a reader that stops early.** `producer | grep -q PAT` and `producer | head -1`
+  let the reader exit while the producer is still writing. The producer then gets SIGPIPE — or a
+  write error where SIGPIPE is ignored, which is the case on GitHub Actions — and under
+  `set -o pipefail` the pipeline fails although the match was found. A test written that way fails
+  at random under load (cckit issue 449: `printf: write error: Broken pipe`, then an assertion that
+  read `no` for `yes`). Write `grep -q PAT <<<"$var"`; capture a command first
+  (`out="$(cmd)"; grep -q PAT <<<"$out"`); use `sed -n 1p` for `head -1` and an `awk` rule without
+  `exit` for "first match". `scripts/review-lint.sh` fails the gate on a new `| grep -q` or
+  `| head -N` under `bin/` or `scripts/` (rule `pipe-into-early-exit-reader`).
+- **A lock is taken with the shell, not with `mkdir`.** `( set -C; : > "$lock" ) 2>/dev/null` is an
+  `O_EXCL` open. `mkdir "$lock"` is not exclusive everywhere: the `mkdir` of uutils coreutils
+  0.10.0 (Ubuntu 26.04, GitHub's `ubuntu-latest`) exits 0 for every process that races to create
+  the same directory. A test of a lock races the primitive itself — N processes, one attempt each,
+  exactly one winner — as `scripts/lib/worktree-ports-test.sh` section 7 does.
 
 ## A rule declares when it loads
 

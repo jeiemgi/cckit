@@ -317,7 +317,7 @@ SH
   chmod +x "$tmp2/bin/gh"
   out="$(PATH="$tmp2/bin:$PATH" KIT_REPO=o/r EFFORT_REPO=o/r KIT_SESSION_BUDGET=4 \
     bash -c ". '$dir/effort-plan.sh'; effort_plan" 2>&1)"
-  chk() { if printf '%s\n' "$out" | grep -qE "$2"; then echo "ok: $1"; else echo "FAIL: $1 (no /$2/ in plan output)"; fail=1; fi; }
+  chk() { if [ -n "$(printf '%s\n' "$out" | grep -E "$2")" ]; then echo "ok: $1"; else echo "FAIL: $1 (no /$2/ in plan output)"; fail=1; fi; }
   chk "the header explains the unlabeled weight" '\? = no ctx: label, weighed 2'
   chk "an unlabeled effort renders as ?"         '#2 +\[\? \] unsized one'
   chk "an XL effort is flagged to delegate"      '#1 +\[XL\] big one.*delegate subs'

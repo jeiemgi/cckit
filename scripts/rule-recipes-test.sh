@@ -74,7 +74,7 @@ JSON
   rule="$proj/.claude/rules/gate-and-review.md"
   t "scaffold installed gate-and-review.md"    "$([ -f "$rule" ] && echo yes || echo no)" "yes"
 
-  src_line="$(grep -E '^source .*pr-evidence\.sh' "$rule" 2>/dev/null | head -1 | sed 's/[[:space:]]*#.*$//')"
+  src_line="$(grep -E '^source .*pr-evidence\.sh' "$rule" 2>/dev/null | sed -n 1p | sed 's/[[:space:]]*#.*$//')"
   t "rule carries a source line"               "$([ -n "$src_line" ] && echo yes || echo no)" "yes"
   t "source line has no placeholder"           "$(printf '%s' "$src_line" | grep -c '<')" "0"
   t "the rule's source line defines pr_attach_evidence in the project" \
@@ -88,7 +88,7 @@ JSON
   t "that library holds pr-evidence.sh"        "$([ -f "$libdir/pr-evidence.sh" ] && echo yes || echo no)" "yes"
 
   # The docs page repeats the recipe; it must be the same line the rule ships.
-  doc_line="$(grep -E '^source .*pr-evidence\.sh' "$ROOT/docs-site/src/content/docs/rules.mdx" | head -1 | sed 's/[[:space:]]*#.*$//')"
+  doc_line="$(grep -E '^source .*pr-evidence\.sh' "$ROOT/docs-site/src/content/docs/rules.mdx" | sed -n 1p | sed 's/[[:space:]]*#.*$//')"
   t "docs-site rules.mdx repeats the rule's source line" "$doc_line" "$src_line"
 fi
 

@@ -42,7 +42,7 @@ usage() { sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//'; }
 # `shift 2` fails on one remaining argument, shifts nothing, and the parse loop never ends.
 need_value() { [ "$2" -ge 2 ] || { echo "checkpoint $1: $3 needs a value" >&2; return 2; }; }
 
-is_version() { printf '%s' "$1" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; }
+is_version() { grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' <<<"$1"; }
 
 # Recorded versions, oldest first (numeric per field: 0.10.0 sorts after 0.9.0).
 cp_versions() {
@@ -98,7 +98,7 @@ cmd_record() {
     esac
   done
   is_version "$version" || { echo "checkpoint record: version must be X.Y.Z (got '${version}')" >&2; return 2; }
-  printf '%s' "$passes" | grep -Eq '^[1-9][0-9]*$' || { echo "checkpoint record: --passes must be a positive integer" >&2; return 2; }
+  grep -Eq '^[1-9][0-9]*$' <<<"$passes" || { echo "checkpoint record: --passes must be a positive integer" >&2; return 2; }
 
   cp_all >/dev/null || return 2   # an unreadable run file is reported before anything is run or written
 

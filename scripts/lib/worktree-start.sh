@@ -107,34 +107,46 @@ _wt_slots_file() {
 # very defect the slot ledger exists to remove. The reclaim rewrite races worse than the append:
 # it `mv`s a snapshot over the ledger, silently dropping any row another process added in between.
 #
-# mkdir is the lock primitive. A stock macOS has no flock(1) and this file targets bash 3.2, while
-# `set -C` redirection is not atomic on every filesystem; mkdir is atomic everywhere and fails when
-# the name already exists.
+# The lock primitive is the shell's own noclobber redirection: `set -C; : > file` opens with
+# O_CREAT|O_EXCL, which the kernel makes exclusive, and no external tool is involved. A stock macOS
+# has no flock(1) and this file targets bash 3.2.
+#
+# It was `mkdir` until #449. `mkdir` is exclusive only when the binary makes ONE mkdir(2) call and
+# reports its EEXIST. uutils coreutils 0.10.0 (the `mkdir` of Ubuntu 26.04, and of GitHub's
+# `ubuntu-latest` runner) calls statx first and exits 0 for the loser of a race: 8 processes running
+# `mkdir <same path>` at once all "succeeded" in 183 of 200 rounds. Two `cckit start` runs then held
+# this lock together and were given the same slot.
 _WT_LOCK_WAIT="${_WT_LOCK_WAIT:-10}"   # seconds to wait for a held lock before giving up
 
-# _wt_lock <lockdir> — 0 when the lock is held, 1 when it is not. A caller that fails to lock
+# _wt_lock_try <lockfile> — ONE attempt: 0 when this call created the lock, 1 when it exists. The
+# subshell keeps noclobber out of the caller's shell. Never replace this with an external command
+# without racing it first (scripts/lib/worktree-ports-test.sh section 7 does).
+_wt_lock_try() { ( set -C; : > "$1" ) 2>/dev/null; }
+
+# _wt_lock <lockfile> — 0 when the lock is held, 1 when it is not. A caller that fails to lock
 # proceeds ANYWAY: an unserialized allocation can collide, but a `cckit start` that refuses to run
 # cannot be worked around. Degrade, don't block.
 #
-# A lock directory older than a minute is treated as abandoned and broken, so a process killed
+# A lock older than a minute is treated as abandoned and broken, so a process killed
 # mid-allocation cannot wedge every future start. The age floor is well above _WT_LOCK_WAIT, so a
-# slow-but-live holder is never stolen from.
+# slow-but-live holder is never stolen from. `rm -rf` because a cckit from before #449 leaves a
+# lock DIRECTORY at the same path; either kind blocks the other, so mixed versions still exclude.
 _wt_lock() {
   local d="$1" tries=0 max
   max=$(( _WT_LOCK_WAIT * 10 ))
   while [[ "$tries" -lt "$max" ]]; do
-    mkdir "$d" 2>/dev/null && return 0
+    _wt_lock_try "$d" && return 0
     sleep 0.1 2>/dev/null || sleep 1
     tries=$(( tries + 1 ))
   done
   if [[ -n "$(find "$d" -maxdepth 0 -mmin +1 2>/dev/null)" ]]; then
     rm -rf "$d" 2>/dev/null
-    mkdir "$d" 2>/dev/null && { echo "warn: broke an abandoned port-slot lock ($d)" >&2; return 0; }
+    _wt_lock_try "$d" && { echo "warn: broke an abandoned port-slot lock ($d)" >&2; return 0; }
   fi
   return 1
 }
 
-_wt_unlock() { rmdir "$1" 2>/dev/null || rm -rf "$1" 2>/dev/null; }
+_wt_unlock() { rm -rf "$1" 2>/dev/null; }
 
 # _wt_slot_alloc <ledger> <issue-num> <worktree> — the ledger transaction: reclaim dead rows,
 # return the issue's existing allocation if it has one, else take the lowest free slot and append
@@ -174,7 +186,9 @@ _wt_slot_alloc() {
 _wt_slot_for() {
   local root="$1" num="$2" wt="$3" f lock out locked=0
   f="$(_wt_slots_file "$root")" || { printf '%s' $(( $(_wt_num_hash "$num") % 40 )); return 0; }
-  [[ -f "$f" ]] || : > "$f" 2>/dev/null || { printf '%s' $(( $(_wt_num_hash "$num") % 40 )); return 0; }
+  # `>>`, not `>`: this line runs BEFORE the lock, so a truncating create could empty a ledger that
+  # another process created and wrote to between the test and the redirection.
+  [[ -f "$f" ]] || : >> "$f" 2>/dev/null || { printf '%s' $(( $(_wt_num_hash "$num") % 40 )); return 0; }
 
   lock="$f.lock"
   if _wt_lock "$lock"; then locked=1; else
@@ -270,7 +284,7 @@ _wt_json_has() {
   if command -v jq >/dev/null 2>&1; then
     jq -e "$filter" "$file" >/dev/null 2>&1
   else
-    tr -d ' \n\t' < "$file" 2>/dev/null | grep -qE "$re"
+    grep -qE "$re" <<<"$(tr -d ' \n\t' < "$file" 2>/dev/null)"
   fi
 }
 
@@ -555,7 +569,7 @@ _wt_pool_find() {
 # mutates). Shows branch / merged-into-develop? / clean? / live-session? / overall reusable?.
 wt_pool_status() {
   local root wtdir wt_path branch locked merged clean owned reusable any=0
-  root="$(git worktree list --porcelain | awk '/^worktree /{print $2; exit}')"
+  root="$(git worktree list --porcelain | awk '/^worktree / && !hit {print $2; hit=1}')"
   [[ -n "$root" ]] || { echo "wt_pool_status: not in a git repo" >&2; return 1; }
   wtdir="$root/.claude/worktrees/"
   git -C "$root" fetch origin "${KIT_BASE_BRANCH:-main}" --quiet 2>/dev/null || true
@@ -598,7 +612,7 @@ wt_start() {
   done
   [[ -n "$num" ]] || { echo "wt_start: issue number required" >&2; return 1; }
 
-  root="$(git worktree list --porcelain | awk '/^worktree /{print $2; exit}')"
+  root="$(git worktree list --porcelain | awk '/^worktree / && !hit {print $2; hit=1}')"
   [[ -n "$root" ]] || { echo "wt_start: not in a git repo" >&2; return 1; }
 
   # Claim check (#384) — BEFORE the issue read, the fetch and `git worktree add`, so a refusal
@@ -658,7 +672,7 @@ wt_start() {
   fi
 
   git -C "$root" fetch origin "${KIT_BASE_BRANCH:-main}" --quiet
-  if git -C "$root" worktree list --porcelain | grep -q "/${kind}+${num}-${slug}$"; then
+  if grep -q "/${kind}+${num}-${slug}$" <<<"$(git -C "$root" worktree list --porcelain)"; then
     echo "[#$num] reusing worktree $wt" >&2
   else
     reused=""

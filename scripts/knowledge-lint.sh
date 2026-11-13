@@ -35,9 +35,9 @@ if [[ -d "$KNOWLEDGE_DIR" ]]; then
     fi
     fm="$(awk '/^---$/{n++; next} n==1{print} n>=2{exit}' "$f")"
     for field in status owner updated; do
-      echo "$fm" | grep -q "^${field}:" || err "$f: missing frontmatter field '${field}:'"
+      grep -q "^${field}:" <<<"$fm" || err "$f: missing frontmatter field '${field}:'"
     done
-    status_val="$(echo "$fm" | grep '^status:' | head -1 | sed 's/^status:[[:space:]]*//')"
+    status_val="$(echo "$fm" | grep '^status:' | sed -n 1p | sed 's/^status:[[:space:]]*//')"
     case "$status_val" in
       canonical|reference|historical|"") ;;
       *) err "$f: invalid status '$status_val' (canonical|reference|historical)" ;;
@@ -77,9 +77,9 @@ if [[ -n "$PLANS_DIR" && "$PLANS_FORMAT" != "none" && -d "$PLANS_DIR" ]]; then
     [[ -e "$p" ]] || continue
     fm="$(awk '/^---$/{n++; next} n==1{print} n>=2{exit}' "$p")"
     for field in title status; do
-      echo "$fm" | grep -q "^${field}:" || err "$p: missing frontmatter '${field}:'"
+      grep -q "^${field}:" <<<"$fm" || err "$p: missing frontmatter '${field}:'"
     done
-    if ! grep -qiE '^##+ .*deliverables' "$p" && ! echo "$fm" | grep -q '^deliverables:[[:space:]]*none'; then
+    if ! grep -qiE '^##+ .*deliverables' "$p" && ! grep -q '^deliverables:[[:space:]]*none' <<<"$fm"; then
       err "$p: no Deliverables section and no 'deliverables: none' (the completion contract is required)"
     fi
   done

@@ -135,7 +135,7 @@ correctly covers. No words."
   # BENCH_JUDGE_RAW=<file> keeps the judge's reply as it came back, before the number is cut out of
   # it: a score that looks wrong can then be told apart from a reply that was parsed wrong.
   [ -z "${BENCH_JUDGE_RAW:-}" ] || printf '%s\n' "$out" > "$BENCH_JUDGE_RAW"
-  score="$(printf '%s' "$out" | grep -oE '0(\.[0-9]+)?|1(\.0+)?' | head -1)"
+  score="$(printf '%s' "$out" | grep -oE '0(\.[0-9]+)?|1(\.0+)?' | sed -n 1p)"
   [ -n "$score" ] || score="0"
   printf '%s' "$score"
 }

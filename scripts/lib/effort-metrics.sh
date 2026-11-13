@@ -169,7 +169,7 @@ _em_token_sum() {
   [[ -n "$sids" ]] || { echo "0 0 0 0"; return 0; }
   while IFS= read -r sid; do
     [[ -n "$sid" ]] || continue
-    tx="$(find "$HOME/.claude/projects" -name "$sid.jsonl" -type f 2>/dev/null | head -1)"
+    tx="$(find "$HOME/.claude/projects" -name "$sid.jsonl" -type f 2>/dev/null | sed -n 1p)"
     [[ -n "$tx" ]] || continue
     # -r (raw) is REQUIRED: without it jq wraps the result string in double-quotes, so $a
     # becomes `"1015901` and the `$(( ))` math below dies ("bad math expression") — the #829 bug.
@@ -247,15 +247,15 @@ capture_effort_metrics() {
   git fetch origin --quiet 2>/dev/null || true
   if [[ "$build_s" == "null" && "$now" =~ ^[0-9]+$ ]]; then
     # Author time, not committer time: a rebase rewrites the second and keeps the first.
-    first="$(git log --format=%at "$base"..HEAD 2>/dev/null | sort -n | head -1)"
+    first="$(git log --format=%at "$base"..HEAD 2>/dev/null | sort -n | sed -n 1p)"
     if [[ "$first" =~ ^[0-9]+$ ]] && (( now >= first )); then
       start="$first"; build_s=$(( now - first )); build_src='"first-commit"'
     fi
   fi
   shortstat="$(git diff --shortstat "$base"...HEAD 2>/dev/null)"
-  files=$(printf '%s' "$shortstat"   | grep -oE '[0-9]+ file'      | grep -oE '[0-9]+' | head -1)
-  added=$(printf '%s' "$shortstat"   | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+' | head -1)
-  removed=$(printf '%s' "$shortstat" | grep -oE '[0-9]+ deletion'  | grep -oE '[0-9]+' | head -1)
+  files=$(printf '%s' "$shortstat"   | grep -oE '[0-9]+ file'      | grep -oE '[0-9]+' | sed -n 1p)
+  added=$(printf '%s' "$shortstat"   | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+' | sed -n 1p)
+  removed=$(printf '%s' "$shortstat" | grep -oE '[0-9]+ deletion'  | grep -oE '[0-9]+' | sed -n 1p)
   commits=$(git rev-list --count "$base"..HEAD 2>/dev/null)
   files=${files:-0}; added=${added:-0}; removed=${removed:-0}; commits=${commits:-0}
   churn=$(( added + removed )); diff_auto=$(_em_difficulty "$churn" "$files")
@@ -363,7 +363,7 @@ _em_judge_goal() {
   printf '%s\n' "$body" | awk '
     /^##[ \t]+[Gg]oal[ \t]*$/ { grab=1; next }
     /^##[ \t]/ { if (grab) exit }
-    grab { print }' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | grep -v '^$' | head -20
+    grab { print }' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | grep -v '^$' | sed -n 1,20p
 }
 
 # _em_model_env <config-key> <default-name> — the VALUE of the env var the hosted judge reads for
@@ -383,7 +383,7 @@ _em_model_env() {
     named="$(jq -r --arg k "$key" '.model[$k] // empty | strings' "$cfg" 2>/dev/null)" || named=""
   fi
   if [[ -n "$named" ]]; then
-    if printf '%s' "$named" | grep -qE '^[A-Za-z_][A-Za-z0-9_]*$' && [[ "$named" != *$'\n'* ]]; then
+    if grep -qE '^[A-Za-z_][A-Za-z0-9_]*$' <<<"$named" && [[ "$named" != *$'\n'* ]]; then
       name="$named"
     else
       echo "effort-metrics: model.$key is not an env var name — using $name" >&2
@@ -486,7 +486,7 @@ ${diff}${truncated_note}"
   model="${out%%$'\t'*}"; reply="${out#*$'\t'}"
 
   # Extract the first {...} object from the reply (models often wrap it in prose/fences).
-  json="$(printf '%s' "$reply" | tr '\n' ' ' | grep -oE '\{[^{}]*\}' | head -1)"
+  json="$(printf '%s' "$reply" | tr '\n' ' ' | grep -oE '\{[^{}]*\}' | sed -n 1p)"
   if [[ -z "$json" ]]; then
     echo "[#$num] judge: model reply had no JSON object — leaving *_judge null (model=$model)" >&2
     return 0
@@ -498,7 +498,7 @@ ${diff}${truncated_note}"
     echo "[#$num] judge: difficulty_judge='$dj' out of range — leaving *_judge null (model=$model)" >&2
     return 0
   fi
-  if ! printf '%s' "$sj" | grep -qE '^[0-9]+(\.[0-9]+)?$' || ! awk -v s="$sj" 'BEGIN{exit !(s>=0 && s<=1)}'; then
+  if ! grep -qE '^[0-9]+(\.[0-9]+)?$' <<<"$sj" || ! awk -v s="$sj" 'BEGIN{exit !(s>=0 && s<=1)}'; then
     echo "[#$num] judge: score_judge='$sj' out of range — leaving *_judge null (model=$model)" >&2
     return 0
   fi

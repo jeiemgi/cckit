@@ -433,7 +433,7 @@ sr_mirror() {
 
   ids="$(printf '%s\n' "$listing" | _sr_mirror_match_id "$marker")" || ids=""
   if [ -n "$ids" ]; then
-    id="$(printf '%s\n' "$ids" | head -1)"
+    id="$(printf '%s\n' "$ids" | sed -n 1p)"
     if _sr_mirror_edit "$repo" "$id" "$body"; then
       rm -f "$body"; SR_MIRROR_LAST_RESULT=updated; return 0
     fi

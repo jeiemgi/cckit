@@ -56,8 +56,8 @@ for id in $(databases_list); do
   yes_if "database $id: the guide names the env file" 'grep -qF "$(jq -r .envFile "$f")" "$guide"'
   for n in $(jq -r '.env[].name' "$f"); do
     yes_if "database $id: the guide names $n" 'grep -qF "$n" "$guide"'
-    yes_if "database $id: the terminal steps name $n" 'database_steps "$f" /p | grep -qF "$n"'
-    yes_if "database $id: the placeholder of $n is not a real key" '! jq -r --arg n "$n" ".env[] | select(.name == \$n) | .placeholder" "$f" | grep -qE "sb_(publishable|secret)_|eyJ"'
+    yes_if "database $id: the terminal steps name $n" 'grep -qF "$n" <<<"$(database_steps "$f" /p)"'
+    yes_if "database $id: the placeholder of $n is not a real key" '! grep -qE "sb_(publishable|secret)_|eyJ" <<<"$(jq -r --arg n "$n" ".env[] | select(.name == \$n) | .placeholder" "$f")"'
   done
   # Guide and descriptor name the same variables: no name in the guide's file sample is undeclared.
   t "database $id: the guide's file sample declares the same names" \
@@ -72,7 +72,7 @@ for id in $(databases_list); do
     t "database $id/$s: the client code reads exactly the declared names" \
       "$(printf '%s\n' $read_names | sort -u | tr '\n' ' ')" "$(jq -r '.env[].name' "$f" | sort -u | tr '\n' ' ')"
     for pk in $(jq -r --arg s "$s" '.stacks[$s].packages[]' "$f"); do
-      yes_if "database $id/$s: the install command installs $pk" 'jq -r --arg s "$s" ".stacks[\$s].install" "$f" | grep -qF -- "$pk"'
+      yes_if "database $id/$s: the install command installs $pk" 'grep -qF -- "$pk" <<<"$(jq -r --arg s "$s" ".stacks[\$s].install" "$f")"'
     done
   done
 done

@@ -291,7 +291,7 @@ pr_attach_evidence() {
   fi
 
   ids="$(printf '%s\n' "$listing" | _pr_evidence_match_id "$marker")" || ids=""
-  id="$(printf '%s\n' "$ids" | head -1)"
+  id="$(printf '%s\n' "$ids" | sed -n 1p)"
   extra="$(printf '%s\n' "$ids" | grep -c '[0-9]' | tr -d '[:space:]')"
 
   if [ -n "$id" ]; then

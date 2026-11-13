@@ -28,7 +28,7 @@ export GH_REPO_LABELS='[{"name":"kind:task"},{"name":"priority:p2"},{"name":"rol
 # `gh pr …` or `gh issue …`. (The stub logs one call per line: newlines in a body become \036.)
 rest_only() {
   local bad
-  bad="$(grep -vE '^api (-[^ ]+ [^ ]+ )*repos/' "$1" | head -3)"
+  bad="$(grep -vE '^api (-[^ ]+ [^ ]+ )*repos/' "$1" | sed -n 1,3p)"
   if [ -n "$bad" ]; then echo "FAIL: $2 — non-REST gh calls: $bad"; fail=1; else echo "ok: $2"; fi
   if grep -q graphql "$1"; then echo "FAIL: $2 — a graphql call was made"; fail=1; fi
 }
@@ -299,7 +299,7 @@ tc "$GH_LOG" '^api repos/o/r/issues/101/timeline '  "wave close: finds the closi
 tc "$GH_LOG" '^api repos/o/r/pulls/5101 -H Accept: application/vnd.github.v3.diff$' "wave close: snapshots the closing PR's diff (not the mention)"
 tc "$GH_LOG" '^api repos/o/r/issues/77 -X PATCH -f state=closed -f state_reason=completed$' "wave close: closes the parent"
 t  "wave close: rows match the graphql shape" \
-   "$(gh_rest_wave_rows o/r 77 | head -1)" "101|CLOSED|5101|abc1234def|feat: sub 5101"
+   "$(gh_rest_wave_rows o/r 77 | sed -n 1p)" "101|CLOSED|5101|abc1234def|feat: sub 5101"
 
 # ── a failed REST read is no data, never the error body ───────────────────────────────────────────
 export GH_FAIL_EP="repos/o/r/issues/404"

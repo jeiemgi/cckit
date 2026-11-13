@@ -19,8 +19,8 @@ CHECK="$ROOT/scripts/integrations-check.sh"
 WF="$ROOT/.github/workflows/integrations-check.yml"
 fail=0
 rc()  { if [ "$2" = "$3" ]; then echo "ok: $1"; else echo "FAIL: $1 -> rc '$2' want '$3'"; fail=1; fi; }
-has() { if printf '%s' "$2" | grep -qF -- "$3"; then echo "ok: $1"; else echo "FAIL: $1 -> '$3' not in: $2"; fail=1; fi; }
-hasnt() { if printf '%s' "$2" | grep -qF -- "$3"; then echo "FAIL: $1 -> '$3' found in: $2"; fail=1; else echo "ok: $1"; fi; }
+has() { if grep -qF -- "$3" <<<"$2"; then echo "ok: $1"; else echo "FAIL: $1 -> '$3' not in: $2"; fail=1; fi; }
+hasnt() { if grep -qF -- "$3" <<<"$2"; then echo "FAIL: $1 -> '$3' found in: $2"; fail=1; else echo "ok: $1"; fi; }
 
 command -v jq >/dev/null 2>&1 || { echo "integrations-check-test: jq absent — skipping (dependency-light gate)"; exit 0; }
 
@@ -182,7 +182,7 @@ hasnt "shipped descriptors: none fails validation" "$out" "FAIL"
 # ── the workflow ───────────────────────────────────────────────────────────────────────────────
 wf="$(cat "$WF" 2>/dev/null)"
 has "workflow: schedule trigger" "$wf" "schedule:"
-printf '%s\n' "$wf" | grep -qE '^[[:space:]]*- cron: "[0-9]+ [0-9]+ [0-9]+ \* \*"'; rc "workflow: the cron is monthly (fixed day of month, every month)" "$?" 0
+grep -qE '^[[:space:]]*- cron: "[0-9]+ [0-9]+ [0-9]+ \* \*"' <<<"$wf"; rc "workflow: the cron is monthly (fixed day of month, every month)" "$?" 0
 has "workflow: manual trigger" "$wf" "workflow_dispatch:"
 has "workflow: may write issues" "$wf" "issues: write"
 has "workflow: an arm64 macOS runner for mlx-lm" "$wf" "macos-15"

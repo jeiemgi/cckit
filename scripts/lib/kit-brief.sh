@@ -155,7 +155,7 @@ kit_brief_worktree() {
         n="$(wt_issue_number "$b")"
         [ "$n" = "$want" ] || continue
         printf '%s\t%s\n' "$wtpath" "$b"
-      done | head -1
+      done | sed -n 1p
 }
 
 # kit_brief_resolve <token> — echo the repo path a token refers to, plus a tab and a status word:
@@ -170,7 +170,7 @@ kit_brief_resolve() {
   esac
   if [ -e "$root/$tok" ]; then printf '%s\there' "$tok"; return 0; fi
   command -v git >/dev/null 2>&1 || { printf '%s\tnew' "$tok"; return 0; }
-  hits="$(git -C "$root" ls-files 2>/dev/null | grep -E "(^|/)$(printf '%s' "$tok" | sed 's/[.[\*^$]/\\&/g')$" | head -5)"
+  hits="$(git -C "$root" ls-files 2>/dev/null | grep -E "(^|/)$(printf '%s' "$tok" | sed 's/[.[\*^$]/\\&/g')$" | sed -n 1,5p)"
   n="$(printf '%s' "$hits" | grep -c . || true)"
   case "$n" in
     0) printf '%s\tnew' "$tok" ;;
@@ -203,7 +203,7 @@ _kb_rows() {
   local libdir="$1" want="$2" row _e _fn _p
   [ -n "$want" ] || return 0
   kit_lib_rows "$libdir" | while IFS="$(printf '\t')" read -r row _e _fn _p; do
-    printf '%s\n' "$want" | grep -qxF "$row" || continue
+    grep -qxF "$row" <<<"$want" || continue
     printf '| `%s` | %s | %s |\n' "$row" "$_e" "$_p"
   done
 }
@@ -358,7 +358,7 @@ EOF
     cap="${KIT_BRIEF_MAX_HELPERS:-10}"
     shown_owned="$(_kb_rows "$libdir" "$(printf '%s\n' "$owned_libs" | grep . | sort -u)")"
     n_src="$(printf '%s' "$shown_owned" | grep -c . || true)"
-    shown_src="$(_kb_rows "$libdir" "$sourced_only" | head -n "$((cap > n_src ? cap - n_src : 0))")"
+    shown_src="$(_kb_rows "$libdir" "$sourced_only" | awk -v n="$((cap > n_src ? cap - n_src : 0))" 'NR <= n')"
     # `|| true`, never `|| echo 0`: `grep -c` on empty input already PRINTS 0 and exits 1, so the
     # `echo 0` fallback appends a SECOND zero and the arithmetic below sees "0\n0". Same bug class
     # as the #142 board-counter regression.

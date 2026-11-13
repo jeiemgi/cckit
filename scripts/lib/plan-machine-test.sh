@@ -96,7 +96,7 @@ if [ -n "${PM_TEST_INNER:-}" ]; then
 
   # pass-through: the trailing columns survive the sort untouched (they feed pm_batches).
   eq "sort preserves payload columns" \
-    "$(printf '1\tp2\tL\ta.sh\n2\tp0\tS\tb.sh\n' | pm_prio_sort | head -1)" \
+    "$(printf '1\tp2\tL\ta.sh\n2\tp0\tS\tb.sh\n' | pm_prio_sort | sed -n 1p)" \
     "2${TAB}p0${TAB}S${TAB}b.sh"
 
   # ---- the safety property: a LOW-priority blocker still runs before its HIGH-priority dependent. ----

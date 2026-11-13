@@ -16,7 +16,7 @@ if [ -n "${RND_TEST_INNER:-}" ]; then
   eq "width clamps high" "$(COLUMNS=999 render_width)" "120"
   eq "width clamps low"  "$(COLUMNS=5 render_width)"   "40"
   eq "width passes mid"  "$(COLUMNS=90 render_width)"  "90"
-  eq "width junk -> safe" "$( (COLUMNS=abc; unset TERM; render_width) | grep -qE '^[0-9]+$' && echo ok)" "ok"
+  eq "width junk -> safe" "$(grep -qE '^[0-9]+$' <<<"$(COLUMNS=abc; unset TERM; render_width)" && echo ok)" "ok"
 
   # table composers.
   eq "table row"  "$(render_table_row '#76' 'M' 'plan')" "| #76 | M | plan |"

@@ -70,12 +70,12 @@ mk_agent pm "skills:" "  - task-sync" "  - morning-briefing"
 capture
 if [ "$run_rc" -eq 0 ]; then
   fail "dead bare skill is rejected (exited 0)"
-elif printf '%s' "$run_out" | grep -q "templates/agents/pm.md:4: task-sync"; then
+elif grep -q "templates/agents/pm.md:4: task-sync" <<<"$run_out"; then
   pass "dead bare skill is rejected with file:line + entry"
 else
   fail "dead bare skill is rejected (wrong message: $run_out)"
 fi
-printf '%s' "$run_out" | grep -q "morning-briefing" \
+grep -q "morning-briefing" <<<"$run_out" \
   && fail "a resolving entry is not reported ($run_out)" \
   || pass "a resolving entry is not reported"
 
@@ -83,7 +83,7 @@ printf '%s' "$run_out" | grep -q "morning-briefing" \
 new_root
 mk_agent inl "skills: [kit-task-sync, task-new]"
 capture
-if [ "$run_rc" -ne 0 ] && printf '%s' "$run_out" | grep -q "templates/agents/inl.md:3: task-new"; then
+if [ "$run_rc" -ne 0 ] && grep -q "templates/agents/inl.md:3: task-new" <<<"$run_out"; then
   pass "dead entry in an inline list is rejected"
 else
   fail "dead entry in an inline list is rejected (rc=$run_rc: $run_out)"
@@ -106,7 +106,7 @@ capture
                     || fail "copied real tree is green before the mutation ($run_out)"
 sed 's/^  - kit-task-sync.*$/  - task-sync/' "$REPO/templates/agents/pm.md" > "$TMP/r/templates/agents/pm.md"
 capture
-if [ "$run_rc" -ne 0 ] && printf '%s' "$run_out" | grep -qE "templates/agents/pm\.md:[0-9]+: task-sync"; then
+if [ "$run_rc" -ne 0 ] && grep -qE "templates/agents/pm\.md:[0-9]+: task-sync" <<<"$run_out"; then
   pass "re-adding task-sync to pm.md fails the lint"
 else
   fail "re-adding task-sync to pm.md fails the lint (rc=$run_rc: $run_out)"
@@ -117,7 +117,7 @@ new_root
 mkdir -p "$TMP/r/skills/deep-research"; : > "$TMP/r/skills/deep-research/SKILL.md"
 mk_agent r "skills:" "  - deep-research"
 capture
-if [ "$run_rc" -ne 0 ] && printf '%s' "$run_out" | grep -q "agent-skills-external.txt: deep-research"; then
+if [ "$run_rc" -ne 0 ] && grep -q "agent-skills-external.txt: deep-research" <<<"$run_out"; then
   pass "allowlisted name that the kit ships is rejected"
 else
   fail "allowlisted name that the kit ships is rejected (rc=$run_rc: $run_out)"
