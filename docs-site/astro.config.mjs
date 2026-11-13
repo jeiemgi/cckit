@@ -157,6 +157,7 @@ export default defineConfig({
           { label: 'All tutorials', slug: 'tutorials' },
           { label: 'Set up cckit in a repo', slug: 'tutorials/set-up-cckit-in-a-repo' },
           { label: 'Add cckit to an existing repo', slug: 'tutorials/adopt-cckit-in-an-existing-repo' },
+          { label: 'Use cckit with Codex', slug: 'tutorials/use-cckit-with-codex' },
           { label: 'Issue → merged PR', slug: 'tutorials/take-a-github-issue-to-a-merged-pr' },
           { label: 'Break a feature into an effort', slug: 'tutorials/break-a-feature-into-an-effort' },
           { label: 'Run a wave in parallel', slug: 'tutorials/run-issues-in-parallel-with-a-wave' },
