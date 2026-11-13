@@ -42,10 +42,14 @@ was being built. Write these files with `cckit bench checkpoint <X.Y.Z>`, not by
 | `results[].passed`, `.asked` | per question: passes answered right, of passes asked |
 | `results[].pass` | true only when every pass was right |
 | `results[].got` | the answer of the first pass that missed, else the last answer |
+| `verbs` | optional, written by `--verbs <file>`: one row per measured verb, `{ "verb", "runs", "min_ms", "median_ms", "gh_calls" }`, plus `exit` when the verb exited non-zero. The file is the output of `cckit bench verbs --json` |
 
-`cckit bench check <X.Y.Z>` compares `pass`/`total` of the version's last checkpoint with the
-checkpoint recorded before it, as fractions. `cckit release <X.Y.Z>` refuses on a missing file or a
-lower score. Files whose name is not `X.Y.Z.json` are ignored. A file named `X.Y.Z.json` that is not
+`cckit bench check <X.Y.Z>` compares the version's last checkpoint with the checkpoint recorded
+before it over the questions both asked: the `results` rows whose `set` and `id` match. On those
+rows it compares the sum of `passed` over the sum of `asked`, as fractions. Rows only one of the two
+has are counted in the output (`N new, M removed`) and do not decide the verdict. When no row
+matches, the checkpoint is a new baseline and passes. `verbs` is not read by the check.
+`cckit release <X.Y.Z>` refuses on a missing file or a lower score. Files whose name is not `X.Y.Z.json` are ignored. A file named `X.Y.Z.json` that is not
 valid JSON with a `checkpoints` array stops every checkpoint verb with exit 2 and its path on stderr.
 
 A run with an empty `got` is refused (exit 2): `cckit bench run` stores an empty answer only when

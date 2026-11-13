@@ -623,8 +623,17 @@ quality claims over `docs-site/src/content/docs`. Recorded runs of the first thr
 cckit records its own benchmark per release: `cckit bench checkpoint <X.Y.Z>` appends a scored run to
 `benchmarks/runs/<X.Y.Z>.json`, a version can hold several checkpoints, and `cckit release <X.Y.Z>`
 refuses when the version has none or its last one scores lower than the checkpoint before it
-(`--skip-bench-check` overrides and says so). Every checkpoint is published at
-[cckit.dev/benchmark-results](https://cckit.dev/benchmark-results/), a page generated from those files.
+(`--skip-bench-check` overrides and says so). The two are compared over the questions both asked,
+matched by set file and id, so a question set that grew does not lower the score; two checkpoints
+with no question in common are not compared and the newer one is a new baseline. Every checkpoint
+is published at [cckit.dev/benchmark-results](https://cckit.dev/benchmark-results/), a page
+generated from those files.
+
+A checkpoint can also carry verb timings. `cckit bench verbs --json` runs nine read-only verbs
+(`status`, `sync`, `next`, `plan`, `gc`, `effort plan`, `claims`, `task list`, `qa lanes`) 3 times
+each and prints the fastest and median wall time in milliseconds and the number of times each ran
+`gh`; `cckit bench checkpoint <X.Y.Z> --verbs <that file>` stores it in the checkpoint and the
+results page shows it. Take the timings on an idle machine.
 
 ## Built with cckit
 

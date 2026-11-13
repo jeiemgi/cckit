@@ -12,7 +12,8 @@
 #   scripts/publish.sh 0.1.0 --skip-bench-check     # release despite a missing or lower benchmark
 #
 # Benchmark check (#452): the version needs a recorded checkpoint in benchmarks/runs/<version>.json
-# and its last checkpoint must not score lower than the checkpoint recorded before it. Otherwise
+# and its last checkpoint must not score lower than the checkpoint recorded before it, counted over
+# the questions both asked (two checkpoints with no question in common are not compared). Otherwise
 # the release is refused (exit 1), in a dry run as well. --skip-bench-check overrides, and says so.
 # The runs are always read from this repo's benchmarks/ dir. BENCH_DIR is NOT honoured here: it is
 # the variable `cckit bench` reads, and one left exported for another project would move the
