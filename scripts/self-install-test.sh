@@ -55,7 +55,8 @@ Durable prose
 Effort flow'
 
 # SKIPPED_*: "<name> :: <reason>". Every skip is a decision on the record, not an omission.
-SKIPPED_SKILLS='copywriting :: not declared by any profile cckit uses (content profile only); cckit ships no marketing copy
+SKIPPED_SKILLS='brand-voice :: records a brand voice in brand/voice.md for copywriting to read; cckit has no brand file and does not install copywriting, its reader
+copywriting :: not declared by any profile cckit uses (content profile only); cckit ships no marketing copy
 feature-build-refine :: stack-gated on a @refinedev/* dependency; cckit has no package.json dependencies at all
 morning-briefing :: reads .claude/kit.config.json, which this repo does not have, and cckit answers the same question with `cckit status` + skills/kit-status
 speckit :: the software profile ships it with defaults.speckit = "off", so init would not install it either
