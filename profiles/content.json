@@ -43,6 +43,7 @@
   ],
   "defaults": {
     "plans_format": "markdown",
-    "memory": "off"
+    "memory": "off",
+    "content_kinds": "on"
   }
 }

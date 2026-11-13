@@ -54,6 +54,15 @@ if [ -n "${KTO_TEST_INNER:-}" ]; then
   eq "kind:chore → chore" \
      "$(kto_pr_title '[Effort 75] 7 · rich rendering' '' 'kind:chore')" \
      "chore: rich rendering"
+  eq "kind:post (content kind) → docs, never feat" \
+     "$(kto_pr_title 'Write the spring newsletter' '' 'kind:post,role:editor')" \
+     "docs: Write the spring newsletter"
+  eq "kind:research (content kind) → docs" \
+     "$(kto_pr_title 'Competitor pricing pages' '' 'kind:research')" \
+     "docs: Competitor pricing pages"
+  eq "kind:fix → fix" \
+     "$(kto_pr_title 'broken link' '' 'kind:fix')" \
+     "fix: broken link"
   eq "conventional summary wins over derivation" \
      "$(kto_pr_title '[Effort 182] 2 · Publish to npm' 'ci: publish via OIDC' 'kind:task')" \
      "ci: publish via OIDC"

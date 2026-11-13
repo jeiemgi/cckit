@@ -24,6 +24,27 @@ if [ -n "${KINDS_TEST_INNER:-}" ]; then
     eq "branch prefix $k is quiet" "$(kit_kind_branch "$k" 2>&1 >/dev/null)" ""
     eq "wt prefix $k"              "$(_wt_kind_prefix "$k" 2>/dev/null)" "$k"
   done
+  # content kinds (#417): a label value, never a branch prefix. Each maps, silently, onto a prefix
+  # that IS in the closed set, and titles a PR with a commit type other than feat.
+  for pair in post:task campaign:plan brand:task research:spike; do
+    k="${pair%%:*}"; want="${pair##*:}"
+    kit_kind_content "$k";     eq "content $k" "$?" "0"
+    kit_kind_label_valid "$k"; eq "label-valid $k" "$?" "0"
+    kit_kind_valid "$k";       eq "content kind $k is not a branch kind" "$?" "1"
+    eq "branch prefix $k"          "$(kit_kind_branch "$k" 2>/dev/null)" "$want"
+    eq "branch prefix $k is quiet" "$(kit_kind_branch "$k" 2>&1 >/dev/null)" ""
+    eq "wt prefix $k"              "$(_wt_kind_prefix "$k" 2>/dev/null)" "$want"
+    kit_kind_valid "$(kit_kind_branch "$k" 2>/dev/null)"; eq "prefix of $k is in the closed set" "$?" "0"
+    eq "commit type $k"            "$(kit_kind_commit_type "$k")" "docs"
+  done
+  kit_kind_content feat; eq "feat is not a content kind" "$?" "1"
+  kit_kind_label_valid feat; eq "label-valid feat" "$?" "0"
+  kit_kind_label_valid bug;  eq "label-valid bug" "$?" "1"
+  eq "commit type feat"  "$(kit_kind_commit_type feat)"  "feat"
+  eq "commit type chore" "$(kit_kind_commit_type chore)" "chore"
+  eq "commit type bug"   "$(kit_kind_commit_type bug)"   "fix"
+  eq "commit type task"  "$(kit_kind_commit_type task)"  "feat"
+  eq "commit type ''"    "$(kit_kind_commit_type "")"    "feat"
   # a value outside the set never becomes a branch prefix: it degrades to task and says so.
   for k in bug docs enhancement Feat "" "fix/x"; do
     kit_kind_valid "$k"; eq "invalid '$k'" "$?" "1"
@@ -57,6 +78,13 @@ t "hygiene hook prefixes == KIT_KINDS" "$(sorted "$hook")" "$want"
 fb="$(sed -n 's/.*\${KIT_KINDS:-\([a-z ]*\)}.*/\1/p' "$root/scripts/setup-labels.sh" | head -1)"
 t "setup-labels fallback kinds == KIT_KINDS" "$(sorted "$fb")" "$want"
 
+# 2b. the content-kind fallback in setup-labels.sh == KIT_CONTENT_KINDS, and no content kind is a
+#     branch prefix the hygiene hook would have to learn.
+fbc="$(sed -n 's/.*\${KIT_CONTENT_KINDS:-\([a-z ]*\)}.*/\1/p' "$root/scripts/setup-labels.sh" | head -1)"
+t "setup-labels fallback content kinds == KIT_CONTENT_KINDS" "$(sorted "$fbc")" "$(sorted "$KIT_CONTENT_KINDS")"
+both="$(printf '%s\n' $KIT_KINDS $KIT_CONTENT_KINDS | sort | uniq -d | tr '\n' ' ')"
+t "no kind is in both sets" "$both" ""
+
 # 3. wt_start routes the label through the closed set rather than using it verbatim.
 t "wt_start maps the kind label through _wt_kind_prefix" \
   "$(grep -c 'kind="$(_wt_kind_prefix "$kind")"' "$dir/worktree-start.sh" | tr -d ' ')" "1"
@@ -77,6 +105,15 @@ GH_LOG="$tmp/gh.log"; export GH_LOG; : > "$GH_LOG"
 t "setup-labels ran" "$?" "0"
 got="$(sed -n 's/^label create kind:\([a-z]*\) .*/\1/p' "$GH_LOG" | sort | tr '\n' ' ' | sed 's/ *$//')"
 t "setup-labels provisions exactly the kind set" "$got" "$want"
+# 4b. with kinds.content on, the content kind labels are provisioned too.
+: > "$GH_LOG"
+jq '.kinds = {content:true}' "$root/cckit.config.json" > "$tmp/content.config.json"
+( cd "$root" && PATH="$tmp/bin:$PATH" KIT_CONFIG="$tmp/content.config.json" bash scripts/setup-labels.sh ) >/dev/null 2>&1
+t "setup-labels ran with kinds.content" "$?" "0"
+got="$(sed -n 's/^label create kind:\([a-z]*\) .*/\1/p' "$GH_LOG" | sort | tr '\n' ' ' | sed 's/ *$//')"
+t "kinds.content adds exactly the content kinds" "$got" "$(sorted "$KIT_KINDS $KIT_CONTENT_KINDS")"
+: > "$GH_LOG"
+( cd "$root" && PATH="$tmp/bin:$PATH" KIT_CONFIG="$root/cckit.config.json" bash scripts/setup-labels.sh ) >/dev/null 2>&1
 got="$(sed -n 's/^label create ctx:\([A-Z]*\) .*/\1/p' "$GH_LOG" | tr '\n' ' ' | sed 's/ *$//')"
 t "setup-labels provisions ctx S M L XL" "$got" "S M L XL"
 # roles and agent profiles come from the project config, so those two families may be absent.

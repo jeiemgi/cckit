@@ -114,6 +114,11 @@ load_kit_config() {
   export KIT_PR_TITLE_STYLE="$(jq -r '.pr.titleStyle // "conventional"' "$cfg")"
   export KIT_PR_ORCHESTRATOR_SECTION="$(jq -r '.pr.orchestratorSection // false' "$cfg")"
 
+  # Content kinds (#417). kinds.content: true makes setup-labels.sh provision kind:post,
+  # kind:campaign, kind:brand and kind:research. The kinds themselves are always accepted and
+  # always map to a branch prefix and a commit type (kinds.sh); this key only decides the labels.
+  export KIT_CONTENT_KINDS_ON="$(jq -r '.kinds.content // false' "$cfg")"
+
   # Apply per-folder .claudekit/ overrides (no-op when none exist).
   _kit_apply_claudekit_overlays "$cfg"
 }

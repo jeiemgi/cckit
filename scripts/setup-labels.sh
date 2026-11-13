@@ -30,6 +30,13 @@ echo "kinds:"
 # the two lists are one list. The literal is the fallback for a project without lib/kinds.sh;
 # scripts/lib/kinds-test.sh fails if it drifts from KIT_KINDS.
 for k in ${KIT_KINDS:-feat fix task chore security scaffold ci adr spike plan}; do ensure_label "kind:$k" "5319e7" "Kind: $k"; done
+# Content kinds (#417) — post, campaign, brand, research — are provisioned only for a project whose
+# config sets `kinds.content: true` (the content and marketing profiles do). A software project
+# would carry four labels that never vary. The literal is the fallback for a project without
+# lib/kinds.sh; scripts/lib/kinds-test.sh fails if it drifts from KIT_CONTENT_KINDS.
+if [ "${KIT_CONTENT_KINDS_ON:-false}" = "true" ]; then
+  for k in ${KIT_CONTENT_KINDS:-post campaign brand research}; do ensure_label "kind:$k" "5319e7" "Kind: $k (content)"; done
+fi
 echo "priorities:"
 ensure_label "priority:p0" "8b0000" "Drop everything"
 ensure_label "priority:p1" "b60205" "Now / blocking"

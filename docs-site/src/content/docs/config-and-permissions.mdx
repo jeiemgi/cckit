@@ -497,6 +497,29 @@ The kit carries no project's layout. Both keys are config, and the fallback is a
 Keep the directory tracked: the list is shared through git, so a gitignored directory would leave
 every task a local draft.
 
+## Content work
+
+Keys the `content` and `marketing` profiles set at `cckit init`. A project on another profile can
+add them by hand.
+
+| Key | Default | What it does |
+| --- | --- | --- |
+| `kinds.content` | `false` | `true` makes `scripts/setup-labels.sh` — and the label step of `cckit init` — provision the four content kind labels: `kind:post`, `kind:campaign`, `kind:brand`, `kind:research`. The kinds work without the key; it only decides whether the labels are created. |
+
+A content kind is a label, never a branch prefix. `cckit start` maps it onto the closed set of
+branch kinds, and `cckit pr` takes the commit type from it:
+
+| `kind:` label | Branch `cckit start` cuts | PR title type |
+| --- | --- | --- |
+| `post` | `task/<N>-<slug>` | `docs:` |
+| `campaign` | `plan/<N>-<slug>` | `docs:` |
+| `brand` | `task/<N>-<slug>` | `docs:` |
+| `research` | `spike/<N>-<slug>` | `docs:` |
+
+The branch set `cckit gc` and the SessionStart hygiene hook parse is unchanged, so a live branch of
+a content-kind issue keeps the same issue-open protection as any other
+(`scripts/lib/content-kinds-gc-test.sh`).
+
 ## Effort WIP limit
 
 `cckit effort start` refuses to start a **new** effort once too many are already in progress. The

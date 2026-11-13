@@ -48,6 +48,17 @@ if ! type cckit_gh_rest >/dev/null 2>&1; then
   unset _kto_self
 fi
 type cckit_gh_rest >/dev/null 2>&1 || cckit_gh_rest() { return 1; }
+
+# The kind vocabulary (kinds.sh): kto_pr_title takes the commit type from kit_kind_commit_type.
+if ! type kit_kind_commit_type >/dev/null 2>&1; then
+  if [ -n "${BASH_SOURCE:-}" ]; then _kto_self="${BASH_SOURCE[0]}"
+  elif [ -n "${ZSH_VERSION:-}" ]; then eval '_kto_self="${(%):-%x}"'
+  else _kto_self="$0"; fi
+  _kto_self="$(cd "$(dirname "$_kto_self")" 2>/dev/null && pwd)/kinds.sh"
+  # shellcheck source=kinds.sh
+  [ -f "$_kto_self" ] && . "$_kto_self"
+  unset _kto_self
+fi
 type cckit_board_skipped >/dev/null 2>&1 || cckit_board_skipped() { return 1; }
 
 kto_repo() {
@@ -116,17 +127,18 @@ kto_pr_title() {
   fi
   # 2) Derive the type from the kind:/bug label.
   kind="$(kto_labels_kind "$labels")"
-  case "$kind" in
-    feat)     ctype=feat ;;
-    chore)    ctype=chore ;;
-    docs)     ctype=docs ;;
-    ci)       ctype=ci ;;
-    test)     ctype=test ;;
-    perf)     ctype=perf ;;
-    refactor) ctype=refactor ;;
-    fix|bug)  ctype=fix ;;
-    *)        ctype=feat ;;   # kind:task (the default) and anything unknown → feat
-  esac
+  # The kind -> type map is kinds.sh's (kit_kind_commit_type): a content kind (post, campaign,
+  # brand, research) titles as `docs`, kind:task and anything unknown as `feat`.
+  if command -v kit_kind_commit_type >/dev/null 2>&1; then
+    ctype="$(kit_kind_commit_type "$kind")"
+  else
+    case "$kind" in
+      feat|chore|docs|ci|test|perf|refactor) ctype="$kind" ;;
+      fix|bug) ctype=fix ;;
+      post|campaign|brand|research) ctype=docs ;;
+      *) ctype=feat ;;
+    esac
+  fi
   case ",$labels," in *,bug,*) ctype=fix ;; esac   # a plain `bug` label → fix
   # 3) Strip "[Effort N] M · " (the "· " consumed here as a literal — byte-wise match is portable
   #    across BSD/GNU sed + locales; a negated class over the multibyte middot is not) and then a

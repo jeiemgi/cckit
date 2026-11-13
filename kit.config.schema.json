@@ -128,6 +128,13 @@
         }
       }
     },
+    "kinds": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "content": { "type": "boolean", "default": false, "description": "When true, `scripts/setup-labels.sh` (and the label step of `cckit init`) provisions the content kind labels `kind:post`, `kind:campaign`, `kind:brand` and `kind:research`. The content and marketing profiles set it. The kinds are accepted by `--kind` with or without this key: a content kind starts on a branch prefix from the closed set (post and brand: `task/`, campaign: `plan/`, research: `spike/`) and titles its PR `docs:`." }
+      }
+    },
     "pr": {
       "type": "object",
       "additionalProperties": true,

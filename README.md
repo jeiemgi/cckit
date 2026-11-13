@@ -217,8 +217,9 @@ A big piece of work is an **effort** — a parent issue with sub-issues. `cckit 
 creates the parent issue (the four-section plan body), applies the `ctx/kind/priority/role/flow` labels, and lints
 every sub-issue title — the same effort `/kit-effort-new` produces, since both call one shared core. `--kind` sets
 the `kind:` label on the parent and every sub: one of `feat fix task chore security scaffold ci adr spike plan`
-(default `task`), the same closed set `cckit start` uses as the branch prefix; any other value is refused before
-anything is created. In `cckit plan` and `cckit effort plan` an issue with no `ctx:` label shows `?` and weighs 2;
+(default `task`), the same closed set `cckit start` uses as the branch prefix, or a content kind — `post`,
+`campaign`, `brand`, `research` — which is a label only: it starts on `task/`, `plan/`, `task/` and `spike/`
+respectively and titles its PR `docs:`. Any other value is refused before anything is created. In `cckit plan` and `cckit effort plan` an issue with no `ctx:` label shows `?` and weighs 2;
 a `ctx:` value outside `S|M|L|XL` also weighs 2 and warns on stderr. The `--flow`
 vocabulary (the `[Flow]` title tags) reads from `effort.flows` in the project config, so `cckit effort new --flow X`
 works out of the box in any configured repo (an explicit `EFFORT_FLOWS` env var still wins per invocation).

@@ -186,8 +186,8 @@ effort_new() {
   # --kind picks the kind:<k> label on the parent and every sub (default task). It is validated
   # against the closed set (kinds.sh) before anything is created: `cckit start` turns the label into
   # the branch prefix, so a value outside the set would yield a branch the hygiene hook rejects.
-  if command -v kit_kind_valid >/dev/null 2>&1 && ! kit_kind_valid "$kind"; then
-    echo "effort_new: --kind must be one of: $KIT_KINDS (got '$kind')" >&2; return 1
+  if command -v kit_kind_label_valid >/dev/null 2>&1 && ! kit_kind_label_valid "$kind"; then
+    echo "effort_new: --kind must be one of: $KIT_KINDS $KIT_CONTENT_KINDS (got '$kind')" >&2; return 1
   fi
   [ -n "$kind" ] || { echo "effort_new: --kind needs a value" >&2; return 1; }
 

@@ -15,6 +15,8 @@ The role determines which agent owns the work. Spawn that agent for the actual e
 ## Kinds
 
 `task` · `plan` · `adr` · `scaffold` · `spike` — drives the branch prefix `<kind>/<N>-<slug>`.
+Content kinds `post` · `campaign` · `brand` · `research` are labels only: the branch starts on
+`task/` · `plan/` · `task/` · `spike/`.
 
 ## Priorities
 
