@@ -166,6 +166,7 @@ export default defineConfig({
           { label: 'Keep private data out of AI commits', slug: 'tutorials/keep-private-data-out-of-ai-commits' },
           { label: 'Control what Claude Code can do', slug: 'tutorials/control-what-claude-code-can-do' },
           { label: 'Give Claude Code persistent memory', slug: 'tutorials/give-claude-code-persistent-memory' },
+          { label: 'Give Claude Code a code graph', slug: 'tutorials/find-code-with-a-code-graph' },
           { label: 'Run checks with cckit hooks', slug: 'tutorials/run-checks-with-cckit-hooks' },
           { label: 'Debug a web page with Claude Code', slug: 'tutorials/debug-a-web-page-with-claude-code' },
           { label: 'Extend Claude Code with skills', slug: 'tutorials/extend-claude-code-with-skills' },
