@@ -11,6 +11,7 @@
 #          the base branch, pushed so the team sees the task is taken        (alias: take)
 #   finish mark the task done ON ITS BRANCH, commit, push, open the pull request. The task is done
 #          when that pull request merges — review stays a pull request       (alias: done)
+#   default  print `light` or `issues`: which list is the project's default (tasks.default)
 #   share  one pull request that adds this checkout's drafts to the base branch, for a backlog
 #          nobody has started yet. The tasks list as `shared` until it merges; run again with no
 #          new drafts, it retries a share whose push or pull request failed
@@ -47,6 +48,15 @@ type cckit_is_json >/dev/null 2>&1 || cckit_is_json() { [ "${CCKIT_OUTPUT:-human
 
 _LT_TAB="$(printf '\t')"
 
+# _lt_say <technical> <plain> — one progress line, worded for the reader (#420). With
+# plainLanguage.enabled (KIT_PLAIN_LANGUAGE=true) the plain wording is printed: no worktree, branch
+# or pull request. Only human progress lines go through here; stdout contracts and --llm do not.
+# The plain finish hint names --all: a draft is a file the task created, and without --all
+# `finish` opens the review without it.
+_lt_say() {
+  if [ "${KIT_PLAIN_LANGUAGE:-false}" = "true" ]; then printf '%s\n' "$2"; else printf '%s\n' "$1"; fi
+}
+
 _lt_usage() {
   cat >&2 <<'EOF'
 cckit task new [--priority p0|p1|p2|p3] [--kind K] [--body B|--body-file F] "<title>"
@@ -55,6 +65,7 @@ cckit task next
 cckit task start [--force] [--no-push] <id>          (alias: take)
 cckit task finish [<id>] "<summary>" [--all]         (alias: done)
 cckit task share ["<summary>"]
+cckit task default                                    light | issues (tasks.default in the config)
 EOF
 }
 
@@ -124,7 +135,8 @@ lt_new() {
   fi
   echo "✓ task $id · $title"
   if [ "$(task_source_name)" = "file" ]; then
-    echo "  file:  $dir/$id.md (a draft: only in this checkout until it is started or shared)"
+    _lt_say "  file:  $dir/$id.md (a draft: only in this checkout until it is started or shared)" \
+            "  file:  $dir/$id.md (only on this computer until you start it or share the list)"
   fi
   echo "  start: cckit task start $id"
 }
@@ -232,7 +244,8 @@ EOF
     wt="$root/.claude/worktrees/$(printf '%s' "$branch" | tr '/' '+')"
     git -C "$root" worktree add --no-track -b "$branch" "$wt" "$base_ref" >/dev/null 2>&1 \
       || { echo "✗ task start: worktree add failed for $branch" >&2; return 1; }
-    echo "[$id] created worktree $wt (branch $branch from $base_ref)" >&2
+    _lt_say "[$id] created worktree $wt (branch $branch from $base_ref)" \
+            "[$id] started — the draft lives in $wt" >&2
     if type wt_bootstrap >/dev/null 2>&1; then wt_bootstrap "$root" "$wt" "$id" >&2 || true; fi
   fi
 
@@ -240,12 +253,15 @@ EOF
 
   if [ "$push" = 1 ] && git -C "$root" remote get-url origin >/dev/null 2>&1; then
     if KIT_PR_BASE="$base" git -C "$wt" push --quiet -u origin "$branch" >/dev/null 2>&1; then
-      echo "[$id] pushed $branch — the team's list now shows the task as doing" >&2
+      _lt_say "[$id] pushed $branch — the team's list now shows the task as doing" \
+              "[$id] the team's list now shows this task as in progress" >&2
     else
-      echo "[$id] ⚠ could not push $branch; the task shows as doing on this machine only" >&2
+      _lt_say "[$id] ⚠ could not push $branch; the task shows as doing on this machine only" \
+              "[$id] ⚠ could not reach the shared copy; the task shows as in progress on this computer only" >&2
     fi
   fi
-  echo "[$id] when the work is ready: cckit task finish $id \"<summary>\"" >&2
+  _lt_say "[$id] when the work is ready: cckit task finish $id \"<summary>\"" \
+          "[$id] when the draft is ready for review: cckit task finish $id \"<summary>\" --all" >&2
   echo "$wt|$branch|$id"
 }
 
@@ -277,7 +293,8 @@ _lt_open_pr() {
     url="$(gh pr list --repo "$repo" --head "$branch" --state open --json url --jq '.[0].url // empty' 2>/dev/null || true)"
   fi
   if [ -n "$url" ]; then
-    echo "[task] a pull request is already open for $branch" >&2
+    _lt_say "[task] a pull request is already open for $branch" \
+            "[task] this draft is already waiting for review" >&2
     echo "✓ $url"; return 0
   fi
   if cckit_gh_rest; then
@@ -290,6 +307,7 @@ _lt_open_pr() {
     echo "✗ could not open the pull request for $branch — the branch is pushed; run the same command again to retry" >&2
     return 1
   fi
+  [ "${KIT_PLAIN_LANGUAGE:-false}" = "true" ] && echo "[task] ready for review — open the link and approve it there" >&2
   echo "✓ $url"
 }
 
@@ -341,8 +359,15 @@ EOF
   fi
 
   dir="$(task_source_dir)"
-  body="$(printf '## Light task\n\n`%s` · %s\n\n## Summary\n\n%s\n\n## Review\n\nMerging this pull request is what marks the task done: its diff carries the task record with `status: done` (`%s/%s.md` with the file source). No GitHub issue is linked.\n' \
-    "$id" "$title" "$summary" "$dir" "$id")"
+  if type kto_pr_body_style >/dev/null 2>&1 && [ "$(kto_pr_body_style)" = "content" ]; then
+    # pr.bodyStyle = content (#418): the reviewer is not a developer — say what approving does and
+    # what to check, without "diff".
+    body="$(printf '## Task\n\n`%s` · %s\n\n## Summary\n\n%s\n\n## Review\n\n%s\n\nApproving and merging this pull request marks the task done: it changes the task record `%s/%s.md` to `status: done`. No GitHub issue is linked.\n' \
+      "$id" "$title" "$summary" "$(kto_content_review_checklist)" "$dir" "$id")"
+  else
+    body="$(printf '## Light task\n\n`%s` · %s\n\n## Summary\n\n%s\n\n## Review\n\nMerging this pull request is what marks the task done: its diff carries the task record with `status: done` (`%s/%s.md` with the file source). No GitHub issue is linked.\n' \
+      "$id" "$title" "$summary" "$dir" "$id")"
+  fi
   _lt_open_pr "$wt" "$branch" "$pr_title" "$body"
 }
 
@@ -433,6 +458,10 @@ lt_cli() {
         return "$rc"
       fi
       "lt_$sub" "$@" ;;
+    default)
+      # Which list is this project's default (tasks.default). Read-only; no fetch, no gh.
+      out="$(task_default_name)"
+      if cckit_is_json; then cckit_json verb "task default" ok true default "$out"; else printf '%s\n' "$out"; fi ;;
     -h|--help|help) _lt_usage; return 0 ;;
     *) _lt_usage; return 2 ;;
   esac

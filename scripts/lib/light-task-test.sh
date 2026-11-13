@@ -154,8 +154,33 @@ t "an open PR is reported, not re-created" "$(grep -c '^pr create' "$GH_LOG")" "
 t "--all commits new files" "$(git -C "$WT" ls-files new-post.txt | grep -c .)" "1"
 "$CCKIT" task finish "$B" >/dev/null 2>&1; t "finish without a summary is a usage error" "$?" "2"
 "$CCKIT" task finish zz9 "x" >/dev/null 2>&1; t "finish refuses an unknown task" "$?" "1"
-out="$(cd "$WTB" && "$CCKIT" task finish "fix: launch posts scheduled" 2>/dev/null)"
-has "a conventional summary becomes the PR title, with the id" "$(grep '^pr create' "$GH_LOG")" "--title fix: launch posts scheduled [$B]"
+has "the default PR body uses the code wording" "$create" "its diff carries the task record"
+# pr.bodyStyle = content (#418): task B is finished under a config that sets it.
+# plainLanguage.enabled (#420) is set in the same config: the progress lines drop the git words.
+jq '.pr = {bodyStyle: "content"} | .plainLanguage = {enabled: true}' "$W/cckit.config.json" > "$tmp/content.config.json"
+: > "$GH_LOG"
+out="$(cd "$WTB" && KIT_CONFIG="$tmp/content.config.json" "$CCKIT" task finish "fix: launch posts scheduled" 2>"$tmp/fin-plain.err")"
+t "plain language: stdout is still the PR url line" "$out" "✓ https://github.com/o/r/pull/77"
+has "plain language: finish says it is ready for review" "$(cat "$tmp/fin-plain.err")" "[task] ready for review — open the link and approve it there"
+has "the default wording names the worktree" "$(cat "$tmp/start.err")" "created worktree"
+pl="$(KIT_CONFIG="$tmp/content.config.json" "$CCKIT" task new "Plain wording probe" 2>&1)"
+has "plain language: new says where the file is, without 'checkout'" "$pl" "only on this computer until you start it or share the list"
+hasnt "plain language: new does not say checkout" "$pl" "checkout"
+plid="$(printf '%s\n' "$pl" | sed -n 's/^✓ task \([a-z0-9]*\) .*/\1/p')"
+plout="$(KIT_CONFIG="$tmp/content.config.json" "$CCKIT" task start --no-push "$plid" 2>"$tmp/start-plain.err")"; t "plain language: start exits 0" "$?" "0"
+t "plain language: start's stdout keeps the <worktree>|<branch>|<id> shape" "${plout##*|}" "$plid"
+has "plain language: start says the draft is started" "$(cat "$tmp/start-plain.err")" "[$plid] started — the draft lives in "
+has "plain language: start says how to send it for review" "$(cat "$tmp/start-plain.err")" "when the draft is ready for review: cckit task finish $plid \"<summary>\" --all"
+hasnt "the default wording's finish hint does not add --all" "$(cat "$tmp/start.err")" "<summary>\" --all"
+hasnt "plain language: start does not say 'created worktree'" "$(cat "$tmp/start-plain.err")" "created worktree"
+hasnt "plain language: start does not name the branch" "$(cat "$tmp/start-plain.err")" "(branch "
+create="$(grep '^pr create' "$GH_LOG")"
+has "a conventional summary becomes the PR title, with the id" "$create" "--title fix: launch posts scheduled [$B]"
+has "content body: names the task" "$create" "\`$B\` · "
+has "content body: review checklist" "$create" "Read the draft from start to finish"
+has "content body: says what approving does" "$create" "Approving and merging this pull request marks the task done"
+hasnt "content body: no 'diff'" "$create" "diff"
+hasnt "content body: no Closes line" "$create" "Closes #"
 
 # ── the PR merges: the task is done, and gc lets the branch go ──────────────────────────────────
 git clone -q "$tmp/remote.git" "$tmp/merger" 2>/dev/null
@@ -239,6 +264,24 @@ out="$(. "$LIB/task-source.sh"; . "$LIB/worktree-issue.sh"
 t "a second source is reached through the dispatcher alone" "$out" "light task t9 still OPEN"
 t "tasks.dir is read from the config" "$(cd "$tmp/mate" && git checkout -q develop 2>/dev/null; jq '.tasks.dir = "work/todo"' cckit.config.json > c.tmp && mv c.tmp cckit.config.json
   id="$("$CCKIT" task new "Elsewhere" --llm | jq -r .id)"; [ -f "work/todo/$id.md" ] && echo yes)" "yes"
+
+# ── tasks.default: which list is the project's default (#422) ───────────────────────────────────
+cd "$tmp/mate" || exit 1
+t "task default: issues when the key is absent" "$("$CCKIT" task default)" "issues"
+jq '.tasks.default = "light"' cckit.config.json > c.tmp && mv c.tmp cckit.config.json
+t "task default: light when the config says so" "$("$CCKIT" task default)" "light"
+t "task default --llm" "$("$CCKIT" task default --llm | jq -r '[.verb, .default] | join(" ")')" "task default light"
+want="$(KIT_TASK_FETCH=0 "$CCKIT" task next)"
+t "a bare cckit next answers from the light list" "$(KIT_TASK_FETCH=0 "$CCKIT" next 2>/dev/null)" "$want"
+has "…and names the command that starts the task" "$want" "start: cckit task start "
+t "cckit next --llm is the light task object" "$(KIT_TASK_FETCH=0 "$CCKIT" next --llm 2>/dev/null | jq -r 'has("start")')" "true"
+: > "$GH_LOG"
+KIT_TASK_FETCH=0 "$CCKIT" next >/dev/null 2>&1
+t "the light next makes no gh call" "$(grep -c . "$GH_LOG" | tr -d ' ')" "0"
+jq '.tasks.default = "sometimes"' cckit.config.json > c.tmp && mv c.tmp cckit.config.json
+out="$("$CCKIT" task default 2>"$tmp/default.err")"
+t "an unknown tasks.default reads as issues" "$out" "issues"
+has "…with a warning naming the value" "$(cat "$tmp/default.err")" "tasks.default 'sometimes' is neither 'light' nor 'issues'"
 
 [ "$fail" -eq 0 ] && echo "PASS light-task-test" || echo "FAIL light-task-test"
 exit "$fail"

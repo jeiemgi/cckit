@@ -167,7 +167,7 @@ nobody consumes.
 | `ctx:` | `S` `M` `L` `XL` | `_ep_weight`, `_pm_weight` (session budget) | how much of a session it costs |
 | `flow:` | `core` `docs` … | effort dispatch | which flow owns it |
 | `role:` | `tech-lead` `docs` … | delegation brief | who it is written for |
-| `kind:` | `feat` `fix` `task` `chore` `security` `scaffold` `ci` `adr` `spike` `plan` | `wt_start` (branch prefix), `kto_pr_title` (commit type) | what sort of work it is |
+| `kind:` | `feat` `fix` `task` `chore` `security` `scaffold` `ci` `adr` `spike` `plan`; content kinds `post` `campaign` `brand` `research` | `wt_start` (branch prefix), `kto_pr_title` (commit type) | what sort of work it is |
 | `agent:` | one per declared profile | `ap_profile_from_labels` | which agent profile runs the work |
 | `slug:` | one per effort | `effort_slug_resolve` | resolve a name to an effort |
 
@@ -176,7 +176,7 @@ nobody consumes.
 - **A label must vary.** `kind:task` on every issue tells you nothing. `kind:` is a closed set
   (`KIT_KINDS`, `scripts/lib/kinds.sh`), the same one `rules/branch-naming.md` allows as a branch
   prefix, because `cckit start` cuts `<kind>/<N>-<slug>` from the label. Set it with
-  `cckit new --kind` or `cckit effort new --kind`; a label outside the set starts on `task/`.
+  `cckit new --kind` or `cckit effort new --kind`; a label outside the set starts on `task/`. A content kind (`KIT_CONTENT_KINDS`) is a label only: it starts on the prefix `kit_kind_branch` maps it to and titles its PR `docs:`.
 - **A label must be read.** If nothing consumes it, delete the label *and* the code that writes
   it. `par:seq|wide|<n>` was written by `effort_new` and read by nothing, so both were removed.
 - **Every value in a scale needs a label.** `scripts/setup-labels.sh` provisions all four `ctx:`

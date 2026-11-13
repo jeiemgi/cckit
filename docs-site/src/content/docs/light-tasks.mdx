@@ -61,12 +61,27 @@ person who approves it needs a GitHub account.
    are listed but not included unless you add `--all`.
 
 5. **Review and merge.** The reviewer approves the pull request on GitHub. When it merges, the
-   task is done for everyone: `cckit task list --all` shows it as `done`.
+   task is done for everyone: `cckit task list --all` shows it as `done`. In a project whose
+   config sets [`pr.bodyStyle: "content"`](/config-and-permissions/#content-work), the pull request
+   body carries a review checklist for a draft: read it through, facts and links checked, voice
+   matches the brand guide, only this piece's files changed.
 
 </Steps>
 
 `take` is the same verb as `start`, and `done` the same as `finish`. An id can be shortened to any
 prefix that matches one task.
+
+## Making light tasks the default
+
+A project that tracks all its work this way sets
+[`tasks.default`](/config-and-permissions/#light-tasks) to `light`:
+
+```bash
+cckit task default     # prints: light   or: issues
+```
+
+With `light`, a bare `cckit next` prints what `cckit task next` prints. `cckit next` with an
+argument, and `cckit new` / `cckit start` / `cckit pr`, still act on GitHub issues.
 
 ## Ask your agent instead
 
@@ -78,6 +93,22 @@ Show me the light tasks in this project with `cckit task list` and what is next 
 work in the worktree it prints, and when I say it is ready run
 `cckit task finish <id> "<summary>"` and give me the pull request link. Do not merge it.
 ```
+
+## Plain language
+
+With [`plainLanguage.enabled`](/config-and-permissions/#content-work) set to `true`, the lines
+`cckit task` prints while it works leave out worktree, branch and pull request:
+
+| Verb | Default line | Plain line |
+| --- | --- | --- |
+| `new` | `file: tasks/<id>.md (a draft: only in this checkout until it is started or shared)` | `file: tasks/<id>.md (only on this computer until you start it or share the list)` |
+| `start` | `created worktree <path> (branch light/<id>-<slug> from origin/<base>)` | `started — the draft lives in <path>` |
+| `start` | `pushed light/<id>-<slug> — the team's list now shows the task as doing` | `the team's list now shows this task as in progress` |
+| `start` | `when the work is ready: cckit task finish <id> "<summary>"` | `when the draft is ready for review: cckit task finish <id> "<summary>" --all` |
+| `finish` | — | `ready for review — open the link and approve it there` |
+
+What a program reads is the same in both: `start` still prints `<worktree>|<branch>|<id>` on
+stdout, `finish` still prints `✓ <url>`, and `--llm` output does not change.
 
 ## States
 

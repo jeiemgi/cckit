@@ -93,7 +93,7 @@ cckit init [<folder>]         # guided setup, end to end: names what the folder 
                               #   (repository, develop, labels, protection) after ONE confirmation.
                               #   A new project starts from a recipe. See "Set up a project" below.
 cckit init --profile software --no-github   # scaffold only: nothing outside the folder
-                              #   profiles: software · content · research · automation · minimal
+                              #   profiles: software · content · marketing · research · automation · minimal
                               #   --adapter claude|codex|both picks the agent (default claude);
                               #   codex writes AGENTS.md + .agents/ and no .claude/ tree;
                               #   both get the commit guards + session-mail hooks (Codex: in
@@ -217,8 +217,9 @@ A big piece of work is an **effort** — a parent issue with sub-issues. `cckit 
 creates the parent issue (the four-section plan body), applies the `ctx/kind/priority/role/flow` labels, and lints
 every sub-issue title — the same effort `/kit-effort-new` produces, since both call one shared core. `--kind` sets
 the `kind:` label on the parent and every sub: one of `feat fix task chore security scaffold ci adr spike plan`
-(default `task`), the same closed set `cckit start` uses as the branch prefix; any other value is refused before
-anything is created. In `cckit plan` and `cckit effort plan` an issue with no `ctx:` label shows `?` and weighs 2;
+(default `task`), the same closed set `cckit start` uses as the branch prefix, or a content kind — `post`,
+`campaign`, `brand`, `research` — which is a label only: it starts on `task/`, `plan/`, `task/` and `spike/`
+respectively and titles its PR `docs:`. Any other value is refused before anything is created. In `cckit plan` and `cckit effort plan` an issue with no `ctx:` label shows `?` and weighs 2;
 a `ctx:` value outside `S|M|L|XL` also weighs 2 and warns on stderr. The `--flow`
 vocabulary (the `[Flow]` title tags) reads from `effort.flows` in the project config, so `cckit effort new --flow X`
 works out of the box in any configured repo (an explicit `EFFORT_FLOWS` env var still wins per invocation).
@@ -386,8 +387,37 @@ cckit task share "Q1 backlog"                  # one PR that adds this checkout'
 - **Sources.** Tasks are read through one interface (`scripts/lib/task-source.sh`). The `file`
   source ships; another store plugs in as `scripts/lib/task-source-<name>.sh` plus
   `tasks.source: "<name>"`.
+- **Default list.** `tasks.default: "light"` makes a bare `cckit next` answer from this list;
+  `cckit task default` prints `light` or `issues`. The `campaign` skill reads it to record a
+  campaign's pieces as light tasks or as an effort's sub-issues.
 
 Guide: [Light tasks](https://cckit.dev/light-tasks/).
+
+### Marketing profile
+
+`cckit init --profile marketing` sets a project up for a team that does not use git. It is the
+`content` profile (PM, Editor, Designer and Researcher agents; the `copywriting` skill) plus:
+
+- **Light tasks as the default list** (`tasks.default: "light"`): a bare `cckit next` answers from
+  `cckit task`, and no GitHub issue is created per task. Review is still a pull request.
+- **Plain language** (`plainLanguage.enabled: true` and the `plain-language` rule): the agent says
+  draft, review and approve, and names worktree, branch and pull request only when asked.
+- **`brand-voice`**: records the voice, key messages and banned phrasings in `brand/voice.md`;
+  `copywriting` reads it before it writes.
+- **`campaign`**: one goal becomes a plan file and its pieces — light tasks, or an effort's
+  sub-issues when `cckit task default` prints `issues`.
+- **Content kinds** `post`, `campaign`, `brand`, `research` as `kind:` labels, and a pull request
+  body with a review checklist for a draft (`pr.bodyStyle: "content"`).
+
+```bash
+cckit init --profile marketing --no-github --dry-run   # print what it would write
+cckit task new --kind post "<title>"                   # record a piece
+cckit next                                             # the piece to take next
+cckit task start <id>                                  # a folder and branch for it
+cckit task finish <id> "<summary>" --all               # open the pull request; --all includes new files
+```
+
+Guide: [Initialize → The marketing profile](https://cckit.dev/initialize/#the-marketing-profile).
 
 ## Waves — parallel agentic development
 

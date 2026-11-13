@@ -17,6 +17,7 @@
 #   kto_labels_role <labels-csv>                      echo the role slug from a labels CSV (role:<slug>)
 #   kto_labels_kind <labels-csv>                      echo the kind slug from a labels CSV (kind:<slug>)
 #   kto_compose_pr_body <num> <summary> <role-slug>   echo a PR body from the template
+#   kto_pr_body_style                                 echo content|code (pr.bodyStyle, #418)
 #   kto_compose_issue_body <user-body> <plan> <blocked> <role-slug>   echo an issue body
 #   kto_closing_issue_numbers <pr-num>                echo the issue #s a merged PR closes
 #   kto_task_pr   <num> <summary> [commit-msg] [--base <branch>]   commit+push+open PR (board → In Review)
@@ -48,6 +49,17 @@ if ! type cckit_gh_rest >/dev/null 2>&1; then
   unset _kto_self
 fi
 type cckit_gh_rest >/dev/null 2>&1 || cckit_gh_rest() { return 1; }
+
+# The kind vocabulary (kinds.sh): kto_pr_title takes the commit type from kit_kind_commit_type.
+if ! type kit_kind_commit_type >/dev/null 2>&1; then
+  if [ -n "${BASH_SOURCE:-}" ]; then _kto_self="${BASH_SOURCE[0]}"
+  elif [ -n "${ZSH_VERSION:-}" ]; then eval '_kto_self="${(%):-%x}"'
+  else _kto_self="$0"; fi
+  _kto_self="$(cd "$(dirname "$_kto_self")" 2>/dev/null && pwd)/kinds.sh"
+  # shellcheck source=kinds.sh
+  [ -f "$_kto_self" ] && . "$_kto_self"
+  unset _kto_self
+fi
 type cckit_board_skipped >/dev/null 2>&1 || cckit_board_skipped() { return 1; }
 
 kto_repo() {
@@ -116,17 +128,18 @@ kto_pr_title() {
   fi
   # 2) Derive the type from the kind:/bug label.
   kind="$(kto_labels_kind "$labels")"
-  case "$kind" in
-    feat)     ctype=feat ;;
-    chore)    ctype=chore ;;
-    docs)     ctype=docs ;;
-    ci)       ctype=ci ;;
-    test)     ctype=test ;;
-    perf)     ctype=perf ;;
-    refactor) ctype=refactor ;;
-    fix|bug)  ctype=fix ;;
-    *)        ctype=feat ;;   # kind:task (the default) and anything unknown → feat
-  esac
+  # The kind -> type map is kinds.sh's (kit_kind_commit_type): a content kind (post, campaign,
+  # brand, research) titles as `docs`, kind:task and anything unknown as `feat`.
+  if command -v kit_kind_commit_type >/dev/null 2>&1; then
+    ctype="$(kit_kind_commit_type "$kind")"
+  else
+    case "$kind" in
+      feat|chore|docs|ci|test|perf|refactor) ctype="$kind" ;;
+      fix|bug) ctype=fix ;;
+      post|campaign|brand|research) ctype=docs ;;
+      *) ctype=feat ;;
+    esac
+  fi
   case ",$labels," in *,bug,*) ctype=fix ;; esac   # a plain `bug` label → fix
   # 3) Strip "[Effort N] M · " (the "· " consumed here as a literal — byte-wise match is portable
   #    across BSD/GNU sed + locales; a negated class over the multibyte middot is not) and then a
@@ -139,14 +152,67 @@ kto_pr_title() {
   printf '%s: %s' "$ctype" "$desc"
 }
 
+# kto_pr_body_style — `content` or `code`: which wording a generated PR body uses (#418).
+# pr.bodyStyle in the config (KIT_PR_BODY_STYLE); anything but `content` is `code`. The content and
+# marketing profiles set `content`. Shared by `cckit pr`, `cckit effort pr` and `cckit task finish`.
+kto_pr_body_style() {
+  if [ "${KIT_PR_BODY_STYLE:-code}" = "content" ]; then printf 'content'; else printf 'code'; fi
+}
+
+# kto_content_review_checklist — the review checklist of a content-style PR body, one item per
+# line. The same four lines in every body the kit writes for content work.
+kto_content_review_checklist() {
+  printf '%s\n' \
+    '- [ ] Read the draft from start to finish' \
+    '- [ ] Facts, names, numbers and links are checked' \
+    '- [ ] The voice matches the brand guide' \
+    '- [ ] Only the files for this piece changed'
+}
+
 # Compose a PR body from the kit-task-pr template. Args: <num> <summary> <role-slug> [issue-title]
 # pr.orchestratorSection = true (KIT_PR_ORCHESTRATOR_SECTION) prepends a 2-line
 # `## For the orchestrator` section: the issue id + title, then what to review.
+# pr.bodyStyle = content swaps the code wording (diff, reproduced manually) for draft-and-review
+# wording; `Closes #N`, the summary and the signature are the same in both.
 kto_compose_pr_body() {
-  local num="$1" summary="$2" role="$3" title="${4:-}" sig=""
+  local num="$1" summary="$2" role="$3" title="${4:-}" sig="" style
+  style="$(kto_pr_body_style)"
   if type role_signature >/dev/null 2>&1; then sig="$(role_signature "$role")"; fi
   if [ "${KIT_PR_ORCHESTRATOR_SECTION:-false}" = "true" ]; then
-    printf '## For the orchestrator\n\n#%s%s\nReview: the summary below and the diff.\n\n' "$num" "${title:+ · $title}"
+    if [ "$style" = "content" ]; then
+      printf '## For the orchestrator\n\n#%s%s\nReview: the summary below and the changed files.\n\n' "$num" "${title:+ · $title}"
+    else
+      printf '## For the orchestrator\n\n#%s%s\nReview: the summary below and the diff.\n\n' "$num" "${title:+ · $title}"
+    fi
+  fi
+  if [ "$style" = "content" ]; then
+    cat <<EOF
+## Closes
+
+Closes #$num
+
+## Summary
+
+$summary
+
+## Review
+
+$(kto_content_review_checklist)
+
+## Notes for the reviewer
+
+—
+
+## Not in this piece
+
+—
+
+$sig
+
+---
+<sub>· \`claude-kit\` · kit-task-pr</sub>
+EOF
+    return 0
   fi
   cat <<EOF
 ## Closes

@@ -70,6 +70,12 @@ branch. `light/share-<timestamp>` is the branch `cckit task share` opens its PR 
 | `spike`    | Time-boxed research (may be thrown away)           | low          |
 | `plan`     | Plan/report deliverable                            | low          |
 
+**Content kinds are labels, never branch prefixes.** `post`, `campaign`, `brand` and `research`
+(`KIT_CONTENT_KINDS`, `scripts/lib/kinds.sh`) are `kind:` values for content work. `cckit start` maps
+each onto the set above — `kind:post` and `kind:brand` → `task/`, `kind:campaign` → `plan/`,
+`kind:research` → `spike/` — so the set `gc` and the hygiene hook parse does not grow. A PR opened
+from one is titled `docs:`.
+
 ### Bot branches (do not create by hand)
 
 | Pattern    | Who                  | Notes                                                        |

@@ -113,6 +113,19 @@ load_kit_config() {
   # pr.orchestratorSection: true adds a 2-line `## For the orchestrator` section to `cckit pr` bodies.
   export KIT_PR_TITLE_STYLE="$(jq -r '.pr.titleStyle // "conventional"' "$cfg")"
   export KIT_PR_ORCHESTRATOR_SECTION="$(jq -r '.pr.orchestratorSection // false' "$cfg")"
+  # pr.bodyStyle (#418): "code" (default) or "content" — the wording of the PR body `cckit pr`,
+  # `cckit effort pr` and `cckit task finish` generate. content drops "diff" and "reproduced
+  # manually" for draft-and-review wording.
+  export KIT_PR_BODY_STYLE="$(jq -r '.pr.bodyStyle // "code"' "$cfg")"
+
+  # Content kinds (#417). kinds.content: true makes setup-labels.sh provision kind:post,
+  # kind:campaign, kind:brand and kind:research. The kinds themselves are always accepted and
+  # always map to a branch prefix and a commit type (kinds.sh); this key only decides the labels.
+  export KIT_CONTENT_KINDS_ON="$(jq -r '.kinds.content // false' "$cfg")"
+
+  # Plain language (#420). plainLanguage.enabled: true installs the plain-language rule at init and
+  # makes `cckit task` word its progress lines without worktree, branch and pull request.
+  export KIT_PLAIN_LANGUAGE="$(jq -r '.plainLanguage.enabled // false' "$cfg")"
 
   # Apply per-folder .claudekit/ overrides (no-op when none exist).
   _kit_apply_claudekit_overlays "$cfg"
