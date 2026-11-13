@@ -272,14 +272,14 @@ export default defineConfig({
         // The middleware shows these as a flat list, without the group heading, on every page
         // under /marketing/.
         { label: 'Marketing', translations: { es: 'Marketing' }, items: [
-          { label: 'What this is for', translations: { es: 'Para qué sirve esto' }, slug: 'marketing' },
-          { label: 'How we work', translations: { es: 'Cómo trabajamos' }, slug: 'marketing/how-we-work' },
+          { label: 'What you can hand over', translations: { es: 'Qué puedes delegar' }, slug: 'marketing' },
+          { label: 'What happens after you hand it over', translations: { es: 'Qué pasa después de que lo delegas' }, slug: 'marketing/how-we-work' },
           { label: 'Who does what', translations: { es: 'Quién hace qué' }, slug: 'marketing/who-does-what' },
-          { label: 'Get set up', translations: { es: 'Prepara todo' }, slug: 'marketing/get-set-up' },
+          { label: 'Give the keys', translations: { es: 'Entrega las llaves' }, slug: 'marketing/get-set-up' },
           { label: 'The tools we plug in', translations: { es: 'Las herramientas que conectamos' }, slug: 'marketing/tools' },
           { label: 'Set your brand voice', translations: { es: 'Define tu voz de marca' }, slug: 'marketing/brand-voice' },
-          { label: 'A piece, idea to approved', translations: { es: 'Una pieza, de la idea a la aprobación' }, slug: 'marketing/your-first-piece' },
-          { label: 'Plan and run a campaign', translations: { es: 'Planea y lleva una campaña' }, slug: 'marketing/campaigns' },
+          { label: 'Hand over your first piece', translations: { es: 'Delega tu primera pieza' }, slug: 'marketing/your-first-piece' },
+          { label: 'Several pieces, one goal', translations: { es: 'Varias piezas, un objetivo' }, slug: 'marketing/campaigns' },
           { label: 'Review and approval', translations: { es: 'Revisión y aprobación' }, slug: 'marketing/review-and-approval' },
           { label: 'Words you will hear', translations: { es: 'Palabras que vas a escuchar' }, slug: 'marketing/words-you-will-hear' },
         ]},

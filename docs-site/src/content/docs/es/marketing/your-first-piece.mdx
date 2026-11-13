@@ -1,54 +1,113 @@
 ---
-title: Una pieza, de la idea a la aprobación
-description: Una entrada de blog, de la idea a la aprobación, con cckit y hablando con Claude. Sin terminal.
+title: Delega tu primera pieza
+description: Delega una pieza de principio a fin con dos comandos o una frase a Claude, mira el enlace de revisión y aprueba. O escríbela junto con Claude, paso a paso.
 ---
 
 import { Steps, Aside } from '@astrojs/starlight/components';
 
-Escribir es donde se va la mayor parte del tiempo, y donde más miedo da romper algo: editar la
-versión equivocada, o cambiar una página que ya tenía el visto bueno. Por eso cada pieza tiene su
-propio borrador. Puedes trabajarlo con Claude con toda libertad, y lo que ya está aprobado no
-cambia hasta que alguien de tu equipo aprueba la pieza nueva.
+La primera vez, delega algo pequeño y completo: una landing page, una entrada, una sección de un
+sitio. Lo describes, cckit lo construye por detrás y te devuelve un enlace de revisión, y tú lo
+apruebas.
 
-Esta página sigue una entrada de blog desde la idea hasta el momento en que queda aprobada.
-Cualquier otra pieza, sea una landing page o la descripción de un producto, avanza igual.
+**Quién lo hace:** tú describes y apruebas. Claude y sus asistentes construyen.
 
-**Quién lo hace:** tú escribes, con Claude y su asistente de edición. Alguien de tu equipo
-aprueba.
+**Lo que vas a tener al final:** la pieza como versión aprobada en el proyecto, y la tarea marcada
+como terminada.
 
-**Lo que vas a tener al final:** la entrada como un archivo aprobado en la versión compartida del
-proyecto, y la pieza marcada como terminada en la lista de tareas.
+**Antes de empezar:** las [llaves están entregadas](/es/marketing/get-set-up/) y el proyecto está
+abierto en Claude Code.
 
-**Antes de empezar:** el proyecto ya está [preparado](/es/marketing/get-set-up/) y abierto en
-Claude Code.
+## Opción 1: delegarla
 
 <Steps>
 
-1. **Dile a Claude qué quieres hacer.**
+1. **Describe la pieza en un párrafo.** Di qué es y qué lleva. Claude la registra como una tarea:
 
    <div class="cckit-prompt">
 
    ```text title="Dile esto a Claude"
-   Quiero escribir una entrada de blog para anunciar nuestro taller de primavera. Regístrala como una pieza de trabajo nueva y ábrele un borrador.
+   Registra una tarea nueva: una landing page para una panadería. Una portada con el nombre y un eslogan, tres productos con precios, el horario y un formulario de contacto. Y luego ejecútala.
    ```
 
    </div>
 
-   Claude agrega la pieza a la lista de tareas que comparte tu equipo, con un título y una
-   descripción corta, y le abre un borrador. Un borrador es tu propia copia para
-   trabajar. Nada de lo que hay en él cambia la versión compartida hasta que la pieza se aprueba.
+   Claude corre dos comandos por ti. Si prefieres escribirlos tú, son:
 
-2. **Acuerda el esquema con Claude.**
+   ```text
+   cckit task new "Una landing page para una panadería" --body "<lo que lleva la página>"
+   cckit task run <id>
+   ```
+
+   `cckit task new` imprime el id de la tarea, y `<id>` es ese id. Las notas después de `--body`
+   son el párrafo sobre lo que lleva la página.
+
+2. **Espera el enlace.** En una prueba real, una ronda sin supervisión de una landing page como
+   esta tardó menos de tres minutos; una segunda página, un menú, tardó cerca de un minuto. La
+   comprobación del proyecto pasa antes de abrir la revisión. Si la comprobación falla, o si no
+   cambió nada, no se abre ninguna revisión y la ejecución dice por qué.
+
+3. **Mira el resultado y aprueba.** Abre el enlace de revisión. Mira
+   [Revisión y aprobación](/es/marketing/review-and-approval/) para saber qué muestra la página.
+   Si quieres cambios, dilo:
 
    <div class="cckit-prompt">
 
    ```text title="Dile esto a Claude"
-   Propón un esquema para esta entrada. Quien la lee tiene un negocio pequeño y no nos conoce. Lo único que quiero que haga es inscribirse al taller.
+   Lee los comentarios de la revisión de esta tarea y aplícalos. Dime cuáles no aplicaste y por qué.
    ```
 
    </div>
 
-   Cambia el esquema hasta que quede bien. Di qué quitar, qué mover y qué falta.
+4. **Aprobado.** Aprobar e integrar la revisión marca la tarea como terminada:
+
+   <div class="cckit-prompt">
+
+   ```text title="Dile esto a Claude"
+   La revisión está aprobada. Termina esta pieza.
+   ```
+
+   </div>
+
+</Steps>
+
+Nunca editas código. Nada se integra solo, y cckit no publica: el resultado es un sitio aprobado
+que compila, y ponerlo en una dirección pública es otro paso.
+
+{/* VERIFY-504 */}
+Para una página, Claude carga las habilidades de diseño descritas en
+[Las herramientas que conectamos](/es/marketing/tools/#habilidades-de-diseño-cómo-se-diseña-una-página)
+y escribe un resumen de diseño corto antes de construir. La revisión dice qué habilidades de
+diseño se cargaron en esa ejecución.
+
+## Opción 2: escribirla juntos
+
+Úsala para una pieza que quieres moldear frase por frase, como una entrada de blog. Trabajas con
+Claude y su asistente de edición en un borrador propio, y la versión aprobada no cambia hasta que
+la pieza se aprueba.
+
+<Steps>
+
+1. **Dile a Claude qué quieres hacer y abre el borrador.**
+
+   <div class="cckit-prompt">
+
+   ```text title="Dile esto a Claude"
+   Quiero escribir una entrada de blog que anuncie nuestro taller de primavera. Regístrala como una pieza de trabajo nueva y abre un borrador.
+   ```
+
+   </div>
+
+2. **Acuerden un esquema.**
+
+   <div class="cckit-prompt">
+
+   ```text title="Dile esto a Claude"
+   Propón un esquema para esta entrada. El lector es el dueño de un negocio pequeño que no nos conoce. Lo único que quiero es que se inscriba al taller.
+   ```
+
+   </div>
+
+   Cámbialo hasta que esté bien: qué quitar, qué mover, qué falta.
 
 3. **Escribe el borrador.**
 
@@ -60,30 +119,24 @@ Claude Code.
 
    </div>
 
-   Claude escribe la entrada como un archivo del proyecto y te dice dónde está. Edítala con Claude:
-   "acorta el inicio", "este párrafo suena a anuncio", "agrega la fecha y el precio". Si tu equipo
-   ya [definió su voz de marca](/es/marketing/brand-voice/), Claude la lee antes de escribir.
+   Claude escribe la entrada como un archivo en el proyecto y te dice dónde está. Edítenla juntos:
+   "haz más corto el arranque", "este párrafo suena a anuncio", "agrega la fecha y el precio". Si
+   tu equipo [definió su voz de marca](/es/marketing/brand-voice/), Claude la lee antes.
 
 4. **Pide una revisión.**
 
    <div class="cckit-prompt">
 
    ```text title="Dile esto a Claude"
-   Ya está listo. Guárdalo y pide una revisión.
+   Esto está listo. Guárdalo y pide una revisión.
    ```
 
    </div>
 
-   Claude guarda el borrador, lo envía a GitHub y te da un enlace. Ese enlace es la revisión: una
-   página que muestra lo que dice la entrada y donde tu equipo puede comentar.
+   Claude guarda el borrador, lo envía a GitHub y te da un enlace.
 
-5. **Alguien de tu equipo la revisa.** Envíale el enlace a quien aprueba. En esa página abre la
-   pestaña **Files changed**, comenta cualquier línea, y después hace clic en **Review changes** y
-   elige **Approve** (aprobar) o **Request changes** (pedir cambios). GitHub muestra esos botones
-   en inglés. GitHub no deja que apruebe la misma persona que pidió la revisión, así que quien
-   aprueba es alguien más.
-
-6. **Aplica los cambios, si los hay.**
+5. **Un compañero la revisa y tú aplicas los cambios.** Manda el enlace a quien aprueba. GitHub no
+   deja que quien pidió la revisión la apruebe, así que quien aprueba es otra persona. Después:
 
    <div class="cckit-prompt">
 
@@ -93,9 +146,7 @@ Claude Code.
 
    </div>
 
-   La página de la revisión se actualiza sola. Quien revisa la vuelve a leer.
-
-7. **Aprobada.** Cuando la revisión diga que está aprobada:
+6. **Aprobada.** Cuando la revisión dice aprobada:
 
    <div class="cckit-prompt">
 
@@ -106,41 +157,33 @@ Claude Code.
    </div>
 
    Claude hace que el borrador aprobado pase a la versión compartida, marca la pieza como
-   terminada y cierra el borrador. Quien aprueba también puede terminarla desde la página de la
-   revisión con el botón verde **Merge pull request** (en algunos proyectos dice
-   **Squash and merge**). Con eso la pieza queda aprobada y terminada; la carpeta del borrador
-   sigue en tu computadora hasta que le pidas a Claude que la quite.
+   terminada y ordena el borrador. Quien aprueba también puede terminarla desde la página de
+   revisión con el botón verde **Merge pull request** (en algunos proyectos dice **Squash and
+   merge**).
 
 </Steps>
 
-<Aside type="note" title="Aprobada no es publicada">
-cckit llega hasta la aprobación. Llevar la entrada a tu sitio se hace como hasta hoy. Mira
-[después de la aprobación](/es/marketing/review-and-approval/#después-de-la-aprobación).
-</Aside>
-
 ## Comprueba que funcionó
 
-Pregúntale a Claude "¿En qué vamos?". La entrada ya no aparece en curso ni esperando revisión, y
-cuenta como terminada.
+Pregúntale a Claude "¿Cómo vamos?". La pieza ya no aparece como en curso ni como esperando
+revisión, y cuenta como terminada.
 
-## Retomar una pieza
+## Volver a una pieza
 
-Los borradores no se pierden al cerrar la aplicación. Abre el proyecto otra vez y di:
+Los borradores sobreviven al cierre de la app. Abre el proyecto otra vez y di:
 
 <div class="cckit-prompt">
 
 ```text title="Dile esto a Claude"
-¿En qué vamos? Muéstrame mis borradores y lo que esté esperando revisión.
+¿Cómo vamos? Muéstrame mis borradores y todo lo que espera una revisión.
 ```
 
 </div>
 
-Después di cuál quieres continuar.
+Luego di cuál continuar. Para elegir trabajo nuevo, di: "Muéstrame qué está listo y yo elijo."
 
-## Lo que queda en manos de las personas
+<Aside type="note" title="Aprobado no es publicado">
+cckit termina en aprobado. Mira [después de la aprobación](/es/marketing/review-and-approval/#después-de-la-aprobación).
+</Aside>
 
-- **Aprobar.** Alguien de tu equipo aprueba en la página de la revisión. Claude termina una pieza
-  solo después de que le dices que la revisión está aprobada.
-- **Publicar.** Eso queda fuera de cckit.
-
-Siguiente: [Planea y lleva una campaña](/es/marketing/campaigns/)
+Siguiente: [Varias piezas, un objetivo](/es/marketing/campaigns/)

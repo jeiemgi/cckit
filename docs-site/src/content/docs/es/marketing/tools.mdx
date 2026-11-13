@@ -1,84 +1,91 @@
 ---
 title: "Las herramientas que conectamos"
-description: "Las herramientas en las que se apoya el método y para qué sirve cada una: Claude, la lista de tareas compartida, las páginas de revisión que respondes en el navegador y la memoria opcional con MemPalace. cckit las conecta; las hacen otras personas."
+description: "Las herramientas que cckit conecta y lo que cada una hace por ti: Claude Code, GitHub, la lista de tareas, las páginas de revisión, la memoria opcional y las habilidades de diseño. cckit las conecta; las hacen otras personas."
 ---
 
-Un método sirve cuando el equipo lo puede seguir sin pensar en él. Para eso hacen falta unas
-pocas herramientas: algo con qué escribir, un lugar para la lista de trabajo, un lugar para
-revisar y, si quieres, una memoria. cckit no construye esas herramientas. Conecta las que ya
-existen para que funcionen como un solo proceso y tú solo tengas que hablar con Claude.
+cckit no construye estas herramientas. Conecta las que ya existen, para que delegar una pieza sea
+una sola petición y el proceso corra por detrás. Esta página dice qué hace cada herramienta por
+ti, quién la hace y si tu equipo tiene que hacer algo para tenerla. La persona técnica las conecta
+cuando se [entregan las llaves](/es/marketing/get-set-up/).
 
-Esta página dice para qué sirve cada una, quién la hace y si tu equipo tiene que hacer algo para
-tenerla. La persona técnica las conecta durante la [preparación](/es/marketing/get-set-up/).
+## Qué hace cada herramienta por ti
 
-## Para qué sirve cada herramienta
+### Claude Code: donde delegas el trabajo
 
-### Claude Code: donde trabajas
+Claude Code es la app con la que hablas. Le describes la pieza y él la planea, la escribe, la
+construye y mantiene al día la lista de tareas. La hace Anthropic. Cada persona que escribe la
+necesita en su computadora; basta con la app de escritorio.
 
-Claude Code es la aplicación con la que hablas. Escribe, edita, planea y mantiene al día la lista
-de tareas cuando se lo pides. La hace Anthropic. Cada persona que escribe la necesita en su
-computadora; con la aplicación de escritorio basta.
-
-La preparación de marketing agrega tres métodos escritos que Claude sigue: uno para redactar, uno
-para la [voz de marca](/es/marketing/brand-voice/) y uno para
+La preparación de marketing agrega tres métodos escritos que Claude sigue: uno para escribir
+textos, uno para la [voz de marca](/es/marketing/brand-voice/) y uno para
 [planear una campaña](/es/marketing/campaigns/). También agrega el modo de lenguaje sencillo, en
 el que Claude dice "borrador", "revisión" y "aprobar".
 
-### GitHub: donde vive el proyecto y se hacen las revisiones
+### GitHub: donde se guarda el trabajo y donde apruebas
 
-GitHub guarda el proyecto y su historial, y tiene la página donde alguien del equipo lee un
-borrador, comenta y aprueba. Lo hace GitHub. Cada persona que escribe o aprueba necesita una
-cuenta con acceso al proyecto. Quien aprueba no necesita nada más: con un navegador basta.
+GitHub guarda el proyecto y su historial, y aloja la página donde lees el resultado, comentas y
+apruebas. Lo hace GitHub. Cada persona que escribe y cada persona que aprueba necesita una cuenta
+con acceso al proyecto. Quien aprueba no necesita nada más: basta un navegador.
 
-### La lista de tareas: qué está planeado y cómo va cada pieza
+### La lista de tareas: lo que delegaste y cómo va
 
 La lista de piezas se guarda dentro del proyecto, en una carpeta llamada `tasks/`, con un archivo
-pequeño por pieza. Esta parte es de cckit. No hay que instalar nada ni abrir otra cuenta. Tú
-nunca abres esos archivos: le preguntas a Claude "¿en qué vamos?" o "¿qué sigue?".
+pequeño por pieza. Esta parte es de cckit. No hay que instalar nada ni abrir otra cuenta. Nunca
+abres esos archivos: le preguntas a Claude "¿cómo vamos?" o "¿qué sigue?".
 
-La persona técnica puede pasar la lista a GitHub. La diferencia que te toca es cómo se revisa una
-campaña, y está explicada en
-[Planea y lleva una campaña](/es/marketing/campaigns/#dos-formas-de-llevar-una-campaña).
+Una persona técnica puede pasar la lista a GitHub. La diferencia que te importa es cómo se revisa
+una campaña, y está descrita en
+[Varias piezas, un objetivo](/es/marketing/campaigns/#dos-formas-de-llevar-una-campaña).
 
 ### Páginas de revisión: planes que respondes en el navegador
 
-Un plan es difícil de juzgar cuando llega como un mensaje largo en una conversación. Cuando
-Claude propone el plan de una campaña o te pide elegir entre opciones, abre una página en tu
-navegador donde puedes comentar cada parte y enviar tu respuesta.
+Un plan es difícil de juzgar como un mensaje largo en una conversación. Cuando Claude propone el
+plan de una campaña o te pide elegir entre opciones, abre una página en tu navegador donde puedes
+comentar cada parte y mandar tu respuesta.
 
-La herramienta detrás de esas páginas es Lavish, software de código abierto hecho por alguien
-más. Viene encendida y la página se sirve desde tu propia computadora. Necesita Node.js ahí, y eso
-lo comprueba la persona técnica durante la preparación. Sin Node.js, o si no hay navegador
-disponible, Claude muestra el mismo plan en la conversación, así que no se pierde nada. Esto es para planes y decisiones. La
-revisión de un borrador terminado se hace en GitHub.
+La herramienta detrás de esas páginas es Lavish, software de código abierto hecho por otra
+persona. Viene activada por defecto y la página se sirve desde tu propia computadora. Necesita
+Node.js ahí, que la persona técnica comprueba durante la preparación. Sin ella, o si no hay
+navegador, Claude muestra el mismo plan en la conversación, así que no se pierde nada. Esto es
+para planes y decisiones. La revisión de un borrador terminado ocurre en GitHub.
 
-### Memoria: opcional y apagada al inicio
+### Memoria: el proyecto recuerda tus decisiones
 
 Sin memoria, cada conversación con Claude parte de lo que está escrito en el proyecto: la voz de
-marca, la lista de tareas, los borradores. A la mayoría de los equipos eso les alcanza, porque el
-método guarda en el proyecto lo que importa.
+marca, la lista de tareas, los borradores. Para la mayoría de los equipos eso alcanza.
 
-MemPalace agrega una memoria que lleva decisiones y contexto de una conversación a la siguiente.
-Es software de código abierto independiente, corre en tu computadora y no pide cuenta. La
-preparación de marketing la deja **apagada**. La enciende y la instala una persona técnica. La
-parte automática solo funciona en Claude Code.
+MemPalace agrega una memoria que lleva decisiones y contexto de una sesión a la siguiente, para
+que no expliques dos veces la misma decisión. cckit la adopta; no la construye. Es software
+independiente de código abierto, corre en tu computadora y no pide cuenta. La preparación de
+marketing la deja **apagada**. Una persona técnica la enciende y la instala. La parte automática
+funciona solo en Claude Code.
 
-## Qué te toca hacer
+### Habilidades de diseño: cómo se diseña una página
 
-| Herramienta | Quién la hace | ¿Lista después de preparar? | Qué necesitas |
+{/* VERIFY-504 */}
+cckit incluye una habilidad de diseño propia, `page-design`. Coordina tres habilidades de diseño
+hechas por otras personas: `impeccable` fija la dirección y las reglas contra el aspecto genérico
+de lo generado, `emil-design-eng` cubre la interacción y el movimiento, y `web-design-guidelines`
+audita la página terminada. Antes de construir escribe un resumen de diseño corto, y la revisión
+dice qué habilidades de diseño se cargaron en esa ejecución. Se instalan con tu consentimiento, no
+por defecto.
+
+## Qué tienes que hacer tú
+
+| Herramienta | La hace | ¿Activa tras la preparación? | Necesitas |
 | --- | --- | --- | --- |
-| Claude Code | Anthropic | Sí | La aplicación en tu computadora |
+| Claude Code | Anthropic | Sí | La app en tu computadora |
 | GitHub | GitHub | Sí | Una cuenta con acceso al proyecto |
 | Lista de tareas | cckit | Sí | Nada |
 | Páginas de revisión | Lavish | Sí | Un navegador, y Node.js en tu computadora |
-| Memoria | MemPalace | No | Una persona técnica que la encienda |
+| Memoria | MemPalace | No | Que una persona técnica la encienda |
+| Habilidades de diseño | Otros autores | No, se instalan con consentimiento | Un sí, una vez |
 
 ## Lo que no está conectado
 
-No hay ninguna herramienta conectada para publicar, programar publicaciones, enviar correos,
-medir resultados o diseñar. cckit llega hasta la pieza aprobada, y esas tareas siguen en las
-herramientas que tu equipo ya usa. Mira
-[después de la aprobación](/es/marketing/review-and-approval/#después-de-la-aprobación).
+No hay ninguna herramienta conectada para publicar, programar publicaciones, mandar correos ni
+analítica. cckit termina en una pieza aprobada, y esas tareas siguen en las herramientas que tu
+equipo ya usa. Mira [después de la aprobación](/es/marketing/review-and-approval/#después-de-la-aprobación).
 
 ## Para la persona técnica
 

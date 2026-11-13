@@ -1,59 +1,57 @@
 ---
-title: Para qué sirve esto
-description: Cómo un equipo de marketing planea, escribe, revisa y aprueba su contenido con cckit hablando con Claude. El proceso en cinco pasos y por dónde empezar.
+title: Qué puedes delegar
+description: Entrégale a cckit una página con contenido, una landing page, una app pequeña o un sitio web, y recibe un enlace para mirar y aprobar. Qué haces tú, qué pasa por detrás y por dónde empezar.
 ---
 
 import { CardGrid, LinkCard, Aside } from '@astrojs/starlight/components';
 
-Un equipo de marketing casi nunca pierde el tiempo escribiendo. Lo pierde alrededor de la
-escritura: buscando la última versión, juntando comentarios que llegaron por cinco lados,
-explicando otra vez la voz de marca, preguntando quién está trabajando en qué.
+Delegas una pieza de trabajo: una página con contenido, una landing page, una app pequeña, un
+sitio web, una publicación. Cuentas con tus palabras lo que quieres. cckit lo construye por
+detrás y te devuelve un enlace para mirar. Lo lees y lo apruebas o pides cambios.
 
-cckit es una forma de trabajar que quita esas preguntas. Cada pieza, sea una entrada de blog o
-una campaña, avanza igual de la idea a la aprobación. El trabajo lo haces hablando con Claude.
-cckit lleva el registro de lo que está planeado, lo que está en borrador, lo que espera revisión
-y lo que ya está aprobado.
+Los pasos intermedios (borradores, comprobaciones, revisión) ocurren por detrás. No los ejecutas y
+no necesitas aprenderlos. [Qué pasa después de que lo delegas](/es/marketing/how-we-work/) los
+cuenta en breve, para que sepas en qué estás confiando.
 
-No abres una terminal ni aprendes herramientas de desarrollo. Alguien con perfil técnico prepara
-el proyecto una vez; después trabajas con tus propias palabras.
+## Dónde actúas tú
 
-## El proceso en cinco pasos
+1. **Entrega las llaves, una vez.** Una persona técnica deja listas las cuentas y el proyecto una
+   sola vez. [Entrega las llaves](/es/marketing/get-set-up/)
+2. **Di qué quieres.** Basta un párrafo: qué es la página o la pieza y qué lleva.
+   [Delega tu primera pieza](/es/marketing/your-first-piece/)
+3. **Responde una pregunta, si Claude te la hace.** Pregunta cuando algo de lo que escribiste
+   puede entenderse de dos maneras.
+4. **Aprueba.** Abres el enlace, lees y apruebas o pides cambios. Decide una persona, nunca
+   Claude. [Revisión y aprobación](/es/marketing/review-and-approval/)
 
-1. **Preparar.** Una persona técnica deja listo el proyecto una sola vez y conecta las pocas
-   herramientas que usa el método. Tú compruebas que funcionó con una pregunta a Claude.
-   [Prepara todo](/es/marketing/get-set-up/) · [Las herramientas que conectamos](/es/marketing/tools/)
-2. **Definir la voz.** El equipo deja por escrito cómo suena la marca, qué dice siempre y qué no
-   dice nunca. Claude lo lee antes de escribir cualquier cosa.
-   [Define tu voz de marca](/es/marketing/brand-voice/)
-3. **Planear.** Dices cuál es el objetivo. Claude propone las piezas que ayudan a cumplirlo, tú corriges
-   el plan y las piezas quedan en la lista de tareas que comparte el equipo.
-   [Planea y lleva una campaña](/es/marketing/campaigns/)
-4. **Crear.** Cada pieza tiene su propio borrador. La escribes y la editas con Claude, y nada de
-   lo que pasa en un borrador cambia lo que ya está aprobado.
-   [Una pieza, de la idea a la aprobación](/es/marketing/your-first-piece/)
-5. **Revisar y aprobar.** Alguien de tu equipo lee el borrador en un solo lugar, comenta y lo
-   aprueba o pide cambios. Decide una persona, nunca Claude.
-   [Revisión y aprobación](/es/marketing/review-and-approval/)
+## Lo que recibes
 
-Los pasos 1 y 2 se hacen una vez. Los pasos 3 a 5 se repiten con cada pieza. Una pieza suelta,
-sin campaña, se salta el paso 3: le dices a Claude qué quieres hacer y empiezas en el paso 4.
+Un enlace a una versión del trabajo que puedes mirar y, cuando dices que sí, una versión aprobada.
+El proyecto recuerda tu voz de marca y, con la memoria opcional activada, las decisiones que
+tomaste en sesiones anteriores. Mira [Las herramientas que conectamos](/es/marketing/tools/).
 
-La primera vez, haz una pieza (paso 4) antes de planear una campaña (paso 3). Las páginas del
-menú están en ese orden.
+## Lo que cckit no hace
 
-<Aside type="note" title="Dónde termina el proceso">
-cckit lleva una pieza hasta **aprobada**. No crea un sitio web y no publica. La forma en que el
-contenido aprobado llega a tu sitio, a tu herramienta de correo o a tus redes sigue siendo la de
-hoy. Mira [qué pasa después de la aprobación](/es/marketing/review-and-approval/#después-de-la-aprobación).
+- **No publica.** El resultado es un sitio aprobado que compila. Ponerlo en una dirección pública
+  es otro paso, que hace la persona técnica o tu servicio de hosting.
+- **No aprueba por ti.** En este flujo nada se integra solo.
+- **No se salta la preparación.** Alguien técnico entrega las llaves una vez, y la primera
+  preparación requiere una terminal.
+
+<Aside type="note" title="Comprobado en una prueba real">
+Un solo comando tomó una tarea escrita en un párrafo, "una landing page para una panadería" con
+portada, tres productos con precios, horario y un formulario de contacto, y devolvió un enlace de
+revisión. Una ronda sin supervisión tardó menos de tres minutos, y la comprobación del proyecto
+pasó antes de abrir la revisión. La persona no editó código.
 </Aside>
 
 ## Por dónde empezar
 
 <CardGrid>
-  <LinkCard title="Quieres entender primero el método" href="/es/marketing/how-we-work/" description="Cómo trabajamos: las cuatro reglas detrás de cada pieza y qué cambia para tu equipo." />
-  <LinkCard title="Todavía no hay nada preparado" href="/es/marketing/get-set-up/" description="Prepara todo: lo que hace la persona técnica una vez y cómo compruebas que funcionó." />
-  <LinkCard title="El proyecto está listo y tú escribes" href="/es/marketing/your-first-piece/" description="Una pieza, de la idea a la aprobación: una entrada de blog, de principio a fin." />
+  <LinkCard title="Todavía no hay nada preparado" href="/es/marketing/get-set-up/" description="Entrega las llaves: lo que hace la persona técnica una vez y lo que necesitas después." />
+  <LinkCard title="El proyecto está listo" href="/es/marketing/your-first-piece/" description="Delega tu primera pieza: descríbela, recibe un enlace, aprueba." />
   <LinkCard title="Te mandaron un enlace de revisión" href="/es/marketing/review-and-approval/" description="Revisión y aprobación: cómo leer, comentar y decidir." />
+  <LinkCard title="Varias piezas, un objetivo" href="/es/marketing/campaigns/" description="Delega una campaña: las piezas se planean juntas y se aprueban una por una." />
 </CardGrid>
 
 Hay dos páginas de consulta: [Quién hace qué](/es/marketing/who-does-what/) enumera a las

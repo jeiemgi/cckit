@@ -1,59 +1,57 @@
 ---
-title: What this is for
-description: How a marketing team plans, writes, reviews and approves its content with cckit by talking to Claude. The process in five steps, and where to start.
+title: What you can hand over
+description: Hand cckit a content-driven page, a landing page, a small app or a website, and get back a link to look at and approve. What you do, what happens behind the scenes, and where to start.
 ---
 
 import { CardGrid, LinkCard, Aside } from '@astrojs/starlight/components';
 
-A marketing team rarely loses time on the writing itself. It loses time around it: finding the
-latest version, collecting feedback from five places, explaining the brand voice again, asking who
-is working on what.
+You hand over a piece of work: a content-driven page, a landing page, a small app, a website, a
+post. You describe what you want in plain words. cckit builds it in the background and gives you
+back a link to look at. You read it, and you approve it or ask for changes.
 
-cckit is a way of working that removes those questions. Every piece, from a blog post to a
-campaign, moves the same way from idea to approved. You do the work by talking to Claude. cckit
-keeps the record of what is planned, what is in draft, what is waiting for a review and what is
-approved.
+The steps in between (drafts, checks, review) happen behind the scenes. You do not run them and
+you do not need to learn them. [What happens after you hand it over](/marketing/how-we-work/)
+tells them briefly, so you know what you are trusting.
 
-You do not open a terminal or learn developer tools. Someone technical sets the project up once;
-after that you work in plain language.
+## Where you act
 
-## The process in five steps
+1. **Give the keys, once.** A technical person sets up the accounts and the project one time.
+   [Give the keys](/marketing/get-set-up/)
+2. **Say what you want.** A paragraph is enough: what the page or the piece is, what goes on it.
+   [Hand over your first piece](/marketing/your-first-piece/)
+3. **Answer a question, if Claude asks one.** It asks when something you wrote can be read two
+   ways.
+4. **Approve.** You open the link, read, and approve or ask for changes. A person decides, never
+   Claude. [Review and approval](/marketing/review-and-approval/)
 
-1. **Set up.** A technical person prepares the project once and connects the few tools the method
-   uses. You check that it worked by asking Claude one question.
-   [Get set up](/marketing/get-set-up/) · [The tools we plug in](/marketing/tools/)
-2. **Set the voice.** The team writes down how the brand sounds, what it always says and what it
-   never says. Claude reads that before it writes anything.
-   [Set your brand voice](/marketing/brand-voice/)
-3. **Plan.** You state a goal. Claude proposes the pieces that serve it, you correct the plan, and
-   the pieces go on the task list the team shares.
-   [Plan and run a campaign](/marketing/campaigns/)
-4. **Create.** Each piece gets its own draft. You write and edit it with Claude, and nothing in a
-   draft changes what is already approved.
-   [A piece, idea to approved](/marketing/your-first-piece/)
-5. **Review and approve.** A teammate reads the draft in one place, comments, and approves it or
-   asks for changes. A person decides, never Claude.
-   [Review and approval](/marketing/review-and-approval/)
+## What you get
 
-Steps 1 and 2 happen once. Steps 3 to 5 repeat for every piece. A single piece with no campaign
-skips step 3: you tell Claude what you want to make and start at step 4.
+A link to a version of the work you can look at, and an approved version once you say yes. The
+project remembers your brand voice and, with the optional memory turned on, the decisions you made
+in earlier sessions. See [The tools we plug in](/marketing/tools/).
 
-Your first time, do one piece (step 4) before you plan a campaign (step 3). The pages in the
-sidebar are in that order.
+## What cckit does not do
 
-<Aside type="note" title="Where the process ends">
-cckit takes a piece to **approved**. It does not create a website and it does not publish. How
-approved content reaches your site, your newsletter tool or your social accounts stays the way it
-is today. See [what happens after approval](/marketing/review-and-approval/#after-approval).
+- **It does not publish.** The result is an approved site that builds. Putting it on a public
+  address is a separate step, done by the technical person or by your hosting service.
+- **It does not approve for you.** Nothing is merged by itself in this flow.
+- **It does not skip the setup.** Someone technical sets up the keys once, and the first setup
+  takes a terminal.
+
+<Aside type="note" title="Proved on a real run">
+One command took a task written as one paragraph, "a landing page for a bakery" with a hero,
+three products with prices, opening hours and a contact form, and returned a review link. One
+unattended round took under three minutes, and the project's check passed before the review was
+opened. The person did not edit code.
 </Aside>
 
 ## Where to start
 
 <CardGrid>
-  <LinkCard title="You want to understand the method first" href="/marketing/how-we-work/" description="How we work: the four rules behind every piece, and what changes for your team." />
-  <LinkCard title="Nothing is set up yet" href="/marketing/get-set-up/" description="Get set up: what the technical person does once, and how you check it worked." />
-  <LinkCard title="The project is ready and you write" href="/marketing/your-first-piece/" description="A piece, idea to approved: one blog post, start to finish." />
+  <LinkCard title="Nothing is set up yet" href="/marketing/get-set-up/" description="Give the keys: what the technical person does once, and what you need afterwards." />
+  <LinkCard title="The project is ready" href="/marketing/your-first-piece/" description="Hand over your first piece: describe it, get a link, approve." />
   <LinkCard title="Someone sent you a review link" href="/marketing/review-and-approval/" description="Review and approval: how to read, comment and decide." />
+  <LinkCard title="Several pieces, one goal" href="/marketing/campaigns/" description="Hand over a campaign: the pieces are planned together and approved one by one." />
 </CardGrid>
 
 Two pages are for looking things up: [Who does what](/marketing/who-does-what/) lists the people

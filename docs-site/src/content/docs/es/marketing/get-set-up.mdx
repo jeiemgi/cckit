@@ -1,68 +1,67 @@
 ---
-title: Prepara todo
-description: La preparación de cckit para un equipo de marketing, que se hace una sola vez. Una persona técnica hace la primera parte; tú compruebas que funcionó.
+title: Entrega las llaves
+description: La preparación de una sola vez que deja que cckit se encargue del resto. Una persona técnica deja listos Claude Code, una cuenta de GitHub y el proyecto; después trabajas con tus propias palabras.
 ---
 
 import { Steps, Aside } from '@astrojs/starlight/components';
 
-El método necesita un lugar para el trabajo: un proyecto donde viven el contenido, la lista de
-tareas y la voz de marca, y donde Claude conoce las reglas de tu equipo. Dejar listo ese lugar
-requiere una terminal, por eso lo hace una persona técnica. Se hace una vez por proyecto. Después,
-nadie del equipo vuelve a necesitar una terminal.
+"Las llaves" son las cuentas y el proyecto que cckit necesita para trabajar por ti: Claude Code,
+una cuenta de GitHub y el proyecto mismo. Las entregas una vez. Después, cckit se encarga del
+proceso que corre detrás de cada pieza.
 
-**Lo que vas a tener al final:** un proyecto que abres en Claude Code, donde Claude habla con
-palabras sencillas, conoce a los cuatro asistentes y responde "¿En qué vamos?".
+Hay una preparación, y requiere una terminal. Por eso la hace una persona técnica: alguien de
+desarrollo de tu equipo, un contacto de la agencia o un freelance, durante media hora más o menos.
+Después, nadie del equipo vuelve a necesitar una terminal.
 
-La preparación tiene dos partes: una para alguien con perfil técnico y otra para ti. Para qué
-sirve cada herramienta conectada está en
+**Lo que vas a tener al final:** un proyecto que puedes abrir en Claude Code, donde Claude habla
+con palabras sencillas, conoce a los cuatro asistentes y responde a "¿Cómo vamos?".
+
+Lo que hace por ti cada herramienta conectada está en
 [Las herramientas que conectamos](/es/marketing/tools/).
 
-## Qué necesitas
+## Las llaves
 
-- **Un proyecto en GitHub** donde vive o va a vivir tu contenido. cckit parte de un proyecto que ya
-  existe; no crea un sitio web.
-- **Una cuenta de GitHub** para cada persona que escribe o aprueba, con acceso a ese proyecto.
-- **Claude Code** en tu computadora. Con la aplicación de escritorio basta.
-- **Una persona técnica durante una media hora**: alguien de desarrollo en tu equipo, tu contacto
-  en la agencia, un freelance.
+- **Claude Code** en tu computadora. Basta con la app de escritorio.
+- **Una cuenta de GitHub** para cada persona que escribe o aprueba, con acceso al proyecto. Quien
+  aprueba solo necesita un navegador.
+- **El proyecto.** Para un sitio web nuevo, la preparación lo crea. Si ya existe, le agrega lo
+  necesario.
 
 ## Parte 1: para la persona técnica
 
-Esta parte usa una terminal. Si no eres tú, envíale esta sección a quien la vaya a hacer. Las
+Esta parte usa una terminal. Si no eres tú, mándale esta sección a quien la va a hacer. Las
 páginas enlazadas aquí están en inglés.
 
 <Steps>
 
-1. **Instala cckit e inicia sesión en GitHub** en la computadora de quien va a escribir:
-   [Install and check](/getting-started/install/) (en inglés). Esa página también trae la comprobación
-   para tu sistema operativo.
+1. **Instala cckit e inicia sesión en GitHub** en la computadora de la persona de marketing:
+   [Install and check](/getting-started/install/) (en inglés).
 
-2. **Abre el proyecto en Claude Code y corre la preparación con el perfil de marketing:**
+2. **Crea el proyecto con el perfil de marketing.** Para un sitio web nuevo:
 
    ```text
-   /kit-init marketing
+   cckit init <folder> --profile marketing --recipe nextjs-shadcn --yes
    ```
 
-   Desde una terminal, la misma preparación es `cckit init --profile marketing`. La preparación
-   pregunta una sola vez antes de guardar sus archivos y enviarlos a GitHub. Di que sí. Qué
-   instala, y qué hacer si esa parte no corrió, está en
+   En una prueba real este comando creó un proyecto Next.js con shadcn que funciona, un
+   repositorio privado en GitHub, y las etiquetas y los ajustes, con una sola confirmación. Si el
+   proyecto ya existe, corre `cckit init --profile marketing` dentro de él, o `/kit-init marketing`
+   en Claude Code. Qué instala, y qué hacer si una parte no corrió, está en la
    [cckit init reference](/init-reference/#the-marketing-profile) (en inglés).
 
-3. **Da acceso al proyecto en GitHub** a todas las personas que escriben o aprueban.
+3. **Dale acceso al proyecto en GitHub** a cada persona que escribe o aprueba, y decide quién
+   aprueba. Una preparación donde una persona pide el trabajo y otra lo aprueba funciona desde el
+   primer día.
 
 </Steps>
 
-<Aside type="tip" title="Aprobaciones">
-Decidan desde ahora quién aprueba. Con una persona que escribe y otra que aprueba ya se puede
-trabajar desde el primer día.
+<Aside type="caution" title="Un repositorio privado en un plan gratuito de GitHub">
+La protección de la línea principal no está disponible en un repositorio privado con un plan
+gratuito de GitHub. La preparación lo avisa cuando se salta ese paso. El proyecto funciona sin
+ella.
 </Aside>
 
-Después de esto, Claude trabaja con cuatro asistentes (planeación, edición, diseño e
-investigación), sigue los métodos del equipo para redactar, para la voz de marca y para las
-campañas, y dice "borrador", "revisión" y "aprobar" en lugar de los términos de desarrollo, salvo
-que se los pidas.
-
-## Parte 2: para ti, y cómo comprobar que funcionó
+## Parte 2: para ti, y la comprobación de que funcionó
 
 <Steps>
 
@@ -71,30 +70,28 @@ que se los pidas.
 2. **Pregúntale a Claude cómo van las cosas:**
 
    ```text
-   ¿En qué vamos?
+   ¿Cómo vamos?
    ```
 
-   Claude responde con lo que está en curso, lo que espera revisión y lo que hay que limpiar. Tus
-   piezas están en esa respuesta: cuántas esperan revisión, cuántas están en curso o sin empezar,
-   y cuáles necesitan que alguien haga algo. En un proyecto nuevo la lista es corta o está vacía.
-   Si responde, la preparación funciona.
+   Claude responde con lo que está en curso, lo que espera revisión y lo que hay que limpiar. En
+   un proyecto nuevo la lista es corta o está vacía. Si responde, la preparación funciona.
 
-3. **Pregunta qué puedes hacer:**
+3. **Pregunta qué puedes delegarle:**
 
    ```text
-   Soy del equipo de marketing y no uso herramientas de desarrollo. ¿Qué te puedo pedir en este proyecto?
+   Soy del equipo de marketing y no uso herramientas de desarrollo. ¿Qué puedo delegarte en este proyecto?
    ```
 
 </Steps>
 
-## Si algo no sale bien
+## Si algo no anda bien
 
-| Lo que ves | Qué hacer |
+| Qué ves | Qué hacer |
 | --- | --- |
 | Claude dice que no puede conectarse a GitHub, o te pide iniciar sesión | Pídele a la persona técnica que repita el paso 1 de la Parte 1. |
 | Claude dice que no puede abrir un borrador | Una parte de la preparación no corrió. Mándale a la persona técnica [este enlace](/init-reference/#the-marketing-profile) (en inglés). |
-| En un borrador nuevo Claude no conoce los roles, la voz de marca ni el modo de lenguaje sencillo | Es la misma causa. Mándale a la persona técnica [el mismo enlace](/init-reference/#the-marketing-profile) y después abre el borrador otra vez. |
+| Claude no conoce los roles, la voz de marca ni el modo de lenguaje sencillo | Es la misma causa. Mándale a la persona técnica [el mismo enlace](/init-reference/#the-marketing-profile) y vuelve a intentar. |
 | Claude responde con términos de desarrollo que no conoces | Dile "Explícamelo con palabras sencillas". Las palabras están en [Palabras que vas a escuchar](/es/marketing/words-you-will-hear/). |
-| Claude pide permiso para ejecutar algo | Lee lo que dice que va a hacer. Crear un borrador, guardar tu trabajo y pedir una revisión es lo esperado. Si dudas, di que no y pídele que te explique. |
+| Claude te pide permiso para ejecutar algo | Lee lo que dice que va a hacer. Crear un borrador, guardar tu trabajo y pedir una revisión son cosas esperadas. Si tienes dudas, di que no y pídele que te lo explique. |
 
 Siguiente: [Las herramientas que conectamos](/es/marketing/tools/)

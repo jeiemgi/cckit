@@ -1,36 +1,33 @@
 ---
 title: "The tools we plug in"
-description: "The tools the method relies on and what each is for: Claude, the shared task list, review pages you answer in a browser, and optional memory with MemPalace. cckit connects them; other people make them."
+description: "The tools cckit connects and what each does for you: Claude Code, GitHub, the task list, review pages, optional memory and the design skills. cckit connects them; other people make them."
 ---
 
-A method is only useful if the team can follow it without thinking about it. That takes a few
-tools: something to write with, somewhere to keep the list of work, a place to review, and
-optionally a memory. cckit does not build those tools. It connects ones that already exist, so
-they work as one process and you only ever talk to Claude.
+cckit does not build these tools. It connects ones that already exist, so that handing a piece
+over is one request and the process runs behind it. This page says what each tool does for you,
+who makes it, and whether your team has to do anything to get it. The technical person connects
+them when the [keys are given](/marketing/get-set-up/).
 
-This page says what each tool is for, who makes it, and whether your team has to do anything to
-get it. The technical person connects them during [setup](/marketing/get-set-up/).
+## What each tool does for you
 
-## What each tool is for
+### Claude Code: where you hand work over
 
-### Claude Code: where you work
-
-Claude Code is the app you talk to. It writes, edits, plans and keeps the task list up to date
-when you ask. It is made by Anthropic. Every writer needs it on their computer; the desktop app
-is enough.
+Claude Code is the app you talk to. You describe the piece, and it plans, writes and builds it,
+and keeps the task list up to date. It is made by Anthropic. Every writer needs it on their
+computer; the desktop app is enough.
 
 The marketing setup adds three written methods that Claude follows: one for writing copy, one for
 the [brand voice](/marketing/brand-voice/) and one for
 [planning a campaign](/marketing/campaigns/). It also adds the plain-language mode, in which
 Claude says "draft", "review" and "approve".
 
-### GitHub: where the project lives and reviews happen
+### GitHub: where the work is kept and where you approve
 
-GitHub holds the project and its history, and it hosts the page where a teammate reads a draft,
-comments and approves. It is made by GitHub. Every writer and every approver needs an account
-with access to the project. An approver needs nothing else: a browser is enough.
+GitHub holds the project and its history, and it hosts the page where you read the result,
+comment and approve. It is made by GitHub. Every writer and every approver needs an account with
+access to the project. An approver needs nothing else: a browser is enough.
 
-### The task list: what is planned and where each piece stands
+### The task list: what you handed over and where it stands
 
 The list of pieces is kept inside the project, in a folder named `tasks/`, one small file per
 piece. This part is cckit's own. Nothing has to be installed and no extra account is needed. You
@@ -38,7 +35,7 @@ never open those files: you ask Claude "where are we?" or "what is next?".
 
 A technical person can move the list to GitHub instead. The difference that matters to you is
 how a campaign is reviewed, and it is described on
-[Plan and run a campaign](/marketing/campaigns/#two-ways-a-campaign-is-tracked).
+[Several pieces, one goal](/marketing/campaigns/#two-ways-a-campaign-is-tracked).
 
 ### Review pages: plans you answer in a browser
 
@@ -52,16 +49,25 @@ technical person checks during setup. Without it, or when no browser is availabl
 the same plan in the conversation, so nothing is lost. This is for plans and decisions. The review of a finished
 draft happens on GitHub.
 
-### Memory: optional, off by default
+### Memory: the project remembers your decisions
 
 Without memory, each conversation with Claude starts from what is written in the project: the
-brand voice, the task list, the drafts. For most teams that is enough, because the method keeps
-what matters in the project.
+brand voice, the task list, the drafts. For most teams that is enough.
 
-MemPalace adds a memory that carries decisions and context from one conversation to the next. It
-is independent open-source software, it runs on your computer and it needs no account. The
-marketing setup leaves it **off**. A technical person turns it on and installs it. The automatic
-part works in Claude Code only.
+MemPalace adds a memory that carries decisions and context from one session to the next, so you
+do not explain the same choice twice. cckit adopts it; it does not build it. It is independent
+open-source software, it runs on your computer and it needs no account. The marketing setup
+leaves it **off**. A technical person turns it on and installs it. The automatic part works in
+Claude Code only.
+
+### Design skills: how a page is designed
+
+{/* VERIFY-504 */}
+cckit ships one design skill of its own, `page-design`. It coordinates three design skills made
+by other people: `impeccable` sets the direction and the rules against a generic generated look,
+`emil-design-eng` covers interaction and motion, and `web-design-guidelines` audits the finished
+page. Before building, it writes a short design brief, and the review says which design skills
+were loaded in that run. They are installed with your consent, not by default.
 
 ## What you have to do
 
@@ -72,11 +78,12 @@ part works in Claude Code only.
 | Task list | cckit | Yes | Nothing |
 | Review pages | Lavish | Yes | A browser, and Node.js on your computer |
 | Memory | MemPalace | No | A technical person to turn it on |
+| Design skills | Other authors | No, installed with consent | A yes, once |
 
 ## What is not connected
 
-No tool is connected for publishing, scheduling posts, sending email, analytics or design. cckit
-stops at an approved piece, and those jobs stay in the tools your team already uses. See
+No tool is connected for publishing, scheduling posts, sending email or analytics. cckit stops at
+an approved piece, and those jobs stay in the tools your team already uses. See
 [after approval](/marketing/review-and-approval/#after-approval).
 
 ## For the technical person
