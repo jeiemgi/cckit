@@ -123,6 +123,8 @@ cckit hotfix 268              # cherry-pick merged PR 268 (or a commit sha) onto
                               #   for another branch): worktree from origin/main, cherry-pick -x,
                               #   push, PR titled after the source with `Cherry-pick of #268`;
                               #   a rebase-merged PR is carried commit by commit
+cckit task new "<title>"      # light tasks: work tracked in tasks/, no GitHub issue —
+                              #   task list · task next · task start <id> · task finish <id> "<summary>"
 cckit sync                    # board state, what's unblocked
 cckit sync --cached 60        # the board as one JSON document, from a cache at most 60s old
                               #   (--json / --write / --watch [secs] / --plan — for a TUI or statusline)
@@ -358,6 +360,32 @@ Columns are `number`, `flow`, `ctx`, `title` and an optional comma-separated `bl
 back to GitHub. The plan prints a `source:` line under its header — the source used, its age when it
 reports one, and the reason for a fallback — so a plan built from a snapshot never passes for a live
 one. `EFFORT_PLAN_SOURCE` overrides the config per invocation.
+
+## Light tasks — work without GitHub issues
+
+A team that does not track its work in GitHub issues keeps the list in the project: one file per
+task under `tasks/`.
+
+```bash
+cckit task new "Write the spring newsletter"   # prints the id, writes tasks/<id>.md
+cckit task next                                # the task to take next
+cckit task list                                # every open task: draft · todo · doing · review
+cckit task start <id>                          # worktree + branch light/<id>-<slug> (alias: take)
+cckit task finish <id> "what was done"         # mark done on the branch, push, open the PR (alias: done)
+cckit task share "Q1 backlog"                  # one PR that adds this checkout's drafts to the base
+```
+
+- **Review is a pull request.** `finish` opens it; the task reads `done` when it merges. The
+  approver needs a GitHub account, the task list does not.
+- **State is derived from git**, not stored twice: on the base branch = `todo`, a `light/<id>-…`
+  branch = `doing`, that branch saying done = `review`, the base branch saying done = `done`.
+- **One file per task** so two branches that each add a task merge without a conflict.
+- **`cckit gc` keeps a live task's branch**: `PROTECTED: light task <id> still OPEN`.
+- **Sources.** Tasks are read through one interface (`scripts/lib/task-source.sh`). The `file`
+  source ships; another store plugs in as `scripts/lib/task-source-<name>.sh` plus
+  `tasks.source: "<name>"`.
+
+Guide: [Light tasks](https://cckit.dev/light-tasks/).
 
 ## Waves — parallel agentic development
 

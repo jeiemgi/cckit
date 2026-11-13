@@ -6,6 +6,7 @@
 # Conventions (see .claude/rules/branch-naming.md):
 #   branch        <kind>/<N>-<slug>     e.g. feat/173-admin-clerk-signin
 #   worktree dir  <kind>+<N>-<slug>     e.g. .claude/worktrees/feat+173-admin-clerk-signin
+#   light task    light/<id>-<slug>     e.g. light/t3f9a-spring-newsletter (no issue; wt_task_id)
 #
 # Source it:  source scripts/lib/worktree-issue.sh
 # Requires: git; gh (for state lookups — degrades to "unknown" without it).
@@ -22,6 +23,10 @@ if ! command -v cckit_gh_rest >/dev/null 2>&1; then
   unset _ghr_lib
 fi
 command -v cckit_gh_rest >/dev/null 2>&1 || cckit_gh_rest() { return 1; }
+
+# This file's own directory, resolved at load time (file scope is the one place bash and zsh agree
+# on it). wt_task_state loads task-source.sh from here on first use.
+_WT_ISSUE_LIB_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" >/dev/null 2>&1 && pwd)"
 
 # Echo the issue number a branch name / worktree path belongs to (empty if none, e.g. bot branches).
 # Normalize the numeric segment of a branch/dir name to an issue number.
@@ -106,10 +111,58 @@ _wt_issue_state_failed() {
   printf 'unknown\n'
 }
 
-# Echo a protection reason if a branch/ref must NOT be garbage-collected because its issue
-# is still open; empty string means "no issue-based protection" (other gc rules still apply).
+# ── light tasks (#450): work tracked without a GitHub issue ───────────────────────────────────
+# A light task's branch is `light/<id>-<slug>` and its worktree dir `light+<id>-<slug>`. <id> starts
+# with a lowercase letter (then lowercase letters / digits, 2-12 characters in all), so
+# wt_issue_number answers nothing for it and no GitHub issue is ever asked about. Without the two
+# functions below such a branch would carry no id at all, and a branch with no id gets no
+# protection: gc would call a task in progress LANDED the moment it has no commit beyond base.
+
+# Echo the light-task id a branch name / worktree path belongs to (empty if it is not one).
+wt_task_id() {
+  local ref="$1" rest id
+  case "$ref" in
+    light/*) rest="${ref#light/}" ;;
+    *) rest="${ref##*/}"
+       case "$rest" in light+*) rest="${rest#light+}" ;; *) return 0 ;; esac ;;
+  esac
+  id="${rest%%-*}"
+  [ "$id" != "$rest" ] || return 0                 # no "-" after the id
+  case "$id" in ''|[!a-z]*|*[!a-z0-9]*) return 0 ;; esac
+  [ "${#id}" -ge 2 ] && [ "${#id}" -le 12 ] || return 0
+  printf '%s' "$id"
+}
+
+# Echo the state of a light task as the task source reports it (task-source.sh): open / closed,
+# empty when there is no such task, `unknown` when the source could not be loaded or read. Same
+# contract as wt_issue_state: callers treat `unknown` as "do not assume safe to delete". rc 0 always.
+wt_task_state() {
+  local id="$1" ref="${2:-}" out
+  [ -n "$id" ] || return 0
+  if ! command -v task_source_call >/dev/null 2>&1 \
+     && [ -n "${_WT_ISSUE_LIB_DIR:-}" ] && [ -f "$_WT_ISSUE_LIB_DIR/task-source.sh" ]; then
+    # shellcheck source=/dev/null
+    . "$_WT_ISSUE_LIB_DIR/task-source.sh"
+  fi
+  command -v task_source_call >/dev/null 2>&1 || { printf 'unknown\n'; return 0; }
+  out="$(task_source_call state "$id" "$ref" 2>/dev/null)" || { printf 'unknown\n'; return 0; }
+  printf '%s\n' "$out" | grep -E -x 'open|closed|unknown' | head -1
+  return 0
+}
+
+# Echo a protection reason if a branch/ref must NOT be garbage-collected because its issue — or its
+# light task — is still open; empty string means "no such protection" (other gc rules still apply).
 wt_protected_reason() {
   local ref="$1" repo="${2:-}" n state
+  n="$(wt_task_id "$ref")"
+  if [ -n "$n" ]; then
+    state="$(wt_task_state "$n" "$ref")"
+    case "$state" in
+      open)    printf 'light task %s still OPEN' "$n" ;;
+      unknown) printf 'light task %s state unknown' "$n" ;;
+    esac
+    return 0
+  fi
   n="$(wt_issue_number "$ref")"
   [[ -z "$n" ]] && return 0
   state="$(wt_issue_state "$n" "$repo")"

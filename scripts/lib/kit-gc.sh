@@ -233,7 +233,8 @@ EOF
 # _kit_gc_classify <branch> <pr_index> [repo] — the ONE verdict for a branch, exactly as
 # kit_gc_analyze prints it after `-> `. kit_gc_prune acts on this same function, so the plan a human
 # approved and the delete that follows can never disagree (Family 1, the failure mode #219 was about).
-# Order: base branch > PROTECTED (issue open) > UNKNOWN (issue state read failed) > SAFE (own PR
+# Order: base branch > PROTECTED (issue open, or light task open) > UNKNOWN (issue or light-task
+# state read failed) > SAFE (own PR
 # merged) > ACTIVE (own PR open) > a CLOSED-unmerged PR verbatim > UNKNOWN (PR list read failed) >
 # LANDED (no PR, work on base) > ORPHAN.
 #
@@ -250,10 +251,19 @@ _kit_gc_classify() {
   # The same read wt_protected_reason makes, kept as a state so `unknown` is not flattened to "".
   n="$(wt_issue_number "$b" 2>/dev/null || true)"
   [ -n "$n" ] && state="$(wt_issue_state "$n" "$repo" 2>/dev/null || true)"
+  # A light task's branch (`light/<id>-<slug>`, #450) names no issue; its task source answers. A
+  # copy of worktree-issue.sh that predates wt_task_id leaves both empty, as before.
+  local tid="" tstate=""
+  if command -v wt_task_id >/dev/null 2>&1; then tid="$(wt_task_id "$b" 2>/dev/null || true)"; fi
+  [ -n "$tid" ] && tstate="$(wt_task_state "$tid" "$b" 2>/dev/null || true)"
   if [ "$state" = open ]; then
     echo "PROTECTED: issue #$n still OPEN"
+  elif [ "$tstate" = open ]; then
+    echo "PROTECTED: light task $tid still OPEN"
   elif [ "$state" = unknown ]; then
     echo "UNKNOWN (could not determine — the state read for issue #$n failed; kept, never auto-deleted)"
+  elif [ "$tstate" = unknown ]; then
+    echo "UNKNOWN (could not determine — the state read for light task $tid failed; kept, never auto-deleted)"
   elif printf '%s' "$pr" | grep -q 'MERGED'; then
     echo "SAFE (${pr}, issue closed/absent — verify level with remote before delete)"
   elif printf '%s' "$pr" | grep -q 'OPEN'; then

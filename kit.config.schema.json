@@ -110,6 +110,24 @@
       }
     },
     "milestones": { "type": "array", "items": { "type": "string" } },
+    "tasks": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Light tasks (`cckit task`): work tracked in the project and not in GitHub issues.",
+      "properties": {
+        "source": {
+          "type": "string",
+          "pattern": "^[a-z0-9_]+$",
+          "default": "file",
+          "description": "The task source `cckit task` and `cckit gc` read. `file` (default, the one source shipped): one tracked file per task under `tasks.dir`. Another name loads `scripts/lib/task-source-<name>.sh`, which must define `task_<name>_list`, `_get`, `_create`, `_on_start`, `_on_finish` and `_state`. KIT_TASKS_SOURCE overrides it per invocation."
+        },
+        "dir": {
+          "type": "string",
+          "default": "tasks",
+          "description": "The tracked directory the `file` source keeps one `<id>.md` per task in, relative to the project root. An absolute path, or one that climbs out of the project, is ignored with a warning. KIT_TASKS_DIR overrides it per invocation."
+        }
+      }
+    },
     "pr": {
       "type": "object",
       "additionalProperties": true,
