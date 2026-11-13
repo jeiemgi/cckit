@@ -53,7 +53,8 @@
 #   qa_verdict_state <lane> [<head>]        `pass` · `fail` · `stale` · `none` for the lane's verdict; rc 0 only for pass
 #   qa_verdict <lane> <pass|fail> [<pr>] [<head>] [<notes>] [<to>] [<shots>]   record it, post it, mail a fail
 #   qa_verdict_show <lane> [<pr>] [<head>]  print that state against the lane's head now
-#   qa_cli <up|ready|open|stop|verdict> [--lane N] …   the `cckit qa` verb (`stop --force`)
+#   qa_lanes                                one row per lane: branch, ports, up, verdict, worktree — read-only
+#   qa_cli <up|ready|open|stop|verdict|lanes> [--lane N] …   the `cckit qa` verb (`stop --force`)
 #
 # The review route comes from the WORK, not from a smoke list: the builder writes one
 # `QA route: /path` line in the PR body (`cckit brief` asks for it when a `qa` block exists) and
@@ -1051,6 +1052,150 @@ qa_verdict_show() {
   return "$rc"
 }
 
+# ── the lanes table (#301): read what is already recorded, launch and judge nothing ───────────
+# `cckit qa lanes` is a READ of four things other verbs wrote: the port-slot ledger (`cckit
+# start`), a lane's `qa/<lane>/ports` record (`qa up`), the listeners on those ports, and the
+# latest `qa` receipt (`qa verdict`). It writes no file, emits no event, kills nothing and calls
+# neither gh nor curl. Two consequences of making no network call:
+#   - the slot is read with awk, never through wt_port_slot, which ALLOCATES on first use;
+#   - a verdict is compared against the LOCAL tip of the lane's branch. `qa verdict` falls back to
+#     the PR's head through gh; here a lane with a verdict and no local branch reads `unknown`.
+
+# _qa_ledger_field <lane> <2|3> — the slot (2) or worktree path (3) the port-slot ledger records
+# for <lane>. Empty when there is no ledger, no row, or the row's worktree is gone: the next
+# `cckit start` reclaims such a row, so its slot is nobody's.
+_qa_ledger_field() {
+  local f="" row="" tab="" wt=""
+  tab="$(printf '\t')"
+  f="$(_wt_slots_file . 2>/dev/null)" || return 0
+  [ -f "$f" ] || return 0
+  row="$(awk -F"$tab" -v n="$1" '$1 == n { print; exit }' "$f" 2>/dev/null)" || row=""
+  [ -n "$row" ] || return 0
+  wt="$(printf '%s\n' "$row" | cut -f3)"
+  [ -z "$wt" ] || [ -d "$wt" ] || return 0
+  printf '%s\n' "$row" | cut -f"$2"
+}
+
+# _qa_lanes_ids — every lane number something recorded, sorted: a ledger row whose worktree still
+# exists, a `qa/<lane>` state directory, or a `qa` receipt.
+_qa_lanes_ids() {
+  local f="" tab="" n="" slot="" wt=""
+  tab="$(printf '\t')"
+  {
+    ls "$(kit_state_dir)/qa" 2>/dev/null
+    ls "$(sr_dir)" 2>/dev/null | sed -n 's/^\([0-9][0-9]*\)-qa-[0-9][0-9]*\.json$/\1/p'
+    f="$(_wt_slots_file . 2>/dev/null)" || f=""
+    if [ -n "$f" ] && [ -f "$f" ]; then
+      while IFS="$tab" read -r n slot wt; do
+        [ -z "$wt" ] || [ -d "$wt" ] || continue
+        printf '%s\n' "$n"
+      done < "$f"
+    fi
+  } | grep -E '^[0-9]+$' | sort -un
+  return 0
+}
+
+# _qa_branch_worktree <branch> — the worktree that has <branch> checked out; empty when none does.
+_qa_branch_worktree() {
+  git worktree list --porcelain 2>/dev/null \
+    | awk -v b="refs/heads/$1" '/^worktree / { w = substr($0, 10) } $1 == "branch" && $2 == b { print w; exit }'
+}
+
+# _qa_lane_ports_now <lane> — the lane's `NAME=port` lines: the ports it was LAUNCHED with when
+# `qa up` recorded them, else the ports it would get from `qa.ports` and its ledger slot. Empty
+# when neither exists (no qa block, or no slot yet).
+_qa_lane_ports_now() {
+  local lane="$1" pfile="" cfg="" slot=""
+  pfile="$(qa_lane_dir "$lane")/ports"
+  if [ -s "$pfile" ]; then grep -E '^[A-Za-z_][A-Za-z0-9_]*=[0-9]+$' "$pfile" 2>/dev/null; return 0; fi
+  cfg="$(qa_cfg 2>/dev/null)" || return 0
+  slot="$(_qa_ledger_field "$lane" 2)"
+  case "$slot" in ''|*[!0-9]*) return 0 ;; esac
+  qa_lane_ports "$cfg" "$slot" "$(wt_port_stride "$cfg")"
+  return 0
+}
+
+# _qa_lane_up <ports-lines> — `up` when every port has a listener, `partial` when some do, `down`
+# when none does, `unknown` when there is no port to check or no tool (lsof, ss) to check it with.
+# A listener is whatever holds the port: this does not tell the lane's stack from a stranger.
+_qa_lane_up() {
+  local ports="$1" tool="" line="" total=0 held=0
+  [ -n "$ports" ] || { printf 'unknown\n'; return 0; }
+  tool="$(qa_port_tool)" || { printf 'unknown\n'; return 0; }
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    total=$((total + 1))
+    if qa_port_held "${line#*=}" "$tool"; then held=$((held + 1)); fi
+  done <<EOF
+$ports
+EOF
+  if [ "$held" -eq 0 ]; then printf 'down\n'
+  elif [ "$held" -eq "$total" ]; then printf 'up\n'
+  else printf 'partial\n'
+  fi
+}
+
+# _qa_lane_verdict <lane> <branch> — qa_verdict_state's word against the local tip of <branch>.
+# `unknown` when a verdict exists and no local branch gives a commit to compare it with.
+_qa_lane_verdict() {
+  local lane="$1" branch="$2" tip="" state=""
+  [ -z "$branch" ] || tip="$(git rev-parse --verify -q "refs/heads/$branch^{commit}" 2>/dev/null)" || tip=""
+  state="$(qa_verdict_state "$lane" "$tip")" || true
+  if [ "$state" = stale ] && [ -z "$tip" ]; then state="unknown"; fi
+  printf '%s\n' "${state:-unknown}"
+}
+
+# qa_lanes — one row per lane: lane, branch, ports, up, verdict, worktree. A table on stdout, or a
+# JSON array under --llm (`[]` with no lane). rc 0 whether or not there is a lane; rc 3 without jq.
+qa_lanes() {
+  local lane="" branch="" wt="" ports="" up="" verdict="" rows="" tab="" objs="" shown=""
+  command -v jq >/dev/null 2>&1 || { echo "cckit qa: jq is required" >&2; return 3; }
+  tab="$(printf '\t')"
+  while IFS= read -r lane; do
+    [ -n "$lane" ] || continue
+    branch="$(_qa_lane_branch "$lane")" || branch=""
+    wt=""
+    [ -z "$branch" ] || wt="$(_qa_branch_worktree "$branch")" || wt=""
+    [ -n "$wt" ] || wt="$(_qa_ledger_field "$lane" 3)" || wt=""
+    ports="$(_qa_lane_ports_now "$lane")" || ports=""
+    up="$(_qa_lane_up "$ports")" || up="unknown"
+    verdict="$(_qa_lane_verdict "$lane" "$branch")" || verdict="unknown"
+    if [ "${CCKIT_OUTPUT:-human}" = json ]; then
+      objs="$objs$(printf '%s\n' "$ports" | jq -Rcn --arg lane "$lane" --arg branch "$branch" --arg wt "$wt" \
+        --arg up "$up" --arg verdict "$verdict" '
+        ([inputs | select(length > 0) | split("=") | { key: .[0], value: (.[1] | tonumber) }] | from_entries) as $p
+        | { lane: $lane,
+            branch: (if $branch == "" then null else $branch end),
+            worktree: (if $wt == "" then null else $wt end),
+            ports: $p, up: $up, verdict: $verdict }')
+"
+    else
+      shown="$(printf '%s' "$ports" | tr '\n' ' ')"; shown="${shown% }"
+      rows="$rows$lane$tab${branch:--}$tab${shown:--}$tab$up$tab$verdict$tab${wt:--}
+"
+    fi
+  done <<EOF
+$(_qa_lanes_ids)
+EOF
+  if [ "${CCKIT_OUTPUT:-human}" = json ]; then
+    printf '%s' "$objs" | jq -cs '.'
+    return 0
+  fi
+  if [ -z "$rows" ]; then
+    echo "no QA lanes — cckit start <issue> gives an issue its port slot, cckit qa up launches its stack" >&2
+    return 0
+  fi
+  printf 'LANE\tBRANCH\tPORTS\tUP\tVERDICT\tWORKTREE\n%s' "$rows" | awk -F"$tab" '
+    { n = NR; for (i = 1; i <= NF; i++) { c[NR, i] = $i; if (length($i) > w[i]) w[i] = length($i) } nf = NF }
+    END {
+      for (r = 1; r <= n; r++) {
+        line = ""
+        for (i = 1; i < nf; i++) line = line sprintf("%-" w[i] "s  ", c[r, i])
+        print line c[r, nf]
+      }
+    }'
+}
+
 # qa_cli <args> — the `cckit qa` verb.
 qa_cli() {
   # Every local gets a value: bin/cckit runs under `set -u`, and a bare `local x` is UNSET.
@@ -1058,6 +1203,11 @@ qa_cli() {
   local verdict="" head="" notes="" nfile="" to="" shots=""
   case "$sub" in
     up|ready|open|stop|verdict) shift ;;
+    lanes)
+      shift
+      [ "$#" -eq 0 ] || { echo "cckit qa lanes: unknown argument '$1' — it takes none and lists every lane" >&2; return 2; }
+      qa_lanes
+      return $? ;;
     ''|-h|--help|help)
       cat >&2 <<'EOF'
 cckit qa up    [--lane <n>] [--timeout <s>]   launch the declared stack command with this lane's
@@ -1074,6 +1224,7 @@ cckit qa verdict <pass|fail> [--lane <n>] [--pr <n>] [--head <sha>] [--note <tex
                                               record the verdict against the reviewed commit
 cckit qa verdict [--lane <n>] [--pr <n>] [--head <sha>]
                                               read it back: pass · fail · stale · none
+cckit qa lanes                                list every lane: branch, ports, up, verdict, worktree
 
 The lane is the issue number in the current branch, or --lane. Exit 0 only when the stack is
 USABLE: every qa.readiness probe answered 2xx/3xx in one round (a redirect to sign-in is up).
@@ -1096,9 +1247,16 @@ KIT_EVIDENCE_URL_BASE is set, because gh cannot upload an image. A fail needs no
 to the builder's branch as a steer (--to names another branch); exit 1 when they reached nobody.
 With no pass|fail it prints how the verdict reads against the lane's head now and exits 0 only for
 a pass on that commit — a push since the verdict reads `stale`.
+
+lanes is read-only: no launch, no stop, no write, no gh or curl call. One row per lane that has a
+port slot (cckit start), a launch record or a verdict. PORTS are the ports the lane was launched
+with, else the ones it would get. UP is up · partial · down by who listens on them (unknown with
+no port or neither lsof nor ss). VERDICT is pass · fail · stale · none against the local tip of
+the lane's branch, unknown when a verdict exists and no local branch does. Exit 0 with or without
+lanes; --llm prints a JSON array.
 EOF
       return 2 ;;
-    *) echo "cckit qa: unknown subcommand '$sub' — cckit qa <up|ready|open|stop|verdict>" >&2; return 2 ;;
+    *) echo "cckit qa: unknown subcommand '$sub' — cckit qa <up|ready|open|stop|verdict|lanes>" >&2; return 2 ;;
   esac
   while [ "$#" -gt 0 ]; do
     case "$1" in
