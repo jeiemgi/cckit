@@ -1027,6 +1027,8 @@ mkdir -p "$TARGET/scripts/lib" "$(dirname "$KITCFG")"
 adapter_has "$ADAPTERS" claude && mkdir -p "$TARGET/.claude/agents" "$TARGET/.claude/skills" "$TARGET/.claude/rules"
 
 # ---- kit.config.json (built with jq for correctness) --------------------
+RECIPE_CFG='{}'
+[[ -n "$RECIPE_FILE" ]] && RECIPE_CFG="$(jq -c '.config // {}' "$RECIPE_FILE")"
 # Location: .claude/kit.config.json when the Claude adapter is selected (the layout every existing
 # project has); the root cckit.config.json for a Codex-only project, which gets no .claude/ tree.
 jq -n \
@@ -1045,6 +1047,7 @@ jq -n \
   --argjson localon "$LOCAL_ON" \
   --argjson ckinds "$CONTENT_KINDS_ON" --arg prbody "$PR_BODY_STYLE" --argjson plain "$PLAIN_ON" \
   --arg tasksdef "$TASKS_DEFAULT" \
+  --argjson recipecfg "$RECIPE_CFG" \
   '{kitVersion:$kitver,
     adapters:$adapters,
     project:{name:$name,slug:$slug,owner:$owner,language:$lang,path:$path},
@@ -1063,6 +1066,9 @@ jq -n \
    | if $prbody == "content" then .pr = {bodyStyle:"content"} else . end
    | if $plain then .plainLanguage = {enabled:true} else . end
    | if $tasksdef == "light" then .tasks = {default:"light"} else . end
+   # Config keys the recipe carries (`config` in recipes/<id>.json), merged over the above: the
+   # recipe knows the commands of the project it made (tasks.check, the gate of `cckit task run`).
+   | . * $recipecfg
    # The config is committed by the guided setup, so it carries no absolute machine path (#490).
    | del(.project.path)' \
   > "$KITCFG.kit-new"

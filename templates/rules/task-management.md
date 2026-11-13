@@ -9,7 +9,9 @@
 - **This project's default list is light tasks** (`tasks.default: "light"`). Work is recorded with
   `cckit task new`, listed with `cckit task list`, started with `cckit task start <id>` and sent for
   review with `cckit task finish <id> "<summary>" --all`, which opens the pull request (`--all`
-  includes the files created for the task; without it a new draft is left out). The issue loop
+  includes the files created for the task; without it a new draft is left out).
+  `cckit task run <id>` does the start, one unattended round behind the project's check
+  (`tasks.check`) and the pull request in one step. The issue loop
   below applies only to work {{OWNER_NAME}} asks to track as a GitHub issue. `tasks/` is that list
   and `cckit task` keeps it: the "never maintain task lists in markdown" line does not cover it.
 <!-- /IF:LIGHT_TASKS -->

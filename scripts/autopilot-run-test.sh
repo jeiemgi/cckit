@@ -109,6 +109,20 @@ t "--dry-run exits 0" "$?" "0"
 has "--dry-run shows the non-interactive codex line" "$(cat "$TMP/out")" "'codex' exec --json '-s' 'workspace-write' -"
 t "--dry-run wrote no state" "$([ -d "$TMP/state" ] && echo wrote || echo no)" "no"
 
+# ── --until that already passes: exit 0, no round, and stderr says nothing was done (#496) ───────
+reset
+bash "$ROOT/scripts/autopilot.sh" run --objective x --until "true" > "$TMP/out" 2> "$TMP/err"
+t "an --until that already passes exits 0" "$?" "0"
+t "reason is done" "$(reason)" "done"
+t "no round ran" "$(field .rounds)" "0"
+t "no agent was started" "$([ -f "$TMP/rounds" ] && echo ran || echo no)" "no"
+has "stderr says no round ran and nothing changed" "$(cat "$TMP/err")" "no round ran and nothing was changed"
+has "stderr names --check as the gate flag" "$(cat "$TMP/err")" 'use --check "<cmd>"'
+# A run that did work before --until passed is not told that.
+reset
+run --objective x --until "$UNTIL"
+case "$(cat "$TMP/out")" in *"no round ran"*) echo "FAIL: a run that worked was told no round ran"; fail=1 ;; *) echo "ok: a run that worked gets no such notice" ;; esac
+
 # ── every stop reason, under both launch kinds ───────────────────────────────────────────────────
 for agent in claude codex; do
   # done: the completion check passes after round 2.

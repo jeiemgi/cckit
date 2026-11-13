@@ -130,6 +130,11 @@ prints nothing: add the line `.cckit/` yourself.
 Without `--until`, the run ends when the agent exits 0 after a round that changed something. With
 it, the command's exit code is the only thing that ends the run as `done`.
 
+`--until` is also asked before round 1. A command that already passes there, such as a build on a
+project that builds today, ends the run with exit 0, `rounds=0` and nothing changed; stderr says
+so. `--until` is the stop condition, not a gate: to require that the finished work passes a
+command, use `--check "<cmd>"`.
+
 Two limits behave differently from the others:
 
 - **Tokens are checked between rounds**, from the usage the agent CLI prints. A round in flight is

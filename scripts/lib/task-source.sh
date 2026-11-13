@@ -24,6 +24,8 @@
 #   task_<name>_on_finish <id> <worktree>                   work is ready for review
 #   task_<name>_state <id> [<branch>]     open | closed | unknown | (empty: no such task). rc 0
 #                                         always. gc keeps a branch on `open` and on `unknown`.
+#   task_<name>_body <id> <worktree>      OPTIONAL: the task's notes, as text. `cckit task run`
+#                                         builds its objective from the title alone without it.
 #   task_<name>_share <worktree> <from-checkout>   OPTIONAL: move every not-yet-shared task into
 #                                         <worktree>; print one id per line. `cckit task share`
 #                                         refuses when the source does not define it.

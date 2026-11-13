@@ -137,6 +137,7 @@ cat > "$fx/demo.json" <<'JSON'
     { "label": "Write the app", "run": "printf '{\"name\":\"demo\",\"dependencies\":{\"next\":\"1.0.0\"}}\\n' > package.json && mkdir -p app && echo page > app/page.tsx" },
     { "label": "Ignore env files", "run": "printf '.env*\\n' > .gitignore" }
   ],
+  "config": { "tasks": { "check": "pnpm build && pnpm lint" } },
   "start": "pnpm dev", "lastVerified": "2026-11-12"
 }
 JSON
@@ -198,6 +199,7 @@ yes_if "new project: home itself got nothing" '[ ! -e "$HOME/.claude" ] && [ ! -
 yes_if "new project: the recipe ran" '[ -f "$shop/app/page.tsx" ]'
 yes_if "new project: the kit is installed" '[ -f "$shop/.claude/kit.config.json" ] && [ -f "$shop/CLAUDE.md" ]'
 t   "new project: profile comes from the recipe" "$(jq -r .profile "$shop/.claude/kit.config.json")" "minimal"
+t   "new project: the recipe's config keys are in the project config" "$(jq -r .tasks.check "$shop/.claude/kit.config.json")" "pnpm build && pnpm lint"
 t   "new project: base branch is develop" "$(jq -r .github.baseBranch "$shop/.claude/kit.config.json")" "develop"
 t   "new project: repo is <login>/<slug>" "$(jq -r .github.repo "$shop/.claude/kit.config.json")" "tester/my-shop"
 yes_if "database: client code is in the project" '[ -f "$shop/lib/supabase/client.ts" ] && [ -f "$shop/lib/supabase/server.ts" ]'
@@ -251,6 +253,11 @@ run "$tmp" "$tmp/p/blank" --answers "$tmp/a-empty.json" --yes --public
 t   "empty folder: rc 0" "$RC" "0"
 has "empty folder: asked whether it is a new project" "$OUT" "Is this a new project?"
 yes_if "empty folder: kit installed, no recipe" '[ -f "$tmp/p/blank/.claude/kit.config.json" ] && [ ! -f "$tmp/p/blank/package.json" ]'
+t   "no recipe: the config gets no tasks.check" "$(jq -r '.tasks.check // "absent"' "$tmp/p/blank/.claude/kit.config.json")" "absent"
+# A recipe's config keys merge with the profile's (#496): marketing sets tasks.default, the recipe tasks.check.
+run "$tmp" "$tmp/p/mk-site" --profile marketing --recipe demo --no-github
+t   "marketing + recipe: rc 0" "$RC" "0"
+t   "marketing + recipe: tasks.default and tasks.check are both written" "$(jq -c .tasks "$(ls "$tmp/p/mk-site/.claude/kit.config.json" "$tmp/p/mk-site/cckit.config.json" 2>/dev/null | sed -n 1p)")" '{"default":"light","check":"pnpm build && pnpm lint"}'
 has "--public: the repository is created public" "$(cat "$GHS/writes.log")" "repo create tester/blank --public"
 t   "empty folder: git init used main, not the user's init.defaultBranch" "$(git -C "$GHS/git/tester/blank.git" for-each-ref --format='%(refname:short)' refs/heads | tr '\n' ' ')" "develop main "
 

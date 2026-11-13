@@ -127,6 +127,10 @@
           "default": "issues",
           "description": "Which task list is this project's default. issues (default): GitHub issues, through `cckit new` / `cckit start` / `cckit pr`. light: the `cckit task` list. With light, a bare `cckit next` prints what `cckit task next` prints, and the campaign skill records a campaign's pieces as light tasks instead of sub-issues. Both lists stay usable whatever the value. `cckit task default` prints it. The marketing profile sets light."
         },
+        "check": {
+          "type": "string",
+          "description": "The gate `cckit task run <id>` runs after the agent's round when no `--check` flag is given: a shell command run in the task's worktree. Exit 0 lets the pull request open; any other exit stops the run with exit 6 and opens none. Absent: no gate. The nextjs-shadcn recipe writes `pnpm build && pnpm lint`."
+        },
         "dir": {
           "type": "string",
           "default": "tasks",

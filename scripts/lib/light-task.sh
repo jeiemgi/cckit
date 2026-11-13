@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# light-task.sh — `cckit task <new|list|next|start|finish|share>` (#450): track work without
+# light-task.sh — `cckit task <new|list|next|start|finish|run|share>` (#450): track work without
 # GitHub issues. The records come from a task source (task-source.sh; the `file` source keeps one
 # tracked file per task); this file is the verbs, and it never reads a task any other way.
 #
@@ -12,6 +12,8 @@
 #   finish mark the task done ON ITS BRANCH, commit, push, open the pull request. The task is done
 #          when that pull request merges — review stays a pull request       (alias: done)
 #   default  print `light` or `issues`: which list is the project's default (tasks.default)
+#   run    start + ONE headless objective built from the task record + finish: hands a task to an
+#          agent and prints the review link. Never merges (#496)
 #   share  one pull request that adds this checkout's drafts to the base branch, for a backlog
 #          nobody has started yet. The tasks list as `shared` until it merges; run again with no
 #          new drafts, it retries a share whose push or pull request failed
@@ -64,6 +66,7 @@ cckit task list [--all]
 cckit task next
 cckit task start [--force] [--no-push] <id>          (alias: take)
 cckit task finish [<id>] "<summary>" [--all]         (alias: done)
+cckit task run <id> [--check "<cmd>"] [--max-iters N] [--max-seconds N] [--agent <cmd>] [--agent-arg <arg>]… [--no-finish]
 cckit task share ["<summary>"]
 cckit task default                                    light | issues (tasks.default in the config)
 EOF
@@ -382,6 +385,119 @@ EOF
   _lt_open_pr "$wt" "$branch" "$pr_title" "$body"
 }
 
+# ── run ─────────────────────────────────────────────────────────────────────────────────────────
+# _lt_check_default — `tasks.check` of the project config (the gate `task run` uses with no
+# --check), or nothing. The config is the one kit_config_path resolves.
+_lt_check_default() {
+  local cfg=""
+  if ! command -v kit_config_path >/dev/null 2>&1 && [ -f "$_LT_LIB_DIR/config-path.sh" ]; then
+    # shellcheck source=config-path.sh
+    . "$_LT_LIB_DIR/config-path.sh"
+  fi
+  if command -v kit_config_path >/dev/null 2>&1; then cfg="$(kit_config_path 2>/dev/null || true)"; fi
+  [ -n "$cfg" ] && [ -f "$cfg" ] || return 0
+  jq -r '.tasks.check // empty | strings' "$cfg" 2>/dev/null || true
+}
+
+# lt_run <id> [flags] — delegate ONE task end to end (#496): lt_start (reusing the task's worktree),
+# one `cckit autopilot run` objective built from the task's title and notes, then lt_finish --all.
+# It adds no engine: the three steps are the code paths the separate verbs run.
+#   --check "<cmd>"   the gate the work must pass before a review opens; else `tasks.check` in the
+#                     project config; else none
+#   --max-iters N · --max-seconds N · --agent <claude|codex> · --agent-arg <arg> (repeatable)
+#                     passed to the run. The run has no --until, so it is one round;
+#                     --max-seconds also bounds that round
+#   --no-finish       stop after the run: nothing is pushed for review, no pull request
+# A stopped earlier run on the task's branch is discarded (--fresh): the task record is the
+# objective, so there is nothing to resume. A task whose branch already says done (state `review`)
+# starts no agent: the open pull request is reported, or opening it is retried.
+# stdout: "✓ <url>" — or "<worktree>|<branch>|<id>" with --no-finish. stderr: progress.
+# returns: the run's exit code (0 done · 2 refused · 3 agent failed · 4 limit · 5 the round changed
+#   nothing · 6 gate failed · 130 interrupted) · 7 the review could not be opened · 1 the task
+#   could not be started · 2 usage
+lt_run() {
+  local want="" check="" check_set=0 iters="" secs="" agent="" finish=1 line id wt branch rest
+  local row state prio kind created br title dir body objective rc sfile reason detail summary
+  local -a pass
+  pass=()
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --check)       [ "$#" -ge 2 ] || { echo "✗ task run: --check needs a value" >&2; return 2; }; check="$2"; check_set=1; shift 2 ;;
+      --max-iters)   [ "$#" -ge 2 ] || { echo "✗ task run: --max-iters needs a value" >&2; return 2; }; iters="$2"; shift 2 ;;
+      --max-seconds) [ "$#" -ge 2 ] || { echo "✗ task run: --max-seconds needs a value" >&2; return 2; }; secs="$2"; shift 2 ;;
+      --agent)       [ "$#" -ge 2 ] || { echo "✗ task run: --agent needs a value" >&2; return 2; }; agent="$2"; shift 2 ;;
+      --agent-arg)   [ "$#" -ge 2 ] || { echo "✗ task run: --agent-arg needs a value" >&2; return 2; }; pass+=(--agent-arg "$2"); shift 2 ;;
+      --no-finish)   finish=0; shift ;;
+      -h|--help)     _lt_usage; return 0 ;;
+      -*) echo "✗ task run: unknown flag '$1'" >&2; _lt_usage; return 2 ;;
+      *)  if [ -z "$want" ]; then want="$1"; shift; else echo "✗ task run: one task id only" >&2; return 2; fi ;;
+    esac
+  done
+  [ -n "$want" ] || { echo "✗ task run: a task id is required — see 'cckit task list'" >&2; return 2; }
+  for rest in "$iters" "$secs"; do
+    case "$rest" in *[!0-9]*|0) echo "✗ task run: '$rest' is not a positive integer" >&2; return 2 ;; esac
+  done
+  [ "$check_set" = 1 ] || check="$(_lt_check_default)"
+
+  line="$(lt_start "$want")" || return 1
+  line="$(printf '%s\n' "$line" | tail -n 1)"
+  wt="${line%%|*}"; id="${line##*|}"; rest="${line#*|}"; branch="${rest%%|*}"
+  [ -n "$wt" ] && [ -d "$wt" ] && [ -n "$id" ] || { echo "✗ task run: the task could not be started" >&2; return 1; }
+  [ -z "${_LT_RUN_ID_FILE:-}" ] || printf '%s' "$id" > "$_LT_RUN_ID_FILE"
+  row="$(task_source_call get "$id")" || return 1
+  IFS="$_LT_TAB" read -r id state prio kind created br title <<EOF
+$row
+EOF
+
+  if [ "$state" = review ]; then
+    # The branch's copy already says done: an earlier run or `task finish` got that far. No round.
+    _lt_say "[$id] already finished on $branch — no agent round; reporting its pull request" \
+            "[$id] this task was already handed in for review — nothing new was written" >&2
+    lt_finish "$id" "$title" --all || return 7
+    return 0
+  fi
+
+  dir="$(task_source_dir)"
+  body=""
+  if task_source_has body; then body="$(task_source_call body "$id" "$wt" || true)"; fi
+  objective="$(printf 'Do this task: %s\n' "$title"
+    if [ -n "$body" ]; then printf '\nNotes from the task record:\n%s\n' "$body"; fi
+    printf '\nThe task is recorded in %s/%s.md. Leave that file as it is: cckit marks the task done when the work goes to review.\n' "$dir" "$id")"
+
+  pass+=(--objective "$objective" --fresh)
+  if [ -n "$check" ]; then pass+=(--check "$check"); fi
+  if [ -n "$iters" ]; then pass+=(--max-iters "$iters"); fi
+  if [ -n "$secs" ];  then pass+=(--max-seconds "$secs" --round-seconds "$secs"); fi
+  if [ -n "$agent" ]; then pass+=(--agent "$agent"); fi
+  _lt_say "[$id] running one headless objective in $wt (gate: ${check:-none})" \
+          "[$id] the assistant is working on this task now (check before review: ${check:-none})" >&2
+  rc=0
+  ( cd "$wt" && bash "$_LT_LIB_DIR/../autopilot-run.sh" "${pass[@]}" ) >&2 || rc=$?
+
+  if [ "$rc" -ne 0 ]; then
+    # Say why in one line of our own: the run's "resume with" hint does not apply here, because a
+    # re-run of `task run` starts over from the task record.
+    reason=""; detail=""
+    sfile="$(cd "$wt" && . "$_LT_LIB_DIR/kit-state.sh" && printf '%s/autopilot/%s.json' "$(kit_state_dir)" \
+      "$(printf '%s' "$branch" | tr -c 'A-Za-z0-9._-' '_')")" || sfile=""
+    if [ -n "$sfile" ] && [ -f "$sfile" ]; then
+      reason="$(jq -r '.reason // ""' "$sfile" 2>/dev/null || true)"
+      detail="$(jq -r '.detail // ""' "$sfile" 2>/dev/null || true)"
+    fi
+    echo "✗ task $id: no review was opened — the run stopped with exit $rc${reason:+ (reason=$reason${detail:+: $detail})}. The work so far is kept in $wt; 'cckit task run $id' starts the task over from its record." >&2
+    return "$rc"
+  fi
+
+  if [ "$finish" = 0 ]; then
+    _lt_say "[$id] the run is done; --no-finish: nothing was sent for review. When ready: cckit task finish $id \"<summary>\" --all" \
+            "[$id] the work is written; nothing was sent for review yet. When ready: cckit task finish $id \"<summary>\" --all" >&2
+    echo "$wt|$branch|$id"
+    return 0
+  fi
+  summary="Delegated with cckit task run: one headless round; gate: ${check:-none}$([ -n "$check" ] && printf ' (passed)' || true)."
+  lt_finish "$id" "$summary" --all || return 7
+}
+
 # ── share ───────────────────────────────────────────────────────────────────────────────────────
 # _lt_share_body <ids> <summary> — the share pull request's body.
 _lt_share_body() {
@@ -447,18 +563,25 @@ lt_share() {
 # ── dispatcher ──────────────────────────────────────────────────────────────────────────────────
 # With --llm: list and next print JSON themselves; the action verbs are wrapped into one object.
 lt_cli() {
-  local sub="${1:-}" out rc url
+  local sub="${1:-}" out rc url rid
   [ "$#" -gt 0 ] && shift
   case "$sub" in
     new)  lt_new "$@" ;;
     list|ls) lt_list "$@" ;;
     next) lt_next "$@" ;;
-    start|take|finish|done|share)
+    start|take|finish|done|share|run)
       case "$sub" in take) sub="start" ;; done) sub="finish" ;; esac
       if cckit_is_json; then
+        _LT_RUN_ID_FILE=""
+        if [ "$sub" = run ]; then _LT_RUN_ID_FILE="$(mktemp 2>/dev/null || true)"; fi
         out="$("lt_$sub" "$@" 2>&1)" && rc=0 || rc=$?
         url="$(printf '%s\n' "$out" | grep -oE 'https://[^ ]+/pull/[0-9]+' | tail -1 || true)"
-        if [ "$sub" = start ] && [ "$rc" -eq 0 ]; then
+        if [ "$sub" = run ]; then
+          rid=""
+          if [ -n "$_LT_RUN_ID_FILE" ]; then rid="$(cat "$_LT_RUN_ID_FILE" 2>/dev/null || true)"; rm -f "$_LT_RUN_ID_FILE"; fi
+          cckit_json verb "task run" ok "$([ "$rc" -eq 0 ] && echo true || echo false)" \
+            id "$rid" url "$url" detail "$(printf '%s\n' "$out" | tail -1)"
+        elif [ "$sub" = start ] && [ "$rc" -eq 0 ]; then
           out="$(printf '%s\n' "$out" | tail -1)"
           cckit_json verb "task start" ok true id "${out##*|}" worktree "${out%%|*}" \
             branch "$(printf '%s' "$out" | cut -d'|' -f2)"

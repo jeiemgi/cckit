@@ -85,6 +85,41 @@ person who approves it needs a GitHub account.
 `take` is the same verb as `start`, and `done` the same as `finish`. An id can be shortened to any
 prefix that matches one task.
 
+## Hand a task to an agent
+
+`cckit task run` does steps 3 and 4 with a headless agent in between:
+
+```bash
+cckit task run <id> --check "<your gate command>"
+```
+
+1. It starts the task, or reuses the task's worktree when it was started before.
+2. It runs ONE headless objective there through [`cckit autopilot run`](/development/run-one-objective-unattended/):
+   the task's title, then the notes from the task file. The agent is `claude` unless `--agent codex`.
+3. It runs the gate. The gate is `--check "<cmd>"`, else
+   [`tasks.check`](/config-and-permissions/#light-tasks) in the config, else none.
+4. It finishes the task with `--all` and prints the pull request link. It does not merge.
+
+| What happened | Exit | Pull request |
+| --- | --- | --- |
+| the round changed files and the gate passed | 0 | opened, or the open one reported |
+| the task is already in `review` | 0 | the open one reported; no agent is started |
+| the round changed nothing | 5 | none |
+| the gate failed | 6 | none |
+| the agent failed (3), a limit was reached (4), the run was interrupted (130) | as listed | none |
+| the pull request could not be opened | 7 | none; run the same command again |
+
+On a non-zero exit the last line on stderr names the reason, and the work so far stays on the
+task's branch. Running `cckit task run <id>` again starts over from the task record: a stopped
+earlier run is discarded, not resumed.
+
+- `--no-finish` stops after the gate: nothing is sent for review. Send it later with
+  `cckit task finish <id> "<summary>" --all`.
+- `--max-seconds N` bounds the round (default 900 seconds). `--max-iters N` is passed to the run;
+  with no stop condition a run is one round.
+- `--agent-arg <arg>`, repeatable, passes one argument to the agent CLI. cckit adds no permission
+  flag: an agent that must edit files gets its own flag here, or from the project's agent settings.
+
 ## Check that it worked
 
 - `cckit task list` shows the task as `doing` after `cckit task start`, and as `review` after
