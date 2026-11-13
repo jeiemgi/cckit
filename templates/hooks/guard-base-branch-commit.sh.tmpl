@@ -23,7 +23,7 @@ cmd=$(printf '%s' "$input" | jq -r '.tool_input.command // empty | if type == "a
 [[ -z "$cmd" ]] && exit 0
 
 # Only care about commit commands (not log/show/commit-graph/etc.)
-printf '%s' "$cmd" | grep -Eq '(^|[;&|[:space:]])git[[:space:]]+(.*[[:space:]])?commit([[:space:]]|$)' || exit 0
+grep -Eq '(^|[;&|[:space:]])git[[:space:]]+(.*[[:space:]])?commit([[:space:]]|$)' <<<"$cmd" || exit 0
 
 # Resolve the directory the commit will actually run in — NOT CLAUDE_PROJECT_DIR,
 # which is always the main checkout (and is unset under Codex). An agent in a linked worktree commits via
