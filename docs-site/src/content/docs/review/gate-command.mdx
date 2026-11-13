@@ -1,0 +1,64 @@
+---
+title: Choose your gate command
+description: "The gate is one command that proves a change is sound. What goes in it, who runs it, and how cckit init --prepush makes an agent run it before every push."
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+An agent says a change works. The cheapest way to check that claim is to run something: the tests,
+the type check, the linters. If each person and each agent runs a different subset, "it passed"
+means a different thing every time.
+
+So a team picks **one command** and calls it the gate. A change is ready for review when that
+command exits 0, and not before. cckit does not choose the command for you. It gives you a place to
+name it and makes the agent run it.
+
+## Steps
+
+1. **Write the command down.** Whatever proves your project is sound, joined into one line that
+   exits non-zero on any failure. For a JavaScript project that is often the test, type-check and
+   lint scripts:
+
+   ```bash
+   pnpm test && pnpm typecheck && pnpm lint
+   ```
+
+   Many projects put it in a script, so the gate has one name. cckit's own gate is
+   `bash scripts/check.sh`.
+
+2. **Tell cckit at setup.** Pass the command when you initialize the project:
+
+   ```bash
+   cckit init --prepush "<your gate command>"
+   ```
+
+   This writes `prePush.enabled` and `prePush.command` to the project config and installs the hook
+   `.claude/hooks/prepush_gate.sh`. From then on, when the agent types `git push`, the hook runs
+   the command first and stops the push if it fails.
+
+3. **Run it in CI too.** The hook covers the agent's machine. A CI workflow that runs the same
+   command on every pull request covers everyone else, and gives the captain a check status to
+   read.
+
+4. **Add cckit's lint scripts to it** when you want a reviewer's repeated findings to fail the
+   gate: [Turn repeated review findings into checks](/review/gates/).
+
+## Check it worked
+
+Ask the agent to push a branch with a failing test. The push is stopped and the agent reports the
+command's output.
+
+## Limits
+
+- **The hook is installed by a first `cckit init`.** `cckit init --upgrade` keeps an existing
+  `prePush.command` and does not add the hook to a project that was set up without the flag.
+- **The hook sees a `git push` the agent types.** A push made by `cckit pr` or `cckit hotfix`
+  reaches only a real git hook (`.git/hooks/pre-push`). Both verbs export the target branch to it
+  as `KIT_PR_BASE`: [Hooks](/hooks/#kit_pr_base-in-a-git-pre-push-hook).
+- **No cckit verb runs the gate before a merge.** `cckit merge` and `cckit effort close` merge what
+  GitHub has. Whoever merges runs the gate on the current tree first:
+  [Merge, close and clean up](/ship/merge-and-close/).
+
+The [`gate-and-review`](/rules/#gate-and-review) rule, installed by every profile, states the
+team's side of this: the gate blocks the push, and every reviewer finding is fixed or answered
+before the merge.

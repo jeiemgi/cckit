@@ -1,13 +1,9 @@
 ---
 title: Cut a release
-description: How the version is decided from commit messages, how a release is cut, and how a hotfix reaches the release branch.
+description: How the version is read from commit titles, how work is promoted to the release branch, how to add release-please to your project, and how a hotfix reaches the release branch.
 ---
 
-import { CardGrid, LinkCard, Steps, Aside } from '@astrojs/starlight/components';
-import Tag from '../../../components/Tag.astro';
-import TagRow from '../../../components/TagRow.astro';
-
-<TagRow kinds={["command", "flow"]} />
+import { Steps, Aside } from '@astrojs/starlight/components';
 
 Merging a change and shipping it to users are two decisions. If every merge shipped, a half-built
 feature would reach users as soon as its first pull request landed. If a release needed someone to
@@ -22,19 +18,15 @@ change.
 **Who does it:** a person merges the release pull request. Agents contribute by titling every pull
 request so the version can be read from it; `cckit pr` and `cckit effort pr` write those titles.
 
-**What plugs in:** [release-please](https://github.com/googleapis/release-please) keeps the
-release pull request, the tag and the changelog. npm and a Homebrew tap receive the published
-version. cckit builds none of them.
+**What plugs in:** [release-please](https://github.com/googleapis/release-please), a GitHub
+workflow that keeps the release pull request, the tag and the changelog. cckit does not build it
+and `cckit init` does not add it to your project: you add it yourself, in step 3 below.
 
-<Aside type="caution" title="This page describes cckit's own release setup">
-The workflow file, the `cckit release` verb and the benchmark check below act on the cckit
-repository. `cckit release` always runs from cckit's install root, whatever folder you call it
-from, and `cckit init` adds no release workflow to your project. Three parts work in any project:
-the Conventional Commit titles `cckit pr` writes, `cckit pr --base` for the promotion pull request,
-and `cckit hotfix`. To release your own project the same way, add release-please to it yourself.
-</Aside>
+**What cckit gives any project:** three parts.
 
-cckit follows [Semantic Versioning](https://semver.org/) driven by [Conventional Commits](https://www.conventionalcommits.org/). The version *number* is automatic — the commit messages since the last tag pick it — and the release is cut by release-please, which keeps a single **Release PR** open and up to date. Merging that PR is the release.
+1. Commit titles a release tool can read.
+2. `cckit pr --base <branch>`, for the pull request that promotes work to the release branch.
+3. `cckit hotfix`, to carry one merged fix to the release branch.
 
 <Aside type="note" title="New here? The two terms">
 **Semantic Versioning** is the `MAJOR.MINOR.PATCH` number on a release (like `1.4.2`). **Conventional Commits** is a small rule for writing commit messages so a tool can read them — each subject starts with a `type:` such as `feat:` or `fix:`. Together they let cckit pick the next version from the commits alone.
@@ -42,7 +34,7 @@ cckit follows [Semantic Versioning](https://semver.org/) driven by [Conventional
 
 ## How the version is decided
 
-release-please reads every Conventional Commit since the last tag and picks the highest bump (the local `cckit release` fallback applies the same rules via `scripts/lib/version-bump.sh`):
+release-please reads every Conventional Commit since the last tag and picks the highest bump:
 
 | Commit | Bump | Example |
 | --- | --- | --- |
@@ -51,102 +43,52 @@ release-please reads every Conventional Commit since the last tag and picks the 
 | `fix:` / `perf:` / `refactor:` / `revert:` | **patch** | `1.4.2 → 1.4.3` |
 | only `docs:` / `chore:` / `style:` / `test:` / `ci:` / `build:` or untyped commits, or no commits since the tag | **none** | no release |
 
-Check what the next version would be at any time:
+## Commit titles that carry the version
 
-```bash
-cckit release --next        # or: scripts/lib/version-bump.sh --next
-```
+- **Every PR title** uses a Conventional Commit subject: `type(scope): summary`. PRs are **squash-merged**, so the PR title becomes the single commit on the base branch — the exact line release-please reads to pick the next version.
+- **`cckit pr` generates a conventional title for you** — it derives the `type` from the issue's `kind:` label (`kind:feat` and `kind:task` → `feat`, `kind:fix` or a `bug` label → `fix`, `kind:chore` → `chore`, `kind:ci` → `ci`; the other kinds → `feat`) and strips the `[Effort N] M ·` / `[Tag]` prefix from the issue title. Pass a summary that is *already* a Conventional Commit subject (e.g. `cckit pr <issue> "fix: guard the empty case"`) to override the derived type when you know the change's true nature. A CI check on the title keeps a non-conventional one from merging; cckit's own is described in [How cckit itself is released](/releasing-cckit/#the-title-check-in-ci).
+- **`cckit effort pr` does the same for an effort PR** — `type(scope): name [#N]`, with the scope from the effort's `flow:` label and the type from `--type` or the `kind:` label (default `feat`). It refuses to open a PR whose title fails the title check CI runs, so an effort PR never needs a manual retitle to merge.
+- **Breaking changes** use `!` after the type/scope **or** a `BREAKING CHANGE:` footer — never a silent major.
+- **One logical change per PR** so the generated release notes read cleanly.
 
-## Cutting a release (merge the Release PR)
+## Release your project
 
-**What you will have at the end:** a `vX.Y.Z` tag, a GitHub Release with generated notes, the
-package on npm and the Homebrew formula updated.
-
-`.github/workflows/release-please.yml` runs on every push to `main`. It doesn't ship anything on its own — it keeps a single **Release PR** open (titled `chore(main): release X.Y.Z`) and rewrites it as more work lands.
-
-<Steps>
-
-1. **Work reaches `main`.** Feature branches merge into `develop`; when you're ready, `develop` merges into `main` via PR. (`main` is protected — releases only.) Open that PR with `cckit pr <issue> "<summary>" --base main` from a branch cut from `develop`: an explicit `--base` wins over `github.baseBranch`, and the labels, milestone and board steps run as for any other PR. Setting `KIT_BASE_BRANCH=main` in the environment does not do this — the config file is read after it.
-
-2. **release-please opens/updates the Release PR** — it computes the bump from the commits since the last tag, bumps all four version surfaces (`package.json`, `docs-site/package.json`, `.claude-plugin/plugin.json`, `cckit.config.json`) plus `Formula/cckit.rb`, and regenerates `CHANGELOG.md`. Review it whenever; nothing ships yet.
-
-3. **Merge the Release PR.** That merge is the release: release-please tags `vX.Y.Z` and cuts the GitHub Release, then the `publish` job pushes to npm and bumps the Homebrew tap automatically.
-
-</Steps>
-
-**How to check it worked:** the tag `vX.Y.Z` exists, `cckit version` on a freshly updated install
-prints the new number, and the badge on cckit.dev shows it
-([The docs site follows the release](#the-docs-site-follows-the-release)).
-
-A batch with only `chore`/`docs` noise produces no Release PR (`bump=none` → nothing to release). Because the release is a single PR merge, two feature PRs merging at once can no longer race each other into a corrupted tag.
-
-<Aside type="caution" title="Workflow edits are human-reviewed">
-Changes to the release workflow are always reviewed by a person — the CI token has a wide blast radius. This repo ships the workflow; a maintainer merges the PR that adds or edits it.
-</Aside>
-
-## The benchmark check
-
-Every release records the [documentation benchmark](/benchmark/) for its version, and the score is
-published on the [Benchmark results](/benchmark-results/) page. The run is a checkpoint: run, fix
-what it showed, run again. A version can hold several.
+This assumes the usual two-branch setup: work integrates on a base branch such as `develop`, and
+releases are cut from `main`.
 
 <Steps>
 
-1. **Record a checkpoint on `develop`** while the version is being built, from a worktree:
+1. **Merge work into the base branch all week.** Every pull request `cckit pr` opens has a title
+   release-please can read. Nothing ships.
+
+2. **Promote a batch.** From a branch cut from the base branch, open the pull request against the
+   release branch:
 
    ```bash
-   cckit release --next                 # the version the commits imply
-   cckit bench checkpoint X.Y.Z         # run the benchmark and append it to benchmarks/runs/X.Y.Z.json
+   cckit pr <issue> "<summary>" --base main
    ```
 
-   The command also rewrites `docs-site/src/content/docs/benchmark-results.md`. Commit both files.
+   An explicit `--base` wins over `github.baseBranch`, and the labels, milestone and board steps
+   run as for any other pull request. Setting `KIT_BASE_BRANCH=main` in the environment does not do
+   this: the config file is read after it.
 
-   To publish [verb timings](/benchmark/#verb-timings) with the checkpoint, measure first, on an
-   idle machine, and attach the file:
+3. **Let release-please keep the release pull request.** Add its GitHub Action to your repository,
+   following [release-please's own instructions](https://github.com/googleapis/release-please), in
+   a workflow that runs on every push to the release branch. It opens one release pull request and
+   rewrites it as more work lands. A workflow file is a change a person reviews and merges; no
+   agent merges it alone.
 
-   ```bash
-   cckit bench verbs --json > verbs.json
-   cckit bench checkpoint X.Y.Z --verbs verbs.json
-   ```
-
-2. **Fix what the checkpoint shows as missed, then record another.** Repeat until the score holds.
-
-3. **Check the verdict** before the `develop` → `main` promotion: `cckit bench check X.Y.Z`.
+4. **Merge the release pull request.** That merge is the release: release-please tags the version
+   and writes the GitHub Release.
 
 </Steps>
 
-`cckit release X.Y.Z` runs that check before it plans or writes anything, in a dry run too:
+**How to check it worked:** the tag exists on the release branch and the GitHub Release lists the
+changes since the last one.
 
-| State of `benchmarks/runs/X.Y.Z.json` | `cckit release X.Y.Z` |
-| --- | --- |
-| missing, or no checkpoint in it | refused, exit 1 |
-| last checkpoint scores lower than the checkpoint recorded before it, on the questions both asked | refused, exit 1 |
-| last checkpoint scores the same or higher on those questions | proceeds |
-| last checkpoint shares no question with the one before it | proceeds as a new baseline |
-| first checkpoint ever recorded | proceeds |
-| any `X.Y.Z.json` in `benchmarks/runs/` is not a checkpoint file | refused, exit 1; the file is named |
-
-"The checkpoint recorded before it" is the previous checkpoint of the same version, or the last
-checkpoint of the previous version when the version has only one. The two are compared over the
-questions both asked, matched by set file and id: a question added since, or removed, is counted in
-the output and does not decide the verdict, so a question set that grew does not refuse a release.
-The output names how many questions were compared, how many are new and how many were removed
-([What the check compares](/benchmark/#what-the-check-compares)). `--skip-bench-check` releases
-anyway; the output then carries the reason and the line
-`! benchmark check OVERRIDDEN by --skip-bench-check`.
-
-The release reads the runs in cckit's own `benchmarks/runs/`. `BENCH_DIR`, which `cckit bench` reads,
-does not move the release check. `KIT_RELEASE_BENCH_DIR=<dir>` does, and the release then prints
-`! benchmark runs read from KIT_RELEASE_BENCH_DIR=<dir>`.
-
-<Aside type="caution" title="Where the refusal applies">
-The refusal is in `cckit release`, the local path. Merging the Release PR does not run it: the
-release-please workflow has no benchmark step. `bash scripts/check.sh` fails when the results page
-differs from the run files, so a recorded checkpoint is always the published one.
-</Aside>
-
-A block can come from noise: one pass over a small question set varies between runs. Record the
-checkpoint with `--passes <N>` to ask every question N times.
+A batch with only `chore` and `docs` commits produces no release pull request. Because the release
+is one pull request merge, two feature pull requests merging at once cannot race each other into
+the same tag.
 
 ## Hotfix to the release branch
 
@@ -181,76 +123,9 @@ PR with `cckit pr <issue> "<summary>" --base main`.
 The hotfix PR's title becomes the squash commit release-please reads on `main`, so a `fix:` source
 produces a patch release there. Merge it with `cckit merge <pr>`.
 
-## Publishing to npm + Homebrew
+## How cckit itself is released
 
-Publishing is automatic once the Release PR is merged — the `publish` job in `release-please.yml` runs `npm publish` and bumps the [jeiemgi/homebrew-cckit](https://github.com/jeiemgi/homebrew-cckit) tap (recomputing the formula `sha256`).
-
-**npm uses OIDC trusted publishing** — no long-lived `NPM_TOKEN`. GitHub Actions mints a short-lived OIDC token per run (`id-token: write`) that npm exchanges for publish rights, and the tarball is signed with [provenance](https://docs.npmjs.com/generating-provenance-statements) automatically. It needs a **one-time setup** on npmjs.com (below) and npm ≥ 11.5.1 (the job upgrades npm before publishing).
-
-The **Homebrew** channel is still gated on a repo secret and skipped if it's absent — either of:
-  - **GitHub App (preferred)** — `HOMEBREW_APP_ID` + `HOMEBREW_APP_PRIVATE_KEY` for an app with **Contents: write** installed on `homebrew-cckit`. The workflow mints a short-lived, tap-scoped token per run — nothing to expire or rotate by hand.
-  - `HOMEBREW_TAP_TOKEN` — legacy fallback: a PAT with push access to the tap repo (`contents:write`). Used only when the app secrets are absent.
-
-<Aside type="tip" title="One-time setup checklist">
-- **npm trusted publishing** — on npmjs.com, open the `@jeiemgi/cckit` package → **Settings → Trusted Publishing** and add a GitHub Actions publisher for this repo with workflow `.github/workflows/release-please.yml`. No secret to store.
-- The Homebrew tap auth (the GitHub App, or the PAT) set under **Settings → Secrets and variables → Actions**.
-- `develop` is the default branch; `main` is protected (PR required, no force-push or deletion) so it only advances through a merged PR.
-- On the **first** Release PR, reconcile the hand-written `## [Unreleased]` block in `CHANGELOG.md` — release-please owns changelog entries from then on.
-</Aside>
-
-<Aside type="note" title="Configuring npm trusted publishing">
-1. Publish `@jeiemgi/cckit` **once** the classic way if it doesn't exist yet (trusted publishing links to an existing package), e.g. `cckit release X.Y.Z --publish` from a logged-in machine.
-2. On npmjs.com go to the package → **Settings → Trusted Publishing → Add publisher** → **GitHub Actions**.
-3. Fill in owner `jeiemgi`, repository `cckit`, workflow filename `release-please.yml`. Leave the environment blank (the job runs without a named environment).
-4. Save. The next merged Release PR publishes with zero secrets and full provenance.
-</Aside>
-
-<Aside type="note" title="Setting up the Homebrew tap GitHub App">
-1. **Settings → Developer settings → GitHub Apps → New GitHub App.** Give it repo **Contents: Read and write**; no webhook, no other permissions.
-2. **Generate a private key** (downloads a `.pem`) and note the **App ID**.
-3. **Install** the app on `homebrew-cckit` only.
-4. Add repo secrets `HOMEBREW_APP_ID` (the App ID) and `HOMEBREW_APP_PRIVATE_KEY` (the full `.pem` contents). The workflow prefers these over `HOMEBREW_TAP_TOKEN` automatically.
-</Aside>
-
-### Local fallback
-
-`scripts/publish.sh` (aliased as `cckit release`) still cuts a release from your machine if you ever need to bypass CI. It is dry-run by default — nothing changes until you add `--publish`.
-
-```bash
-cckit release X.Y.Z              # DRY RUN — prints the full plan, changes nothing
-cckit release X.Y.Z --publish    # tag + GitHub release + Homebrew formula + npm (needs tokens)
-```
-
-## The docs site follows the release
-
-cckit.dev is the `docs-site/` package, deployed by Vercel from `main`. The Release PR bumps
-`docs-site/package.json` along with the other version files, so merging it changes `docs-site/` and
-Vercel builds the site; the header badge reads its version from that file.
-
-`docs-site/vercel.json` skips a build when a commit leaves `docs-site/` untouched. Vercel runs that
-check from inside `docs-site/`, so its pathspec is `.`. `scripts/docs-deploy-ignore-test.sh` runs
-the configured command against a fixture repo and fails if a commit that touches `docs-site/` would
-be skipped.
-
-After a release, confirm the badge on cckit.dev shows the new version. If it does not, deploy by
-hand from the repo root: `vercel --prod --archive=tgz`.
-
-## Commit message rules (the contract)
-
-- **Every PR title** uses a Conventional Commit subject: `type(scope): summary`. PRs are **squash-merged**, so the PR title becomes the single commit on the base branch — the exact line release-please reads to pick the next version.
-- **`cckit pr` generates a conventional title for you** — it derives the `type` from the issue's `kind:` label (`kind:feat` and `kind:task` → `feat`, `kind:fix` or a `bug` label → `fix`, `kind:chore` → `chore`, `kind:ci` → `ci`; the other kinds → `feat`) and strips the `[Effort N] M ·` / `[Tag]` prefix from the issue title. Pass a summary that is *already* a Conventional Commit subject (e.g. `cckit pr <issue> "fix: guard the empty case"`) to override the derived type when you know the change's true nature. Either way the opened PR passes the gate below.
-- **`cckit effort pr` does the same for an effort PR** — `type(scope): name [#N]`, with the scope from the effort's `flow:` label and the type from `--type` or the `kind:` label (default `feat`). It refuses to open a PR whose title fails the same check the gate runs, so an effort PR never needs a manual retitle to merge.
-- **Breaking changes** use `!` after the type/scope **or** a `BREAKING CHANGE:` footer — never a silent major.
-- **One logical change per PR** so the generated release notes read cleanly.
-
-### The gate (enforced in CI)
-
-`.github/workflows/commitlint.yml` runs on every pull request and **fails the check until the PR title is a Conventional Commit subject** — so a non-conventional title can never merge and under-bump the release. The rule lives in `scripts/lib/commitlint.sh` (the single source of truth), which also runs locally through `scripts/check.sh`, so you can validate a subject before you open the PR:
-
-```bash
-scripts/lib/commitlint.sh "feat(orchestrate): headless launch"   # exit 0 = valid
-```
-
-Accepted types are the [config-conventional](https://www.conventionalcommits.org/) set — `feat`, `fix`, `perf`, `refactor`, `revert`, `docs`, `chore`, `style`, `test`, `ci`, `build` — a superset of the types that trigger a version bump (see the table above); the rest are valid but release-neutral. Re-titling a PR re-runs the check automatically (the workflow listens for `edited`).
-
-
+`cckit release`, the benchmark check that can refuse it, publishing to npm and Homebrew, and the
+docs site deploy all act on the cckit repository. `cckit release` always runs from cckit's install
+root, whatever folder you call it from. They are described for maintainers in
+[How cckit itself is released](/releasing-cckit/).

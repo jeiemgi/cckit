@@ -12,11 +12,8 @@ tutorial:
 ---
 
 import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
-import TagRow from '../../../components/TagRow.astro';
 import TutorialMeta from '../../../components/TutorialMeta.astro';
 import TutorialSchema from '../../../components/TutorialSchema.astro';
-
-<TagRow kinds={["flow"]} />
 
 <TutorialMeta />
 
@@ -38,19 +35,31 @@ Memory is off in every profile until you do this. It runs on your machine and ne
 
 <Steps>
 
-1. **Switch memory on when you set up the project.** Pass the flag to `cckit init`, or answer yes
-   to the memory question when you set up through the `/kit-init` command in Claude Code:
+1. **Switch memory on in the project.** Which command depends on where the project stands.
+
+   **The project is not set up yet.** Pass the flag to `cckit init`, or answer yes to the memory
+   question when you set up through the `/kit-init` command in Claude Code:
 
    ```bash frame="terminal"
    cckit init --profile software --memory on
    ```
 
-   This writes four hook scripts under `.claude/hooks/`, registers them in
-   `.claude/settings.local.json`, adds the rule file `.claude/rules/mempalace.md`, and creates the
-   project's summary header, `.claude/mempal-identity.<wing>.txt`.
+   **You already ran `cckit init` without memory.** cckit has no command that adds only the memory
+   files. `cckit init` stops on a project that is already set up unless you pass `--force`, which
+   writes cckit's generated files again, the memory files included. Commit your work first, run it
+   with the profile the project uses, and read the diff afterwards:
 
-   If the project already has those files and only the switch is off, `cckit add mempalace` sets
-   `memory.enabled` and installs nothing.
+   ```bash frame="terminal"
+   cckit init --profile <profile> --memory on --no-github --force
+   ```
+
+   `cckit init --upgrade` does not add them, and `cckit add mempalace` only sets `memory.enabled`
+   in a project that already has the files.
+
+   Either way the result is four hook scripts under `.claude/hooks/`, registered in
+   `.claude/settings.local.json`, the rule file `.claude/rules/mempalace.md`, and the project's
+   summary header, `.claude/mempal-identity.<wing>.txt`. A **wing** is MemPalace's name for one
+   project's memory; `<wing>` is the project's short name.
 
 2. **Let `cckit doctor` install the tool.** The doctor sees that memory is on and asks before it
    installs anything. On your yes (or with `--fix`) it installs the MemPalace command-line tool
@@ -69,7 +78,8 @@ Memory is off in every profile until you do this. It runs on your machine and ne
    installs this way.
 
 3. **Connect the MCP server.** The hooks cover the start and the end of a session. Searching and
-   saving during a session go through MemPalace's MCP server. This command prints the line that
+   saving during a session go through MemPalace's MCP server: the connection Claude Code uses to
+   call a tool while it works. This command prints the line that
    registers it with Claude Code:
 
    ```bash frame="terminal"
@@ -109,8 +119,8 @@ bugs to its own issue tracker.
 
 ## Troubleshooting
 
-**`doctor` did not install MemPalace.** It installs it only when memory is on. Re-run `cckit init`
-with `--memory on` (or answer yes), then `cckit doctor`. With no terminal attached it installs
+**`doctor` did not install MemPalace.** It installs it only when memory is on. Switch it on as in
+step 1, then run `cckit doctor`. With no terminal attached it installs
 nothing unless you pass `--fix`.
 
 **Claude is not recalling anything.** Confirm the MCP server line from `mempalace mcp` is registered
@@ -128,19 +138,19 @@ See [Under Codex](/memory/how-cckit-uses-it/#under-codex).
 
 <CardGrid>
   <LinkCard title="Run checks automatically with cckit hooks" href="/development/checks-with-hooks/" description="The hook system memory plugs into." />
-  <LinkCard title="Set up cckit in a repo" href="/getting-started/initialize/" description="Initialize the repo where you turn memory on." />
+  <LinkCard title="Initialize a project" href="/getting-started/initialize/" description="Initialize the repo where you turn memory on." />
   <LinkCard title="Drive Claude Code headless in CI" href="/development/headless-in-ci/" description="Keep hand-offs token-lean, memory included." />
 </CardGrid>
 
 <TutorialSchema
   steps={[
-    { name: 'Switch memory on when you set up the project', text: 'Pass --memory on to cckit init, for example cckit init --profile software --memory on. It writes the four hook scripts, the rule file and the summary header.' },
+    { name: 'Switch memory on in the project', text: 'On a new project pass --memory on to cckit init, for example cckit init --profile software --memory on. On a project already set up without memory, commit first and run cckit init --profile <profile> --memory on --no-github --force. Either way it writes the four hook scripts, the rule file and the summary header.' },
     { name: 'Let cckit doctor install the tool', text: 'cckit doctor asks, then installs the MemPalace CLI into an isolated environment (pipx, then uv) and creates the summary header if it is missing.' },
     { name: 'Connect the MCP server', text: 'mempalace mcp prints the line that registers the MemPalace MCP server with Claude Code. Run it and restart Claude Code.' },
     { name: 'Describe the project in the header', text: 'Edit the Stack line of .claude/mempal-identity.<wing>.txt. Every session then loads that header plus recent decisions; the read and write rule lives in .claude/rules/mempalace.md.' },
   ]}
   faqs={[
-    { q: "doctor didn't install MemPalace", a: 'It only installs when memory is on. Re-run cckit init with --memory on (or answer yes), then cckit doctor. With no terminal attached it installs nothing unless you pass --fix.' },
+    { q: "doctor didn't install MemPalace", a: 'It only installs when memory is on. Switch memory on as in step 1, then run cckit doctor. With no terminal attached it installs nothing unless you pass --fix.' },
     { q: "Claude isn't recalling anything", a: 'Confirm the MCP server line from mempalace mcp is wired into Claude Code and that .claude/rules/mempalace.md exists — it teaches Claude to recall before answering.' },
     { q: 'Memories from another repo showed up', a: 'Memory is scoped per wing (one per project). Check you are in the right repo and its wing name is unique.' },
   ]}

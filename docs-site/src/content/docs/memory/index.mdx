@@ -4,9 +4,6 @@ description: What a team of agents loses between sessions, what a session starts
 ---
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
-import TagRow from '../../../components/TagRow.astro';
-
-<TagRow kinds={["flow", "concept"]} />
 
 A coding agent starts every session knowing nothing about yesterday. It has the files in the
 repository and whatever you type. It does not have the reason the team chose one database over
@@ -24,8 +21,8 @@ The team keeps a shared record outside any single session, and every session doe
 it:
 
 1. **Reads it at the start.** The session opens with a short summary of the project and its recent
-   decisions. The summary is about 600 to 900 tokens, which leaves more than 95% of the context
-   window for the work.
+   decisions. The summary is short: about 600 to 900 tokens, a few paragraphs, so nearly all of
+   what the session can hold is left for the work.
 2. **Writes to it at the end.** The finished session is filed back, so the next one can search it.
 
 What that buys:
@@ -48,7 +45,8 @@ asking for context that lives in conversations and not in the repository.
 Nobody has "memory" as a job. With memory on:
 
 - **Every session** reads the summary at the start and files its work at the end, through four
-  hooks that run without being asked.
+  hooks. A hook is a script the agent's app runs by itself at a fixed moment, such as when a
+  session starts.
 - **Each specialist agent** (the project manager, the tech lead and the others in your profile)
   keeps a diary of its own sessions and saves project decisions to the shared record.
 - **You** switch it on once, and edit one line that describes the project.
@@ -61,8 +59,7 @@ searches it and serves it to the agent. cckit adds the parts that connect it to 
 session hooks, one rule file that tells the agent when to read and when to write, and the install
 step in `cckit doctor`.
 
-MemPalace is one of the [integrations](/integrations/) cckit installs from a descriptor, here
-`integrations/mempalace.json`.
+MemPalace is one of the [integrations](/integrations/) cckit can install for you.
 
 ## The commands
 
@@ -70,15 +67,13 @@ MemPalace is one of the [integrations](/integrations/) cckit installs from a des
 | --- | --- |
 | `cckit init --memory on` | Set up a project with memory on: the hooks, the rule and the config switch. |
 | `cckit doctor` | Install the MemPalace command-line tool after you say yes, and check the project's memory files. |
-| `cckit add mempalace` | Set `memory.enabled` in a project that already has the memory files. |
+| `cckit add mempalace` | Set `memory.enabled` in a project that already has the memory files. It adds no file. |
 | `cckit handoff "<note>"` | Leave a note for the next session. It needs no memory tool and works with memory off. |
 
 ## Codex
 
-The automatic half of memory is Claude Code only. `cckit init --adapter codex` installs no memory
-hook, even with `--memory on`, and says so in its output and in the generated `AGENTS.md`. A
-MemPalace MCP server you configure yourself still works when called explicitly. The reason and the
-details are in [How cckit uses memory](/memory/how-cckit-uses-it/#under-codex).
+Under Codex the automatic part does not run: no memory hook is installed. See
+[How cckit uses memory](/memory/how-cckit-uses-it/#under-codex).
 
 ## Guides
 

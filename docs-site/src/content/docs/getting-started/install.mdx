@@ -3,11 +3,7 @@ title: Install and check
 description: "Put the cckit command on your machine, then let cckit doctor confirm the dependencies and the GitHub sign-in."
 ---
 
-import { CardGrid, LinkCard, Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
-import Tag from '../../../components/Tag.astro';
-import TagRow from '../../../components/TagRow.astro';
-
-<TagRow kinds={["flow", "command"]} />
+import { LinkCard, Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
 Every step of the process is one `cckit` command, and every one of them talks to GitHub. So before
 a project can be set up, the machine needs two things: the command itself, and a GitHub sign-in it
@@ -103,52 +99,19 @@ Run the doctor once more:
 cckit doctor
 ```
 
-It should report `git`, `gh` (authenticated) and `jq` as present and list nothing left to do. If a
+It should report `git`, `gh` (authenticated), `jq` and `perl` as present and list nothing left to do. If a
 row is still missing, the doctor prints the command that fixes it.
 
-## How the install works
+## Looking something up
 
-cckit is bash scripts over `git`, `gh` and `jq`. There is no build step: installing it puts the
-`cckit` dispatcher on your PATH, the list of folders your terminal searches when you type a
-command.
-
-`cckit install [bin-dir]` symlinks `bin/cckit` into the first writable PATH folder (`~/.local/bin`, then `/usr/local/bin`, then `~/bin`), or a folder you pass.
-
-With the one-liner and the "From source" route it is a **symlink, not a copy**: the dispatcher resolves the link back to the cloned repository, so `git pull` there upgrades your install with no reinstall.
-
-That also means such an install is as old as the branch its clone is parked on. The [install and update matrix](/install-matrix/) compares every route: what lands on disk, how it updates, and when a restart is needed. [Many sessions, one repository](/development/many-sessions/) covers a clone that several agent sessions share.
-
-## What it depends on
-
-| Required | Why |
-| --- | --- |
-| `git`, `gh`, `jq` | the work itself: worktrees, GitHub, JSON |
-| `perl` | `cckit init` stops without it; headless agent runs use it to bound a round |
-| `bash` 3.2+ | the dispatcher and its libraries |
-
-Optional, auto-detected, never required:
-
-| Optional | Enables |
-| --- | --- |
-| `tmux` | the default `cckit orchestrate` runtime |
-| `herdr` | persistent, state-aware orchestration with `--runtime herdr` |
-| `glow` / `fzf` / `gum` | nicer terminal output and pickers |
-| Node + Chrome | `cckit debug` (browser debugging via chrome-devtools-axi) |
-
-`cckit doctor` reports what is missing, including the agent CLI (`claude`, `codex`) of each adapter
-the project selected. `cckit doctor --agents` prints only those rows and makes no network call.
-
-<Aside type="tip" title="What is a symlink? (skip if you know)">
-A symlink is a pointer file: it stands in one folder but redirects to a file somewhere else. cckit installs as a symlink into a PATH folder that points back to the cloned repo, so updating the repo updates your installed command automatically.
-</Aside>
+How each install route works, what it depends on and how it updates:
+[Install and update matrix](/install-matrix/).
 
 ## Next step
 
 Installing only puts `cckit` on your PATH. Nothing has touched a repository yet.
 
-<CardGrid>
-  <LinkCard title="Initialize a project" href="/getting-started/initialize/" description="Set cckit up in a repository or a new folder, and pick the profile that matches your team." />
-  <LinkCard title="Add cckit to an existing repo" href="/getting-started/existing-repo/" description="The repository already has cckit files copied in by hand? Record them instead of overwriting." />
-  <LinkCard title="Claude Code and other agents" href="/adapters/" description="How cckit ships as a Claude Code plugin, and how any agent drives the same commands through AGENTS.md." />
-  <LinkCard title="The secret guard" href="/review/secret-guard/" description="The local gate and pre-commit hook that block secrets, keys and your private data before they leave your machine." />
-</CardGrid>
+<LinkCard title="Initialize a project" href="/getting-started/initialize/" description="Set cckit up in a repository or a new folder, and pick the profile that matches your team." />
+
+A repository that already has cckit files copied in by hand follows
+[Add cckit to an existing repo](/getting-started/existing-repo/) instead.

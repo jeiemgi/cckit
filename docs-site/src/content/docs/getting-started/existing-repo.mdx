@@ -4,10 +4,6 @@ description: Bring cckit to a project that already has its own structure, step b
 ---
 
 import { Steps, Aside } from '@astrojs/starlight/components';
-import Tag from '../../../components/Tag.astro';
-import TagRow from '../../../components/TagRow.astro';
-
-<TagRow kinds={["flow", "command"]} />
 
 A project that has been running for a while already has a layout, a history, and often a
 `.claude/` folder somebody copied in by hand. The worry with any new tool is that it will rearrange
@@ -26,7 +22,7 @@ Run these in order from inside the repository.
 
 ```sh
 cckit scan      # 1. what the repository contains, and the state of any cckit files
-cckit init      # 2. write cckit.config.json and .claude/  (only when there are none)
+cckit init      # 2. write the project config and .claude/  (only when there are none)
 cckit adopt     # 3. record the cckit files the repository ALREADY has
 cckit migrate   # 4. move an old cckit layout to the current one
 cckit update    # 5. say whether the project is behind the installed cckit
@@ -46,7 +42,8 @@ cckit doctor    # 6. check the tools and the GitHub sign-in
 3. **`adopt`: take ownership of files already there.** This is the step for a repository that got
    its cckit files by hand: a copied `.claude/`, an old init, skills a teammate pasted in. The
    files are present, but the **manifest**, cckit's record of which files it owns, does not know
-   them, so `update` and `remove` will not touch them. `adopt` records each at its current hash. It
+   them, so an upgrade (`cckit init --upgrade`) and the uninstall script (`scripts/kit-remove.sh`)
+   will not touch them. `adopt` records each at its current hash. It
    writes no content. Preview it first with `cckit adopt --dry-run`; it never claims your
    `knowledge/`, plans or app code.
 
@@ -63,7 +60,8 @@ cckit doctor    # 6. check the tools and the GitHub sign-in
 
 <Aside type="note" title="What is the manifest?">
 The manifest is cckit's list of which files in your repository it owns and manages. Files outside
-it (your app code, your `knowledge/`, your plans) are never touched by `update` or `remove`.
+it (your app code, your `knowledge/`, your plans) are never touched by an upgrade or by the uninstall script, `scripts/kit-remove.sh`, which
+deletes only what the manifest lists.
 `adopt` is how you add cckit files that are already present to that list.
 </Aside>
 
@@ -98,7 +96,7 @@ the only changes are cckit's own config and files.
 
    ```bash frame="terminal"
    cckit scan      # the repository's stack and the state of its cckit files
-   cckit init      # write cckit.config.json and .claude/
+   cckit init      # write the project config and .claude/
    cckit adopt     # record the cckit files the repository already has
    cckit status    # where the project stands
    ```
@@ -110,8 +108,8 @@ the only changes are cckit's own config and files.
 
 ## Why it is safe to run
 
-- **It adds; it does not rewrite.** `scan` only reads. `init` writes only its own
-  `cckit.config.json` and `.claude/`. `adopt` records the cckit files you already have, so cckit
+- **It adds; it does not rewrite.** `scan` only reads. `init` writes only its own files:
+  the project config (`.claude/kit.config.json`; `cckit.config.json` at the root for a Codex-only project) and `.claude/`. `adopt` records the cckit files you already have, so cckit
   manages them in place and does not duplicate them. No company, framework or repository layout is
   built into cckit.
 - **Every step does nothing when there is nothing to do.** The three that touch files (`init`,

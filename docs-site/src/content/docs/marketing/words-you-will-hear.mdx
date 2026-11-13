@@ -19,10 +19,10 @@ You do not need to learn them to do your work.
 
 | Plain word | Developer word | What it is |
 | --- | --- | --- |
-| **Draft** | **branch** | A separate line of changes for one piece of work. What you write in it stays apart from the shared version until it is approved. More: [The GitHub cycle](/development/) |
-| **Review** | **pull request**, **PR** | The page on GitHub where a draft is read, commented on and approved. "Open a PR" means "ask for a review". More: [Issue to merged PR](/development/issue-to-merged-pr/) |
-| **Piece of work**, **task** | **issue**, **light task** | The record of one thing to make: a title, a description and whether it is open or closed. An issue is that record on GitHub. A light task is the same record as a file in the project's `tasks/` folder, which is where the marketing setup keeps it. More: [The GitHub cycle](/development/) · [Light tasks](/project-management/light-tasks/) |
-| **Approved** | **merged** | The draft's changes are part of the shared version. To "merge" is to finish an approved piece. More: [Review gates](/review/gates/) |
+| **Draft** | **branch** | A separate line of changes for one piece of work. What you write in it stays apart from the shared version until it is approved. More: [How one change is built](/development/) |
+| **Review** | **pull request**, **PR** | The page on GitHub where a draft is read, commented on and approved. "Open a PR" means "ask for a review". More: [Take an issue to merged](/development/issue-to-merged-pr/) |
+| **Piece of work**, **task** | **issue**, **light task** | The record of one thing to make: a title, a description and whether it is open or closed. An issue is that record on GitHub. A light task is the same record as a file in the project's `tasks/` folder, which is where the marketing setup keeps it. More: [How one change is built](/development/) · [Tasks without GitHub issues](/project-management/light-tasks/) |
+| **Approved** | **merged** | The draft's changes are part of the shared version. To "merge" is to finish an approved piece. More: [Why merging is a decision](/ship/) |
 
 </div>
 
@@ -32,16 +32,16 @@ You do not need to learn them to do your work.
 
 | Plain word | Developer word | What it is |
 | --- | --- | --- |
-| Project | repository, repo | The folder that holds your content and its whole history, kept on GitHub. More: [Quickstart](/getting-started/) |
-| The shared version | base branch, `main`, `develop` | The version everyone agrees on. Drafts start from it and return to it. More: [The GitHub cycle](/development/) |
-| A draft's own folder | worktree | A separate folder on your computer for one draft, so two drafts never mix. Claude creates and removes it. More: [Efforts, waves and worktrees](/project-management/efforts-and-waves/) |
-| Saved change | commit | One saved step in a draft, with a note saying what changed. More: [The GitHub cycle](/development/) |
-| Send to GitHub | push | Copy your saved changes from your computer to GitHub so others can see them. More: [The GitHub cycle](/development/) |
+| Project | repository, repo | The folder that holds your content and its whole history, kept on GitHub. More: [What you set up, and why](/getting-started/) |
+| The shared version | base branch, `main`, `develop` | The version everyone agrees on. Drafts start from it and return to it. More: [How one change is built](/development/) |
+| A draft's own folder | worktree | A separate folder on your computer for one draft, so two drafts never mix. Claude creates and removes it. More: [How one change is built](/development/) |
+| Saved change | commit | One saved step in a draft, with a note saying what changed. More: [How one change is built](/development/) |
+| Send to GitHub | push | Copy your saved changes from your computer to GitHub so others can see them. More: [How one change is built](/development/) |
 | Campaign | effort | Several pieces of work under one plan. "Effort" is the name when the task list is on GitHub; its pieces are then approved together. More: [Break a feature into an effort](/project-management/break-a-feature-into-an-effort/) |
-| A piece in a campaign | sub-issue | One entry under the campaign's entry, when the task list is on GitHub. More: [Efforts, waves and worktrees](/project-management/efforts-and-waves/) |
+| A piece in a campaign | sub-issue | One entry under the campaign's entry, when the task list is on GitHub. More: [Efforts and waves in practice](/project-management/efforts-and-waves/) |
 | Tag | label | A colored tag on a piece of work: its kind, its priority, who it is for. More: [Config and permissions](/config-and-permissions/) |
 | Stage | milestone | A named stage a piece of work belongs to, such as Draft or Review. More: [Config and permissions](/config-and-permissions/) |
-| Setup | profile | The set of skills, roles and rules installed for a kind of team. Yours is the marketing profile. More: [Initialize cckit](/getting-started/initialize/) |
+| Setup | profile | The set of skills, roles and rules installed for a kind of team. Yours is the marketing profile. More: [Initialize a project](/getting-started/initialize/) |
 | A method Claude follows | skill | A written method Claude follows for one job, such as writing copy or planning a campaign. More: [Skills cckit ships](/skills/) |
 | Assistant | agent, sub-agent | A role Claude takes on for part of the work: planner, editor, designer, researcher. More: [Who does what](/marketing/who-does-what/) |
 | Automatic check | hook, gate | Something that runs by itself before a change is saved or approved, such as a check for passwords left in a file. More: [Hooks](/hooks/) |

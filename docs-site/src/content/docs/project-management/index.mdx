@@ -1,12 +1,9 @@
 ---
-title: "Units of work, in Scrum terms"
+title: "How work is written down: issues, efforts, waves"
 description: "Why every change starts from an issue, and the three units (issue, effort, wave) set beside backlog, story, epic and sprint, saying where each match is loose."
 ---
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
-import TagRow from '../../../components/TagRow.astro';
-
-<TagRow kinds={["flow", "concept"]} />
 
 Agents write code faster than a team can keep track of it. Once several run at the same time, the
 slow part is no longer the typing. It is knowing what to work on next, what is already done, and
@@ -14,7 +11,8 @@ who decided what. A team that keeps this in chat or in someone's head loses it w
 
 So a team working with agents writes the work down before it starts, in one place everyone and
 every agent reads. In cckit that place is GitHub: **every change starts from an issue**, and the
-list of open issues is the plan. This area defines the units that list is made of, who plans them
+list of open issues is the plan. That list is **the board**: the open issues, or a GitHub Projects
+board if you use one. This area defines the units that list is made of, who plans them
 and who decides.
 
 ## The three units
@@ -29,6 +27,11 @@ and who decides.
 Each deliverable is its own issue. A checklist inside an issue body is not tracking: when the
 issue closes, the unchecked boxes disappear from every list with it. A sub-issue stays open and
 visible until its own work is done.
+
+## What to do first
+
+Ask the agent: "sync the board and show me what is ready, and I will pick." Or run `cckit next`,
+which prints the next issue that nothing blocks and the command that starts it.
 
 ## If you know Scrum
 
@@ -52,8 +55,8 @@ looking for them.
   of unblocked issues run in parallel, and it ends when its work merges, whether that takes an
   hour or three days.
 - **There are no story points and no velocity.** The size label `ctx:S`, `ctx:M`, `ctx:L` or
-  `ctx:XL` measures something else: how much of one agent session an effort uses before the
-  agent's context window fills. `cckit effort plan` uses it to pack efforts into session-sized
+  `ctx:XL` measures something else: how much of one agent session an effort uses. A session can
+  only hold so much text at once, and a large effort fills it. `cckit effort plan` uses it to pack efforts into session-sized
   batches.
 - **The only cadence is a weekly one**, and it is a reminder, not a ceremony: `cckit plan` on
   Monday, `cckit next` each day, `cckit gc` on Friday. `cckit next` and `cckit status` print that
@@ -65,7 +68,7 @@ looking for them.
 - **The project manager agent** reads the board, reports where things stand and drafts issues.
 - **The tech lead agent** owns the engineering foundation and writes architecture decisions.
 - **The captain** drives an approved plan: it checks the pull requests, merges the ones that pass
-  and starts the next wave. The captain is a role a process plays, not an agent you install.
+  and starts the next wave.
 
 [Tech lead, PM and captain](/project-management/roles/) says what each one owns.
 
@@ -93,17 +96,17 @@ looking for them.
 | Ask where the project stands | `cckit status` |
 
 Every flag is in the [CLI reference](/cli-reference/).
-[Efforts and waves in practice](/project-management/efforts-and-waves/) explains how the effort
-commands behave.
+[Efforts and waves in practice](/project-management/efforts-and-waves/) walks through the effort
+commands in order.
 
 ## Guides
 
 <CardGrid>
   <LinkCard title="Tech lead, PM and captain" href="/project-management/roles/" description="Who plans, who decides, and what stays with the owner." />
-  <LinkCard title="Plans you answer on a page" href="/project-management/plan-pages/" description="Read a plan, pick an option, and have the answer recorded on the issue." />
-  <LinkCard title="Efforts and waves in practice" href="/project-management/efforts-and-waves/" description="Create, order, start and close an effort, and the limit on efforts in progress." />
-  <LinkCard title="Tasks without GitHub issues" href="/project-management/light-tasks/" description="A task list kept as files in the project." />
   <LinkCard title="Break a feature into an effort" href="/project-management/break-a-feature-into-an-effort/" description="Step by step, from one big goal to one merged pull request." />
+  <LinkCard title="Plans you answer on a page" href="/project-management/plan-pages/" description="Read a plan, pick an option, and have the answer recorded on the issue." />
+  <LinkCard title="Tasks without GitHub issues" href="/project-management/light-tasks/" description="A task list kept as files in the project." />
+  <LinkCard title="Efforts and waves in practice" href="/project-management/efforts-and-waves/" description="The six effort commands in order, and the limit on efforts in progress." />
 </CardGrid>
 
 <Aside type="note" title="Where the building happens">

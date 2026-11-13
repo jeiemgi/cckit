@@ -4,16 +4,14 @@ description: "The verbs that land work and tidy after it: merge, watch, effort c
 ---
 
 import { Steps, Aside } from '@astrojs/starlight/components';
-import TagRow from '../../../components/TagRow.astro';
-
-<TagRow kinds={["flow", "command"]} />
 
 Landing a change is four small jobs: merge the pull request, close the issue, delete the branch,
 remove the working folder. Done by hand, one of them gets skipped. The issue stays open after the
 merge, or the branch stays for months, and the board stops matching the code.
 
 cckit puts the four jobs behind one verb, so they happen together or not at all. Which verb depends
-on what you are landing. Why merging is treated as a decision is on
+on what you are landing. One thing comes before the verb: the branch is brought up to date and
+checked, because no verb does that for a branch that is behind and has no conflict. Why merging is treated as a decision is on
 [the area's first page](/ship/).
 
 ## Pick the verb
@@ -32,9 +30,26 @@ branches and working folders left behind.
 **What you will have at the end:** the change on the base branch, its issue closed, its branch
 deleted and its working folder removed.
 
+Ask the agent that built the change:
+
+<div class="cckit-prompt">
+
+```text frame="terminal" title="Prompt to paste"
+Bring this branch onto the current base branch. Show me what the diff deletes, run the gate on
+that tree, and merge the pull request if it passes.
+```
+
+</div>
+
+A branch that GitHub calls mergeable can still undo somebody else's merge without a conflict, and
+`cckit merge` merges a behind branch as it stands. So the agent does three things first, and you
+read the second one.
+
+### What the agent runs
+
 <Steps>
 
-1. **Bring the branch onto the current base.** Run this in the branch's own worktree. `<base>` is
+1. **Bring the branch onto the current base.** Run in the branch's own worktree. `<base>` is
    your base branch, for example `develop`.
 
    ```bash frame="terminal"
@@ -82,7 +97,7 @@ What `cckit merge` does, in order:
   `KIT_FORCE=1` merges anyway, with a warning that no per-sub-issue record was taken.
 - When GitHub reports the pull request as conflicting, and you ran the verb from that pull
   request's own branch, it rebases onto the base and pushes with `--force-with-lease`. A branch
-  that is behind but has no conflict is merged as it stands, which is why steps 1 to 3 are yours.
+  that is behind but has no conflict is merged as it stands, which is why steps 1 to 3 come first.
 - It squash-merges. `--merge` and `--rebase` pick the other two methods.
 - It closes every open issue the pull request links.
 - It removes the branch and its worktree. The base branch, the pull request's own base, `main`,
@@ -132,7 +147,7 @@ gone, and `<git-common-dir>/effort-metrics/records.jsonl` has one new line for t
 5. Removes the worktree and the branch, including the effort's `sub/…` branches.
 
 It also appends one metrics record for the effort. The hooks are in [Effort close hooks](/config-and-permissions/#effort-close-hooks), and the fields
-of the record in [Efforts and waves in practice](/project-management/efforts-and-waves/).
+of the record in the [Effort verbs reference](/effort-reference/#the-lifecycle-new-start-pr-close).
 
 ## Let the captain merge an approved plan
 

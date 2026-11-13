@@ -80,7 +80,7 @@ install writes — is in the
   reads it and never drops an adapter; `--upgrade --adapter codex` adds one, and the adapter already
   installed keeps its files byte for byte. Config and manifest stay where the first install put them.
 - **Ownership.** Every adapter file init writes is recorded in the manifest with its hash. An edited
-  file reads as modified and is preserved by an upgrade and kept by `cckit remove`.
+  file reads as modified and is preserved by an upgrade and kept by the uninstall script, `scripts/kit-remove.sh`.
 - **Portable Codex output.** A Codex-only config carries no absolute path, and no generated file
   under `.agents/` or `AGENTS.md` references `CLAUDE_PLUGIN_ROOT`. `scripts/init-upgrade-test.sh`
   asserts both on the `minimal` profile.

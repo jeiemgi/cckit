@@ -21,8 +21,7 @@ These docs follow the process in the order a team works through it.
 1. **Set up.** An agent that opens your repository knows nothing about your team: which branch you
    integrate on, which roles you have, which rules you follow. You install the tool once and run
    `cckit init` in the project, and that description is written down for every later session.
-   Memory between sessions is an optional extra.
-   Go to [Getting started](/getting-started/), then [Memory](/memory/) if you want it.
+   Go to [Getting started](/getting-started/).
 
 2. **Plan.** "Build the billing page" is too large to hand to anyone. The team splits it into
    pieces that can each be reviewed, writes each one as a GitHub issue, and puts them in an order.
@@ -31,7 +30,7 @@ These docs follow the process in the order a team works through it.
 
 3. **Design.** When five agents each pick a spacing value, the product looks like five products.
    Every visual question goes to one owner, the designer, and the team gives feedback on the
-   running interface. cckit wires in no outside design tool; the area says what it does offer.
+   running interface.
    Go to [Design](/design/).
 
 4. **Build.** Two changes made in the same folder overwrite each other. Each issue gets its own
@@ -49,6 +48,10 @@ These docs follow the process in the order a team works through it.
    release is cut when you choose.
    Go to [Ship](/ship/).
 
+Every area is laid out the same way: why the step exists, who does it, which tools plug in, the
+commands, then step-by-step guides. Memory between sessions is an optional extra with an area of
+its own, after the six: [Memory](/memory/).
+
 ## Who does the work
 
 A software project starts with eight roles, each filled by an agent: project manager, tech lead,
@@ -63,31 +66,17 @@ already trusts and connects them:
 
 - **GitHub**, through the `gh` command, holds the issues, the pull requests and the board.
 - **Claude Code or Codex** is the agent that runs the work. cckit does not include a model.
-- **MemPalace** gives the agent memory between sessions. It is off until you turn it on.
-- **Lavish** opens a plan or a decision as a page you can answer on.
-- **Graft** and **mlx-lm** are optional: a code graph for finding code, and a local model for
-  summaries.
 
-MemPalace, Lavish, Graft and mlx-lm are installed only after you agree. The list, and how each is
-installed, is on
-[Integrations](/integrations/).
-
-## How each area is laid out
-
-Every area answers the same questions in the same order, so you can stop reading as soon as you
-have what you came for:
-
-1. Why the step exists.
-2. Who does it: which roles and agents.
-3. Which tools plug in.
-4. The commands.
-5. Step-by-step guides.
+Four optional tools (MemPalace, Lavish, Graft and mlx-lm) are installed only after you agree. What
+each one is for, and how it is installed, is on [Integrations](/integrations/).
 
 ## Where to start
 
 <CardGrid>
-  <LinkCard title="New to cckit" href="/philosophy/" description="Read the idea first: what stays with you and what the agents take over." />
+  <LinkCard title="New to cckit" href="/philosophy/the-team/" description="Read who does what first: the decisions that stay with you and the roles the agents take." />
   <LinkCard title="Ready to set up" href="/getting-started/" description="The three things a project needs before an agent can work in it." />
   <LinkCard title="You already have a repository" href="/getting-started/existing-repo/" description="Add cckit to a project without restructuring it." />
   <LinkCard title="Looking for a command or a flag" href="/reference/" description="The reference pages: every verb, config key, skill and rule." />
 </CardGrid>
+
+Why the author built cckit, in his own words: [The idea](/philosophy/).

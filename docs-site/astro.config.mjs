@@ -161,7 +161,7 @@ export default defineConfig({
         LanguageSelect: './src/components/LanguageSelect.astro',
         ...(DEV ? { PageSidebar: './src/components/DevAnnotate.astro' } : {}),
       },
-      description: 'Be the architect — cckit runs the mechanics. The full GitHub work lifecycle as a CLI that turns your Git into retrievable, efficient context, drivable by Claude Code and any agent.',
+      description: "You decide what gets made and you approve it; agents do the work in between. cckit is the process that keeps that work in order: each piece is planned, made in its own space, reviewed and approved, and GitHub keeps the record. A command-line tool and a set of skills for Claude Code and other agents.",
       social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/jeiemgi/cckit' }],
       favicon: '/favicon.svg',
       // SEO / social share. Starlight emits canonical, description, sitemap, and title/OG tags from
@@ -202,8 +202,8 @@ export default defineConfig({
       // Per-track sidebars: this one array holds the entries of both tracks, and the route
       // middleware keeps only the entries of the track a page belongs to (src/routeData.ts).
       routeMiddleware: './src/routeData.ts',
-      // Software: 42 entries. One link to the track's entry page, then the areas in the order a team
-      // works in, then Reference. Every group is collapsed; Starlight opens the group that holds the
+      // Software: 43 entries. One link to the track's entry page, then the six areas in the order a
+      // team works in, the optional Memory area, then Reference. Every group is collapsed; Starlight opens the group that holds the
       // current page. A Software page that is not listed here is linked from its area's "More
       // guides" page or from /reference/, and search covers all of them.
       sidebar: [
@@ -220,18 +220,13 @@ export default defineConfig({
           { label: 'Use cckit with Codex', slug: 'getting-started/codex' },
           { label: 'Update a project', slug: 'getting-started/update' },
         ]},
-        { label: 'Memory', collapsed: true, items: [
-          { label: 'Why an agent team needs memory', slug: 'memory' },
-          { label: 'Install MemPalace', slug: 'memory/install-mempalace' },
-          { label: 'How cckit uses memory', slug: 'memory/how-cckit-uses-it' },
-        ]},
         { label: 'Project management', collapsed: true, items: [
-          { label: 'Units of work, in Scrum terms', slug: 'project-management' },
+          { label: 'How work is written down', slug: 'project-management' },
           { label: 'Tech lead, PM and captain', slug: 'project-management/roles' },
-          { label: 'Plans you answer on a page', slug: 'project-management/plan-pages' },
-          { label: 'Efforts and waves in practice', slug: 'project-management/efforts-and-waves' },
-          { label: 'Tasks without GitHub issues', slug: 'project-management/light-tasks' },
           { label: 'Break a feature into an effort', slug: 'project-management/break-a-feature-into-an-effort' },
+          { label: 'Plans you answer on a page', slug: 'project-management/plan-pages' },
+          { label: 'Tasks without GitHub issues', slug: 'project-management/light-tasks' },
+          { label: 'Efforts and waves in practice', slug: 'project-management/efforts-and-waves' },
         ]},
         { label: 'Design', collapsed: true, items: [
           { label: 'Why design has one owner', slug: 'design' },
@@ -240,24 +235,30 @@ export default defineConfig({
         ]},
         { label: 'Development', collapsed: true, items: [
           { label: 'How one change is built', slug: 'development' },
-          { label: 'Let the agent see the page', slug: 'development/browser-debug' },
+          { label: 'Take an issue to merged', slug: 'development/issue-to-merged-pr' },
           { label: 'Run work in parallel waves', slug: 'development/waves' },
           { label: 'Many sessions, one repository', slug: 'development/many-sessions' },
-          { label: 'Take an issue to merged', slug: 'development/issue-to-merged-pr' },
+          { label: 'Let the agent see the page', slug: 'development/browser-debug' },
           { label: 'More development guides', slug: 'development/more-guides' },
         ]},
         { label: 'Review', collapsed: true, items: [
           { label: 'Why nothing merges unreviewed', slug: 'review' },
-          { label: 'Review gates', slug: 'review/gates' },
-          { label: 'QA on a running stack', slug: 'review/qa-lane' },
+          { label: 'Choose your gate command', slug: 'review/gate-command' },
+          { label: 'Turn repeated findings into checks', slug: 'review/gates' },
           { label: 'The secret guard', slug: 'review/secret-guard' },
           { label: 'Agent review before a merge', slug: 'review/agent-review' },
+          { label: 'QA on a running stack', slug: 'review/qa-lane' },
           { label: 'More review guides', slug: 'review/more-guides' },
         ]},
         { label: 'Ship', collapsed: true, items: [
           { label: 'Why merging is a decision', slug: 'ship' },
           { label: 'Merge, close and clean up', slug: 'ship/merge-and-close' },
           { label: 'Cut a release', slug: 'ship/releasing' },
+        ]},
+        { label: 'Memory (optional)', collapsed: true, items: [
+          { label: 'Why an agent team needs memory', slug: 'memory' },
+          { label: 'Install MemPalace', slug: 'memory/install-mempalace' },
+          { label: 'How cckit uses memory', slug: 'memory/how-cckit-uses-it' },
         ]},
         { label: 'Reference', collapsed: true, items: [
           { label: 'CLI reference', slug: 'cli-reference' },
@@ -277,8 +278,8 @@ export default defineConfig({
           { label: 'Get set up', translations: { es: 'Prepara todo' }, slug: 'marketing/get-set-up' },
           { label: 'The tools we plug in', translations: { es: 'Las herramientas que conectamos' }, slug: 'marketing/tools' },
           { label: 'Set your brand voice', translations: { es: 'Define tu voz de marca' }, slug: 'marketing/brand-voice' },
-          { label: 'Plan and run a campaign', translations: { es: 'Planea y lleva una campaña' }, slug: 'marketing/campaigns' },
           { label: 'A piece, idea to approved', translations: { es: 'Una pieza, de la idea a la aprobación' }, slug: 'marketing/your-first-piece' },
+          { label: 'Plan and run a campaign', translations: { es: 'Planea y lleva una campaña' }, slug: 'marketing/campaigns' },
           { label: 'Review and approval', translations: { es: 'Revisión y aprobación' }, slug: 'marketing/review-and-approval' },
           { label: 'Words you will hear', translations: { es: 'Palabras que vas a escuchar' }, slug: 'marketing/words-you-will-hear' },
         ]},

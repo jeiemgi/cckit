@@ -4,9 +4,6 @@ description: "What the project manager agent, the tech lead agent and the captai
 ---
 
 import { Aside } from '@astrojs/starlight/components';
-import TagRow from '../../../components/TagRow.astro';
-
-<TagRow kinds={["agent", "concept"]} />
 
 When agents do the building, the open question on a team is who decides. An agent that plans,
 builds, approves and merges its own work has nobody checking it. An agent that asks a person
@@ -22,7 +19,8 @@ The owner is whoever is responsible for the project. The owner:
 - approves a plan before it runs. An approved plan is an explicit instruction to run named
   efforts, an approved `cckit effort plan`, or a wave the owner told the captain to drive. A plan
   an agent proposed and nobody approved is not one;
-- confirms before an agent files or closes an issue;
+- confirms before the project manager, designer or tech lead agent files or closes an issue. One
+  skill is the exception: `/kit-security-sweep` files an issue for every finding without asking;
 - decides the changes no agent merges alone (listed under the captain, below);
 - merges, unless an approved plan gives that to the captain.
 
@@ -110,8 +108,10 @@ Failing checks are not on that list. The captain does not merge a failing pull r
 not ask about it: it fixes the cause or reports the failure.
 
 What `cckit watch --merge` may merge is configuration, under `captain.mergePolicy`. By default it
-refuses a pull request that touches a workflow file, a lockfile or a security-sensitive path, and
-it always respects a `hold` label. It can also be told to wait for an agent review or for a
+refuses a pull request that touches a workflow file, a lockfile or a security-sensitive path, or
+that carries a `hold` label. These refusals are the policy floors. They are on by default, and
+`captain.mergePolicy.floors: false` (or `KIT_CAPTAIN_FLOORS=0` for one command) switches all of
+them off together, the `hold` label included. The captain can also be told to wait for an agent review or for a
 person's QA pass. See
 [Captain merge policy](/config-and-permissions/#captain-merge-policy) for the keys, and
 [Run a wave](/development/waves/) for the captain at work.
@@ -125,7 +125,7 @@ person's QA pass. See
 | How the build, the toolchain and CI are set up | The tech lead agent proposes; the owner merges |
 | Whether a pull request inside an approved plan merges | The captain, within the merge policy |
 | Whether a dependency, security or workflow change merges | The owner |
-| Whether an issue is filed or closed | The owner confirms; an approved plan covers its own closes |
+| Whether an issue is filed or closed | The owner confirms; an approved plan covers its own closes, and `/kit-security-sweep` files its findings directly |
 
 ## Limits
 

@@ -207,13 +207,14 @@ Marketing; every other page is Software. The track sets the sidebar, the accent 
 current entry of the top-bar switch (`docs-site/src/lib/tracks.ts`, `docs-site/src/routeData.ts`).
 
 - **Software pages live under their area.** The areas, in sidebar order: `getting-started/`,
-  `memory/`, `project-management/`, `design/`, `development/`, `review/`, `ship/`. `software.mdx`
+  `project-management/`, `design/`, `development/`, `review/`, `ship/`, then the optional
+  `memory/`. `software.mdx`
   is the track's entry page and `philosophy/` holds the team page beside `philosophy.mdx`.
   Reference pages (`cli-reference`, `config-and-permissions`, `integrations`, `skills`, `rules`,
   `hooks`, …) stay at the root so links to their anchors keep working. Inside an area the order is:
   why it exists, who does it, which tools plug in, the verbs, the guides. There is no separate
   tutorials section: a step-by-step page is a guide in its area.
-- **The sidebar is curated.** `sidebar` in `docs-site/astro.config.mjs` lists 42 Software pages:
+- **The sidebar is curated.** `sidebar` in `docs-site/astro.config.mjs` lists 43 Software pages:
   one "Start here" link, eight area groups and a Reference group, every group collapsed except the
   one holding the current page. The Marketing list is 10 pages, flat, in process order. A new
   Software page is not added to the sidebar by default: link a guide from its area's

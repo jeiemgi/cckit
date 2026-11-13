@@ -31,7 +31,7 @@ No org, repo, or path is hardcoded — every value comes from this file. A repo 
 `cckit init` writes source 3 when the Claude adapter is selected and source 2 for a Codex-only
 project, which has no `.claude/` directory. The config's `adapters` array records the selection
 (`["claude"]`, `["codex"]` or both); a config without the key means `["claude"]`. The ownership
-manifest — the hashes `cckit remove` and `--upgrade` use to tell a kit-owned file from an edited one —
+manifest — the hashes the uninstall script (`scripts/kit-remove.sh`) and `--upgrade` use to tell a kit-owned file from an edited one —
 sits beside it: `.claude/kit.manifest.json`, or `.cckit/kit.manifest.json` in a project that started
 Codex-only. Neither file moves when the second adapter is enabled later.
 
@@ -137,6 +137,79 @@ cckit asks before it changes anything in a repo it has not worked in before.
 - **Where the secret and privacy guard is wired in, no consent bypasses it.** It runs as a git pre-commit hook (`githooks/pre-commit`) and inside the gate of cckit's own repository. `cckit init` does not copy it into your project: [Stop agents committing secrets](/review/stop-committing-secrets/) has the commands, and [The secret guard](/review/secret-guard/) says what it blocks.
 - **Destructive or irreversible operations** (force-push, repo create, history rewrite) always require a separate, explicit confirmation.
 
+## Lint gates: baselines
+
+The three lint scripts `cckit init` scaffolds are described in
+[Turn repeated review findings into checks](/review/gates/). This section is the detail behind
+them, plus the one lint that runs only in cckit's own repository, where `scripts/check.sh` runs all
+four.
+
+### Baselines are seeded once
+
+`cckit init` seeds each baseline the first time it scaffolds the lint, so a fresh project starts green
+and only *new* defects fail. It never regenerates an existing baseline — that would silently
+re-grandfather whatever drifted since the last upgrade.
+
+Seeding sets `KIT_LINT_WALK=1`, which forces the filesystem walk instead of `git ls-files`.
+Scaffolding usually lands in a repo that already has commits, so the kit's freshly written files are
+untracked and invisible to the index; without the walk the baseline comes out empty and the gate goes
+red on your first commit of the scaffold.
+
+Each lint reports its own baseline path, which is how `init.sh` finds it:
+
+```bash
+scripts/review-lint.sh --baseline-path             # scripts/review-lint-baseline.txt
+scripts/skill-frontmatter-lint.sh --baseline-path  # scripts/skill-frontmatter-baseline.txt
+scripts/instruction-budget-lint.sh --baseline-path # scripts/instruction-budget-baseline.txt
+```
+
+A freshly scaffolded project's instruction-budget baseline already lists two rules: the shipped
+`effort-model.md` (209 lines) and `naming-and-ids.md` (208) are over the 200-line limit, so they are
+grandfathered and may shrink but not grow.
+
+### The review-lint baseline is TAB-separated
+
+```text
+# <RULE>\t<path>\t<count>   (TAB-separated: a path may contain a space)
+fence-missing-language	docs/my file.md	1
+```
+
+A space-separated baseline written by an earlier version is still read, so upgrading does not turn
+the gate red.
+
+### agent-skills-lint — every agent skill resolves
+
+A `skills:` entry that names nothing fails silently: the agent loads, answers, and has fewer skills
+than its frontmatter lists. A rename is how it happens — `templates/agents/pm.md` kept listing
+`task-sync`, `task-new` and `task-close` after the kit shipped them as `kit-task-*`, so all three of
+the PM agent's lifecycle skills were dead.
+
+```bash
+scripts/agent-skills-lint.sh           # the gate: fails on any unresolved entry
+```
+
+It reads the frontmatter `skills:` key of every `templates/agents/*.md` (block list or inline
+`[a, b]`) and accepts an entry that is one of:
+
+| Form | Resolves against |
+| --- | --- |
+| a skill the kit ships | `skills/<name>/SKILL.md` |
+| a skill the kit scaffolds | `templates/skills/<name>/SKILL.md` |
+| another plugin's skill | the `plugin:skill` form, e.g. `agent-skills:context7` |
+| a third-party bare name | a line in `scripts/agent-skills-external.txt` |
+
+Anything else is reported as `<file>:<line>: <entry>` and fails `scripts/check.sh`.
+
+`scripts/agent-skills-external.txt` is the list of **optional** skills: names an agent template
+lists that come from a third-party skill pack or from the harness (`deep-research`, `impeccable`,
+the `gsap-*` and `n8n-*` sets). An agent scaffolded into a project without one of them runs without
+that skill. A name that is both in that file and shipped by the kit fails the lint, so the list
+cannot keep describing a kit skill as third-party.
+
+Unlike the three lints `cckit init` scaffolds, this lint has no baseline — every entry resolves or the gate is red —
+and it is **not** scaffolded by `cckit init`: it checks the kit's own agent templates. A
+`plugin:skill` entry is accepted on its form alone; the lint cannot see another plugin's skills.
+
 ## Captain merge policy
 
 `cckit watch --merge` is the one place cckit lands code without a human in the loop, so its policy is
@@ -146,11 +219,22 @@ a single invocation without editing the file.
 
 | Key | Default | What it does | Env override |
 | --- | --- | --- | --- |
-| `floors` | `true` | Refuse to auto-merge a PR that touches `.github/workflows/**`, a lockfile or dependency-graph file, or a security-sensitive path — and always honour a `hold` label. Verdict becomes `HELD`. | `KIT_CAPTAIN_FLOORS=0` |
+| `floors` | `true` | Refuse to auto-merge a PR that touches `.github/workflows/**`, a lockfile or dependency-graph file, or a security-sensitive path, or that carries a `hold` label. Verdict becomes `HELD`. Switching the floors off disables the `hold` label too. | `KIT_CAPTAIN_FLOORS=0` |
 | `protectedGlobs` | `[]` | Extra path globs added to the floors above. | `KIT_CAPTAIN_EXTRA_GLOBS` |
 | `requireChecks` | `false` | Treat a PR with **no checks at all** as unverified rather than green. Verdict becomes `CHECKS_MISSING`, action `verify`. | `KIT_CAPTAIN_REQUIRE_CHECKS=1` |
 | `requireReview` | *(implied)* | Treat a PR with **no agent review recorded** as unverified. Verdict becomes `REVIEW_MISSING`, action `verify`. Defaults to on when `review.command` or `review.headless` is set and off when it is not — set it explicitly to break that link either way. | `KIT_CAPTAIN_REQUIRE_REVIEW=1` |
 | `requireQa` | `false` | Hold a PR for a **human QA pass**. `true` covers every PR; a list of label names (`["flow:ui"]`) covers only PRs carrying one of them. A would-be merge with no `cckit qa verdict pass` recorded against its current head becomes `QA_MISSING`, action `verify`. | `KIT_CAPTAIN_REQUIRE_QA=1`, `KIT_CAPTAIN_QA_LABELS` |
+
+The paths the floors cover:
+
+- a file under `.github/workflows/`;
+- a lockfile or dependency-graph file: `pnpm-lock.yaml`, `package.json`, `package-lock.json`,
+  `yarn.lock`, `turbo.json`, `*-workspace.yaml` / `*-workspace.yml`;
+- a security-sensitive path: `*.pem`, `*.key`, `.env`, `.env.*`, or a `secret` or `secrets` path
+  segment.
+
+A draft pull request is not a floor: it gets the verdict `DRAFT` and the action `wait`, with the
+floors on or off.
 
 ### Holding merges for a QA pass
 
@@ -310,7 +394,7 @@ with no verdict prints that, names both keys that close it, and goes quiet once 
 </Aside>
 
 <Aside type="tip" title="Not the same thing as review-lint">
-[Codified review gates](/review/gates/) are static linters that run inside `scripts/check.sh` —
+[Turn repeated review findings into checks](/review/gates/) are static linters that run inside `scripts/check.sh` —
 patterns earned from past review findings, enforced on every commit. This page's review stage is an
 **agent** reading a diff. Neither replaces the other.
 </Aside>
@@ -484,6 +568,27 @@ in a shared checkout — writing `node_modules` and a lockfile into another sess
 | `pr.orchestratorSection` | `false` | `true` opens the PR body with a two-line `## For the orchestrator` section: the issue number and what to review. |
 | `pr.bodyStyle` | `code` | The wording of the body `cckit pr`, `cckit effort pr` and `cckit task finish` generate. `code`: a `## Verification` checklist that names the diff. `content`: a `## Review` checklist for a draft — see [Content work](#content-work). |
 
+### Evidence on the pull request
+
+A pull request should show that the checks passed, not claim it. cckit ships a helper,
+`pr_attach_evidence` (`scripts/lib/pr-evidence.sh`), that attaches the output as a comment after
+the request opens: the build log, the typecheck log, a screenshot of the working screen. A
+reviewer, person or agent, can then trust the result without running everything again.
+
+Each piece of evidence gets its own comment, named by its caption: one for `build`, one for
+`typecheck`, one for a screenshot. Attach again and cckit updates that same comment in place, so
+a request that took ten pushes shows one current build log and not ten stale ones.
+
+<Aside type="caution" title="Evidence never breaks your work">
+By default, a comment that fails to post prints a warning and the run continues. A caller that
+needs the evidence to exist asks for the opposite with `--strict` or `PR_EVIDENCE_STRICT=1`, and
+the failure stops the run. Either way the failure is printed and never reported as success.
+</Aside>
+
+Image evidence has one limit. GitHub has no supported way to upload a file to a comment from the
+command line, so a screenshot is referenced by its path, with instructions. Drag it into the
+comment box yourself, or host the file, set `KIT_EVIDENCE_URL_BASE`, and cckit embeds it.
+
 ## Light tasks
 
 [`cckit task`](/project-management/light-tasks/) tracks work without GitHub issues. Three keys, all optional:
@@ -584,7 +689,7 @@ refusal leaves no branch, no worktree and no board change. It is not read-free: 
 origin, and a `<slug>` argument was resolved before it, which can run `gh issue list`. Re-running
 `cckit effort start` on an effort that is *already* in progress is never gated — it adds no WIP.
 `cckit start <issue>` (a plain task worktree) has no WIP limit. Full behaviour:
-[Only so many efforts at once](/project-management/efforts-and-waves/#only-so-many-efforts-at-once).
+[Only so many efforts at once](/effort-reference/#the-wip-limit).
 
 ## Integrations
 
@@ -1107,7 +1212,7 @@ hold secrets, so cckit must never depend on it.
 So the worker records its own receipt, through a verb:
 
 ```bash
-cckit receipt 321 --stage build <<'RECEIPT'
+cckit receipt <issue> --stage build <<'RECEIPT'
 outcome:    pr-open
 url:        https://github.com/jeiemgi/cckit/pull/999
 gate:       pass
@@ -1117,17 +1222,17 @@ RECEIPT
 ```
 
 The stage is one of `build` · `review` · `design` · `docs` · `qa` · `none`. `qa` is the stage
-`cckit qa verdict` writes — see [the QA lane](/review/qa-lane/#record-the-verdict--cckit-qa-verdict).
+`cckit qa verdict` writes — see [the QA lane](/qa-reference/#record-the-verdict--cckit-qa-verdict).
 
 One JSON file per attempt, under `.cckit/receipts/`, keyed `<issue>-<stage>-<attempt>`. The
 directory resolves from the repo's shared git dir, so a receipt a worker writes inside its own
 isolation worktree is readable by a captain standing anywhere else.
 
 ```bash
-cckit receipt list 321          # 321  build   1  blocked
-                                # 321  build   2  pr-open
-                                # 321  review  1  merged
-cckit receipt show 321 build    # the latest attempt's JSON
+cckit receipt list <issue>      # <issue>  build   1  blocked
+                                # <issue>  build   2  pr-open
+                                # <issue>  review  1  merged
+cckit receipt show <issue> build    # the latest attempt's JSON
 ```
 
 **Every receipt is also posted as a comment on its issue.** `.cckit/` is gitignored and
@@ -1141,7 +1246,7 @@ The comment carries an invisible marker keyed to the same `<issue>-<stage>-<atte
 file gives. A new attempt gets its own comment.
 
 ```bash
-cckit receipt 321 --stage build --no-remote <<'RECEIPT'   # write the file, post nothing
+cckit receipt <issue> --stage build --no-remote <<'RECEIPT'   # write the file, post nothing
 ```
 
 The mirror is best-effort, and the local write has already succeeded before it runs: a failure

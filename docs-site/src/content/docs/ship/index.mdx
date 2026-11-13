@@ -42,24 +42,11 @@ Two more habits follow from the same incident:
 **The owner.** By default merging is a human decision. An agent opens the pull request, reports
 the link and stops.
 
-**The captain, on a plan the owner approved.** The captain is not an agent you install. It is
-whoever drives a plan: `cckit watch --merge`, the `/kit-autopilot` skill, or the session that is
-orchestrating the work. Once the owner has approved a plan, the captain merges each wave when its
-gate is green and continues. It does not stop to ask "merge or review?" for a merge the plan
-already covers.
-
-The captain stops and asks a person in four cases only:
-
-1. a merge conflict it cannot safely resolve;
-2. a change the plan did not call for that always needs a person: a new dependency or lockfile
-   change, an auth, secret or security edit, a file under `.github/workflows/`;
-3. something the approved scope does not answer;
-4. a destructive or irreversible step outside the plan.
-
-A failing gate is not on that list. The captain does not merge it and does not ask: it fixes the
-cause or reports the failure.
-
-More on the roles: [Tech lead, PM and captain](/project-management/roles/).
+**The captain, on a plan the owner approved.** Once the owner has approved a plan, the captain
+merges each wave when its gate is green and continues. It does not stop to ask "merge or review?"
+for a merge the plan already covers, and it stops for a person in four cases only.
+[Tech lead, PM and captain](/project-management/roles/#the-captain) says what the captain is and
+lists the four.
 
 ## What closing does
 
@@ -86,9 +73,9 @@ stays: it is how GitHub links the two and how cckit finds which issues to close.
   work cckit cannot do for you: *Require branches to be up to date before merging* makes GitHub
   report a stale branch as behind, which the captain then refuses to merge, and *Automatically
   delete head branches* removes the remote branch when its pull request merges.
-- **release-please, npm and Homebrew.** cckit's own releases are cut by a release-please workflow
-  and published to npm and a Homebrew tap. [Cut a release](/ship/releasing/) describes that setup.
-  `cckit init` does not add a release workflow to your project.
+- **release-please.** `cckit init` does not add a release workflow to your project. The commit
+  titles cckit writes are the ones release-please reads, so you can add it yourself:
+  [Cut a release](/ship/releasing/).
 
 <Aside type="caution" title="What the merge verbs do not do">
 Neither `cckit merge` nor `cckit watch --merge` brings a stale, conflict-free branch up to date.
@@ -116,7 +103,7 @@ Every flag is in the [CLI reference](/cli-reference/).
 
 <CardGrid>
   <LinkCard title="Merge, close and clean up" href="/ship/merge-and-close/" description="Land a pull request or an effort, close what it finished, and remove what is left over." />
-  <LinkCard title="Cut a release" href="/ship/releasing/" description="How the version is decided, how a release is cut, and how a hotfix reaches the release branch." />
+  <LinkCard title="Cut a release" href="/ship/releasing/" description="Commit titles that carry the version, the promotion pull request, and how a hotfix reaches the release branch." />
 </CardGrid>
 
 Before this area: [Review](/review/), the checks a change passes before anyone merges it.

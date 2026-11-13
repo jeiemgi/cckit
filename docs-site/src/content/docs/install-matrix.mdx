@@ -11,6 +11,42 @@ a Claude Code install, a Codex-only install or both, what moves each of them for
 machines that both say `0.9.0` can be running different code. Every claim names the script that
 implements it.
 
+## How the install works
+
+cckit is bash scripts over `git`, `gh` and `jq`. There is no build step: installing it puts the
+`cckit` dispatcher on your PATH, the list of folders your terminal searches when you type a
+command.
+
+`cckit install [bin-dir]` symlinks `bin/cckit` into the first writable PATH folder (`~/.local/bin`, then `/usr/local/bin`, then `~/bin`), or a folder you pass.
+
+With the one-liner and the "From source" route it is a **symlink, not a copy**: the dispatcher resolves the link back to the cloned repository, so `git pull` there upgrades your install with no reinstall.
+
+That also means such an install is as old as the branch its clone is parked on. [Install routes](#install-routes) compares every route: what lands on disk, how it updates, and when a restart is needed. [Many sessions, one repository](/development/many-sessions/) covers a clone that several agent sessions share.
+
+## What it depends on
+
+| Required | Why |
+| --- | --- |
+| `git`, `gh`, `jq` | the work itself: worktrees, GitHub, JSON |
+| `perl` | `cckit init` stops without it; `cckit doctor` lists it with the hard dependencies |
+| `bash` 3.2+ | the dispatcher and its libraries |
+
+Optional, auto-detected, never required:
+
+| Optional | Enables |
+| --- | --- |
+| `tmux` | the default `cckit orchestrate` runtime |
+| `herdr` | persistent, state-aware orchestration with `--runtime herdr` |
+| `glow` / `fzf` / `gum` | nicer terminal output and pickers |
+| Node + Chrome | `cckit debug` (browser debugging via chrome-devtools-axi) |
+
+`cckit doctor` reports what is missing, including the agent CLI (`claude`, `codex`) of each adapter
+the project selected. `cckit doctor --agents` prints only those rows and makes no network call.
+
+<Aside type="tip" title="What is a symlink? (skip if you know)">
+A symlink is a pointer file: it stands in one folder but redirects to a file somewhere else. cckit installs as a symlink into a PATH folder that points back to the cloned repo, so updating the repo updates your installed command automatically.
+</Aside>
+
 ## Three things carry a version
 
 Updating cckit means moving up to three separate things, and they do not move together.
@@ -88,7 +124,7 @@ the project's files, and the adapter decides which. The default is `claude`.
   under `scripts/` and `knowledge/INDEX.md`.
 - **A pre-existing `AGENTS.md` is kept** by a fresh init unless `--force` is passed.
 - **Every file written is recorded in the ownership manifest with its hash.** A file you edited
-  reads as modified; an upgrade preserves it and `cckit remove` keeps it.
+  reads as modified; an upgrade preserves it and the uninstall script (`scripts/kit-remove.sh`) keeps it.
 
 `cckit init --dry-run` prints the exact list for your project before anything is written. How the
 two adapters render from one set of templates, and what the Codex adapter does not do yet:

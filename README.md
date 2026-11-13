@@ -427,7 +427,7 @@ cckit task start <id>                                  # a folder and branch for
 cckit task finish <id> "<summary>" --all               # open the pull request; --all includes new files
 ```
 
-Guide: [Initialize → The marketing profile](https://cckit.dev/getting-started/initialize/#the-marketing-profile).
+Guide: [cckit init reference → The marketing profile](https://cckit.dev/init-reference/#the-marketing-profile).
 
 ## Waves — parallel agentic development
 
@@ -579,9 +579,9 @@ prompt** you can paste straight into Claude Code. The
 [CLI reference](https://cckit.dev/cli-reference/) covers every verb.
 
 The site has two tracks, switched from the top bar. **Software** is for developers: its sidebar
-lists 42 pages in the order a team works in (Start here, Philosophy, Getting started, Memory,
-Project management, Design, Development, Review, Ship, Reference), with only the current group
-open. Every other page is linked from its area's "More guides" page or from
+lists 43 pages in the order a team works in (Start here, Philosophy, Getting started, Project
+management, Design, Development, Review, Ship, then the optional Memory area and Reference), with
+only the current group open. Every other page is linked from its area's "More guides" page or from
 [All reference pages](https://cckit.dev/reference/). **[Marketing](https://cckit.dev/marketing/)** is
 ten pages for a marketing team that works by talking to Claude and never opens a terminal; the
 same ten pages are in Spanish at [cckit.dev/es/marketing](https://cckit.dev/es/marketing/).

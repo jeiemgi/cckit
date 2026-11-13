@@ -1,6 +1,6 @@
 ---
-title: Review gates
-description: The lint gates that turn a reviewer's repeated findings, and the size of what every session loads, into checks that fail.
+title: Turn repeated review findings into checks
+description: Three lint scripts you add to your gate command, so a defect a reviewer reported once, an oversized skill description or an oversized instruction file fails a check from then on.
 ---
 
 import { Aside } from '@astrojs/starlight/components';
@@ -14,22 +14,24 @@ The team's answer is to move a finding out of the thread and into the gate. Once
 rule, the gate fails on it and no reviewer has to notice it a second time. The same idea covers two
 costs no reviewer sees at all: the text every session loads before any work starts.
 
+<Aside type="note" title="These are not the gate itself">
+Your gate is the one command that proves a change is sound: your tests, your type check, your
+linters. [Choose your gate command](/review/gate-command/) covers it. The three scripts on this
+page are checks you add to that command.
+</Aside>
+
 ## What you get
 
-| Gate | What it stops from coming back |
+| Script | What it stops from coming back |
 | --- | --- |
 | `scripts/review-lint.sh` | A mechanical defect a reviewer already reported once |
 | `scripts/skill-frontmatter-lint.sh` | A skill description that grows and is paid for in every session |
 | `scripts/instruction-budget-lint.sh` | `CLAUDE.md` and the rules growing past what a session loads well |
-| `scripts/agent-skills-lint.sh` | An agent template naming a skill that does not exist (the kit's own templates only) |
 
-`cckit init` copies the first three into your project and seeds a baseline for each, so a new
-project starts green. In cckit's own repository `scripts/check.sh` runs all four; in your project,
-add the three to the command you use as your gate.
-
-The first three are **ratchets, not caps**: today's offenders are recorded in a baseline and
-allowed to stay, but nothing may grow past its recorded size and nothing new may land dirty. Adding
-a rule therefore never forces a repo-wide fix.
+`cckit init` copies the three into your project and records, for each, the defects the project
+already has. That record is the **baseline**, and each script is a ratchet over it: what is in
+the baseline is allowed to stay, nothing in it may grow, and nothing new may be added. A new project therefore starts green, and adding a rule never
+forces a repo-wide fix.
 
 ## Use them
 
@@ -56,7 +58,9 @@ a rule therefore never forces a repo-wide fix.
 prints every hit with context. Then run the gate: it passes on the baseline and fails when you add
 one more hit.
 
-The rest of this page is the detail of each gate.
+The rest of this page is the detail of each script. The baseline file format, how baselines are
+seeded, and a fourth lint that checks only cckit's own templates are in
+[Lint gates: baselines](/config-and-permissions/#lint-gates-baselines).
 
 ## review-lint — findings that became a gate
 
@@ -80,16 +84,6 @@ gate is worse than no gate.
 
 The [`gate-and-review`](/rules/#gate-and-review) rule is the other half: a finding that does not
 become a lint rule is still fixed or rebutted on its thread before the PR merges.
-
-### The baseline is TAB-separated
-
-```text
-# <RULE>\t<path>\t<count>   (TAB-separated: a path may contain a space)
-fence-missing-language	docs/my file.md	1
-```
-
-A space-separated baseline written by an earlier version is still read, so upgrading does not turn
-the gate red.
 
 ## skill-frontmatter-lint — the context budget
 
@@ -118,39 +112,6 @@ under `LC_ALL=C`, and CI only looked green because `ubuntu-latest` happens to ex
 The lint therefore pins `LC_ALL=C` and measures bytes. Every environment can produce a byte count,
 and no locale has to be installed to reproduce a number. An em-dash costs the three bytes it occupies.
 </Aside>
-
-## agent-skills-lint — every agent skill resolves
-
-A `skills:` entry that names nothing fails silently: the agent loads, answers, and has fewer skills
-than its frontmatter lists. A rename is how it happens — `templates/agents/pm.md` kept listing
-`task-sync`, `task-new` and `task-close` after the kit shipped them as `kit-task-*`, so all three of
-the PM agent's lifecycle skills were dead.
-
-```bash
-scripts/agent-skills-lint.sh           # the gate: fails on any unresolved entry
-```
-
-It reads the frontmatter `skills:` key of every `templates/agents/*.md` (block list or inline
-`[a, b]`) and accepts an entry that is one of:
-
-| Form | Resolves against |
-| --- | --- |
-| a skill the kit ships | `skills/<name>/SKILL.md` |
-| a skill the kit scaffolds | `templates/skills/<name>/SKILL.md` |
-| another plugin's skill | the `plugin:skill` form, e.g. `agent-skills:context7` |
-| a third-party bare name | a line in `scripts/agent-skills-external.txt` |
-
-Anything else is reported as `<file>:<line>: <entry>` and fails `scripts/check.sh`.
-
-`scripts/agent-skills-external.txt` is the list of **optional** skills: names an agent template
-lists that come from a third-party skill pack or from the harness (`deep-research`, `impeccable`,
-the `gsap-*` and `n8n-*` sets). An agent scaffolded into a project without one of them runs without
-that skill. A name that is both in that file and shipped by the kit fails the lint, so the list
-cannot keep describing a kit skill as third-party.
-
-Unlike the two ratchets above, this lint has no baseline — every entry resolves or the gate is red —
-and it is **not** scaffolded by `cckit init`: it checks the kit's own agent templates. A
-`plugin:skill` entry is accepted on its form alone; the lint cannot see another plugin's skills.
 
 ## instruction-budget-lint — what every session loads
 
@@ -195,29 +156,6 @@ imports inside a `CLAUDE.md`, and it does not count `CLAUDE.md` files in subdire
 `~/.claude`. `paths:` is detected as a top-level frontmatter key on line 1's block; the globs are
 not evaluated.
 </Aside>
-
-## Baselines are seeded once
-
-`cckit init` seeds each baseline the first time it scaffolds the lint, so a fresh project starts green
-and only *new* defects fail. It never regenerates an existing baseline — that would silently
-re-grandfather whatever drifted since the last upgrade.
-
-Seeding sets `KIT_LINT_WALK=1`, which forces the filesystem walk instead of `git ls-files`.
-Scaffolding usually lands in a repo that already has commits, so the kit's freshly written files are
-untracked and invisible to the index; without the walk the baseline comes out empty and the gate goes
-red on your first commit of the scaffold.
-
-Each lint reports its own baseline path, which is how `init.sh` finds it:
-
-```bash
-scripts/review-lint.sh --baseline-path             # scripts/review-lint-baseline.txt
-scripts/skill-frontmatter-lint.sh --baseline-path  # scripts/skill-frontmatter-baseline.txt
-scripts/instruction-budget-lint.sh --baseline-path # scripts/instruction-budget-baseline.txt
-```
-
-A freshly scaffolded project's instruction-budget baseline already lists two rules: the shipped
-`effort-model.md` (209 lines) and `naming-and-ids.md` (208) are over the 200-line limit, so they are
-grandfathered and may shrink but not grow.
 
 ## All three self-disable
 

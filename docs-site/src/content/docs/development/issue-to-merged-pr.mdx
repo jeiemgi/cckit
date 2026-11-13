@@ -12,11 +12,8 @@ tutorial:
 ---
 
 import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
-import TagRow from '../../../components/TagRow.astro';
 import TutorialMeta from '../../../components/TutorialMeta.astro';
 import TutorialSchema from '../../../components/TutorialSchema.astro';
-
-<TagRow kinds={["flow", "conversational"]} />
 
 <TutorialMeta />
 
@@ -68,7 +65,10 @@ request, and no leftover branch or folder on your machine.
    This is where you look at the work. The checks run on the pull request, and you or a reviewing
    agent read the change.
 
-5. **Merge, close and clean up.** Once the review passes:
+5. **Merge, close and clean up.** Once the review passes, the agent first brings the branch onto
+   the current base branch, shows you what the diff deletes and runs the gate again. `cckit merge`
+   does not do that for a branch that is behind and has no conflict. The commands are in
+   [Land one pull request](/ship/merge-and-close/#land-one-pull-request). Then:
 
    ```bash frame="terminal"
    cckit merge                      # merge the PR, close its issue, remove the branch and worktree

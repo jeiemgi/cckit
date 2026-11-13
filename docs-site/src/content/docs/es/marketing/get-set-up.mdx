@@ -34,7 +34,7 @@ páginas enlazadas aquí están en inglés.
 <Steps>
 
 1. **Instala cckit e inicia sesión en GitHub** en la computadora de quien va a escribir:
-   [Install cckit](/getting-started/install/) (en inglés). Esa página también trae la comprobación
+   [Install and check](/getting-started/install/) (en inglés). Esa página también trae la comprobación
    para tu sistema operativo.
 
 2. **Abre el proyecto en Claude Code y corre la preparación con el perfil de marketing:**
@@ -43,23 +43,10 @@ páginas enlazadas aquí están en inglés.
    /kit-init marketing
    ```
 
-   El perfil de marketing instala las habilidades de redacción, voz de marca y campañas, los cuatro
-   roles (planeación, edición, diseño e investigación) y el modo de lenguaje sencillo, en el que
-   Claude dice "borrador", "revisión" y "aprobar" y deja los términos de desarrollo fuera de la
-   conversación salvo que se los pidan. Desde una terminal, la misma preparación es
-   `cckit init --profile marketing`. Lo que la preparación escribe y pregunta está en
-   [Initialize cckit](/getting-started/initialize/) (en inglés).
-
-   La preparación enumera sus pasos de git y GitHub y pregunta una sola vez antes de correrlos. Di
-   que sí. Esos pasos guardan los archivos de la preparación en la versión compartida de la que
-   sale cada borrador y los envían a GitHub, para que cada borrador nuevo y la copia del proyecto
-   de cada persona del equipo los tenga. En un proyecto nuevo en GitHub también crean esa versión
-   compartida, llamada `develop`; un proyecto que ya está en GitHub conserva la que tiene.
-
-   Si las últimas líneas de la salida dicen `Git and GitHub setup: not run`, corre
-   `cckit init --yes` en la carpeta del proyecto. Las líneas que siguen dicen qué quedó sin hacer.
-   Mientras eso no haya corrido, un borrador nuevo empieza sin los archivos de la preparación, y
-   Claude trabaja en él sin las reglas del equipo.
+   Desde una terminal, la misma preparación es `cckit init --profile marketing`. La preparación
+   pregunta una sola vez antes de guardar sus archivos y enviarlos a GitHub. Di que sí. Qué
+   instala, y qué hacer si esa parte no corrió, está en
+   [cckit init reference](/init-reference/#the-marketing-profile) (en inglés).
 
 3. **Da acceso al proyecto en GitHub** a todas las personas que escriben o aprueban.
 
@@ -69,6 +56,11 @@ páginas enlazadas aquí están en inglés.
 Decidan desde ahora quién aprueba. Con una persona que escribe y otra que aprueba ya se puede
 trabajar desde el primer día.
 </Aside>
+
+Después de esto, Claude trabaja con cuatro asistentes (planeación, edición, diseño e
+investigación), sigue los métodos del equipo para redactar, para la voz de marca y para las
+campañas, y dice "borrador", "revisión" y "aprobar" en lugar de los términos de desarrollo, salvo
+que se los pidas.
 
 ## Parte 2: para ti, y cómo comprobar que funcionó
 
@@ -100,8 +92,8 @@ trabajar desde el primer día.
 | Lo que ves | Qué hacer |
 | --- | --- |
 | Claude dice que no puede conectarse a GitHub, o te pide iniciar sesión | Pídele a la persona técnica que repita el paso 1 de la Parte 1. |
-| Claude dice que no puede abrir un borrador porque la versión compartida (`develop` o `main`) no existe | La parte de git y GitHub de la preparación no corrió. Pídele a la persona técnica que corra `cckit init --yes` en la carpeta del proyecto (paso 2 de la Parte 1). |
-| En un borrador nuevo Claude no conoce los roles, la habilidad de voz de marca ni el modo de lenguaje sencillo | Los archivos de la preparación nunca se guardaron en la versión compartida. El arreglo es el mismo: `cckit init --yes` en la carpeta del proyecto, y luego abrir el borrador otra vez. |
+| Claude dice que no puede abrir un borrador | Una parte de la preparación no corrió. Mándale a la persona técnica [este enlace](/init-reference/#the-marketing-profile) (en inglés). |
+| En un borrador nuevo Claude no conoce los roles, la voz de marca ni el modo de lenguaje sencillo | Es la misma causa. Mándale a la persona técnica [el mismo enlace](/init-reference/#the-marketing-profile) y después abre el borrador otra vez. |
 | Claude responde con términos de desarrollo que no conoces | Dile "Explícamelo con palabras sencillas". Las palabras están en [Palabras que vas a escuchar](/es/marketing/words-you-will-hear/). |
 | Claude pide permiso para ejecutar algo | Lee lo que dice que va a hacer. Crear un borrador, guardar tu trabajo y pedir una revisión es lo esperado. Si dudas, di que no y pídele que te explique. |
 

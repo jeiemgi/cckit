@@ -24,7 +24,11 @@ The `design-routing` rule turns that into a habit. The `software`, `content` and
 profiles install it, and it is read in every session. It says: a design decision or adjustment is
 never answered by the agent that happens to be working. That agent starts the designer, passes the
 question word for word with its context (the screen, the token name, the current state), and
-returns the designer's answer to you.
+returns the designer's answer to you. Tokens are the named values for colour, spacing and type
+that the project reuses.
+
+**Try it.** Ask in plain words: "the spacing under the card title looks tight, what should it be?"
+The session hands the question to the designer and comes back with its answer.
 
 What counts as a design question:
 
@@ -76,24 +80,7 @@ about the running interface:
 - **chrome-devtools-axi**, a browser bridge. `cckit debug` gives an agent screenshots, console
   and network logs of a page. See [Let the agent see the page](/development/browser-debug/).
 
-<Aside type="caution" title="No outside design tool is wired in">
-cckit has no integration with a design canvas or mockup tool such as Figma. `integrations/` holds
-four descriptors (`graft`, `lavish`, `mempalace`, `mlx-lm`) and none of them is a design tool.
-The designer agent works in the code: the tokens, the components and the running app. If your
-designs live in an outside tool, a person carries them across.
-</Aside>
-
-Three more limits to know before you rely on this area:
-
-- **The designer's craft skills are not shipped.** The designer's role file lists six skills
-  (`emil-design-eng`, `impeccable`, `web-design-guidelines`, `gsap-core`, `gsap-timeline`,
-  `gsap-performance`). All six come from third-party skill packs and are optional. In a fresh
-  project the designer runs without them, on its role instructions alone.
-- **Annotation is narrow.** It covers React apps (Next.js, Vite, React Router) and Claude Code
-  only.
-- **The UX audit reads source, not pixels.** It reasons over the structure of the app. A purely
-  visual critique of one screen goes to the designer.
-
+No outside design tool is wired in: see [Limits](#limits).
 ## The commands
 
 Design has no `cckit` verb of its own. The work runs through two skills and one verb:
@@ -113,3 +100,18 @@ Every skill is listed on [Skills](/skills/), and the rule on [Rules](/rules/).
   <LinkCard title="Annotate the running interface" href="/design/annotate-the-ui/" description="Click an element in your React dev app, leave a note, and have Claude Code fix it." />
   <LinkCard title="Run a UX audit" href="/design/ux-audit/" description="A report on confusing flows, inconsistent components and inaccessible markup." />
 </CardGrid>
+
+## Limits
+
+- **No outside design tool is wired in.** cckit has no integration with a design canvas or mockup
+  tool such as Figma; none of the four tools on [Integrations](/integrations/) is a design tool.
+  The designer agent works in the code: the tokens, the components and the running app. If your
+  designs live in an outside tool, a person carries them across.
+- **The designer's craft skills are not shipped.** The designer's role file lists six skills
+  (`emil-design-eng`, `impeccable`, `web-design-guidelines`, `gsap-core`, `gsap-timeline`,
+  `gsap-performance`). All six come from third-party skill packs and are optional. In a fresh
+  project the designer runs without them, on its role instructions alone.
+- **Annotation is narrow.** It covers React apps (Next.js, Vite, React Router) and Claude Code
+  only.
+- **The UX audit reads source, not pixels.** It reasons over the structure of the app. A purely
+  visual critique of one screen goes to the designer.

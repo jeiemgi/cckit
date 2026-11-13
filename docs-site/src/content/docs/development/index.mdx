@@ -5,9 +5,7 @@ description: The path of one piece of work from issue to merged code, why each p
 
 import { CardGrid, LinkCard, Steps, Aside } from '@astrojs/starlight/components';
 import GitHubCycle from '../../../components/diagrams/GitHubCycle';
-import TagRow from '../../../components/TagRow.astro';
-
-<TagRow kinds={["flow"]} />
+import WorktreeIsolation from '../../../components/diagrams/WorktreeIsolation';
 
 Building is the part of the process where several agents touch the same repository at the same
 time. Two of them editing one folder overwrite each other's files, and git has no lock that stops
@@ -30,7 +28,8 @@ to happen. The work becomes a **pull request**, and **review** either merges it 
 1. **Issue.** A short note of one thing to do. Its number follows the work the whole way through.
 
 2. **Start.** `cckit start <issue>` makes a branch and a worktree for that issue, cut from a
-   freshly fetched base branch. A worktree is a second folder on your disk holding its own copy of
+   freshly fetched base branch. The base branch is the shared branch every change starts from and
+   returns to, for example `develop`. A worktree is a second folder on your disk holding its own copy of
    the code, so this work cannot disturb anyone else's.
 
 3. **Work.** The agent makes the change inside that folder and runs the project's checks until
@@ -52,7 +51,11 @@ An agent runs each step. Read this page to know what is happening behind the com
 
 ## Why every change gets its own copy
 
-One issue, one branch, one worktree, one pull request. The rule buys three things:
+One issue, one branch, one worktree, one pull request.
+
+<WorktreeIsolation client:only="react" />
+
+The changes only meet again when their pull requests merge. The rule buys three things:
 
 - **Nothing collides.** Each agent writes in its own folder, so several can build at once on
   one machine.
@@ -69,21 +72,18 @@ What still needs care when several sessions share one repository is on
 
 ## Who does the building
 
-The agents that write code come from the profile you chose at setup. The `software` profile
-installs a backend agent (API, data model, server logic), a frontend agent (everything the user
-sees and touches), a devops agent (pipelines and deployment) and a tech lead (toolchain and
-architecture decisions), alongside QA and security. The `minimal` and `automation` profiles
-install a generalist instead.
+The agents that write code come from the profile you chose at setup. In a `software` project the
+builders are the backend, frontend and devops agents and the tech lead; the `minimal` and
+`automation` profiles install a generalist instead. What each role owns is on
+[The team](/philosophy/the-team/#the-eight-roles-of-a-software-project).
 
 Three other roles shape a build without writing it:
 
 - **The designer** answers every visual question before the frontend agent writes it. See
   [Design](/design/).
-- **The captain** is not an agent. It is whoever drives a batch of work to merged: the command
-  `cckit watch --merge`, or a session you told to run an approved plan.
+- **The captain** drives a batch of approved work to merged. It is a role, not an agent you
+  install: [Tech lead, PM and captain](/project-management/roles/#the-captain).
 - **You** pick the work, approve the plan and decide what merges.
-
-Every role and what it owns is on [The team](/philosophy/the-team/).
 
 ## Which tools plug in
 
@@ -125,24 +125,10 @@ Every flag is in the [CLI reference](/cli-reference/).
 
 ## The pull request carries its own proof
 
-A pull request should show that the checks passed, not claim it. cckit ships a helper,
-`pr_attach_evidence` (`scripts/lib/pr-evidence.sh`), that attaches the output as a comment after
-the request opens: the build log, the typecheck log, a screenshot of the working screen. A
-reviewer, person or agent, can then trust the result without running everything again.
-
-Each piece of evidence gets its own comment, named by its caption: one for `build`, one for
-`typecheck`, one for a screenshot. Attach again and cckit updates that same comment in place, so
-a request that took ten pushes shows one current build log and not ten stale ones.
-
-<Aside type="caution" title="Evidence never breaks your work">
-By default, a comment that fails to post prints a warning and the run continues. A caller that
-needs the evidence to exist asks for the opposite with `--strict` or `PR_EVIDENCE_STRICT=1`, and
-the failure stops the run. Either way the failure is printed and never reported as success.
-</Aside>
-
-Image evidence has one limit. GitHub has no supported way to upload a file to a comment from the
-command line, so a screenshot is referenced by its path, with instructions. Drag it into the
-comment box yourself, or host the file, set `KIT_EVIDENCE_URL_BASE`, and cckit embeds it.
+A pull request should show that the checks passed, not claim it. The agent attaches the output of
+the checks to the pull request as comments, one per check, so a reviewer does not run them again.
+The helper behind it and its settings are under
+[Evidence on the pull request](/config-and-permissions/#evidence-on-the-pull-request).
 
 ## Guides
 
@@ -151,6 +137,7 @@ Start with the first one. It is the path on this page, run for real.
 <CardGrid>
   <LinkCard title="Take an issue to merged" href="/development/issue-to-merged-pr/" description="One issue through start, change, pull request, close and cleanup." />
   <LinkCard title="Run work in parallel waves" href="/development/waves/" description="How a batch of unblocked issues is handed to parallel agents." />
+  <LinkCard title="Many sessions, one repository" href="/development/many-sessions/" description="Three habits that keep several sessions on one machine from colliding." />
   <LinkCard title="Let the agent see the page" href="/development/browser-debug/" description="Give an agent screenshots and logs of a running page." />
   <LinkCard title="More development guides" href="/development/more-guides/" description="Unattended runs, CI, code search, local models, hooks, skills and integrations." />
 </CardGrid>

@@ -18,15 +18,17 @@ project.
 
 The agents do the work. These decisions are yours:
 
-- **What gets built.** No agent files or closes an issue without your confirmation. The project
-  manager drafts one and shows it to you first.
+- **What gets built.** The project manager, designer and tech lead agents do not file or close an
+  issue without your confirmation: the project manager drafts one and shows it to you first. One
+  skill is the exception. `/kit-security-sweep` files an issue for every finding it makes, without
+  asking.
 - **The plan.** A plan an agent proposed and nobody approved is not a plan. Work starts on the plan
   you approved.
 - **The merge.** An agent stops after it opens the pull request. Merging is your decision, unless
   you approved a plan that says the work may be merged as it passes.
 - **The changes that are always a person's.** Even inside an approved plan, the run stops and asks
-  before a new dependency or lockfile change, an edit to auth, secrets or security, an edit under
-  `.github/workflows/`, and any destructive step the plan did not name.
+  you in four cases, listed under
+  [the captain](/project-management/roles/#the-captain).
 - **Your keys.** You type secret values yourself. cckit reads none of them back and puts none in a
   commit.
 
@@ -60,24 +62,17 @@ where its work happens.
 
 - **The orchestrator** is the session you are talking to. It reads the board, picks the role and
   reports back to you.
-- **The captain** is whoever drives a plan you approved: `cckit watch --merge`, the `/kit-autopilot`
-  skill, or an orchestrating session. It checks each pull request, merges the ones that pass and
-  moves to the next batch. No agent file is installed for it.
-  [Tech lead, PM and captain](/project-management/roles/) covers the three roles that run a plan.
+- **The captain** is whoever drives a plan you approved. It checks each pull request, merges the
+  ones that pass and moves to the next batch.
+  [Tech lead, PM and captain](/project-management/roles/#the-captain) says what it can be and when
+  it stops to ask.
 
 ## Other profiles, other teams
 
-The profile you pick at setup decides the team. Every profile has a project manager.
-
-| Profile | Roles |
-| --- | --- |
-| `software` | PM, Tech Lead, Designer, DevOps, Backend, Frontend, QA, Security |
-| `content` and `marketing` | PM, Editor, Designer, Researcher |
-| `research` | PM, Researcher, Analyst |
-| `automation` | PM, Automation, Generalist |
-| `minimal` | PM, Generalist |
-
-[Initialize a project](/getting-started/initialize/#profiles) says what else a profile sets.
+The profile you pick at setup decides the team. Every profile has a project manager; a content or
+marketing team gets an editor and a researcher where a software team gets engineers. The roles of
+each profile, and what else a profile sets, are in the
+[cckit init reference](/init-reference/#profiles).
 
 ## The tools behind the team
 
@@ -98,9 +93,9 @@ the two.
   build and architecture decisions.
 - **A role's tool allowlist is enforced by Claude Code only.** For Codex it is written into the
   agent file as a comment.
-- **The designer's three design skills are not shipped.** Its charter names `emil-design-eng`,
-  `impeccable` and `web-design-guidelines`; all three are third-party and optional, so a new
-  project's designer runs without them until you install them.
+- **The designer's skills are not shipped.** Its charter names six third-party skills, and a new
+  project's designer runs without them until you install them. [Design](/design/#limits) lists
+  them.
 - **A UX agent exists and no profile installs it.** `templates/agents/ux.md` is used by the
   `/kit-ux-audit` skill. Day to day, design has one agent: the designer.
 - **Two more templates are in no profile:** `auto-dev`, for a CI run started by the `agent:auto`

@@ -4,10 +4,6 @@ description: cckit qa starts the project, opens the changed screen, records a pa
 ---
 
 import { Steps, Aside } from '@astrojs/starlight/components';
-import Tag from '../../../components/Tag.astro';
-import TagRow from '../../../components/TagRow.astro';
-
-<TagRow kinds={["flow", "command"]} />
 
 Tests pass and the diff reads well, and the save button still does nothing when a person clicks
 it. Some defects only show on the running product. With several agents each building a change,
@@ -24,7 +20,9 @@ the change and names the screen to open.
 **What plugs in:** your project's own start command. cckit does **not** boot your project by
 guessing and does **not** write a boot script. It asks once how the review stack boots, saves the
 answers under `qa` in the kit config, and owns the rest: the ports, the readiness check, the URL,
-the stop, the verdict.
+the stop, the verdict. A **stack** here is everything the project needs running to be tried: the
+web app, and its API if it has one. A **readiness check** is an address cckit requests until it
+answers, to know the stack is up.
 
 <Aside type="note" title="What a lane is">
 A **lane** is one review stack, keyed by an **issue number**: the number in the current branch
@@ -39,7 +37,7 @@ one stack for the whole effort PR, not one per sub-issue agent. Every `cckit qa`
 
 1. **Declare the stack, once per project.** See [Declare how the project boots](#declare-how-the-project-boots).
 
-2. **Bring the lane up.** Exit 0 means every readiness probe answered.
+2. **Bring the lane up.** Exit 0 means every address you listed as a readiness check answered.
 
    ```sh
    cckit qa up
@@ -69,7 +67,8 @@ one stack for the whole effort PR, not one per sub-issue agent. Every `cckit qa`
 **How to check it worked:** `cckit qa verdict` with no argument prints `pass` and exits `0`, and
 the pull request carries one `QA verdict` comment.
 
-The sections below are the detail of each step: read the one you need.
+Every flag, exit code and environment variable of the five subcommands is in the
+[cckit qa reference](/qa-reference/).
 
 ## Declare how the project boots
 
@@ -104,188 +103,6 @@ The file written is a root `cckit.config.json` when the project has one, otherwi
 
 The full key reference is in [Config & permissions](/config-and-permissions/#the-qa-lane).
 
-## Bring a lane up — `cckit qa up`
-
-```sh
-cckit qa up [--lane <n>] [--timeout <s>]
-cckit qa ready [--lane <n>] [--timeout <s>]    # wait on a lane that is already launched
-```
-
-`up` launches `qa.command` from the current worktree with each `qa.ports` variable exported, then
-waits. `ready` only waits.
-
-**Ports.** Each variable is set to `base + slot × stride`. The slot is the lane's row in the same
-port-slot ledger `cckit start` uses, so a lane running in an issue's own worktree lands on the
-port block that worktree already holds. The stride is `worktree.devPortStride` (default `10`).
-
-**A port already in use refuses the launch.** Slot 0 is the bases themselves (`3000` and `4000`
-with the interview's defaults), which is where a dev server in the main checkout usually listens.
-Before it writes the lane's record, `up` asks `lsof` (else `ss`) who listens on each lane port. If
-anything does, `up` exits `2`, names the port and the pid, and launches nothing: the declared
-command could not bind that port, and the process already there would answer the readiness probes.
-Stop that process, or run `cckit qa stop` if it is this lane's earlier stack. With neither tool
-installed the ports are not checked, and `up` says so. A process that takes the port between the
-check and the command's own bind is not caught.
-
-**Usable is not the same as launched.** A lane is usable only when **every** `qa.readiness` probe
-answers in the same polling round:
-
-| Probe answers | Reads as |
-| --- | --- |
-| 2xx | up |
-| 3xx — redirects are not followed, so a 302 to sign-in counts | up |
-| 4xx, 5xx, connection refused | not yet |
-
-A web process answering 200 while the API probe fails is **not** usable.
-
-| Exit | Meaning |
-| --- | --- |
-| `0` | Usable. Prints `lane <n> usable · NAME=port …`. |
-| `1` | Not usable: the wait timed out, or the stack command exited first. The message names the probes still failing and the launch log. |
-| `2` | Refused before anything launched: no config, no `qa.command`, no `qa.readiness`, a probe naming a variable that is not in `qa.ports`, a port set that two lanes would share, or no lane number. |
-| `3` | `jq` or `curl` is missing. |
-
-- A second `up` on a lane whose command is still running starts nothing and reports the existing pid.
-- Two bases that differ by a multiple of the stride, fewer than 40 strides apart, are refused: lane
-  10's first port would be lane 0's second (bases `3000` and `3100` at stride `10`).
-- The launch log is `qa/<lane>/launch.log` under the shared [`.cckit/` state directory](/config-and-permissions/#project-scanning).
-
-## Open the changed screen — `cckit qa open`
-
-```sh
-cckit qa open [--lane <n>] [--pr <n>] [--route </path>] [--port-env <NAME>] [--print]
-```
-
-Prints `http://localhost:<lane port><route>` and opens it in a browser.
-
-The route is resolved in this order:
-
-1. `--route </path>`.
-2. A `QA route: /path` line in the lane's PR body. `--pr <n>` reads another PR.
-3. The configured `qa.route`.
-
-The builder is the one who knows which screen changed, so [`cckit brief`](/cli-reference/#briefing-an-agent-without-retyping-the-repo)
-asks for that `QA route:` line — only in a project whose config has a `qa.command`.
-
-- The port is the **first** `qa.ports` variable. `--port-env <NAME>` picks another.
-- A lane that is not usable right now is refused with exit `1`, and no browser starts. `open` runs
-  one probe round and does not wait; use `cckit qa ready` for that.
-- `--print` prints the URL and opens nothing.
-- With no opener on the machine (`open`, `xdg-open`, or `QA_OPENER`) the URL is still printed and
-  the exit is `0`.
-
-## Record the verdict — `cckit qa verdict`
-
-```sh
-cckit qa verdict <pass|fail> [--lane <n>] [--pr <n>] [--head <sha>]
-                 [--note <text> | --notes-file <file>] [--shot <file>]… [--to <branch>]
-cckit qa verdict [--lane <n>] [--pr <n>] [--head <sha>]        # read it back
-```
-
-A verdict is a [stage receipt](/config-and-permissions/#stage-receipts) at stage `qa`, bound to
-the reviewed commit: `--head`, else the local tip of the lane's branch, else the PR's head on
-GitHub.
-
-Recording one does four things:
-
-| Write | What |
-| --- | --- |
-| Receipt | `cckit receipt show <lane> qa` reads it. |
-| PR comment | **One** `QA verdict` comment on the lane's PR; a second verdict edits it. Each `--shot` adds one `QA screenshot <n>` comment. |
-| Mail | A `fail` sends its notes to the builder's branch as a steer. `--to <branch>` names another branch. |
-| Event | One `qa.verdict` line in `kit-events.jsonl`. |
-
-- A `fail` needs notes. Without `--note` or `--notes-file` it is refused and nothing is written.
-- Exit `1` after a recorded `fail` means the notes reached no mailbox. The receipt is still written.
-- A screenshot is posted as a local path reference unless `KIT_EVIDENCE_URL_BASE` is set: `gh`
-  cannot upload an image.
-- With no PR for the lane the verdict is recorded locally and posted nowhere.
-
-**Reading it back.** With no `pass|fail`, the verb prints one word and exits `0` only for `pass`:
-
-| Word | Meaning |
-| --- | --- |
-| `pass` | A pass is recorded against the lane's current head. |
-| `fail` | A fail is recorded against the lane's current head. |
-| `stale` | The verdict was recorded against another commit. Review again. |
-| `none` | No verdict is recorded. |
-
-A verdict belongs to one commit. A push after it reads `stale` with no extra step — the recorded
-commit no longer matches the head.
-
-## List the lanes — `cckit qa lanes`
-
-```sh
-cckit qa lanes [--llm]
-```
-
-One row per lane, read from what the other verbs recorded. It takes no argument, launches and
-stops nothing, writes no file and no event, and calls neither `gh` nor `curl`.
-
-```text
-LANE  BRANCH                 PORTS                        UP       VERDICT  WORKTREE
-311   feat/311-billing-form  WEB_PORT=3030 API_PORT=4030  up       pass     /repo/.claude/worktrees/feat+311-billing-form
-312   fix/312-save-button    WEB_PORT=3050 API_PORT=4050  down     stale    /repo/.claude/worktrees/fix+312-save-button
-314   -                      -                            unknown  unknown  -
-```
-
-A lane is listed when any of these exists: a row in the port-slot ledger whose worktree is still
-on disk (`cckit start` writes it), a launch record (`cckit qa up`), or a verdict
-(`cckit qa verdict`).
-
-| Column | What it is |
-| --- | --- |
-| `LANE` | The issue number. |
-| `BRANCH` | The local branch carrying that number; `-` when there is none. |
-| `PORTS` | The ports the lane was launched with. With no launch record, the ports it would get from `qa.ports` and its slot; `-` with no `qa` block or no slot. |
-| `UP` | `up` when every port has a listener, `partial` when some do, `down` when none does, `unknown` with no port to check or neither `lsof` nor `ss`. |
-| `VERDICT` | `pass` · `fail` · `stale` · `none`, read as [above](#record-the-verdict--cckit-qa-verdict) against the local tip of the lane's branch. `unknown` when a verdict exists and no local branch does. |
-| `WORKTREE` | Where the branch is checked out, else the path the ledger recorded; `-` when neither exists. |
-
-- `UP` reports a listener, whoever started it. It does not run the readiness probes: `cckit qa
-  ready --lane <n>` answers whether the stack is usable.
-- `VERDICT` is compared with the local branch tip and makes no GitHub call. `cckit qa verdict
-  --lane <n>` also falls back to the PR's head.
-- Exit `0` with or without lanes, `2` on any argument, `3` without `jq`. With no lane the table is
-  empty and one line on stderr says so.
-- `--llm` prints a JSON array, `[]` with no lane:
-
-  ```json
-  [{"lane":"311","branch":"feat/311-billing-form","worktree":"/repo/.claude/worktrees/feat+311-billing-form","ports":{"WEB_PORT":3030,"API_PORT":4030},"up":"up","verdict":"pass"}]
-  ```
-
-## Stop the lane — `cckit qa stop`
-
-```sh
-cckit qa stop [--lane <n>] [--force]
-```
-
-The process holding a port is rarely the one that was launched: `pnpm dev` starts a runner that
-starts a watcher that starts the server. Stopping the listener alone frees the port until its
-supervisor respawns it. So `stop`:
-
-1. Stops the supervisors, parents before children.
-2. Stops the lane's own listeners on its recorded ports (`lsof`, else `ss`).
-3. Resolves the port holders again, to catch a respawn.
-
-**`stop` only signals what the lane launched**: the descendants of the recorded pid and the
-members of the lane's process group. A listener on a lane port that is in neither set is left
-running; `stop` names its pid and exits `1`. `--force` stops it as well, with its parent processes
-for as long as they share its process group — never pid 1, the calling shell or that shell's
-ancestors. Use it when the listener is this lane's stack and the record no longer ties them
-together: the root died and `up` ran without `perl`, so no process group was recorded.
-
-| Exit | Meaning |
-| --- | --- |
-| `0` | No listener is left on the lane's ports. An already-stopped lane reports "nothing stopped" and also exits `0`. |
-| `1` | A port is still held — by a process that outlived `KILL`, or by one the lane did not launch and `--force` was not given. The message names the pid. |
-
-- Only pids that are actually gone are reported as stopped.
-- With neither `lsof` nor `ss` installed, the launched process tree is still stopped and the
-  report says the ports were **not checked**.
-- When `perl` is present, `up` starts the command as its own process group, so `stop` finds the
-  stack after its root process died.
-
 ## Hold the merge on a QA pass
 
 `cckit watch` reads the verdict. Two captain verdicts come from it:
@@ -310,33 +127,6 @@ Requiring a pass is **off by default** and declaring a `qa` block does not turn 
 overrides and ordering against the agent review stage are in
 [Holding merges for a QA pass](/config-and-permissions/#holding-merges-for-a-qa-pass).
 
-## Events
-
-Each step appends one line to `kit-events.jsonl`:
-
-| Event | Written when |
-| --- | --- |
-| `op.start qa.launch` | The stack command starts. |
-| `op.done qa.ready` | The lane becomes usable. |
-| `op.done qa.timeout` | The wait ran out. |
-| `op.done qa.exited` | The command exited before the lane was usable. |
-| `op.done qa.open` | A usable lane's URL was handed over. |
-| `op.done qa.stop` | A stop ran against a lane with a record. |
-| `op.done qa.verdict` | A verdict was recorded. |
-
-## Environment tunables
-
-| Variable | Default | What it does |
-| --- | --- | --- |
-| `QA_READY_TIMEOUT` | `120` | Seconds `up` and `ready` wait. `--timeout` overrides it. |
-| `QA_READY_INTERVAL` | `2` | Seconds between probe rounds. |
-| `QA_PROBE_TIMEOUT` | `5` | Seconds per probe request. |
-| `QA_HOST` | `localhost` | Host in probe and review URLs. |
-| `QA_OPENER` | `open`, else `xdg-open` | The command that opens a URL. |
-| `QA_STOP_GRACE` | `5` | Seconds a process gets on `TERM` before `KILL`. |
-| `QA_STOP_ROUNDS` | `5` | How many times `stop` re-resolves the port holders. |
-| `QA_PORT_TOOL` | whichever exists | `lsof`, `ss` or `none`: force the holder lookup. |
-
 ## Not built yet
 
 - **Signing in.** `qa.credentialEnv` is recorded, and no verb reads it. `cckit qa open` lands on
@@ -347,7 +137,6 @@ Each step appends one line to `kit-events.jsonl`:
 
 ## Links to learn more
 
-- [Config & permissions](/config-and-permissions/#the-qa-lane) — every `qa.*` key.
-- [Wave](/development/waves/) — the loop the captain runs.
-- [Efforts, waves & worktrees](/project-management/efforts-and-waves/) — where the lanes come from.
-- [CLI reference](/cli-reference/) — every verb.
+- [cckit qa reference](/qa-reference/): each subcommand, its exit codes, the events and the environment variables.
+- [Config & permissions](/config-and-permissions/#the-qa-lane): every `qa.*` key.
+- [Run work in parallel waves](/development/waves/): the loop the captain runs.

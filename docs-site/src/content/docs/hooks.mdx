@@ -122,7 +122,7 @@ scripts read (`hook_event_name`, `cwd`, `tool_input.command`) and documents the 
 - **Memory.** `mempal_save.sh` and `mempal_precompact.sh` mine `~/.claude/projects/`, the Claude
   Code transcript store. No Codex transcript format has been validated against `mempalace mine`, so
   the memory hooks are not installed for Codex. See [How cckit uses memory](/memory/how-cckit-uses-it/#under-codex).
-- **`cckit remove`** deletes the hook scripts it installed and a `hooks.json` it created and you
+- **The uninstall script, `scripts/kit-remove.sh`,** deletes the hook scripts it installed and a `hooks.json` it created and you
   never edited. Entries merged into a `hooks.json` of your own stay; delete those by hand.
 
 What is tested: `scripts/hook-adapter-test.sh` feeds each installed hook the event JSON each
