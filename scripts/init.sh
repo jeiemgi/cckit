@@ -15,7 +15,8 @@
 #   --answers <file>          JSON {"<question key>":"<answer>"} for the guided questions
 #   --recipe <id|none>        start a NEW project from recipes/<id>.json
 #   --database <id|none>      add the database option databases/<id>.json
-#   --profile <software|content|research|minimal>   role profile (asked when a terminal or an
+#   --profile <name>          role profile, one of profiles/*.json: software · content · marketing ·
+#                             research · automation · minimal (asked when a terminal or an
 #                             answers file is there; else required unless --upgrade)
 #   --name <str>              human project name                  (default: target basename)
 #   --slug <str>             short slug / mempalace wing          (default: lowercased basename)
@@ -263,6 +264,7 @@ _INIT_ARGS=("$@")   # as typed — the --upgrade dry run replays them against a 
 PROFILE=""; TARGET="$PWD"; NAME=""; SLUG=""; REPO=""; GH_OWNER=""; OWNER_NAME=""
 PROJECT_NUMBER=""; PLANS_FORMAT=""; PLANS_DIR=""; MEMORY=""; LANG_PREF="English"; FORCE=0
 PLAIN_LANGUAGE=""
+TASKS_DEFAULT=""   # light | issues — the profile's defaults.tasks; on --upgrade, the stored tasks.default
 SPECKIT=""; PREPUSH_CMD=""; LOCAL_LAYER=""; LOCAL_EXPLICIT=0; DRY_RUN=0; UPGRADE=0
 ADAPTER_ARG=""    # --adapter as typed; resolved to ADAPTERS below (stored selection wins on upgrade)
 # Guided setup (#456): the folder as typed, the git + GitHub steps, the advisor's answers.
@@ -297,7 +299,7 @@ while [[ $# -gt 0 ]]; do
     --answers) INIT_ANSWERS="$2"; shift 2 ;;
     --recipe) RECIPE_ARG="$2"; shift 2 ;;
     --database) DATABASE_ARG="$2"; shift 2 ;;
-    -h|--help) sed -n '2,41p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,42p' "$0"; exit 0 ;;
     -*) echo "x unknown flag: $1" >&2; exit 1 ;;
     *) if [[ $FOLDER_GIVEN -eq 1 ]]; then echo "x one folder only (got '$TARGET' and '$1')" >&2; exit 1; fi
        TARGET="$1"; FOLDER_GIVEN=1; shift ;;
@@ -383,6 +385,8 @@ if [[ $UPGRADE -eq 1 ]]; then
   # The stored switch is the truth on upgrade: a project that turned plain language off keeps it
   # off whatever its profile defaults to.
   [[ -z "$PLAIN_LANGUAGE" ]] && PLAIN_LANGUAGE="$(jq -r 'if (.plainLanguage.enabled // false) then "on" else "off" end' "$UP_CFG")"
+  # Same for the default task list: the project's tasks.default, never the profile default.
+  TASKS_DEFAULT="$(jq -r '.tasks.default // "issues"' "$UP_CFG")"
   # A config with NO plans key at all deliberately runs without plan files — upgrade must not
   # resurrect the profile default (and with it the plans rule + config block) (#149).
   [[ -z "$PLANS_FORMAT" ]] && PLANS_FORMAT="$(jq -r 'if has("plans") then (.plans.format // "") else "none" end' "$UP_CFG")"
@@ -419,9 +423,11 @@ if [[ $UPGRADE -eq 1 ]]; then
   fi
 fi
 
-[[ -z "$PROFILE" ]] && { echo "x --profile is required (software|content|research|minimal)"; exit 1; }
+# The profile names come from profiles/*.json, so a profile added there is offered here.
+_PROFILE_NAMES="$(for _pf in "$KIT_ROOT"/profiles/*.json; do [[ -f "$_pf" ]] && basename "$_pf" .json; done | paste -sd '|' -)"
+[[ -z "$PROFILE" ]] && { echo "x --profile is required ($_PROFILE_NAMES)"; exit 1; }
 PROFILE_FILE="$KIT_ROOT/profiles/$PROFILE.json"
-[[ -f "$PROFILE_FILE" ]] || { echo "x no such profile: $PROFILE ($PROFILE_FILE)"; exit 1; }
+[[ -f "$PROFILE_FILE" ]] || { echo "x no such profile: $PROFILE — one of: $_PROFILE_NAMES"; exit 1; }
 
 # ---- resolve target + defaults ------------------------------------------
 # A folder that is not there yet is created when the first file is written, not here: a dry run
@@ -501,6 +507,9 @@ case "$CONTENT_KINDS" in on|true|yes) CONTENT_KINDS_ON="true";; *) CONTENT_KINDS
 PR_BODY_STYLE="$(jq -r '.defaults.pr_body // "code"' "$PROFILE_FILE")"
 [[ -z "$PLAIN_LANGUAGE" ]] && PLAIN_LANGUAGE="$(jq -r '.defaults.plain_language // "off"' "$PROFILE_FILE")"
 case "$PLAIN_LANGUAGE" in on|true|yes) PLAIN_ON="true";; *) PLAIN_ON="false";; esac
+#   tasks light       -> tasks.default: "light" (a bare `cckit next` answers from `cckit task`)
+[[ -z "$TASKS_DEFAULT" ]] && TASKS_DEFAULT="$(jq -r '.defaults.tasks // "issues"' "$PROFILE_FILE")"
+[[ "$TASKS_DEFAULT" == "light" ]] || TASKS_DEFAULT="issues"
 [[ "$PR_BODY_STYLE" == "content" ]] || PR_BODY_STYLE="code"
 if [[ -z "$PLANS_DIR" ]]; then
   case "$PLANS_FORMAT" in
@@ -581,6 +590,7 @@ FLAGS_ON=""
 [[ "$SPECKIT_ON" == "true" ]]       && FLAGS_ON="${FLAGS_ON}SPECKIT,"
 [[ "$STACK_SKILLS_ON" == "true" ]]  && FLAGS_ON="${FLAGS_ON}STACK_SKILLS,"
 [[ "$CODEGRAPH_ON" == "true" ]]     && FLAGS_ON="${FLAGS_ON}CODEGRAPH,"
+[[ "$TASKS_DEFAULT" == "light" ]]   && FLAGS_ON="${FLAGS_ON}LIGHT_TASKS,"
 
 # ---- build agent/skill tables -------------------------------------------
 short_desc() { sed -n 's/^description: //p' "$1" | head -1 | cut -c1-92; }
@@ -805,6 +815,7 @@ if [[ $DRY_RUN -eq 1 ]]; then
   [[ "$CONTENT_KINDS_ON" == "true" ]] && echo "  Content : kind labels post · campaign · brand · research"
   [[ "$PR_BODY_STYLE" == "content" ]] && echo "  PR text : content (draft and review wording)"
   [[ "$PLAIN_ON" == "true" ]] && echo "  Wording : plain language (draft, review, approve)"
+  [[ "$TASKS_DEFAULT" == "light" ]] && echo "  Tasks   : light tasks are the default list (cckit task; no GitHub issue per task)"
   echo ""
   if [[ $UPGRADE -eq 1 ]]; then
     # An upgrade's dry run is the upgrade itself, run on a temporary copy of the kit-managed paths
@@ -974,6 +985,7 @@ jq -n \
   --argjson ppen "$PREPUSH_ENABLED" --arg ppcmd "$PREPUSH_CMD" \
   --argjson localon "$LOCAL_ON" \
   --argjson ckinds "$CONTENT_KINDS_ON" --arg prbody "$PR_BODY_STYLE" --argjson plain "$PLAIN_ON" \
+  --arg tasksdef "$TASKS_DEFAULT" \
   '{kitVersion:$kitver,
     adapters:$adapters,
     project:{name:$name,slug:$slug,owner:$owner,language:$lang,path:$path},
@@ -991,6 +1003,7 @@ jq -n \
    | if $ckinds then .kinds = {content:true} else . end
    | if $prbody == "content" then .pr = {bodyStyle:"content"} else . end
    | if $plain then .plainLanguage = {enabled:true} else . end
+   | if $tasksdef == "light" then .tasks = {default:"light"} else . end
    # A Codex-only config is the tracked root file, so it carries no absolute machine path.
    | if ($adapters | index("claude")) then . else del(.project.path) end' \
   > "$KITCFG.kit-new"
@@ -1478,6 +1491,8 @@ echo "  Board   : $([[ "$PROJECTS_V2" == "true" ]] && echo "Projects v2 #$PROJEC
 echo "  Agents  : $(echo $AGENTS | tr '\n' ' ')"
 echo "  Memory  : $MEMORY_BOOL   Plans: $PLANS_FORMAT   Lang: $LANG_PREF   kitVersion: $PLUGIN_VERSION"
 echo "  Spec Kit: $SPECKIT_ON   Pre-push gate: $PREPUSH_ENABLED   Local model: $LOCAL_ON   Stack skills self-gate by package.json"
+[[ "$PLAIN_ON" == "true" ]] && echo "  Wording : plain language (draft, review, approve)"
+[[ "$TASKS_DEFAULT" == "light" ]] && echo "  Tasks   : light tasks are the default list (cckit task; no GitHub issue per task)"
 
 if [[ $UPGRADE -eq 1 ]]; then
   echo ""
@@ -1515,6 +1530,7 @@ else
   echo "  2. ./scripts/setup-labels.sh && ./scripts/setup-milestones.sh   # seed the repo"
   if [[ "$PROJECTS_V2" == "true" ]]; then echo "  3. ./scripts/capture-project-ids.sh   # cache Projects v2 field IDs"; fi
   fi
+  [[ "$TASKS_DEFAULT" == "light" ]] && echo "  · First task: cckit task new \"<title>\"   then: cckit next"
   [[ "$LOCAL_ON" == "true" ]] && echo "  4. /kit-doctor   # local model layer: installs mlx-lm (recipe: integrations/mlx-lm.json) + starts mlx_lm.server"
   adapter_has "$ADAPTERS" codex && echo "  · Codex: commit .codex/, then run /hooks in Codex and trust the project hooks — Codex skips them until you do."
 fi

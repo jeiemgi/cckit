@@ -493,7 +493,7 @@ The kit carries no project's layout. Both keys are config, and the fallback is a
 
 | Key | Default | What it does |
 | --- | --- | --- |
-| `tasks.default` | `issues` | Which list is the project's default: `issues` (GitHub issues) or `light` (the `cckit task` list). With `light`, a bare `cckit next` prints what `cckit task next` prints, and the `campaign` skill records a campaign's pieces as light tasks. `cckit next` with any argument still asks about issues, and both lists stay usable whatever the value. `cckit task default` prints it. A value that is neither is read as `issues`, with a warning. |
+| `tasks.default` | `issues` | Which list is the project's default: `issues` (GitHub issues) or `light` (the `cckit task` list). With `light`, a bare `cckit next` prints what `cckit task next` prints, and the `campaign` skill records a campaign's pieces as light tasks. `cckit next` with any argument still asks about issues, and both lists stay usable whatever the value. `cckit task default` prints it. A value that is neither is read as `issues`, with a warning. The `marketing` profile sets `light`; on `cckit init --upgrade` the stored value is kept. |
 | `tasks.source` | `file` | Where task records live. `file` is the one source cckit ships: one tracked file per task. Another name `<name>` loads `scripts/lib/task-source-<name>.sh`; a name with no such file is refused with exit 1. `KIT_TASKS_SOURCE` overrides it per invocation. |
 | `tasks.dir` | `tasks` | The tracked directory the `file` source keeps tasks in, relative to the project root. An absolute path, or one that climbs out of the project, is ignored with a warning and `tasks` is used. `KIT_TASKS_DIR` overrides it per invocation. |
 
@@ -505,10 +505,18 @@ every task a local draft.
 Keys the `content` and `marketing` profiles set at `cckit init`. A project on another profile can
 add them by hand.
 
+| Profile | `kinds.content` | `pr.bodyStyle` | `plainLanguage.enabled` | `tasks.default` |
+| --- | --- | --- | --- | --- |
+| `content` | `true` | `content` | not written (off) | not written (`issues`) |
+| `marketing` | `true` | `content` | `true` | `light` |
+| the other four | not written | not written | not written | not written |
+
+A key that is "not written" is absent from the config, and its default applies.
+
 | Key | Default | What it does |
 | --- | --- | --- |
 | `pr.bodyStyle` | `code` | `content` gives generated pull request bodies draft-and-review wording. Details below. |
-| `plainLanguage.enabled` | `false` | `true` installs the [`plain-language`](/rules/#plain-language) rule at `cckit init` and rewords the progress lines of `cckit task`. Set by `cckit init --plain-language on\|off`; the `content` profile leaves it off. On `--upgrade` the stored value wins over the profile default. |
+| `plainLanguage.enabled` | `false` | `true` installs the [`plain-language`](/rules/#plain-language) rule at `cckit init` and rewords the progress lines of `cckit task`. Set by `cckit init --plain-language on\|off`; the `marketing` profile turns it on and the `content` profile leaves it off. On `--upgrade` the stored value wins over the profile default. |
 | `kinds.content` | `false` | `true` makes `scripts/setup-labels.sh` — and the label step of `cckit init` — provision the four content kind labels: `kind:post`, `kind:campaign`, `kind:brand`, `kind:research`. The kinds work without the key; it only decides whether the labels are created. |
 
 A content kind is a label, never a branch prefix. `cckit start` maps it onto the closed set of

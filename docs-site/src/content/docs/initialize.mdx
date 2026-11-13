@@ -107,6 +107,49 @@ cckit init --profile content --plain-language on --no-github             # + the
 Recipes and database options are data: one JSON file each in `recipes/` and `databases/` of the kit.
 A database option is offered only when it ships its guide page and its setup test.
 
+### Profiles
+
+A profile is one JSON file in the kit's `profiles/` folder: the agents, skills, rules, roles and
+milestones a project starts with, plus a few defaults. The guided setup asks for it ("What kind of
+work is this project?"); `--profile <name>` and the `profile` key of an answers file name it
+directly.
+
+| Profile | For | Roles |
+| --- | --- | --- |
+| `software` | a software product | PM, Tech Lead, Designer, DevOps, Backend, Frontend, QA, Security |
+| `content` | writing and publishing, tracked in GitHub issues | PM, Editor, Designer, Researcher |
+| `marketing` | a marketing team that does not use git | PM, Editor, Designer, Researcher |
+| `research` | research and analysis | PM, Researcher, Analyst |
+| `automation` | workflow automation | PM, Automation, Generalist |
+| `minimal` | the smallest setup | PM, Generalist |
+
+`cckit init --profile <name> --no-github --dry-run` prints everything a profile would write and
+writes nothing.
+
+#### The marketing profile
+
+```bash
+cckit init --profile marketing --no-github     # the kit files only
+cckit init my-campaigns --profile marketing    # guided: folder, git and GitHub setup too
+```
+
+It is the `content` profile plus what a team that does not use git needs:
+
+| It adds | What that changes |
+| --- | --- |
+| `tasks.default: "light"` | Work is tracked as [light tasks](/light-tasks/) — one file per task in the project, no GitHub issue per task. A bare `cckit next` answers from that list. `CLAUDE.md` opens its task section with the four `cckit task` steps. |
+| the `plain-language` rule, `plainLanguage.enabled: true` | The agent says draft, review and approve, and names worktree, branch and pull request only when asked. `cckit task` words its progress lines the same way. See [plain-language](/rules/#plain-language). |
+| the `brand-voice` skill | Records the voice, key messages and banned phrasings in `brand/voice.md`. |
+| the `campaign` skill | Turns one goal into a plan file and its pieces. |
+| the `effort-model` rule | For a campaign tracked as an effort with sub-issues, when the team uses GitHub issues for it. |
+
+Like `content`, it sets `kinds.content: true` (the `kind:post`, `kind:campaign`, `kind:brand` and
+`kind:research` labels) and `pr.bodyStyle: "content"` (a review checklist for a draft in generated
+pull request bodies) — see [Content work](/config-and-permissions/#content-work).
+
+Review is still a pull request, which cckit opens; the person who approves it needs a GitHub
+account. Setting the project up needs a terminal once.
+
 ### What the kit writes
 
 `cckit init` writes two things:

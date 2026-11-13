@@ -21,30 +21,30 @@ cckit init --dry-run
 
 | Rule | Governs | Profiles | Loads |
 | --- | --- | --- | --- |
-| `branch-naming` | branch name format, merge order, the lockfile rule, one worktree per agent | all five | every session |
-| `communication-style` | how the agent writes to you, and the `concrete` pass on durable prose | all five | every session |
-| `task-management` | GitHub issues as the source of truth, and the task loop | all five | every session |
-| [`issue-lifecycle`](#issue-lifecycle) | deliverables as native sub-issues, approved-plan autonomy, explicit closes | all five | every session |
-| [`merge-safety`](#merge-safety) | rebase onto the current base before merging, a coupled chain as one PR, the gate re-run on the integration branch | all five | every session |
-| [`gate-and-review`](#gate-and-review) | the gate blocks the push and its output goes on the PR; every AI-reviewer finding is fixed or rebutted before the merge | all five | every session |
-| [`authoring`](#authoring) | docs and README updated in the same change, no issue numbers in pasted prompts, summaries that name the work without machine flags | all five | every session |
-| [`shared-checkout`](#shared-checkout) | the primary checkout is shared by every session: never move it by hand, work in a worktree, call a freshly merged verb from a current worktree | all five | every session |
-| [`review-pages`](#review-pages) | a plan, a decision with options or a grilling round opens as a review page; terminal output where there is no browser; the answer is written back | all five | every session |
-| `mempalace` | the persistent-memory protocol — written only when memory is on | all five | every session |
-| `knowledge-base` | frontmatter and the index for the project's knowledge docs | software, content, research, automation | every session |
-| `plan-output-format` | a plan is a file with a `## Deliverables` table | software, content, research, automation | every session |
-| `design-routing` | which agent answers a design question | software, content | every session |
-| `effort-model` | the effort as the unit of work: parent issue, sub-issues, one PR | software | every session |
+| `branch-naming` | branch name format, merge order, the lockfile rule, one worktree per agent | all six | every session |
+| `communication-style` | how the agent writes to you, and the `concrete` pass on durable prose | all six | every session |
+| `task-management` | GitHub issues as the source of truth, and the task loop | all six | every session |
+| [`issue-lifecycle`](#issue-lifecycle) | deliverables as native sub-issues, approved-plan autonomy, explicit closes | all six | every session |
+| [`merge-safety`](#merge-safety) | rebase onto the current base before merging, a coupled chain as one PR, the gate re-run on the integration branch | all six | every session |
+| [`gate-and-review`](#gate-and-review) | the gate blocks the push and its output goes on the PR; every AI-reviewer finding is fixed or rebutted before the merge | all six | every session |
+| [`authoring`](#authoring) | docs and README updated in the same change, no issue numbers in pasted prompts, summaries that name the work without machine flags | all six | every session |
+| [`shared-checkout`](#shared-checkout) | the primary checkout is shared by every session: never move it by hand, work in a worktree, call a freshly merged verb from a current worktree | all six | every session |
+| [`review-pages`](#review-pages) | a plan, a decision with options or a grilling round opens as a review page; terminal output where there is no browser; the answer is written back | all six | every session |
+| `mempalace` | the persistent-memory protocol — written only when memory is on | all six | every session |
+| `knowledge-base` | frontmatter and the index for the project's knowledge docs | software, content, marketing, research, automation | every session |
+| `plan-output-format` | a plan is a file with a `## Deliverables` table | software, content, marketing, research, automation | every session |
+| `design-routing` | which agent answers a design question | software, content, marketing | every session |
+| `effort-model` | the effort as the unit of work: parent issue, sub-issues, one PR | software, marketing | every session |
 | `delegation-brief` | what every delegated agent is handed up front | software | every session |
 | `skill-gaps` | proposing a skill when the same gap shows up twice | software | every session |
-| [`plain-language`](#plain-language) | the agent says draft, review and approve, and names worktree, branch and pull request only when asked — written only while `plainLanguage.enabled` is true | none by default — `cckit init --plain-language on` | every session |
+| [`plain-language`](#plain-language) | the agent says draft, review and approve, and names worktree, branch and pull request only when asked — written only while `plainLanguage.enabled` is true | marketing; any other profile with `cckit init --plain-language on` | every session |
 | `naming-and-ids` | the `E241` / `E241.2` / `#209` / `PR 268` tokens | none — copy it in | every session |
 | `risk-tiered-review` | which PRs need a human read | none — copy it in | every session |
 | `plan-next` | the forward-planning verb's output | none — copy it in | every session |
 | `react-annotate` | the UI annotation loop | none — written by the annotation setup | path-scoped: `**/*.tsx`, `**/*.jsx` |
 | `code-retrieval` | ask the code graph before searching the tree | none — written by `cckit add graft` | every session |
 
-The five profiles are `software`, `content`, `research`, `automation` and `minimal`; each lists its
+The six profiles are `software`, `content`, `marketing`, `research`, `automation` and `minimal`; each lists its
 rules under `rules` in `profiles/<name>.json`.
 
 <Aside type="note" title="They are yours once written">
@@ -110,7 +110,8 @@ The rule follows a config switch, not a profile list:
 cckit init --profile content --plain-language on --no-github
 ```
 
-writes `"plainLanguage": {"enabled": true}` and the rule. `--plain-language off` leaves both out.
+writes `"plainLanguage": {"enabled": true}` and the rule. `--plain-language off` leaves both out,
+also on the `marketing` profile, whose default is on.
 On `cckit init --upgrade` the stored switch wins: a project that set it to `false` and deleted the
 rule does not get the rule back, and one whose switch is on gets a missing rule file restored. The
 same switch rewords the progress lines of [`cckit task`](/light-tasks/#plain-language).

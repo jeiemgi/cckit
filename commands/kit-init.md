@@ -28,7 +28,7 @@ You are initializing the current project with the **claude-kit** setup. The kit 
 
    **Then gather inputs.** If `$ARGUMENTS` already names a profile and the key values, use them.
    Otherwise ask the user with `AskUserQuestion`:
-   - **Profile** — `software`, `content`, `research`, or `minimal`
+   - **Profile** — `software`, `content`, `marketing`, `research`, `automation`, or `minimal`
      (read `${CLAUDE_PLUGIN_ROOT}/profiles/*.json` to describe each)
    - **GitHub repo** — `owner/repo` (offer `gh api user --jq .login` as the default owner)
    - **Projects v2 board** — board number if they use one, else "off"

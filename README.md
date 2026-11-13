@@ -93,7 +93,7 @@ cckit init [<folder>]         # guided setup, end to end: names what the folder 
                               #   (repository, develop, labels, protection) after ONE confirmation.
                               #   A new project starts from a recipe. See "Set up a project" below.
 cckit init --profile software --no-github   # scaffold only: nothing outside the folder
-                              #   profiles: software · content · research · automation · minimal
+                              #   profiles: software · content · marketing · research · automation · minimal
                               #   --adapter claude|codex|both picks the agent (default claude);
                               #   codex writes AGENTS.md + .agents/ and no .claude/ tree;
                               #   both get the commit guards + session-mail hooks (Codex: in
@@ -392,6 +392,32 @@ cckit task share "Q1 backlog"                  # one PR that adds this checkout'
   campaign's pieces as light tasks or as an effort's sub-issues.
 
 Guide: [Light tasks](https://cckit.dev/light-tasks/).
+
+### Marketing profile
+
+`cckit init --profile marketing` sets a project up for a team that does not use git. It is the
+`content` profile (PM, Editor, Designer and Researcher agents; the `copywriting` skill) plus:
+
+- **Light tasks as the default list** (`tasks.default: "light"`): a bare `cckit next` answers from
+  `cckit task`, and no GitHub issue is created per task. Review is still a pull request.
+- **Plain language** (`plainLanguage.enabled: true` and the `plain-language` rule): the agent says
+  draft, review and approve, and names worktree, branch and pull request only when asked.
+- **`brand-voice`**: records the voice, key messages and banned phrasings in `brand/voice.md`;
+  `copywriting` reads it before it writes.
+- **`campaign`**: one goal becomes a plan file and its pieces — light tasks, or an effort's
+  sub-issues when `cckit task default` prints `issues`.
+- **Content kinds** `post`, `campaign`, `brand`, `research` as `kind:` labels, and a pull request
+  body with a review checklist for a draft (`pr.bodyStyle: "content"`).
+
+```bash
+cckit init --profile marketing --no-github --dry-run   # print what it would write
+cckit task new --kind post "<title>"                   # record a piece
+cckit next                                             # the piece to take next
+cckit task start <id>                                  # a folder and branch for it
+cckit task finish <id> "<summary>" --all               # open the pull request; --all includes new files
+```
+
+Guide: [Initialize → The marketing profile](https://cckit.dev/initialize/#the-marketing-profile).
 
 ## Waves — parallel agentic development
 
