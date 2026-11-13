@@ -491,7 +491,20 @@ fi
 if [[ -z "$BASE_BRANCH" && $SETUP_WANTED -eq 1 ]] && [[ -z "$(git -C "$TARGET" remote get-url origin 2>/dev/null || true)" ]]; then
   BASE_BRANCH="develop"; SETUP_BASE_CHOSEN=1
 fi
-[[ -z "$BASE_BRANCH" ]] && BASE_BRANCH="main"
+# No setup, no remote default, no config: `main` when the repository has it (or has no commit yet),
+# else the branch that is checked out — a base branch the repository does not have stops the first
+# `cckit start` / `cckit task start` (#487).
+_init_fallback_base() {
+  local cur
+  if git -C "$TARGET" rev-parse --verify -q HEAD >/dev/null 2>&1 \
+     && ! git -C "$TARGET" show-ref --verify -q refs/heads/main \
+     && ! git -C "$TARGET" show-ref --verify -q refs/remotes/origin/main; then
+    cur="$(git -C "$TARGET" symbolic-ref --short -q HEAD 2>/dev/null || true)"
+    if [[ -n "$cur" ]]; then printf '%s' "$cur"; return 0; fi
+  fi
+  printf 'main'
+}
+[[ -z "$BASE_BRANCH" ]] && BASE_BRANCH="$(_init_fallback_base)"
 
 # profile defaults
 [[ -z "$PLANS_FORMAT" ]] && PLANS_FORMAT="$(jq -r '.defaults.plans_format' "$PROFILE_FILE")"
@@ -591,9 +604,29 @@ FLAGS_ON=""
 [[ "$STACK_SKILLS_ON" == "true" ]]  && FLAGS_ON="${FLAGS_ON}STACK_SKILLS,"
 [[ "$CODEGRAPH_ON" == "true" ]]     && FLAGS_ON="${FLAGS_ON}CODEGRAPH,"
 [[ "$TASKS_DEFAULT" == "light" ]]   && FLAGS_ON="${FLAGS_ON}LIGHT_TASKS,"
+# The counterpart, so the instruction file can say "GitHub issues are the task list" only where
+# that is true (#487).
+[[ "$TASKS_DEFAULT" == "light" ]]   || FLAGS_ON="${FLAGS_ON}ISSUE_TASKS,"
 
 # ---- build agent/skill tables -------------------------------------------
-short_desc() { sed -n 's/^description: //p' "$1" | sed -n 1p | cut -c1-92; }
+# short_desc <file> -> the frontmatter description, at most 92 characters. A folded or literal
+# block (`description: >` with the text on the indented lines below it) is joined into one line;
+# the old one-line read printed the `>` itself in the skills table (#487).
+short_desc() {
+  awk '
+    /^---[[:space:]]*$/ { fm++; if (fm == 2) exit; next }
+    fm != 1 { next }
+    inblock {
+      if ($0 ~ /^[[:space:]]+[^[:space:]]/) { t = $0; sub(/^[[:space:]]+/, "", t); sub(/[[:space:]]+$/, "", t); out = out (out == "" ? "" : " ") t; next }
+      if ($0 ~ /^[[:space:]]*$/) next
+      inblock = 0
+    }
+    /^description:/ && !seen {
+      seen = 1; v = $0; sub(/^description:[[:space:]]*/, "", v); sub(/[[:space:]]+$/, "", v)
+      if (v == "" || v ~ /^[>|][+-]?$/) { inblock = 1 } else { out = v }
+    }
+    END { print out }' "$1" | cut -c1-92
+}
 AGENT_TABLE="| Agent | Role |
 | ----- | ---- |"
 for a in $AGENTS; do
@@ -744,7 +777,7 @@ hook_write() {  # <src> <dest>
 # Nothing has been written yet. --yes confirms; a terminal is asked once; with neither, the setup
 # does not run and the run says so at the end (re-run with --yes). A dry run only prints the plan.
 IG_TARGET="$TARGET"; IG_REPO="$REPO"; IG_BASE="$BASE_BRANCH"; IG_VISIBILITY="$REPO_VISIBILITY"
-IG_PROJECTS_V2="$PROJECTS_V2"; IG_KIT_ROOT="$KIT_ROOT"; IG_DOCTOR=1
+IG_PROJECTS_V2="$PROJECTS_V2"; IG_KIT_ROOT="$KIT_ROOT"; IG_DOCTOR=1; IG_CONFIG_REL="$CONFIG_REL"
 [[ "${KIT_INIT_PREFLIGHT:-1}" == "0" ]] && IG_DOCTOR=0   # the fixture tests' switch: no doctor, no network
 SETUP_DECLINED=0
 if [[ $SETUP_WANTED -eq 1 && $DRY_RUN -eq 0 ]]; then
@@ -762,7 +795,7 @@ if [[ $SETUP_WANTED -eq 1 && $DRY_RUN -eq 0 ]]; then
     case "$_setup_ok" in ""|y|Y|yes|Yes|YES) SETUP_RUN=1 ;; *) SETUP_DECLINED=1 ;; esac
   fi
   # Declined: the project keeps the base branch it would have had without the setup.
-  if [[ $SETUP_RUN -eq 0 && $SETUP_BASE_CHOSEN -eq 1 ]]; then BASE_BRANCH="main"; IG_BASE="main"; fi
+  if [[ $SETUP_RUN -eq 0 && $SETUP_BASE_CHOSEN -eq 1 ]]; then BASE_BRANCH="$(_init_fallback_base)"; IG_BASE="$BASE_BRANCH"; fi
 fi
 
 # _init_finish — the closing lines of a guided run: the database guide, why the setup did not run
@@ -777,6 +810,32 @@ _init_finish() {
     else
       echo "Git and GitHub setup: not run — there is no terminal to confirm on."
       echo "  To run it: cckit init --yes   (inside $TARGET).  To leave it out on purpose: --no-github."
+    fi
+  fi
+  # A run without the setup says what it left undone, with the command that does it (#487).
+  if [[ $UPGRADE -eq 0 && $SETUP_RUN -eq 0 ]]; then
+    if ! git -C "$TARGET" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+      if [[ $NO_GITHUB -eq 0 ]]; then
+        echo "  Not done: $TARGET is not a git repository yet, so no task can be started in it."
+        echo "    cckit init --yes   starts version control, saves the cckit files and creates the branch '$BASE_BRANCH'."
+      fi
+    else
+      if init_base_missing; then
+        echo ""
+        echo "Not done: the branch '$BASE_BRANCH' (github.baseBranch in $CONFIG_REL) does not exist in this repository."
+        echo "  cckit start and cckit task start cut their work from it and stop until it exists."
+        echo "  To create it and push it: cckit init --yes   (inside $TARGET)"
+      fi
+      if init_scaffold_pending; then
+        echo ""
+        echo "Not done: the cckit files are not committed. A task started now gets a folder without them,"
+        echo "  and a teammate who clones the project gets no setup."
+        if [[ $NO_GITHUB -eq 1 ]]; then
+          echo "  To commit them, on the branch '$BASE_BRANCH':  $(init_scaffold_command)"
+        else
+          echo "  To commit them on '$BASE_BRANCH' and push:  cckit init --yes   (inside $TARGET)"
+        fi
+      fi
     fi
   fi
   if [[ -n "$INIT_STEP_LOG" ]]; then
@@ -1445,7 +1504,9 @@ fi   # ==== end Codex adapter hooks ====
 # wire) — tracking it would dirty the tree on every session/upgrade, the exact churn #334 removes.
 GI="$TARGET/.gitignore"
 _GI_LOCAL=""; adapter_has "$ADAPTERS" claude && _GI_LOCAL=".claude/settings.local.json"
-for _ig in "$_GI_LOCAL" "$MANIFEST_REL" ".kann/"; do
+# .cckit/ is cckit's local state (consent, mail, handoff, autopilot runs) and .claude/worktrees/ holds
+# the checkouts `cckit start` and `cckit task start` create: neither is ever committed (#487).
+for _ig in "$_GI_LOCAL" "$MANIFEST_REL" ".kann/" ".cckit/" ".claude/worktrees/"; do
   [[ -n "$_ig" ]] || continue
   if [[ -f "$GI" ]]; then grep -qxF "$_ig" "$GI" || printf '%s\n' "$_ig" >> "$GI"; else printf '%s\n' "$_ig" > "$GI"; fi
 done
@@ -1526,11 +1587,16 @@ else
   echo ""
   echo "Next steps:"
   echo "  1. Review $(adapter_instructions "${ADAPTERS%% *}") and $CONFIG_REL"
-  if [[ $SETUP_RUN -eq 0 ]]; then
+  # Labels and milestones belong to GitHub issues. A project whose task list is light tasks is not
+  # told to seed them (#487); `cckit init --yes` still creates them with the rest of the setup.
+  if [[ $SETUP_RUN -eq 0 && "$TASKS_DEFAULT" != "light" ]]; then
   echo "  2. ./scripts/setup-labels.sh && ./scripts/setup-milestones.sh   # seed the repo"
   if [[ "$PROJECTS_V2" == "true" ]]; then echo "  3. ./scripts/capture-project-ids.sh   # cache Projects v2 field IDs"; fi
   fi
-  [[ "$TASKS_DEFAULT" == "light" ]] && echo "  · First task: cckit task new \"<title>\"   then: cckit next"
+  if [[ "$TASKS_DEFAULT" == "light" ]]; then
+  echo "  2. Add the first task:  cckit task new \"<title>\"   then: cckit next"
+  echo "  3. Start it:            cckit task start <id>"
+  fi
   [[ "$LOCAL_ON" == "true" ]] && echo "  4. /kit-doctor   # local model layer: installs mlx-lm (recipe: integrations/mlx-lm.json) + starts mlx_lm.server"
   adapter_has "$ADAPTERS" codex && echo "  · Codex: commit .codex/, then run /hooks in Codex and trust the project hooks — Codex skips them until you do."
 fi

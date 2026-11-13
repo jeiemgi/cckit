@@ -21,6 +21,14 @@ It is installed because `plainLanguage.enabled` is `true` in `{{CONFIG_REL}}`. S
 | two branches changed the same lines | "Two drafts changed the same passage." |
 | an effort and its sub-issues | "the campaign and its pieces" |
 | task states `todo` · `doing` · `review` · `done` | "not started" · "in progress" · "waiting for review" · "done" |
+| task state `draft` (`cckit task list` prints it for a task that exists only on this computer) | "not started, and only on this computer so far" |
+| task state `shared` (a task sent to the shared list, not approved yet) | "waiting to be added to the shared list" |
+| task state `dropped` | "dropped" |
+
+`draft` has two meanings in cckit's output. In the STATE column of `cckit task list` it describes
+the task record: nobody has started the task and it is not on the shared list. Everywhere else in
+this rule "the draft" is the piece being written. Say "not started" for the first; never tell the
+person a draft exists because a task is in the `draft` state.
 
 ## Rules
 

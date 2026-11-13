@@ -309,6 +309,25 @@ if [ -n "${KS_TEST_INNER:-}" ]; then
     fi
   fi
 
+  # ── light tasks (#487): counts and the rows somebody has to act on, from the source's rows ─────
+  T="$(printf '\t')"
+  lrows="t1${T}review${T}p2${T}post${T}2026-11-13${T}light/t1-a${T}Piece one
+t2${T}doing${T}p1${T}post${T}2026-11-13${T}light/t2-b${T}Piece two
+t3${T}todo${T}p2${T}post${T}2026-11-13${T}-${T}Piece three
+t4${T}draft${T}p2${T}post${T}2026-11-13${T}-${T}Piece four
+t5${T}shared${T}p2${T}post${T}2026-11-13${T}light/share-1${T}Piece five
+t6${T}done${T}p2${T}post${T}2026-11-13${T}-${T}Piece six"
+  eq "light counts: draft todo shared doing review done dropped" \
+     "$(printf '%s\n' "$lrows" | status_light_task_counts | tr '\t' ' ')" "1 1 1 1 1 1 0"
+  latt="$(printf '%s\n' "$lrows" | status_light_task_attention)"
+  eq "light attention: review, doing, draft, shared — in that order" \
+     "$(printf '%s\n' "$latt" | cut -f1,2 | tr '\t\n' ':,')" "t1:review,t2:doing,t4:draft,t5:shared,"
+  no  "light attention: todo is not listed" "$latt" "Piece three"
+  no  "light attention: done is not listed" "$latt" "Piece six"
+  has "light attention: a doing row names the finish command" "$latt" 'cckit task finish t2 "<summary>" --all'
+  eq "light counts: no rows is all zeros" "$(printf '' | status_light_task_counts | tr '\t' ' ')" "0 0 0 0 0 0 0"
+  eq "light section: nothing outside a git repository" "$(cd "$tmp" && mkdir -p nogit && cd nogit && GIT_CEILING_DIRECTORIES="$tmp" status_light_tasks_md)" ""
+
   rm -rf "$tmp"
   if [ "$fail" -eq 0 ]; then echo "PASS($KS_TEST_INNER): kit-status buckets + PR verdicts"; fi
   exit "$fail"

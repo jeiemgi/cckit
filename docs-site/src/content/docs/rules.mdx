@@ -99,6 +99,12 @@ the work on worktrees, branches and pull requests; the rule decides what the age
 | commits and pushes | "I saved the draft." |
 | opens a pull request | "The draft is ready for review." Then the link. |
 | the pull request merges | "It is approved and part of the shared version." |
+| task states `todo` · `doing` · `review` · `done` | "not started" · "in progress" · "waiting for review" · "done" |
+| task state `draft` (only on this computer) · `shared` · `dropped` | "not started, and only on this computer so far" · "waiting to be added to the shared list" · "dropped" |
+
+The rule has a wording for every state `cckit task list` prints. `draft` in that list describes the
+task record (nobody has started it and it is not on the shared list), so the agent says "not
+started" for it and keeps "the draft" for the piece being written.
 
 It names the mechanics when the person uses one of those words or asks how it works, reports a
 failure as a failure with the command and its error on one line, and changes no command, no commit

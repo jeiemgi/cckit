@@ -105,7 +105,7 @@ cckit add                     # list the optional integrations + modules; `cckit
                               #   `cckit add lavish --set enable=no`: turn review pages off (on by default)
 cckit page mode               # `page`, or `terminal: <why>` — can this session show a review page?
 cckit plan-next               # propose what to build next, grounded in current capabilities
-cckit status                  # where are we: next effort per flow, local undone work, PRs to attend, cleanup available
+cckit status                  # where are we: light tasks, next effort per flow, local undone work, PRs to attend, cleanup available
 cckit next                    # the next unblocked issue + how to start it + the weekly cadence
 cckit start 42                # isolated worktree + branch for issue #42, bootstrapped:
                               #   env files copied, dev port assigned, deps installed at the
@@ -182,18 +182,28 @@ and git ignores the file.
 
 **3. Git and GitHub, after one confirmation.** init lists every step first, then asks once on a
 terminal. With no terminal it runs them only with `--yes`; without it the kit files are written and
-the run ends by saying the setup did not run.
+the run ends by saying the setup did not run and what that leaves undone: the kit files are not
+committed (with the command that commits them), and, when the config's base branch does not exist
+in the repository, that `cckit start` and `cckit task start` cannot cut from it. Without the setup
+the base branch written to the config is one the repository has: its GitHub default, else `main`,
+else the branch that is checked out.
 
 | Step | Skipped when |
 | --- | --- |
-| `git init` (branch `main`) and the first commit | the folder is a repository / it has a commit |
+| `git init` (branch `main`) and the first commit, the kit files included | the folder is a repository / it has a commit |
+| one commit holding the kit files, on the base branch, in a repository that already had commits. No env file, nothing git ignores, no script of the project's own, nothing the project had staged | the project config is already tracked. Fails, naming the branch to switch to, when the folder is on another branch than the base |
 | `gh repo create`, private (`--public` for public) | `origin` is set; an existing `<owner>/<name>` is connected instead |
-| branch `develop` created and pushed; default branch on a repository init created | GitHub has the branch / an existing repository keeps its default |
+| branch `develop` created and pushed; default branch on a repository init created. When GitHub already has the base branch, the kit files commit is pushed to it | GitHub has the branch and nothing is waiting / an existing repository keeps its default |
 | labels and milestones | only the missing ones are created |
 | "automatically delete head branches" | already on |
 | protection of the base branch: pull request required, branch up to date, linear history, no force-push | already protected. A plan that refuses it (HTTP 403 on a private repository of a free account) is reported as skipped with that reason |
 | Projects v2 field ids | the project has no board |
 | `cckit doctor` report | never |
+
+init adds `.cckit/` (cckit's local state) and `.claude/worktrees/` (the folders `cckit start` and
+`cckit task start` create) to the project's `.gitignore`, next to `.claude/settings.local.json` and
+the ownership manifest. In a project whose task list is light tasks, the closing next steps name
+`cckit task new` and `cckit task start` and no label or milestone script.
 
 Each step prints `done`, `skipped` or `failed`. A failed step does not stop the later ones, and the
 run exits 1 after all of them. A re-run skips what is finished: on a set-up project it changes
@@ -344,7 +354,8 @@ from one shared function, so the line cannot differ between the two verbs:
 Priority never overrides a dependency: a p3 issue that blocks a p0 issue sits in an earlier wave and
 still runs first. For efforts, `cckit status` opens with a **Next effort per flow** table — per
 flow, the effort with no open blocker, p0 → p3 then lowest number, plus how many are still waiting.
-`cckit status --llm` carries those rows as `next_efforts`; the cadence line is human output only,
+`cckit status --llm` carries those rows as `next_efforts` (and a project's light tasks as
+`light_tasks`: counts by state plus the tasks that need someone to act, read from local git); the cadence line is human output only,
 so `cckit next --llm` rows stay `{number,ctx,title}`.
 
 **`cckit effort plan` can read a local snapshot instead of GitHub.** By default it makes one

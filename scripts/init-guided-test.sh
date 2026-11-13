@@ -278,7 +278,19 @@ run "$tmp/p/local" --profile minimal --yes
 t   "git, no remote: rc 0" "$RC" "0"
 has "git, no remote: first commit skipped" "$OUT" "first commit — the repository already has commits"
 has "git, no remote: repository created" "$(cat "$GHS/writes.log")" "repo create tester/local --private"
-t   "git, no remote: the existing commit is the only one" "$(git -C "$tmp/p/local" rev-list --count HEAD)" "1"
+# #487: a repository that already had a commit gets ONE more, holding the cckit files.
+t   "git, no remote: the existing commit plus the cckit files commit" "$(git -C "$tmp/p/local" rev-list --count HEAD)" "2"
+has "git, no remote: the plan lists the cckit files commit" "$OUT" "Save the cckit files as one commit on 'develop'"
+has "git, no remote: the commit step is reported" "$OUT" "[done   ] cckit files commit"
+t   "git, no remote: the commit's subject" "$(git -C "$tmp/p/local" log -1 --format=%s)" "chore: add the cckit project files"
+t   "git, no remote: the working tree is clean" "$(git -C "$tmp/p/local" status --porcelain)" ""
+t   "git, no remote: the config is tracked" "$(git -C "$tmp/p/local" ls-files .claude/kit.config.json)" ".claude/kit.config.json"
+t   "git, no remote: an ignored file is not in the commit" "$(git -C "$tmp/p/local" ls-files .claude/settings.local.json .claude/kit.manifest.json)" ""
+t   "git, no remote: develop on GitHub carries the cckit files" "$(git -C "$GHS/git/tester/local.git" ls-tree -r --name-only develop -- CLAUDE.md)" "CLAUDE.md"
+h7="$(git -C "$tmp/p/local" rev-parse HEAD)"; w7="$(writes)"
+run "$tmp/p/local" --yes
+t   "git, no remote, re-run: rc 0, no new commit, no GitHub write" "$RC:$(git -C "$tmp/p/local" rev-parse HEAD):$(writes)" "0:$h7:$w7"
+has "git, no remote, re-run: the commit step is skipped" "$OUT" "[skipped] cckit files commit — already committed"
 yes_if "git, no remote: develop is on GitHub" 'git -C "$GHS/git/tester/local.git" show-ref --verify -q refs/heads/develop'
 
 # ── 8. repository that already has a GitHub remote ──────────────────────────────────────────────
@@ -296,6 +308,43 @@ hasnt "existing remote: default branch not changed" "$(cat "$GHS/writes.log")" "
 t   "existing remote: base branch is the repository's own" "$(jq -r .github.baseBranch "$tmp/p/adopted/.claude/kit.config.json")" "main"
 has "existing remote: the missing steps still run" "$(cat "$GHS/writes.log")" "protect"
 t   "existing remote: the checkout was not moved" "$(git -C "$tmp/p/adopted" symbolic-ref --short HEAD)" "main"
+# #487: the base branch is already on GitHub, so the cckit files commit is pushed to it.
+has "existing remote: the cckit files commit is pushed" "$OUT" "[done   ] branch main — pushed the cckit files commit"
+t   "existing remote: GitHub's main is the local main" "$(git -C "$GHS/git/tester/adopted.git" rev-parse main)" "$(git -C "$tmp/p/adopted" rev-parse main)"
+t   "existing remote: the working tree is clean" "$(git -C "$tmp/p/adopted" status --porcelain)" ""
+
+# A project with its own untracked files, a staged change and an env file: none of them is in the
+# cckit files commit.
+mkdir -p "$GHS/repos/tester__mixed" "$tmp/p/mixed/scripts"
+git init -q --bare "$GHS/git/tester/mixed.git"
+git -C "$tmp/p/mixed" init -q; git -C "$tmp/p/mixed" symbolic-ref HEAD refs/heads/main
+echo hi > "$tmp/p/mixed/README.md"; git -C "$tmp/p/mixed" add -A; git -C "$tmp/p/mixed" commit -q -m first
+git -C "$tmp/p/mixed" remote add origin "$GHS/git/tester/mixed.git"; git -C "$tmp/p/mixed" push -q -u origin main
+echo "SECRET=1" > "$tmp/p/mixed/.env"; echo "SECRET=2" > "$tmp/p/mixed/scripts/.env.local"
+echo "mine" > "$tmp/p/mixed/scripts/my-own.sh"; echo "notes" > "$tmp/p/mixed/notes.txt"
+echo "staged" > "$tmp/p/mixed/staged.txt"; git -C "$tmp/p/mixed" add staged.txt
+run "$tmp/p/mixed" --profile minimal --yes
+t   "mixed project: rc 0" "$RC" "0"
+in_commit="$(git -C "$tmp/p/mixed" show --name-only --format= HEAD)"
+has   "mixed project: the commit holds the cckit files" "$in_commit" ".claude/kit.config.json"
+has   "mixed project: a kit script is in it" "$in_commit" "scripts/setup-labels.sh"
+hasnt "mixed project: no env file" "$in_commit" ".env"
+hasnt "mixed project: the project's own script is left out" "$in_commit" "scripts/my-own.sh"
+hasnt "mixed project: an unrelated file is left out" "$in_commit" "notes.txt"
+hasnt "mixed project: a change the project had staged is left out" "$in_commit" "staged.txt"
+t     "mixed project: the staged change is still staged" "$(git -C "$tmp/p/mixed" diff --cached --name-only)" "staged.txt"
+
+# A folder parked on another branch while the base branch exists: the commit is not made there.
+mkdir -p "$GHS/repos/tester__parked" "$tmp/p/parked"
+git init -q --bare "$GHS/git/tester/parked.git"
+git -C "$tmp/p/parked" init -q; git -C "$tmp/p/parked" symbolic-ref HEAD refs/heads/main
+echo hi > "$tmp/p/parked/README.md"; git -C "$tmp/p/parked" add -A; git -C "$tmp/p/parked" commit -q -m first
+git -C "$tmp/p/parked" remote add origin "$GHS/git/tester/parked.git"; git -C "$tmp/p/parked" push -q -u origin main
+git -C "$tmp/p/parked" checkout -q -b side
+run "$tmp/p/parked" --profile minimal --yes
+t   "parked on another branch: rc 1" "$RC" "1"
+has "parked on another branch: says which branch the files belong on" "$OUT" "this folder is on 'side' and the files belong on 'main'"
+t   "parked on another branch: no commit was made" "$(git -C "$tmp/p/parked" rev-list --count side)" "1"
 
 # ── 9. --dry-run writes nothing ─────────────────────────────────────────────────────────────────
 : > "$GHS/writes.log"
@@ -311,6 +360,24 @@ has "dry run: lists the database files" "$OUT" "lib/supabase/client.ts"
 run "$tmp" "$tmp/p/zzbravo" --profile minimal
 t   "no --yes, no terminal: rc 0 (the files are written)" "$RC" "0"
 has "no --yes, no terminal: says the setup did not run and how to run it" "$OUT" "cckit init --yes"
+has "no --yes, no terminal: says no task can be started yet" "$OUT" "is not a git repository yet, so no task can be started in it"
+# #487: a repository with a commit, no terminal, no --yes. The base branch is one the repository
+# has, and the closing lines name what was left undone with the command that does it.
+mkdir -p "$tmp/p/quiet"; git -C "$tmp/p/quiet" init -q; git -C "$tmp/p/quiet" symbolic-ref HEAD refs/heads/trunk
+echo hi > "$tmp/p/quiet/README.md"; git -C "$tmp/p/quiet" add -A; git -C "$tmp/p/quiet" commit -q -m first
+run "$tmp/p/quiet" --profile marketing
+t   "commits, no --yes: rc 0" "$RC" "0"
+t   "commits, no --yes: the base branch is the one the repository has" "$(jq -r .github.baseBranch "$tmp/p/quiet/.claude/kit.config.json")" "trunk"
+has "commits, no --yes: says the cckit files are not committed" "$OUT" "Not done: the cckit files are not committed."
+has "commits, no --yes: names the command" "$OUT" "To commit them on 'trunk' and push:  cckit init --yes"
+hasnt "commits, no --yes: no missing-branch notice, the branch exists" "$OUT" "does not exist in this repository"
+hasnt "marketing next steps: no label or milestone script" "$OUT" "setup-labels.sh"
+has "marketing next steps: the first task" "$OUT" 'cckit task new "<title>"'
+t   "commits, no --yes: nothing was committed" "$(git -C "$tmp/p/quiet" rev-list --count HEAD)" "1"
+jq '.github.baseBranch = "develop"' "$tmp/p/quiet/.claude/kit.config.json" > "$tmp/q.json" && mv "$tmp/q.json" "$tmp/p/quiet/.claude/kit.config.json"
+run "$tmp/p/quiet" --profile marketing --force
+has "a base branch the repository lacks: said before exiting" "$OUT" "Not done: the branch 'develop' (github.baseBranch in .claude/kit.config.json) does not exist in this repository."
+has "a base branch the repository lacks: names the command" "$OUT" "To create it and push it: cckit init --yes"
 yes_if "no --yes, no terminal: no git repository, no GitHub write" '[ ! -e "$tmp/p/zzbravo/.git" ] && [ "$(writes)" = "0" ]'
 
 # ── 11. --no-github is the scaffold-only run ────────────────────────────────────────────────────
@@ -318,6 +385,9 @@ run "$tmp" "$tmp/p/zzalpha" --profile minimal --no-github
 t   "--no-github: rc 0" "$RC" "0"
 yes_if "--no-github: no git repository, no GitHub write" '[ ! -e "$tmp/p/zzalpha/.git" ] && [ "$(writes)" = "0" ]'
 has "--no-github: prints the manual next steps" "$OUT" "./scripts/setup-labels.sh && ./scripts/setup-milestones.sh"
+# #487: cckit's local state and the worktrees are ignored in every scaffolded project.
+t   "--no-github: .cckit/ is gitignored" "$(grep -cxF '.cckit/' "$tmp/p/zzalpha/.gitignore")" "1"
+t   "--no-github: .claude/worktrees/ is gitignored" "$(grep -cxF '.claude/worktrees/' "$tmp/p/zzalpha/.gitignore")" "1"
 hasnt "--no-github: no setup notice" "$OUT" "Git and GitHub setup"
 t   "--no-github: base branch as before (main)" "$(jq -r .github.baseBranch "$tmp/p/zzalpha/.claude/kit.config.json")" "main"
 # The same files as the unconfirmed run above, which is the scaffold init has always written.

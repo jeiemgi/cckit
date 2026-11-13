@@ -8,31 +8,45 @@
 # init_step (init-guide.sh), and a failed step never stops the ones after it.
 #
 #    1. git repository      git init (branch main) when the folder is not one
-#    2. first commit        only on a repository with no commit yet
-#    3. GitHub repository   adopt `origin`, or link / create <owner>/<name> (private unless IG_VISIBILITY=public)
-#    4. base branch         create it from the current commit and push it
-#    5. default branch      set to the base branch — only on a repository this run created
-#    6. labels              create the ones setup-labels.sh lists and the repository lacks
-#    7. milestones          setup-milestones.sh (it creates only the missing ones)
-#    8. head branches       "automatically delete head branches" on merge
-#    9. branch protection   the base branch: pull request required, branch up to date, no
+#    2. first commit        only on a repository with no commit yet (the cckit files are in it)
+#    3. cckit files commit  on a repository that already had commits: ONE commit holding the files
+#                           cckit init wrote, on the base branch (#487). Skipped once the project
+#                           config is tracked. Never an env file, never an ignored file
+#    4. GitHub repository   adopt `origin`, or link / create <owner>/<name> (private unless IG_VISIBILITY=public)
+#    5. base branch         create it from the current commit and push it; when GitHub already has
+#                           it, push the cckit files commit to it
+#    6. default branch      set to the base branch — only on a repository this run created
+#    7. labels              create the ones setup-labels.sh lists and the repository lacks
+#    8. milestones          setup-milestones.sh (it creates only the missing ones)
+#    9. head branches       "automatically delete head branches" on merge
+#   10. branch protection   the base branch: pull request required, branch up to date, no
 #                           force-push, no deletion. A plan that refuses it (HTTP 403 on a private
 #                           repository of a free account) is a skip with the reason, not a failure
-#   10. Projects v2 ids     only when the project has a board
-#   11. doctor              the read-only report
+#   11. Projects v2 ids     only when the project has a board
+#   12. doctor              the read-only report
 #
-# Steps 3-10 write to GitHub. init_setup_plan prints all of them BEFORE any runs, and the caller
+# Steps 4-11 write to GitHub. init_setup_plan prints all of them BEFORE any runs, and the caller
 # (init.sh) runs init_setup_run only after one confirmation: a yes on a terminal, or --yes.
 #
 # Inputs (set by the caller): IG_TARGET (project dir), IG_REPO (owner/name), IG_BASE (base branch),
-# IG_VISIBILITY (private|public), IG_PROJECTS_V2 (true|false), IG_KIT_ROOT (the kit), IG_DOCTOR (1|0).
+# IG_VISIBILITY (private|public), IG_PROJECTS_V2 (true|false), IG_KIT_ROOT (the kit), IG_DOCTOR (1|0),
+# IG_CONFIG_REL (the project config, relative to IG_TARGET).
 #   init_setup_plan     print the numbered plan (local reads only)
 #   init_setup_run      run it; rc 0, failures are counted in INIT_FAILED
+#   init_scaffold_pending   rc 0 when the repository has commits and the cckit files are not in one
+#   init_scaffold_command   the git command that commits them by hand (for a run with no setup)
+#   init_base_missing   rc 0 when the base branch exists neither here nor on origin
 # Requires: git, gh, jq. bash 3.2 compatible.
 # errors: best-effort — a failed step is reported and counted in INIT_FAILED; the run continues
 
 IG_CREATED=0     # 1 when THIS run created the GitHub repository
 IG_REPO_OK=0     # 1 once the project has a GitHub repository to write to
+IG_FIRST_COMMIT=0  # 1 when THIS run made the repository's first commit (the cckit files are in it)
+
+_GS_SCAFFOLD_MSG="chore: add the cckit project files"
+# The top-level paths cckit init writes into. `scripts/` is narrowed to the files the kit ships
+# (_gs_scaffold_files), so a script of the project's own is never swept into the commit.
+_GS_SCAFFOLD_PATHS=".gitignore CLAUDE.md AGENTS.md cckit.config.json .claude .agents .codex benchmarks knowledge scripts"
 
 _gs_git() { git -C "$IG_TARGET" "$@"; }
 _gs_last() { printf '%s' "$1" | grep -v '^[[:space:]]*$' | tail -1 | cut -c1-200; }
@@ -48,8 +62,12 @@ init_setup_plan() {
   fi
   echo "  On this computer:"
   if [ "$in_git" -eq 0 ]; then n=$((n + 1)); echo "    $n. Start version control in $IG_TARGET (git init)"; fi
-  if [ "$has_commit" -eq 0 ]; then n=$((n + 1)); echo "    $n. Save the first version (first commit)"; fi
-  [ "$n" -eq 0 ] && echo "    (nothing — it is already a git repository with commits)"
+  if [ "$has_commit" -eq 0 ]; then
+    n=$((n + 1)); echo "    $n. Save the first version (first commit, the cckit files included)"
+  elif ! _gs_config_tracked; then
+    n=$((n + 1)); echo "    $n. Save the cckit files as one commit on '$IG_BASE' (no env file, nothing git ignores)"
+  fi
+  [ "$n" -eq 0 ] && echo "    (nothing — it is already a git repository and the cckit files are committed)"
   echo "  On GitHub ($IG_REPO):"
   n=$((n + 1))
   if [ -n "$origin" ]; then
@@ -57,7 +75,7 @@ init_setup_plan() {
   else
     echo "    $n. Create the $(printf '%s' "$IG_VISIBILITY" | tr '[:lower:]' '[:upper:]') repository $IG_REPO (or connect to it when it exists)"
   fi
-  n=$((n + 1)); echo "    $n. Create the branch '$IG_BASE' and push it; make it the default branch of a new repository"
+  n=$((n + 1)); echo "    $n. Create the branch '$IG_BASE' and push it, the cckit files commit included; make it the default branch of a new repository"
   n=$((n + 1)); echo "    $n. Add the labels and milestones the workflow uses (only the missing ones)"
   n=$((n + 1)); echo "    $n. Turn on \"automatically delete head branches\" after a merge"
   n=$((n + 1)); echo "    $n. Protect '$IG_BASE': changes arrive by pull request, up to date, no force-push"
@@ -93,10 +111,108 @@ _gs_step_first_commit() {
     return 0
   fi
   if out="$(_gs_git add -A 2>&1 && _gs_git commit -q -m "chore: set up the project with cckit" 2>&1)"; then
+    IG_FIRST_COMMIT=1
     init_step done "first commit"
   else
     init_step failed "first commit" "$(_gs_last "$out")"
   fi
+}
+
+# ── the cckit files commit (#487) ────────────────────────────────────────────────────────────────
+# A project that already had commits kept every file cckit init wrote untracked: a worktree cut from
+# the base branch had no .claude/ and no CLAUDE.md, and a teammate who cloned got no setup.
+
+_gs_config_tracked() {
+  [ -n "${IG_CONFIG_REL:-}" ] && _gs_git ls-files --error-unmatch -- "$IG_CONFIG_REL" >/dev/null 2>&1
+}
+
+# _gs_scaffold_specs -> the paths of _GS_SCAFFOLD_PATHS that exist in the project, one per line.
+_gs_scaffold_specs() {
+  local p
+  for p in $_GS_SCAFFOLD_PATHS; do
+    if [ -e "$IG_TARGET/$p" ]; then printf '%s\n' "$p"; fi
+  done
+}
+
+# _gs_scaffold_files -> NUL-separated: the untracked or modified files under those paths that belong
+# in the commit. Git's ignore rules apply (so settings.local.json, the manifest and .cckit/ never
+# appear); an env file and a worktree are left out by name; under scripts/ only a file the kit
+# ships at the same path is kept.
+_gs_scaffold_files() {
+  local specs f
+  specs="$(_gs_scaffold_specs)"
+  [ -n "$specs" ] || return 0
+  # shellcheck disable=SC2086  # one pathspec per word; none of the names holds a space
+  _gs_git ls-files -z --others --modified --exclude-standard -- $specs 2>/dev/null \
+    | while IFS= read -r -d '' f; do
+        case "$f" in
+          .claude/worktrees/*) continue ;;
+          .env|.env.*|*/.env|*/.env.*|*.env) continue ;;
+          scripts/*) [ -e "$IG_KIT_ROOT/$f" ] || continue ;;
+        esac
+        [ -e "$IG_TARGET/$f" ] || continue
+        printf '%s\0' "$f"
+      done
+}
+
+# init_scaffold_pending -> rc 0 when the repository has commits and the project config is in none.
+init_scaffold_pending() {
+  _gs_git rev-parse --verify -q HEAD >/dev/null 2>&1 || return 1
+  [ -n "${IG_CONFIG_REL:-}" ] && [ -e "$IG_TARGET/$IG_CONFIG_REL" ] || return 1
+  ! _gs_config_tracked
+}
+
+# init_scaffold_command -> the command that makes the same commit by hand. `git add` skips what git
+# ignores; this form adds every file under scripts/, the project's own included.
+init_scaffold_command() {
+  printf 'git add %s && git commit -m "%s"' "$(_gs_scaffold_specs | tr '\n' ' ' | sed 's/ $//')" "$_GS_SCAFFOLD_MSG"
+}
+
+# init_base_missing -> rc 0 when IG_BASE is neither a local branch nor a branch of origin (cached).
+init_base_missing() {
+  _gs_git rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
+  _gs_git show-ref --verify -q "refs/heads/$IG_BASE" && return 1
+  _gs_git show-ref --verify -q "refs/remotes/origin/$IG_BASE" && return 1
+  return 0
+}
+
+_gs_step_scaffold_commit() {
+  local cur out n=0 f files=()
+  _gs_git rev-parse --verify -q HEAD >/dev/null 2>&1 || { init_step skipped "cckit files commit" "no commit to add to (see above)"; return 0; }
+  if [ "${IG_FIRST_COMMIT:-0}" -eq 1 ]; then init_step skipped "cckit files commit" "they are in the first commit"; return 0; fi
+  if _gs_config_tracked; then init_step skipped "cckit files commit" "already committed"; return 0; fi
+  cur="$(_gs_git symbolic-ref --short -q HEAD 2>/dev/null || true)"
+  if [ -z "$cur" ]; then
+    init_step failed "cckit files commit" "no branch is checked out here. Run: git switch $IG_BASE — then cckit init --yes again"
+    return 0
+  fi
+  # The commit goes on the base branch. A base branch that does not exist yet is created from this
+  # commit by the next step, so the checked-out branch stands in for it.
+  if [ "$cur" != "$IG_BASE" ] && { _gs_git show-ref --verify -q "refs/heads/$IG_BASE" || _gs_git show-ref --verify -q "refs/remotes/origin/$IG_BASE"; }; then
+    init_step failed "cckit files commit" "this folder is on '$cur' and the files belong on '$IG_BASE'. Run: git switch $IG_BASE — then cckit init --yes again"
+    return 0
+  fi
+  while IFS= read -r -d '' f; do files[n]="$f"; n=$((n + 1)); done < <(_gs_scaffold_files)
+  if [ "$n" -eq 0 ]; then init_step skipped "cckit files commit" "no cckit file is waiting"; return 0; fi
+  if [ -z "$(_gs_git config user.name 2>/dev/null || true)" ] || [ -z "$(_gs_git config user.email 2>/dev/null || true)" ]; then
+    init_step failed "cckit files commit" "git does not know who you are yet. Run: git config --global user.name \"Your Name\" and git config --global user.email \"you@example.com\", then run cckit init again"
+    return 0
+  fi
+  # --only: the commit holds these paths and nothing else the project had staged.
+  if out="$(_gs_git add -- "${files[@]}" 2>&1 && _gs_git commit -q --only -m "$_GS_SCAFFOLD_MSG" -- "${files[@]}" 2>&1)"; then
+    init_step done "cckit files commit" "$n files on $cur"
+  else
+    init_step failed "cckit files commit" "$(_gs_last "$out")"
+  fi
+}
+
+# _gs_scaffold_unpushed -> rc 0 when the local base branch holds a cckit files commit origin lacks.
+_gs_scaffold_unpushed() {
+  local subjects
+  _gs_git show-ref --verify -q "refs/heads/$IG_BASE" || return 1
+  _gs_git fetch -q origin "$IG_BASE" 2>/dev/null || true
+  subjects="$(_gs_git log --format=%s "origin/$IG_BASE..$IG_BASE" 2>/dev/null || true)"
+  grep -qxF "$_GS_SCAFFOLD_MSG" <<<"$subjects"
 }
 
 _gs_step_repo() {
@@ -138,10 +254,19 @@ _gs_step_base_branch() {
   if ! _gs_git rev-parse --verify -q HEAD >/dev/null 2>&1; then
     init_step skipped "branch $IG_BASE" "nothing to push yet — the repository has no commit"; return 0
   fi
+  cur="$(_gs_git symbolic-ref --short -q HEAD 2>/dev/null || true)"
   if _gs_remote_has "$IG_BASE"; then
+    # GitHub has the branch. The one thing left to send is a cckit files commit made on it here.
+    if _gs_scaffold_unpushed; then
+      if out="$(_gs_git push -q origin "$IG_BASE" 2>&1)"; then
+        init_step done "branch $IG_BASE" "pushed the cckit files commit"
+      else
+        init_step failed "branch $IG_BASE" "the cckit files commit is saved here but GitHub refused the push ($(_gs_last "$out")). If '$IG_BASE' is protected, send the commit as a pull request"
+      fi
+      return 0
+    fi
     init_step skipped "branch $IG_BASE" "GitHub already has it"; return 0
   fi
-  cur="$(_gs_git symbolic-ref --short -q HEAD 2>/dev/null || true)"
   # A repository with no branch at all gets the current one first (main, the release branch).
   if [ -n "$cur" ] && [ "$cur" != "$IG_BASE" ] && [ -z "$(_gs_git ls-remote --heads origin 2>/dev/null)" ]; then
     out="$(_gs_git push -q -u origin "$cur" 2>&1)" || { init_step failed "branch $IG_BASE" "could not push $cur: $(_gs_last "$out")"; return 0; }
@@ -273,6 +398,7 @@ init_setup_run() {
   echo "Project setup — $IG_TARGET"
   _gs_step_git_init
   _gs_step_first_commit
+  _gs_step_scaffold_commit
   _gs_step_repo
   _gs_step_base_branch
   _gs_step_default_branch

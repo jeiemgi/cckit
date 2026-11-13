@@ -283,5 +283,27 @@ out="$("$CCKIT" task default 2>"$tmp/default.err")"
 t "an unknown tasks.default reads as issues" "$out" "issues"
 has "…with a warning naming the value" "$(cat "$tmp/default.err")" "tasks.default 'sometimes' is neither 'light' nor 'issues'"
 
+# ── #487: a base branch the repository does not have; the `draft` state in plain language ───────
+nb="$tmp/nobase"; mkdir -p "$nb"; cd "$nb" || exit 1
+git init -q; git symbolic-ref HEAD refs/heads/trunk; git config user.email t@t; git config user.name t
+cat > cckit.config.json <<'JSON'
+{"kitVersion":"0.0.0","project":{"name":"x","slug":"x","owner":"o","language":"en"},"profile":"p",
+ "github":{"repo":"o/r","owner":"o","baseBranch":"develop","projectsV2":false},"plainLanguage":{"enabled":true}}
+JSON
+echo ".claude/worktrees/" > .gitignore; git add -A; git commit -q -m init
+N="$("$CCKIT" task new "No base yet" --llm | jq -r .id)"
+out="$("$CCKIT" task start "$N" 2>&1)"; t "start without the base branch: rc 1" "$?" "1"
+has "…names the missing branch" "$out" "no base branch 'develop' to cut from"
+has "…names the config key" "$out" "github.baseBranch"
+has "…names the command that creates it" "$out" "cckit init --yes"
+has "…names the branch the folder is on" "$out" "this folder is on 'trunk'"
+t "…and made no worktree" "$([ -e .claude/worktrees ] && echo yes || echo no)" "no"
+out="$(KIT_TASK_FETCH=0 "$CCKIT" task list 2>&1)"
+has "plain language: list still prints the state the source reports" "$out" "$N   draft"
+has "plain language: list says what draft means there" "$out" "draft = the task is on this computer only"
+jq 'del(.plainLanguage)' cckit.config.json > c.tmp && mv c.tmp cckit.config.json
+out="$(KIT_TASK_FETCH=0 "$CCKIT" task list 2>&1)"
+case "$out" in *"draft = "*) echo "FAIL: the legend is printed without plain language"; fail=1 ;; *) echo "ok: no legend without plain language" ;; esac
+
 [ "$fail" -eq 0 ] && echo "PASS light-task-test" || echo "FAIL light-task-test"
 exit "$fail"
