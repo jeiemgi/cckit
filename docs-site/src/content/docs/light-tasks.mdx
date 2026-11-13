@@ -110,6 +110,12 @@ With [`plainLanguage.enabled`](/config-and-permissions/#content-work) set to `tr
 What a program reads is the same in both: `start` still prints `<worktree>|<branch>|<id>` on
 stdout, `finish` still prints `✓ <url>`, and `--llm` output does not change.
 
+`cckit task list` prints the same state words in both modes. In plain-language mode, when a task
+is in the `draft` state, it adds one line under the table:
+`draft = the task is on this computer only: not started, not on the shared list yet`. The
+`plain-language` rule tells the agent to say "not started" for that state, because in the rest of
+the rule "the draft" is the piece being written. The rule lists a wording for every state.
+
 ## States
 
 `cckit task list` derives each task's state from where its file is and what it says. Nothing else
@@ -127,6 +133,14 @@ records it.
 
 `list` hides `done` and `dropped` unless you pass `--all`. `list` and `next` fetch from `origin`
 first; offline they show the last fetched state and say so.
+
+[`cckit status`](/cli-reference/#light-tasks) shows the same states as counts, plus the tasks
+that need someone to act (`review`, `doing`, `draft`, `shared`). It reads local git and does not
+fetch.
+
+`cckit task start` cuts the task's branch from the base branch. When the repository has no such
+branch, here or on origin, it stops and prints the fix: `cckit init --yes` creates the branch and
+pushes it, or `github.baseBranch` in the config is pointed at a branch that exists.
 
 ## Sharing a backlog
 

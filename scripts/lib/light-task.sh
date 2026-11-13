@@ -159,6 +159,10 @@ lt_list() {
     echo '(no open tasks — create one with: cckit task new "<title>")'; return 0
   fi
   printf '%s\n' "$rows" | _lt_table
+  # `draft` in the STATE column is about the task record, not about a piece of writing (#487).
+  if [ "${KIT_PLAIN_LANGUAGE:-false}" = "true" ] && grep -q "^[^$_LT_TAB]*${_LT_TAB}draft${_LT_TAB}" <<<"$rows"; then
+    echo "draft = the task is on this computer only: not started, not on the shared list yet"
+  fi
 }
 
 lt_next() {
@@ -237,7 +241,14 @@ EOF
   else
     if git -C "$root" show-ref --verify --quiet "refs/remotes/origin/$base"; then base_ref="origin/$base"
     elif git -C "$root" show-ref --verify --quiet "refs/heads/$base"; then base_ref="$base"
-    else echo "✗ task start: no base branch '$base' to cut from" >&2; return 1; fi
+    else
+      # Name the fix (#487): the usual cause is a config whose base branch was never created.
+      echo "✗ task start: no base branch '$base' to cut from" >&2
+      echo "  The project config names '$base' (github.baseBranch) and this repository has no such branch, here or on origin." >&2
+      echo "  Create it and push it:  cckit init --yes   (inside $root)" >&2
+      echo "  Or point the config at a branch that exists: this folder is on '$(git -C "$root" symbolic-ref --short -q HEAD 2>/dev/null || echo "no branch")'." >&2
+      return 1
+    fi
     branch="light/$id-$(_lt_slug "$title")"
     branch="${branch%-}"
     case "$branch" in "light/$id") branch="light/$id-task" ;; esac
