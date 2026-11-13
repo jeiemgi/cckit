@@ -27,6 +27,14 @@ printf '%s\n' '{"id":"q1","claim":"Summarize releasing.","must":["version bumped
 
 export BENCH_DIR="$FIX/bench"
 
+# ---- 0. a live backend that reads stdin must not swallow the remaining records ----
+# The real `claude -p` reads stdin. The runners loop with `while read … done < <(records)`, so a
+# child inheriting that stdin drained it and each set scored only its first record.
+STUB="$FIX/stub"; mkdir -p "$STUB"
+printf '%s\n' '#!/bin/sh' 'cat >/dev/null' 'echo NONE' > "$STUB/claude"; chmod +x "$STUB/claude"
+n="$(PATH="$STUB:$PATH" BENCH_BACKEND=claude bash "$HERE/run.sh" --set "$FIX/bench/retrieval.jsonl" --json 2>/dev/null | jq -r '.total')"
+t "a stdin-reading backend still runs every record" "$n" "2"
+
 # ---- 1. --dry on well-formed data passes -----------------------------------
 bash "$HERE/run.sh" --dry >/dev/null 2>&1;         t "run --dry well-formed" "$?" "0"
 bash "$HERE/run-quality.sh" --dry >/dev/null 2>&1; t "quality --dry well-formed" "$?" "0"

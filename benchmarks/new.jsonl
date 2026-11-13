@@ -1,0 +1,6 @@
+{"id":"new-01","q":"How do I boot one QA stack per wave and record a QA verdict before merge?","expect":"docs-site/src/content/docs/qa-lane.mdx"}
+{"id":"new-02","q":"How do I add an optional third-party tool such as a code graph to my project?","expect":"docs-site/src/content/docs/integrations.mdx"}
+{"id":"new-03","q":"Which files does a Codex-only install of cckit write, compared with a Claude Code install?","expect":"docs-site/src/content/docs/install-matrix.mdx"}
+{"id":"new-04","q":"How does cckit stop two live sessions from starting work on the same issue?","expect":"docs-site/src/content/docs/multi-session.mdx"}
+{"id":"new-05","q":"Which rules does cckit ship into a project, and which of them are path-scoped?","expect":"docs-site/src/content/docs/rules.mdx"}
+{"id":"new-06","q":"How do I cherry-pick an already merged fix onto the release branch as a hotfix?","expect":"docs-site/src/content/docs/releasing.mdx"}
