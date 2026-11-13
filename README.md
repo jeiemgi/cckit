@@ -126,6 +126,8 @@ cckit hotfix 268              # cherry-pick merged PR 268 (or a commit sha) onto
                               #   a rebase-merged PR is carried commit by commit
 cckit task new "<title>"      # light tasks: work tracked in tasks/, no GitHub issue —
                               #   task list · task next · task start <id> · task finish <id> "<summary>"
+cckit task run <id>           # hand one light task to a headless agent: start, one round, the gate
+                              #   (--check, else tasks.check), finish, the review link. Never merges
 cckit sync                    # board state, what's unblocked
 cckit sync --cached 60        # the board as one JSON document, from a cache at most 60s old
                               #   (--json / --write / --watch [secs] / --plan — for a TUI or statusline)
@@ -170,7 +172,9 @@ every question has one recommended answer.
 | your home directory, `~/Desktop`, `~/Documents`, `~/Downloads`, `/` | never scaffolds there. Asks whether this is a new project and which folder it gets; with no terminal and no answers file it exits 2 |
 
 **2. A new project starts from a recipe.** A recipe is a JSON file in `recipes/`; adding a file adds
-a recipe. One ships: `nextjs-shadcn` (Next.js, shadcn/ui, pnpm). init then asks whether the project
+a recipe. One ships: `nextjs-shadcn` (Next.js, shadcn/ui, pnpm). A recipe's `config` object is
+merged into the project config: `nextjs-shadcn` sets `tasks.check` to `pnpm build && pnpm lint`,
+the gate `cckit task run` uses. init then asks whether the project
 needs a database and offers the options in `databases/`. One ships: `supabase`. It adds
 `@supabase/supabase-js` and `@supabase/ssr`, `lib/supabase/client.ts` and `lib/supabase/server.ts`,
 and the two variable names in `.env.local` with placeholders. A guide page
@@ -386,6 +390,7 @@ cckit task list                                # every open task: draft · todo 
 cckit task start <id>                          # worktree + branch light/<id>-<slug> (alias: take)
 cckit task finish <id> "what was done"         # mark done on the branch, push, open the PR (alias: done)
 cckit task share "Q1 backlog"                  # one PR that adds this checkout's drafts to the base
+cckit task run <id> --check "pnpm build"       # start + ONE headless agent round + finish: prints the PR link
 ```
 
 - **Review is a pull request.** `finish` opens it; the task reads `done` when it merges. The
@@ -397,6 +402,11 @@ cckit task share "Q1 backlog"                  # one PR that adds this checkout'
 - **Sources.** Tasks are read through one interface (`scripts/lib/task-source.sh`). The `file`
   source ships; another store plugs in as `scripts/lib/task-source-<name>.sh` plus
   `tasks.source: "<name>"`.
+- **Delegating a task.** `cckit task run <id>` does `start`, one `cckit autopilot run` objective
+  built from the task's title and notes, and `finish --all`, then prints the pull request link. The
+  gate is `--check "<cmd>"`, else `tasks.check` in the config, else none. A failing gate exits 6
+  and a round that changed nothing exits 5; neither opens a pull request. `--no-finish` stops
+  before the pull request. A stopped earlier run for the task is discarded. It never merges.
 - **Default list.** `tasks.default: "light"` makes a bare `cckit next` answer from this list;
   `cckit task default` prints `light` or `issues`. The `campaign` skill reads it to record a
   campaign's pieces as light tasks or as an effort's sub-issues.
@@ -425,6 +435,7 @@ cckit task new --kind post "<title>"                   # record a piece
 cckit next                                             # the piece to take next
 cckit task start <id>                                  # a folder and branch for it
 cckit task finish <id> "<summary>" --all               # open the pull request; --all includes new files
+cckit task run <id>                                    # or hand the piece to a headless agent: one round, then the pull request
 ```
 
 Guide: [Initialize → The marketing profile](https://cckit.dev/initialize/#the-marketing-profile).
@@ -448,6 +459,8 @@ cckit autopilot            # select unblocked work, then call orchestrate --deta
 cckit autopilot run 12 --agent codex --objective "make the tests pass" --until "pnpm test" --max-iters 5
                            # ONE headless objective on this branch (claude -p / codex exec): code
                            #   stops it on a limit, a failing gate, or a round that changed nothing;
+                           #   an --until that already passes ends it with no round (exit 0, said
+                           #   on stderr): --check is the flag for a gate on the work;
                            #   a killed runner's agent is stopped, or the next start is refused
                            #   while it lives; --resume counts the cut-short round as usage
                            #   unknown, not zero

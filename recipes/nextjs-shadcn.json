@@ -29,6 +29,7 @@
     }
   ],
   "verify": { "run": "pnpm build" },
+  "config": { "tasks": { "check": "pnpm build && pnpm lint" } },
   "start": "pnpm dev",
   "produces": ["package.json", "app/page.tsx", "components.json", "components/ui/button.tsx", "lib/utils.ts"],
   "lastVerified": "2026-11-12",

@@ -20,13 +20,16 @@
 #               [--superseded-by N]  close the issue with a reason + summary comment; board Done
 #   cckit new [--role R --kind K --priority P --milestone M --blocked-by "#1" --body B|--body-file F] "<title>"
 #                                   file ONE issue: labels + board (Todo) in one step (never raw gh issue create)
-#   cckit task <new|list|next|start|finish|share|default>   light tasks: work tracked in the project, no GitHub issue
+#   cckit task <new|list|next|start|finish|run|share|default>   light tasks: work tracked in the project, no GitHub issue
 #     task new [--priority pN --kind K --body B|--body-file F] "<title>"   record a task (one file
 #         under tasks/; a draft in this checkout until it is started or shared)
 #     task list [--all] · task next   every open task and its state · the one to take next
 #     task start [--force] [--no-push] <id>   worktree + branch light/<id>-<slug> from the base (alias: take)
 #     task finish [<id>] "<summary>" [--all]  mark it done on its branch, push, open the pull request;
 #         the task is done when that PR merges (alias: done). --all also commits new files
+#     task run <id> [--check "<cmd>"] [--max-iters N] [--max-seconds N] [--agent <cmd>] [--no-finish]
+#         start the task, run ONE headless objective built from its title and notes, finish it and
+#         print the review link. Gate: --check, else tasks.check in the config. Never merges
 #     task share ["<summary>"]        one pull request that adds this checkout's drafts to the base;
 #         they list as shared until it merges. Re-run to retry a share whose push or PR failed
 #     task default                    print light | issues: the project's default list (tasks.default).
