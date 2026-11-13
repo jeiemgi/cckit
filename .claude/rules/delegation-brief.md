@@ -77,6 +77,13 @@ context.
   and `cckit.config.json`, the branding scan, the secret + privacy guard, then `scripts/test.sh`
   (every `*-test.sh` under `bin/` and `scripts/`). `shellcheck` and `jq` are skipped when absent
   locally; CI installs both, so run them locally before trusting a green.
+- `scripts/test.sh` runs the test files several at a time: the CPU count, capped at 8. `-j <N>` or
+  `TEST_JOBS=<N>` sets the count, `--serial` runs one file at a time, `--timings` prints wall
+  seconds per file, and a `<pattern>` argument filters by path. A failing file's output is printed
+  whole after the run. A test file must therefore keep its fixtures under its own `mktemp -d` and
+  bind no fixed port; one that cannot run beside others carries `# test-runner: serial` in its
+  first 30 lines and runs alone after the rest. The runner turns `commit.gpgsign` and `tag.gpgsign`
+  off for every test, so fixture commits are not signed with the developer's key.
 - CI runs the same script: `.github/workflows/test.yml` on push to `main`/`develop` and on every PR.
   `.github/workflows/commitlint.yml` separately fails a PR whose **title** is not a Conventional
   Commit subject — PRs are squash-merged, so the title becomes the commit.

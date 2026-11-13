@@ -27,6 +27,12 @@ cckit pr <issue> "<summary>" # open the PR
   with `scripts/lib/commitlint.sh "feat: your summary"`.
 - Run the local gate before opening a PR: `bash scripts/check.sh` (shell syntax, valid manifests,
   no stray branding, the commitlint rules, the skill-listing and instruction-file budgets). A green gate is the bar.
+- The gate ends with `bash scripts/test.sh`, which runs every `*-test.sh` under `bin/` and
+  `scripts/`, several files at a time (the CPU count, capped at 8). `bash scripts/test.sh <pattern>`
+  runs the files whose path matches; `-j <N>` or `TEST_JOBS=<N>` sets how many run at once,
+  `--serial` runs one at a time and `--timings` lists wall seconds per file. A new test file keeps
+  its fixtures under its own `mktemp -d` and binds no fixed port, because it runs beside others; if
+  it cannot, put `# test-runner: serial` in its first 30 lines and it runs alone after the rest.
 
 ## A rule declares when it loads
 
