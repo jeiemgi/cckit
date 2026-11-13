@@ -430,6 +430,7 @@ cckit/
   scripts/lib/*.sh       # the git-mechanics bundle (effort, worktree, gh, gc, …)
                          #   each declares `# errors:` — see CONTRIBUTING.md
   scripts/benchmark/     # doc-retrieval benchmark harness (cckit bench)
+  benchmarks/runs/       # recorded benchmark checkpoints, one file per release (format: its README.md)
   .claude-plugin/        # the Claude Code plugin manifest
   skills/ commands/      # Claude Code skills + slash commands
   profiles/ templates/   # init profiles + scaffold templates
@@ -458,6 +459,12 @@ See [Codified review gates](https://cckit.dev/review-gates/).
 well an agent finds and uses your own canonical docs (retrieval / adversarial / abstain / quality
 tiers). Run `cckit bench report` after a docs or kit-version change to catch findability regressions;
 see the [benchmark guide](https://cckit.dev/benchmark/).
+
+cckit records its own benchmark per release: `cckit bench checkpoint <X.Y.Z>` appends a scored run to
+`benchmarks/runs/<X.Y.Z>.json`, a version can hold several checkpoints, and `cckit release <X.Y.Z>`
+refuses when the version has none or its last one scores lower than the checkpoint before it
+(`--skip-bench-check` overrides and says so). Every checkpoint is published at
+[cckit.dev/benchmark-results](https://cckit.dev/benchmark-results/), a page generated from those files.
 
 ## Built with cckit
 

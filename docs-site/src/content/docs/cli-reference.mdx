@@ -207,12 +207,13 @@ A test greps the shipped `scripts/lib` and `bin` for any vendor model id and req
 | `cckit encode-context` | stdin JSON → compact TOON (token-saving for subagents). |
 | `cckit digest <path\|url>` | Summarize a file or URL with the local model. |
 | `cckit bench [run\|report\|…]` | [Documentation benchmark](/benchmark/): score how well this project finds + uses its own canonical docs. |
+| `cckit bench checkpoint <X.Y.Z> [--passes N] [--from <run.json>] [--model <name>] [--note <text>]` | Record a benchmark run as a checkpoint of release `<X.Y.Z>` in `benchmarks/runs/<X.Y.Z>.json`. `cckit bench checkpoints [--json]` lists every checkpoint, `cckit bench check <X.Y.Z>` gives the release verdict (exit 0 · 1 · 2), `cckit bench page [--out <file>] [--check]` prints or verifies the [results page](/benchmark-results/). See [Checkpoints per release](/benchmark/#checkpoints-per-release). |
 | `cckit version` | The installed cckit version. |
 | `cckit commands` | List every verb (the command catalog). |
 | `cckit lib [--all] [--reasons]` | List every `scripts/lib` helper: its public functions, its one-line purpose, and its declared error behaviour. The companion to `commands` — that lists the verbs, this lists the library they are built from. |
 | `cckit brief <issue>` | Generate an issue's delegation brief from real repo state: its worktree and branch, whether that branch's seed is stale, the files it owns, the helpers those files sit on, and the project's standing gotchas. |
 | `cckit update` | Report whether this project is behind the installed cckit: `up to date` (exit 0), or `update available` with the command to run, `cckit init --upgrade` (exit 10). Changes nothing. See [Update a project](/update/). |
-| `cckit release <ver> [--publish]` | Cut a release (dry-run by default). |
+| `cckit release <ver> [--publish] [--skip-bench-check]` | Cut a release (dry-run by default). Refused, exit 1, when the version has no recorded benchmark checkpoint or its last checkpoint scores lower than the one before it; `--skip-bench-check` overrides and prints that it did. See [the benchmark check](/releasing/#the-benchmark-check). |
 
 ### Finding a helper before you write one
 
