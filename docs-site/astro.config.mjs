@@ -155,7 +155,7 @@ export default defineConfig({
       // Per-track sidebars: this one array holds the entries of both tracks, and the route
       // middleware keeps only the entries of the track a page belongs to (src/routeData.ts).
       routeMiddleware: './src/routeData.ts',
-      // Software: 19 entries in 4 groups, grouped by the job the reader is doing. Every other
+      // Software: 20 entries in 4 groups, grouped by the job the reader is doing. Every other
       // Software page stays reachable by search and from the "All tutorials" / "All guides" pages.
       sidebar: [
         { label: 'Start', items: [
