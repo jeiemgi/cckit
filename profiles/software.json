@@ -26,7 +26,8 @@
     "gate-and-review",
     "authoring",
     "shared-checkout",
-    "task-management"
+    "task-management",
+    "review-pages"
   ],
   "roles": ["PM", "Tech Lead", "Designer", "DevOps", "Backend", "Frontend", "QA", "Security"],
   "milestones": ["Foundation", "MVP", "Beta", "GA"],

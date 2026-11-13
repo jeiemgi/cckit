@@ -533,16 +533,18 @@ Three optional fields carry what an installer needs beyond the candidate list:
 | `install[].bootstrap` (`manager`, `run`) | How to get that candidate's manager, e.g. `brew install uv`. Run only when **none** of the descriptor's managers is on `PATH`; a machine that already has any of them is never bootstrapped. |
 | `detect.bin` | The binary's name when `detect.run` does not start with it (a `command -v <bin>` probe, for a tool whose own flags are slow to answer). |
 | `afterInstall` | The one step left to the user after a successful install, shown once in the install report. |
+| `config.default` | `true` makes the integration ON in a project whose config does not hold the key; only an explicit other value (`false`, or `"none"` for a named key) turns it off, and `cckit add <id> --set enable=no` writes that value. The doctor reports a missing default-on tool as a skip row: no install, no failure. Omitted: off until `cckit add <id>`. |
 | `rules` | Rule templates (`templates/rules/<name>.md`) that `cckit add <id>` copies into the project's `.claude/rules/` when the integration is switched on. |
 | `wire.kept` | Tool features left **on** although a flag could decline them, each mapped to the test behind that decision. The counterpart of `wire.declined`; it never reaches the command line. |
 
-Three descriptors ship:
+Four descriptors ship:
 
 | Descriptor | Config key | Candidates, in order | Bootstrap | Applies |
 | --- | --- | --- | --- | --- |
 | `integrations/mempalace.json` | `memory.enabled` | `pipx install mempalace`, then `uv tool install mempalace` | `brew install pipx` | any repo, any machine |
 | `integrations/mlx-lm.json` | `local.enabled` | `uv tool install mlx-lm`, then `pipx install mlx-lm` | `brew install uv` | `Darwin` + `arm64` only |
 | `integrations/graft.json` | `codeGraph.provider` = `graft` | `npm install -g @nanonets/graft`, then `pnpm add -g @nanonets/graft` | none | a repo with at least one file in a language Graft indexes |
+| `integrations/lavish.json` | `reviewPages.enabled`, **on by default** | `npm install -g lavish-axi`, then `brew install node` (only when neither `lavish-axi` nor `npx` is on `PATH`) | none | any repo, any machine |
 
 The config key names a capability, never the vendor: `<capability>.provider` whose value names the
 tool, or an existing `<capability>.enabled` switch. A key containing the descriptor's own id is
@@ -555,6 +557,9 @@ refused by the validator.
 | `local.enabled` | *(unset — off)* | `true` switches on `integrations/mlx-lm.json`: `cckit doctor` installs the runtime on Apple silicon and starts `mlx_lm.server` on `local.port` (default `8080`) with `local.model`. |
 | `local.port` | `8080` | The port `mlx_lm.server` listens on. |
 | `local.model` | `mlx-community/Qwen3-8B-4bit` | The model the server loads. The first start downloads it. |
+| `reviewPages.enabled` | *(unset — on)* | `false` turns [review pages](/review-pages/) off: plans, decisions and grills print to the terminal. `integrations/lavish.json` sets `config.default: true`, so the unset key is on. |
+| `reviewPages.answers` | *(unset)* | `issue` or `file`: where `cckit page answer` writes. Unset: a comment on the issue when `github.repo` is set and `--issue` is given, else a file. |
+| `reviewPages.answersDir` | `docs/answers` | Directory, relative to the repo root, for answers written as files. |
 | `local.dismissed` | *(unset)* | The `kitVersion` at which the "local layer down" session notice was dismissed. Written by `cckit doctor --dismiss-local`. |
 
 `bash scripts/lib/integrations.sh --validate` checks every descriptor and prints one

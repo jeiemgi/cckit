@@ -68,6 +68,9 @@
 #   cckit render                    stdin markdown -> rich (glow on a TTY; verbatim when piped)
 #   cckit doctor                    onboarding preflight (deps, gh auth, selected agent CLIs)
 #   cckit add [<name>] [--set k=v]  list integrations + modules; with a name, switch one on in the config
+#   cckit page <mode|open|poll|reply|end|answer>
+#                                   review pages: open a plan/decision/grill as a page (terminal
+#                                   output where there is no browser), and record the answer
 #   cckit update                    check whether this project is behind the installed cckit
 #   cckit migrate                   reshuffle an old kit layout to the current one
 #   cckit adopt                     record kit-shaped files a repo already has into the manifest
@@ -539,6 +542,13 @@ case "$cmd" in
     # shellcheck source=/dev/null
     source "$LIB/qa-lane.sh"
     qa_cli "$@"
+    ;;
+  page)
+    # Review pages (#451): a plan, a decision or a grilling round opens as a page when this session
+    # has a browser, and prints to the terminal when it does not. One dispatcher in the lib.
+    # shellcheck source=/dev/null
+    source "$LIB/review-page.sh"
+    rp_cli "$@"
     ;;
   completions)
     case "${1:-bash}" in

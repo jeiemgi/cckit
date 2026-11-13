@@ -83,6 +83,9 @@ Everything else: decide, land it, report on completion. Quiet by default, loud o
   (squash), closes subs+parent, and gc's — then advances any effort that was `blocked_by` it.
 - **Objective mode never auto-merges its own run.** A single capped objective lands commits on its
   branch; the merge is the captain's/human's call under the plan, not the loop's.
+- **No review pages.** An unattended run has no reader. `cckit page mode` answers `terminal` there
+  (`cckit autopilot run` and the tmux wave worker export `CCKIT_HEADLESS=1`; a night executor is
+  told to set it), and `cckit page open` prints instead and exits 0. Never set `CCKIT_PAGES=page`.
 - **Never free-spawn (plan mode).** The parallel set comes from `kit effort plan`, never improvised;
   co-launch only **file-disjoint** efforts (sequence the rest).
 

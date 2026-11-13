@@ -236,6 +236,16 @@
         "provider": { "type": "string", "description": "Which integration provides the code graph, as the descriptor's `config.value` names it. Absent or \"none\" = no code graph; every path that would use one skips." }
       }
     },
+    "reviewPages": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Review pages: a plan, a decision with options or a grilling round opens as an HTML page the reader annotates and answers (`cckit page`). ON when absent. `enabled` is the config key of the integration descriptor integrations/lavish.json, which is on by default.",
+      "properties": {
+        "enabled": { "type": "boolean", "description": "false = plans, decisions and grills print to the terminal; `cckit page open` never starts the page tool. Absent or true = a page opens in a session that has a browser." },
+        "answers": { "type": "string", "enum": ["issue", "file"], "description": "Where `cckit page answer` writes. Absent = a comment on the issue when `github.repo` is set and `--issue` is given, else a file. `issue` requires `--issue`; `file` always writes a file." },
+        "answersDir": { "type": "string", "description": "Directory, relative to the repo root, for answers written as files. Default `docs/answers`. A path that leaves the repo is refused." }
+      }
+    },
     "routines": {
       "type": "array",
       "description": "Opt-in scheduled routines accepted by the user (briefing, board sweep, gc, ...). The kit SUGGESTS; the user accepts; nothing is created without opt-in.",

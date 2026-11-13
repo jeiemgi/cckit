@@ -19,7 +19,8 @@
     "shared-checkout",
     "task-management",
     "mempalace",
-    "branch-naming"
+    "branch-naming",
+    "review-pages"
   ],
   "roles": [
     "PM",

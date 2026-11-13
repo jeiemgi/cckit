@@ -64,6 +64,8 @@ separate step.
 - **Never hand-edit the config** to switch an integration on — go through `cckit add`.
 - **Idempotent.** A second run with the same answer leaves the file byte-identical.
 - Answering `no` to an integration writes nothing; it does not switch off one that is already on.
+  The exception is an integration that is on by default (`lavish`, `config.default: true`): there
+  `no` writes the off value (`reviewPages.enabled: false`), and no rule.
 - An integration add changes one config key. If the diff in step 4 shows more than that key, stop
   and report it instead of applying. Rule files are separate: an existing one is never overwritten.
 - A module is written into this directory only, never above it.

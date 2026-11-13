@@ -102,6 +102,8 @@ cckit init --profile software --no-github   # scaffold only: nothing outside the
                               #   .claude/agents/<role>/AGENT.md and .codex/agents/<role>.toml
 cckit add                     # list the optional integrations + modules; `cckit add <name>` switches one on
                               #   `cckit add graft`: code-graph retrieval + the code-retrieval rule
+                              #   `cckit add lavish --set enable=no`: turn review pages off (on by default)
+cckit page mode               # `page`, or `terminal: <why>` — can this session show a review page?
 cckit plan-next               # propose what to build next, grounded in current capabilities
 cckit status                  # where are we: next effort per flow, local undone work, PRs to attend, cleanup available
 cckit next                    # the next unblocked issue + how to start it + the weekly cadence
@@ -403,6 +405,29 @@ build `claude -p` / `codex exec` from the review profile.) A PR with **no** verd
 `verify`, never merges silently: absence of evidence is not a pass. Off until you configure it.
 → [the agent review stage](https://cckit.dev/config-and-permissions/#the-agent-review-stage)
 
+Plans, decisions with options and grilling rounds open as a **review page** you annotate and answer,
+instead of long terminal prose. It is on by default in every project; the page tool is
+[Lavish](https://github.com/kunchenguid/lavish-axi) (third-party, run through `npx`, not affiliated
+with cckit).
+
+```bash
+cckit page mode            # `page`, or `terminal: <reason>`
+cckit page open .lavish/<name>.html --fallback .lavish/<name>.md
+                           # opens the page; with no browser, or when the tool fails, prints the
+                           #   markdown and exits 0
+cckit page poll .lavish/<name>.html            # wait for the reader's feedback
+cckit page answer --kind decision --title "<what was decided>" --issue <issue> --body-file <file>
+                           # a comment on the issue when the project uses GitHub and --issue is
+                           #   given; else docs/answers/<date>-<kind>-<slug>.md, to commit
+```
+
+A session with no browser gets terminal output and exit 0: CI, an unattended run (`cckit autopilot
+run` and the tmux wave worker export `CCKIT_HEADLESS=1`), a headless agent session, SSH, a machine
+with no display. `reviewPages.enabled: false` (`cckit add lavish --set enable=no`) turns pages off,
+and `CCKIT_PAGES=terminal` does it for one command. A plan page before `cckit effort start` is
+recommended; `effort start` checks nothing.
+→ [Review pages](https://cckit.dev/review-pages/)
+
 For review by a person on the running app, `cckit qa` drives one review stack per lane — a lane is
 an issue number, so an effort's worktree is one lane. Declare how the project boots once
 (`/kit-add qa`: the stack command, its port env vars, one readiness probe per service, a fallback
@@ -470,7 +495,7 @@ project; `.claude/skills/` and `.claude/rules/` here are the subset cckit applie
 delegation and issue lifecycle (`issue-lifecycle.md`: deliverables are native sub-issues, an
 approved plan is executed without re-confirming each merge, and a close op — not `Closes #N` —
 closes the issue) and merge safety (`merge-safety.md`: bring a branch onto the current base before
-merging, ship a coupled chain as one PR, re-run the gate on the integration branch) and authoring (`authoring.md`: docs and README change with the behaviour, a pasted prompt carries no issue number, a summary names the work and drops machine flags) and the shared checkout (`shared-checkout.md`: the primary checkout is never moved by hand, all work happens in a worktree, a freshly merged verb is called from a current worktree — see [Multi-session safety](https://cckit.dev/multi-session/) and the [install & update matrix](https://cckit.dev/install-matrix/)). Every shipped rule is listed in [Rules cckit ships](https://cckit.dev/rules/) — `gate-and-review.md` (the gate blocks the push and its output goes on the PR; every AI-reviewer finding is fixed or rebutted before the merge) ships to projects and is skipped here.
+merging, ship a coupled chain as one PR, re-run the gate on the integration branch) and authoring (`authoring.md`: docs and README change with the behaviour, a pasted prompt carries no issue number, a summary names the work and drops machine flags) and review pages (`review-pages.md`: a plan, a decision or a grilling round opens as a page, terminal output where there is no browser, the answer written back — see [Review pages](https://cckit.dev/review-pages/)) and the shared checkout (`shared-checkout.md`: the primary checkout is never moved by hand, all work happens in a worktree, a freshly merged verb is called from a current worktree — see [Multi-session safety](https://cckit.dev/multi-session/) and the [install & update matrix](https://cckit.dev/install-matrix/)). Every shipped rule is listed in [Rules cckit ships](https://cckit.dev/rules/) — `gate-and-review.md` (the gate blocks the push and its output goes on the PR; every AI-reviewer finding is fixed or rebutted before the merge) ships to projects and is skipped here.
 It is a subset on purpose: several templates target stacks cckit does not have.
 `scripts/self-install-test.sh` holds the manifest, the reason for every skip, and the assertion that
 the installed copies have not drifted from their templates.
@@ -498,7 +523,8 @@ cckit/
   profiles/ templates/   # init profiles + scaffold templates
   routines/ modules/     # scheduled routines + optional modules
   integrations/          # one JSON descriptor per optional third-party tool + its schema
-                         #   (mempalace.json, mlx-lm.json, graft.json). `cckit doctor` installs each one the
+                         #   (mempalace.json, mlx-lm.json, graft.json, lavish.json — the last is on
+                         #   by default and never installed unasked). `cckit doctor` installs each one the
                          #   config switches on through scripts/lib/integration-install.sh, only
                          #   with consent recorded in .cckit/consent (`--fix`, or yes at the prompt)
                          #   scripts/integrations-check.sh installs each one for real and names the
