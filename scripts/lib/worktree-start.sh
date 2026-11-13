@@ -467,7 +467,7 @@ wt_bootstrap() {
 #   • no LIVE session owns it (kit-sessions registry: no live pid sitting in that dir)
 
 # _wt_mtime <path> — file mtime as epoch seconds (BSD stat, then GNU stat). Picks the oldest tree.
-_wt_mtime() { stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null; }
+_wt_mtime() { stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null; }
 
 # _wt_list <root> — emit one "<path>\t<branch-or-->\t<locked:0|1>" line per worktree (porcelain).
 _wt_list() {

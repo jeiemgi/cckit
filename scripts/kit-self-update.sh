@@ -36,7 +36,7 @@ STAMP_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/cckit"
 STAMP="$STAMP_DIR/self-update.stamp"
 if [[ $FORCE -eq 0 && -f "$STAMP" ]]; then
   now=$(date +%s)
-  last=$(stat -f %m "$STAMP" 2>/dev/null || stat -c %Y "$STAMP" 2>/dev/null || echo 0)
+  last=$(stat -c %Y "$STAMP" 2>/dev/null || stat -f %m "$STAMP" 2>/dev/null || echo 0)
   (( now - last < THROTTLE )) && exit 0
 fi
 mkdir -p "$STAMP_DIR" 2>/dev/null && touch "$STAMP" 2>/dev/null

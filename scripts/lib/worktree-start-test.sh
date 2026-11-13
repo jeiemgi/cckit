@@ -99,7 +99,7 @@ jq -n --argjson pid "$SESS_A" --arg host "$(hostname)" --arg wt "$REPO/.claude/w
   '{issue:9, branch:"task/9-claimed-thing", worktree:$wt, cwd:$wt, pid:$pid, host:$host, started:$started}' \
   > "$REG/issue-9.json"
 b_before="$(branches)"; w_before="$(worktrees)"; : > "$GH_CALL_LOG"
-fetch_before="$(stat -f %m "$REPO/.git/FETCH_HEAD" 2>/dev/null || stat -c %Y "$REPO/.git/FETCH_HEAD" 2>/dev/null)"
+fetch_before="$(stat -c %Y "$REPO/.git/FETCH_HEAD" 2>/dev/null || stat -f %m "$REPO/.git/FETCH_HEAD" 2>/dev/null)"
 err="$(start_as "$SESS_B" 9 2>&1 >/dev/null)"; rc=$?
 t "second session on a claimed issue is refused (rc 1)" "$rc" "1"
 has "refusal names the claimant pid" "$err" "pid $SESS_A"
@@ -109,7 +109,7 @@ t "refusal creates no worktree" "$(worktrees)" "$w_before"
 t "refusal creates no worktree dir" "$([ -e "$REPO/.claude/worktrees/task+9-claimed-thing" ] && echo yes || echo no)" "no"
 t "refusal makes no gh call (it runs before the issue read)" "$(wc -l < "$GH_CALL_LOG" | tr -d ' ')" "0"
 t "refusal runs before the fetch (FETCH_HEAD untouched)" \
-  "$(stat -f %m "$REPO/.git/FETCH_HEAD" 2>/dev/null || stat -c %Y "$REPO/.git/FETCH_HEAD" 2>/dev/null)" "$fetch_before"
+  "$(stat -c %Y "$REPO/.git/FETCH_HEAD" 2>/dev/null || stat -f %m "$REPO/.git/FETCH_HEAD" 2>/dev/null)" "$fetch_before"
 t "refusal leaves the claim with its owner" "$(jq -r .pid "$REG/issue-9.json")" "$SESS_A"
 
 # The same refusal on the issue that already has a worktree: no "reusing worktree" success.
