@@ -1,13 +1,16 @@
 ---
 title: Multi-session safety
-description: "What several agent sessions on one repository share, what cckit isolates for you, and the three habits that keep the primary checkout from moving under a live session."
+description: "What stops two sessions from working on the same issue, branch or checkout: the session claim cckit start writes, the orchestrate branch lease, the guards, and the three habits the shared-checkout rule adds."
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-Run two agent sessions on one repository and they share more than the remote. This page lists what
-is shared, what cckit already isolates, and the part left to a rule: the
-[`shared-checkout` rule](/rules/#shared-checkout), which every profile installs.
+Run two agent sessions on one repository and they can collide in three places: both start the same
+issue, both write the same branch, or one moves the checkout the other is reading. cckit refuses
+the first two. `cckit start` records a [session claim](#session-claims) per issue and refuses a
+second live session, and `cckit orchestrate` leases each branch of a wave to one writer. The third
+is left to a rule: the [`shared-checkout` rule](/rules/#shared-checkout), which every profile
+installs.
 
 ## What every session shares
 
@@ -27,12 +30,52 @@ Each worktree `cckit start` creates hangs off it.
 | Mechanism | What it guarantees | What it does not |
 | --- | --- | --- |
 | `cckit start <issue>` · `cckit effort start <N>` | a worktree and branch of your own, cut from a freshly fetched base | it does not stop you from working in the primary checkout instead |
+| The [session claim](#session-claims) `cckit start <issue>` writes (`scripts/lib/session-registry.sh`) | one live session per issue; a second `cckit start` on a claimed issue is refused before any branch or worktree exists | `cckit effort start` writes no claim; it has its own WIP limit |
 | `cckit orchestrate`'s branch lease (`scripts/lib/branch-owner.sh`) | one writer per branch in a wave; a branch a live writer owns refuses the launch | it covers branches cckit handed out, not a directory |
 | The base-branch commit guard (`guard-base-branch-commit.sh`) | an agent's `git commit` is blocked while `HEAD` is on the base | a session that checked out a feature branch in the primary checkout commits freely |
 | The raw-git guard (`guard-raw-git-ops.sh`) | `git checkout -b`, `git switch -c` and `git worktree add` on the base are redirected to `cckit start` | a plain `git checkout <existing-branch>` or `git pull` is not inspected |
 
 Nothing in that table stops a session from running `git checkout` or `git pull` in the primary
-checkout. That gap is what the rule fills.
+checkout. That gap is what [the rule's three habits](#the-three-habits) fill.
+
+## Session claims
+
+Two sessions starting the same issue is the collision git does not catch. Git refuses one branch in
+two worktrees, but the second `cckit start` found the worktree already there, reported "reusing
+worktree", and both sessions wrote one tree. `cckit start` now records a **claim** and checks for
+one first.
+
+```bash
+cckit start <issue>            # refused (exit 1) while another live session holds the issue
+cckit start --force <issue>    # start anyway and take the claim over
+cckit claims                   # list the live claims: issue, session pid, start time, branch, worktree
+```
+
+- **The record.** One JSON file per issue at `<git-common-dir>/kit-sessions/issue-<N>.json`:
+  issue, branch, worktree, session pid, host, start time. It lives in the shared git dir, so every
+  worktree of the repo reads the same set. Nothing is committed and nothing leaves the machine.
+- **The check.** It runs before the issue read, the fetch and `git worktree add`. A refusal exits 1
+  with the claimant's pid and worktree, and creates no branch and no worktree.
+- **Your own claim never blocks you.** Re-running `cckit start <issue>` from the session that
+  claimed it, or from inside the claimed worktree, is the same no-op it always was.
+- **`--force`** (or `KIT_FORCE=1`) starts anyway and takes the claim over. `KIT_FORCE=1` is also how
+  to relaunch `cckit orchestrate` onto an issue another session still claims — orchestrate stops at
+  the first refused start.
+- **Which pid.** The session, not the command: `KIT_SESSION_PID` when set, otherwise the nearest
+  ancestor process that is not a throwaway shell — the agent process, or your terminal's own shell.
+  Sub-agents that share one agent process share one session pid and are not told apart; give each
+  its own `KIT_SESSION_PID` if they must be.
+- **When a claim ends.** Nothing has to release it. A claim is dropped when its pid is dead (or
+  alive with a different start time — a reused pid), or when its worktree has been gone for more
+  than five minutes. A claim written on another host is never dropped on a pid check.
+- **The board is a warning, not a gate.** An issue already In Progress or In Review prints a
+  warning and the start proceeds: nothing resets the board when a session dies, so refusing on it
+  would block every restart after a crash.
+- **Scope.** `cckit start <issue>` only. `cckit effort start` has its own WIP limit and writes no
+  claim.
+
+`cckit claims` prints the live claims and writes nothing — a dead claim is hidden there and removed
+by the next `cckit start` on that issue.
 
 ## The three habits
 

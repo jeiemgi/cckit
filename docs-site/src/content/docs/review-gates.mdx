@@ -118,14 +118,9 @@ frontmatter, into every session whatever the task. It warns at startup once thos
 combined 150k characters; over the limit they still load, and its docs say adherence drops. A
 project adds rules one decision at a time, so the resident set grows with no single commit to blame.
 
-A rule that covers one kind of file opts out of the resident set by declaring when it loads:
-
-```markdown
----
-paths:
-  - "src/components/**/*.tsx"
----
-```
+A rule that covers one kind of file opts out of the resident set by declaring `paths:` in its
+frontmatter. [Resident and path-scoped rules](/rules/#resident-and-path-scoped-rules) shows the
+form and lists which of the rules cckit ships are path-scoped.
 
 ```bash
 scripts/instruction-budget-lint.sh              # the gate
@@ -147,16 +142,10 @@ add to every session if their `paths:` were removed. `cckit status` and `cckit d
 
 Two ways to bring the resident total down, and they pair:
 
-- **Scope it.** Give a rule about one surface a `paths:` list. Globs resolve from the directory that
-  holds the rule's `.claude/`, so a session started in the main checkout that edits inside
-  `.claude/worktrees/<wt>/` needs the `.claude/worktrees/*/apps/**` form next to `apps/**`.
+- **Scope it.** Give a rule about one surface a `paths:` list —
+  [how, and which rules not to scope](/rules/#resident-and-path-scoped-rules).
 - **Split it.** Keep a short rule resident and move the reference material to a `knowledge/` doc the
   rule points at.
-
-Do not scope a behavioural routing rule ("send every design question to the designer agent"): it
-would not load until a matching file had already been read. The rules `cckit init` scaffolds from a
-profile are cross-cutting and stay unscoped; `react-annotate.md`, written by `/kit-annotate`, ships
-scoped to `**/*.tsx` and `**/*.jsx`.
 
 <Aside type="caution" title="What the number leaves out">
 The lint measures bytes with `LC_ALL=C`, for the reason in the note above; bytes are never fewer
