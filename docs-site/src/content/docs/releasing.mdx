@@ -54,6 +54,57 @@ A batch with only `chore`/`docs` noise produces no Release PR (`bump=none` → n
 Changes to the release workflow are always reviewed by a person — the CI token has a wide blast radius. This repo ships the workflow; a maintainer merges the PR that adds or edits it.
 </Aside>
 
+## The benchmark check
+
+Every release records the [documentation benchmark](/benchmark/) for its version, and the score is
+published on the [Benchmark results](/benchmark-results/) page. The run is a checkpoint: run, fix
+what it showed, run again. A version can hold several.
+
+<Steps>
+
+1. **Record a checkpoint on `develop`** while the version is being built, from a worktree:
+
+   ```bash
+   cckit release --next                 # the version the commits imply
+   cckit bench checkpoint X.Y.Z         # run the benchmark and append it to benchmarks/runs/X.Y.Z.json
+   ```
+
+   The command also rewrites `docs-site/src/content/docs/benchmark-results.md`. Commit both files.
+
+2. **Fix what the checkpoint shows as missed, then record another.** Repeat until the score holds.
+
+3. **Check the verdict** before the `develop` → `main` promotion: `cckit bench check X.Y.Z`.
+
+</Steps>
+
+`cckit release X.Y.Z` runs that check before it plans or writes anything, in a dry run too:
+
+| State of `benchmarks/runs/X.Y.Z.json` | `cckit release X.Y.Z` |
+| --- | --- |
+| missing, or no checkpoint in it | refused, exit 1 |
+| last checkpoint scores lower than the checkpoint recorded before it | refused, exit 1 |
+| last checkpoint scores the same or higher | proceeds |
+| first checkpoint ever recorded | proceeds |
+| any `X.Y.Z.json` in `benchmarks/runs/` is not a checkpoint file | refused, exit 1; the file is named |
+
+"The checkpoint recorded before it" is the previous checkpoint of the same version, or the last
+checkpoint of the previous version when the version has only one. `--skip-bench-check` releases
+anyway; the output then carries the reason and the line
+`! benchmark check OVERRIDDEN by --skip-bench-check`.
+
+The release reads the runs in cckit's own `benchmarks/runs/`. `BENCH_DIR`, which `cckit bench` reads,
+does not move the release check. `KIT_RELEASE_BENCH_DIR=<dir>` does, and the release then prints
+`! benchmark runs read from KIT_RELEASE_BENCH_DIR=<dir>`.
+
+<Aside type="caution" title="Where the refusal applies">
+The refusal is in `cckit release`, the local path. Merging the Release PR does not run it: the
+release-please workflow has no benchmark step. `bash scripts/check.sh` fails when the results page
+differs from the run files, so a recorded checkpoint is always the published one.
+</Aside>
+
+A block can come from noise: one pass over a small question set varies between runs. Record the
+checkpoint with `--passes <N>` to ask every question N times.
+
 ## Hotfix to the release branch
 
 A fix that cannot wait for the next `develop` → `main` promotion goes to `main` on its own. It lands

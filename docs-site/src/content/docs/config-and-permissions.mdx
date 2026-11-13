@@ -476,6 +476,27 @@ The kit carries no project's layout. Both keys are config, and the fallback is a
 | `pr.titleStyle` | `conventional` | `conventional`: a Conventional Commits title derived from the issue's kind label, which release-please and a commitlint gate read. `issue-title`: the issue title, verbatim. `cckit effort pr` follows the same key: `conventional` gives `type(scope): name [#N]` and refuses a title that fails commitlint; `issue-title` gives `[Role] [#N] name`, unchecked. |
 | `pr.orchestratorSection` | `false` | `true` opens the PR body with a two-line `## For the orchestrator` section: the issue number and what to review. |
 
+## Light tasks
+
+[`cckit task`](/light-tasks/) tracks work without GitHub issues. Two keys, both optional:
+
+```json
+{
+  "tasks": {
+    "source": "file",
+    "dir": "tasks"
+  }
+}
+```
+
+| Key | Default | What it does |
+| --- | --- | --- |
+| `tasks.source` | `file` | Where task records live. `file` is the one source cckit ships: one tracked file per task. Another name `<name>` loads `scripts/lib/task-source-<name>.sh`; a name with no such file is refused with exit 1. `KIT_TASKS_SOURCE` overrides it per invocation. |
+| `tasks.dir` | `tasks` | The tracked directory the `file` source keeps tasks in, relative to the project root. An absolute path, or one that climbs out of the project, is ignored with a warning and `tasks` is used. `KIT_TASKS_DIR` overrides it per invocation. |
+
+Keep the directory tracked: the list is shared through git, so a gitignored directory would leave
+every task a local draft.
+
 ## Effort WIP limit
 
 `cckit effort start` refuses to start a **new** effort once too many are already in progress. The

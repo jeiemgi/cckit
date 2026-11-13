@@ -8,7 +8,7 @@ Canonical naming + merge-order rules so you're never confused about *what a bran
 <kind>/<issue-number>-<slug>
 ```
 
-- `<kind>` — one of the closed set below, or one of the two effort prefixes named next. No others.
+- `<kind>` — one of the closed set below, one of the two effort prefixes, or `light` (a light task). No others.
 - `<issue-number>` — the issue this branch closes. **Always required** for human work.
 - `<slug>` — short kebab-case description (≤ 5 words).
 
@@ -46,6 +46,14 @@ names its branch after the **source PR**, not an issue — a cherry-pick has no 
 as an issue number, and a merged PR reads as closed, so `gc` treats the branch like any other whose
 issue is closed: prunable once its own PR merges. Do not run `cckit pr` in a hotfix worktree — it
 would read the source PR number as the issue to close.
+
+### Light-task branches (created by `cckit task start`, not by hand)
+
+A light task is work tracked in the project's task list, with no GitHub issue. `cckit task start
+<id>` cuts `light/<id>-<slug>`. `<id>` starts with a letter (`t3f9a`), so the branch never parses as
+an issue number; `gc` asks the task source and keeps the branch until the task is done on the base
+branch. `light/share-<timestamp>` is the branch `cckit task share` opens its PR from. Do not run
+`cckit pr` in a light worktree: `cckit task finish` opens the PR.
 
 ### Closed set of kinds
 

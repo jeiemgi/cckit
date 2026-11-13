@@ -101,6 +101,24 @@ In `--llm` output the same rows are the `next_efforts` array:
 
 Below the table both `cckit status` and `cckit next` print the same weekly cadence line: Monday `cckit plan` orders the week, `cckit next` daily picks up one issue, Friday `cckit gc` reports what can be pruned.
 
+## Light tasks
+
+Work tracked in the project and not in GitHub issues: one file per task under `tasks/`, a worktree
+and a `light/<id>-<slug>` branch per task, a pull request for review. Guide:
+[Light tasks](/light-tasks/).
+
+| Verb | Purpose |
+| --- | --- |
+| `cckit task new [--priority p0\|p1\|p2\|p3] [--kind K] [--body B\|--body-file F] "<title>"` | Record a task: writes `tasks/<id>.md` in the current checkout and prints the id. Nothing is committed; the task is a `draft` until it is started or shared. Exit 2 without a title or with a priority outside `p0`–`p3`. `--llm` returns `{verb, ok, id, title, file}`. |
+| `cckit task list [--all]` | Every open task with its state — `draft`, `todo`, `shared`, `doing`, `review`; `--all` adds `done` and `dropped`. Fetches `origin` first (`KIT_TASK_FETCH=0` skips the fetch). `--llm` returns a JSON array of `{id, state, priority, kind, created, branch, title}`. |
+| `cckit task next` | The first `todo` or `draft` task by priority, then creation date, and the command that starts it. `--llm` returns that task plus `start`, or `null`. |
+| `cckit task start [--force] [--no-push] <id>` | Worktree `.claude/worktrees/light+<id>-<slug>` on branch `light/<id>-<slug>`, cut from `origin/<base>` and bootstrapped like `cckit start`. A draft is committed onto the branch and removed from the checkout it was created in. The branch is pushed so other clones list the task as `doing` (`--no-push` keeps it local). Re-running reuses the worktree. Refuses a `done` or `dropped` task, a `shared` task (its share pull request has not merged), and a task whose branch exists on `origin` but not here unless `--force`, which continues that branch. Prints `<worktree>\|<branch>\|<id>`; `--llm` returns `{verb, ok, id, worktree, branch}`. Alias: `take`. |
+| `cckit task finish [<id>] "<summary>" [--all]` | Set the task to `done` on its branch, commit the tracked changes (`--all` also commits new files; without it they are listed and left), push, and open the pull request against the base branch. The title is a Conventional Commits subject ending in `[<id>]`; the body has no `Closes` line. An open pull request for the branch is reported, not re-created. Inside the task's worktree the id may be omitted. The task reads `done` once the pull request merges. Never merges. `--llm` returns `{verb, ok, url, detail}`. Alias: `done`. |
+| `cckit task share ["<summary>"]` | One pull request, from a `light/share-<timestamp>` branch, that adds every draft in the current checkout to the base branch as `todo`. The drafts are removed from the checkout once committed, and list as `shared` until the pull request merges. With no drafts: if an earlier share's branch is still in this repository and unmerged, it pushes that branch and opens its pull request (an open one is reported, not re-created), which is how a share that failed is retried; otherwise it prints a notice and exits 0. `--llm` returns `{verb, ok, url, detail}`. |
+
+Exit codes: 0 done · 1 refused or a failed step · 2 usage. `tasks.source` and `tasks.dir` are in
+[Config & permissions](/config-and-permissions/#light-tasks).
+
 ## Verb ↔ skill map
 
 Every verb below is drivable from the CLI. The ones with a skill are also reachable as a slash command in Claude Code; the ones without are CLI-only, which means an agent that only reads the skills list cannot see them. Kept here so that gap stays visible rather than being rediscovered.
@@ -209,12 +227,13 @@ A test greps the shipped `scripts/lib` and `bin` for any vendor model id and req
 | `cckit encode-context` | stdin JSON → compact TOON (token-saving for subagents). |
 | `cckit digest <path\|url>` | Summarize a file or URL with the local model. |
 | `cckit bench [run\|report\|…]` | [Documentation benchmark](/benchmark/): score how well this project finds + uses its own canonical docs. |
+| `cckit bench checkpoint <X.Y.Z> [--passes N] [--from <run.json>] [--model <name>] [--note <text>]` | Record a benchmark run as a checkpoint of release `<X.Y.Z>` in `benchmarks/runs/<X.Y.Z>.json`. `cckit bench checkpoints [--json]` lists every checkpoint, `cckit bench check <X.Y.Z>` gives the release verdict (exit 0 · 1 · 2), `cckit bench page [--out <file>] [--check]` prints or verifies the [results page](/benchmark-results/). See [Checkpoints per release](/benchmark/#checkpoints-per-release). |
 | `cckit version` | The installed cckit version. |
 | `cckit commands` | List every verb (the command catalog). |
 | `cckit lib [--all] [--reasons]` | List every `scripts/lib` helper: its public functions, its one-line purpose, and its declared error behaviour. The companion to `commands` — that lists the verbs, this lists the library they are built from. |
 | `cckit brief <issue>` | Generate an issue's delegation brief from real repo state: its worktree and branch, whether that branch's seed is stale, the files it owns, the helpers those files sit on, and the project's standing gotchas. |
 | `cckit update` | Report whether this project is behind the installed cckit: `up to date` (exit 0), or `update available` with the command to run, `cckit init --upgrade` (exit 10). Changes nothing. See [Update a project](/update/). |
-| `cckit release <ver> [--publish]` | Cut a release (dry-run by default). |
+| `cckit release <ver> [--publish] [--skip-bench-check]` | Cut a release (dry-run by default). Refused, exit 1, when the version has no recorded benchmark checkpoint or its last checkpoint scores lower than the one before it; `--skip-bench-check` overrides and prints that it did. See [the benchmark check](/releasing/#the-benchmark-check). |
 
 ### Finding a helper before you write one
 

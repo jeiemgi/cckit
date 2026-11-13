@@ -182,6 +182,7 @@ export default defineConfig({
           { label: 'Wave', slug: 'wave' },
           { label: 'QA lane', slug: 'qa-lane' },
           { label: 'Review pages', slug: 'review-pages' },
+          { label: 'Light tasks', slug: 'light-tasks' },
           { label: 'Driving cckit from agents', slug: 'agents' },
           { label: 'Integrations', slug: 'integrations' },
           { label: 'Cookbook', slug: 'cookbook' },
@@ -190,6 +191,7 @@ export default defineConfig({
         { label: 'Reference', items: [
           { label: 'CLI reference', slug: 'cli-reference' },
           { label: 'Documentation benchmark', slug: 'benchmark' },
+          { label: 'Benchmark results', slug: 'benchmark-results' },
           { label: 'Skills cckit ships', slug: 'skills' },
           { label: 'Rules cckit ships', slug: 'rules' },
           { label: 'Tags directory', slug: 'tags' },

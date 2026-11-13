@@ -125,6 +125,8 @@ cckit hotfix 268              # cherry-pick merged PR 268 (or a commit sha) onto
                               #   for another branch): worktree from origin/main, cherry-pick -x,
                               #   push, PR titled after the source with `Cherry-pick of #268`;
                               #   a rebase-merged PR is carried commit by commit
+cckit task new "<title>"      # light tasks: work tracked in tasks/, no GitHub issue —
+                              #   task list · task next · task start <id> · task finish <id> "<summary>"
 cckit sync                    # board state, what's unblocked
 cckit sync --cached 60        # the board as one JSON document, from a cache at most 60s old
                               #   (--json / --write / --watch [secs] / --plan — for a TUI or statusline)
@@ -361,6 +363,32 @@ back to GitHub. The plan prints a `source:` line under its header — the source
 reports one, and the reason for a fallback — so a plan built from a snapshot never passes for a live
 one. `EFFORT_PLAN_SOURCE` overrides the config per invocation.
 
+## Light tasks — work without GitHub issues
+
+A team that does not track its work in GitHub issues keeps the list in the project: one file per
+task under `tasks/`.
+
+```bash
+cckit task new "Write the spring newsletter"   # prints the id, writes tasks/<id>.md
+cckit task next                                # the task to take next
+cckit task list                                # every open task: draft · todo · shared · doing · review
+cckit task start <id>                          # worktree + branch light/<id>-<slug> (alias: take)
+cckit task finish <id> "what was done"         # mark done on the branch, push, open the PR (alias: done)
+cckit task share "Q1 backlog"                  # one PR that adds this checkout's drafts to the base
+```
+
+- **Review is a pull request.** `finish` opens it; the task reads `done` when it merges. The
+  approver needs a GitHub account, the task list does not.
+- **State is derived from git**, not stored twice: on the base branch = `todo`, a `light/<id>-…`
+  branch = `doing`, that branch saying done = `review`, the base branch saying done = `done`.
+- **One file per task** so two branches that each add a task merge without a conflict.
+- **`cckit gc` keeps a live task's branch**: `PROTECTED: light task <id> still OPEN`.
+- **Sources.** Tasks are read through one interface (`scripts/lib/task-source.sh`). The `file`
+  source ships; another store plugs in as `scripts/lib/task-source-<name>.sh` plus
+  `tasks.source: "<name>"`.
+
+Guide: [Light tasks](https://cckit.dev/light-tasks/).
+
 ## Waves — parallel agentic development
 
 `cckit wave` reads your open efforts and proposes the incoming waves of work — parallel agent tasks
@@ -518,6 +546,7 @@ cckit/
   scripts/lib/*.sh       # the git-mechanics bundle (effort, worktree, gh, gc, …)
                          #   each declares `# errors:` — see CONTRIBUTING.md
   scripts/benchmark/     # doc-retrieval benchmark harness (cckit bench)
+  benchmarks/runs/       # recorded benchmark checkpoints, one file per release (format: its README.md)
   .claude-plugin/        # the Claude Code plugin manifest
   skills/ commands/      # Claude Code skills + slash commands
   profiles/ templates/   # init profiles + scaffold templates
@@ -547,6 +576,16 @@ See [Codified review gates](https://cckit.dev/review-gates/).
 well an agent finds and uses your own canonical docs (retrieval / adversarial / abstain / quality
 tiers). Run `cckit bench report` after a docs or kit-version change to catch findability regressions;
 see the [benchmark guide](https://cckit.dev/benchmark/).
+
+cckit's own sets are in `benchmarks/`: 55 retrieval, adversarial and abstain questions and 12 judged
+quality claims over `docs-site/src/content/docs`. Recorded runs of the first three tiers are under
+`benchmarks/runs/`.
+
+cckit records its own benchmark per release: `cckit bench checkpoint <X.Y.Z>` appends a scored run to
+`benchmarks/runs/<X.Y.Z>.json`, a version can hold several checkpoints, and `cckit release <X.Y.Z>`
+refuses when the version has none or its last one scores lower than the checkpoint before it
+(`--skip-bench-check` overrides and says so). Every checkpoint is published at
+[cckit.dev/benchmark-results](https://cckit.dev/benchmark-results/), a page generated from those files.
 
 ## Built with cckit
 
