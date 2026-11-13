@@ -44,6 +44,7 @@
   "defaults": {
     "plans_format": "markdown",
     "memory": "off",
-    "content_kinds": "on"
+    "content_kinds": "on",
+    "pr_body": "content"
   }
 }

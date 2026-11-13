@@ -140,6 +140,7 @@
       "additionalProperties": true,
       "properties": {
         "titleStyle": { "type": "string", "enum": ["conventional", "issue-title"], "default": "conventional", "description": "How `cckit pr` titles a single-issue PR. conventional (default): a Conventional Commits subject derived from the kind label, which release-please and a commitlint gate read. issue-title: the issue title, verbatim. `cckit effort pr` follows the same key: conventional gives `type(scope): name [#N]` and refuses a title that fails commitlint; issue-title gives `[Role] [#N] name`, unchecked." },
+        "bodyStyle": { "type": "string", "enum": ["code", "content"], "default": "code", "description": "The wording of the PR body `cckit pr`, `cckit effort pr` and `cckit task finish` generate. code (default): a Verification checklist that names the diff. content: a Review checklist for a draft (read it through, facts and links checked, voice matches the brand guide, only the files for this piece changed). `Closes #N`, the summary and the role signature are the same in both. The content and marketing profiles set content." },
         "orchestratorSection": { "type": "boolean", "default": false, "description": "When true, `cckit pr` opens the PR body with a two-line `## For the orchestrator` section: the issue number and what to review." }
       }
     },

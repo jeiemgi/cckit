@@ -17,6 +17,7 @@
 #   kto_labels_role <labels-csv>                      echo the role slug from a labels CSV (role:<slug>)
 #   kto_labels_kind <labels-csv>                      echo the kind slug from a labels CSV (kind:<slug>)
 #   kto_compose_pr_body <num> <summary> <role-slug>   echo a PR body from the template
+#   kto_pr_body_style                                 echo content|code (pr.bodyStyle, #418)
 #   kto_compose_issue_body <user-body> <plan> <blocked> <role-slug>   echo an issue body
 #   kto_closing_issue_numbers <pr-num>                echo the issue #s a merged PR closes
 #   kto_task_pr   <num> <summary> [commit-msg] [--base <branch>]   commit+push+open PR (board → In Review)
@@ -151,14 +152,67 @@ kto_pr_title() {
   printf '%s: %s' "$ctype" "$desc"
 }
 
+# kto_pr_body_style — `content` or `code`: which wording a generated PR body uses (#418).
+# pr.bodyStyle in the config (KIT_PR_BODY_STYLE); anything but `content` is `code`. The content and
+# marketing profiles set `content`. Shared by `cckit pr`, `cckit effort pr` and `cckit task finish`.
+kto_pr_body_style() {
+  if [ "${KIT_PR_BODY_STYLE:-code}" = "content" ]; then printf 'content'; else printf 'code'; fi
+}
+
+# kto_content_review_checklist — the review checklist of a content-style PR body, one item per
+# line. The same four lines in every body the kit writes for content work.
+kto_content_review_checklist() {
+  printf '%s\n' \
+    '- [ ] Read the draft from start to finish' \
+    '- [ ] Facts, names, numbers and links are checked' \
+    '- [ ] The voice matches the brand guide' \
+    '- [ ] Only the files for this piece changed'
+}
+
 # Compose a PR body from the kit-task-pr template. Args: <num> <summary> <role-slug> [issue-title]
 # pr.orchestratorSection = true (KIT_PR_ORCHESTRATOR_SECTION) prepends a 2-line
 # `## For the orchestrator` section: the issue id + title, then what to review.
+# pr.bodyStyle = content swaps the code wording (diff, reproduced manually) for draft-and-review
+# wording; `Closes #N`, the summary and the signature are the same in both.
 kto_compose_pr_body() {
-  local num="$1" summary="$2" role="$3" title="${4:-}" sig=""
+  local num="$1" summary="$2" role="$3" title="${4:-}" sig="" style
+  style="$(kto_pr_body_style)"
   if type role_signature >/dev/null 2>&1; then sig="$(role_signature "$role")"; fi
   if [ "${KIT_PR_ORCHESTRATOR_SECTION:-false}" = "true" ]; then
-    printf '## For the orchestrator\n\n#%s%s\nReview: the summary below and the diff.\n\n' "$num" "${title:+ · $title}"
+    if [ "$style" = "content" ]; then
+      printf '## For the orchestrator\n\n#%s%s\nReview: the summary below and the changed files.\n\n' "$num" "${title:+ · $title}"
+    else
+      printf '## For the orchestrator\n\n#%s%s\nReview: the summary below and the diff.\n\n' "$num" "${title:+ · $title}"
+    fi
+  fi
+  if [ "$style" = "content" ]; then
+    cat <<EOF
+## Closes
+
+Closes #$num
+
+## Summary
+
+$summary
+
+## Review
+
+$(kto_content_review_checklist)
+
+## Notes for the reviewer
+
+—
+
+## Not in this piece
+
+—
+
+$sig
+
+---
+<sub>· \`claude-kit\` · kit-task-pr</sub>
+EOF
+    return 0
   fi
   cat <<EOF
 ## Closes

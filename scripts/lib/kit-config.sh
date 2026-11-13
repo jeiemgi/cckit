@@ -113,6 +113,10 @@ load_kit_config() {
   # pr.orchestratorSection: true adds a 2-line `## For the orchestrator` section to `cckit pr` bodies.
   export KIT_PR_TITLE_STYLE="$(jq -r '.pr.titleStyle // "conventional"' "$cfg")"
   export KIT_PR_ORCHESTRATOR_SECTION="$(jq -r '.pr.orchestratorSection // false' "$cfg")"
+  # pr.bodyStyle (#418): "code" (default) or "content" — the wording of the PR body `cckit pr`,
+  # `cckit effort pr` and `cckit task finish` generate. content drops "diff" and "reproduced
+  # manually" for draft-and-review wording.
+  export KIT_PR_BODY_STYLE="$(jq -r '.pr.bodyStyle // "code"' "$cfg")"
 
   # Content kinds (#417). kinds.content: true makes setup-labels.sh provision kind:post,
   # kind:campaign, kind:brand and kind:research. The kinds themselves are always accepted and

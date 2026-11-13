@@ -488,7 +488,10 @@ fi
 # Content work (E415). Profile defaults only — no flag: a project changes them in its config.
 #   content_kinds on  -> kinds.content: true   (setup-labels.sh provisions the content kind labels)
 CONTENT_KINDS="$(jq -r '.defaults.content_kinds // "off"' "$PROFILE_FILE")"
+#   pr_body content   -> pr.bodyStyle: "content" (draft-and-review wording in generated PR bodies)
 case "$CONTENT_KINDS" in on|true|yes) CONTENT_KINDS_ON="true";; *) CONTENT_KINDS_ON="false";; esac
+PR_BODY_STYLE="$(jq -r '.defaults.pr_body // "code"' "$PROFILE_FILE")"
+[[ "$PR_BODY_STYLE" == "content" ]] || PR_BODY_STYLE="code"
 if [[ -z "$PLANS_DIR" ]]; then
   case "$PLANS_FORMAT" in
     mdx) PLANS_DIR="apps/plans/src/briefs" ;;
@@ -783,6 +786,7 @@ if [[ $DRY_RUN -eq 1 ]]; then
   echo "  Memory  : $MEMORY_BOOL   Plans: $PLANS_FORMAT   Lang: $LANG_PREF"
   echo "  Spec Kit: $SPECKIT_ON   Pre-push gate: $PREPUSH_ENABLED   Local model: $LOCAL_ON   kitVersion: $PLUGIN_VERSION"
   [[ "$CONTENT_KINDS_ON" == "true" ]] && echo "  Content : kind labels post · campaign · brand · research"
+  [[ "$PR_BODY_STYLE" == "content" ]] && echo "  PR text : content (draft and review wording)"
   echo ""
   if [[ $UPGRADE -eq 1 ]]; then
     # An upgrade's dry run is the upgrade itself, run on a temporary copy of the kit-managed paths
@@ -951,7 +955,7 @@ jq -n \
   --argjson speckit "$SPECKIT_JSON" \
   --argjson ppen "$PREPUSH_ENABLED" --arg ppcmd "$PREPUSH_CMD" \
   --argjson localon "$LOCAL_ON" \
-  --argjson ckinds "$CONTENT_KINDS_ON" \
+  --argjson ckinds "$CONTENT_KINDS_ON" --arg prbody "$PR_BODY_STYLE" \
   '{kitVersion:$kitver,
     adapters:$adapters,
     project:{name:$name,slug:$slug,owner:$owner,language:$lang,path:$path},
@@ -967,6 +971,7 @@ jq -n \
    # Content-work keys are written only when the profile turns them on, so the config of a
    # software project does not gain keys it never reads (E415).
    | if $ckinds then .kinds = {content:true} else . end
+   | if $prbody == "content" then .pr = {bodyStyle:"content"} else . end
    # A Codex-only config is the tracked root file, so it carries no absolute machine path.
    | if ($adapters | index("claude")) then . else del(.project.path) end' \
   > "$KITCFG.kit-new"

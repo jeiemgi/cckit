@@ -119,6 +119,15 @@ tc "$GH_LOG" 'SUMMARY-MARKER'                                "effort_pr puts --s
 tc "$GH_LOG" 'AGENTS-MARKER'                                 "effort_pr puts --for-agents in the body"
 tc "$GH_LOG" '^Closes #99$'                                  "effort_pr body closes the parent"
 t  "effort_pr never commits an untracked .env.local" "$(git ls-files .env.local)" ""
+# #418: pr.bodyStyle = content swaps the Verification checklist for a Review one; the machine line,
+# the summary and the For agents block stay.
+eb="$(_eff_pr_body 99 "S-MARK" "A-MARK")"
+t  "effort body (code) keeps its Verification checklist" "$(printf '%s\n' "$eb" | grep -c -e '^## Verification$' -e 'present in the diff')" "2"
+eb="$(KIT_PR_BODY_STYLE=content _eff_pr_body 99 "S-MARK" "A-MARK" editor)"
+t  "effort body (content) closes the parent"       "$(printf '%s\n' "$eb" | grep -c '^Closes #99$')" "1"
+t  "effort body (content) keeps summary + agents"  "$(printf '%s\n' "$eb" | grep -c -e 'S-MARK' -e 'A-MARK' -e '^## For agents$')" "3"
+t  "effort body (content) has a Review checklist"  "$(printf '%s\n' "$eb" | grep -c -e '^## Review$' -e 'voice matches the brand guide')" "2"
+t  "effort body (content) drops the code wording"  "$(printf '%s\n' "$eb" | grep -c -e 'diff' -e 'lint/typecheck' -e '^## Verification$')" "0"
 : > "$GH_LOG"
 effort_pr 99 --title "feat(x): a conventional title" >/dev/null 2>&1 && rc=0 || rc=1
 t  "effort_pr refuses a --title without the [#N] id" "$rc" "1"

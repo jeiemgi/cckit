@@ -61,7 +61,10 @@ person who approves it needs a GitHub account.
    are listed but not included unless you add `--all`.
 
 5. **Review and merge.** The reviewer approves the pull request on GitHub. When it merges, the
-   task is done for everyone: `cckit task list --all` shows it as `done`.
+   task is done for everyone: `cckit task list --all` shows it as `done`. In a project whose
+   config sets [`pr.bodyStyle: "content"`](/config-and-permissions/#content-work), the pull request
+   body carries a review checklist for a draft: read it through, facts and links checked, voice
+   matches the brand guide, only this piece's files changed.
 
 </Steps>
 

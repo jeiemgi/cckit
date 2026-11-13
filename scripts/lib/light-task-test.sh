@@ -154,8 +154,18 @@ t "an open PR is reported, not re-created" "$(grep -c '^pr create' "$GH_LOG")" "
 t "--all commits new files" "$(git -C "$WT" ls-files new-post.txt | grep -c .)" "1"
 "$CCKIT" task finish "$B" >/dev/null 2>&1; t "finish without a summary is a usage error" "$?" "2"
 "$CCKIT" task finish zz9 "x" >/dev/null 2>&1; t "finish refuses an unknown task" "$?" "1"
-out="$(cd "$WTB" && "$CCKIT" task finish "fix: launch posts scheduled" 2>/dev/null)"
-has "a conventional summary becomes the PR title, with the id" "$(grep '^pr create' "$GH_LOG")" "--title fix: launch posts scheduled [$B]"
+has "the default PR body uses the code wording" "$create" "its diff carries the task record"
+# pr.bodyStyle = content (#418): task B is finished under a config that sets it.
+jq '.pr = {bodyStyle: "content"}' "$W/cckit.config.json" > "$tmp/content.config.json"
+: > "$GH_LOG"
+out="$(cd "$WTB" && KIT_CONFIG="$tmp/content.config.json" "$CCKIT" task finish "fix: launch posts scheduled" 2>/dev/null)"
+create="$(grep '^pr create' "$GH_LOG")"
+has "a conventional summary becomes the PR title, with the id" "$create" "--title fix: launch posts scheduled [$B]"
+has "content body: names the task" "$create" "\`$B\` · "
+has "content body: review checklist" "$create" "Read the draft from start to finish"
+has "content body: says what approving does" "$create" "Approving and merging this pull request marks the task done"
+hasnt "content body: no 'diff'" "$create" "diff"
+hasnt "content body: no Closes line" "$create" "Closes #"
 
 # ── the PR merges: the task is done, and gc lets the branch go ──────────────────────────────────
 git clone -q "$tmp/remote.git" "$tmp/merger" 2>/dev/null

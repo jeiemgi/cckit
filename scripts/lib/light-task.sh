@@ -341,8 +341,15 @@ EOF
   fi
 
   dir="$(task_source_dir)"
-  body="$(printf '## Light task\n\n`%s` · %s\n\n## Summary\n\n%s\n\n## Review\n\nMerging this pull request is what marks the task done: its diff carries the task record with `status: done` (`%s/%s.md` with the file source). No GitHub issue is linked.\n' \
-    "$id" "$title" "$summary" "$dir" "$id")"
+  if type kto_pr_body_style >/dev/null 2>&1 && [ "$(kto_pr_body_style)" = "content" ]; then
+    # pr.bodyStyle = content (#418): the reviewer is not a developer — say what approving does and
+    # what to check, without "diff".
+    body="$(printf '## Task\n\n`%s` · %s\n\n## Summary\n\n%s\n\n## Review\n\n%s\n\nApproving and merging this pull request marks the task done: it changes the task record `%s/%s.md` to `status: done`. No GitHub issue is linked.\n' \
+      "$id" "$title" "$summary" "$(kto_content_review_checklist)" "$dir" "$id")"
+  else
+    body="$(printf '## Light task\n\n`%s` · %s\n\n## Summary\n\n%s\n\n## Review\n\nMerging this pull request is what marks the task done: its diff carries the task record with `status: done` (`%s/%s.md` with the file source). No GitHub issue is linked.\n' \
+      "$id" "$title" "$summary" "$dir" "$id")"
+  fi
   _lt_open_pr "$wt" "$branch" "$pr_title" "$body"
 }
 

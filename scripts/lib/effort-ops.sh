@@ -830,6 +830,16 @@ _eff_pr_body() {
   if [ -n "$role" ] && command -v role_signature >/dev/null 2>&1; then
     sig="$(role_signature "$role" 2>/dev/null || true)"
   fi
+  # pr.bodyStyle = content (KIT_PR_BODY_STYLE, #418): draft-and-review wording for content work.
+  # `Closes #N`, the Summary and the For agents block are the same in both styles.
+  if [ "${KIT_PR_BODY_STYLE:-code}" = "content" ]; then
+    printf '## For the orchestrator\n\nEffort #%s — one PR for the whole effort. Review: the summary below and the changed files.\n\nCloses #%s\n\n' "$num" "$num"
+    printf '## Summary\n\n%s\n\n' "${summary:-_(no summary given — pass --summary)_}"
+    printf '## For agents\n\n%s\n\n' "${for_agents:-See #$num for the goal, scope, and entry points.}"
+    printf '## Review\n\n- [ ] Every piece the summary lists is in the changed files\n- [ ] Facts, names, numbers and links are checked\n- [ ] The voice matches the brand guide\n- [ ] Only the files for this work changed\n- [ ] Labels + milestone match the parent issue\n'
+    [ -n "$sig" ] && printf '\n%s\n' "$sig"
+    return 0
+  fi
   printf '## For the orchestrator\n\nEffort #%s — one PR for the whole effort. Review: the summary below + the diff.\n\nCloses #%s\n\n' "$num" "$num"
   printf '## Summary\n\n%s\n\n' "${summary:-_(no summary given — pass --summary)_}"
   printf '## For agents\n\n%s\n\n' "${for_agents:-See #$num for the goal, scope, and entry points.}"
