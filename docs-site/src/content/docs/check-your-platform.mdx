@@ -32,7 +32,9 @@ and GitHub signed in.
    ```
 
    Say yes and it installs each piece for you (Homebrew, `gh`, `jq`, …); say no and it just prints
-   the exact commands to run yourself. To skip the question, use `--fix`:
+   the exact commands to run yourself. Run where there is no terminal to ask in — from an agent, a
+   script, CI — it installs nothing and writes no file, and says so on its second line. To skip the
+   question, use `--fix`:
 
    ```bash title="Install the missing pieces without the prompt"
    cckit doctor --fix

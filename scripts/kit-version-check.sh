@@ -97,7 +97,9 @@ ver_is_newer() {  # ver_is_newer HAVE LATEST → exit 0 if LATEST strictly newer
 }
 
 if ver_is_newer "$have" "$latest"; then
-  banner "update available" "$have -> $latest · run /kit-update to merge new features (your edits are preserved)"
+  # Both entry points are named: `cckit init --upgrade` is what a terminal user or any agent runs;
+  # /kit-update is the Claude Code command that wraps it (#448).
+  banner "update available" "$have -> $latest · run: cckit init --upgrade (in Claude Code: /kit-update) · preview with --dry-run · your edits are kept"
   exit 10  # signal: behind
 fi
 

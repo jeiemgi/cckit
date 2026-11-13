@@ -146,6 +146,7 @@ export default defineConfig({
           { label: 'Quickstart', slug: 'getting-started', badge: { text: 'Start here', variant: 'success' } },
           { label: 'Install cckit', slug: 'install' },
           { label: 'Install & update matrix', slug: 'install-matrix' },
+          { label: 'Update a project', slug: 'update' },
           { label: 'Check your platform', slug: 'check-your-platform' },
           { label: 'Initialize cckit', slug: 'initialize' },
           { label: 'Set up memory', slug: 'memory', badge: { text: 'Optional', variant: 'note' } },

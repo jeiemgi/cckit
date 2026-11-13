@@ -87,6 +87,7 @@ Requirements: `bash` 4+, `git`, and `gh` (GitHub CLI) authenticated. `jq` recomm
 
 ```bash
 cckit doctor                  # onboarding preflight: deps, gh auth, and each integration you switched on
+                              #   asks before installing; with no terminal and no --fix it only reports
 cckit init --profile software # scaffold cckit.config.json + .claude/ for this repo
                               #   profiles: software · content · research · automation · minimal
                               #   --adapter claude|codex|both picks the agent (default claude);
@@ -134,6 +135,14 @@ rules without a `paths:` frontmatter put into every session, against Claude Code
 the three largest files (`cckit doctor` prints the same line; `scripts/instruction-budget-lint.sh`
 is the gate behind it). Run `cckit help` for the full verb list, or
 `cckit <verb> --help` for any one.
+
+Updating a project an older cckit scaffolded? `cckit update` says whether it is behind (exit 10) and
+names the command; `cckit migrate` moves an old layout to the current one;
+`cckit init --upgrade --dry-run` runs the upgrade on a temporary copy and prints the files it would
+add or modify; `cckit init --upgrade` applies it and prints that same list as `Changed on disk`.
+Existing files and every path under `upgrade.removed` are kept, and a version bump alone changes one
+line of the config. The path, with what it changes and what it never touches:
+[Update a project](https://cckit.dev/update/).
 
 ## Efforts and slug handles
 
