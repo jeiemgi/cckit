@@ -20,7 +20,7 @@ Run the kit-doctor script to check all dependencies and authentication required 
 | Local | Only when `.local.enabled` — starts `mlx_lm.server` in background with a port health check (first run downloads ~4.5 GB) |
 | Memory | Only when `.memory.enabled` — seeds the per-wing wake-up header (`.claude/mempal-identity.<wing>.txt`) and refreshes a stale session-start hook. Seed + refresh obey the consent guard: `--fix` applies them, `--dry-run`/`--no-install` only report |
 | Auth | `gh auth status`, scope `project`, `git config user.name/email` |
-| Repo | `github.baseBranch` vs the repo's GitHub default branch — a mismatch means `Closes #N` won't auto-close issues on GitHub-UI merges (report-only; `cckit pr-merge` already closes them explicitly) |
+| Repo | `github.baseBranch` vs the repo's GitHub default branch — a mismatch means `Closes #N` won't auto-close issues on GitHub-UI merges (report-only; `cckit merge` already closes them explicitly) |
 | Instruction files | The bytes `CLAUDE.md` + every `.claude/rules/*.md` without a `paths:` frontmatter load into every session, against Claude Code's 150k limit, and the three largest files. Warns over the limit (report-only; `scripts/instruction-budget-lint.sh --report` lists every file) |
 | SSH | Optional: detect existing key; `KIT_DOCTOR_SSH=1` triggers guided ed25519 setup |
 

@@ -26,8 +26,8 @@ token budget does not enforce that budget. The full table, including what no liv
 confirmed, is in the docs site's agent-compatibility page under "Unattended run limits".
 
 **Exception — night mode.** The Workflow runtime does enforce a token budget, so an approved plan
-can run unattended through `${CLAUDE_PLUGIN_ROOT}/scripts/night-run.mjs` (see _Mode: night_ below). The CLI flags above
-are still unimplemented.
+can run unattended through `${CLAUDE_PLUGIN_ROOT}/scripts/night-run.mjs` (see _Mode: night_ below). The CLI still
+refuses `--plan` and `--notify`.
 
 One skill, two modes — both delegate work that runs **autonomously to a verifiable stop, under hard
 caps**. It is a **thin wrapper**: it composes the built-in `/loop` and the kit's `orchestrate`
@@ -51,7 +51,6 @@ back to the human to confirm a planned step.** "Do these efforts with the new fl
 build a wave → merge its PRs → close subs+parent → gc → launch the next wave — **without asking
 "merge or review?"**. A planned merge is _execution_, not a new decision (the canonical "Error 1" incident: stalling an approved plan to ask for a routine merge).
 
-- The human steers the **plan**, not each merge. Asking to confirm a routine planned merge is the error.
 - A `risk:med` change the plan already approved (a product feature in the agreed scope) is **not** a
   reason to stop — the plan blessed it. The risk-tiered review tiers
   (`risk-tiered-review.md`) govern **ad-hoc** PRs, **not** execution of an approved plan.
@@ -72,7 +71,7 @@ Interrupt only when the plan genuinely can't proceed without a human:
 - a **real ambiguity the plan doesn't cover** (a fork the approved scope is silent on);
 - a **destructive/irreversible step outside the plan**.
 
-Everything else: decide, land it, report on completion. Quiet by default, loud only on a true blocker.
+Everything else: decide, land it, report on completion.
 
 ## The contract (hard — both modes)
 

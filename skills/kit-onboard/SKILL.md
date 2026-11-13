@@ -7,7 +7,7 @@ allowed-tools: Bash, Read, AskUserQuestion
 
 # kit-onboard — the two-tier interview (D11)
 
-Two tiers. The ASKING is yours (AskUserQuestion). The DERIVING + WRITING is deterministic and
+The ASKING is yours (AskUserQuestion). The DERIVING + WRITING is deterministic and
 lives in the engine — never hand-edit config JSON; call the scripts.
 
 Engine (under `${CLAUDE_PLUGIN_ROOT}`):
@@ -21,7 +21,7 @@ Engine (under `${CLAUDE_PLUGIN_ROOT}`):
 ## Tier 1 — global profile (ONCE in a lifetime)
 
 1. Run `scripts/kit-onboard.sh status`. **If it reports a profile already exists, SKIP tier 1**
-   entirely — the wide-range interview is once-ever. Go straight to tier 2.
+   and go straight to tier 2.
 2. Otherwise render the catalog: `scripts/lib/kit-interview.sh --render global`.
 3. Ask the questions with **AskUserQuestion** — one batched round. For each question use its
    `header`, `question`, and `options` (mark the `recommended` option first, label it

@@ -53,7 +53,7 @@ _behind="$(git -C "${CLAUDE_PLUGIN_ROOT}" rev-list --count HEAD.."origin/$_branc
 
 If `_behind` > 0:
 
-- Print a prominent warning (ASCII only, no emoji):
+- Print a warning (ASCII only, no emoji):
   > "[warn] plugin source is $_behind commit(s) behind origin/$_branch -- you may be installing an older version of claude-kit"
   > "Update the source first:  git -C ${CLAUDE_PLUGIN_ROOT} pull  then re-run /kit-update."
 - Use `AskUserQuestion` to ask:
@@ -125,7 +125,7 @@ _plug="$(jq -r '.version // "0.0.0"' "${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugi
    **preserved**, and the new `.kitVersion`. Then warmly
    walk the user through the headline new features and offer to run any that fit this project (e.g.
    "this release adds `/kit-annotate` — want me to set it up?"). The goal is comfort with the new
-   surface, not a changelog dump.
+   features, not a changelog dump.
 
 ## Rules
 

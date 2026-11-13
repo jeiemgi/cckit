@@ -39,10 +39,6 @@ here (kit-engine-boundary #1/#2 — same single-implementation principle as the 
 | Issue number | ✓        | `123`                                                     |
 | Slug         | optional | Short kebab suffix; defaults to a slug of the issue title |
 
-**Worktree-first, always.** Every start gets its own isolated worktree — one branch per worktree,
-never a shared checkout. This is what makes parallel / sub-agent work safe and keeps a read-only
-base checkout untouched.
-
 ## Execution
 
 ```bash

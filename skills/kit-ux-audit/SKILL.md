@@ -9,7 +9,7 @@ allowed-tools: Bash, Read, Write, Glob, Grep, AskUserQuestion, Task, Skill
 # kit-ux-audit — graph-driven UX/UI audit
 
 Analyze how a front-end app's **flows, data-editing surfaces, forms, and design-system usage** hang
-together by reasoning over a **graph** of the app — not by opening screen after screen. Two lanes,
+together by reasoning over a **graph** of the app — not by opening screen after screen. Three lanes,
 one graph, one HTML report. Detection is deterministic (a script / the graph); judgment is the
 model. Never eyeball a codebase for something a script already finds — run it, read it, then think.
 
@@ -233,7 +233,8 @@ widths/paddings, anything with a visual value). Label assumed vs decided.
 
 ## Optional: seed a graphify graph at install time
 
-Seeding the graph once makes every later run richer and cheaper. Opt-in, outside the default flow:
+A seeded graphify graph is what step 1 uses on every later run, in place of the fallback scan.
+Opt-in, outside the default flow:
 1. `graphify detect` on the app → report corpus size + a token estimate.
 2. Recommend by cost: `--directed` always (this skill wants edge direction); `--mode deep` only if
    the app carries many docs/specs; `--no-viz` if > 5000 nodes; `--neo4j-push` only if the project
