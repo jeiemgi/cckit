@@ -105,6 +105,7 @@ The skills above ship with the plugin. `cckit init` also copies these into the p
 | `copywriting` | content, marketing | Write or rewrite a page meant to persuade: homepage, landing, pricing, feature, headline, call to action. The `editor` agent lists it in `skills:`, so the Editor follows it for marketing copy. |
 | [`brand-voice`](#brand-voice) | marketing | Record the brand's voice, key messages and banned phrasings in `brand/voice.md`; check a draft against it. `copywriting` reads the file before it writes. |
 | [`campaign`](#campaign) | marketing | Turn one goal into a campaign plan, get it approved, then record its pieces as light tasks or as an effort's sub-issues. |
+| [`page-design`](#page-design) | marketing; the `nextjs-shadcn` recipe; an existing project with `cckit add page-design` | Build or change a page with three named third-party design skills in a fixed order — `impeccable`, `emil-design-eng`, `web-design-guidelines` — with a design brief before any code and a self-review after. |
 | `speckit` | software | Install or identify Spec Kit and drive the spec-driven lifecycle. |
 | `feature-build-refine` | software | Build strategy for a Next.js + RefineDev project; applies only when the stack matches. |
 | `supabase-patterns` | software | Supabase access conventions; applies only when the project uses Supabase. |
@@ -145,6 +146,56 @@ One goal, one plan file, and the pieces that deliver it. The skill does not writ
 | `issues` | one sub-issue per piece of an effort (`cckit effort new … --kind campaign`) | the effort's one pull request |
 
 `tasks.default` in the config decides which; see [Light tasks](/config-and-permissions/#light-tasks).
+
+### page-design
+
+cckit's own skill for a page. It coordinates three third-party design skills and contains none of
+their content. Each of the three is an [integration](/integrations/#the-design-skills): off until
+you add it, installed only with your consent.
+
+| Order | Skill | Decides | Source · licence |
+| --- | --- | --- | --- |
+| 1 | `impeccable` | direction: what the page is for, its type, layout and colour, and what it must not look like | [pbakaus/impeccable](https://github.com/pbakaus/impeccable) · Apache-2.0 |
+| 2 | `emil-design-eng` | interaction and motion on the chosen design; it may remove an animation step 1 added without a purpose | [emilkowalski/skills](https://github.com/emilkowalski/skills) · MIT |
+| 3 | `web-design-guidelines` | the audit of the finished code; its accessibility and reduced-motion findings win a disagreement | [vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills) · MIT per its README |
+
+What the skill has the agent do, in order:
+
+1. **Check what is installed** and whether the run is unattended (`CCKIT_HEADLESS` is set by
+   `cckit autopilot run` and `cckit task run`).
+2. **Write the design brief before any code**, in `docs/design/<task-id>.md`: the audience, ONE
+   visual idea, type, colour, and at least four concrete patterns the page refuses to have, picked
+   from the skill's list of what a generic generated page looks like (a centred hero with two
+   buttons, three icon cards in a row, one default sans-serif for everything, a fade-in on every
+   section). A fact it does not have is written `not known`.
+3. **Apply the three skills** in the order of the table, each for what it decides.
+4. **Write the self-review** into the same file: whether the one idea is on the page, each refusal
+   as `absent` or `present at <file:line>`, the final state of each skill, and what was not
+   verified.
+
+The limits it holds the agent to:
+
+| Case | What the skill says |
+| --- | --- |
+| An unattended run | never `impeccable`'s live mode (`live`, `generate`): it opens a browser session and can start the agent CLI with permission checks off |
+| No network, or the rules cannot be fetched | `audit: not run`, never passed. `web-design-guidelines` fetches its rules from GitHub on every run |
+| One of the three is not installed | `<skill>: not installed` in the design file, then cckit's own minimum rules for that step (`references/minimum-rules.md`). The missing skill is never written as used |
+
+The skill's instructions are not the check. For a page task, [`cckit task run`](/cli-reference/)
+reads which skills the run loaded from the events the agent CLI prints and puts that list in the
+pull request, with `docs/design/<id>.md` named beside it. A page task is a task whose kind is
+`page` (`cckit task new --kind page "<title>"`), or any task in a project whose config sets
+`tasks.design: true`.
+
+In a project that already exists, `cckit add page-design` sets that key and copies the skill into
+the skills folder of each adapter the project selects. It needs no version bump: `cckit init
+--upgrade` adds nothing to a project already at the installed version. With the key on and the
+folder absent, `cckit doctor` prints a failing `page-design skill` row naming the command.
+
+<Aside type="caution" title="Not measured yet">
+No page built with the three skills installed has been compared with one built without them. This
+section describes what the skill instructs and what cckit records, not a result.
+</Aside>
 
 <Aside type="note" title="Running a skill">
 In Claude Code, type `/` and the skill name (for example `/kit-next`). A

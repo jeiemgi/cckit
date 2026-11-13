@@ -45,11 +45,19 @@ STATE="$TMP/state/autopilot/task_7-thing.json"
 # and prints usage in the shape its name documents.
 cat > "$TMP/bin/agent-stub" <<'STUB'
 #!/usr/bin/env bash
-me="$(basename "$0")"
+me="$(basename "$0")"; argv="$*"
 printf '%s\n' "$*" > "$FX/$me.argv"
 cat > "$FX/$me.prompt"
 n="$(cat "$FX/rounds" 2>/dev/null || echo 0)"; n=$((n + 1)); echo "$n" > "$FX/rounds"
 usage() {
+  # Event output, when cckit asked claude for it: one Skill call that returned (STUB_SKILL).
+  case "$me:$argv" in claude:*stream-json*)
+    printf '{"type":"system","subtype":"init"}\n'
+    if [ -n "${STUB_SKILL:-}" ]; then
+      printf '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"s%s","name":"Skill","input":{"skill":"%s"}}]}}\n' "$n" "$STUB_SKILL"
+      printf '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"s%s","content":"ok"}]}}\n' "$n"
+    fi ;;
+  esac
   case "$me" in
     claude) printf '{"type":"result","total_cost_usd":0.01,"usage":{"input_tokens":100,"output_tokens":50}}\n' ;;
     codex)  printf '{"type":"turn.completed","usage":{"input_tokens":100,"output_tokens":50}}\n' ;;
@@ -304,6 +312,27 @@ for agent in claude codex; do
   t "[$agent] and still opens no second PR"         "$(creates)" "1"
   t "[$agent] it records the PR it found"           "$(field .pr_url)" "https://github.com/fixture/project/pull/41"
 done
+
+# ── --record-skills: the skills each round loaded, from the CLI's events (#504) ─────────────────
+reset
+run --objective x
+t "without --record-skills the state holds no skill list" "$(field '.skills')" "null"
+t "and claude is started in its single-result mode" "$(cat "$TMP/claude.argv")" "-p --output-format json"
+reset
+STUB_SKILL=page-design STUB_DONE_AT=2 run --objective x --until "$UNTIL" --max-iters 1 --record-skills
+t "a limit stop with --record-skills exits 4" "$?" "4"
+t "claude is started with event output" "$(cat "$TMP/claude.argv")" "-p --output-format stream-json --verbose"
+t "round 1's skill is in the state" "$(field '.skills | [.loaded, .complete, .source] | tostring')" '[["page-design"],true,"claude"]'
+t "usage is still counted from the event output" "$(field .usage.tokens)" "150"
+STUB_SKILL=impeccable STUB_DONE_AT=2 run --resume --max-iters 2
+t "the resumed run exits 0" "$?" "0"
+t "a resumed run keeps recording without the flag" "$(cat "$TMP/claude.argv")" "-p --output-format stream-json --verbose"
+t "skills from both rounds are in the state" "$(field '.skills.loaded | tostring')" '["impeccable","page-design"]'
+reset
+STUB_MODE=nousage run --objective x --record-skills
+t "a round whose output holds no event leaves the list incomplete" "$(field '.skills | [.loaded, .complete] | tostring')" '[[],false]'
+run --dry-run --objective x --record-skills
+has "--dry-run shows the event form of the command" "$(cat "$TMP/out")" "'claude' -p --output-format stream-json --verbose"
 
 [ "$fail" -eq 0 ] && echo "ALL OK (autopilot-run: A07 fixture, claude + codex)" || echo "autopilot-run: FAILURES"
 exit "$fail"

@@ -489,7 +489,7 @@ _kitcfg="$(kit_config_path "${TARGET:-$PWD}" 2>/dev/null || true)"
 
 # doctor_integration <descriptor> — one row for one enabled integration.
 doctor_integration() {
-  local f="$1" id label recipe st bin after
+  local f="$1" id label recipe st bin after also
   id="$(jq -r '.id' "$f")"; label="$(jq -r '.label' "$f")"
   recipe="$(jq -r '.install[0].run' "$f")"
   if integration_detect "$f" "$_ig_target"; then
@@ -522,8 +522,10 @@ doctor_integration() {
         row "$MARK_OK" "$label" "installed${bin:+ ($bin)}"
       else
         after="$(jq -r '.afterInstall // ""' "$f")"
-        row "$MARK_OK" "$label" "installed via ${st#installed }${bin:+ ($bin)}"
-        ACTIONS_TAKEN+=("Installed $label via ${st#installed }${after:+ — $after}")
+        # What the installer writes besides the file `detect` checks (descriptor: alsoWrites).
+        also="$(jq -r '(.alsoWrites // []) | join(", ")' "$f")"
+        row "$MARK_OK" "$label" "installed via ${st#installed }${bin:+ ($bin)}${also:+ — it also wrote: $also}"
+        ACTIONS_TAKEN+=("Installed $label via ${st#installed }${also:+ — it also wrote: $also}${after:+ — $after}")
       fi
       CHECKS_OK=$((CHECKS_OK + 1)) ;;
     dry-run)
@@ -556,6 +558,32 @@ if has_cmd jq && [[ -f "$_kitcfg" ]]; then
     doctor_integration "$_ig_f"
   done
   if [[ $_ig_shown -eq 1 ]]; then printf '\n'; fi
+fi
+
+# ============================================================================
+# PAGE-DESIGN SKILL (only checked when tasks.design is true)
+# ============================================================================
+# `tasks.design: true` makes every task of the project a page task, and a page task tells the agent
+# to load cckit's `page-design` skill. The key alone installs nothing: a project already at the
+# installed version gets no file from `cckit init --upgrade`. One row per selected adapter says
+# whether the skill is in its skills folder, and a missing one names the command that copies it.
+if has_cmd jq && [[ -f "$_kitcfg" ]] && [[ "$(jq -r '.tasks.design // false' "$_kitcfg" 2>/dev/null)" == "true" ]]; then
+  command -v adapter_list_from_config >/dev/null 2>&1 || . "$_export_dir_doctor/lib/adapter-select.sh"
+  printf '  %s%sPage tasks (tasks.design is on)%s\n' "$C_BOLD" "" "$C_RESET"
+  _pd_root="$(dirname "$_kitcfg")"
+  [[ "$(basename "$_pd_root")" == ".claude" ]] && _pd_root="$(dirname "$_pd_root")"
+  for _pd_a in $(adapter_list_from_config "$_kitcfg" 2>/dev/null || echo claude); do
+    _pd_dir="$(adapter_dir "$_pd_a")/skills/page-design"
+    if [[ -f "$_pd_root/$_pd_dir/SKILL.md" ]]; then
+      row "$MARK_OK" "page-design skill" "$_pd_dir"
+      CHECKS_OK=$((CHECKS_OK + 1))
+    else
+      row "$MARK_FAIL" "page-design skill" "missing from $_pd_dir — run: cckit add page-design"
+      CHECKS_FAIL=$((CHECKS_FAIL + 1))
+      ACTIONS_NEEDED+=("Add the page-design skill ($_pd_dir): cckit add page-design")
+    fi
+  done
+  printf '\n'
 fi
 
 # ============================================================================

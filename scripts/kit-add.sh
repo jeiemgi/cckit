@@ -18,8 +18,16 @@
 # A descriptor that lists `rules` (E303.10) also gets each rule template copied into the project's
 # .claude/rules/, and under KIT_DRY_RUN the install + wire plan is printed after the config diff.
 #
+# SKILLS (#504): a skill cckit ships that declares itself addable (templates/skills/<name>/add.json:
+# label, summary and the one config key it switches on) is the third thing `add` accepts.
+# `kit-add.sh page-design` sets that key in the project config and copies the skill's SKILL.md and
+# references/ into the skills folder of each adapter the project selects. It asks nothing, keeps a
+# copy that is already there, and is the way a project already at the installed version gets the
+# skill: `cckit init --upgrade` refuses such a project before it adds anything.
+#
 # Run:
-#   scripts/kit-add.sh                                         # list integrations + modules
+#   scripts/kit-add.sh                                         # list integrations + modules + skills
+#   scripts/kit-add.sh page-design [--dir DIR]                 # switch a kit skill on and copy it in
 #   scripts/kit-add.sh <integration> [--dir DIR] [--set enable=yes|no]
 #   scripts/kit-add.sh software [--dir DIR] --answers FILE     # non-interactive (skill/CI/tests)
 #   scripts/kit-add.sh software --set versioning=github --set deploy=vercel --set ci=github-actions
@@ -36,6 +44,8 @@ _add_dir="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
 . "$_add_dir/lib/kit-operate.sh"     # four-beat machine + manifest
 # shellcheck source=/dev/null
 . "$_add_dir/lib/integration-install.sh"  # integration_install_plan — the dry-run plan
+# shellcheck source=/dev/null
+command -v adapter_list_from_config >/dev/null 2>&1 || . "$_add_dir/lib/adapter-select.sh"  # which skills folders
 
 # kit_add_module_exists <module> -> rc 0 if a module spec is installed
 kit_add_module_exists() { [ -f "$(kit_interview_catalog_file "$1")" ]; }
@@ -86,13 +96,104 @@ kit_add() {
 kit_add_kind() {
   if kit_add_module_exists "$1"; then printf 'module\n'; return 0; fi
   if integration_file "$1" >/dev/null 2>&1; then printf 'integration\n'; return 0; fi
+  if kit_add_skill_file "$1" >/dev/null 2>&1; then printf 'skill\n'; return 0; fi
   return 1
 }
 
-# _kit_add_list_json [dir] -> {integrations:[{id,label,summary,key,enabled,applies}],modules:[{id,label}]}
+# --- addable kit skills (#504) ---------------------------------------------
+# kit_add_skill_file <name> -> the add.json of a kit skill that can be added; rc 1 when the name is
+# not a skill id or the skill ships no add.json. The id grammar is checked first, so `../x` never
+# resolves outside templates/skills/.
+kit_add_skill_file() {
+  local f
+  grep -qE '^[a-z][a-z0-9]*(-[a-z0-9]+)*$' <<<"${1:-}" || return 1
+  f="$(kit_iv_plugin_root)/templates/skills/$1/add.json"
+  [ -f "$f" ] && [ -f "$(dirname "$f")/SKILL.md" ] || return 1
+  printf '%s\n' "$f"
+}
+
+# kit_add_skills_list -> the names of the addable kit skills, sorted.
+kit_add_skills_list() {
+  find "$(kit_iv_plugin_root)/templates/skills" -mindepth 2 -maxdepth 2 -type f -name add.json 2>/dev/null \
+    | sed -e 's#/add\.json$##' -e 's#.*/##' | sort
+}
+
+# kit_add_skill_missing <name> <root> <adapters> -> the adapter skill folders (relative to root)
+# that do not hold the skill, one per line. Empty = installed for every selected adapter.
+kit_add_skill_missing() {
+  local name="$1" root="$2" a d
+  for a in $(printf '%s\n' "$3"); do   # a substitution splits under zsh; a bare $3 does not
+    d="$(adapter_dir "$a")" || continue
+    [ -f "$root/$d/skills/$name/SKILL.md" ] || printf '%s/skills/%s\n' "$d" "$name"
+  done
+}
+
+# kit_add_skill <name> [targetdir]
+# Sets the skill's config key in the project config (the same merge an integration gets: every
+# other key is kept) and copies templates/skills/<name>/ — SKILL.md and references/ — into
+# <adapter-dir>/skills/<name>/ for each adapter in the config. A folder that already holds a
+# SKILL.md is kept whole, so a project's edits survive a re-run; a second run changes nothing.
+# KIT_DRY_RUN prints the plan and writes nothing. rc 1: no project config, or a failed copy.
+kit_add_skill() {
+  command -v jq >/dev/null 2>&1 || { kit_die "jq required"; }
+  local name="$1" target="${2:-$PWD}" f src cfg root rel key on merged tmp verdict adapters rest d ref bad=0
+  f="$(kit_add_skill_file "$name")" || kit_die "unknown skill '$name' — run 'cckit add' to list what can be added"
+  src="$(dirname "$f")"
+  target="$(cd "$target" 2>/dev/null && pwd)" || kit_die "no such dir: $target"
+  cfg="$(kit_config_path "$target" 2>/dev/null)" || cfg=""
+  [ -n "$cfg" ] && [ -f "$cfg" ] || kit_die "no project config found from $target — run 'cckit init' first"
+  key="$(jq -r '.config.key' "$f")"; on="$(jq -c 'if (.config | has("value")) then .config.value else true end' "$f")"
+  root="$(_kit_add_root "$cfg")"
+  rel="${cfg#"$root"/}"
+  merged="$(jq --arg k "$key" --argjson v "$on" 'setpath($k | split("."); $v)' "$cfg")" || kit_die "cannot read $cfg"
+
+  if [ "$(printf '%s' "$merged" | jq -S .)" = "$(jq -S . "$cfg")" ]; then
+    kit_say "kit add $name: $key is already $on in $cfg."
+  else
+    kit_say "kit add $name  ->  $cfg"
+    tmp="$(mktemp "$cfg.XXXXXX")" || kit_die "cannot write beside $cfg"
+    printf '%s\n' "$merged" > "$tmp"
+    _kit_op_diff "$tmp" "$cfg"
+    if [ -n "${KIT_DRY_RUN:-}" ]; then
+      rm -f "$tmp"; kit_say "  [dry-run] would write $cfg"
+    else
+      verdict="$(cd "$root" && kit_manifest_verify "$rel" 2>/dev/null || true)"
+      mv "$tmp" "$cfg" || { rm -f "$tmp"; kit_die "failed to write $cfg"; }
+      [ "$verdict" = "intact" ] && ( cd "$root" && kit_manifest_record "$rel" A "add:$name" ) >/dev/null 2>&1
+      kit_say "$key = $on."
+    fi
+  fi
+
+  adapters="$(adapter_list_from_config "$cfg")" || kit_die "the config's 'adapters' value is invalid (expected claude and/or codex)"
+  rest="$(kit_add_skill_missing "$name" "$root" "$adapters")"
+  if [ -z "$rest" ]; then kit_say "skill $name: already in the project — kept as it is."; return 0; fi
+  while IFS= read -r d; do
+    [ -n "$d" ] || continue
+    if [ -n "${KIT_DRY_RUN:-}" ]; then kit_say "  [dry-run] would write $root/$d/"; continue; fi
+    if ! mkdir -p "$root/$d" 2>/dev/null || ! cp "$src/SKILL.md" "$root/$d/SKILL.md" 2>/dev/null; then
+      kit_warn "kit add $name: cannot write $root/$d/SKILL.md"; bad=1; continue
+    fi
+    if [ -d "$src/references" ]; then
+      mkdir -p "$root/$d/references" 2>/dev/null || bad=1
+      # `find`, not a glob: an unmatched glob is an error under zsh.
+      find "$src/references" -maxdepth 1 -type f 2>/dev/null | while IFS= read -r ref; do
+        cp "$ref" "$root/$d/references/" 2>/dev/null || kit_warn "kit add $name: cannot write $root/$d/references/$(basename "$ref")"
+      done
+    fi
+    kit_say "skill written: $root/$d/"
+  done <<EOF
+$rest
+EOF
+  [ "$bad" -eq 0 ] || return 1
+  [ -n "${KIT_DRY_RUN:-}" ] || kit_say "Reload the agent session so it lists $name, and commit the files above."
+  return 0
+}
+
+# _kit_add_list_json [dir] -> {integrations:[{id,label,summary,key,enabled,applies}],modules:[{id,label}],
+#                              skills:[{id,label,summary,key,enabled,installed}]}
 # `enabled` / `applies` are judged against the project at dir. Read-only.
 _kit_add_list_json() {
-  local d="${1:-$PWD}" id f cfg en ap rows mods m
+  local d="${1:-$PWD}" id f cfg en ap rows mods m sks root
   cfg="$(kit_config_path "$d" 2>/dev/null)" || cfg=""
   rows="[]"
   for id in $(integrations_list); do
@@ -111,7 +212,21 @@ _kit_add_list_json() {
     jq -e 'type == "object"' "$f" >/dev/null 2>&1 || continue
     mods="$(printf '%s' "$mods" | jq -c --slurpfile x "$f" --arg id "$m" '. + [{id: $id, label: ($x[0].label // $id)}]')"
   done
-  jq -cn --argjson i "$rows" --argjson m "$mods" '{integrations: $i, modules: $m}'
+  # Addable kit skills: `enabled` is the config key, `installed` is the skill folder of every
+  # adapter the project selects.
+  sks="[]"; root=""; [ -n "$cfg" ] && root="$(_kit_add_root "$cfg")"
+  for m in $(kit_add_skills_list); do
+    f="$(kit_add_skill_file "$m")" || continue
+    en=false; ap=false
+    if [ -n "$cfg" ] && [ -f "$cfg" ]; then
+      jq -e --slurpfile x "$f" '($x[0].config) as $c
+        | (try getpath($c.key | split(".")) catch null) == (if ($c | has("value")) then $c.value else true end)' "$cfg" >/dev/null 2>&1 && en=true
+      [ -z "$(kit_add_skill_missing "$m" "$root" "$(adapter_list_from_config "$cfg" 2>/dev/null || echo claude)")" ] && ap=true
+    fi
+    sks="$(printf '%s' "$sks" | jq -c --slurpfile x "$f" --arg id "$m" --argjson en "$en" --argjson ap "$ap" \
+      '. + [{id: $id, label: ($x[0].label // $id), summary: ($x[0].summary // ""), key: ($x[0].config.key // ""), enabled: $en, installed: $ap}]')"
+  done
+  jq -cn --argjson i "$rows" --argjson m "$mods" --argjson s "$sks" '{integrations: $i, modules: $m, skills: $s}'
 }
 
 # kit_add_list [dir] -> what `add` accepts, on stdout. One JSON object when CCKIT_OUTPUT=json
@@ -132,6 +247,11 @@ kit_add_list() {
   if [ "$(printf '%s' "$j" | jq '.modules | length')" -gt 0 ]; then
     printf 'Modules (cckit add <name>):\n'
     printf '%s' "$j" | jq -r '.modules[] | "  \(.id)  \(.label)"'
+  fi
+  if [ "$(printf '%s' "$j" | jq '.skills | length')" -gt 0 ]; then
+    printf 'Skills — shipped with cckit (cckit add <name>):\n'
+    printf '%s' "$j" | jq -r '.skills[]
+      | "  \(.id)  \(.summary)  [\(if .enabled then "on" else "off" end), \(if .installed then "installed" else "not in this project" end)]"'
   fi
 }
 
@@ -278,13 +398,15 @@ if kit_is_main; then
     --dir) _target="$2"; shift 2;;
     --answers) _answers="$2"; shift 2;;
     --set) _sets+=("$2"); shift 2;;
-    -h|--help) echo "usage: kit-add.sh [<module|integration>] [--dir DIR] [--answers FILE] [--set k=v ...]   (no name lists what can be added; env: KIT_ASSUME_YES, KIT_DRY_RUN)"; exit 0;;
+    -h|--help) echo "usage: kit-add.sh [<module|integration|skill>] [--dir DIR] [--answers FILE] [--set k=v ...]   (no name lists what can be added; env: KIT_ASSUME_YES, KIT_DRY_RUN)"; exit 0;;
     -*) kit_die "unknown flag: $1";;
     *) [ -z "$_module" ] && _module="$1" || kit_die "unexpected arg: $1"; shift;;
   esac; done
   # No name = the list. Read-only, rc 0 even when the registry is empty.
   [ -n "$_module" ] || { kit_add_list "$_target"; exit $?; }
   _kind="$(kit_add_kind "$_module")" || kit_die "unknown module or integration '$_module' — run 'cckit add' to list them"
+  # A kit skill has no question to ask: it sets one key and copies its files.
+  if [ "$_kind" = "skill" ]; then kit_add_skill "$_module" "$_target"; exit $?; fi
   _af="$(_kit_add_collect "$_module" "$_answers" ${_sets[@]+"${_sets[@]}"})" || kit_die "collecting answers failed"
   if [ "$_kind" = "integration" ]; then kit_add_integration "$_module" "$_af" "$_target"; _rc=$?
   else kit_add "$_module" "$_af" "$_target"; _rc=$?; fi

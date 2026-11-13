@@ -536,6 +536,17 @@ ROLES_NL="$(jq -r '.roles[]' "$PROFILE_FILE")"
 MS_NL="$(jq -r '.milestones[]' "$PROFILE_FILE")"
 AGENTS="$(jq -r '.agents[]' "$PROFILE_FILE")"
 SKILLS="$(jq -r '.skills[]' "$PROFILE_FILE")"
+# page-design (#504) is installed wherever pages are designed: a profile that lists it (marketing),
+# a recipe whose config sets `tasks.design: true` (nextjs-shadcn), or, on --upgrade, a project
+# config that holds that key. One switch, so the skill and the page-task rule of `cckit task run`
+# cannot disagree.
+DESIGN_SKILL_ON=""
+if [[ -n "$RECIPE_FILE" ]]; then DESIGN_SKILL_ON="$(jq -r '.config.tasks.design // empty' "$RECIPE_FILE" 2>/dev/null || true)"; fi
+if [[ $UPGRADE -eq 1 && -n "${UP_CFG:-}" && -f "${UP_CFG:-}" ]]; then DESIGN_SKILL_ON="$(jq -r '.tasks.design // empty' "$UP_CFG" 2>/dev/null || true)"; fi
+if [[ "$DESIGN_SKILL_ON" == "true" ]] && ! grep -qx "page-design" <<<"$SKILLS"; then
+  SKILLS="$SKILLS
+page-design"
+fi
 RULES="$(jq -r '.rules[]' "$PROFILE_FILE")"
 
 # Kit-namespaced skill set: templates whose names take $SKILL_PREFIX (the workflow skills:
@@ -1604,6 +1615,12 @@ else
   echo "  3. Start it:            cckit task start <id>"
   fi
   [[ "$LOCAL_ON" == "true" ]] && echo "  4. /kit-doctor   # local model layer: installs mlx-lm (recipe: integrations/mlx-lm.json) + starts mlx_lm.server"
+  # The page-design skill coordinates three third-party design skills. They are offered, never
+  # installed by init: each is an integration the person switches on and consents to (#504).
+  if grep -qx "page-design" <<<"$SKILLS"; then
+  echo "  · Pages: the page-design skill is installed. It works with three third-party design skills, off until you add them:"
+  echo "      cckit add impeccable && cckit add emil-design-eng && cckit add web-design-guidelines && cckit doctor --fix"
+  fi
   adapter_has "$ADAPTERS" codex && echo "  · Codex: commit .codex/, then run /hooks in Codex and trust the project hooks — Codex skips them until you do."
 fi
 

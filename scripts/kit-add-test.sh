@@ -230,6 +230,37 @@ if [ -n "${KIT_ADD_TEST_INNER:-}" ]; then
   t "qa self-host: no scaffolded twin" "$([ -f "$bare/app/.claude/kit.config.json" ] && echo wrote || echo clean)" "clean"
   rm -rf "$bare"
 
+  # ── a kit skill (#504): `add page-design` sets its key and copies the skill, no version bump ──
+  unset KIT_INTEGRATIONS_DIR
+  sk="$(mktemp -d)"; skc="$sk/.claude/kit.config.json"; mkdir -p "$sk/.claude"
+  printf '%s\n' '{"kitVersion":"9.9.9","adapters":["claude","codex"],"tasks":{"default":"light"},"project":{"name":"P"}}' > "$skc"
+  has "skill: listed" "$(cd "$sk" && "$ADD" 2>/dev/null)" "page-design"
+  t "skill: list --llm before" "$(cd "$sk" && "$CCKIT" add --llm 2>/dev/null | jq -c '.skills[] | select(.id=="page-design") | [.key,.enabled,.installed]')" '["tasks.design",false,false]'
+  KIT_DRY_RUN=1 "$ADD" page-design --dir "$sk" >/dev/null 2>&1; t "skill dry-run rc" "$?" "0"
+  t "skill dry-run: nothing written" "$(cd "$sk" && find . -type f | LC_ALL=C sort | tr '\n' ' ')|$(jq -r '.tasks.design // "unset"' "$skc")" "./.claude/kit.config.json |unset"
+  "$ADD" page-design --dir "$sk" >/dev/null 2>&1; t "skill add rc" "$?" "0"
+  t "skill: key set, others kept" "$(jq -c '[.tasks.design, .tasks.default, .kitVersion, .project.name]' "$skc")" '[true,"light","9.9.9","P"]'
+  t "skill: copied for each adapter, add.json left behind" "$(cd "$sk" && find .claude/skills .agents/skills -type f | LC_ALL=C sort | tr '\n' ' ')" \
+    ".agents/skills/page-design/SKILL.md .agents/skills/page-design/references/design-file-template.md .agents/skills/page-design/references/generic-page-patterns.md .agents/skills/page-design/references/minimum-rules.md .claude/skills/page-design/SKILL.md .claude/skills/page-design/references/design-file-template.md .claude/skills/page-design/references/generic-page-patterns.md .claude/skills/page-design/references/minimum-rules.md "
+  t "skill: the copy is the template" "$(cmp -s "$sk/.claude/skills/page-design/SKILL.md" "$dir/../templates/skills/page-design/SKILL.md" && echo same)" "same"
+  t "skill: list --llm after" "$(cd "$sk" && "$CCKIT" add --llm 2>/dev/null | jq -c '.skills[] | select(.id=="page-design") | [.enabled,.installed]')" '[true,true]'
+  # a copy the project edited is kept; a copy missing for one adapter is restored
+  echo "edited by the project" > "$sk/.claude/skills/page-design/SKILL.md"; rm -rf "$sk/.agents/skills/page-design"
+  snap="$(cat "$skc")"
+  "$ADD" page-design --dir "$sk" >/dev/null 2>&1; t "skill re-run rc" "$?" "0"
+  t "skill re-run: the edited copy is kept" "$(cat "$sk/.claude/skills/page-design/SKILL.md")" "edited by the project"
+  t "skill re-run: the missing adapter copy is written" "$([ -f "$sk/.agents/skills/page-design/SKILL.md" ] && echo yes)" "yes"
+  t "skill re-run: config byte-identical" "$(cat "$skc")" "$snap"
+  # a claude-only project gets no .agents tree; a folder with no config is refused
+  sk2="$(mktemp -d)"; mkdir -p "$sk2/.claude"; printf '%s\n' '{"kitVersion":"9.9.9"}' > "$sk2/.claude/kit.config.json"
+  "$ADD" page-design --dir "$sk2" >/dev/null 2>&1
+  t "skill: claude-only project" "$([ -f "$sk2/.claude/skills/page-design/SKILL.md" ] && echo yes)|$([ -e "$sk2/.agents" ] && echo agents || echo none)" "yes|none"
+  sk3="$(mktemp -d)"
+  out="$("$ADD" page-design --dir "$sk3" 2>&1)"; t "skill: no config rc" "$?" "1"
+  has "skill: no config names init" "$out" "cckit init"
+  t "skill: no config writes nothing" "$(find "$sk3" -type f | wc -l | tr -d ' ')" "0"
+  rm -rf "$sk" "$sk2" "$sk3"
+
   [ "$fail" -eq 0 ] && echo "ALL OK($KIT_ADD_TEST_INNER)"
   exit "$fail"
 fi

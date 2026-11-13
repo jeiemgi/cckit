@@ -26,6 +26,8 @@ al_supported "";              rc "an empty kind is not"           "$?" "1"
 # ── the command line ─────────────────────────────────────────────────────────────────────────────
 t "claude text"  "$(al_headless_cmd claude text)" "'claude' -p"
 t "claude json"  "$(al_headless_cmd claude json)" "'claude' -p --output-format json"
+t "claude events" "$(al_headless_cmd claude events)" "'claude' -p --output-format stream-json --verbose"
+t "codex events is its one JSON mode" "$(al_headless_cmd codex events)" "'codex' exec --json -"
 t "codex text reads stdin"  "$(al_headless_cmd codex text)" "'codex' exec -"
 t "codex json reads stdin"  "$(al_headless_cmd codex json)" "'codex' exec --json -"
 t "args are quoted and precede codex's stdin marker" \
@@ -167,6 +169,44 @@ t "a missing file is unknown"             "$(al_usage codex "$tmp/absent")"     
 t "an unsupported kind is unknown"        "$(al_usage aider "$tmp/claude.json")" "unknown unknown unknown"
 : > "$tmp/empty"
 t "an empty file is unknown"              "$(al_usage claude "$tmp/empty")"      "unknown unknown unknown"
+
+# ── skills, from the runtime's own event output (#504) ───────────────────────────────────────────
+# Four calls: a Skill call that returned, a Skill call the runtime answered with an error (a skill
+# that is not installed), a Read of a SKILL.md, and a Skill call with no result at all. The last
+# assistant line is the agent CLAIMING a skill in prose.
+cat > "$tmp/claude-events.jsonl" <<'JSONL'
+{"type":"system","subtype":"init","skills":["page-design","impeccable","web-design-guidelines"]}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Skill","input":{"skill":"page-design"}}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"ok"}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"t2","name":"Skill","input":{"skill":"impeccable"}},{"type":"tool_use","id":"t3","name":"Read","input":{"file_path":"/w/.claude/skills/emil-design-eng/SKILL.md"}},{"type":"tool_use","id":"t4","name":"Read","input":{"file_path":"/w/app/page.tsx"}}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t2","is_error":true,"content":"Unknown skill: impeccable"},{"type":"tool_result","tool_use_id":"t3","content":"…"},{"type":"tool_result","tool_use_id":"t4","content":"…"}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"t5","name":"Skill","input":{"skill":"web-design-guidelines"}}]}}
+not json at all
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"I applied impeccable and web-design-guidelines."}]}}
+{"type":"result","total_cost_usd":0.02,"usage":{"input_tokens":10,"output_tokens":4}}
+JSONL
+t "claude: only calls that returned without an error are loaded skills" \
+  "$(al_skills claude "$tmp/claude-events.jsonl" | tr '\n' ' ')" "emil-design-eng page-design "
+al_skills claude "$tmp/claude-events.jsonl" >/dev/null; rc "claude: an event stream is a reading" "$?" "0"
+t "claude: usage is read from the same event stream" "$(al_usage claude "$tmp/claude-events.jsonl")" "10 4 0.02"
+printf '%s\n' '{"type":"system","subtype":"init"}' '{"type":"result","usage":{"input_tokens":1,"output_tokens":1}}' > "$tmp/claude-noskill.jsonl"
+t "claude: events with no skill call list nothing" "$(al_skills claude "$tmp/claude-noskill.jsonl")" ""
+al_skills claude "$tmp/claude-noskill.jsonl" >/dev/null; rc "claude: and that is still a reading" "$?" "0"
+al_skills claude "$tmp/claude.json" >/dev/null;  rc "claude: a lone result object cannot tell" "$?" "1"
+al_skills claude "$tmp/plain.txt" >/dev/null;    rc "claude: text output cannot tell" "$?" "1"
+al_skills claude "$tmp/empty" >/dev/null;        rc "an empty file cannot tell" "$?" "1"
+al_skills claude "$tmp/absent" >/dev/null;       rc "a missing file cannot tell" "$?" "1"
+al_skills aider "$tmp/claude-events.jsonl" >/dev/null; rc "an unsupported kind cannot tell" "$?" "1"
+cat > "$tmp/codex-events.jsonl" <<'JSONL'
+{"type":"thread.started","thread_id":"t"}
+{"type":"item.completed","item":{"id":"i1","type":"command_execution","command":"bash -lc 'cat .agents/skills/page-design/SKILL.md'","exit_code":0}}
+{"type":"item.completed","item":{"id":"i2","type":"command_execution","command":"cat .agents/skills/impeccable/SKILL.md","exit_code":1}}
+{"type":"item.completed","item":{"id":"i3","type":"agent_message","text":"I read skills/emil-design-eng/SKILL.md"}}
+{"type":"turn.completed","usage":{"input_tokens":5,"output_tokens":6}}
+JSONL
+t "codex: a skill file read by a command that exited 0" "$(al_skills codex "$tmp/codex-events.jsonl" | tr '\n' ' ')" "page-design "
+al_skills codex "$tmp/codex.jsonl" >/dev/null; rc "codex: events with no skill read are a reading" "$?" "0"
+al_skills codex "$tmp/plain.txt" >/dev/null;   rc "codex: text output cannot tell" "$?" "1"
 
 [ "$fail" -eq 0 ] && echo "ALL OK (agent-launch)" || echo "agent-launch: FAILURES"
 exit "$fail"
