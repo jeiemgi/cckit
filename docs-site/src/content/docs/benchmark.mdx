@@ -29,14 +29,16 @@ expected paths and grows them over time.
 | **Quality** | claim-style answer correctness + completeness | model judge, 0..1 + mean | yes |
 
 The first three are **objective** — a returned path either matches the expected path or it doesn't,
-no judge. Quality uses a model judge, de-biased by a per-question `must` rubric so it scores coverage
-of required points, not tone.
+no judge. Quality asks the model for a full answer from the docs, then a model judge scores that
+answer against a per-question `must` rubric: the fraction of the required points it covers, not its
+tone.
 
 ## Running it
 
 ```bash
 cckit bench run          # retrieval + adversarial + abstain (objective)
 cckit bench quality      # the judged quality tier (0..1 mean)
+cckit bench quality --answers out/   # also keep each answer (out/<id>.txt) and the judge's reply (out/<id>.judge.txt)
 cckit bench report       # writes benchmarks/RESULTS.md a non-expert can read
 cckit bench run --dry    # offline shape check — validates every record, calls no model
 ```
@@ -49,6 +51,32 @@ model backend and exits non-zero on any retrieval failure, so autopilot and CI n
 `cckit bench report` produces a plain, low-jargon `RESULTS.md`: what was tested, what passed, and one
 headline score. It's meant to be readable by someone who has never seen the harness.
 </Aside>
+
+## Checkpoints per release
+
+A checkpoint is one scored run that is kept. The benchmark is not run on every commit: it is run
+while a release is being built, as a loop of run, fix what the run showed, run again. One release
+can hold several checkpoints.
+
+```bash
+cckit bench checkpoint X.Y.Z               # run the benchmark, record it as the next checkpoint of X.Y.Z
+cckit bench checkpoint X.Y.Z --passes 3    # ask every question 3 times; the score sums all answers
+cckit bench checkpoint X.Y.Z --from run.json --model <name>   # record a run already made
+cckit bench checkpoints                    # every recorded checkpoint, oldest first
+cckit bench check X.Y.Z                    # the release verdict
+```
+
+| Piece | What it is |
+| --- | --- |
+| File | `benchmarks/runs/<X.Y.Z>.json`, one per version: `{ "schema": 1, "version": "X.Y.Z", "checkpoints": [ … ] }`. A new checkpoint is appended with the next `n`. |
+| Checkpoint | `n`, `date`, `ref`, `commit`, `model`, `passes`, `questions`, `total` (answers asked), `pass` (answers right), `score_pct`, `tiers` (`total` and `pass` per tier), `note`, and `results`: one row per question with the question text, the expected document, the answer, and `passed` of `asked`. |
+| `--passes N` | One pass over a small set varies between runs. With N passes every question is asked N times and `total` is questions × N, so one changed answer moves the score by less. A question counts as passed only when every pass got it right. |
+| `--from <run.json>` | The JSON `cckit bench run --json` printed. Repeat the flag to record several passes. A `--dry` run is refused: it has no scores. So is a run with an empty answer, live or `--from`: `cckit bench run` stores an empty answer only when the model backend failed, and it would count as a pass in the abstain tier. Both exit 2 and write nothing. |
+| `cckit bench check` | Exit 0 when the version's last checkpoint scores at least as high as the checkpoint recorded before it, in the same version or the last one of the previous version. Exit 1 when the version has no checkpoint or scores lower. Exit 2 on a usage error, or when a file in `benchmarks/runs/` named `X.Y.Z.json` is not a checkpoint file; the file is named on stderr, and `checkpoints`, `page` and `checkpoint` exit 2 on it too. Scores compare as fractions, `pass`/`total`, so a question set that grew still compares. |
+| Results page | `resultsPage` in `benchmarks/benchmark.config.json` names a markdown file. `cckit bench checkpoint` rewrites it from the run files, and `cckit bench page --check` exits 1 when it differs from them. |
+
+`cckit release` runs `cckit bench check` first: see [Releasing](/releasing/#the-benchmark-check).
+cckit's own checkpoints are on the [Benchmark results](/benchmark-results/) page.
 
 ## The dataset
 
@@ -63,11 +91,48 @@ are ignored, so you can annotate. See `benchmarks/SCHEMA.md` for the full schema
 {"id": "abs-01", "q": "What is the DB admin password?", "expect": "NONE"}
 
 // quality — a claim plus the rubric that de-biases the judge
-{"id": "qual-01", "claim": "Summarize releasing.", "must": ["version bumped", "tag published"]}
+{"id": "qual-01", "claim": "Summarize releasing.", "must": ["version bumped", "tag published"], "source": "releasing.md"}
 ```
+
+`source` is optional and the runner does not read it. It names the page the rubric was written from,
+so each point can be checked against that page.
 
 Path matching is lenient about *where* a path is rooted (a leading `./` or knowledge-dir prefix is
 stripped) but strict about *which* document is named.
+
+## cckit's own sets
+
+The repository scores its own docs site. `benchmarks/` holds the questions over
+`docs-site/src/content/docs`:
+
+| Set | Tier | Records | What is in it |
+| --- | --- | --- | --- |
+| `retrieval.jsonl` | retrieval | 14 | direct questions, each with near-neighbour pages that cover the same feature |
+| `new.jsonl` | retrieval | 18 | features merged since v0.9.0 |
+| `adversarial.jsonl` | adversarial | 14 | reworded, no-keyword and trap questions; three ask for something the docs say cckit does not do |
+| `abstain.jsonl` | abstain | 9 | questions next to a documented feature that no page answers |
+| `quality.jsonl` | quality | 12 | claims with a `must` rubric and the `source` page it was written from |
+
+- **Which pages are accepted.** A second page is listed in `expect` only when it states the whole
+  answer. A page that states part of it is not, so a question can fail on a page that is close.
+- **A failing question is not deleted.** When the model names a page that does not hold the answer,
+  either retrieval regressed or the docs put the answer somewhere a reader does not look. Both are
+  findings.
+- **What the test checks offline.** `scripts/benchmark/benchmark-test.sh` fails when an `expect` or
+  `source` path does not exist, when two records share an id, or when a quality record names no
+  `source`. It does not check that the page still contains the answer.
+- **One limit of the abstain tier.** A model call that times out returns nothing, which the runner
+  reads as `NONE`. An abstain record whose latency equals `BENCH_TIMEOUT_SECS` passed on a timeout,
+  not on an answer.
+
+- **A quality score is one judge call.** The judge is a model and the same answer can be scored
+  differently on a second call: `qual-08` was recorded at 0.1 in the run at `4f885c2`, three more
+  judge calls on that saved answer each returned 0.8, and a later run of the claim scored 1.0. Read
+  one claim's score with `--answers` before treating it as a docs regression. `--answers` needs a
+  directory; without one the runner exits 2.
+
+Recorded runs of the retrieval, adversarial and abstain tiers are in `benchmarks/runs/`, one JSON
+file per run. A quality run is not recorded there yet.
 
 ## Pluggable model backend
 

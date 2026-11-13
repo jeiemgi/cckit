@@ -20,6 +20,15 @@
 #               [--superseded-by N]  close the issue with a reason + summary comment; board Done
 #   cckit new [--role R --kind K --priority P --milestone M --blocked-by "#1" --body B|--body-file F] "<title>"
 #                                   file ONE issue: labels + board (Todo) in one step (never raw gh issue create)
+#   cckit task <new|list|next|start|finish|share>   light tasks: work tracked in the project, no GitHub issue
+#     task new [--priority pN --kind K --body B|--body-file F] "<title>"   record a task (one file
+#         under tasks/; a draft in this checkout until it is started or shared)
+#     task list [--all] · task next   every open task and its state · the one to take next
+#     task start [--force] [--no-push] <id>   worktree + branch light/<id>-<slug> from the base (alias: take)
+#     task finish [<id>] "<summary>" [--all]  mark it done on its branch, push, open the pull request;
+#         the task is done when that PR merges (alias: done). --all also commits new files
+#     task share ["<summary>"]        one pull request that adds this checkout's drafts to the base;
+#         they list as shared until it merges. Re-run to retry a share whose push or PR failed
 #   cckit merge [<pr>] [--merge|--rebase]   merge the PR (squash by default; rebases on conflict), close
 #                                   its issues, GC the branch, update the PR's base (develop or effort/<N>);
 #                                   refuses an effort/* head: that PR merges with cckit effort close <N>
@@ -68,12 +77,18 @@
 #   cckit render                    stdin markdown -> rich (glow on a TTY; verbatim when piped)
 #   cckit doctor                    onboarding preflight (deps, gh auth, selected agent CLIs)
 #   cckit add [<name>] [--set k=v]  list integrations + modules; with a name, switch one on in the config
+#   cckit page <mode|open|poll|reply|end|answer>
+#                                   review pages: open a plan/decision/grill as a page (terminal
+#                                   output where there is no browser), and record the answer
 #   cckit update                    check whether this project is behind the installed cckit
 #   cckit migrate                   reshuffle an old kit layout to the current one
 #   cckit adopt                     record kit-shaped files a repo already has into the manifest
 #   cckit digest <path|url>         summarize a file or URL (local model)
 #   cckit bench [run|report|…]      doc-retrieval benchmark: score how well docs are found + used
-#   cckit release <ver> [--publish] cut a release (dry-run by default)
+#   cckit bench checkpoint <ver>    record a benchmark run as a checkpoint of release <ver>
+#                                   (checkpoints: list them · check <ver>: the release gate · page)
+#   cckit release <ver> [--publish] cut a release (dry-run by default); refuses when <ver> has no
+#                                   benchmark checkpoint or scores lower (--skip-bench-check overrides)
 #   cckit version [--llm]           the installed cckit version
 #   cckit commands [--llm]          list every verb (the command catalog)
 #   cckit lib [--llm] [--all]       list every scripts/lib helper: functions, purpose, error contract
@@ -292,6 +307,21 @@ case "$cmd" in
     fi
     kto_task_new "$n_title" "$n_role" "$n_kind" "$n_prio" "$n_ms" "$n_plan" "$n_blocked" "$n_body"; echo
     ;;
+  task)
+    # Light tasks (#450): work tracked through a task source (the `file` source: one tracked file
+    # per task) and not through GitHub issues. One dispatcher in the lib, as `qa` and `receipt` do.
+    # kit-task-ops.sh is loaded for kto_pr_title only, so the PR title is built by the same code
+    # `cckit pr` uses.
+    # shellcheck source=/dev/null
+    source "$LIB/kit-config.sh" && load_kit_config
+    # shellcheck source=/dev/null
+    source "$LIB/worktree-issue.sh"; source "$LIB/worktree-start.sh"
+    # shellcheck source=/dev/null
+    source "$LIB/commitlint.sh"; source "$LIB/kit-task-ops.sh"
+    # shellcheck source=/dev/null
+    source "$LIB/light-task.sh"
+    lt_cli "$@"
+    ;;
   merge)
     # Merge (squash by default, --merge / --rebase, #376) through kto_task_pr_merge: rebase on conflict, close the PR's linked issues (native
     # auto-close only fires on the default branch), then clean the branch + worktree. The verb behind
@@ -439,14 +469,26 @@ case "$cmd" in
     BENCH_ROOT="$PWD/scripts/benchmark"; [ -d "$BENCH_ROOT" ] || BENCH_ROOT="$ROOT/scripts/benchmark"
     export BENCH_KIT_ROOT="$ROOT"
     sub="${1:-report}"; shift || true
+    BENCH_USAGE='cckit bench <run|quality|report|gate|stop-check> [--dry] [--json]
+cckit bench checkpoint <X.Y.Z> [--passes N] [--from <run.json>] [--model <name>] [--note <text>]
+cckit bench checkpoints [--json] | check <X.Y.Z> | page [--out <file>] [--check]'
     case "$sub" in
       run)        exec bash "$BENCH_ROOT/run.sh" "$@" ;;
       quality)    exec bash "$BENCH_ROOT/run-quality.sh" "$@" ;;
       report)     exec bash "$BENCH_ROOT/report.sh" "$@" ;;
       gate)       exec bash "$BENCH_ROOT/gate.sh" "$@" ;;
       stop-check) exec bash "$BENCH_ROOT/stop-check.sh" "$@" ;;
-      -h|--help)  echo 'cckit bench <run|quality|report|gate|stop-check> [--dry] [--json]'; exit 0 ;;
-      *) echo 'cckit bench <run|quality|report|gate|stop-check> [--dry] [--json]' >&2; exit 2 ;;
+      # Recorded checkpoints per release version (#452). A project scaffolded before checkpoint.sh
+      # existed has no copy of it, so these fall back to cckit's own.
+      checkpoint|checkpoints|check|page)
+        CP="$BENCH_ROOT/checkpoint.sh"; [ -f "$CP" ] || CP="$ROOT/scripts/benchmark/checkpoint.sh"
+        case "$sub" in
+          checkpoint)  exec bash "$CP" record "$@" ;;
+          checkpoints) exec bash "$CP" list "$@" ;;
+          *)           exec bash "$CP" "$sub" "$@" ;;
+        esac ;;
+      -h|--help)  echo "$BENCH_USAGE"; exit 0 ;;
+      *) echo "$BENCH_USAGE" >&2; exit 2 ;;
     esac
     ;;
   scan)        source "$LIB/project-scan.sh"; project_scan "$@" ;;
@@ -539,6 +581,13 @@ case "$cmd" in
     # shellcheck source=/dev/null
     source "$LIB/qa-lane.sh"
     qa_cli "$@"
+    ;;
+  page)
+    # Review pages (#451): a plan, a decision or a grilling round opens as a page when this session
+    # has a browser, and prints to the terminal when it does not. One dispatcher in the lib.
+    # shellcheck source=/dev/null
+    source "$LIB/review-page.sh"
+    rp_cli "$@"
     ;;
   completions)
     case "${1:-bash}" in

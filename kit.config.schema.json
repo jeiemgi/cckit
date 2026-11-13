@@ -110,6 +110,24 @@
       }
     },
     "milestones": { "type": "array", "items": { "type": "string" } },
+    "tasks": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Light tasks (`cckit task`): work tracked in the project and not in GitHub issues.",
+      "properties": {
+        "source": {
+          "type": "string",
+          "pattern": "^[a-z0-9_]+$",
+          "default": "file",
+          "description": "The task source `cckit task` and `cckit gc` read. `file` (default, the one source shipped): one tracked file per task under `tasks.dir`. Another name loads `scripts/lib/task-source-<name>.sh`, which must define `task_<name>_list`, `_get`, `_create`, `_on_start`, `_on_finish` and `_state`. KIT_TASKS_SOURCE overrides it per invocation."
+        },
+        "dir": {
+          "type": "string",
+          "default": "tasks",
+          "description": "The tracked directory the `file` source keeps one `<id>.md` per task in, relative to the project root. An absolute path, or one that climbs out of the project, is ignored with a warning. KIT_TASKS_DIR overrides it per invocation."
+        }
+      }
+    },
     "pr": {
       "type": "object",
       "additionalProperties": true,
@@ -234,6 +252,16 @@
       "description": "Code-graph retrieval: agents query an index of the code instead of grepping the tree. Off when absent. Turned on by an integration descriptor (integrations/<id>.json) whose `config.key` is `codeGraph.provider`.",
       "properties": {
         "provider": { "type": "string", "description": "Which integration provides the code graph, as the descriptor's `config.value` names it. Absent or \"none\" = no code graph; every path that would use one skips." }
+      }
+    },
+    "reviewPages": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Review pages: a plan, a decision with options or a grilling round opens as an HTML page the reader annotates and answers (`cckit page`). ON when absent. `enabled` is the config key of the integration descriptor integrations/lavish.json, which is on by default.",
+      "properties": {
+        "enabled": { "type": "boolean", "description": "false = plans, decisions and grills print to the terminal; `cckit page open` never starts the page tool. Absent or true = a page opens in a session that has a browser." },
+        "answers": { "type": "string", "enum": ["issue", "file"], "description": "Where `cckit page answer` writes. Absent = a comment on the issue when `github.repo` is set and `--issue` is given, else a file. `issue` requires `--issue`; `file` always writes a file." },
+        "answersDir": { "type": "string", "description": "Directory, relative to the repo root, for answers written as files. Default `docs/answers`. A path that leaves the repo is refused." }
       }
     },
     "routines": {

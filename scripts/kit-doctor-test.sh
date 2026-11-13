@@ -129,7 +129,7 @@ t "no installer recipe or per-tool finder is left in kit-doctor.sh" \
 
 # ── 1. nothing switched on: no integration row, and the exit code a keyless config gets ────────
 bare="$(project bare '{"project":{"name":"x"}}')"
-off="$(project off '{"memory":{"enabled":false},"local":{"enabled":false}}')"
+off="$(project off '{"memory":{"enabled":false},"local":{"enabled":false},"reviewPages":{"enabled":false}}')"
 out_bare="$(doctor "$tmp/h1" "$bare" --dry-run)"; rc_bare=$?
 out_off="$(doctor "$tmp/h1" "$off" --dry-run)"; rc_off=$?
 t "no keys -> exit 0 on a healthy machine" "$rc_bare" "0"
@@ -140,10 +140,35 @@ hasnt "both keys false -> no Memory section" "$out_off" "Memory (MemPalace)"
 hasnt "both keys false -> no Local section" "$out_off" "Local model layer"
 t "both keys false -> no manager was called" "$(calls)" ""
 
+# ── 1b. on by default (#451): Lavish has a row in a project that set no key. Missing, it is a
+# skip row — reported, never installed, never a failure, whatever the flags. An explicit key gets
+# the hard row every other integration gets. The sealed PATH has no npx and no lavish-axi.
+lrows() { printf '%s\n' "$1" | grep -E '^ +(ok|FAIL|warn|-) +Lavish ' | sed -E 's/^ +//; s/ +/ /g'; }
+has "no keys -> Lavish is listed: on by default" "$(lrows "$out_bare")" "- Lavish not installed — on by default, falls back without it."
+t "all three keys false -> no Lavish row" "$(lrows "$out_off")" ""
+: > "$log"
+out="$(doctor "$tmp/h1b" "$bare" --yes)"; r=$?
+has "no keys, --yes -> still a skip row" "$(lrows "$out")" "- Lavish not installed — on by default"
+t "no keys, --yes -> nothing is installed for a tool the project never chose" "$(grep -cE 'npm install|brew install node' "$log")" "0"
+t "no keys, --yes -> no consent recorded" "$(cat "$bare/.cckit/consent" 2>/dev/null | grep -c 'install:lavish')" "0"
+t "no keys, --yes -> exit 0" "$r" "0"
+lav="$(project lav '{"reviewPages":{"enabled":true}}')"
+out="$(doctor "$tmp/h1b" "$lav" --dry-run)"; r=$?
+has "explicit reviewPages.enabled -> the hard row" "$(lrows "$out")" "FAIL Lavish missing — npm install -g lavish-axi"
+t "explicit reviewPages.enabled, tool missing -> exit 1" "$r" "1"
+mk npx <<'EOS'
+#!/bin/sh
+exit 0
+EOS
+out="$(doctor "$tmp/h1b" "$bare" --dry-run)"
+has "npx on PATH -> Lavish is installed, nothing to do" "$(lrows "$out")" "ok Lavish installed ($stubs/npx)"
+rm -f "$stubs/npx"
+: > "$log"
+
 # ── 2. both on, tools absent, --dry-run: two rows from the runner, nothing installed ───────────
 on="$(project on '{"memory":{"enabled":true},"local":{"enabled":true}}')"
 out="$(doctor "$tmp/h2" "$on" --dry-run)"; r=$?
-has "dry-run -> Integrations section" "$out" "Integrations (optional tools this project switched on)"
+has "dry-run -> Integrations section" "$out" "Integrations (optional tools that are on in this project)"
 t "dry-run -> one row per descriptor, each naming its FIRST candidate" "$(rows "$out" | tr '\n' '|')" \
   "FAIL mempalace CLI missing — pipx install mempalace|FAIL mlx-lm missing — uv tool install mlx-lm|"
 has "dry-run -> action names the recipe" "$out" "Install mlx-lm: uv tool install mlx-lm"

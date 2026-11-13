@@ -1,0 +1,43 @@
+{
+  "id": "lavish",
+  "label": "Lavish",
+  "summary": "Review pages: a plan, a decision with options or a grilling round opens as an HTML page the reader annotates and answers, instead of long terminal prose.",
+  "why": "Runs through npx: nothing stays installed and no API key is read. The page is served from a local server on this machine. A session with no browser prints to the terminal instead.",
+  "config": { "key": "reviewPages.enabled", "default": true },
+  "detect": { "run": "command -v lavish-axi || command -v npx", "bin": "npx" },
+  "install": [
+    {
+      "manager": "npm",
+      "run": "npm install -g lavish-axi",
+      "note": "Only reached when neither `lavish-axi` nor `npx` is on PATH. With npx present nothing is installed: `npx -y lavish-axi` fetches the package on first use."
+    },
+    {
+      "manager": "brew",
+      "run": "brew install node",
+      "note": "npx ships with Node."
+    }
+  ],
+  "verify": {
+    "run": "npx -y lavish-axi --help",
+    "failsOn": "npx is missing, the registry is unreachable, or the lavish-axi package no longer answers --help."
+  },
+  "rules": ["review-pages"],
+  "afterInstall": "nothing to wire: `cckit page open <html-file>` opens a page",
+  "uninstall": "npm uninstall -g lavish-axi",
+  "recheck": {
+    "cadence": "monthly",
+    "drifts": [
+      "the package name lavish-axi on npm",
+      "the subcommands cckit passes through (poll, reply, end)",
+      "that `lavish-axi <html-file>` opens a session and `--help` exits 0"
+    ]
+  },
+  "docs": "https://github.com/kunchenguid/lavish-axi#readme",
+  "attribution": {
+    "author": "Kun Chen (kunchenguid)",
+    "license": "MIT",
+    "homepage": "https://github.com/kunchenguid/lavish-axi",
+    "affiliated": false,
+    "notice": "Lavish (lavish-axi) is open-source software by Kun Chen, run from its public npm package under its own MIT license. cckit is not affiliated with its author and vendors none of its code."
+  }
+}

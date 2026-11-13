@@ -52,6 +52,11 @@ Surface the proposals as a short, visual summary — lead with the human-meaning
 item (its `proposal`), not the verb noise. Confirm which one to pursue. Do not invent scope beyond
 what the inventory supports.
 
+Choosing between proposals is a **decision**: when `cckit page mode` prints `page`, present them as
+a review page with one recommendation and collect the choice there (`/kit-page`). When it prints
+`terminal`, show the same summary in the terminal. Either way, record the choice with
+`cckit page answer --kind decision` once it is made.
+
 ## 3. Hand off to /kit-effort-new
 
 Once an item is chosen, scope it into an effort:

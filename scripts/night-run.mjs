@@ -110,7 +110,8 @@ const STOP = {
 const BRIEF =
   "Read the project's delegation brief first if it has one. You run unattended inside a night " +
   'run: never ask a question, never confirm a destructive prompt, never take a cost action, and ' +
-  'return only the schema.'
+  'never open a review page (run every `cckit page` command with `CCKIT_HEADLESS=1`, so it ' +
+  'prints to the terminal). Return only the schema.'
 
 const preflightPrompt = (n) =>
   `${BRIEF}\nRead effort #${n}: \`gh issue view ${n} --json labels,state\`. ok=false when it ` +

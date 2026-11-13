@@ -84,6 +84,16 @@ _wt_set_port() {
 # State lives beside the event log under the git-common-dir, so it is worktree-durable and shared by
 # every checkout. Each line: <issue>\t<slot>\t<worktree-path>. A slot whose worktree is gone is
 # reclaimed on the next call, which is what keeps the 40 slots from leaking away over a long project.
+# _wt_num_hash <key> — <key> itself when it is a number, else a number derived from it. The slot
+# ledger is keyed by issue number; a light task (#450) is keyed by its id (`t3f9a`), and the hashed
+# fallbacks below do arithmetic on the key.
+_wt_num_hash() {
+  case "$1" in
+    ''|*[!0-9]*) printf '%s' "$1" | cksum | cut -d' ' -f1 ;;
+    *) printf '%s' "$1" ;;
+  esac
+}
+
 _wt_slots_file() {
   local gcd
   gcd="$(git -C "${1:-.}" rev-parse --git-common-dir 2>/dev/null)" || return 1
@@ -154,7 +164,7 @@ _wt_slot_alloc() {
     i=$(( i + 1 ))
   done
   echo "[#$num] warn: all 40 dev-port slots are held — falling back to a hashed port (collisions possible); run cckit gc" >&2
-  printf '%s' $(( num % 40 ))
+  printf '%s' $(( $(_wt_num_hash "$num") % 40 ))
 }
 
 # _wt_slot_for <root> <issue-num> <worktree> — echo this issue's slot (0-39), allocating on first
@@ -163,8 +173,8 @@ _wt_slot_alloc() {
 # a warning) only when every slot is genuinely held.
 _wt_slot_for() {
   local root="$1" num="$2" wt="$3" f lock out locked=0
-  f="$(_wt_slots_file "$root")" || { printf '%s' $(( num % 40 )); return 0; }
-  [[ -f "$f" ]] || : > "$f" 2>/dev/null || { printf '%s' $(( num % 40 )); return 0; }
+  f="$(_wt_slots_file "$root")" || { printf '%s' $(( $(_wt_num_hash "$num") % 40 )); return 0; }
+  [[ -f "$f" ]] || : > "$f" 2>/dev/null || { printf '%s' $(( $(_wt_num_hash "$num") % 40 )); return 0; }
 
   lock="$f.lock"
   if _wt_lock "$lock"; then locked=1; else
@@ -224,7 +234,7 @@ wt_assign_ports() {
   fi
 
   offset="$(_wt_slot_for "$root" "$num" "$wt")"
-  [[ "$offset" =~ ^[0-9]+$ ]] || offset=$(( num % 40 ))
+  [[ "$offset" =~ ^[0-9]+$ ]] || offset=$(( $(_wt_num_hash "$num") % 40 ))
   i=0
   while [[ "$i" -lt "$n" ]]; do
     apppath="$(jq -r ".[$i].path // empty" <<<"$ports")"

@@ -9,17 +9,27 @@
 #   scripts/publish.sh 0.1.0 --publish       # execute: tag + GitHub release + formula + npm
 #   scripts/publish.sh 0.1.0 --publish --no-npm     # skip npm (brew only)
 #   scripts/publish.sh 0.1.0 --publish --no-brew    # skip brew (npm only)
+#   scripts/publish.sh 0.1.0 --skip-bench-check     # release despite a missing or lower benchmark
+#
+# Benchmark check (#452): the version needs a recorded checkpoint in benchmarks/runs/<version>.json
+# and its last checkpoint must not score lower than the checkpoint recorded before it. Otherwise
+# the release is refused (exit 1), in a dry run as well. --skip-bench-check overrides, and says so.
+# The runs are always read from this repo's benchmarks/ dir. BENCH_DIR is NOT honoured here: it is
+# the variable `cckit bench` reads, and one left exported for another project would move the
+# release check to that project's runs without a word. KIT_RELEASE_BENCH_DIR points the check
+# elsewhere (the tests use it), and the release prints the directory when it is set.
 # Env: TAP_DIR=~/Dev/jeiemgi/homebrew-cckit (where the tap repo is cloned)
 set -euo pipefail
 
 VERSION="${1:-}"; shift || true
-PUBLISH=0; DO_NPM=1; DO_BREW=1
+PUBLISH=0; DO_NPM=1; DO_BREW=1; SKIP_BENCH=0
 for a in "$@"; do case "$a" in
   --publish) PUBLISH=1 ;; --no-npm) DO_NPM=0 ;; --no-brew) DO_BREW=0 ;;
+  --skip-bench-check) SKIP_BENCH=1 ;;
   *) echo "unknown flag: $a" >&2; exit 2 ;;
 esac; done
 
-[ -n "$VERSION" ] || { echo "usage: scripts/publish.sh <version> [--publish] [--no-npm] [--no-brew]" >&2; exit 2; }
+[ -n "$VERSION" ] || { echo "usage: scripts/publish.sh <version> [--publish] [--no-npm] [--no-brew] [--skip-bench-check]" >&2; exit 2; }
 echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo "version must be X.Y.Z" >&2; exit 2; }
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -32,6 +42,20 @@ run() { if [ "$PUBLISH" = 1 ]; then echo "+ $*"; "$@"; else echo "DRY: $*"; fi; 
 
 mode="DRY-RUN"; [ "$PUBLISH" = 1 ] && mode="PUBLISH"
 echo "== cckit publish $tag  (mode: $mode) =="
+
+# 0. Benchmark check: refuse a version with no recorded checkpoint, or one that scores lower than
+# the checkpoint before it. Runs before anything is written, and in a dry run too.
+[ -z "${KIT_RELEASE_BENCH_DIR:-}" ] || echo "! benchmark runs read from KIT_RELEASE_BENCH_DIR=$KIT_RELEASE_BENCH_DIR"
+bench_out="$(BENCH_DIR="${KIT_RELEASE_BENCH_DIR:-$root/benchmarks}" bash "$root/scripts/benchmark/checkpoint.sh" check "$VERSION" 2>&1)" && bench_rc=0 || bench_rc=$?
+printf '%s\n' "$bench_out"
+if [ "$bench_rc" -ne 0 ]; then
+  if [ "$SKIP_BENCH" = 1 ]; then
+    echo "! benchmark check OVERRIDDEN by --skip-bench-check: releasing $tag anyway"
+  else
+    echo "x release refused by the benchmark check (override: --skip-bench-check)" >&2
+    exit 1
+  fi
+fi
 
 if [ "$PUBLISH" = 1 ]; then
   [ -z "$(git -C "$root" status --porcelain)" ] || { echo "x working tree not clean" >&2; exit 1; }
