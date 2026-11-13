@@ -289,7 +289,7 @@ rp_answer() {
   # The marker is looked up in every file of the directory, not only today's: the file name starts
   # with the date, so the same answer recorded on a later day would otherwise be written twice.
   f=""
-  [ -d "$root/$dir" ] && f="$(grep -lF -- "$marker" "$root/$dir"/*.md 2>/dev/null | head -n 1)"
+  [ -d "$root/$dir" ] && f="$(grep -lF -- "$marker" "$root/$dir"/*.md 2>/dev/null | sed -n 1p)"
   if [ -n "$f" ]; then
     rm -f "$tmp" "$body"
     kit_say "page answer: already recorded in $f — nothing written"
