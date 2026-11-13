@@ -162,6 +162,7 @@ export default defineConfig({
           { label: 'Break a feature into an effort', slug: 'tutorials/break-a-feature-into-an-effort' },
           { label: 'Run a wave in parallel', slug: 'tutorials/run-issues-in-parallel-with-a-wave' },
           { label: 'Run Claude Code unattended', slug: 'tutorials/run-claude-code-unattended' },
+          { label: 'Run one objective unattended', slug: 'tutorials/run-one-objective-unattended' },
           { label: 'Drive Claude Code headless in CI', slug: 'tutorials/drive-claude-code-headless-in-ci' },
           { label: 'Stop Claude committing secrets', slug: 'tutorials/stop-claude-committing-secrets' },
           { label: 'Keep private data out of AI commits', slug: 'tutorials/keep-private-data-out-of-ai-commits' },
