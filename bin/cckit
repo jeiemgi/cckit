@@ -89,6 +89,8 @@
 #   cckit bench [run|report|…]      doc-retrieval benchmark: score how well docs are found + used
 #   cckit bench checkpoint <ver>    record a benchmark run as a checkpoint of release <ver>
 #                                   (checkpoints: list them · check <ver>: the release gate · page)
+#   cckit bench verbs [--json]      wall time + gh call count of the read-only verbs
+#                                   (attach to a checkpoint: bench checkpoint <ver> --verbs <file>)
 #   cckit release <ver> [--publish] cut a release (dry-run by default); refuses when <ver> has no
 #                                   benchmark checkpoint or scores lower (--skip-bench-check overrides)
 #   cckit version [--llm]           the installed cckit version
@@ -485,8 +487,9 @@ case "$cmd" in
     export BENCH_KIT_ROOT="$ROOT"
     sub="${1:-report}"; shift || true
     BENCH_USAGE='cckit bench <run|quality|report|gate|stop-check> [--dry] [--json]
-cckit bench checkpoint <X.Y.Z> [--passes N] [--from <run.json>] [--model <name>] [--note <text>]
-cckit bench checkpoints [--json] | check <X.Y.Z> | page [--out <file>] [--check]'
+cckit bench checkpoint <X.Y.Z> [--passes N] [--from <run.json>] [--model <name>] [--note <text>] [--verbs <timings.json>]
+cckit bench checkpoints [--json] | check <X.Y.Z> | page [--out <file>] [--check]
+cckit bench verbs [--runs N] [--checkout <dir>] [--verb "<verb>"] [--json]   (attach: checkpoint <X.Y.Z> --verbs <file>)'
     case "$sub" in
       run)        exec bash "$BENCH_ROOT/run.sh" "$@" ;;
       quality)    exec bash "$BENCH_ROOT/run-quality.sh" "$@" ;;
@@ -502,6 +505,10 @@ cckit bench checkpoints [--json] | check <X.Y.Z> | page [--out <file>] [--check]
           checkpoints) exec bash "$CP" list "$@" ;;
           *)           exec bash "$CP" "$sub" "$@" ;;
         esac ;;
+      # Wall time + gh call count of the read-only verbs (#452). Same fallback as the checkpoint verbs.
+      verbs)
+        VT="$BENCH_ROOT/verb-timings.sh"; [ -f "$VT" ] || VT="$ROOT/scripts/benchmark/verb-timings.sh"
+        exec bash "$VT" "$@" ;;
       -h|--help)  echo "$BENCH_USAGE"; exit 0 ;;
       *) echo "$BENCH_USAGE" >&2; exit 2 ;;
     esac

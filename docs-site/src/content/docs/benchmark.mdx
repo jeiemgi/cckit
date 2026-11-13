@@ -64,19 +64,64 @@ cckit bench checkpoint X.Y.Z --passes 3    # ask every question 3 times; the sco
 cckit bench checkpoint X.Y.Z --from run.json --model <name>   # record a run already made
 cckit bench checkpoints                    # every recorded checkpoint, oldest first
 cckit bench check X.Y.Z                    # the release verdict
+cckit bench checkpoint X.Y.Z --verbs verbs.json   # also attach verb timings (see below)
 ```
 
 | Piece | What it is |
 | --- | --- |
 | File | `benchmarks/runs/<X.Y.Z>.json`, one per version: `{ "schema": 1, "version": "X.Y.Z", "checkpoints": [ … ] }`. A new checkpoint is appended with the next `n`. |
-| Checkpoint | `n`, `date`, `ref`, `commit`, `model`, `passes`, `questions`, `total` (answers asked), `pass` (answers right), `score_pct`, `tiers` (`total` and `pass` per tier), `note`, and `results`: one row per question with the question text, the expected document, the answer, and `passed` of `asked`. |
+| Checkpoint | `n`, `date`, `ref`, `commit`, `model`, `passes`, `questions`, `total` (answers asked), `pass` (answers right), `score_pct`, `tiers` (`total` and `pass` per tier), `note`, and `results`: one row per question with the question text, the expected document, the answer, and `passed` of `asked`. With `--verbs`, also `verbs`: one row per measured verb. |
 | `--passes N` | One pass over a small set varies between runs. With N passes every question is asked N times and `total` is questions × N, so one changed answer moves the score by less. A question counts as passed only when every pass got it right. |
 | `--from <run.json>` | The JSON `cckit bench run --json` printed. Repeat the flag to record several passes. A `--dry` run is refused: it has no scores. So is a run with an empty answer, live or `--from`: `cckit bench run` stores an empty answer only when the model backend failed, and it would count as a pass in the abstain tier. Both exit 2 and write nothing. |
-| `cckit bench check` | Exit 0 when the version's last checkpoint scores at least as high as the checkpoint recorded before it, in the same version or the last one of the previous version. Exit 1 when the version has no checkpoint or scores lower. Exit 2 on a usage error, or when a file in `benchmarks/runs/` named `X.Y.Z.json` is not a checkpoint file; the file is named on stderr, and `checkpoints`, `page` and `checkpoint` exit 2 on it too. Scores compare as fractions, `pass`/`total`, so a question set that grew still compares. |
+| `cckit bench check` | Exit 0 when the version's last checkpoint scores at least as high as the checkpoint recorded before it, in the same version or the last one of the previous version, or when the two share no question. Exit 1 when the version has no checkpoint or scores lower. Exit 2 on a usage error, or when a file in `benchmarks/runs/` named `X.Y.Z.json` is not a checkpoint file; the file is named on stderr, and `checkpoints`, `page` and `checkpoint` exit 2 on it too. The comparison is described below. |
 | Results page | `resultsPage` in `benchmarks/benchmark.config.json` names a markdown file. `cckit bench checkpoint` rewrites it from the run files, and `cckit bench page --check` exits 1 when it differs from them. |
 
 `cckit release` runs `cckit bench check` first: see [Releasing](/releasing/#the-benchmark-check).
 cckit's own checkpoints are on the [Benchmark results](/benchmark-results/) page.
+
+### What the check compares
+
+Two checkpoints are compared over the questions both asked. A question is the same one when its set
+file and its `id` match. On those questions the score is answers right out of answers asked, so two
+checkpoints with a different number of passes still compare.
+
+| The two checkpoints | Verdict | The line says |
+| --- | --- | --- |
+| share questions, and the newer one scores the same or higher on them | exit 0 | `… — not lower than … on the 18 question(s) both asked (18/18 now, 18/18 before); 37 new, 0 removed` |
+| share questions, and the newer one scores lower on them | exit 1 | `… is lower than … on the 18 question(s) both asked (17/18 now, 18/18 before); 37 new, 0 removed` |
+| share no question | exit 0 | `… — new baseline: it shares no question with … (5 new, 18 removed)` |
+
+A question that is new in the later checkpoint, or that was removed from it, is counted in the line
+and takes no part in the verdict. A run of 54 right out of 55 after a run of 18 right out of 18 is
+therefore not lower when the 18 are still right. Whenever a shared question was right before and is
+missed now, a second line names it: `right before, missed now: retrieval.jsonl ret-03`. The verdict
+is the score on the shared questions, so one question newly missed and another newly right is level
+and passes; the second line is still printed.
+
+## Verb timings
+
+A checkpoint can carry the wall time and the GitHub call count of cckit's read-only verbs.
+
+```bash
+cckit bench verbs --json > verbs.json              # measure the checkout in the current directory
+cckit bench checkpoint X.Y.Z --verbs verbs.json    # record the benchmark and attach the measurement
+```
+
+| Piece | What it is |
+| --- | --- |
+| Verbs | `status`, `sync`, `next`, `plan`, `gc`, `effort plan`, `claims`, `task list`, `qa lanes`. None changes an issue, a PR, a branch, a worktree or a tracked file. `status`, `gc` and `task list` refresh the remote-tracking refs (`git fetch --prune`) and `sync` appends two lines to `kit-events.jsonl`, as they do in normal use. `--verb "<verb>"` measures other verbs in place of the list; repeat it. |
+| Runs | Each verb runs `--runs` times, default 3. `min_ms` is the fastest run and `median_ms` the median, in wall milliseconds. |
+| `gh_calls` | The number of times the verb ran `gh`, as the median across the runs. A `gh` shim in a temp dir is put first on PATH of the measured verb only. It appends one line to a log and runs the real `gh` with the same arguments, so the verb's output and exit code are unchanged. The temp dir is removed when the command exits. |
+| `exit` | The highest exit code the verb returned. A failed verb is still timed, and the results page prints its exit code next to it. |
+| `--checkout <dir>` | The directory the verbs run in, default the current one. The CLI measured is `<dir>/bin/cckit` when it exists, else the installed one; `--cckit <path>` names another. |
+| Output | Without `--json`, a table. With it, `{ "kind": "verb-timings", "date", "commit", "runs", "verbs": [ { "verb", "runs", "min_ms", "median_ms", "gh_calls", "exit" } ] }`. |
+
+`--verbs <file>` is refused, exit 2, when the file is missing or a row lacks `verb`, `runs`,
+`min_ms`, `median_ms` or `gh_calls`; nothing is written. The check does not read the timings: they
+are published, not gated.
+
+Take the timings on an idle machine. Other work running at the same time lengthens every number, and
+two checkpoints measured under different load do not compare.
 
 ## The dataset
 

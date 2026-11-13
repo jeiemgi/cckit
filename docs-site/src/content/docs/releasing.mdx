@@ -71,6 +71,14 @@ what it showed, run again. A version can hold several.
 
    The command also rewrites `docs-site/src/content/docs/benchmark-results.md`. Commit both files.
 
+   To publish [verb timings](/benchmark/#verb-timings) with the checkpoint, measure first, on an
+   idle machine, and attach the file:
+
+   ```bash
+   cckit bench verbs --json > verbs.json
+   cckit bench checkpoint X.Y.Z --verbs verbs.json
+   ```
+
 2. **Fix what the checkpoint shows as missed, then record another.** Repeat until the score holds.
 
 3. **Check the verdict** before the `develop` → `main` promotion: `cckit bench check X.Y.Z`.
@@ -82,13 +90,18 @@ what it showed, run again. A version can hold several.
 | State of `benchmarks/runs/X.Y.Z.json` | `cckit release X.Y.Z` |
 | --- | --- |
 | missing, or no checkpoint in it | refused, exit 1 |
-| last checkpoint scores lower than the checkpoint recorded before it | refused, exit 1 |
-| last checkpoint scores the same or higher | proceeds |
+| last checkpoint scores lower than the checkpoint recorded before it, on the questions both asked | refused, exit 1 |
+| last checkpoint scores the same or higher on those questions | proceeds |
+| last checkpoint shares no question with the one before it | proceeds as a new baseline |
 | first checkpoint ever recorded | proceeds |
 | any `X.Y.Z.json` in `benchmarks/runs/` is not a checkpoint file | refused, exit 1; the file is named |
 
 "The checkpoint recorded before it" is the previous checkpoint of the same version, or the last
-checkpoint of the previous version when the version has only one. `--skip-bench-check` releases
+checkpoint of the previous version when the version has only one. The two are compared over the
+questions both asked, matched by set file and id: a question added since, or removed, is counted in
+the output and does not decide the verdict, so a question set that grew does not refuse a release.
+The output names how many questions were compared, how many are new and how many were removed
+([What the check compares](/benchmark/#what-the-check-compares)). `--skip-bench-check` releases
 anyway; the output then carries the reason and the line
 `! benchmark check OVERRIDDEN by --skip-bench-check`.
 

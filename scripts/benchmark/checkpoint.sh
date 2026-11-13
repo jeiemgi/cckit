@@ -9,16 +9,21 @@
 # Usage:
 #   checkpoint.sh record <X.Y.Z> [--from <run.json>]… [--passes <N>] [--model <name>]
 #                        [--commit <sha>] [--ref <name>] [--date <YYYY-MM-DD>] [--note <text>]
+#                        [--verbs <timings.json>]
 #       Append a checkpoint to benchmarks/runs/<X.Y.Z>.json. Without --from it runs the benchmark
 #       (run.sh --json) --passes times (default 1). Each --from is one pass already run: the JSON
 #       `cckit bench run --json` printed. Passes are summed, so score = answers right / answers asked.
+#       --verbs attaches a per-verb measurement already taken (the JSON verb-timings.sh --json
+#       printed) as the checkpoint's `verbs`: wall milliseconds and gh calls per verb.
 #       Rewrites the results page when benchmark.config.json names one in `resultsPage`.
 #   checkpoint.sh list [--json]
 #       Every recorded checkpoint, oldest first.
 #   checkpoint.sh check <X.Y.Z>
-#       The release gate. Exit 0 when the version's last checkpoint scores at least as high as the
-#       checkpoint recorded before it; exit 1 when the version has no checkpoint, or it scores lower;
-#       exit 2 on a usage error or a run file that is not a checkpoint file.
+#       The release gate. The version's last checkpoint is compared with the checkpoint recorded
+#       before it over the questions BOTH asked (matched by set file + id). Exit 0 when it scores at
+#       least as high on those, or when the two share no question (a new baseline); exit 1 when the
+#       version has no checkpoint, or it scores lower on the shared questions; exit 2 on a usage
+#       error or a run file that is not a checkpoint file.
 #   checkpoint.sh page [--out <file>] [--check]
 #       Print the results page (markdown) built from the run files; --out writes it; --check exits 1
 #       when the file on disk differs from what the run files produce.
@@ -36,7 +41,7 @@ DIR="$(bench_dir)"
 RUNS="$DIR/runs"
 PROJECT_ROOT="$(cd "$DIR/.." 2>/dev/null && pwd)"
 
-usage() { sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,31p' "$0" | sed 's/^# \{0,1\}//'; }
 
 # A flag that takes a value, given as the last argument, has none: refuse it. Without this check
 # `shift 2` fails on one remaining argument, shifts nothing, and the parse loop never ends.
@@ -71,10 +76,10 @@ cp_all() {
 
 # ---- record ----------------------------------------------------------------
 cmd_record() {
-  local version="" passes=1 model="" commit="" ref="" date_s="" note="" froms=() tmp i f
+  local version="" passes=1 model="" commit="" ref="" date_s="" note="" verbs="" froms=() tmp i f
   while [ "$#" -gt 0 ]; do
     case "$1" in
-      --from|--passes|--model|--commit|--ref|--date|--note) need_value record "$#" "$1" || return 2 ;;
+      --from|--passes|--model|--commit|--ref|--date|--note|--verbs) need_value record "$#" "$1" || return 2 ;;
       -h|--help) usage; return 0 ;;
     esac
     case "$1" in
@@ -92,6 +97,8 @@ cmd_record() {
       --date=*)  date_s="${1#*=}"; shift ;;
       --note)    note="${2:-}"; shift 2 ;;
       --note=*)  note="${1#*=}"; shift ;;
+      --verbs)   verbs="${2:-}"; shift 2 ;;
+      --verbs=*) verbs="${1#*=}"; shift ;;
       -*)        echo "checkpoint record: unknown flag '$1'" >&2; return 2 ;;
       *)         if [ -z "$version" ]; then version="$1"; shift
                  else echo "checkpoint record: unexpected argument '$1'" >&2; return 2; fi ;;
@@ -101,6 +108,17 @@ cmd_record() {
   grep -Eq '^[1-9][0-9]*$' <<<"$passes" || { echo "checkpoint record: --passes must be a positive integer" >&2; return 2; }
 
   cp_all >/dev/null || return 2   # an unreadable run file is reported before anything is run or written
+
+  # A measurement to attach is validated before anything is run: every row needs the five fields
+  # the page prints, as a string and four non-negative numbers.
+  if [ -n "$verbs" ]; then
+    [ -f "$verbs" ] || { echo "checkpoint record: no such verb timings file: $verbs" >&2; return 2; }
+    jq -e '(.verbs | type == "array") and (.verbs | length) > 0
+           and ([ .verbs[] | (.verb | type == "string")
+                  and ([.runs, .min_ms, .median_ms, .gh_calls] | all(type == "number" and . >= 0)) ] | all)' \
+      "$verbs" >/dev/null 2>&1 \
+      || { echo "checkpoint record: $verbs is not a verb timings file (.verbs rows need verb, runs, min_ms, median_ms, gh_calls)" >&2; return 2; }
+  fi
 
   tmp="$(mktemp -d)" || return 2
   # shellcheck disable=SC2064
@@ -154,7 +172,14 @@ cmd_record() {
     jq -n --arg v "$version" '{schema: 1, version: $v, checkpoints: []}' > "$existing"
   fi
 
-  jq -s --slurpfile ex "$existing" --slurpfile q "$qmap" \
+  local vfile="$tmp/verbs.json"
+  if [ -n "$verbs" ]; then
+    jq -c '[ .verbs[] | {verb, runs, min_ms, median_ms, gh_calls} + (if (.exit // 0) != 0 then {exit} else {} end) ]' "$verbs" > "$vfile" || return 2
+  else
+    printf 'null' > "$vfile"
+  fi
+
+  jq -s --slurpfile ex "$existing" --slurpfile q "$qmap" --slurpfile vb "$vfile" \
      --arg date "$date_s" --arg commit "$commit" --arg ref "$ref" --arg model "$model" --arg note "$note" '
     . as $passes
     | [ $passes[] | select(.dry == true) ] as $dry
@@ -193,11 +218,12 @@ cmd_record() {
                  | map({ key: .[0].tier, value: { total: ([.[].asked] | add), pass: ([.[].passed] | add) } })
                  | from_entries ),
         note: $note,
-        results: $results } ]
+        results: $results }
+        + (if $vb[0] != null then { verbs: $vb[0] } else {} end) ]
   ' "$tmp"/pass-*.json > "$tmp/new.json" || { echo "checkpoint record: could not build the checkpoint" >&2; return 2; }
 
   mv "$tmp/new.json" "$out"
-  jq -r '.checkpoints[-1] | "recorded checkpoint \(.n) of '"$version"': \(.pass)/\(.total) (\(.score_pct)%) · \(.passes) pass(es) · \(.model) · \(.ref)@\(.commit)"' "$out"
+  jq -r '.checkpoints[-1] | "recorded checkpoint \(.n) of '"$version"': \(.pass)/\(.total) (\(.score_pct)%) · \(.passes) pass(es) · \(.model) · \(.ref)@\(.commit)" + (if .verbs then " · \(.verbs | length) verb timings" else "" end)' "$out"
   echo "  file: $out"
 
   local page; page="$(cp_page_path)"
@@ -222,8 +248,12 @@ cmd_list() {
 }
 
 # ---- check (the release gate) ----------------------------------------------
-# Scores compare as fractions (pass/total cross-multiplied), so a question set that grew between two
-# checkpoints still compares, and integer-percent rounding never decides a release.
+# Two checkpoints are compared over the questions BOTH asked, matched by set file + id (#452). The
+# question set grows between checkpoints (18 to 55 in 0.10.0), and a whole-run fraction would read
+# 54 of 55 as lower than 18 of 18 although no question got worse. On the shared questions the scores
+# compare as fractions (answers right / answers asked, cross-multiplied), so a different number of
+# passes still compares and integer-percent rounding never decides a release. Two checkpoints that
+# share no question cannot be compared: the newer one is a new baseline and passes.
 cmd_check() {
   local version="${1:-}" all
   is_version "$version" || { echo "checkpoint check: version must be X.Y.Z (got '${version}')" >&2; return 2; }
@@ -235,15 +265,34 @@ cmd_check() {
   fi
   local verdict line
   line="$(printf '%s' "$all" | jq -r --arg v "$version" '
+    def key: .set + "|" + (.id | tostring);
+    def bykey(c): [ (c.results // [])[] | { key: key, value: . } ] | from_entries;
+    def lbl(c): "\(c.version) checkpoint \(c.n): \(c.pass)/\(c.total) (\(c.score_pct)%)";
     . as $a
     | ( [ range(0; length) | select($a[.].version == $v) ] | last ) as $idx
     | $a[$idx] as $cur
     | ( if $idx > 0 then $a[$idx - 1] else null end ) as $prev
-    | def lbl(c): "\(c.version) checkpoint \(c.n): \(c.pass)/\(c.total) (\(c.score_pct)%)";
-      if $prev == null then "ok\tbenchmark check: " + lbl($cur) + " — no earlier checkpoint to compare against"
-      elif ($cur.pass * $prev.total) < ($prev.pass * $cur.total)
-        then "low\tbenchmark check: " + lbl($cur) + " is lower than " + lbl($prev)
-      else "ok\tbenchmark check: " + lbl($cur) + " — not lower than " + lbl($prev)
+    | if $prev == null then "ok\tbenchmark check: " + lbl($cur) + " — no earlier checkpoint to compare against"
+      else
+        bykey($cur) as $c | bykey($prev) as $p
+        | [ $c | keys_unsorted[] | select($p[.] != null) ] as $shared
+        | ( ($c | length) - ($shared | length) ) as $new
+        | ( ($p | length) - ($shared | length) ) as $gone
+        | "\($new) new, \($gone) removed" as $delta
+        | if ($shared | length) == 0
+            then "ok\tbenchmark check: " + lbl($cur) + " — new baseline: it shares no question with "
+                 + lbl($prev) + " (\($delta))"
+          else
+            ( [ $shared[] | $c[.].passed ] | add ) as $cp | ( [ $shared[] | $c[.].asked ] | add ) as $ct
+            | ( [ $shared[] | $p[.].passed ] | add ) as $pp | ( [ $shared[] | $p[.].asked ] | add ) as $pt
+            | [ $shared[] | select($p[.].pass and ($c[.].pass | not)) | $c[.] | "\(.set) \(.id)" ] as $worse
+            | "on the \($shared | length) question(s) both asked (\($cp)/\($ct) now, \($pp)/\($pt) before); \($delta)" as $on
+            | ( if ($worse | length) > 0 then "\n  right before, missed now: " + ($worse | join(", ")) else "" end ) as $tail
+            | if ($cp * $pt) < ($pp * $ct)
+                then "low\tbenchmark check: " + lbl($cur) + " is lower than " + lbl($prev) + " " + $on + $tail
+              else "ok\tbenchmark check: " + lbl($cur) + " — not lower than " + lbl($prev) + " " + $on + $tail
+              end
+          end
       end
   ')"
   verdict="${line%%	*}"
@@ -279,7 +328,7 @@ cp_render_page() {
       "",
       "<!-- Generated from benchmarks/runs/*.json by `cckit bench page`. Do not edit by hand: scripts/check.sh fails when this page differs from the run files. -->",
       "",
-      "Each release records the [documentation benchmark](/benchmark/) as one or more checkpoints: a run, the fixes it showed were needed, then another run. A release is refused when its last checkpoint scores lower than the checkpoint recorded before it ([Releasing](/releasing/#the-benchmark-check)).",
+      "Each release records the [documentation benchmark](/benchmark/) as one or more checkpoints: a run, the fixes it showed were needed, then another run. A release is refused when its last checkpoint scores lower than the checkpoint recorded before it, counted over the questions both checkpoints asked ([Releasing](/releasing/#the-benchmark-check)).",
       "",
       "Score is answers right out of answers asked. A checkpoint with more than one pass asks every question that many times.",
       "",
@@ -303,6 +352,15 @@ cp_render_page() {
                     "| Question | Tier | Expected | Answered | Right |",
                     "| --- | --- | --- | --- | --- |",
                     ( $missed[] | "| \(.id | code) \(.q // "" | cell) | \(.tier | cell) | \(.expect | docs) | \(.got | code) | \(.passed)/\(.asked) |" ),
+                    ""
+                  end ),
+                ( if (($c.verbs // []) | length) == 0 then empty
+                  else
+                    "Checkpoint \($c.n) verb timings: wall time of each read-only verb and the number of times it ran `gh`.",
+                    "",
+                    "| Verb | Runs | Min ms | Median ms | gh calls |",
+                    "| --- | --- | --- | --- | --- |",
+                    ( $c.verbs[] | "| \("cckit " + .verb | code)\(if (.exit // 0) != 0 then " (exit \(.exit))" else "" end) | \(.runs) | \(.min_ms) | \(.median_ms) | \(.gh_calls) |" ),
                     ""
                   end ) )
         end )

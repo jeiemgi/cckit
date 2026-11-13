@@ -41,6 +41,17 @@ mk_run() {
                  pass: (. < $pass), latency_ms: 1000 } ] }'
 }
 
+# A run over named questions: each argument is <id>:<1|0> (answered right or not).
+mk_ids() {
+  local a list=""
+  for a in "$@"; do list="$list${list:+,}{\"id\":\"${a%%:*}\",\"ok\":${a##*:}}"; done
+  jq -n --argjson qs "[$list]" '
+    { kind: "retrieval-run", dry: false, total: ($qs | length), pass: ([ $qs[] | select(.ok == 1) ] | length),
+      results: [ $qs[] | { set: "retrieval.jsonl", tier: "retrieval", id: .id,
+                 got: (if .ok == 1 then "x.md" else "NONE" end), expect: "x.md",
+                 pass: (.ok == 1), latency_ms: 1000 } ] }'
+}
+
 P="$FIX/p1"; new_project "$P"
 export BENCH_DIR="$P/benchmarks"
 RUNS="$BENCH_DIR/runs"
@@ -87,7 +98,7 @@ jq '.results[0].got = ""' "$FIX/run-3of3.json" > "$FIX/run-noanswer.json"
 out="$(bash "$CP" record 1.2.0 --from "$FIX/run-noanswer.json" 2>&1)";   t "record refuses a run with an empty answer" "$?" "2"
 has "the empty-answer refusal says why" "$out" "the model backend returned nothing"
 # A flag given last with no value is a usage error, not an endless parse loop (5 s watchdog).
-for flag in --from --passes --model --commit --ref --date --note; do
+for flag in --from --passes --model --commit --ref --date --note --verbs; do
   perl -e 'alarm 5; exec @ARGV' bash "$CP" record 1.2.0 "$flag" >/dev/null 2>&1; t "record: $flag with no value exits 2" "$?" "2"
 done
 perl -e 'alarm 5; exec @ARGV' bash "$CP" page --out >/dev/null 2>&1;      t "page: --out with no value exits 2" "$?" "2"
@@ -107,7 +118,10 @@ rec 1.3.0 --from "$FIX/run-3of3.json"
 bash "$CP" check 1.3.0 >/dev/null 2>&1;  t "check: equal to the previous version's last checkpoint passes" "$?" "0"
 rec 1.3.0 --from "$FIX/run-2of3.json"
 bash "$CP" check 1.3.0 >/dev/null 2>&1;  t "check: lower than the previous checkpoint refuses" "$?" "1"
-has "check: lower names both scores" "$(bash "$CP" check 1.3.0 2>&1)" "1.3.0 checkpoint 2: 2/3 (66%) is lower than 1.3.0 checkpoint 1: 3/3 (100%)"
+out="$(bash "$CP" check 1.3.0 2>&1)"
+has "check: lower names both scores" "$out" "1.3.0 checkpoint 2: 2/3 (66%) is lower than 1.3.0 checkpoint 1: 3/3 (100%)"
+has "check: lower names how many questions were compared" "$out" "on the 3 question(s) both asked (2/3 now, 3/3 before); 0 new, 0 removed"
+has "check: lower names the question that got worse" "$out" "right before, missed now: retrieval.jsonl r3"
 rec 1.3.0 --from "$FIX/run-3of3.json"
 bash "$CP" check 1.3.0 >/dev/null 2>&1;  t "check: a later, higher checkpoint clears the refusal" "$?" "0"
 bash "$CP" check 1.2.0 >/dev/null 2>&1;  t "check: a later version does not change an earlier verdict" "$?" "0"
@@ -135,16 +149,71 @@ P2="$FIX/p2"; new_project "$P2"
 BENCH_DIR="$P2/benchmarks" bash "$CP" record 0.1.0 --from "$FIX/run-1of3.json" >/dev/null 2>&1
 BENCH_DIR="$P2/benchmarks" bash "$CP" check 0.1.0 >/dev/null 2>&1; t "check: the first recorded checkpoint passes" "$?" "0"
 
-# Versions order numerically (0.10.0 follows 0.9.0), and scores compare as fractions.
+# Versions order numerically (0.10.0 follows 0.9.0). mk_run names its questions r1..rN and answers
+# the first <pass> right, so a 6-question run shares r1..r3 with a 3-question one.
 P3="$FIX/p3"; new_project "$P3"
 cp3() { BENCH_DIR="$P3/benchmarks" bash "$CP" "$@" >/dev/null 2>&1; }
 cp3 record 0.9.0 --from "$FIX/run-2of3.json"
 cp3 record 0.10.0 --from "$FIX/run-4of6.json"
-cp3 check 0.10.0; t "check: 4/6 equals 2/3 on a larger set" "$?" "0"
+cp3 check 0.10.0; t "check: 4/6 against 2/3 is 3/3 against 2/3 on the 3 shared questions" "$?" "0"
 cp3 record 0.10.0 --from "$FIX/run-1of3.json"
 cp3 record 0.9.1 --from "$FIX/run-5of6.json"
 cp3 check 0.9.1;  t "check: 0.9.1 compares against 0.9.0, not 0.10.0" "$?" "0"
-cp3 check 0.10.0; t "check: 0.10.0 last checkpoint 1/3 is lower than 4/6" "$?" "1"
+cp3 check 0.10.0; t "check: 0.10.0 last checkpoint 1/3 is lower than 3/3 on the shared questions" "$?" "1"
+
+# ---- 6b. comparison over the questions both checkpoints asked ---------------
+# One project per case: a 3-question checkpoint, then a second one over a changed set.
+cmp_case() {   # cmp_case <second run file> [<first run file>] -> prints the verdict, returns check's exit
+  # Called in $(…), so the directory is named after the run file and not after a counter.
+  local d; d="$FIX/c-$(basename "$1" .json)"; new_project "$d"
+  BENCH_DIR="$d/benchmarks" bash "$CP" record 3.0.0 --from "${2:-$FIX/ids-base.json}" >/dev/null 2>&1
+  BENCH_DIR="$d/benchmarks" bash "$CP" record 3.0.0 --from "$1" >/dev/null 2>&1
+  BENCH_DIR="$d/benchmarks" bash "$CP" check 3.0.0 2>&1
+}
+mk_ids r1:1 r2:1 r3:1 > "$FIX/ids-base.json"
+# Grown set, every shared question still right, one NEW question missed: 5/6 is under 3/3 as a
+# whole-run fraction, and it is not lower.
+mk_ids r1:1 r2:1 r3:1 n1:1 n2:1 n3:0 > "$FIX/ids-grown-ok.json"
+out="$(cmp_case "$FIX/ids-grown-ok.json")"; t "check: grown set, shared questions all still right, passes" "$?" "0"
+has "check: grown set says what was compared" "$out" "3.0.0 checkpoint 2: 5/6 (83%) — not lower than 3.0.0 checkpoint 1: 3/3 (100%) on the 3 question(s) both asked (3/3 now, 3/3 before); 3 new, 0 removed"
+# Grown set, a shared question newly missed: refused although every new question is right.
+mk_ids r1:1 r2:0 r3:1 n1:1 n2:1 n3:1 > "$FIX/ids-grown-low.json"
+out="$(cmp_case "$FIX/ids-grown-low.json")"; t "check: grown set, a shared question newly missed, refuses" "$?" "1"
+has "check: grown-set refusal says what was compared" "$out" "is lower than 3.0.0 checkpoint 1: 3/3 (100%) on the 3 question(s) both asked (2/3 now, 3/3 before); 3 new, 0 removed"
+has "check: grown-set refusal names the question" "$out" "right before, missed now: retrieval.jsonl r2"
+# No question in common: nothing to compare, so the checkpoint is a new baseline.
+mk_ids n1:1 n2:0 > "$FIX/ids-disjoint.json"
+out="$(cmp_case "$FIX/ids-disjoint.json")"; t "check: disjoint sets pass as a new baseline" "$?" "0"
+has "check: a new baseline is named as one" "$out" "3.0.0 checkpoint 2: 1/2 (50%) — new baseline: it shares no question with 3.0.0 checkpoint 1: 3/3 (100%) (2 new, 3 removed)"
+# The same id in another set file is another question.
+jq '.results |= map(.set = "other.jsonl")' "$FIX/ids-base.json" > "$FIX/ids-otherset.json"
+out="$(cmp_case "$FIX/ids-otherset.json")"; t "check: the same ids in another set file share nothing" "$?" "0"
+has "check: another set file is a new baseline" "$out" "new baseline"
+# Removed questions: a missed question that was dropped does not raise or lower the verdict.
+mk_ids r1:1 r2:1 r3:0 > "$FIX/ids-base-miss.json"
+mk_ids r1:1 r2:1 > "$FIX/ids-removed.json"
+out="$(cmp_case "$FIX/ids-removed.json" "$FIX/ids-base-miss.json")"; t "check: removed question, the rest unchanged, passes" "$?" "0"
+has "check: removed questions are counted" "$out" "on the 2 question(s) both asked (2/2 now, 2/2 before); 0 new, 1 removed"
+mk_ids r1:1 r2:0 > "$FIX/ids-removed-low.json"
+out="$(cmp_case "$FIX/ids-removed-low.json")"; t "check: removed question and a remaining one newly missed, refuses" "$?" "1"
+has "check: the removal refusal counts both" "$out" "on the 2 question(s) both asked (1/2 now, 2/2 before); 0 new, 1 removed"
+# The verdict is the score on the shared questions: one newly missed and one newly right is level,
+# and the question that got worse is still named.
+mk_ids r1:0 r2:1 r3:1 > "$FIX/ids-swap.json"
+out="$(cmp_case "$FIX/ids-swap.json" "$FIX/ids-base-miss.json")"; t "check: one newly missed, one newly right, is not lower" "$?" "0"
+has "check: a level score still names the question that got worse" "$out" "right before, missed now: retrieval.jsonl r1"
+# Passes differ: 2 passes over r1..r3 (5 of 6 answers) against 1 pass (3 of 3) is lower.
+d="$FIX/c-passes"; new_project "$d"
+BENCH_DIR="$d/benchmarks" bash "$CP" record 3.0.0 --from "$FIX/ids-base.json" >/dev/null 2>&1
+BENCH_DIR="$d/benchmarks" bash "$CP" record 3.0.0 --from "$FIX/ids-base.json" --from "$FIX/ids-base-miss.json" >/dev/null 2>&1
+out="$(BENCH_DIR="$d/benchmarks" bash "$CP" check 3.0.0 2>&1)"; t "check: a question missed in one of two passes is lower" "$?" "1"
+has "check: passes are counted as answers" "$out" "(5/6 now, 3/3 before)"
+# The release reads the same verdict: a grown set does not refuse it.
+d="$FIX/c-release"; new_project "$d"
+BENCH_DIR="$d/benchmarks" bash "$CP" record 3.0.0 --from "$FIX/ids-base.json" >/dev/null 2>&1
+BENCH_DIR="$d/benchmarks" bash "$CP" record 3.0.0 --from "$FIX/ids-grown-ok.json" >/dev/null 2>&1
+out="$(KIT_RELEASE_BENCH_DIR="$d/benchmarks" bash "$PUBLISH" 3.0.0 2>&1)"; t "release: a grown set with no shared question worse proceeds" "$?" "0"
+has "release: the grown-set comparison is printed" "$out" "3 new, 0 removed"
 
 # ---- 7. cckit release (publish.sh) refuses on the same verdict --------------
 # Dry runs only: publish.sh prints its plan and changes nothing.
@@ -192,6 +261,34 @@ jq '. + {resultsPage: "site/results.md"}' "$BENCH_DIR/benchmark.config.json" > "
 rec 1.3.0 --from "$FIX/run-3of3.json"
 t "record rewrites the configured page" "$([ -s "$P/site/results.md" ] && echo yes)" "yes"
 bash "$CP" page --check >/dev/null 2>&1;               t "page --check reads the configured path" "$?" "0"
+
+# ---- 8b. verb timings attached to a checkpoint ------------------------------
+P6="$FIX/p6"; new_project "$P6"
+cp6() { BENCH_DIR="$P6/benchmarks" bash "$CP" "$@" 2>&1; }
+cat > "$FIX/verbs.json" <<'JSON'
+{ "kind": "verb-timings", "date": "2026-01-02", "commit": "abc1234", "runs": 3,
+  "verbs": [ { "verb": "status", "runs": 3, "min_ms": 410, "median_ms": 450, "gh_calls": 7, "exit": 0 },
+             { "verb": "effort plan", "runs": 3, "min_ms": 90, "median_ms": 95, "gh_calls": 2, "exit": 1 } ] }
+JSON
+out="$(cp6 record 4.0.0 --from "$FIX/run-3of3.json" --verbs "$FIX/verbs.json" --date 2026-01-02 --commit abc1234 --ref develop --model test-model)"
+t "record --verbs exits 0" "$?" "0"
+has "record --verbs says how many verbs were attached" "$out" "2 verb timings"
+t "the checkpoint carries the verbs" "$(jq -c '.checkpoints[0].verbs[0]' "$P6/benchmarks/runs/4.0.0.json")" '{"verb":"status","runs":3,"min_ms":410,"median_ms":450,"gh_calls":7}'
+t "a non-zero exit is kept with the verb" "$(jq -c '.checkpoints[0].verbs[1].exit' "$P6/benchmarks/runs/4.0.0.json")" "1"
+cp6 record 4.0.0 --from "$FIX/run-3of3.json" >/dev/null
+t "a checkpoint without --verbs has no verbs key" "$(jq -c '.checkpoints[1] | has("verbs")' "$P6/benchmarks/runs/4.0.0.json")" "false"
+cp6 check 4.0.0 >/dev/null; t "check ignores the verbs" "$?" "0"
+p6_page="$(cp6 page)"
+has "page: the verb table header" "$p6_page" "| Verb | Runs | Min ms | Median ms | gh calls |"
+has "page: a verb row" "$p6_page" '| `cckit status` | 3 | 410 | 450 | 7 |'
+has "page: a failed verb shows its exit code" "$p6_page" '| `cckit effort plan` (exit 1) | 3 | 90 | 95 | 2 |'
+t "page: one verb table, for the checkpoint that has one" "$(grep -c 'verb timings' <<<"$p6_page")" "1"
+before="$(cat "$P6/benchmarks/runs/4.0.0.json")"
+cp6 record 4.0.0 --from "$FIX/run-3of3.json" --verbs "$FIX/nope.json" >/dev/null; t "record --verbs refuses a missing file" "$?" "2"
+printf '%s' '{"verbs":[{"verb":"status","runs":3}]}' > "$FIX/verbs-bad.json"
+out="$(cp6 record 4.0.0 --from "$FIX/run-3of3.json" --verbs "$FIX/verbs-bad.json")"; t "record --verbs refuses rows without the timing fields" "$?" "2"
+has "the --verbs refusal says why" "$out" "is not a verb timings file"
+t "a refused --verbs leaves the file unchanged" "$(cat "$P6/benchmarks/runs/4.0.0.json")" "$before"
 
 # ---- 9. the verb reaches the script -----------------------------------------
 out="$(cd "$P" && bash "$ROOT/bin/cckit" bench checkpoints 2>&1)"
