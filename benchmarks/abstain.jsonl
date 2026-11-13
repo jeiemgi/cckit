@@ -1,3 +1,9 @@
 {"id":"abs-01","q":"What does the cckit enterprise tier cost per seat?","expect":"NONE"}
 {"id":"abs-02","q":"How do I deploy cckit to a Kubernetes cluster with Helm?","expect":"NONE"}
 {"id":"abs-03","q":"Which Slack channel do I post in to reach cckit support?","expect":"NONE"}
+{"id":"abs-04","q":"How do I make cckit open merge requests on GitLab?","expect":"NONE"}
+{"id":"abs-05","q":"cckit cleanup deleted a branch I still needed. Which cckit command brings it back?","expect":"NONE"}
+{"id":"abs-06","q":"Which port does cckit's web dashboard listen on by default?","expect":"NONE"}
+{"id":"abs-07","q":"After how many days are old lines rotated out of kit-events.jsonl?","expect":"NONE"}
+{"id":"abs-08","q":"How do I run the QA lane's review stack inside Docker containers?","expect":"NONE"}
+{"id":"abs-09","q":"Which command exports a wave's results as a CSV file?","expect":"NONE"}

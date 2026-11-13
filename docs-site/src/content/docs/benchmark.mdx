@@ -29,14 +29,16 @@ expected paths and grows them over time.
 | **Quality** | claim-style answer correctness + completeness | model judge, 0..1 + mean | yes |
 
 The first three are **objective** — a returned path either matches the expected path or it doesn't,
-no judge. Quality uses a model judge, de-biased by a per-question `must` rubric so it scores coverage
-of required points, not tone.
+no judge. Quality asks the model for a full answer from the docs, then a model judge scores that
+answer against a per-question `must` rubric: the fraction of the required points it covers, not its
+tone.
 
 ## Running it
 
 ```bash
 cckit bench run          # retrieval + adversarial + abstain (objective)
 cckit bench quality      # the judged quality tier (0..1 mean)
+cckit bench quality --answers out/   # also keep each answer (out/<id>.txt) and the judge's reply (out/<id>.judge.txt)
 cckit bench report       # writes benchmarks/RESULTS.md a non-expert can read
 cckit bench run --dry    # offline shape check — validates every record, calls no model
 ```
@@ -89,11 +91,48 @@ are ignored, so you can annotate. See `benchmarks/SCHEMA.md` for the full schema
 {"id": "abs-01", "q": "What is the DB admin password?", "expect": "NONE"}
 
 // quality — a claim plus the rubric that de-biases the judge
-{"id": "qual-01", "claim": "Summarize releasing.", "must": ["version bumped", "tag published"]}
+{"id": "qual-01", "claim": "Summarize releasing.", "must": ["version bumped", "tag published"], "source": "releasing.md"}
 ```
+
+`source` is optional and the runner does not read it. It names the page the rubric was written from,
+so each point can be checked against that page.
 
 Path matching is lenient about *where* a path is rooted (a leading `./` or knowledge-dir prefix is
 stripped) but strict about *which* document is named.
+
+## cckit's own sets
+
+The repository scores its own docs site. `benchmarks/` holds the questions over
+`docs-site/src/content/docs`:
+
+| Set | Tier | Records | What is in it |
+| --- | --- | --- | --- |
+| `retrieval.jsonl` | retrieval | 14 | direct questions, each with near-neighbour pages that cover the same feature |
+| `new.jsonl` | retrieval | 18 | features merged since v0.9.0 |
+| `adversarial.jsonl` | adversarial | 14 | reworded, no-keyword and trap questions; three ask for something the docs say cckit does not do |
+| `abstain.jsonl` | abstain | 9 | questions next to a documented feature that no page answers |
+| `quality.jsonl` | quality | 12 | claims with a `must` rubric and the `source` page it was written from |
+
+- **Which pages are accepted.** A second page is listed in `expect` only when it states the whole
+  answer. A page that states part of it is not, so a question can fail on a page that is close.
+- **A failing question is not deleted.** When the model names a page that does not hold the answer,
+  either retrieval regressed or the docs put the answer somewhere a reader does not look. Both are
+  findings.
+- **What the test checks offline.** `scripts/benchmark/benchmark-test.sh` fails when an `expect` or
+  `source` path does not exist, when two records share an id, or when a quality record names no
+  `source`. It does not check that the page still contains the answer.
+- **One limit of the abstain tier.** A model call that times out returns nothing, which the runner
+  reads as `NONE`. An abstain record whose latency equals `BENCH_TIMEOUT_SECS` passed on a timeout,
+  not on an answer.
+
+- **A quality score is one judge call.** The judge is a model and the same answer can be scored
+  differently on a second call: `qual-08` was recorded at 0.1 in the run at `4f885c2`, three more
+  judge calls on that saved answer each returned 0.8, and a later run of the claim scored 1.0. Read
+  one claim's score with `--answers` before treating it as a docs regression. `--answers` needs a
+  directory; without one the runner exits 2.
+
+Recorded runs of the retrieval, adversarial and abstain tiers are in `benchmarks/runs/`, one JSON
+file per run. A quality run is not recorded there yet.
 
 ## Pluggable model backend
 
