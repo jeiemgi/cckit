@@ -104,7 +104,9 @@ _plug="$(jq -r '.version // "0.0.0"' "/Users/josegutierrezdelgado/.claude/plugin
    ```bash
    "${CLAUDE_PLUGIN_ROOT}/scripts/init.sh" --upgrade --target "$PWD" --dry-run
    ```
-   Then run it for real to see the precise added/preserved report (step 4). Make clear: upgrade only
+   It runs the upgrade on a temporary copy and prints `Would change (N added, M modified)` with one
+   `A`/`M` row per file — the same rows the real run prints as `Changed on disk` (step 4). Show the
+   user that list. Make clear: upgrade only
    **adds** missing files and **merges** new required config keys — your existing `.claude/` files
    (including a customized `.claude/statusline.sh` shim) and `kit.config.json` values are never
    overwritten, and feature blocks your config deliberately lacks (`plans`, `specKit`, `prePush`,
@@ -119,7 +121,8 @@ _plug="$(jq -r '.version // "0.0.0"' "/Users/josegutierrezdelgado/.claude/plugin
    "${CLAUDE_PLUGIN_ROOT}/scripts/init.sh" --upgrade --target "$PWD"
    ```
 
-5. **Report + onboard.** Echo what was **added** vs **preserved** and the new `.kitVersion`. Then warmly
+5. **Report + onboard.** Echo the `Changed on disk` list (added and modified files), what was
+   **preserved**, and the new `.kitVersion`. Then warmly
    walk the user through the headline new features and offer to run any that fit this project (e.g.
    "this release adds `/kit-annotate` — want me to set it up?"). The goal is comfort with the new
    surface, not a changelog dump.

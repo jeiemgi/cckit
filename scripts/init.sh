@@ -249,6 +249,7 @@ else
 fi
 
 # ---- parse flags ---------------------------------------------------------
+_INIT_ARGS=("$@")   # as typed — the --upgrade dry run replays them against a copy (#448)
 PROFILE=""; TARGET="$PWD"; NAME=""; SLUG=""; REPO=""; GH_OWNER=""; OWNER_NAME=""
 PROJECT_NUMBER=""; PLANS_FORMAT=""; PLANS_DIR=""; MEMORY=""; LANG_PREF="English"; FORCE=0
 SPECKIT=""; PREPUSH_CMD=""; LOCAL_LAYER=""; LOCAL_EXPLICIT=0; DRY_RUN=0; UPGRADE=0
@@ -390,6 +391,8 @@ BASENAME="$(basename "$TARGET")"
 . "$KIT_ROOT/scripts/lib/git-remote.sh"
 # shellcheck source=/dev/null
 . "$KIT_ROOT/scripts/lib/hook-refresh.sh"   # hook_refresh_state — refresh unmodified hooks (#370)
+# shellcheck source=/dev/null
+. "$KIT_ROOT/scripts/lib/upgrade-report.sh" # measured change list + minimal JSON writes (#448)
 NAME_SRC="$(git_remote_repo_name "$TARGET" 2>/dev/null || true)"; NAME_SRC="${NAME_SRC:-$BASENAME}"
 [[ -z "$NAME" ]] && NAME="$NAME_SRC"
 [[ -z "$SLUG" ]] && SLUG="$(echo "$NAME_SRC" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed -E 's/^-|-$//g')"
@@ -669,6 +672,15 @@ if [[ $DRY_RUN -eq 1 ]]; then
   echo "  Memory  : $MEMORY_BOOL   Plans: $PLANS_FORMAT   Lang: $LANG_PREF"
   echo "  Spec Kit: $SPECKIT_ON   Pre-push gate: $PREPUSH_ENABLED   Local model: $LOCAL_ON   kitVersion: $PLUGIN_VERSION"
   echo ""
+  if [[ $UPGRADE -eq 1 ]]; then
+    # An upgrade's dry run is the upgrade itself, run on a temporary copy of the kit-managed paths
+    # and measured (#448) — not the list below, which names everything a FRESH init can write.
+    upgrade_dry_run "$TARGET" "$KIT_ROOT/scripts/init.sh" "${_INIT_ARGS[@]}" || exit $?
+    echo ""
+    echo "  A = added · M = modified. Measured by running the upgrade on a temporary copy; $TARGET was not written."
+    echo "Re-run without --dry-run to apply."
+    exit 0
+  fi
   echo "  Would write:"
   echo "    $CONFIG_REL"
   echo "    $MANIFEST_REL   (ownership manifest, gitignored)"
@@ -735,6 +747,12 @@ if [[ $UPGRADE -eq 0 ]]; then
 fi
 
 UPGRADE_ADDED=(); UPGRADE_PRESERVED=(); UPGRADE_SKIPPED=(); UPGRADE_REFRESHED=(); UPGRADE_DRIFTED=()
+# Checksums of the kit-managed paths before the first write: the summary prints what differs after
+# the last one, so a file a later step merges into is reported as modified, not as preserved (#448).
+_UP_SNAP=""
+if [[ $UPGRADE -eq 1 && -z "${KIT_UPGRADE_SIMULATED:-}" ]]; then
+  _UP_SNAP="$(mktemp -d)" && upgrade_snapshot "$TARGET" > "$_UP_SNAP/before"
+fi
 echo "-> $([[ $UPGRADE -eq 1 ]] && echo Upgrading || echo Scaffolding) $PROFILE profile $([[ $UPGRADE -eq 1 ]] && echo in || echo into) $TARGET"
 mkdir -p "$TARGET/scripts/lib" "$(dirname "$KITCFG")"
 adapter_has "$ADAPTERS" claude && mkdir -p "$TARGET/.claude/agents" "$TARGET/.claude/skills" "$TARGET/.claude/rules"
@@ -777,25 +795,36 @@ if [[ $UPGRADE -eq 1 && -f "$KITCFG" ]]; then
   # project's config ALREADY has them — a missing feature key is a deliberate absence, and an
   # upgrade must never inject profile defaults over it (#149). `adapters` follows the same rule: a
   # config without the key means Claude, and an upgrade that changes nothing must not write it.
+  # The project's key order is kept: a key the template adds goes after the keys already there, at
+  # every depth. (`$tmpl * $have` gave the same values in the TEMPLATE's order, which moved the
+  # project's own blocks around on every upgrade — #448.)
   jq -s --arg kitver "$PLUGIN_VERSION" '
+    def fill($h; $t):
+      if ($h | type) == "object" and ($t | type) == "object"
+      then reduce ($t | keys_unsorted[]) as $k ($h;
+             if has($k) then .[$k] = fill($h[$k]; $t[$k]) else .[$k] = $t[$k] end)
+      else $h end;
     .[1] as $have
     | (.[0] | with_entries(.key as $k | select(
         (["plans","specKit","prePush","local","memory","adapters"] | index($k)) == null
         or ($have | has($k))))) as $tmpl
-    | $tmpl * $have | .kitVersion = $kitver' "$KITCFG.kit-new" "$KITCFG" \
-    > "$KITCFG.merged" && mv "$KITCFG.merged" "$KITCFG"
+    | fill($have; $tmpl) | .kitVersion = $kitver' "$KITCFG.kit-new" "$KITCFG" \
+    > "$KITCFG.merged"
   rm -f "$KITCFG.kit-new"
   # Existing values win in the merge — but an EXPLICIT --local flag is a user decision now,
   # so it overrides the preserved value (port/model stay as the user configured them).
   if [[ $LOCAL_EXPLICIT -eq 1 ]]; then
     jq --argjson v "$LOCAL_ON" '.local = ((.local // {port:8080,model:"mlx-community/Qwen3-8B-4bit"}) | .enabled = $v)' \
-      "$KITCFG" > "$KITCFG.tmp" && mv "$KITCFG.tmp" "$KITCFG"
+      "$KITCFG.merged" > "$KITCFG.tmp" && mv "$KITCFG.tmp" "$KITCFG.merged"
   fi
   # An explicit --adapter is a decision made now, so it is written even where the key was absent.
   if [[ -n "$ADAPTERS_NEW" ]]; then
-    jq --argjson v "$(adapter_json "$ADAPTERS")" '.adapters = $v' "$KITCFG" > "$KITCFG.tmp" && mv "$KITCFG.tmp" "$KITCFG"
+    jq --argjson v "$(adapter_json "$ADAPTERS")" '.adapters = $v' "$KITCFG.merged" > "$KITCFG.tmp" && mv "$KITCFG.tmp" "$KITCFG.merged"
   fi
-  echo "  + $CONFIG_REL (merged · kitVersion -> $PLUGIN_VERSION)"
+  # Written with the fewest changed lines: a version bump alone edits the one `kitVersion` line and
+  # leaves the file's formatting as the project keeps it. A merge that adds keys re-serialises it.
+  _cfg_how="$(json_write_minimal "$KITCFG.merged" "$KITCFG")"
+  echo "  + $CONFIG_REL (merged · kitVersion -> $PLUGIN_VERSION · $_cfg_how)"
 else
   mv "$KITCFG.kit-new" "$KITCFG"
   echo "  + $CONFIG_REL"
@@ -1012,7 +1041,8 @@ echo "  + .claude/settings.json (versioned captain merge permission)"
 mkdir -p "$TARGET/.claude"
 safe_write "$KIT_ROOT/templates/settings/settings.local.json.tmpl" "$TARGET/.claude/settings.local.json"
 SETTINGS="$TARGET/.claude/settings.local.json"
-merge_settings() { jq "$@" "$SETTINGS" > "$SETTINGS.tmp" && mv "$SETTINGS.tmp" "$SETTINGS"; }
+# A merge that leaves the value as it was does not rewrite the file (json_write_minimal, #448).
+merge_settings() { jq "$@" "$SETTINGS" > "$SETTINGS.tmp" && json_write_minimal "$SETTINGS.tmp" "$SETTINGS" >/dev/null; }
 HOOK_NOTE=""
 
 if [[ "$MEMORY_BOOL" == "true" && $UPGRADE -eq 0 ]]; then
@@ -1085,10 +1115,14 @@ hook_write "$KIT_ROOT/templates/hooks/guard-raw-git-ops.sh.tmpl" "$TARGET/.claud
 chmod +x "$TARGET/.claude/hooks/guard-raw-git-ops.sh" 2>/dev/null || true
 _TRACKED="$TARGET/.claude/settings.json"
 [[ -f "$_TRACKED" ]] || echo '{}' > "$_TRACKED"
+# A registration that is already there — in its own block or inside one the project arranged — is
+# left where it is; the file is rewritten only when the guard had to be added (#448: the upgrade
+# moved it into a new block on every run and still listed settings.json as preserved).
+# shellcheck disable=SC2016  # $CLAUDE_PROJECT_DIR is expanded by Claude Code at hook time
 jq --arg g '$CLAUDE_PROJECT_DIR/.claude/hooks/guard-raw-git-ops.sh' \
-  '.hooks.PreToolUse = (((.hooks.PreToolUse // []) | map(.hooks |= map(select(.command != $g))) | map(select((.hooks | length) > 0)))
-     + [{matcher:"Bash",hooks:[{type:"command",command:$g,timeout:10}]}])' \
-  "$_TRACKED" > "$_TRACKED.tmp" && mv "$_TRACKED.tmp" "$_TRACKED"
+  'if ([ (.hooks.PreToolUse // [])[] | (.hooks // [])[] | .command ] | index($g)) != null then .
+   else .hooks.PreToolUse = ((.hooks.PreToolUse // []) + [{matcher:"Bash",hooks:[{type:"command",command:$g,timeout:10}]}])
+   end' "$_TRACKED" > "$_TRACKED.tmp" && json_write_minimal "$_TRACKED.tmp" "$_TRACKED" >/dev/null
 echo "  + .claude/hooks/guard-raw-git-ops.sh (PreToolUse Bash, wired in tracked settings.json: raw gh/git -> cckit verb)"
 
 # ---- session-mail hook (all projects; init AND --upgrade; idempotent) ----
@@ -1105,7 +1139,7 @@ if ! _upgrade_excluded ".claude/hooks/kit-mail-check.sh"; then
       if ([ (.hooks[$e] // [])[] | (.hooks // [])[] | .command ] | index($m)) != null then .
       else .hooks[$e] = ((.hooks[$e] // [])
         + [ (if $mt == "" then {} else {matcher: $mt} end) + {hooks: [{type: "command", command: $m, timeout: 10}]} ])
-      end)' "$_TRACKED" > "$_TRACKED.tmp" && mv "$_TRACKED.tmp" "$_TRACKED"
+      end)' "$_TRACKED" > "$_TRACKED.tmp" && json_write_minimal "$_TRACKED.tmp" "$_TRACKED" >/dev/null
   echo "  + .claude/hooks/kit-mail-check.sh (session mail, wired in tracked settings.json on 4 events)"
 fi
 
@@ -1243,7 +1277,26 @@ echo "  Spec Kit: $SPECKIT_ON   Pre-push gate: $PREPUSH_ENABLED   Local model: $
 if [[ $UPGRADE -eq 1 ]]; then
   echo ""
   echo "  Upgrade -> kitVersion $PLUGIN_VERSION"
-  if [[ ${#UPGRADE_ADDED[@]}     -gt 0 ]]; then echo "  Added (new in this kit version):"; printf '    + %s\n' "${UPGRADE_ADDED[@]}"; fi
+  # What changed on disk, measured (the same block `--upgrade --dry-run` prints as "Would change").
+  # A file the helpers left alone but a later step merged into — .claude/settings.json gaining a hook
+  # registration — is in this block as M and is taken out of the Preserved list below.
+  if [[ -n "$_UP_SNAP" && -f "$_UP_SNAP/before" ]]; then
+    upgrade_snapshot "$TARGET" > "$_UP_SNAP/after"
+    upgrade_changes "$_UP_SNAP/before" "$_UP_SNAP/after" > "$_UP_SNAP/changes"
+    upgrade_changes_print "$_UP_SNAP/changes" "Changed on disk"
+    _UP_MEASURED=1
+    if [[ ${#UPGRADE_PRESERVED[@]} -gt 0 ]]; then
+      _up_kept=()
+      for _p in "${UPGRADE_PRESERVED[@]}"; do
+        grep -qxF "M	$_p" "$_UP_SNAP/changes" || _up_kept+=("$_p")
+      done
+      UPGRADE_PRESERVED=(); [[ ${#_up_kept[@]} -gt 0 ]] && UPGRADE_PRESERVED=("${_up_kept[@]}")
+    fi
+    rm -rf "$_UP_SNAP"
+  fi
+  # The A rows above already name every added file; the helper's own list is printed only when no
+  # measurement was taken.
+  if [[ ${_UP_MEASURED:-0} -eq 0 && ${#UPGRADE_ADDED[@]} -gt 0 ]]; then echo "  Added (new in this kit version):"; printf '    + %s\n' "${UPGRADE_ADDED[@]}"; fi
   if [[ ${#UPGRADE_PRESERVED[@]} -gt 0 ]]; then echo "  Preserved (your edits, untouched):"; printf '    = %s\n' "${UPGRADE_PRESERVED[@]}"; fi
   if [[ ${#UPGRADE_SKIPPED[@]}   -gt 0 ]]; then echo "  Skipped (removed/renamed via kit.config upgrade):"; printf '    - %s\n' "${UPGRADE_SKIPPED[@]}"; fi
   if [[ ${#UPGRADE_REFRESHED[@]} -gt 0 ]]; then echo "  Refreshed (unmodified hook, now the current template):"; printf '    ~ %s\n' "${UPGRADE_REFRESHED[@]}"; fi

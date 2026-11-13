@@ -2,7 +2,9 @@
 # kit-doctor — onboarding preflight: deps + brew bootstrap + gh auth/scopes + SSH guided
 #
 # Usage:
-#   scripts/kit-doctor.sh                 # detect + report; in a terminal, ASK before installing
+#   scripts/kit-doctor.sh                 # detect + report; in a terminal, ASK before installing.
+#                                         # With no terminal and no --fix: report only, nothing is
+#                                         # installed and no file is written
 #   scripts/kit-doctor.sh --fix           # install missing deps without asking (alias: --yes, -y)
 #   scripts/kit-doctor.sh --dry-run       # report only — no installs, no auth changes
 #   scripts/kit-doctor.sh --no-install    # check and auth only — skip package installs
@@ -96,9 +98,12 @@ fi
 
 # ---- install consent --------------------------------------------------------
 # The doctor can install missing dependencies for you (Homebrew, gh, jq, node, …). When a HUMAN runs
-# it in a terminal, ASK first — install only if approved. Non-interactive callers (init.sh preflight,
-# hooks) pass --fix/--yes or simply have no TTY, so automation keeps its current auto-install behavior
-# and never blocks on a prompt. --dry-run / --no-install already skip installs entirely.
+# it in a terminal, ASK first — install only if approved. A non-interactive caller that wants
+# installs passes --fix/--yes (init.sh's preflight does). A run with no terminal and no --fix has
+# nobody to ask, so it is report-only: no package install, no `pnpm install`, no seeded or refreshed
+# file, no server start (#448 — it used to run `pnpm install` in whatever directory it was called
+# from). --dry-run / --no-install already skip installs entirely. MAY_INSTALL is the one gate every
+# install or write below reads.
 if [[ $DRY_RUN -eq 0 && $NO_INSTALL -eq 0 && $ASSUME_YES -eq 0 && $AGENTS_ONLY -eq 0 && -t 0 ]]; then
   printf '\n  %s%scckit doctor can install anything missing for you%s (via Homebrew, corepack, etc.).\n' "$C_BOLD" "" "$C_RESET"
   printf '  It will show each thing as it goes. Nothing is installed if you decline.\n\n'
@@ -110,6 +115,10 @@ if [[ $DRY_RUN -eq 0 && $NO_INSTALL -eq 0 && $ASSUME_YES -eq 0 && $AGENTS_ONLY -
       printf '\n  %s report-only — listing what is missing and how to install it (no changes made).\n' "$MARK_SKIP" ;;
     *) INSTALL_APPROVED=1 ;;  # default (Enter / y) → proceed with installs
   esac
+fi
+MAY_INSTALL=0; UNAPPROVED=0
+if [[ $DRY_RUN -eq 0 && $NO_INSTALL -eq 0 ]]; then
+  if [[ $INSTALL_APPROVED -eq 1 ]]; then MAY_INSTALL=1; else UNAPPROVED=1; fi
 fi
 
 # ---- report accumulators ----------------------------------------------------
@@ -132,7 +141,7 @@ has_cmd() { command -v "$1" >/dev/null 2>&1; }
 # Returns 0 if the command is now available, 1 if not.
 brew_install() {
   local pkg="$1" cmd="${2:-$1}"
-  if [[ $DRY_RUN -eq 1 || $NO_INSTALL -eq 1 ]]; then
+  if [[ $MAY_INSTALL -eq 0 ]]; then
     return 1
   fi
   if ! has_cmd brew; then return 1; fi
@@ -202,6 +211,7 @@ fi
 printf '\n'
 printf '  %s%s%s  kit-doctor\n' "$MARK_SEED" "$C_BOLD" " / claude-kit${C_RESET}"
 printf '  %s\n' "${C_DIM}onboarding preflight${C_RESET}${DRY_RUN:+${C_WARN} [dry-run]${C_RESET}}${NO_INSTALL:+${C_DIM} [no-install]${C_RESET}}"
+[[ $UNAPPROVED -eq 1 && $AGENTS_ONLY -eq 0 ]] && printf '  %s report-only — no terminal and no --fix, so nothing is installed and no file is written. To install: cckit doctor --fix\n' "$MARK_SKIP"
 printf '\n'
 
 # ============================================================================
@@ -215,7 +225,7 @@ elif has_cmd brew; then
   row "$MARK_OK" "Homebrew" "$(brew --version 2>/dev/null | head -1)"
   CHECKS_OK=$((CHECKS_OK + 1))
 else
-  if [[ $DRY_RUN -eq 1 || $NO_INSTALL -eq 1 ]]; then
+  if [[ $MAY_INSTALL -eq 0 ]]; then
     row "$MARK_FAIL" "Homebrew" "missing — install: https://brew.sh"
     CHECKS_FAIL=$((CHECKS_FAIL + 1))
     ACTIONS_NEEDED+=("Install Homebrew: https://brew.sh")
@@ -274,7 +284,7 @@ if has_cmd gh; then
   else
     row "$MARK_WARN" "gh" "$_ghver — upgrade needed (>=2.29 for Projects v2)"
     CHECKS_WARN=$((CHECKS_WARN + 1))
-    if [[ $DRY_RUN -eq 0 && $NO_INSTALL -eq 0 ]] && has_cmd brew; then
+    if [[ $MAY_INSTALL -eq 1 ]] && has_cmd brew; then
       brew upgrade gh >/dev/null 2>&1 && GH_OK=1 && ACTIONS_TAKEN+=("Upgraded gh")
     fi
     [[ $GH_OK -eq 0 ]] && ACTIONS_NEEDED+=("Upgrade gh: brew upgrade gh")
@@ -349,7 +359,7 @@ if has_cmd pnpm; then
 elif [[ -n "$_pkg_mgr" && "$_pkg_mgr" == pnpm* ]]; then
   # Pinned in package.json — enable via corepack
   if has_cmd corepack || has_cmd node; then
-    if [[ $DRY_RUN -eq 0 && $NO_INSTALL -eq 0 ]]; then
+    if [[ $MAY_INSTALL -eq 1 ]]; then
       corepack enable pnpm 2>/dev/null && \
         corepack prepare "$_pkg_mgr" --activate 2>/dev/null && \
         ACTIONS_TAKEN+=("Enabled pnpm via corepack ($_pkg_mgr)") || true
@@ -383,7 +393,7 @@ if [[ -d "$_nm" ]]; then
   row "$MARK_OK" "node_modules" "present"
   CHECKS_OK=$((CHECKS_OK + 1))
 elif [[ -f "$_pkg_json" ]]; then
-  if [[ $DRY_RUN -eq 0 && $NO_INSTALL -eq 0 ]] && has_cmd pnpm; then
+  if [[ $MAY_INSTALL -eq 1 ]] && has_cmd pnpm; then
     printf '\n  %s node_modules missing — running pnpm install...\n' "$MARK_WARN"
     if pnpm install --frozen-lockfile 2>/dev/null || pnpm install; then
       row "$MARK_OK" "node_modules" "installed via pnpm install"
@@ -415,7 +425,7 @@ if [[ $_has_vercel_link -eq 1 ]] || [[ -n "${VERCEL:-}" ]]; then
     row "$MARK_OK" "vercel" "installed $(vercel --version 2>/dev/null | head -1)"
     CHECKS_OK=$((CHECKS_OK + 1))
     ACTIONS_TAKEN+=("Installed vercel CLI via brew")
-  elif [[ $DRY_RUN -eq 0 && $NO_INSTALL -eq 0 ]] && has_cmd npm; then
+  elif [[ $MAY_INSTALL -eq 1 ]] && has_cmd npm; then
     npm install -g vercel >/dev/null 2>&1 && \
       ACTIONS_TAKEN+=("Installed vercel CLI via npm") || true
     if has_cmd vercel; then
@@ -576,7 +586,7 @@ if [[ "$_local_on" == "true" ]]; then
     row "$MARK_WARN" "server" "not running — install mlx-lm first, then re-run kit-doctor"
     CHECKS_WARN=$((CHECKS_WARN + 1))
     ACTIONS_NEEDED+=("Start the local model server: mlx_lm.server --model ${_lmodel} --port ${_lport}")
-  elif [[ $DRY_RUN -eq 1 ]]; then
+  elif [[ $DRY_RUN -eq 1 || $UNAPPROVED -eq 1 ]]; then
     row "$MARK_WARN" "server" "not running — would start mlx_lm.server in background (first run downloads ~4.5 GB)"
     CHECKS_WARN=$((CHECKS_WARN + 1))
     ACTIONS_NEEDED+=("Start the local model server: mlx_lm.server --model ${_lmodel} --port ${_lport}")
@@ -638,7 +648,7 @@ if [[ "$_mem_on" == "true" ]]; then
     _present="$_idfile"; [[ -s "$_idfile" ]] || _present="$_idfile_generic"
     row "$MARK_OK" "identity header" "wing-scoped (${_present#${TARGET:-$PWD}/})"
     CHECKS_OK=$((CHECKS_OK + 1))
-  elif [[ $DRY_RUN -eq 0 && $NO_INSTALL -eq 0 ]]; then
+  elif [[ $MAY_INSTALL -eq 1 ]]; then
     # Seed a starter header from kit.config so this wing stops inheriting the global identity.
     _owner="$(jq -r '.project.owner // ""' "$_kitcfg" 2>/dev/null || echo "")"
     _pname="$(jq -r '.project.name // ""' "$_kitcfg" 2>/dev/null || echo "")"
@@ -667,7 +677,7 @@ if [[ "$_mem_on" == "true" ]]; then
   elif grep -q 'mempal-identity' "$_hook" 2>/dev/null; then
     row "$MARK_OK" "session-start hook" "current — applies the per-wing header"
     CHECKS_OK=$((CHECKS_OK + 1))
-  elif [[ $DRY_RUN -eq 0 && $NO_INSTALL -eq 0 && -f "$_hook_tmpl" ]]; then
+  elif [[ $MAY_INSTALL -eq 1 && -f "$_hook_tmpl" ]]; then
     # Re-emit from the template (only {{WING}} to substitute; no IF blocks in this hook).
     if sed "s|{{WING}}|${_mwing}|g" "$_hook_tmpl" > "$_hook"; then
       chmod +x "$_hook"

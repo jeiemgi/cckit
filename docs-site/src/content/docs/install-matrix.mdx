@@ -97,6 +97,8 @@ two adapters render from one set of templates, and what the Codex adapter does n
 ## Updating a project
 
 Updating the install does not touch a project that was already scaffolded. Two steps do that.
+[Update a project](/update/) is the full path — check, migrate, preview, apply, confirm — with what
+the upgrade changes and what it never touches.
 
 1. **`cckit update` reports; it changes nothing.** The verb runs `scripts/kit-version-check.sh`
    (`bin/cckit:368`), which compares the project's `kitVersion` (line 49) with the installed
@@ -105,7 +107,7 @@ Updating the install does not touch a project that was already scaffolded. Two s
    | Output | Meaning | Exit |
    | --- | --- | --- |
    | `up to date` | the two strings are equal | 0 |
-   | `update available · <have> -> <latest>` | the install is newer than the project | 10 |
+   | `update available · <have> -> <latest> · run: cckit init --upgrade (in Claude Code: /kit-update)` | the install is newer than the project | 10 |
    | `ahead of plugin <latest>` | the project records a **newer** version than the install it is being compared with | 0 |
 
    Which install it compares with is resolved in order (lines 26-46): `--plugin-root` or
@@ -114,7 +116,9 @@ Updating the install does not touch a project that was already scaffolded. Two s
    nothing and exits 0.
 
 2. **`cckit init --upgrade` writes.** It adds the files the project is missing, preserves every
-   file that exists, and sets `kitVersion` to the installed version. It reads
+   file that exists, and sets `kitVersion` to the installed version. `--dry-run` runs the same
+   upgrade on a temporary copy and prints the files it would add or modify; the real run prints
+   that list as `Changed on disk`. It reads
    `.claude/kit.config.json` and stops if that file is absent (`scripts/init.sh:282-283`).
 
 ## Updates are skipped when the version string did not change

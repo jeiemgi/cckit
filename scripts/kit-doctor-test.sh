@@ -60,8 +60,9 @@ mk node <<'EOF'
 #!/bin/sh
 echo v22.0.0
 EOF
-mk pnpm <<'EOF'
+mk pnpm <<EOF
 #!/bin/sh
+echo "pnpm \$*" >> "$log"
 echo 9.0.0
 EOF
 mk ssh <<'EOF'
@@ -208,5 +209,26 @@ has "x86_64 -> mlx-lm row is a skip that names the requirement" "$(rows "$out")"
 t "x86_64 -> only mempalace is installed" "$(calls)" "pipx install mempalace|"
 t "x86_64 -> no mlx binary" "$(ls "$tmp/h7/.local/bin")" "mempalace"
 printf 'arm64\n' > "$tmp/arch"
+
+# ── 8. no terminal and no --fix: report only — no `pnpm install`, no seeded file (#448) ────────
+# A trial run of the update path called `cckit doctor` with no flag and stdin not a terminal; it ran
+# `pnpm install` in the project and wrote a MemPalace header. Nobody had been asked.
+pn="$(project pn '{"project":{"name":"x","slug":"pn"},"memory":{"enabled":true}}')"
+printf '{"name":"pn","dependencies":{"left-pad":"1.0.0"}}\n' > "$pn/package.json"
+: > "$log"
+out="$(doctor "$tmp/h8" "$pn")"
+t "no flag, no terminal -> pnpm install is not run" "$(grep -c '^pnpm install' "$log")" "0"
+has "no flag, no terminal -> node_modules is reported, with the command" "$out" "missing — run pnpm install"
+t "no flag, no terminal -> no identity header is written" "$(ls "$pn/.claude" | grep -c mempal-identity)" "0"
+has "no flag, no terminal -> the report says it is report-only and how to install" "$out" "report-only — no terminal and no --fix"
+has "no flag, no terminal -> names the flag" "$out" "cckit doctor --fix"
+t "no flag, no terminal -> no file is added to the project" "$(cd "$pn" && find . -type f | LC_ALL=C sort | tr '\n' ' ')" "./.claude/kit.config.json ./package.json "
+out="$(doctor "$tmp/h8" "$pn" --dry-run)"
+hasnt "--dry-run -> not labelled report-only for want of a terminal" "$out" "no terminal and no --fix"
+: > "$log"
+out="$(doctor "$tmp/h8" "$pn" --fix)"
+t "--fix -> pnpm install runs" "$(grep -c '^pnpm install' "$log")" "1"
+t "--fix -> the identity header is seeded" "$(ls "$pn/.claude" | grep -c mempal-identity)" "1"
+hasnt "--fix -> not report-only" "$out" "report-only"
 
 [ "$fail" = "0" ] && echo "ALL OK (kit-doctor)" || { echo "kit-doctor: FAILURES"; exit 1; }

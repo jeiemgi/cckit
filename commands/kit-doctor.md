@@ -1,6 +1,6 @@
 ---
-description: Onboarding preflight — check deps (Homebrew, git, gh, jq, perl, node, pnpm), authenticate gh + add scope:project, optionally set up SSH. Auto-installs everything it can; pauses only for sudo password (Homebrew) and browser OAuth (gh auth login).
-argument-hint: "[--dry-run] [--no-install] [--dismiss-local]"
+description: Onboarding preflight — check deps (Homebrew, git, gh, jq, perl, node, pnpm), authenticate gh + add scope:project, optionally set up SSH. Report-only unless run with --fix (or answered yes in a terminal); with --fix it installs what it can and pauses only for sudo password (Homebrew) and browser OAuth (gh auth login).
+argument-hint: "[--fix] [--dry-run] [--no-install] [--dismiss-local]"
 allowed-tools: Bash
 ---
 
@@ -26,6 +26,10 @@ Run the kit-doctor script to check all dependencies and authentication required 
 
 ## Flags
 
+- *(no flag)* — in a terminal it asks before installing. Run from Claude Code there is no terminal, so
+  it is report-only: no package install, no `pnpm install`, no seeded or refreshed file, no server start
+- `--fix` (alias `--yes`) — install what is missing and seed/refresh files without asking. Pass it only
+  when the user asked for installs
 - `--dry-run` — report only, touch nothing (no installs, no server start)
 - `--no-install` — check + auth only, skip package installs
 - `--agents` — only the agent-runtime rows; no installs, no network; exits 1 when a selected runtime is absent
