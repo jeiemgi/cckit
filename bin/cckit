@@ -133,6 +133,7 @@ LIB="$ROOT/scripts/lib"
 # (config-path.sh, #69) that every kit entrypoint uses.
 # shellcheck source=/dev/null
 source "$LIB/config-path.sh"
+_KIT_CONFIG_GIVEN="${KIT_CONFIG:+1}"   # 1 = the caller named a config; init keeps only that one (#487)
 if [ -z "${KIT_CONFIG:-}" ]; then
   KIT_CONFIG="$(kit_config_find "$PWD" || true)"
   [ -n "$KIT_CONFIG" ] || KIT_CONFIG="$ROOT/cckit.config.json"
@@ -555,7 +556,13 @@ cckit bench verbs [--runs N] [--checkout <dir>] [--verb "<verb>"] [--json]   (at
     esac
     ;;
   install)     exec "$ROOT/scripts/install.sh" "$@" ;;
-  init)        exec "$ROOT/scripts/init.sh" "$@" ;;
+  init)
+    # init resolves the config from the folder it sets up. The KIT_CONFIG this dispatcher worked out
+    # is the invoking directory's project or, outside any project, cckit's OWN config: read as the
+    # new project's, that one gave every fresh project cckit's base branch and label set (#487).
+    # A KIT_CONFIG the caller exported is kept.
+    [ -n "$_KIT_CONFIG_GIVEN" ] || unset KIT_CONFIG
+    exec "$ROOT/scripts/init.sh" "$@" ;;
   commands)
     # The command catalog - verbs parsed from this dispatcher's own case labels (single source).
     verbs="$(grep -oE '^  [a-z][a-z|-]*\)' "$BIN/cckit" | sed 's/[) ]//g' | tr '|' '\n' | grep -vE '^(-|$)' | sort -u)"

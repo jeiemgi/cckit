@@ -118,7 +118,32 @@ has "marketing: CLAUDE.md opens the task section with light tasks" "$(cat "$m/CL
 has "marketing: CLAUDE.md names the finish verb, with --all for new files" "$(cat "$m/CLAUDE.md")" 'cckit task finish <id> "<summary>" --all'
 has "marketing: task-management says the default list is light" "$(cat "$m/.claude/rules/task-management.md")" "default list is light tasks"
 has "marketing: the closing summary says so" "$out" "Tasks   : light tasks are the default list"
-has "marketing: the closing summary names the first command" "$out" 'First task: cckit task new "<title>"'
+has "marketing: the closing summary names the first command" "$out" 'Add the first task:  cckit task new "<title>"'
+# #487: the next steps of a light-task project do not send the reader to the label scripts.
+hasnt "marketing: no label or milestone script in the next steps" "$out" "setup-labels.sh"
+has "software keeps them" "$(init "$tmp/sw-steps" --profile software 2>&1)" "./scripts/setup-labels.sh && ./scripts/setup-milestones.sh"
+# #487: the instruction file. A folded `description: >` is read; the base branch is the project's;
+# the task section does not contradict the light-task section; the credit names this repository.
+md="$(cat "$m/CLAUDE.md")"
+has   "marketing CLAUDE.md: brand-voice has its description" "$md" '| `brand-voice` | Record the brand'
+has   "marketing CLAUDE.md: campaign has its description" "$md" '| `campaign` | Turn one marketing goal'
+hasnt "marketing CLAUDE.md: no bare > in the skills table" "$md" '| > |'
+has   "marketing CLAUDE.md: the task files are the source of truth" "$md" '**Source of truth:** the task files under `tasks/`'
+hasnt "marketing CLAUDE.md: does not call GitHub issues the source of truth" "$md" "**Source of truth:** GitHub issues"
+hasnt "marketing CLAUDE.md: does not forbid task lists in markdown" "$md" "maintain task lists in markdown"
+has   "marketing CLAUDE.md: credits the kit's repository" "$md" "[cckit](https://github.com/jeiemgi/cckit)"
+has   "content CLAUDE.md: GitHub issues stay the source of truth" "$(cat "$c/CLAUDE.md")" "**Source of truth:** GitHub issues"
+bb="$tmp/base"; mkdir -p "$bb"
+KIT_BASE_BRANCH=develop init "$bb" --profile marketing >/dev/null 2>&1
+has   "CLAUDE.md names the project's base branch" "$(cat "$bb/CLAUDE.md")" 'lands on `develop` through a Pull Request'
+hasnt "CLAUDE.md does not say main when the base is develop" "$(cat "$bb/CLAUDE.md")" '`main`'
+t "no template names the old repository" "$(grep -rl 'tuempresadigital' "$ROOT/templates" "$ROOT/kit.config.schema.json" 2>/dev/null | wc -l | tr -d ' ')" "0"
+# #487: every state `cckit task list` can print has a plain wording in the rule.
+rule="$(cat "$m/.claude/rules/plain-language.md")"
+for st in draft todo shared doing review 'done' dropped; do
+  has "plain-language: names the task state $st" "$rule" "\`$st\`"
+done
+has "plain-language: says what the draft state is" "$rule" "nobody has started the task and it is not on the shared list"
 hasnt "content: CLAUDE.md has no light-task section" "$(cat "$c/CLAUDE.md")" "Work is tracked as light tasks"
 hasnt "content: task-management does not mention light tasks" "$(cat "$c/.claude/rules/task-management.md")" "light tasks"
 t "marketing: the installed cckit reads the default" "$(cd "$m" && "$ROOT/bin/cckit" task default)" "light"

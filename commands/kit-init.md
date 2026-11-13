@@ -101,11 +101,15 @@ You are initializing the current project with the **claude-kit** setup. The kit 
 
 4. **Report** what was written (echo the engine's summary) and its closing lines.
 
-5. **Git and GitHub setup.** The engine does this itself: `git init` + first commit, the GitHub
-   repository (private unless `--public`), the base branch `develop`, labels, milestones,
-   delete-head-branches, base-branch protection, Projects v2 ids, the doctor report. You have no
-   terminal, so it runs only with `--yes`, and the scaffold in step 2 ends with "Git and GitHub
-   setup: not run". Show the user the plan first, then run it on their go-ahead:
+5. **Git and GitHub setup.** The engine does this itself: `git init` + first commit, one commit
+   holding the kit files on the base branch when the repository already had commits, the GitHub
+   repository (private unless `--public`), the base branch `develop` (pushed with that commit),
+   labels, milestones, delete-head-branches, base-branch protection, Projects v2 ids, the doctor
+   report. You have no terminal, so it runs only with `--yes`, and the scaffold in step 2 ends
+   with "Git and GitHub setup: not run" followed by one "Not done:" block per thing left undone
+   (the kit files are not committed; the base branch does not exist). Relay those blocks: until
+   the kit files are committed, a task started in the project gets a folder without them. Show
+   the user the plan first, then run it on their go-ahead:
 
    ```bash
    "${CLAUDE_PLUGIN_ROOT}/scripts/init.sh" --target "$PWD" --dry-run   # the steps, nothing written

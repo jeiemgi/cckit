@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/tuempresadigital/claude-kit/kit.config.schema.json",
+  "$id": "https://github.com/jeiemgi/cckit/kit.config.schema.json",
   "title": "claude-kit project config (v2)",
   "description": "Identity layer of a kit project. Resolved in cascade workspace -> project -> island by scripts/lib/kit-config-resolve.sh; the nearest layer wins. The $schema reference in kit.config.json points here so editors validate + autocomplete.",
   "type": "object",

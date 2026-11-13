@@ -52,9 +52,10 @@ language, and every question has one answer marked **(Recommended)**: press Ente
 
    | Step | Skipped when |
    | --- | --- |
-   | Start version control (`git init`, branch `main`) and save the first version | the folder is already a repository / it already has a commit |
+   | Start version control (`git init`, branch `main`) and save the first version, the kit files included | the folder is already a repository / it already has a commit |
+   | Save the kit files as one commit on the base branch (`chore: add the cckit project files`), on a repository that already had commits. Only the files init writes go in: no env file, nothing git ignores, no script of your own under `scripts/`, nothing you had staged | the project config is already tracked. With the folder on another branch than the base, the step fails and names the branch to switch to |
    | Create the GitHub repository. Private unless you pass `--public` | the folder is already connected to one |
-   | Create the branch `develop`, push it, and make it the default branch of a repository init created | GitHub already has it. An existing repository keeps its default branch |
+   | Create the branch `develop`, push it, and make it the default branch of a repository init created. When GitHub already has the base branch, push the kit files commit to it | GitHub has the branch and nothing is waiting to be pushed. An existing repository keeps its default branch |
    | Add the labels and milestones the workflow uses | they exist. Only missing ones are created |
    | Turn on "automatically delete head branches" | it is on |
    | Protect the base branch: pull request required, branch up to date, linear history, no force-push | it is protected. On a free personal account GitHub refuses protection for a private repository (HTTP 403): init reports the step as skipped with that reason and carries on |
@@ -99,7 +100,14 @@ cckit init --profile content --plain-language on --no-github             # + the
   `database`, `profile`. A question the file leaves out takes the recommended answer, and the output
   says so. A value that is not one of the choices exits 2 before anything is written.
 - `--yes` confirms the git and GitHub steps. With no terminal and no `--yes` they do not run: the
-  kit files are written and the last lines say how to run the setup.
+  kit files are written and the last lines say how to run the setup. They also name what the run
+  left undone: `Not done: the cckit files are not committed.` with the command that commits them
+  (`cckit init --yes`, or the `git add … && git commit` line after `--no-github`), and
+  `Not done: the branch '<base>' … does not exist in this repository.` when `cckit start` and
+  `cckit task start` would have nothing to cut from. The run still exits 0.
+- The base branch written to the config, when the setup does not run: the repository's default
+  branch on GitHub; else `main` when the repository has it or has no commit yet; else the branch
+  that is checked out. It is never a branch the repository lacks.
 - `--no-github` leaves git and GitHub out entirely. `--recipe <id>` and `--database <id>` choose
   without a question; `--public` creates the repository public.
 - With neither a terminal nor an answers file, a home folder exits 2 and `--profile` is required.
@@ -175,6 +183,22 @@ Afterwards your repo looks roughly like this — your own files are untouched, c
     - lib/    shared helpers (kit-sigil.sh, …)
   - … your existing files, unchanged
 </FileTree>
+
+init also adds these lines to `.gitignore` (each once; an existing file keeps its other lines):
+`.claude/settings.local.json`, the ownership manifest (`.claude/kit.manifest.json`), `.kann/`,
+`.cckit/` (cckit's local state: consent, session mail, the handoff note, autopilot runs) and
+`.claude/worktrees/` (the folders `cckit start` and `cckit task start` create). None of them is
+ever part of a commit.
+
+The instruction file (`CLAUDE.md`, or `AGENTS.md` for Codex) is rendered for the project: its
+pull-request section names the project's base branch, its skills table carries each skill's
+description, and in a project whose task list is light tasks (`tasks.default: "light"`) its "Task
+management" section names the task files under `tasks/` as the source of truth, not GitHub issues.
+
+The closing "Next steps" follow the task list too. A light-task project is told to add its first
+task (`cckit task new "<title>"`) and start it; the `./scripts/setup-labels.sh &&
+./scripts/setup-milestones.sh` line is printed only for a project that tracks work in GitHub
+issues and did not run the git and GitHub steps.
 
 ### Claude Code, Codex, or both
 

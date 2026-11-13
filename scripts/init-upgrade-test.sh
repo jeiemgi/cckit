@@ -233,7 +233,8 @@ t "codex: no .claude tree at all"        "$(has_path x .claude)" "no"
 t "codex: config at the root"            "$(jq -c '.adapters' "$fx/x/cckit.config.json")" '["codex"]'
 t "codex: manifest under .cckit/"        "$(has_path x .cckit/kit.manifest.json)" "yes"
 t "codex: manifest is gitignored"        "$(grep -cxF '.cckit/kit.manifest.json' "$fx/x/.gitignore")" "1"
-t "codex: no Claude settings ignore line" "$(grep -cF '.claude' "$fx/x/.gitignore")" "0"
+t "codex: no Claude settings ignore line" "$(grep -cF '.claude/settings' "$fx/x/.gitignore")" "0"
+t "codex: .cckit/ is gitignored" "$(grep -cxF '.cckit/' "$fx/x/.gitignore")" "1"
 t "both: CLAUDE.md + AGENTS.md"          "$(has_path b CLAUDE.md)$(has_path b AGENTS.md)" "yesyes"
 t "both: both skill trees"               "$(has_path b .claude/skills/concrete/SKILL.md)$(has_path b .agents/skills/concrete/SKILL.md)" "yesyes"
 t "both: stored selection"               "$(jq -c '.adapters' "$fx/b/.claude/kit.config.json")" '["claude","codex"]'

@@ -76,7 +76,7 @@ in-tree) nor **downgrade**:
 [ -f "$PWD/packages/claude-kit-plugin/.claude-plugin/plugin.json" ] && echo "home-repo"
 # Same version? (nothing to add)
 _have="$(jq -r '.kitVersion // "0.0.0"' "$PWD/.claude/kit.config.json" 2>/dev/null)"
-_plug="$(jq -r '.version // "0.0.0"' "/Users/josegutierrezdelgado/.claude/plugins/cache/claude-kit-marketplace/claude-kit/0.7.0-beta.6/.claude-plugin/plugin.json" 2>/dev/null)"
+_plug="$(jq -r '.version // "0.0.0"' "${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json" 2>/dev/null)"
 [ "$_have" = "$_plug" ] && echo "same-version"
 ```
 

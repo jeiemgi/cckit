@@ -1,6 +1,6 @@
 # {{PROJECT_NAME}}
 
-> Scaffolded by [claude-kit](https://github.com/tuempresadigital/claude-kit) — profile `{{PROFILE}}`.
+> Scaffolded by [cckit](https://github.com/jeiemgi/cckit) — profile `{{PROFILE}}`.
 > Project config lives in `{{CONFIG_REL}}`. Edit freely; this file is yours now.
 
 <!-- IF:ADAPTER_CLAUDE --><!-- IF:MEMORY -->
@@ -94,23 +94,25 @@ in GitHub issues (`tasks.default` is `light` in `{{CONFIG_REL}}`). Review is sti
 `--all` includes the files created for the task. Without it `finish` sends only files that already
 existed and lists the new ones it left out, so a new draft would not reach the reviewer.
 
-Where this section and "Task management" or "PR workflow" below disagree about where work is
-tracked, this section wins. Create a GitHub issue only when {{OWNER_NAME}} asks for one.
+Create a GitHub issue only when {{OWNER_NAME}} asks for one.
 <!-- /IF:LIGHT_TASKS -->
 
 ## Task management
 
-- **Source of truth:** GitHub issues<!-- IF:PROJECTS_V2 --> + Projects v2 board (`https://github.com/users/{{GH_OWNER}}/projects/{{PROJECT_NUMBER}}`)<!-- /IF:PROJECTS_V2 -->
+<!-- IF:LIGHT_TASKS -->- **Source of truth:** the task files under `tasks/`, read with `cckit task list` (section above). Do not keep a second list anywhere else.
+- Repo: `{{GH_REPO}}`
+- GitHub issues are for work {{OWNER_NAME}} asks to track there; "PR workflow" below is the path such an issue takes.
+<!-- /IF:LIGHT_TASKS --><!-- IF:ISSUE_TASKS -->- **Source of truth:** GitHub issues<!-- IF:PROJECTS_V2 --> + Projects v2 board (`https://github.com/users/{{GH_OWNER}}/projects/{{PROJECT_NUMBER}}`)<!-- /IF:PROJECTS_V2 -->
 - Repo: `{{GH_REPO}}`
 - **Never** maintain task lists in markdown — use <!-- IF:ADAPTER_CLAUDE -->`gh issue` + the `task-*` skills<!-- /IF:ADAPTER_CLAUDE --><!-- IF:ADAPTER_CODEX -->the `cckit` verbs below<!-- /IF:ADAPTER_CODEX -->
-- Milestones: {{MILESTONES_HUMAN}}
+<!-- /IF:ISSUE_TASKS -->- Milestones: {{MILESTONES_HUMAN}}
 <!-- IF:PLANS -->
 - Plans live in `{{PLANS_DIR}}` (format: `{{PLANS_FORMAT}}`) — see `{{ADAPTER_DIR}}/rules/plan-output-format.md`
 <!-- /IF:PLANS -->
 
 ## PR workflow
 
-Every issue lands on `main` through a Pull Request. No direct commits to `main`.
+<!-- IF:LIGHT_TASKS -->Every task and every issue lands on `{{BASE_BRANCH}}` through a Pull Request. No direct commits to `{{BASE_BRANCH}}`. A light task follows the four steps above; the table below is for a GitHub issue.<!-- /IF:LIGHT_TASKS --><!-- IF:ISSUE_TASKS -->Every issue lands on `{{BASE_BRANCH}}` through a Pull Request. No direct commits to `{{BASE_BRANCH}}`.<!-- /IF:ISSUE_TASKS -->
 
 <!-- IF:ADAPTER_CLAUDE -->| Step              | Skill              | What it does                                            |
 | ----------------- | ------------------ | ------------------------------------------------------- |
@@ -118,7 +120,7 @@ Every issue lands on `main` through a Pull Request. No direct commits to `main`.
 | 2. Start work     | `/kit-task-start <N>`  | Isolated worktree + branch `<kind>/<N>-<slug>` from the base + mark In Progress |
 | 3. Do the work    | —                  | Code, write plans, etc.                                 |
 | 4. Open PR        | `/kit-task-pr <N>`     | Commit + push + open PR with template/labels/milestone  |
-| 5. Review + merge | `/kit-task-pr-merge`   | Squash-merge PR, switch to main, pull                   |
+| 5. Review + merge | `/kit-task-pr-merge`   | Squash-merge PR, switch to `{{BASE_BRANCH}}`, pull     |
 | 6. Close          | `/kit-task-close <N>`  | Close issue (auto on `Closes #N`) + archive plan        |
 <!-- /IF:ADAPTER_CLAUDE --><!-- IF:ADAPTER_CODEX -->| Step              | Command                         | What it does                                            |
 | ----------------- | ------------------------------- | ------------------------------------------------------- |
