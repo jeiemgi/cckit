@@ -1,184 +1,263 @@
 {
+  "schema": 1,
   "version": "0.9.0",
-  "date": "2026-11-12",
-  "model": "claude-haiku-5-5",
-  "total": 18,
-  "pass": 10,
-  "score_pct": 55,
-  "results": [
+  "checkpoints": [
     {
-      "set": "retrieval.jsonl",
-      "tier": "retrieval",
-      "id": "ret-01",
-      "got": "docs-site/src/content/docs/releasing.mdx",
-      "expect": "docs-site/src/content/docs/releasing.mdx",
-      "pass": true,
-      "latency_ms": 10000
-    },
-    {
-      "set": "retrieval.jsonl",
-      "tier": "retrieval",
-      "id": "ret-02",
-      "got": "docs-site/src/content/docs/efforts-and-waves.mdx",
-      "expect": [
-        "docs-site/src/content/docs/efforts-and-waves.mdx",
-        "docs-site/src/content/docs/wave.mdx"
-      ],
-      "pass": true,
-      "latency_ms": 12000
-    },
-    {
-      "set": "retrieval.jsonl",
-      "tier": "retrieval",
-      "id": "ret-03",
-      "got": "docs-site/src/content/docs/hooks.mdx",
-      "expect": "docs-site/src/content/docs/hooks.mdx",
-      "pass": true,
-      "latency_ms": 9000
-    },
-    {
-      "set": "retrieval.jsonl",
-      "tier": "retrieval",
-      "id": "ret-04",
-      "got": "docs-site/src/content/docs/tutorials/give-claude-code-persistent-memory.mdx",
-      "expect": [
-        "docs-site/src/content/docs/memory.mdx",
-        "docs-site/src/content/docs/tutorials/give-claude-code-persistent-memory.mdx"
-      ],
-      "pass": true,
-      "latency_ms": 7000
-    },
-    {
-      "set": "retrieval.jsonl",
-      "tier": "retrieval",
-      "id": "ret-05",
-      "got": "docs-site/src/content/docs/config-and-permissions.mdx",
-      "expect": "docs-site/src/content/docs/config-and-permissions.mdx",
-      "pass": true,
-      "latency_ms": 12000
-    },
-    {
-      "set": "retrieval.jsonl",
-      "tier": "retrieval",
-      "id": "ret-06",
-      "got": "docs-site/src/content/docs/review-gates.mdx",
-      "expect": "docs-site/src/content/docs/review-gates.mdx",
-      "pass": true,
-      "latency_ms": 9000
-    },
-    {
-      "set": "new.jsonl",
-      "tier": "retrieval",
-      "id": "new-01",
-      "got": "NONE",
-      "expect": "docs-site/src/content/docs/qa-lane.mdx",
-      "pass": false,
-      "latency_ms": 18000
-    },
-    {
-      "set": "new.jsonl",
-      "tier": "retrieval",
-      "id": "new-02",
-      "got": "NONE",
-      "expect": "docs-site/src/content/docs/integrations.mdx",
-      "pass": false,
-      "latency_ms": 18000
-    },
-    {
-      "set": "new.jsonl",
-      "tier": "retrieval",
-      "id": "new-03",
-      "got": "NONE",
-      "expect": "docs-site/src/content/docs/install-matrix.mdx",
-      "pass": false,
-      "latency_ms": 18000
-    },
-    {
-      "set": "new.jsonl",
-      "tier": "retrieval",
-      "id": "new-04",
-      "got": "wave.mdx",
-      "expect": "docs-site/src/content/docs/multi-session.mdx",
-      "pass": false,
-      "latency_ms": 9000
-    },
-    {
-      "set": "new.jsonl",
-      "tier": "retrieval",
-      "id": "new-05",
-      "got": "NONE",
-      "expect": "docs-site/src/content/docs/rules.mdx",
-      "pass": false,
-      "latency_ms": 16000
-    },
-    {
-      "set": "new.jsonl",
-      "tier": "retrieval",
-      "id": "new-06",
-      "got": "NONE",
-      "expect": "docs-site/src/content/docs/releasing.mdx",
-      "pass": false,
-      "latency_ms": 12000
-    },
-    {
-      "set": "adversarial.jsonl",
-      "tier": "adversarial",
-      "id": "adv-01",
-      "got": "wave.mdx",
-      "expect": "docs-site/src/content/docs/multi-session.mdx",
-      "pass": false,
-      "latency_ms": 10000
-    },
-    {
-      "set": "adversarial.jsonl",
-      "tier": "adversarial",
-      "id": "adv-02",
-      "got": "NONE",
-      "expect": [
-        "docs-site/src/content/docs/tutorials/run-claude-code-unattended.mdx",
-        "docs-site/src/content/docs/config-and-permissions.mdx"
-      ],
-      "pass": false,
-      "latency_ms": 14000
-    },
-    {
-      "set": "adversarial.jsonl",
-      "tier": "adversarial",
-      "id": "adv-03",
-      "got": "docs-site/src/content/docs/debug.mdx",
-      "expect": [
-        "docs-site/src/content/docs/qa-lane.mdx",
-        "docs-site/src/content/docs/debug.mdx"
-      ],
-      "pass": true,
-      "latency_ms": 16000
-    },
-    {
-      "set": "abstain.jsonl",
-      "tier": "abstain",
-      "id": "abs-01",
-      "got": "NONE",
-      "expect": "NONE",
-      "pass": true,
-      "latency_ms": 7000
-    },
-    {
-      "set": "abstain.jsonl",
-      "tier": "abstain",
-      "id": "abs-02",
-      "got": "NONE",
-      "expect": "NONE",
-      "pass": true,
-      "latency_ms": 9000
-    },
-    {
-      "set": "abstain.jsonl",
-      "tier": "abstain",
-      "id": "abs-03",
-      "got": "NONE",
-      "expect": "NONE",
-      "pass": true,
-      "latency_ms": 9000
+      "n": 1,
+      "date": "2026-11-12",
+      "ref": "v0.9.0",
+      "commit": "1885252",
+      "model": "claude-haiku-5-5",
+      "passes": 1,
+      "questions": 18,
+      "total": 18,
+      "pass": 10,
+      "score_pct": 55,
+      "tiers": {
+        "abstain": {
+          "total": 3,
+          "pass": 3
+        },
+        "adversarial": {
+          "total": 3,
+          "pass": 1
+        },
+        "retrieval": {
+          "total": 12,
+          "pass": 6
+        }
+      },
+      "note": "",
+      "results": [
+        {
+          "set": "retrieval.jsonl",
+          "tier": "retrieval",
+          "id": "ret-01",
+          "q": "How do I cut a release, and what does release-please do on main?",
+          "expect": "docs-site/src/content/docs/releasing.mdx",
+          "got": "docs-site/src/content/docs/releasing.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 10000,
+          "pass": true
+        },
+        {
+          "set": "retrieval.jsonl",
+          "tier": "retrieval",
+          "id": "ret-02",
+          "q": "How does an effort differ from a single task, and how are waves ordered?",
+          "expect": [
+            "docs-site/src/content/docs/efforts-and-waves.mdx",
+            "docs-site/src/content/docs/wave.mdx"
+          ],
+          "got": "docs-site/src/content/docs/efforts-and-waves.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 12000,
+          "pass": true
+        },
+        {
+          "set": "retrieval.jsonl",
+          "tier": "retrieval",
+          "id": "ret-03",
+          "q": "Which hooks does cckit install and what does each one block?",
+          "expect": "docs-site/src/content/docs/hooks.mdx",
+          "got": "docs-site/src/content/docs/hooks.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 9000,
+          "pass": true
+        },
+        {
+          "set": "retrieval.jsonl",
+          "tier": "retrieval",
+          "id": "ret-04",
+          "q": "How do I give Claude Code memory that persists across sessions?",
+          "expect": [
+            "docs-site/src/content/docs/memory.mdx",
+            "docs-site/src/content/docs/tutorials/give-claude-code-persistent-memory.mdx"
+          ],
+          "got": "docs-site/src/content/docs/tutorials/give-claude-code-persistent-memory.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 7000,
+          "pass": true
+        },
+        {
+          "set": "retrieval.jsonl",
+          "tier": "retrieval",
+          "id": "ret-05",
+          "q": "Where is every config key documented, for example worktree.installPaths?",
+          "expect": "docs-site/src/content/docs/config-and-permissions.mdx",
+          "got": "docs-site/src/content/docs/config-and-permissions.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 12000,
+          "pass": true
+        },
+        {
+          "set": "retrieval.jsonl",
+          "tier": "retrieval",
+          "id": "ret-06",
+          "q": "Which lint gates turn a repeated AI-review finding into a permanent check?",
+          "expect": "docs-site/src/content/docs/review-gates.mdx",
+          "got": "docs-site/src/content/docs/review-gates.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 9000,
+          "pass": true
+        },
+        {
+          "set": "new.jsonl",
+          "tier": "retrieval",
+          "id": "new-01",
+          "q": "How do I boot one QA stack per wave and record a QA verdict before merge?",
+          "expect": "docs-site/src/content/docs/qa-lane.mdx",
+          "got": "NONE",
+          "passed": 0,
+          "asked": 1,
+          "latency_ms": 18000,
+          "pass": false
+        },
+        {
+          "set": "new.jsonl",
+          "tier": "retrieval",
+          "id": "new-02",
+          "q": "How do I add an optional third-party tool such as a code graph to my project?",
+          "expect": "docs-site/src/content/docs/integrations.mdx",
+          "got": "NONE",
+          "passed": 0,
+          "asked": 1,
+          "latency_ms": 18000,
+          "pass": false
+        },
+        {
+          "set": "new.jsonl",
+          "tier": "retrieval",
+          "id": "new-03",
+          "q": "Which files does a Codex-only install of cckit write, compared with a Claude Code install?",
+          "expect": "docs-site/src/content/docs/install-matrix.mdx",
+          "got": "NONE",
+          "passed": 0,
+          "asked": 1,
+          "latency_ms": 18000,
+          "pass": false
+        },
+        {
+          "set": "new.jsonl",
+          "tier": "retrieval",
+          "id": "new-04",
+          "q": "How does cckit stop two live sessions from starting work on the same issue?",
+          "expect": "docs-site/src/content/docs/multi-session.mdx",
+          "got": "wave.mdx",
+          "passed": 0,
+          "asked": 1,
+          "latency_ms": 9000,
+          "pass": false
+        },
+        {
+          "set": "new.jsonl",
+          "tier": "retrieval",
+          "id": "new-05",
+          "q": "Which rules does cckit ship into a project, and which of them are path-scoped?",
+          "expect": "docs-site/src/content/docs/rules.mdx",
+          "got": "NONE",
+          "passed": 0,
+          "asked": 1,
+          "latency_ms": 16000,
+          "pass": false
+        },
+        {
+          "set": "new.jsonl",
+          "tier": "retrieval",
+          "id": "new-06",
+          "q": "How do I cherry-pick an already merged fix onto the release branch as a hotfix?",
+          "expect": "docs-site/src/content/docs/releasing.mdx",
+          "got": "NONE",
+          "passed": 0,
+          "asked": 1,
+          "latency_ms": 12000,
+          "pass": false
+        },
+        {
+          "set": "adversarial.jsonl",
+          "tier": "adversarial",
+          "id": "adv-01",
+          "q": "Two of my helpers grabbed the same ticket at once. What in the tool prevents that?",
+          "expect": "docs-site/src/content/docs/multi-session.mdx",
+          "got": "wave.mdx",
+          "passed": 0,
+          "asked": 1,
+          "latency_ms": 10000,
+          "pass": false
+        },
+        {
+          "set": "adversarial.jsonl",
+          "tier": "adversarial",
+          "id": "adv-02",
+          "q": "I want the thing to keep working while I sleep, but with a spending ceiling. Where is that explained step by step?",
+          "expect": [
+            "docs-site/src/content/docs/tutorials/run-claude-code-unattended.mdx",
+            "docs-site/src/content/docs/config-and-permissions.mdx"
+          ],
+          "got": "NONE",
+          "passed": 0,
+          "asked": 1,
+          "latency_ms": 14000,
+          "pass": false
+        },
+        {
+          "set": "adversarial.jsonl",
+          "tier": "adversarial",
+          "id": "adv-03",
+          "q": "My project never opens a browser to check the change actually works before it lands. What part covers that?",
+          "expect": [
+            "docs-site/src/content/docs/qa-lane.mdx",
+            "docs-site/src/content/docs/debug.mdx"
+          ],
+          "got": "docs-site/src/content/docs/debug.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 16000,
+          "pass": true
+        },
+        {
+          "set": "abstain.jsonl",
+          "tier": "abstain",
+          "id": "abs-01",
+          "q": "What does the cckit enterprise tier cost per seat?",
+          "expect": "NONE",
+          "got": "NONE",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 7000,
+          "pass": true
+        },
+        {
+          "set": "abstain.jsonl",
+          "tier": "abstain",
+          "id": "abs-02",
+          "q": "How do I deploy cckit to a Kubernetes cluster with Helm?",
+          "expect": "NONE",
+          "got": "NONE",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 9000,
+          "pass": true
+        },
+        {
+          "set": "abstain.jsonl",
+          "tier": "abstain",
+          "id": "abs-03",
+          "q": "Which Slack channel do I post in to reach cckit support?",
+          "expect": "NONE",
+          "got": "NONE",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 9000,
+          "pass": true
+        }
+      ]
     }
   ]
 }
