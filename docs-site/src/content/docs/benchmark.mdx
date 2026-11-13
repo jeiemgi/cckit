@@ -52,6 +52,32 @@ model backend and exits non-zero on any retrieval failure, so autopilot and CI n
 headline score. It's meant to be readable by someone who has never seen the harness.
 </Aside>
 
+## Checkpoints per release
+
+A checkpoint is one scored run that is kept. The benchmark is not run on every commit: it is run
+while a release is being built, as a loop of run, fix what the run showed, run again. One release
+can hold several checkpoints.
+
+```bash
+cckit bench checkpoint X.Y.Z               # run the benchmark, record it as the next checkpoint of X.Y.Z
+cckit bench checkpoint X.Y.Z --passes 3    # ask every question 3 times; the score sums all answers
+cckit bench checkpoint X.Y.Z --from run.json --model <name>   # record a run already made
+cckit bench checkpoints                    # every recorded checkpoint, oldest first
+cckit bench check X.Y.Z                    # the release verdict
+```
+
+| Piece | What it is |
+| --- | --- |
+| File | `benchmarks/runs/<X.Y.Z>.json`, one per version: `{ "schema": 1, "version": "X.Y.Z", "checkpoints": [ … ] }`. A new checkpoint is appended with the next `n`. |
+| Checkpoint | `n`, `date`, `ref`, `commit`, `model`, `passes`, `questions`, `total` (answers asked), `pass` (answers right), `score_pct`, `tiers` (`total` and `pass` per tier), `note`, and `results`: one row per question with the question text, the expected document, the answer, and `passed` of `asked`. |
+| `--passes N` | One pass over a small set varies between runs. With N passes every question is asked N times and `total` is questions × N, so one changed answer moves the score by less. A question counts as passed only when every pass got it right. |
+| `--from <run.json>` | The JSON `cckit bench run --json` printed. Repeat the flag to record several passes. A `--dry` run is refused: it has no scores. So is a run with an empty answer, live or `--from`: `cckit bench run` stores an empty answer only when the model backend failed, and it would count as a pass in the abstain tier. Both exit 2 and write nothing. |
+| `cckit bench check` | Exit 0 when the version's last checkpoint scores at least as high as the checkpoint recorded before it, in the same version or the last one of the previous version. Exit 1 when the version has no checkpoint or scores lower. Exit 2 on a usage error, or when a file in `benchmarks/runs/` named `X.Y.Z.json` is not a checkpoint file; the file is named on stderr, and `checkpoints`, `page` and `checkpoint` exit 2 on it too. Scores compare as fractions, `pass`/`total`, so a question set that grew still compares. |
+| Results page | `resultsPage` in `benchmarks/benchmark.config.json` names a markdown file. `cckit bench checkpoint` rewrites it from the run files, and `cckit bench page --check` exits 1 when it differs from them. |
+
+`cckit release` runs `cckit bench check` first: see [Releasing](/releasing/#the-benchmark-check).
+cckit's own checkpoints are on the [Benchmark results](/benchmark-results/) page.
+
 ## The dataset
 
 Datasets live in `benchmarks/` as one JSON object per line (`*.jsonl`). Blank lines and `#` comments
