@@ -47,6 +47,10 @@ t "content: kinds.content is on"          "$(cfg "$c" '.kinds.content')" "true"
 t "content: pr.bodyStyle is content"      "$(cfg "$c" '.pr.bodyStyle')" '"content"'
 t "content: no plainLanguage key"         "$(cfg "$c" 'has("plainLanguage")')" "false"
 t "content: no tasks key"                 "$(cfg "$c" 'has("tasks")')" "false"
+# The config is committed by the guided setup: it must not record where the folder lives (#490).
+t "content: no project.path key"          "$(cfg "$c" '.project | has("path")')" "false"
+cfgtxt="$(cat "$c/.claude/kit.config.json")"
+t "content: the config names no absolute path of the project" "$(case "$cfgtxt" in *"$c"*) echo yes ;; *) echo no ;; esac)" "no"
 t "content: no plain-language rule"       "$([ -e "$c/.claude/rules/plain-language.md" ] && echo yes || echo no)" "no"
 t "content: no effort-model rule"         "$([ -e "$c/.claude/rules/effort-model.md" ] && echo yes || echo no)" "no"
 t "content: the editor agent lists copywriting" "$(sed -n '/^skills:/,/^---/p' "$c/.claude/agents/editor/AGENT.md" | grep -c '^  - copywriting$')" "1"
