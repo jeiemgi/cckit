@@ -171,7 +171,7 @@ Config: `night.floors`, `night.neverWaivable`, `night.gate`, `night.grantors`, `
 ## Model endpoint
 
 cckit shells out to whatever agent invokes it; it does not embed a model. For verbs that synthesize
-text (digests, ingest), the model endpoint is configurable via environment — see the docs site (
+text (digests, ingest), the model endpoint is configurable via environment — see the docs site,
 [cckit.dev](https://cckit.dev).
 
 `cckit effort close` appends one record per effort to `<git-common-dir>/effort-metrics/records.jsonl`.

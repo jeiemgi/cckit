@@ -9,7 +9,7 @@ import TagRow from '../../components/TagRow.astro';
 
 <TagRow kinds={["command", "agent"]} />
 
-Every cckit verb, grouped by job, with the one-liner version of what it does.
+Every cckit verb, with one line on what it does.
 
 cckit is a thin bash dispatcher over a git-mechanics bundle. Every verb reads from `cckit.config.json` — no org or repo is hardcoded. Append `--llm` to any verb for machine-readable output an agent can parse.
 
@@ -58,7 +58,7 @@ ends are on [Multi-session safety](/multi-session/#session-claims).
 
 ### Where are we?
 
-`cckit status` answers the question a session actually opens with, which is not what `git status` answers. Plain `git` output describes refs; it cannot see which PRs are waiting on a person, or which branches are safe to delete. The three buckets, in this order:
+`cckit status` answers the question a session opens with, which is not what `git status` answers. Plain `git` output describes refs; it cannot see which PRs are waiting on a person, or which branches are safe to delete. The three buckets, in this order:
 
 | # | Bucket | What it reports |
 | --- | --- | --- |
@@ -68,7 +68,7 @@ ends are on [Multi-session safety](/multi-session/#session-claims).
 
 The report ends with one **Instruction files** line — the bytes `CLAUDE.md` and every rule without a `paths:` frontmatter load into every session, against Claude Code's 150k limit, and the three largest files. `cckit doctor` prints the same line and warns over the limit; `--llm` carries it as `instruction_budget` (`null` when the project has no instruction files). The gate behind it is [`instruction-budget-lint`](/review-gates/#instruction-budget-lint--what-every-session-loads).
 
-Two details worth knowing, because both are places a naive reading gets it wrong:
+How two of the verdicts are computed:
 
 - **"Unpushed" means on no remote at all**, not "ahead of its own upstream". An effort sub whose commits were merged into a pushed effort branch has no upstream of its own, yet its work is safely on the remote — reporting it as undone would send you to re-push work that is already there.
 - **A superseded check run never counts.** Re-running a check, or retitling a PR and re-firing a title gate, leaves the old run in GitHub's rollup. Counting every context there reports a PR as failing a check that has since passed, so only the latest run per check name is read.
@@ -278,7 +278,7 @@ Each row carries the four facts you need before sourcing a file:
 
 `*-test.sh` runners are excluded by default (they are test entry points, not a library); the footer always states how many, and `--all` includes them.
 
-Run from a project cckit is installed in, it catalogs that project's own `scripts/lib` when it has one and otherwise the cckit install itself — which is the library `cckit` on your PATH can actually source. `--root <dir>` points it somewhere else.
+Run from a project cckit is installed in, it catalogs that project's own `scripts/lib` when it has one and otherwise the cckit install itself — which is the library `cckit` on your PATH can source. `--root <dir>` points it somewhere else.
 
 ```bash
 cckit lib                 # the markdown table
@@ -289,7 +289,7 @@ cckit lib --reasons       # every failure reason, not only the mixed ones
 
 ### Briefing an agent without retyping the repo
 
-A hand-written delegation brief drops whatever its author forgot, and what gets forgotten is exactly what the delegated agent then rediscovers by hand. `cckit brief <issue>` reads it out of the repo instead:
+A hand-written delegation brief drops whatever its author forgot, and what gets forgotten is what the delegated agent then rediscovers by hand. `cckit brief <issue>` reads it out of the repo instead:
 
 | Section | Where it comes from |
 | --- | --- |

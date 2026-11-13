@@ -49,10 +49,9 @@ merge — an auto-pass included. On those two points it wins over this rule.
 
 - An agent-driven swarm produces more PRs than a human can hand-review; uniform review is the bottleneck.
 - The pipeline (build + typecheck + lint) is a deterministic reviewer for mechanical correctness — let
-  it own the low-risk tier. Reserve human judgment for the changes where judgment is the actual value:
-  design decisions, data/graph shape, security, blast radius.
-- This is the merge-side counterpart to fanning work out across parallel agents — fan-out the work in,
-  tier the review out.
+  it own the low-risk tier. Reserve human judgment for design decisions, data/graph shape, security,
+  blast radius.
+- This is the merge-side counterpart to fanning work out across parallel agents.
 
 ## Enforcement
 

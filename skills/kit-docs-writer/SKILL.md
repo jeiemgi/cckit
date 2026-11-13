@@ -21,8 +21,6 @@ Documentation here is read by people with low software knowledge. It must still 
 complete for experts. The whole skill is one promise: **a beginner can follow the flow, and an
 expert can skip to the part they need — on the same page.**
 
-You write the page so both happen at once.
-
 ## The reader
 
 - The lowest-baseline reader has barely used a terminal. Write so they are never lost.
@@ -63,8 +61,6 @@ Every page follows this order, top to bottom:
 5. **Next-section buttons** — at the bottom, one or two clear buttons to the next step(s) in the
    journey. Never leave the reader at a dead end.
 
-Hold the order. Title, then the one-liner, then the picture, then the words, then the way out.
-
 ### Skeleton
 
 ```mdx
@@ -97,9 +93,9 @@ Hold the order. Title, then the one-liner, then the picture, then the words, the
   sequences, branches, parallel work, lifecycles. Do not draw a diagram that just restates a
   sentence.
 - **Never repetitive.** If two pages share a flow, draw it once on the most relevant page and link
-  to it from the other. The same diagram should not appear twice.
+  to it from the other.
 - **Pair with steps, don't duplicate them.** The diagram shows the shape; a Steps list gives the
-  exact actions. They complement each other — they do not repeat each other word for word.
+  exact actions.
 
 ## Scannability mechanics
 

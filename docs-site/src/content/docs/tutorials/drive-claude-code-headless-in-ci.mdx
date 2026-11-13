@@ -60,8 +60,8 @@ finish.
 
 ## How it works
 
-cckit is agent-operable by design: every verb has a machine-readable mode and the repo ships an
-[`AGENTS.md`](/agents/) contract, so an agent reasons over structured data instead of scraping human
+Every verb accepts `--llm`, each verb that produces a result prints it as JSON or TOON, and the repo
+ships an [`AGENTS.md`](/agents/) contract, so an agent reasons over structured data instead of scraping human
 output. Point the agent at `AGENTS.md` once and it knows the grammar; `--llm` then gives it the board,
 the stack, and the plan as JSON/TOON it can act on without a human in the loop.
 
@@ -72,14 +72,14 @@ context to sub-agents costs fewer tokens.
 
 ## Troubleshooting
 
-**A verb printed human output in CI.** Add `--llm`. Only the reporting verbs take it; if one still
-prints prose, you've hit a verb that doesn't report state (it just acts) — that's expected.
+**A verb printed human output in CI.** Add `--llm`. Every verb accepts it; if one still prints prose,
+you've hit a verb with no JSON result (`init`, `orchestrate`, `autopilot`, `brief`) — that's expected.
 
 **The agent doesn't know the verbs.** It hasn't read the contract. Have it read `AGENTS.md` and
 `cckit.config.json` once at the start of the run.
 
 **Hand-offs are burning tokens.** Pipe the JSON through `cckit encode-context` before handing it to a
-sub-agent; TOON is materially smaller than the equivalent JSON.
+sub-agent; TOON is smaller than the equivalent JSON.
 
 ## Related tutorials
 
@@ -96,8 +96,8 @@ sub-agent; TOON is materially smaller than the equivalent JSON.
     { name: 'Compact context for sub-agents', text: 'Pipe uniform arrays through cckit encode-context to compact them into TOON so hand-offs to sub-agents stay token-lean.' },
   ]}
   faqs={[
-    { q: 'A verb printed human output in CI', a: 'Add --llm. Only reporting verbs take it; a verb that just acts (rather than reporting state) will still print prose, which is expected.' },
+    { q: 'A verb printed human output in CI', a: 'Add --llm. Every verb accepts it; a verb with no JSON result (init, orchestrate, autopilot, brief) will still print prose, which is expected.' },
     { q: "The agent doesn't know the verbs", a: 'It has not read the contract. Have it read AGENTS.md and cckit.config.json once at the start of the run.' },
-    { q: 'Hand-offs are burning tokens', a: 'Pipe the JSON through cckit encode-context before handing it to a sub-agent; TOON is materially smaller than the equivalent JSON.' },
+    { q: 'Hand-offs are burning tokens', a: 'Pipe the JSON through cckit encode-context before handing it to a sub-agent; TOON is smaller than the equivalent JSON.' },
   ]}
 />

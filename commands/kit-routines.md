@@ -10,7 +10,7 @@ Plugin-direct command. Engine at `${CLAUDE_PLUGIN_ROOT}/scripts/kit-routines.sh`
 
 The kit ships a set of **suggested routines** (briefing, board sweep, GC, knowledge-lint,
 kit-wire-check, security-sweep). Each is an OS cron job scoped to this project. Nothing is
-created without your explicit opt-in — the kit suggests, you accept.
+created without your explicit opt-in.
 
 ## Steps
 

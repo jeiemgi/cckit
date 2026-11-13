@@ -9,7 +9,7 @@ import TagRow from '../../components/TagRow.astro';
 
 <TagRow kinds={["concept"]} />
 
-How cckit finds its config, reads what kind of project it is pointed at, and asks before it changes anything — all without a single hardcoded org, repo, or path.
+How cckit finds its config, reads what kind of project it is pointed at, and asks before it changes anything.
 
 ## Config resolution (nearest wins)
 
@@ -68,7 +68,7 @@ happened to start the server. `orchestrate` also starts a tmux server without `K
 its environment and removes one an earlier run left there, so panes opened later on other projects
 do not inherit it.
 
-Two things to know before using it:
+Before using it:
 
 - **The branch must exist on origin.** `cckit start` and `orchestrate` fetch `origin/<base>` before
   cutting the worktree, and the fetch fails on a branch that was never pushed.
@@ -297,7 +297,7 @@ state of every repository that has not run a reviewer yet. Requiring it uncondit
 every captain everywhere the moment you upgraded, so it blocks only when review is required.
 
 <Aside type="caution" title="Absence is not failure — and not a pass either">
-The distinction runs through both gates. Something that ran and went red is a fact you can act on.
+Something that ran and went red is a fact you can act on.
 Nothing having run is a hole where a fact should be. cckit reports them as different verdicts
 because the fix is different: one is "go read the finding", the other is "go produce the evidence".
 
@@ -308,7 +308,7 @@ with no verdict prints that, names both keys that close it, and goes quiet once 
 <Aside type="tip" title="Not the same thing as review-lint">
 [Codified review gates](/review-gates/) are static linters that run inside `scripts/check.sh` —
 patterns earned from past review findings, enforced on every commit. This page's review stage is an
-**agent** reading a diff. They are complementary and neither replaces the other.
+**agent** reading a diff. Neither replaces the other.
 </Aside>
 
 ## The QA lane
@@ -382,7 +382,7 @@ and the ones below it are never consulted:
 
 </Steps>
 
-Rule 3 is the point. A root manifest with no dependencies has nothing to resolve, but pnpm would
+Rule 3 exists because a root manifest with no dependencies has nothing to resolve, but pnpm would
 still write an empty `pnpm-lock.yaml` (`importers: { .: {} }`) — a file that then trips the
 [captain's own lockfile policy floor](#captain-merge-policy) and holds the PR for human review. cckit
 itself is exactly this shape: a published bash CLI with zero dependencies whose only Node project is
@@ -459,11 +459,6 @@ Entries are worktree-**relative** and validated for containment: an absolute pat
 out with `..`, or a symlink pointing outside the tree, is refused with a message and skipped. A
 worktree sits three levels under the primary checkout, so an escaping entry would otherwise run pnpm
 in a shared checkout — writing `node_modules` and a lockfile into another session's working tree.
-</Aside>
-
-<Aside type="tip" title="Nothing is hardcoded">
-The kit carries no project's layout. Both keys are config, and the fallback is a question asked of
-*your* `package.json` — so a repo with real root dependencies still gets its install, unchanged.
 </Aside>
 
 ## PR conventions
@@ -989,7 +984,7 @@ A **profile** is a named agent configuration: which CLI to run, roughly what it 
 permissions, and at which stages.
 
 **cckit never names a model.** A kit that suggests an expensive model in its own config schema
-pushes every user toward spending more, which is the opposite of the point. You spell your own
+pushes every user toward spending more. You spell your own
 flags in `args`; the only cost signal cckit reads is `tier`, and the cheapest profile is what runs
 when nothing else is chosen.
 
@@ -1086,7 +1081,7 @@ Dropping whole sections rather than truncating mid-sentence, and naming the cut 
 it silently, are the same decision: **a partial brief has to read as partial.** A worker handed a
 brief that looks complete acts as though it is.
 
-The order is not arbitrary — the sections the worker cannot reconstruct come first. What the issue
+The sections the worker cannot reconstruct come first. What the issue
 owns is unrecoverable from anywhere else; the standing gotchas are a rule file the worker can open
 on its own.
 

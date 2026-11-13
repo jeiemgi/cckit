@@ -63,11 +63,6 @@ If not, abort and route to `/kit-effort-pr` first.
 
 ## Execution
 
-This skill is a **thin caller** of `effort_close` (`scripts/lib/effort-ops.sh`) — the SAME
-function `cckit effort close` runs. The core owns the pre-close hook, the pre-squash snapshot + trace backstop,
-telemetry capture/judge/sync, the squash-merge, issue closes, board Done, GC, the
-knowledge-ingest hook, and the kit-sync drift check. There is no second implementation here.
-
 The core handles both effort styles (#164): run from the `effort/<N>-…` branch it squash-merges
 the integration PR; run from anywhere else with an explicit `#N`, and if no `effort/<N>` branch
 exists anywhere (a **wave-driven** effort — subs merged as individual task PRs), it verifies every

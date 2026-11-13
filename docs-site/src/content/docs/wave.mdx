@@ -24,17 +24,15 @@ worked in parallel.
 issue, each scoped to its own isolated worktree so the parallel work can't collide. It doesn't run
 anything itself — it hands the brief to the agent, and the agent does the work.
 
-Here's the whole shape, then the steps below walk each part:
-
 - **One wave → many agents.** The brief lists each unblocked issue as a self-contained task. The
   driving agent starts one worker per task — how depends on the runtime, see
   [Dispatch per runtime](#dispatch-per-runtime). They run **at the same time**, in **separate
   worktrees**, each implementing its issue and opening a pull request.
 - **The captain gates and merges.** The *captain* is `cckit watch` — one long-running process that
   steers the whole wave. It checks every open pull request the subagents opened; the clean ones —
-  tests passing, no conflicts — get merged; the rest are reported with exactly what to fix.
+  tests passing, no conflicts — get merged; the rest are reported with what to fix.
 - **Merging unblocks the next wave.** Closing this wave's issues frees the ones that depended on
-  them. Re-run `cckit wave` and it proposes the next set. The board drains itself, wave by wave.
+  them. Re-run `cckit wave` and it proposes the next set.
 
 ## One turn of the loop
 
@@ -73,7 +71,7 @@ Here's the whole shape, then the steps below walk each part:
 <Aside type="tip" title="Why 'captain'?">
 The subagents are a fleet — each one off in its own worktree, opening its own pull request. The
 **captain** is the one process watching over all of them: `cckit watch` polls every PR, merges the
-ones that are ready, and calls out the ones that aren't. One captain, many boats.
+ones that are ready, and calls out the ones that aren't.
 </Aside>
 
 <Aside type="note" title="Why a brief, not a launcher">
@@ -144,9 +142,8 @@ Claude Code or Codex session is part of that test.
 
 ## One writer per branch
 
-Git refuses to check one branch out in two worktrees. That is a narrower guarantee than it sounds:
-it says nothing about two agent processes driving the branch cckit just handed them — a second wave
-launched onto a branch a live worker is still pushing, or a re-run of `orchestrate` over an issue
+Git refuses to check one branch out in two worktrees. That says nothing about two agent processes
+driving the branch cckit just handed them — a second wave launched onto a branch a live worker is still pushing, or a re-run of `orchestrate` over an issue
 whose pane is already open.
 
 So `orchestrate` takes a **lease** on every branch in the wave before it starts a single pane. A

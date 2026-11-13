@@ -13,7 +13,7 @@ cckit is split in two: an agnostic core that does every operation, and per-agent
 
 <Aside type="tip" title="You don't do this by hand">
 This is how cckit is built, not something you set up. Read it to understand how any agent can drive
-cckit — there's nothing here for you to run.
+cckit.
 </Aside>
 
 ## The two layers
@@ -26,8 +26,6 @@ cckit — there's nothing here for you to run.
 | **Adapter** | The thin layer a specific agent uses to discover and call the core | Yes — one per agent |
 
 </div>
-
-Understanding this split is the key to extending cckit to a new agent.
 
 ## The agnostic core
 
@@ -44,7 +42,7 @@ The contract the core exposes to agents lives in [`AGENTS.md`](https://github.co
 
 ## Adapter one — Claude Code
 
-The Claude adapter is the native layer that makes cckit feel built-in inside Claude Code. It is a thin shell over the core — it adds discovery and ergonomics, never a second copy of an operation.
+The Claude adapter is a thin shell over the core inside Claude Code: it adds discovery and ergonomics, never a second copy of an operation.
 
 | Path | Role |
 | --- | --- |
@@ -53,7 +51,7 @@ The Claude adapter is the native layer that makes cckit feel built-in inside Cla
 | `skills/*` | Skills that teach Claude how and when to run each operation |
 | `templates/{agents,hooks,rules,skills,settings}` | What `cckit init` scaffolds into a project's `.claude/` |
 
-Every command and skill ultimately calls a core verb or a `scripts/lib` function. There is one implementation of each operation (in the core); the adapter only routes Claude to it. This is why a fix in the core is a fix for every agent at once.
+Every command and skill calls a core verb or a `scripts/lib` function, so a fix in the core is a fix for every agent at once.
 
 ## Claude and Codex support
 
@@ -67,8 +65,7 @@ is being implemented; shell access alone does not establish behavioral parity.
 `cckit init --adapter <claude|codex|both>` selects what is installed. The default is `claude`.
 The file-by-file comparison — which paths a Claude Code install writes and which a Codex-only
 install writes — is in the
-[install matrix](/install-matrix/#what-cckit-init-writes-claude-code-codex-or-both). What follows
-is how the two are kept in step.
+[install matrix](/install-matrix/#what-cckit-init-writes-claude-code-codex-or-both).
 
 - **One source.** Both instruction files render from `templates/instructions.md.tmpl`, and both
   skill and rule trees from `templates/skills/` and `templates/rules/`. The adapter decides the
@@ -117,7 +114,7 @@ Limits of the Codex adapter today:
 
 Any other agent (Copilot, Antigravity, a custom model) is a future adapter over the same core. An adapter is whatever that agent needs to discover and call the verbs — at minimum, the agent reads `AGENTS.md` and shells out with `--llm`.
 
-No adapter re-implements an operation; they all target the one core contract. Deeper per-agent adapters (native command palettes, richer prompts) are follow-ups. The agnostic CLI contract is the floor every agent already stands on.
+Deeper per-agent adapters (native command palettes, richer prompts) are follow-ups.
 
 ## Why the split
 

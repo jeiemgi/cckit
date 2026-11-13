@@ -6,14 +6,11 @@ allowed-tools: Bash, Read, AskUserQuestion
 
 # /kit-export-training — export sessions as redacted training data
 
-Fine-tuning a local model on your own work only helps if the data leaves the machine clean. This is
-the **consent gate** in front of a dataset builder (`chat-datasets/build_dataset.py`): it lets a
-builder choose which sessions to export, **always** runs the builder with redaction ON (secret /
-key / token / email masking is the builder's default; this command never passes `--no-redact`), and
-prints where it wrote plus a reminder that redaction must be verified before sharing.
-
-Nothing here is automatic — it runs **only when explicitly invoked**, and it never uploads anything.
-The output is plain JSONL on disk; what you do with it is your call.
+This command is the **consent gate** in front of a dataset builder
+(`chat-datasets/build_dataset.py`): it lets a builder choose which sessions to export, **always**
+runs the builder with redaction ON (secret / key / token / email masking is the builder's default;
+this command never passes `--no-redact`), and prints where it wrote plus a reminder that redaction
+must be verified before sharing.
 
 Handler (under `${CLAUDE_PLUGIN_ROOT}`):
 - `scripts/kit-export-training.sh [--builder PATH] [--match KEY ...] [--dirs DIR ...] [--sessions FILE ...] [--out PATH] [--split FRAC] [--final-only] [--drop-narration]`

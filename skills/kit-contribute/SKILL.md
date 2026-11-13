@@ -17,10 +17,10 @@ you *de-parameterize a project artifact back into a reusable kit template*.
 
 ## 1. Resolve upstream
 
-- The kit ships **inside `jeiemgi/cckit`** at `` — there is no
+- The kit ships **inside `jeiemgi/cckit`** — there is no
   standalone `claude-kit` repo. Read `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json` → `repository`
-  for `OWNER/REPO` (default `jeiemgi/cckit`); contributing = a PR to that repo touching
-  `**`. **Confirm `OWNER/REPO` with the user.**
+  for `OWNER/REPO` (default `jeiemgi/cckit`); contributing = a PR to that repo.
+  **Confirm `OWNER/REPO` with the user.**
 - Require GitHub auth: run `gh auth status`. If not logged in, **stop** and tell the user to run
   `gh auth login` first — every step below needs it.
 
@@ -105,7 +105,7 @@ Check permission: `gh repo view OWNER/REPO --json viewerPermission -q .viewerPer
 ## 5. Commit & push
 
 - `git add` the file(s) at the correct kit path.
-- Commit with a clear, scoped message: `feat(agent): add <name>`, `feat(skill): add <name>`,
+- Commit with a scoped message: `feat(agent): add <name>`, `feat(skill): add <name>`,
   `feat(profile): add <name>`.
 - Push the branch to the fork/origin (`git push -u origin <branch>`).
 

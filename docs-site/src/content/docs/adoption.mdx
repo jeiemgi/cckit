@@ -50,17 +50,16 @@ The manifest is cckit's list of which files in your repo it owns and manages. Fi
 
 ## Why issue-driven
 
-Every change starts as an issue — **because that's how real software is built**. The issue says *what*
+Every change starts as an issue. The issue says *what*
 and *why* before any code exists; the branch, the PR, and the review all hang off it, so the work is
 traceable, reviewable, and reversible. (Adoption itself follows this path: one issue → one branch →
 one PR via `cckit start` / `cckit pr`, with the issue recording which steps applied to this repo.)
 
-You don't have to know that theory to get it. cckit makes the issue-first path the path of least
-resistance, so you pick up the discipline of professional software delivery just by using the kit —
-no process to study, no habits to force. The good practice is simply the default.
+`cckit start <issue>` takes an issue number, so the branch, the worktree and the PR each start
+from one.
 
 ## Idempotent and safe
 
-Every step is a no-op when there is nothing to do. The file-touching ones (`init`, `adopt`, `migrate`) are dry-run-previewable and never overwrite content they don't own. Re-running the whole flow is safe.
+Every step is a no-op when there is nothing to do. The file-touching ones (`init`, `adopt`, `migrate`) are dry-run-previewable and never overwrite content they don't own.
 
 

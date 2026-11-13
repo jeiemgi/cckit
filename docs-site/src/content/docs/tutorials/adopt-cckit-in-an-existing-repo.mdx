@@ -22,7 +22,7 @@ import TutorialSchema from '../../../components/TutorialSchema.astro';
 
 **What you'll do:** bring cckit into a project that already has its own layout — nothing above the kit
 is restructured. cckit looks at what's already there, adds its config, and records the kit-shaped
-files the repo already has, then confirms everything's wired up.
+files the repo already has, then shows the board.
 
 ## Steps
 
@@ -58,8 +58,7 @@ files the repo already has, then confirms everything's wired up.
 
 Adoption is deliberately additive. `scan` reads your stack and current state so cckit knows what it's
 joining; `init` writes only its own `cckit.config.json` and `.claude/`; `adopt` records the
-kit-shaped files you already have so cckit manages them in place instead of duplicating them. Because
-everything resolves from the config, cckit adapts to your repo — your repo never adapts to cckit.
+kit-shaped files you already have so cckit manages them in place instead of duplicating them.
 
 <Aside type="tip" title="Additive, not a rewrite">
 No company, framework, or repo layout is baked into cckit. Adoption adds a config and records what
@@ -68,8 +67,10 @@ exists; it never reshapes your project.
 
 ## Troubleshooting
 
-**`adopt` didn't pick up a file I expected.** It records the kit-shaped files it recognizes. If one
-was missed, add it to `cckit.config.json` and re-run `status` to confirm it's tracked.
+**`adopt` didn't pick up a file I expected.** It records only files under `.claude/skills`,
+`.claude/rules`, `.claude/agents`, `.claude/commands`, `.claude/hooks`, `.claude/lib`,
+`.agents/skills` and `.agents/rules`, plus `.claude/statusline.sh` and `.claude/settings.json`.
+`cckit adopt --check` lists the ones not yet recorded and writes nothing.
 
 **I already ran `init` elsewhere.** `init` is idempotent — running it on an already-configured repo
 leaves your existing config in place rather than overwriting it.
@@ -92,7 +93,7 @@ Start one with the [single-issue lifecycle](/tutorials/take-a-github-issue-to-a-
     { name: 'Confirm nothing else moved', text: 'status shows the board, worktrees, and handoff view. Existing files and structure are untouched — only cckit config was added.' },
   ]}
   faqs={[
-    { q: "adopt didn't pick up a file I expected", a: 'It records the kit-shaped files it recognizes. Add the missed file to cckit.config.json and re-run status to confirm it is tracked.' },
+    { q: "adopt didn't pick up a file I expected", a: 'It records only files under the skills, rules, agents, commands, hooks and lib folders of .claude/, .agents/skills and .agents/rules, plus .claude/statusline.sh and .claude/settings.json. cckit adopt --check lists the ones not yet recorded and writes nothing.' },
     { q: 'I already ran init elsewhere', a: 'init is idempotent — on an already-configured repo it leaves your existing config in place rather than overwriting it.' },
     { q: 'The board looks empty', a: 'Expected on a fresh adoption — nothing is in flight yet. Start one with the single-issue lifecycle.' },
   ]}

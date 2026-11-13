@@ -21,7 +21,7 @@ turn.
 
 <Aside type="tip" title="You don't do this by hand">
 cckit plans the waves and isolates the worktrees for you. Read this to understand how parallel work
-stays safe — you don't set any of it up manually.
+stays safe.
 </Aside>
 
 ## Efforts and sub-issues
@@ -37,7 +37,7 @@ drift between the verb and the skill.
 
 The GitHub issue **number** is the canonical key for an effort — the sub-issue links, PRs, labels,
 and dependencies all reference it. But a bare number is hard to remember, so every effort also has a
-memorable **slug** handle: the one that already lives in its `effort/<N>-<slug>` branch.
+**slug** handle: the one that already lives in its `effort/<N>-<slug>` branch.
 
 `cckit effort start`, `pr`, and `close` accept the slug *or* the number interchangeably:
 
@@ -50,7 +50,7 @@ cckit effort close slug-handles
 
 A pure-digits argument is always treated as a number; anything else is resolved to the canonical
 number by matching the `effort/*` branches (local and remote), then the `slug:<slug>` label, then
-the titles of open efforts. An unknown or ambiguous slug fails with a clear error instead of guessing
+the titles of open efforts. An unknown or ambiguous slug fails with an error instead of guessing
 the wrong effort. Listings and titles render efforts as `slug #N`.
 
 <Aside type="note" title="The number stays canonical">
@@ -147,8 +147,7 @@ The slug is a *derived* convenience, not a second source of truth. `--slug` only
 
 ## Only so many efforts at once
 
-Three half-finished efforts finish nothing. `cckit effort start` refuses to start a **new** effort
-once the WIP limit is reached:
+`cckit effort start` refuses to start a **new** effort once the WIP limit is reached:
 
 ```console
 $ cckit effort start 244
@@ -224,7 +223,7 @@ limit and is unaffected.
 <Aside type="tip" title="Working offline">
 `EFFORT_WIP_REMOTE=0` skips the origin query and counts local heads plus your cached
 `refs/remotes` — deterministic, no round-trip, and back to the cache's approximation. If origin is
-simply unreachable the gate does the same on its own: it prints one line saying the count may be
+unreachable the gate does the same on its own: it prints one line saying the count may be
 stale, then **applies the limit to that cached count**. So an ordinary start can still be refused
 offline — a stale `origin/effort/<N>-…` that origin no longer has will keep counting until you
 prune. `--force` (or `KIT_FORCE=1`) starts anyway.
@@ -279,8 +278,8 @@ Some sub-issues depend on others: sub #4 can't start until sub #1 is merged. cck
 
 ### Inside a wave, the most urgent work comes first
 
-A wave can hold a dozen issues, and they are not equally urgent. Within one wave `cckit plan` orders
-them by their `priority:pN` label — **p0 → p1 → p2 → p3**, with unlabeled issues last. Issues that
+Within one wave `cckit plan` orders the issues by their `priority:pN` label —
+**p0 → p1 → p2 → p3**, with unlabeled issues last. Issues that
 share a priority keep the order they already had, and the batch packing follows that order, so the
 p0 work lands in the first batch rather than wherever it happened to fall.
 
@@ -292,8 +291,7 @@ p0 work lands in the first batch rather than wherever it happened to fall.
 
 ### Declaring the order — `cckit effort chain`
 
-Waves are only as good as the blocked-by links they read, and setting those links by hand is
-tedious. `cckit effort chain` declares a whole running order in one command:
+`cckit effort chain` declares a whole running order in one command:
 
 ```bash
 cckit effort chain 241 242 243     # 242 blocked_by 241 · 243 blocked_by 242
@@ -305,13 +303,11 @@ line in its **`## Relations`** section, the human-readable mirror. It is the sam
 `cckit effort new --depends-on` writes, produced by the same formatter, so the two never drift.
 A chained set therefore lands one issue per wave, in the order you gave.
 
-What it does and does not do:
-
 - **Idempotent.** An edge or a `Depends on` line that is already there is reported and skipped, so
   running the same chain twice changes nothing — no duplicate line, no duplicate edge.
 - **Additive.** It only ever *adds* its edge. An issue already blocked by something else keeps that
   blocker and ends up with both.
-- **Validated before anything is written.** A refused chain leaves the board completely untouched.
+- **Validated before anything is written.** A refused chain leaves the board untouched.
   It refuses fewer than two numbers, an argument that is not an issue number, an issue that does not
   exist in the repo, a number that appears twice in the list (`chain 1 2 1` revisits a node), and an
   edge that would close a cycle through dependencies GitHub already holds. A cycle is refused rather
@@ -358,8 +354,8 @@ slot in the cadence.
 
 ## Worktrees keep parallel work apart
 
-Running several issues at once raises one question: how do the changes not overwrite each other?
-The answer is a **worktree** — a separate working copy of the repo on disk, on its own branch.
+A **worktree** — a separate working copy of the repo on disk, on its own branch — keeps the changes
+of issues that run at once from overwriting each other.
 
 <WorktreeIsolation client:only="react" />
 
@@ -368,7 +364,7 @@ only meet again when their pull requests merge into `main` — and because the i
 different files, they merge cleanly.
 
 <Aside type="tip" title="One command">
-`cckit start <issue>` makes the branch and the worktree for you. You don't manage worktrees by hand.
+`cckit start <issue>` makes the branch and the worktree for you.
 </Aside>
 
 For a whole wave, `cckit orchestrate <issues…>` does the same per issue and then starts one agent

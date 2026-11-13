@@ -14,8 +14,7 @@ Repo + board config come from `load_kit_config` (`$KIT_REPO`, `KIT_PROJECTS_V2`)
 `.claude/kit.config.json` from the working directory.
 
 Creates the **parent issue** (the plan) + **N native sub-issues** for one effort. See
-`rules/effort-model.md` for the model and the parent-issue template. GitHub is the single source of
-truth — the parent issue IS the plan (no separate plan file).
+`rules/effort-model.md` for the model and the parent-issue template.
 
 ## Before creating — show the plan
 
@@ -45,10 +44,8 @@ gate: `cckit effort start` checks nothing.
 
 ## Execution
 
-This skill is a **thin caller** of the shared creation core `effort_new`
-(`scripts/lib/effort-ops.sh`) — the SAME function `cckit effort new` runs (effort #98). The core owns
-body composition, the `ctx/kind/priority/role/flow` label set, per-sub title lint, native sub-issue
-links, `blocked_by` edges, and the board add. There is no second implementation here.
+The core `effort_new` owns body composition, the `ctx/kind/priority/role/flow` label set, per-sub
+title lint, native sub-issue links, `blocked_by` edges, and the board add.
 
 ```bash
 source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/kit-config.sh" && load_kit_config
@@ -82,9 +79,8 @@ PARENT_NUM=$(effort_new \
 echo "✓ effort #$PARENT_NUM created — next: /kit-effort-start $PARENT_NUM"
 ```
 
-> The block above is intentionally short: all creation logic lives in `effort_new`. If you need to
-> change what an effort looks like (body, labels, lint, board), change the core — both the skill and
-> the verb move together.
+> To change what an effort looks like (body, labels, lint, board), change the core — both the skill
+> and the verb move together.
 
 ## Output
 

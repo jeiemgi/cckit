@@ -9,7 +9,7 @@ import TagRow from '../../components/TagRow.astro';
 
 <TagRow kinds={["command"]} />
 
-Give an agent a token-efficient, scriptable way to debug a web page — screenshots, accessibility snapshots, console and network logs, [Lighthouse](https://developer.chrome.com/docs/lighthouse/overview) — without bloating its context.
+Give an agent a token-efficient, scriptable way to debug a web page — screenshots, accessibility snapshots, console and network logs, [Lighthouse](https://developer.chrome.com/docs/lighthouse/overview).
 
 `cckit debug` drives [chrome-devtools-axi](https://github.com/kunchenguid/chrome-devtools-axi) (Kun Chen), which runs a self-contained [Chrome DevTools](https://developer.chrome.com/docs/devtools/) bridge and emits [TOON](/agents/#the-verbs-an-agent-uses-most)-encoded output. TOON is a compact text format, so results stay small in an agent's context.
 
@@ -23,7 +23,7 @@ Debugging a web page normally means a person clicking around a browser. An agent
 
 ## Optional + auto-detected
 
-cckit is pure bash; axi needs Node and Chrome. So this is **not a hard dependency** — cckit detects it at call time and degrades cleanly:
+cckit is pure bash; axi needs Node and Chrome. So this is **not a hard dependency** — cckit detects it at call time:
 
 - **Node/npx and Chrome present** → `cckit debug` drives axi.
 - **Otherwise** → it prints how to enable the capability and exits `0`. An unattended run is never hard-failed by a missing optional tool.
@@ -48,7 +48,7 @@ export CCKIT_AXI=<command>
 
 ## Usage
 
-Everything after `cckit debug` is forwarded verbatim to axi, so cckit never has to track axi's evolving subcommand surface:
+Everything after `cckit debug` is forwarded verbatim to axi, so cckit does not track axi's subcommands:
 
 ```bash
 cckit debug <axi-args...>         # passed straight through — see the axi docs for subcommands

@@ -15,7 +15,7 @@ Includes (not limited to):
 - Microcopy and UX writing decisions
 - Accessibility decisions that affect UI (contrast, focus states, tap targets)
 - Responsive behavior and breakpoints
-- "Adjustments" — any tweak to an existing visual/UX surface, however small
+- "Adjustments" — any tweak to an existing screen or component, however small
 
 ## How to route
 
@@ -26,8 +26,8 @@ Includes (not limited to):
 
 ## Why
 
-The Designer is the canonical voice for craft. Centralizing design decisions there keeps the
-system coherent and prevents ad-hoc visual calls that contradict the established direction.
+Design decisions made by one agent stay consistent with each other. An ad-hoc visual call made
+elsewhere can contradict the direction the Designer already set.
 
 ## Exception
 

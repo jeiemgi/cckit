@@ -43,7 +43,7 @@ You are initializing the current project with the **claude-kit** setup. The kit 
    `software` profile and **self-activate** only when their technology is in the project's
    `package.json` — nothing to choose at init.
 
-   Skip questions already answered in `$ARGUMENTS`. Derive sensible defaults (project name =
+   Skip questions already answered in `$ARGUMENTS`. Derive defaults (project name =
    repo name, slug = lowercased name) and only confirm the non-obvious ones.
 
 2. **Run the engine** from the project root:
@@ -69,12 +69,12 @@ You are initializing the current project with the **claude-kit** setup. The kit 
 
    Tip: add `--dry-run` to print the exact scaffold plan (files, hooks, onboarding tools) **without
    writing anything** — useful to confirm the profile first. Offer the user a dry-run preview if the
-   profile/target is at all uncertain.
+   profile/target is uncertain.
 
-3. **Set up external tools — opt-in.** Configure the CLIs the scaffold relies on. This is
-   **opt-in and consent-based**: for each tool, **explain what it is and why it's needed, then
-   install/authenticate only with the user's go-ahead**. Nothing is forced; a declined tool just
-   leaves the matching features dormant (they don't error) and can be re-run anytime.
+3. **Set up external tools — opt-in.** Configure the CLIs the scaffold relies on. For each tool,
+   **explain what it is and why it's needed, then install/authenticate only with the user's
+   go-ahead**. A declined tool leaves the matching features dormant (they don't error) and can be
+   re-run anytime.
 
    **GitHub CLI (`gh`)** — backs the whole task/PR workflow (issues, PRs, labels, milestones).
    - Detect: `gh auth status`. If not authenticated, explain every `task-*` skill needs it and,

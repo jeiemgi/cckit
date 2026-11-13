@@ -20,9 +20,8 @@ Answer one question: **given everything the kit can already do, what is the high
 effort?** This wraps the `cckit plan-next` verb (the engine — never re-author its logic here;
 kit-engine-boundary) and turns its proposals into a scoped effort via `/kit-effort-new`.
 
-The verb introspects the CURRENT capability surface at runtime, so the plan is always consistent
-with what ships today — planning pre-grounded in current docs/skills/rules means the executing agent
-burns fewer tokens rediscovering context.
+The verb reads the CURRENT skills, commands, rules and docs at runtime, so the plan reflects what
+ships today.
 
 ## CRITICAL — context-anxiety rule
 
@@ -44,7 +43,7 @@ if you need to reason over the proposals structurally — but keep that output o
 context.
 
 Run it from the cckit repo for a full inventory, or from a host project where the kit is installed —
-there it degrades gracefully to whatever capability dirs exist (host docs only) and never crashes.
+there it inventories whatever capability dirs exist (host docs only).
 
 ## 2. Choose with the human
 

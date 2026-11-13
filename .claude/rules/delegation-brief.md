@@ -67,9 +67,6 @@ The constraints, so this block is self-sufficient when the skill file is not in 
   fires, the fix is the underlying gap — verify the claim, or make the decision. Rewording it into
   fluent prose is the failure mode, not the fix.
 
-`communication-style.md` states the mandate; this block is what carries it into a delegated agent's
-context.
-
 ## Gate commands (cckit)
 
 - **`bash scripts/check.sh` is the whole gate** and the bar for a PR: `bash -n` over every script in

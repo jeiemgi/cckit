@@ -1,6 +1,6 @@
 # Smart skill-gap detection ({{PROJECT_NAME}})
 
-Surface a missing capability **before** starting work — but only when it's genuinely non-obvious, and
+Surface a missing capability **before** starting work — but only when it's non-obvious, and
 without nagging. Prompt for the **special and new**; stay silent on the **routine**.
 
 ## When to prompt (all must hold)
@@ -41,8 +41,3 @@ Record outcomes in `{{CONFIG_REL}}` under `skillPrompts`:
 - A `gap-key` is a short, stable slug for the capability (e.g. `gsap-animation`, `stripe-billing`,
   `playwright-e2e`).
 - Ask **at most once per gap per project**. A declined gap stays declined unless the user reopens it.
-
-## Principle
-
-One good question up front beats five mid-task interruptions. Detecting a real, non-obvious capability
-gap early — and remembering the answer — is the whole point.

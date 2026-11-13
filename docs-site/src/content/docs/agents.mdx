@@ -11,7 +11,7 @@ import TagRow from '../../components/TagRow.astro';
 
 Drive the whole GitHub work lifecycle from any agent that can run a shell — read the board, start an issue, open a pull request — all in machine-readable output.
 
-cckit is agent-agnostic. Claude Code is first-class (skills and slash commands), but the contract is a plain CLI. Any agent that can run a shell and parse text can run it. The full contract lives in `AGENTS.md` at the repo root.
+cckit is agent-agnostic. Claude Code is first-class (skills and slash commands), but the contract is a plain CLI. The full contract lives in `AGENTS.md` at the repo root.
 
 ## The one rule that makes it agent-friendly
 
@@ -19,15 +19,13 @@ Every verb takes `--llm`. Append it to any command and the verb switches from pr
 
 - **Uniform results come back as TOON.** TOON is a compact text format for uniform lists — the board, the wave plan, the next-issue set. It is smaller than JSON, so it costs fewer tokens in an agent's context.
 - **Single-result verbs come back as one JSON object** on stdout (the pretty text goes to stderr).
-- **Human output is markdown**, rendered through the `cckit render` seam — `glow` on a terminal, verbatim text when piped. So the same verb reads well to a person and parses cleanly to a machine.
+- **Human output is markdown**, rendered through `cckit render` — `glow` on a terminal, verbatim text when piped.
 
 <Aside type="note" title="New here? What an agent is">
 An agent is a program that runs commands on your behalf — Claude Code is one. cckit does not contain a model. It hands the agent commands to run, and the agent runs them. That is why cckit works with any agent: it only ever speaks shell.
 </Aside>
 
 ## Ground rules
-
-These five rules keep an agent's work safe and repeatable.
 
 - **Read state before acting.** `cckit sync --llm` returns the board. Decide from the data, never guess.
 - **One issue = one branch = one worktree = one PR.** `cckit start <issue>` creates the isolated worktree; do all the work there; `cckit pr <issue>` opens the pull request. Never commit to the base branch.
@@ -70,9 +68,7 @@ object — there's nothing to tabulate.
 | Close the issue | `cckit close <issue> "<summary>"` | JSON (one object) |
 | Render markdown to a terminal | `cckit render` | — |
 
-So the loop is **read in TOON, act in JSON**: pull state cheaply as TOON, then fire the one-shot
-action verbs. An agent that stays on the `--llm` reads spends a fraction of the tokens that scraping
-human output or re-fetching JSON would cost.
+So the loop is **read in TOON, act in JSON**.
 
 
 ## Specialist agents, per runtime
