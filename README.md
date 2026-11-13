@@ -340,6 +340,7 @@ cckit qa verdict pass      # record the verdict against the reviewed commit (a p
 cckit qa verdict fail --note "what is wrong"   # also mails the notes to the builder's branch
 cckit qa stop              # stop the stack; exit 0 only when nothing listens on the lane's ports
                            #   (a listener the lane did not launch is left running; --force stops it)
+cckit qa lanes             # read-only table of every lane: branch, ports, up, verdict, worktree
 ```
 
 Set `captain.mergePolicy.requireQa` and `cckit watch` holds a PR until a pass is recorded against

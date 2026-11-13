@@ -198,6 +198,47 @@ Recording one does four things:
 A verdict belongs to one commit. A push after it reads `stale` with no extra step — the recorded
 commit no longer matches the head.
 
+## List the lanes — `cckit qa lanes`
+
+```sh
+cckit qa lanes [--llm]
+```
+
+One row per lane, read from what the other verbs recorded. It takes no argument, launches and
+stops nothing, writes no file and no event, and calls neither `gh` nor `curl`.
+
+```text
+LANE  BRANCH                 PORTS                        UP       VERDICT  WORKTREE
+311   feat/311-billing-form  WEB_PORT=3030 API_PORT=4030  up       pass     /repo/.claude/worktrees/feat+311-billing-form
+312   fix/312-save-button    WEB_PORT=3050 API_PORT=4050  down     stale    /repo/.claude/worktrees/fix+312-save-button
+314   -                      -                            unknown  unknown  -
+```
+
+A lane is listed when any of these exists: a row in the port-slot ledger whose worktree is still
+on disk (`cckit start` writes it), a launch record (`cckit qa up`), or a verdict
+(`cckit qa verdict`).
+
+| Column | What it is |
+| --- | --- |
+| `LANE` | The issue number. |
+| `BRANCH` | The local branch carrying that number; `-` when there is none. |
+| `PORTS` | The ports the lane was launched with. With no launch record, the ports it would get from `qa.ports` and its slot; `-` with no `qa` block or no slot. |
+| `UP` | `up` when every port has a listener, `partial` when some do, `down` when none does, `unknown` with no port to check or neither `lsof` nor `ss`. |
+| `VERDICT` | `pass` · `fail` · `stale` · `none`, read as [above](#record-the-verdict--cckit-qa-verdict) against the local tip of the lane's branch. `unknown` when a verdict exists and no local branch does. |
+| `WORKTREE` | Where the branch is checked out, else the path the ledger recorded; `-` when neither exists. |
+
+- `UP` reports a listener, whoever started it. It does not run the readiness probes: `cckit qa
+  ready --lane <n>` answers whether the stack is usable.
+- `VERDICT` is compared with the local branch tip and makes no GitHub call. `cckit qa verdict
+  --lane <n>` also falls back to the PR's head.
+- Exit `0` with or without lanes, `2` on any argument, `3` without `jq`. With no lane the table is
+  empty and one line on stderr says so.
+- `--llm` prints a JSON array, `[]` with no lane:
+
+  ```json
+  [{"lane":"311","branch":"feat/311-billing-form","worktree":"/repo/.claude/worktrees/feat+311-billing-form","ports":{"WEB_PORT":3030,"API_PORT":4030},"up":"up","verdict":"pass"}]
+  ```
+
 ## Stop the lane — `cckit qa stop`
 
 ```sh
@@ -285,8 +326,9 @@ Each step appends one line to `kit-events.jsonl`:
 
 - **Signing in.** `qa.credentialEnv` is recorded, and no verb reads it. `cckit qa open` lands on
   the route; a route behind a login shows the app's sign-in page.
-- **A panel of lanes.** There is no screen listing the lanes of a wave. Each lane is driven with
-  `--lane <n>`.
+- **Acting on a lane from the list.** `cckit qa lanes` is a read-only table. There is no screen
+  with buttons to open or judge a lane, and no wait screen before the first lane arrives; each
+  lane is driven with `--lane <n>`.
 
 ## Links to learn more
 
