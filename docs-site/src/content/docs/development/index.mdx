@@ -1,0 +1,160 @@
+---
+title: How one change is built
+description: The path of one piece of work from issue to merged code, why each piece gets its own worktree, and which agents do the building.
+---
+
+import { CardGrid, LinkCard, Steps, Aside } from '@astrojs/starlight/components';
+import GitHubCycle from '../../../components/diagrams/GitHubCycle';
+import WorktreeIsolation from '../../../components/diagrams/WorktreeIsolation';
+
+Building is the part of the process where several agents touch the same repository at the same
+time. Two of them editing one folder overwrite each other's files, and git has no lock that stops
+it. A change made straight on the shared branch reaches everyone before anyone has looked at it.
+
+An agency avoids both with one habit: every piece of work gets its own copy of the code, and it
+comes back as a pull request that someone reviews. cckit runs that habit for you. This area shows
+how one change travels from an issue to a pull request, and how many travel at once without
+colliding.
+
+## The path of one change
+
+<GitHubCycle client:only="react" />
+
+Read it left to right. An **issue** says what to do. A **branch** gives the work a private place
+to happen. The work becomes a **pull request**, and **review** either merges it or sends it back.
+
+<Steps>
+
+1. **Issue.** A short note of one thing to do. Its number follows the work the whole way through.
+
+2. **Start.** `cckit start <issue>` makes a branch and a worktree for that issue, cut from a
+   freshly fetched base branch. The base branch is the shared branch every change starts from and
+   returns to, for example `develop`. A worktree is a second folder on your disk holding its own copy of
+   the code, so this work cannot disturb anyone else's.
+
+3. **Work.** The agent makes the change inside that folder and runs the project's checks until
+   they pass.
+
+4. **Pull request.** `cckit pr <issue> "<summary>"` commits, pushes and opens the request. It
+   links the request to the issue with a `Closes` line.
+
+5. **Review.** Automated checks run, and a person or an agent looks at the change. If it is good
+   it merges into the base branch. If not, it comes back and the work returns to step 3. How that
+   decision is made is the [Review](/review/) area; merging and tidying up is
+   [Ship](/ship/merge-and-close/).
+
+</Steps>
+
+<Aside type="tip" title="You do not type these by hand">
+Your agent runs each step when you ask in the chat. Read this page to know what is happening behind the commands.
+</Aside>
+
+## Why every change gets its own copy
+
+One issue, one branch, one worktree, one pull request.
+
+<WorktreeIsolation client:only="react" />
+
+The changes only meet again when their pull requests merge. The rule buys three things:
+
+- **Nothing collides.** Each agent writes in its own folder, so several can build at once on
+  one machine.
+- **Nothing lands unseen.** The base branch only changes through a pull request. A hook blocks an
+  agent's commit made directly on the base branch.
+- **Everything is traceable.** The branch name, the pull request and the board all carry the
+  issue number, so you can go from a line of merged code back to the request that asked for it.
+
+One exception is deliberate. An [effort](/project-management/efforts-and-waves/) is a larger goal
+with several sub-issues, and it ships as one branch and one pull request for all of them.
+
+What still needs care when several sessions share one repository is on
+[Many sessions, one repository](/development/many-sessions/).
+
+## Who does the building
+
+The agents that write code come from the profile you chose at setup. In a `software` project the
+builders are the backend, frontend and devops agents and the tech lead; the `minimal` and
+`automation` profiles install a generalist instead. What each role owns is on
+[The team](/philosophy/the-team/#the-eight-roles-of-a-software-project).
+
+Three other roles shape a build without writing it:
+
+- **The designer** answers every visual question before the frontend agent writes it. See
+  [Design](/design/).
+- **The captain** drives a batch of approved work to merged. It is a role, not an agent you
+  install: [Tech lead, PM and captain](/project-management/roles/#the-captain).
+- **You** pick the work, approve the plan and decide what merges.
+
+## Which tools plug in
+
+Four optional tools can help an agent build: see [Integrations](/integrations/). You need none of
+them for your first change. cckit adopts them and writes none of them.
+
+<details>
+<summary>The four tools and how you reach each one</summary>
+
+| Tool | What it gives the agent | How you reach it |
+| --- | --- | --- |
+| chrome-devtools-axi | screenshots, console and network logs of a web page | [`cckit debug`](/development/browser-debug/) |
+| Graft | an index that answers where code lives and what calls it | [`cckit add graft`](/development/code-graph/) |
+| mlx-lm | a local model that shortens a long file before it is read | [`cckit digest`](/development/local-model-digest/) |
+| tmux or Herdr | one terminal pane per parallel agent | [`cckit orchestrate`](/development/waves/) |
+
+mlx-lm runs on Apple silicon only.
+
+</details>
+
+The agent itself is Claude Code or Codex. GitHub is reached through the `gh` command. The full
+list of optional tools, with who makes each one, is on [Integrations](/integrations/).
+
+## The commands
+
+Each row is a sentence you can say to your agent in the chat, and the command your agent runs for it.
+
+For one change:
+
+<div data-table="grid">
+
+| What you say | What runs |
+| ---- | ------- |
+| "What is on the board?" | `cckit sync` |
+| "What should I work on next?" | `cckit next` |
+| "Start the next issue." | `cckit start <issue>` |
+| "Open the pull request." | `cckit pr <issue> "<summary>"` |
+| "That issue needs no change, close it." | `cckit close <issue> "<reason>"` |
+
+</div>
+
+For many at once:
+
+<div data-table="grid">
+
+| What you say | What runs |
+| ---- | ------- |
+| "What can run in parallel right now?" | `cckit wave` |
+| "Run these issues in parallel." | `cckit orchestrate <issues…>` |
+| "Check the finished pull requests and merge the clean ones." | `cckit watch --merge` |
+| "Which session is working on which issue?" | `cckit claims` |
+
+</div>
+
+Every flag is in the [CLI reference](/cli-reference/).
+
+## Guides
+
+Start with the first one. It is the path on this page, run for real.
+
+<CardGrid>
+  <LinkCard title="Take an issue to merged" href="/development/issue-to-merged-pr/" description="One issue through start, change, pull request, close and cleanup." />
+  <LinkCard title="Run work in parallel waves" href="/development/waves/" description="How a batch of unblocked issues is handed to parallel agents." />
+  <LinkCard title="Many sessions, one repository" href="/development/many-sessions/" description="Three habits that keep several sessions on one machine from colliding." />
+  <LinkCard title="Let the agent see the page" href="/development/browser-debug/" description="Give an agent screenshots and logs of a running page." />
+  <LinkCard title="More development guides" href="/development/more-guides/" description="Unattended runs, CI, code search, local models, hooks, skills and integrations." />
+</CardGrid>
+
+## The pull request carries its own proof
+
+A pull request should show that the checks passed, not claim it. The agent attaches the output of
+the checks to the pull request as comments, one per check, so a reviewer does not run them again.
+The helper behind it and its settings are under
+[Evidence on the pull request](/config-and-permissions/#evidence-on-the-pull-request).

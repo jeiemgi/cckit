@@ -1,0 +1,161 @@
+---
+title: "Tech lead, PM and captain"
+description: "What the project manager agent, the tech lead agent and the captain each own, and which decisions stay with the human owner."
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import Chat from '../../../components/Chat.astro';
+
+When agents do the building, the open question on a team is who decides. An agent that plans,
+builds, approves and merges its own work has nobody checking it. An agent that asks a person
+before every step is no faster than the person. A team needs the decisions divided up in advance,
+so each one has a single owner and the person is asked only what a person has to answer.
+
+cckit divides them among one person and three roles.
+
+## The owner: a person
+
+The owner is whoever is responsible for the project. The owner:
+
+- approves a plan before it runs. An approved plan is an explicit instruction to run named
+  efforts, an approved `cckit effort plan`, or a wave the owner told the captain to drive. A plan
+  an agent proposed and nobody approved is not one;
+- confirms before the project manager, designer or tech lead agent files or closes an issue. One
+  skill is the exception: `/kit-security-sweep` files an issue for every finding without asking;
+- decides the changes no agent merges alone (listed under the captain, below);
+- merges, unless an approved plan gives that to the captain.
+
+## The project manager agent
+
+**What it is for:** answering "where does the work stand?" from GitHub and not from memory, and
+turning newly found scope into issues.
+
+It ships in every profile, as `.claude/agents/pm/AGENT.md` in a Claude Code project. The session
+calls it when someone asks for status, for the next plan, for what is blocked, or for an issue to
+be drafted.
+
+<Chat
+  title="asking the project manager agent where the Bakery site stands"
+  say="Where does the work on the bakery site stand?"
+  ran="cckit status"
+  output={[
+    "…",
+    "## Light tasks",
+    "",
+    "review: 2   doing: 0   todo: 0   draft: 0   shared: 0   done: 2",
+    "",
+    "| task | state | title | what it needs |",
+    "| --- | --- | --- | --- |",
+    "| `tb643` | **review** | Rebuild the bakery landing page | waiting for review: its pull request is open from light/tb643-rebuild-the-bakery-landing-page |",
+    "| `tdf42` | **review** | Menu page with the full list of bakes | waiting for review: its pull request is open from light/tdf42-menu-page-with-the-full-list-of-bakes |",
+    "…",
+  ]}
+  means="The state is read from the repository and GitHub every time, not from memory."
+>
+  Two tasks are done. Two are waiting for your review: the landing page rebuild and the menu page.
+  The next action is to review those two pull requests.
+</Chat>
+
+What it does:
+
+- **Reports the state of the work.** It re-reads GitHub every time and adds a short summary: what
+  changed, the critical blockers, the recommended next action.
+- **Drafts issues.** It shows the title, role, kind, priority and body, and files the issue only
+  after you confirm. Work that only makes sense together, such as a chain of database migrations,
+  is drafted as one issue and one pull request.
+- **Finds blockers.** It follows the "blocked by" links of the urgent issues and says which are
+  ready to unblock.
+- **Checks milestone health:** percent complete, items idle for more than 14 days, items with no
+  acceptance criteria.
+- **Repairs links** between plan files and their issues, in a project that keeps plan files.
+
+What it does not do: file or close an issue without confirmation, or make a design or technical
+decision. Those go to the designer or the tech lead.
+
+It works through the skills `kit-task-sync`, `kit-task-new`, `kit-task-close` and
+`morning-briefing`.
+
+## The tech lead agent
+
+**What it is for:** the parts of the project every other role depends on.
+
+It ships in the `software` profile only. The session calls it when the build, the toolchain or the
+structure of the project has to change.
+
+What it owns:
+
+- build and tooling configuration, dependencies and scripts;
+- adding a package or a module to the workspace;
+- architecture decision records, written as `decisions/adr-NNN-slug.md` with four sections:
+  Status, Context, Decision, Consequences;
+- CI workflows under `.github/workflows/`;
+- lint and type-check rules, and fixing build errors.
+
+What it does not do: write product feature code (that goes to the backend and frontend agents),
+make design decisions, or file issues without confirmation. It runs the build before and after a
+change, and marks a breaking change as such.
+
+The tech lead proposes a workflow or dependency change. Merging one still stops for the owner.
+
+## The captain
+
+**What it is for:** keeping an approved plan moving without a person watching each pull request.
+
+<Aside type="caution" title="The captain is not an agent you install">
+There is no captain file under `templates/agents/` and none in your project's `.claude/agents/`.
+The captain is whoever is driving the plan at that moment. It is one of three things.
+</Aside>
+
+1. **`cckit watch --merge`**: a process that checks every open pull request, squash-merges the
+   ones that pass, and reports the rest with what to fix. `cckit watch --merge --loop` keeps going
+   until the wave is done.
+2. **The `kit-autopilot` skill** in Claude Code, which selects the planned work, launches it under
+   a cap and plays the captain between waves.
+3. **An orchestrating session**: the Claude Code or Codex session you are talking to, when you
+   have told it to drive a wave.
+
+On an approved plan the captain does not stop to ask "merge or review?" for a merge the plan
+already covers. It builds a wave, merges each pull request once its checks pass, closes the
+issues, cleans up, starts the next wave, and reports at the end.
+
+It stops and asks the owner in four cases only:
+
+- a merge conflict it cannot resolve safely;
+- a change that always needs a person and that the plan did not call for: a new dependency or a
+  lockfile change, an edit to authentication, secrets or security code, an edit under
+  `.github/workflows/`;
+- a question the approved scope does not answer;
+- a destructive or irreversible step outside the plan.
+
+Failing checks are not on that list. The captain does not merge a failing pull request and does
+not ask about it: it fixes the cause or reports the failure.
+
+What `cckit watch --merge` may merge is configuration, under `captain.mergePolicy`. By default it
+refuses a pull request that touches a workflow file, a lockfile or a security-sensitive path, or
+that carries a `hold` label. These refusals are the policy floors. They are on by default, and
+`captain.mergePolicy.floors: false` (or `KIT_CAPTAIN_FLOORS=0` for one command) switches all of
+them off together, the `hold` label included. The captain can also be told to wait for an agent review or for a
+person's QA pass. See
+[Captain merge policy](/config-and-permissions/#captain-merge-policy) for the keys, and
+[Run a wave](/development/waves/) for the captain at work.
+
+## Who decides what
+
+| Decision | Who decides |
+| --- | --- |
+| What gets built, and in what order | The owner, from what the project manager agent drafts |
+| Whether a plan runs | The owner |
+| How the build, the toolchain and CI are set up | The tech lead agent proposes; the owner merges |
+| Whether a pull request inside an approved plan merges | The captain, within the merge policy |
+| Whether a dependency, security or workflow change merges | The owner |
+| Whether an issue is filed or closed | The owner confirms; an approved plan covers its own closes, and `/kit-security-sweep` files its findings directly |
+
+## Limits
+
+- The tech lead agent is in the `software` profile only. The `content`, `marketing`, `research`,
+  `automation` and `minimal` profiles ship the project manager agent without it.
+- Under Codex the same roles are written as `.codex/agents/<role>.toml`. A Claude Code tool
+  allowlist does not translate and is carried there as a comment. See
+  [Specialist agents, per runtime](/agents/#specialist-agents-per-runtime).
+- The other roles in a software project (designer, devops, backend, frontend, QA, security) are
+  described in [The team: you and the agents](/philosophy/the-team/).

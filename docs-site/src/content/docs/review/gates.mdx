@@ -1,0 +1,199 @@
+---
+title: Turn repeated review findings into checks
+description: Three lint scripts you add to your gate command, so a defect a reviewer reported once, an oversized skill description or an oversized instruction file fails a check from then on.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
+
+A reviewer, human or AI, finds the same kinds of defect again and again: a code fence with no
+language, a pattern the project agreed to stop using. Each finding is written in a pull-request
+thread, fixed once, and forgotten. The next pull request brings it back and somebody has to find it
+again.
+
+The team's answer is to move a finding out of the thread and into the gate. Once a defect is a
+rule, the gate fails on it and no reviewer has to notice it a second time. The same idea covers two
+costs no reviewer sees at all: the text every session loads before any work starts.
+
+<Aside type="note" title="These are not the gate itself">
+Your gate is the one command that proves a change is sound: your tests, your type check, your
+linters. [Choose your gate command](/review/gate-command/) covers it. The three scripts on this
+page are checks you add to that command.
+</Aside>
+
+## What you get
+
+| Script | What it stops from coming back |
+| --- | --- |
+| `scripts/review-lint.sh` | A mechanical defect a reviewer already reported once |
+| `scripts/skill-frontmatter-lint.sh` | A skill description that grows and is paid for in every session |
+| `scripts/instruction-budget-lint.sh` | `CLAUDE.md` and the rules growing past what a session loads well |
+
+`cckit init` copies the three into your project and records, for each, the defects the project
+already has. That record is the **baseline**, and each script is a ratchet over it: what is in
+the baseline is allowed to stay, nothing in it may grow, and nothing new may be added. A new project therefore starts green, and adding a rule never
+forces a repo-wide fix.
+
+## Use them
+
+### 1. See where the project stands
+
+<Chat
+  title="seeing what the three checks find on the Bakery site"
+  say="Show me what the three review checks find on the Bakery site. Don't fail anything yet."
+  ran={[
+    "scripts/review-lint.sh --report",
+    "scripts/skill-frontmatter-lint.sh --report",
+    "scripts/instruction-budget-lint.sh --report",
+  ]}
+  means="Each gate has a report mode that never fails, so this is safe to run at any time."
+>
+  I ran the report mode of all three. A new project starts green: what each report lists is the
+  baseline, and the gates only fail on something new.
+</Chat>
+
+### 2. Run the gates
+
+<Chat
+  title="running all three checks on the Bakery site"
+  say="Run the three checks the way the gate would."
+  ran="scripts/review-lint.sh && scripts/skill-frontmatter-lint.sh && scripts/instruction-budget-lint.sh"
+  means="With no flag each one exits non-zero on a new or grown hit."
+>
+  All three exited 0, so nothing new and nothing grown.
+</Chat>
+
+### 3. Add them to your gate command
+
+<Chat
+  title="adding the three checks to the Bakery gate"
+  say="Add the three checks to the Bakery site's gate, so they run before every push and in CI."
+  ran="jq .prePush .claude/kit.config.json"
+  means="The gate is the command from Choose your gate command, with the three scripts joined on."
+>
+  I added the three scripts to `prePush.command` in the project config and read it back. A push now
+  runs the build, the linters and the three checks first. CI runs them once its workflow uses the
+  same command.
+</Chat>
+
+### 4. When a reviewer repeats a finding, write the rule
+
+<Chat
+  title="turning a repeated finding into a rule on the Bakery site"
+  say="The reviewer keeps finding images with no alt text on the Bakery site. Make that a rule so the gate fails on it."
+  ran="scripts/review-lint.sh --rule <ID>"
+  means="The rule is a new block in scripts/review-rules.conf. Running --rule prints every hit with context."
+>
+  I added a block to `scripts/review-rules.conf` and ran the rule on its own. Every hit it found is
+  listed with its context.
+</Chat>
+
+**How to check it worked:** run `scripts/review-lint.sh --rule <ID>` for the rule you added. It
+prints every hit with context. Then run the gate: it passes on the baseline and fails when you add
+one more hit.
+
+The rest of this page is the detail of each script. The baseline file format, how baselines are
+seeded, and a fourth lint that checks only cckit's own templates are in
+[Lint gates: baselines](/config-and-permissions/#lint-gates-baselines).
+
+## review-lint — findings that became a gate
+
+```bash
+scripts/review-lint.sh                 # the gate: fails on new or grown hits
+scripts/review-lint.sh --report        # every rule's current hit count; never fails
+scripts/review-lint.sh --rule <ID>     # every hit for one rule, with context
+scripts/review-lint.sh --update        # re-baseline from current hits
+```
+
+Rules live in `scripts/review-rules.conf`, one block per rule, each carrying the PR it was earned
+from. A rule is either a per-line `pattern` (regex) or a stateful `awk` program for findings that
+need to see more than one line — fence parity, for instance, where an unlabelled fence is a defect
+only when it *opens* a block.
+
+<Aside type="caution" title="Only the mechanical slice belongs here">
+A finding maps to a rule when it is wrong every time it appears, regardless of intent. Doc-vs-code
+drift, architectural contracts, and "is this the right abstraction" stay with the reviewer. A noisy
+gate is worse than no gate.
+</Aside>
+
+The [`gate-and-review`](/rules/#gate-and-review) rule is the other half: a finding that does not
+become a lint rule is still fixed or rebutted on its thread before the PR merges.
+
+## skill-frontmatter-lint — the context budget
+
+Claude Code concatenates a skill's `description` and `when_to_use` into the always-loaded skill
+listing. Both sit in every session's context whether or not the skill is ever invoked — only the
+`SKILL.md` *body* is lazy. Unbudgeted, those fields grow into second bodies: rent paid on every turn,
+and past the harness cap the tail is silently truncated, so an over-long field costs tokens while
+delivering nothing.
+
+```bash
+scripts/skill-frontmatter-lint.sh              # the gate
+scripts/skill-frontmatter-lint.sh --report     # every skill's cost, sorted; never fails
+scripts/skill-frontmatter-lint.sh --update     # re-baseline from current sizes
+```
+
+The default budget is **500 bytes** per skill (`KIT_SKILL_LISTING_BUDGET`). Both `skills/` and
+`.claude/skills/` are measured, so the lint works in the kit's own layout and in the one `cckit init`
+scaffolds.
+
+<Aside type="note" title="Bytes, not characters — the locale is pinned">
+`${#s}` counts characters under a UTF-8 locale and bytes under `C`/`POSIX`, and skill descriptions
+are full of em-dashes and `·`. A baseline generated under one and checked under the other makes the
+ratchet fire on skills nobody touched — this repo's UTF-8 baseline reported 15 false "grown" skills
+under `LC_ALL=C`, and CI only looked green because `ubuntu-latest` happens to export `LANG=C.UTF-8`.
+
+The lint therefore pins `LC_ALL=C` and measures bytes. Every environment can produce a byte count,
+and no locale has to be installed to reproduce a number. An em-dash costs the three bytes it occupies.
+</Aside>
+
+## instruction-budget-lint — what every session loads
+
+Claude Code loads every `CLAUDE.md`, and every `.claude/rules/*.md` that has no `paths:`
+frontmatter, into every session whatever the task. It warns at startup once those files pass a
+combined 150k characters; over the limit they still load, and its docs say adherence drops. A
+project adds rules one decision at a time, so the resident set grows with no single commit to blame.
+
+A rule that covers one kind of file opts out of the resident set by declaring `paths:` in its
+frontmatter. [Resident and path-scoped rules](/rules/#resident-and-path-scoped-rules) shows the
+form and lists which of the rules cckit ships are path-scoped.
+
+```bash
+scripts/instruction-budget-lint.sh              # the gate
+scripts/instruction-budget-lint.sh --report     # every file's bytes and lines, resident and path-scoped; never fails
+scripts/instruction-budget-lint.sh --summary    # one line: the resident total and the three largest files
+scripts/instruction-budget-lint.sh --update     # re-baseline from current sizes
+```
+
+The gate holds two limits, both in the baseline when exceeded:
+
+| Limit | Default | Override | Baseline row |
+| --- | --- | --- | --- |
+| Resident total — `CLAUDE.md`, `CLAUDE.local.md`, `.claude/CLAUDE.md`, and every rule without `paths:` | 150000 bytes | `KIT_INSTRUCTION_BUDGET` | `@resident <bytes>` |
+| Any one instruction file, resident or path-scoped | 200 lines | `KIT_INSTRUCTION_MAX_LINES` | `<path> <lines>` |
+
+`--report` prints the path-scoped rules as their own block with a byte total: what those rules would
+add to every session if their `paths:` were removed. `cckit status` and `cckit doctor` print the
+`--summary` line, so the number is seen before the startup warning is.
+
+Two ways to bring the resident total down, and they pair:
+
+- **Scope it.** Give a rule about one surface a `paths:` list —
+  [how, and which rules not to scope](/rules/#resident-and-path-scoped-rules).
+- **Split it.** Keep a short rule resident and move the reference material to a `knowledge/` doc the
+  rule points at.
+
+<Aside type="caution" title="What the number leaves out">
+The lint measures bytes with `LC_ALL=C`, for the reason in the note above; bytes are never fewer
+than characters, so it reaches the limit no later than Claude Code does. It does not follow `@path`
+imports inside a `CLAUDE.md`, and it does not count `CLAUDE.md` files in subdirectories or in
+`~/.claude`. `paths:` is detected as a top-level frontmatter key on line 1's block; the globs are
+not evaluated.
+</Aside>
+
+## All three self-disable
+
+`review-lint` exits 0 when there is no rule table; `skill-frontmatter-lint` exits 0 when there is no
+`skills/` or `.claude/skills/` directory; `instruction-budget-lint` exits 0 when there is no
+`CLAUDE.md` and no `.claude/rules/`. Shipping them to every project is safe.

@@ -1,129 +1,186 @@
 ---
-title: Planea y lleva una campaña
-description: Convierte un objetivo de marketing en un plan de campaña, divídelo en piezas de trabajo y lleva cada pieza hasta la aprobación.
+title: Varias piezas, un objetivo
+description: "Delega una campaña: un objetivo se vuelve un plan que apruebas, las piezas se delegan bajo ese plan y cada pieza vuelve como un enlace de revisión."
+tutorial:
+  job: delegar una campaña de varias piezas bajo un mismo objetivo
+  difficulty: intermediate
+  time: "20 min"
+  prerequisites:
+    - { text: "Tu voz de marca está definida", link: "voz de marca", href: "/es/marketing/brand-voice/" }
+    - { text: "Ya llevaste una pieza hasta la aprobación", link: "una pieza", href: "/es/marketing/your-first-piece/" }
+  ogTag: Marketing
+  related: [marketing/your-first-piece, marketing/review-and-approval, marketing/where-things-stand]
 ---
 
 import { Steps, Aside } from '@astrojs/starlight/components';
+import Chat from '../../../../components/Chat.astro';
+import Outcomes from '../../../../components/Outcomes.astro';
+import TutorialMeta from '../../../../components/TutorialMeta.astro';
 
-Una campaña es un objetivo y varias piezas que lo sirven: una landing page, tres correos, cinco
-publicaciones en redes. cckit las mantiene juntas bajo un mismo plan, para que veas qué está hecho
-y qué falta.
+<TutorialMeta />
 
-**Antes de empezar:** ya llevaste [una pieza hasta la aprobación](/es/marketing/your-first-piece/)
-y tu [voz de marca](/es/marketing/brand-voice/) está definida.
+Una campaña son varias piezas delegadas bajo un mismo objetivo: una landing page, tres correos,
+cinco publicaciones en redes. Tienen que contar una sola historia y estar listas al mismo tiempo.
+Planeadas bajo un objetivo, dejan ver qué está escrito, qué está detenido y qué falta. En la
+panadería Pilot Light la página del menú de Semana Santa ya está aprobada y en línea; "Semana
+Santa" es la campaña que lleva a los vecinos hasta ella.
+
+**Quién lo hace:** tú dices el objetivo y apruebas el plan. El asistente de planeación propone las
+piezas y lleva la lista. Después cada pieza se delega como
+[la primera](/es/marketing/your-first-piece/), una a la vez.
+
+**Lo que vas a tener al final:** un plan de campaña aprobado y guardado en el proyecto, todas las
+piezas en la lista de tareas, y cada pieza llevada hasta la aprobación.
+
+**Antes de empezar:** tu [voz de marca](/es/marketing/brand-voice/) está definida, porque el plan
+toma de ella el público y el mensaje. Ya llevaste
+[una pieza hasta la aprobación](/es/marketing/your-first-piece/), porque cada pieza de una campaña
+avanza igual.
 
 <Steps>
 
-1. **Di cuál es el objetivo.**
+1. **Di el objetivo.** Un objetivo, un público y una fecha bastan para empezar. Tu asistente
+   pregunta lo que falte. Un objetivo necesita un número y una fecha; un segundo objetivo o un
+   segundo público es otra campaña.
 
-   <div class="cckit-prompt">
+   <Chat
+     title="decir el objetivo de la campaña de Semana Santa"
+     say="Quiero planear una campaña para Semana Santa. El objetivo son 100 encargos de rosca de Pascua antes del 20 de marzo. Es para los vecinos que nos siguen en Instagram y están en la lista de correo de la panadería."
+     means="Diste un objetivo con un número y una fecha, un público y ningún segundo objetivo."
+   >
+     Es un objetivo, un público y una fecha. Antes de planear: ¿dónde se hace un encargo, en el
+     mostrador, por teléfono o en el sitio? El plan tiene que decir a dónde manda cada pieza a la
+     gente.
+   </Chat>
 
-   ```text title="Dile esto a Claude"
-   Planea una campaña. El objetivo es llegar a 200 inscripciones a nuestro taller de primavera antes del 15 de abril. El público son dueñas y dueños de negocios pequeños que están en nuestro boletín y en Instagram.
-   ```
+2. **Lee el plan.** Tu asistente propone la campaña: el mensaje, las piezas, el orden y para qué
+   sirve cada pieza. El plan se abre como una página en tu navegador, donde puedes comentar y
+   responder. Si no hay navegador disponible, se muestra en el chat.
 
-   </div>
+   <Chat
+     title="leer el plan de Semana Santa"
+     say="Los encargos se hacen en la página del menú de Semana Santa. Muéstrame el plan."
+     means="La página es para leer y responder. Todavía no se crea nada."
+   >
+     El plan está abierto en tu navegador. La página del menú de Semana Santa ya está aprobada, así
+     que aparece en el plan como terminada. Hay dos piezas nuevas: una publicación sobre la rosca y
+     una sobre la fecha límite para encargar. Las dos llevan a la página del menú. Comenta
+     cualquier parte y manda tu respuesta.
+   </Chat>
 
-   Con un objetivo, un público y una fecha alcanza para empezar. Claude pregunta por lo que falte.
-
-2. **Lee el plan.** Claude propone la campaña: el mensaje, las piezas, el orden y para qué sirve
-   cada pieza. El plan se abre como una página en tu navegador, donde puedes comentar y responder.
-   Si no hay navegador disponible, se muestra en la conversación.
-
-3. **Cámbialo hasta que quede bien.** Quita las piezas que no vas a hacer. Agrega las que faltaron.
+3. **Cámbialo hasta que esté bien.** Quita las piezas que no vas a hacer. Agrega las que faltaron.
    Todavía no se ha creado nada.
 
-4. **Aprueba el plan.**
+   <Chat
+     title="cambiar el plan de Semana Santa"
+     say="Agrega una tercera publicación sobre el día de entrega."
+     means="Cambia el plan hasta que te dé gusto aprobarlo."
+   >
+     Agregada. El plan ahora tiene la página del menú y tres publicaciones: la rosca, la fecha
+     límite para encargar y el día de entrega. Todavía no se crea nada.
+   </Chat>
 
-   <div class="cckit-prompt">
+4. **Aprueba el plan.** Tu asistente anota la campaña y una pieza de trabajo por cada pieza nueva
+   del plan. No se anota nada antes de que digas que sí.
 
-   ```text title="Dile esto a Claude"
-   El plan está bien. Crea la campaña y sus piezas.
-   ```
+   <Chat
+     title="aprobar el plan de Semana Santa"
+     say="El plan está bien. Adelante, déjalo armado."
+     means="El plan y la lista de sus piezas van en una sola revisión."
+   >
+     Ya quedaron anotadas la campaña "Semana Santa" y sus tres publicaciones. Abrí una revisión con
+     el plan y la lista; aquí está el enlace para tu colega. Cuando se apruebe, las tres
+     publicaciones quedan en la lista compartida como sin empezar.
+   </Chat>
 
-   </div>
+5. **Delega las piezas.** Cada pieza sigue el mismo camino que
+   [la primera](/es/marketing/your-first-piece/).
 
-   Claude registra la campaña y una pieza de trabajo por cada pieza del plan. No registra nada
-   antes de que digas que sí. Cómo se registran y se revisan las piezas depende de dónde guarda tu
-   proyecto la lista de tareas: mira
-   [Dos formas de llevar una campaña](#dos-formas-de-llevar-una-campaña).
+   <Chat
+     title="empezar la primera publicación de Semana Santa"
+     say="¿Qué sigue en la campaña? Hazla."
+     means="Una pieza a la vez, cada una con su propio borrador."
+   >
+     Sigue la publicación sobre la rosca de Pascua. Ya la empecé y te aviso cuando haya un enlace
+     para revisar.
+   </Chat>
 
-5. **Avanza pieza por pieza.** Cada pieza la escribes como escribiste
-   [la primera](/es/marketing/your-first-piece/): esquema, borrador, ajustes.
+6. **Espera el enlace.** Cada pieza vuelve con su propia revisión.
 
-   <div class="cckit-prompt">
+   <Chat
+     title="recibir el enlace de revisión de la primera publicación de Semana Santa"
+     say="¿Cómo va la publicación de la rosca?"
+     means="Cada pieza tiene su propio borrador y su propia revisión."
+   >
+     La publicación sobre la rosca de Pascua ya está lista, y aquí está el enlace de revisión.
+     Faltan dos publicaciones: la fecha límite para encargar y el día de entrega.
+   </Chat>
 
-   ```text title="Dile esto a Claude"
-   ¿Qué sigue en la campaña? Vamos a escribirlo.
-   ```
-
-   </div>
-
-6. **Pide la revisión.** Si la lista de tareas está en el proyecto, pídela cuando cada pieza esté
-   lista, como hiciste con tu primera pieza. Si está en GitHub, pídela una sola vez, cuando todas
-   las piezas estén escritas:
-
-   <div class="cckit-prompt">
-
-   ```text title="Dile esto a Claude"
-   La campaña está lista. Pide la revisión.
-   ```
-
-   </div>
-
-   Esa única revisión cubre todas las piezas, así quien aprueba las lee una junto a la otra y
-   comprueba que cuentan una misma historia.
-
-7. **Aprobada.** Si la lista de tareas está en el proyecto, termina cada pieza cuando su revisión
-   quede aprobada. Si está en GitHub, cuando la revisión de la campaña diga que está aprobada:
-
-   <div class="cckit-prompt">
-
-   ```text title="Dile esto a Claude"
-   La revisión de la campaña está aprobada. Termina la campaña.
-   ```
-
-   </div>
-
-   Claude hace que las piezas aprobadas pasen a la versión compartida y marca como terminadas la
-   campaña y todas sus piezas.
+7. **Aprobada.** Cuando una pieza esté aprobada, díselo a tu asistente y él la termina (mira
+   [Después de la aprobación](/es/marketing/review-and-approval/#después-de-la-aprobación)).
+   Después pide la siguiente, hasta que no quede ninguna.
 
 </Steps>
 
-## Dos formas de llevar una campaña
-
-La preparación de marketing guarda la lista de tareas en el proyecto. La persona técnica puede
-pasarla a GitHub. Para saber cuál usa el tuyo, pregúntale a Claude: "¿Este proyecto guarda su
-lista de tareas en el proyecto o en GitHub?"
-
-| | Lista de tareas en el proyecto | Lista de tareas en GitHub |
-| --- | --- | --- |
-| **Cuando apruebas el plan** | El plan y la lista de sus piezas van en una sola revisión. Cuando esa revisión se aprueba, todas las piezas quedan en la lista compartida como no iniciadas. | La campaña aparece en GitHub con cada pieza dentro de ella. |
-| **Cómo se revisan las piezas** | Una por una. Cada pieza tiene su propio borrador y su propia revisión. | Juntas. Las piezas comparten un mismo borrador y tienen una sola revisión al final. |
-| **Cuántas a la vez** | Sin límite. | El límite por defecto es de dos campañas en curso. La persona técnica puede cambiarlo. |
-
 ## Mira cómo va una campaña
 
-<div class="cckit-prompt">
-
-```text title="Dile esto a Claude"
-¿En qué vamos con la campaña? ¿Qué está hecho, qué está en borrador y qué está esperando a alguien?
-```
-
-</div>
+<Chat
+  title="revisar cómo va Semana Santa"
+  say="¿Cómo vamos con la campaña? ¿Qué está terminado, qué se está escribiendo y qué espera a alguien?"
+  means="Esto cubre una campaña. La página “Mira cómo va todo” cubre el proyecto completo."
+>
+  Semana Santa: la página del menú está terminada, la publicación de la rosca espera revisión y dos
+  publicaciones están sin empezar. La revisión de la publicación de la rosca espera a tu colega.
+</Chat>
 
 ## Conviene saber
 
-- **Termina una campaña solo cuando todas sus piezas estén escritas.** Si la lista de tareas está
-  en GitHub, terminar la campaña marca como terminadas todas sus piezas, incluso una que nadie
-  escribió. Si está en el proyecto, cada pieza se termina por separado, así que una pieza sin
-  escribir sigue en la lista.
-- **Investiga antes de planear.** Pídele a Claude que mire qué está diciendo la competencia, o que
-  verifique un dato, antes de escribir el plan. Te dice de dónde sacó la información.
+- **Investiga antes de planear.** Pídele a tu asistente que mire qué está diciendo la competencia,
+  o que verifique un dato, antes de escribir el plan. Te dice sus fuentes.
+- **Un plan lleva ocho piezas como máximo.** Más que eso son dos campañas.
 
 <Aside type="note">
-Enviar los correos y programar las publicaciones queda fuera de cckit. La campaña termina cuando
+Mandar los correos y programar las publicaciones queda fuera de cckit. La campaña termina cuando
 sus piezas están aprobadas.
 </Aside>
 
-Siguiente: [Quién hace qué](/es/marketing/who-does-what/)
+## Después de la campaña
+
+Cuando pase la fecha del objetivo, dile a tu asistente el número que mediste. Lo anota en el plan.
+cckit no lo mide por ti, y una campaña sin número queda anotada como no medida.
+
+<Chat
+  title="anotar el resultado de Semana Santa"
+  say="Ya pasó Semana Santa. Tuvimos 112 encargos. Ponlo en el plan."
+  means="El número es tuyo. cckit no lo mide."
+>
+  Anotado: 112 encargos, con un objetivo de 100.
+</Chat>
+
+## Si tu persona técnica pasó la lista de tareas a GitHub
+
+La instalación de marketing guarda la lista de tareas en el proyecto, y los pasos de arriba
+describen eso. La persona técnica puede pasarla a GitHub. Si no sabes cuál tienes, pregúntale.
+
+<Outcomes title="Qué cambia con la lista de tareas en GitHub">
+
+| | Lista de tareas en el proyecto | Lista de tareas en GitHub |
+| --- | --- | --- |
+| **Cuando apruebas el plan** | El plan y la lista de sus piezas van en una sola revisión. Cuando esa revisión se aprueba, todas las piezas quedan en la lista compartida como sin empezar. | La campaña aparece en GitHub con cada pieza dentro de ella. |
+| **Cómo se revisan las piezas** | Una por una. Cada pieza tiene su propio borrador y su propia revisión. | Juntas. Las piezas comparten un mismo borrador y tienen una sola revisión al final. |
+| **Cuántas a la vez** | Sin límite. | El límite por defecto es de dos campañas en curso. La persona técnica puede cambiarlo. |
+
+- **Pedir la revisión.** Con la lista de tareas en GitHub, pídela una sola vez, cuando todas las
+  piezas estén escritas: "La campaña está lista. Pide la revisión." Esa revisión cubre todas las
+  piezas, así que quien aprueba las lee una junto a otra y puede ver si cuentan una sola historia.
+- **Terminar.** Cuando la revisión de la campaña diga aprobada, di "La revisión de la campaña está
+  aprobada. Termina la campaña." Tu asistente pasa las piezas aprobadas a la versión compartida y
+  marca como terminadas la campaña y todas sus piezas.
+- **Termina una campaña solo cuando todas las piezas estén escritas.** Con la lista de tareas en
+  GitHub, terminar la campaña marca como terminadas todas sus piezas, también una que nadie
+  escribió. Con la lista de tareas en el proyecto, cada pieza se termina por separado, así que
+  una pieza sin escribir sigue en la lista.
+
+</Outcomes>
+
+Siguiente: [Mira cómo va todo](/es/marketing/where-things-stand/)

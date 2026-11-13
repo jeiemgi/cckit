@@ -1,0 +1,181 @@
+---
+title: "Run agents unattended overnight"
+description: "Step by step: clear an unblocked backlog with nobody watching, under a concurrency cap, including night mode."
+tutorial:
+  job: run Claude Code unattended overnight
+  difficulty: advanced
+  time: "8 min"
+  prerequisites:
+    - { text: "cckit is installed and set up in this project", link: "Set it up", href: "/getting-started/initialize/" }
+    - "There is a backlog of unblocked issues to work through"
+  ogTag: Parallel work
+  keywords: [claude code unattended, ai agent overnight autopilot, cckit orchestrate]
+  related: [development/run-a-wave-in-parallel, project-management/break-a-feature-into-an-effort, development/headless-in-ci]
+---
+
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import TagRow from '../../../components/TagRow.astro';
+import TutorialMeta from '../../../components/TutorialMeta.astro';
+import TutorialSchema from '../../../components/TutorialSchema.astro';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
+
+<TagRow kinds={["flow", "conversational"]} />
+
+<TutorialMeta />
+
+A backlog of small, ready issues does not need you in the room. What it needs is a limit you set
+before you leave: which issues may run, how many at once, and when the run has to stop and wait
+for you.
+
+Each step starts with what you say to your agent in the chat. Below it is the command your agent
+runs. The example is the Bakery site, with its backlog of small ready issues.
+
+In this guide cckit launches each issue in its own worktree, a few at a time. The agent driving
+the run reviews and merges each pull request. You look at the launch plan before anything is
+created, and the run pings you only on a real blocker.
+
+**What you will have at the end:** the issues you picked (or the ones autopilot picked) each
+worked in its own worktree with a pull request, and a record of how every worker ended.
+
+## Steps
+
+### 1. Read the board, then pick the work
+
+Have the agent sync the board first and show you what is ready. You choose which issues run,
+rather than naming numbers up front.
+
+<Chat
+  title="reading the Bakery site board before an unattended run"
+  say="Read the board and show me what's unblocked right now. I'll tell you which of those to run in parallel. Show me the launch plan before anything is created, then run them a few at a time."
+  ran="cckit sync --llm"
+  means="Decide from what is actually ready, not from numbers you remember."
+>
+  Three issues are unblocked: the opening hours, the contact form and the footer links. Tell me which
+  ones to run and I will show the launch plan first.
+</Chat>
+
+### 2. Dry-run, then launch with a cap
+
+Pass the issues you picked. A dry run creates nothing.
+
+<Chat
+  title="launching two Bakery site issues with a cap"
+  say="Run the opening hours and the contact form. Show me the plan first, then launch at most 3 at a time."
+  ran={['cckit orchestrate --dry-run <issues…>', 'cckit orchestrate --cap 3 <issues…>']}
+  means="The dry run resolves the plan and prints what would launch. The launch runs at most 3 at once and the rest queue."
+>
+  The plan listed the two issues and no queue. I launched them: each has its own worktree and its own
+  agent.
+</Chat>
+
+### 3. Or let autopilot pick the work
+
+For a fully unattended run, autopilot picks ready issues itself, so there are no numbers to name.
+
+<Chat
+  title="letting autopilot clear the Bakery site backlog"
+  say="Clear the unblocked backlog unattended, a few at a time. Sync the board, auto-pick what's ready, and drive each to merged. Only stop and ping me on a genuine blocker, otherwise summarize what merged."
+  ran="cckit autopilot --cap 3"
+  means="Autopilot picks the unblocked issues and launches them through orchestrate, detached. Reviewing and merging each PR is the driving agent's job, not the script's."
+>
+  I started the run with at most 3 at a time. I will stop only on a genuine blocker and summarize what
+  merged when it finishes.
+</Chat>
+
+<Aside type="tip" title="Which verb for which case">
+Same board, three routes — let what's ready decide: one issue → the
+[single-issue lifecycle](/development/issue-to-merged-pr/); a set of related sub-issues
+→ an [effort](/project-management/break-a-feature-into-an-effort/) or a [wave](/development/run-a-wave-in-parallel/);
+a whole backlog with nobody watching → `cckit autopilot`.
+</Aside>
+
+## Check it worked
+
+<Chat
+  title="checking how the unattended workers ended"
+  say="How did each worker end, and what is still open?"
+  ran={['cckit orchestrate --results', 'cckit sync']}
+  means="Each worker ends as success, failure or interrupted."
+>
+  I read the recorded results of the workers and the board. The merged issues are gone from the open
+  list.
+</Chat>
+
+<Outcomes of="cckit orchestrate --results">
+
+| Exit | Meaning |
+| --- | --- |
+| `0` | every worker succeeded |
+| `1` | any worker failed or was interrupted |
+| `3` | none failed and some are still running |
+
+</Outcomes>
+
+## How it works
+
+`orchestrate` takes a specific set of issue numbers and runs them in isolated worktrees, capped so
+only N run at once and the rest queue. `autopilot` picks the unblocked issues itself and launches
+them through `orchestrate`, detached; reviewing and merging each PR is the driving agent's job, not
+the script's. The **dry-run** resolves the plan and prints what *would* launch without creating a
+branch, so you approve it before anything runs.
+
+<Aside type="caution" title="Always dry-run first">
+Unattended runs create real branches, worktrees, and PRs. Seeing the plan first is how you (and the
+agent) catch a wrong issue or a bad cap before it fans out.
+</Aside>
+
+## Night mode: approved waves under a token budget
+
+`cckit autopilot` caps concurrency; it does not cap spend. Night mode does: the `kit-autopilot`
+skill launches a Workflow script, and the Workflow runtime stops the run when the token budget is
+spent. You approve the night with one comment on the plan parent issue — the budget, the effort
+waves, and the review floors you waive:
+
+````markdown
+<!-- night-grant -->
+Tonight: run the two approved waves. I accept the lockfile floor.
+
+```json
+{ "budget": "+2000k", "waves": [[<effort>], [<effort>]], "waivers": ["lockfile"], "stopCommand": null }
+```
+````
+
+Replace each `<effort>` with the number of an effort from your own board; each inner list is one
+wave. Only a grant written by the repository owner, or by a login in `night.grantors`, is read. The run
+is no wider than `effort.wipLimit`, ends at the first wave that did not fully merge, and reports
+`done` only when the gate is green on the base branch. Every rule and config key:
+[Night mode](/config-and-permissions/#night-mode).
+
+## Troubleshooting
+
+**It stopped on a blocker.** That's by design — unattended runs ping you only on a genuine blocker
+rather than guessing. Resolve it, then re-run; the merged work isn't repeated.
+
+**Too many worktrees at once.** Lower `--cap`. A smaller cap trades wall-clock for less load and
+fewer merge conflicts on a busy repo.
+
+**A queued issue never started.** It was skipped because an issue it is `blocked_by` is still open, or
+it was queued past `--cap`. `orchestrate` prints both lists and starts neither later: `cckit sync`
+shows what's gating it, and you run it again once the blocker has merged or a slot is free.
+
+## Related guides
+
+<CardGrid>
+  <LinkCard title="Run a wave in parallel" href="/development/run-a-wave-in-parallel/" description="The attended version — fan out and gate a single wave." />
+  <LinkCard title="Break a feature into an effort" href="/project-management/break-a-feature-into-an-effort/" description="Create the backlog of sub-issues to clear." />
+  <LinkCard title="Drive cckit from CI" href="/development/headless-in-ci/" description="Run with no human at all, consuming JSON." />
+</CardGrid>
+
+<TutorialSchema
+  steps={[
+    { name: 'Dry-run the launch plan', text: 'Ask to see the launch plan before anything runs. cckit orchestrate --dry-run resolves and prints the plan without creating anything.' },
+    { name: 'Launch with a concurrency cap', text: 'Once the plan looks right, run cckit orchestrate --cap 3 with the issue numbers to launch at most three concurrent worktrees; the rest queue.' },
+    { name: 'Or let autopilot pick the work', text: 'For a fully unattended run, cckit autopilot --cap 3 auto-selects ready issues and launches them; the driving agent merges each PR and pings you only on a genuine blocker.' },
+  ]}
+  faqs={[
+    { q: 'It stopped on a blocker', a: 'By design, unattended runs ping you only on a genuine blocker rather than guessing. Resolve it and re-run; merged work is not repeated.' },
+    { q: 'Too many worktrees at once', a: 'Lower --cap. A smaller cap trades wall-clock for less load and fewer merge conflicts on a busy repo.' },
+    { q: 'A queued issue never started', a: 'It was skipped because an issue it is blocked_by is still open, or it was queued past --cap. orchestrate starts neither later: cckit sync shows what is gating it, and you run it again once the blocker has merged or a slot is free.' },
+  ]}
+/>

@@ -1,0 +1,116 @@
+---
+title: "Why merging is a decision"
+description: "What a branch must pass before it lands, why a mergeable badge is not enough, who merges (a person, or the captain on an approved plan), and what closing does."
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+A change that passed review is not yet part of the product. It still has to join the shared code
+without undoing what a neighbour merged an hour ago, close the issue that asked for it, leave no
+stale branch behind, and at some point reach users as a version.
+
+With one developer these steps are routine. With several agents each opening a pull request from
+the same starting point, they are where finished work gets lost. This area covers the four steps:
+the merge, the close, the cleanup and the release.
+
+## A green badge is not enough
+
+GitHub marks a pull request `MERGEABLE` when git can combine it with the base branch without a
+textual conflict. It says nothing more than that.
+
+This rule came from an incident. A pull request cut from a base that had since moved was merged
+because GitHub reported it mergeable. It reverted a sibling pull request that had landed in
+between: 7,285 lines removed, with no conflict and no failing check to announce it. The checks on
+that pull request were green because they had run on the old tree.
+
+So before a branch merges, the team does two things: it brings the branch onto the current tip of
+the base branch, and it runs the gate again on that combined tree. Then it reads what the diff
+deletes. A file the issue never asked to remove, showing as deleted, is the revert.
+
+Two more habits follow from the same incident:
+
+- **Changes that only work together land as one pull request.** A rename and its call sites, or a
+  set of migrations in sequence, are one unit. Split into siblings, each one goes stale the moment
+  the one before it lands. Inside the pull request, keep one commit per step so the review still
+  reads step by step.
+- **After several branches are collected into one, the gate runs on the collection.** Two
+  sub-branches of an effort can each pass and still break together. The gate runs on the effort
+  branch before its pull request opens.
+
+## Who merges
+
+**The owner.** By default merging is a human decision. An agent opens the pull request, reports
+the link and stops.
+
+**The captain, on a plan the owner approved.** Once the owner has approved a plan, the captain
+merges each wave when its gate is green and continues. It does not stop to ask "merge or review?"
+for a merge the plan already covers, and it stops for a person in four cases only.
+[Tech lead, PM and captain](/project-management/roles/#the-captain) says what the captain is and
+lists the four.
+
+## What closing does
+
+A pull request body says `Closes #<issue>`. GitHub acts on that line only when the pull request
+merges into the repository's **default** branch. Many teams integrate on another branch, such as
+`develop`, and release from `main`. There, a merged pull request leaves its issue open and nothing
+reports it. The board shows finished work as open, and `cckit gc` keeps the merged branch because
+its issue still looks alive.
+
+cckit's merge verbs therefore close the issue themselves, after the merge. The line in the body
+stays: it is how GitHub links the two and how cckit finds which issues to close.
+
+| Merged with | What closes the issue |
+| --- | --- |
+| `cckit merge` | The verb closes every issue the pull request links |
+| `cckit effort close` | The verb closes the parent issue and every sub-issue |
+| The GitHub page, or `gh pr merge` typed by hand | Nothing, off the default branch. Run `cckit close <issue> "<summary>"` |
+
+`cckit doctor` warns when your base branch is not the GitHub default branch.
+
+## The tools that plug in
+
+- **GitHub.** Pull requests, checks and branch protection are GitHub's. Two repository settings do
+  work cckit cannot do for you: *Require branches to be up to date before merging* makes GitHub
+  report a stale branch as behind, which the captain then refuses to merge, and *Automatically
+  delete head branches* removes the remote branch when its pull request merges.
+- **release-please.** `cckit init` does not add a release workflow to your project. The commit
+  titles cckit writes are the ones release-please reads, so you can add it yourself:
+  [Cut a release](/ship/releasing/).
+
+<Aside type="caution" title="What the merge verbs do not do">
+Neither `cckit merge` nor `cckit watch --merge` brings a stale, conflict-free branch up to date.
+`cckit merge` rebases only a pull request GitHub reports as conflicting. Without the GitHub setting
+above, a stale branch reads as clean and is merged as it stands. Bringing the branch current is a
+step for whoever merges: [Merge, close and clean up](/ship/merge-and-close/) has the commands.
+</Aside>
+
+## What you say, and what runs
+
+Shipping is a conversation with your agent in the chat. These are the sentences you will use on the
+Bakery site, and the command your agent runs for each.
+
+<div data-table="grid">
+
+| What you say | What runs |
+| --- | --- |
+| "Merge the menu page pull request." (merges one pull request, closes its issues, removes its branch and working folder) | `cckit merge [<pr>]` |
+| "The launch effort is reviewed. Land it." (merges an effort's one pull request and closes the parent and every sub-issue) | `cckit effort close <slug\|N>` |
+| "Merge every pull request that is ready." (the captain reads every open pull request and merges the ones that are ready) | `cckit watch [--merge] [--loop]` |
+| "That issue ended without code. Close it." (closes an issue that no merge closed) | `cckit close <issue> "<summary>"` |
+| "What branches and working folders can go?" (reports; deletes nothing) | `cckit gc` |
+| "Show me the cleanup plan." Then: "Do it." (shows the plan, and with `--yes` carries it out) | `cckit cleanup [--yes]` |
+| "Carry that fix to the release branch." (carries one merged change to the release branch) | `cckit hotfix <pr\|sha>` |
+| "What version do the commits since the last release make?" (prints the version the commits since the last tag imply) | `cckit release --next` |
+
+</div>
+
+Every flag is in the [CLI reference](/cli-reference/).
+
+## Guides in this area
+
+<CardGrid>
+  <LinkCard title="Merge, close and clean up" href="/ship/merge-and-close/" description="Land a pull request or an effort, close what it finished, and remove what is left over." />
+  <LinkCard title="Cut a release" href="/ship/releasing/" description="Commit titles that carry the version, the promotion pull request, and how a hotfix reaches the release branch." />
+</CardGrid>
+
+Before this area: [Review](/review/), the checks a change passes before anyone merges it.

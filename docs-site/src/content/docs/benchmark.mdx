@@ -74,7 +74,7 @@ cckit bench checkpoint X.Y.Z --verbs verbs.json   # also attach verb timings (se
 | `cckit bench check` | Exit 0 when the version's last checkpoint scores at least as high as the checkpoint recorded before it, in the same version or the last one of the previous version, or when the two share no question. Exit 1 when the version has no checkpoint or scores lower. Exit 2 on a usage error, or when a file in `benchmarks/runs/` named `X.Y.Z.json` is not a checkpoint file; the file is named on stderr, and `checkpoints`, `page` and `checkpoint` exit 2 on it too. The comparison is described below. |
 | Results page | `resultsPage` in `benchmarks/benchmark.config.json` names a markdown file. `cckit bench checkpoint` rewrites it from the run files, and `cckit bench page --check` exits 1 when it differs from them. |
 
-`cckit release` runs `cckit bench check` first: see [Releasing](/releasing/#the-benchmark-check).
+`cckit release` runs `cckit bench check` first: see [Releasing](/releasing-cckit/#the-benchmark-check).
 cckit's own checkpoints are on the [Benchmark results](/benchmark-results/) page.
 
 ### What the check compares
@@ -192,7 +192,7 @@ The backend has **no hard dependency on a provider**. Selection is by environmen
 
 ## Autopilot objective mode
 
-Two scripts wire the harness into unattended objective runs (see [autopilot](/efforts-and-waves/)):
+Two scripts wire the harness into unattended objective runs (see [autopilot](/project-management/efforts-and-waves/)):
 
 - **`scripts/benchmark/gate.sh`** — the per-round no-mistakes bundle: `bash -n` on every harness
   script, `--dry` on every set, and the project's `knowledge-lint`.

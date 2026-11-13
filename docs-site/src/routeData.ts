@@ -24,6 +24,41 @@ export const onRequest = defineRouteMiddleware((context) => {
 	// Marketing is one short list: drop the group heading and show its pages directly.
 	route.sidebar = track === 'marketing' ? own.flatMap((e) => (e.type === 'group' ? e.entries : [e])) : own;
 
+	// Marketing is short enough to read whole: every group is open (Software keeps its collapsed groups).
+	if (track === 'marketing') {
+		const open = (list: Entry[]) => {
+			for (const e of list) {
+				if (e.type === 'group') {
+					e.collapsed = false;
+					open(e.entries);
+				}
+			}
+		};
+		open(route.sidebar);
+	}
+
+	// Software groups are collapsed, and Starlight opens the one that holds the current page. A page
+	// that is not in the sidebar (a guide listed on its area's "More guides" page, a reference page
+	// listed on /reference/) opens the group it belongs to: the group whose pages share its first
+	// path segment, else the Reference group for a root-level page. The track's entry page
+	// (/software/) is a link of its own and leaves every group closed.
+	if (track === 'software') {
+		// An English fallback copy lives under /es/: compare paths without the locale.
+		const bare = (path: string) => path.replace(/^\/[a-z]{2}(?=\/)/, '');
+		const here = bare(context.url.pathname);
+		const area = here.split('/')[1] ?? '';
+		const groups = route.sidebar.filter((e): e is Extract<Entry, { type: 'group' }> => e.type === 'group');
+		const listed = route.sidebar.flatMap(links).some((l) => l.isCurrent);
+		if (!listed && area) {
+			const home =
+				groups.find((g) => links(g).some((l) => bare(l.href).split('/')[1] === area)) ??
+				(here.split('/').filter(Boolean).length === 1
+					? groups.find((g) => links(g).some((l) => bare(l.href) === '/cli-reference/'))
+					: undefined);
+			if (home) home.collapsed = false;
+		}
+	}
+
 	// Previous / next were computed over both tracks. Drop a link that leaves the track, so the last
 	// Software page does not point at the first Marketing page.
 	const hrefs = new Set(route.sidebar.flatMap(links).map((l) => l.href));

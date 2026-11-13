@@ -1,0 +1,80 @@
+---
+title: What you set up, and why
+description: The three things a project needs before agents can work in it (the cckit command, GitHub access, a profile of roles) and the order to set them up.
+---
+
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+An agent that opens your repository for the first time knows nothing about how your team works. It
+does not know which branch you integrate on, who owns a design question, or that work starts from
+an issue. Ask it for a fix and it will edit files wherever it happens to be standing.
+
+Setup is where you write that down, once. After it, every session starts from the same description
+of the project, and every piece of work can go through the same steps.
+
+## The three things a project needs
+
+1. **The `cckit` command on your machine.** It is the one tool that runs each step: start a piece
+   of work, open its pull request, clean up after the merge. You install it once per machine.
+2. **Access to GitHub.** The plan and the record of the work live there, as issues and pull
+   requests. cckit reaches GitHub through your own signed-in `gh` session and stores no token of
+   its own.
+3. **A profile of roles in the project.** A profile is the description of your team: which agents
+   exist, which rules they follow, which skills they have. `cckit init` writes it into the
+   repository, once per project.
+
+Set them up in that order. Each step checks the one before it.
+
+## Who does it
+
+One person, once. It needs a terminal for a few minutes; after that the work can be done by talking
+to your agent in the chat. In Claude Code the same steps exist as the skills `/kit-doctor` and
+`/kit-init`, so your agent can run them and ask you its questions.
+
+No agent role is involved yet. The roles arrive with the profile:
+[The team: you and the agents](/philosophy/the-team/).
+
+## The guides
+
+Start with the first two, in order. The other three are for when you need them.
+
+<CardGrid>
+  <LinkCard title="1 · Install and check" href="/getting-started/install/" description="Put cckit on your machine, then let cckit doctor confirm the tools and the GitHub sign-in." />
+  <LinkCard title="2 · Initialize a project" href="/getting-started/initialize/" description="Run cckit init, pick the profile that matches your team, and run a first real task." />
+  <LinkCard title="Add cckit to an existing repo" href="/getting-started/existing-repo/" description="For a project that already has its own structure, or cckit files copied in by hand." />
+  <LinkCard title="Use cckit with Codex" href="/getting-started/codex/" description="The same process with Codex as the agent." />
+  <LinkCard title="Update a project" href="/getting-started/update/" description="Bring a project set up by an older cckit to the installed version." />
+</CardGrid>
+
+## The tools that plug in
+
+cckit runs on tools you may already have and builds none of them. It is itself a set of bash
+scripts.
+
+- **`git`, `gh`, `jq` and `perl`** are required. `gh` is GitHub's command-line tool; `jq` reads
+  JSON; `cckit init` stops without `perl`.
+- **Claude Code or Codex** is the agent. You choose one or both at setup.
+- **MemPalace**, for memory between sessions, is optional and off by default. It has its own area:
+  [Memory](/memory/).
+
+`cckit doctor` reports which of these are missing and asks before it installs anything.
+
+## The commands
+
+<div data-table="grid">
+
+| What you say | What runs |
+| --- | --- |
+| "Check that this computer has what cckit needs." | `cckit doctor`: the required tools and the GitHub sign-in |
+| "Set up the Bakery site." | `cckit init`: the config, the profile, and the git and GitHub steps |
+
+</div>
+
+A repository that already has files of its own, or cckit files copied in by hand, uses
+`cckit scan` and `cckit adopt`: [Add cckit to an existing repo](/getting-started/existing-repo/).
+A project set up by an older cckit uses `cckit update` and `cckit init --upgrade`:
+[Update a project](/getting-started/update/). Every flag of these commands is in the
+[CLI reference](/cli-reference/).
+
+When the project is set up, the next step of the process is planning the work:
+[Project management](/project-management/).

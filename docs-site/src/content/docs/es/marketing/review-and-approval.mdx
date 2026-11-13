@@ -1,0 +1,109 @@
+---
+title: "Revisión y aprobación"
+description: "Para quien recibió un enlace de revisión: qué ves, dónde comentas, qué significan aprobar y pedir cambios, por qué quien escribe nunca aprueba su propia pieza y qué pasa después de la aprobación."
+---
+
+import Chat from '../../../../components/Chat.astro';
+
+Delegar termina aquí: recibes un enlace, lees lo que se construyó y decides. La revisión es el
+único paso que cckit nunca hace por ti. Una pieza está terminada cuando alguien distinto de quien
+pidió el trabajo la leyó y dijo que sí.
+
+Una revisión tiene un lugar, un enlace y uno de dos finales, así que nadie tiene que preguntar si
+la pieza llegó a aprobarse.
+
+## Quién la hace
+
+- **Quien escribe**, la persona que delegó el trabajo, aplica los cambios con tu asistente.
+- **Quien aprueba** lee, comenta y decide. Le basta una cuenta de GitHub y un navegador.
+- **Tu asistente** prepara la revisión, aplica los comentarios cuando se lo piden y avisa cuáles
+  no aplicó. Nunca aprueba.
+
+## Te mandaron un enlace de revisión
+
+A ti te toca aprobar. El enlace abre una página de GitHub, y esa página es la revisión.
+
+1. **Abre el enlace** e inicia sesión en GitHub si te lo pide.
+2. **Abre la pestaña Files changed.** Ahí está lo que dice la pieza. El texto nuevo aparece en
+   verde.
+3. **Comenta donde algo esté mal.** Pasa el cursor sobre una línea, haz clic en el **+** que
+   aparece y escribe tu comentario.
+4. **Decide.** Haz clic en **Review changes** y elige **Approve** (aprobar) o **Request changes**
+   (pedir cambios). GitHub muestra esos botones en inglés.
+5. **Si pediste cambios, vuelve a leer** cuando quien escribe te avise que ya los aplicó. La misma
+   página se actualiza sola. Esto se repite hasta que tu respuesta sea **Approve**.
+
+El lado de quien escribe es más corto de contar: le pide la revisión a su asistente, te manda el enlace
+y aplica tus comentarios con él. Lo que dice está en
+[Delega tu primera pieza](/es/marketing/your-first-piece/) y en
+[Pide cambios en una pieza](/es/marketing/ask-for-changes/).
+
+## Qué significan las dos respuestas
+
+| Respuesta | Qué significa | Qué sigue |
+| --- | --- | --- |
+| **Approve** (aprobar) | La pieza puede pasar a la versión compartida tal como está. | Quien escribe le dice a su asistente que termine la pieza. |
+| **Request changes** (pedir cambios) | La pieza no está lista. Los comentarios dicen por qué. | Quien escribe los aplica con su asistente; quien aprueba vuelve a leer. |
+
+Un comentario solo no es una respuesta. Una pieza con comentarios y sin decisión sigue esperando.
+
+## Por qué quien escribe nunca aprueba su propia pieza
+
+GitHub lo impide: la persona que pidió la revisión no puede aprobarla. La regla existe por la
+razón que abre esta página. Además, así cada pieza aprobada tiene una segunda lectura con nombre,
+y el historial del proyecto muestra de quién fue.
+
+En un equipo de dos, cada quien aprueba las piezas de la otra persona. Una misma persona puede
+escribir una pieza y aprobar otra.
+
+### Si trabajas por tu cuenta
+
+Un equipo de una persona no tiene segunda lectura, y GitHub no te deja hacer clic en **Approve**
+en una pieza que pediste tú. Lees la revisión y la terminas tú: dile a tu asistente que la pieza
+está bien, o usa el botón verde **Merge pull request** de la página de la revisión. Lo que pierdes
+es el segundo par de ojos, así que lee la pestaña Files changed con el mismo cuidado que tendría
+quien aprueba. Para tener una segunda lectura, dale a otra persona una cuenta de GitHub con acceso
+al proyecto.
+
+## Qué más se revisa
+
+- **El plan de una campaña.** Antes de escribir cualquier pieza, el plan se abre como una página
+  en tu navegador donde comentas y respondes. Mira
+  [Varias piezas, un objetivo](/es/marketing/campaigns/).
+- **La voz de marca.** Un cambio en la voz se revisa como una pieza, porque aplica para todo el
+  equipo. Mira [Define tu voz de marca](/es/marketing/brand-voice/).
+
+También puede ejecutarse una comprobación automática cuando se guarda un borrador, por ejemplo una
+que busca una contraseña olvidada en un archivo. Si falla, tu asistente te dice "Falló una
+comprobación" y qué falló. No es una aprobación y no reemplaza a quien aprueba.
+
+## Después de la aprobación
+
+Cuando la revisión dice **Approve**, quien escribe le dice a su asistente que está aprobada:
+
+<Chat
+  title="terminar la página aprobada del menú de Semana Santa"
+  say="Mi colega ya aprobó la página del menú de Semana Santa. ¿La dejas terminada?"
+  means="Este es el paso de quien escribe. Quien aprueba también puede terminarla desde la página de la revisión."
+>
+  Listo. La página del menú de Semana Santa ya es parte de la versión compartida, la pieza está
+  marcada como terminada y borré el borrador que ya no hace falta.
+</Chat>
+
+Pasan tres cosas:
+
+1. El borrador aprobado pasa a formar parte de la versión compartida del proyecto.
+2. La pieza queda marcada como terminada en la lista de tareas.
+3. El borrador se cierra y se archiva.
+
+Quien aprueba también puede terminarla desde la página de la revisión con el botón verde
+**Merge pull request**, que en algunos proyectos dice **Squash and merge**.
+
+El texto aprobado ya es un archivo del proyecto, y la versión compartida es el único lugar de
+donde hay que copiarlo.
+
+**cckit no publica.** El resultado es un sitio aprobado y que funciona; ponerlo en una dirección pública es otro paso, que hace la persona técnica o el servicio de hosting. No sube la pieza a tu sitio, no envía el correo, no programa la publicación
+y no te dice cómo le fue. Eso lo hace tu equipo en las herramientas que ya usa, como hasta hoy.
+No hay conectada ninguna herramienta para publicar, programar publicaciones ni medir resultados.
+
+Siguiente: [Pon en línea una pieza aprobada](/es/marketing/go-live/)

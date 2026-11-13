@@ -1,0 +1,128 @@
+---
+title: "How work is written down: issues, efforts, waves"
+description: "Why every change starts from an issue, and the three units (issue, effort, wave) set beside backlog, story, epic and sprint, saying where each match is loose."
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import Chat from '../../../components/Chat.astro';
+
+Agents write code faster than a team can keep track of it. Once several run at the same time, the
+slow part is no longer the typing. It is knowing what to work on next, what is already done, and
+who decided what. A team that keeps this in chat or in someone's head loses it within a day.
+
+So a team working with agents writes the work down before it starts, in one place everyone and
+every agent reads. In cckit that place is GitHub: **every change starts from an issue**, and the
+list of open issues is the plan. That list is **the board**: the open issues, or a GitHub Projects
+board if you use one. This area defines the units that list is made of, who plans them
+and who decides.
+
+## The three units
+
+1. **An issue** is one change one agent can finish: a bug fix, a screen, a migration. It gets its
+   own branch and its own pull request.
+2. **An effort** is a goal too big for one issue. It is a parent issue with a sub-issue for each
+   step, built on one branch and shipped as one pull request.
+3. **A wave** is a set of issues that do not wait on each other, run at the same time by separate
+   agents. When a wave's pull requests merge, the issues they were blocking form the next wave.
+
+Each deliverable is its own issue. A checklist inside an issue body is not tracking: when the
+issue closes, the unchecked boxes disappear from every list with it. A sub-issue stays open and
+visible until its own work is done.
+
+## What to do first
+
+<Chat
+  title="asking what is ready on the Bakery site's board"
+  say="Sync the board and show me what is ready, and I will pick."
+  ran={["cckit sync", "cckit next"]}
+  means="Both only read. The board is the open issues, or a GitHub Projects board if you use one."
+>
+  Here is what nothing blocks. Tell me which one to start.
+</Chat>
+
+`cckit next` prints the next issue that nothing blocks and the command that starts it.
+
+## If you know Scrum
+
+Most of the vocabulary carries over. Two parts do not, and they are named here so nobody goes
+looking for them.
+
+| Scrum | In cckit | How close |
+| --- | --- | --- |
+| Backlog | The open issues on the board, read with `cckit sync` and `cckit next` | Close |
+| Story | One issue, or one sub-issue of an effort | Close |
+| Epic | An effort: a parent issue with sub-issues | Loose |
+| Sprint | Nothing. A wave is the nearest unit | No counterpart |
+| Product owner | The human owner, who approves plans and decides what merges | Close |
+| Scrum master | Split in two: the project manager agent reads the board and drafts issues, and the captain drives a plan the owner approved | Loose |
+
+**Where the match is loose:**
+
+- **An effort is smaller than most epics.** It is one branch and one pull request, and it is meant
+  to close in days. A quarter-long theme is several efforts, linked by dependencies.
+- **There is no sprint.** cckit has no timebox. A wave is not a fixed length of time: it is a batch
+  of unblocked issues run in parallel, and it ends when its work merges, whether that takes an
+  hour or three days.
+- **There are no story points and no velocity.** The size label `ctx:S`, `ctx:M`, `ctx:L` or
+  `ctx:XL` measures something else: how much of one agent session an effort uses. A session can
+  only hold so much text at once, and a large effort fills it. `cckit effort plan` uses it to pack efforts into session-sized
+  batches.
+- **The only cadence is a weekly one**, and it is a reminder, not a ceremony: `cckit plan` on
+  Monday, `cckit next` each day, `cckit gc` on Friday. `cckit next` and `cckit status` print that
+  line at the end of their output.
+
+## Who does it
+
+- **The owner** (a person) approves plans and keeps the decisions no agent takes.
+- **The project manager agent** reads the board, reports where things stand and drafts issues.
+- **The tech lead agent** owns the engineering foundation and writes architecture decisions.
+- **The captain** drives an approved plan: it checks the pull requests, merges the ones that pass
+  and starts the next wave.
+
+[Tech lead, PM and captain](/project-management/roles/) says what each one owns.
+
+## Tools that plug in
+
+- **GitHub** holds the issues, the sub-issue links and the "blocked by" dependencies. cckit reads
+  and writes them through the `gh` command-line tool. A Projects v2 board is optional
+  (`github.projectsV2` in the config); without one, the issues are the whole board.
+- **Lavish** shows a plan or a decision as a page you annotate and answer. It is third-party
+  software cckit runs, on by default. See [Plans you answer on a page](/project-management/plan-pages/).
+- **A task list in the project**, for a team that does not plan in GitHub issues. This one is part
+  of cckit and needs no outside tool. See [Tasks without GitHub issues](/project-management/light-tasks/).
+
+## The commands
+
+<div data-table="grid">
+
+| What you say | What runs |
+| --- | --- |
+| "Show me the board and what is unblocked." | `cckit sync` |
+| "What should I work on next?" | `cckit next` |
+| "File an issue: …" | `cckit new --role <role> "<title>"` |
+| "Order the open issues into waves." | `cckit plan` |
+| "Make this an effort with these steps." | `cckit effort new "<name>" "<sub> :: <description>" …` |
+| "Step B comes after step A." | `cckit effort chain <a> <b> …` |
+| "Pack the open efforts into sessions." | `cckit effort plan` |
+| "Where does the project stand?" | `cckit status` |
+
+</div>
+
+Every flag is in the [CLI reference](/cli-reference/).
+[Efforts and waves in practice](/project-management/efforts-and-waves/) walks through the effort
+commands in order.
+
+## Guides
+
+<CardGrid>
+  <LinkCard title="Tech lead, PM and captain" href="/project-management/roles/" description="Who plans, who decides, and what stays with the owner." />
+  <LinkCard title="Break a feature into an effort" href="/project-management/break-a-feature-into-an-effort/" description="Step by step, from one big goal to one merged pull request." />
+  <LinkCard title="Plans you answer on a page" href="/project-management/plan-pages/" description="Read a plan, pick an option, and have the answer recorded on the issue." />
+  <LinkCard title="Tasks without GitHub issues" href="/project-management/light-tasks/" description="A task list kept as files in the project." />
+  <LinkCard title="Efforts and waves in practice" href="/project-management/efforts-and-waves/" description="The six effort commands in order, and the limit on efforts in progress." />
+</CardGrid>
+
+<Aside type="note" title="Where the building happens">
+This area covers planning. Taking one issue from a branch to a merged pull request, and running a
+wave of agents, are in [Development](/development/).
+</Aside>

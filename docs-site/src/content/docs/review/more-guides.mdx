@@ -1,0 +1,37 @@
+---
+title: "More review guides"
+description: "The list of every other review and safety guide, one line each."
+---
+
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+The sidebar lists the guides most teams follow first. These three cover the safety side of review:
+what may not be committed, and what an agent may change without asking. Each one is a short
+step-by-step page with a way to check the result.
+
+## Keep secrets and private data out of commits
+
+<CardGrid>
+  <LinkCard title="Stop agents committing secrets" href="/review/stop-committing-secrets/" description="Wire the secret guard as a pre-commit hook and prove it blocks a key. Beginner, 5 minutes." />
+  <LinkCard title="Keep private data out" href="/review/keep-private-data-out/" description="List the organisation names, hosts and emails the guard must block. Beginner, 5 minutes." />
+</CardGrid>
+
+Do the first before the second: the private list is read by the hook the first guide turns on.
+
+## Decide what an agent may do
+
+<CardGrid>
+  <LinkCard title="Control what agents may do" href="/review/control-what-agents-can-do/" description="What cckit reads freely, what it asks before writing, the one yes it records, and what asks every time. Intermediate, 5 minutes." />
+</CardGrid>
+
+## Guides in the sidebar
+
+- [Choose your gate command](/review/gate-command/): the one command that proves a change is sound.
+- [Turn repeated review findings into checks](/review/gates/): checks that fail when a known defect comes back.
+- [The secret guard](/review/secret-guard/): what the guard blocks and where it runs.
+- [Agent review before a merge](/review/agent-review/): a second agent reads each pull request.
+- [QA on a running stack](/review/qa-lane/): a person tries the change and records a verdict.
+
+Related guides in other areas: [Run checks with hooks](/development/checks-with-hooks/) for what
+runs before an agent's command, and [Merge, close and clean up](/ship/merge-and-close/) for what
+happens after a change passes review.

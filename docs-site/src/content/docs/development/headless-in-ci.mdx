@@ -1,0 +1,130 @@
+---
+title: "Drive cckit from CI"
+description: "Step by step: run cckit with no person attached and read each verb's structured output."
+tutorial:
+  job: drive Claude Code headless in CI with structured JSON
+  difficulty: advanced
+  time: "6 min"
+  prerequisites:
+    - { text: "cckit is installed and set up in this project", link: "Set it up", href: "/getting-started/initialize/" }
+    - "There is a CI runner or a scheduled job to run it on"
+  ogTag: Headless
+  keywords: [claude code headless json ci, cckit --llm, ai agent ci automation]
+  related: [development/run-unattended, getting-started/initialize, development/run-a-wave-in-parallel]
+---
+
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import TagRow from '../../../components/TagRow.astro';
+import TutorialMeta from '../../../components/TutorialMeta.astro';
+import TutorialSchema from '../../../components/TutorialSchema.astro';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
+
+<TagRow kinds={["flow", "agent"]} />
+
+<TutorialMeta />
+
+A CI job or a scheduled run has nobody to read a nicely formatted table. An agent in that job
+that reads output meant for people has to guess at columns and wording, and guesses break when
+the wording changes.
+
+cckit gives every verb a second output for this case. Add `--llm` and a verb that reports state
+prints data: JSON for a single result, TOON (a compact table format) for a list. The agent reads
+the board, the stack and the plan as data, picks the highest-priority unblocked issue and drives
+it.
+
+Each step starts with what you say to the agent that runs in the job. Below it are the commands it
+runs. The example is the Bakery site, with a nightly job that reads the board.
+
+**What you will have at the end:** an agent in a job with no person attached that reads the
+board as data and works one issue through, with small hand-offs to any sub-agent it starts.
+
+## Steps
+
+### 1. Prime the headless agent and consume every verb as data
+
+Tell it there is no human and to consume data, not prose.
+
+<Chat
+  title="priming the nightly Bakery site job"
+  say="You're running headless: no human watching. Work the board through to merged on your own: read state as structured data, pick the highest-priority unblocked issue, and drive it start to finish. Keep token use lean when you hand context to sub-agents."
+  ran={['cckit sync --llm', 'cckit scan --llm', 'cckit plan --llm']}
+  means="`sync` returns the board and what is unblocked as TOON, `scan` the stack and kit state as JSON, `plan` the session-fit wave plan as TOON."
+>
+  I read the board, the stack and the plan as data. The highest-priority unblocked issue is the one I
+  will drive.
+</Chat>
+
+### 2. Compact context for sub-agents
+
+Pipe uniform arrays through `encode-context` so hand-offs stay token-lean.
+
+<Chat
+  title="handing the board to a sub-agent in compact form"
+  say="Hand the board to the sub-agent in compact form."
+  ran={'echo "$json" | cckit encode-context'}
+  means="Uniform arrays become TOON, a denser encoding than raw JSON."
+>
+  I compacted the board before the hand-off, so the sub-agent gets fewer tokens.
+</Chat>
+
+
+## Check it worked
+
+Run one verb in the job and parse it.
+
+<Chat
+  title="checking that a verb prints data in the Bakery site job"
+  say="Is the scan readable as data?"
+  ran="cckit scan --llm | jq ."
+  means="It exits 0 and prints one JSON object."
+>
+  Yes. The scan printed one JSON object and it parsed.
+</Chat>
+
+In the job log, the agent's commands carry `--llm` and none of its decisions quote a
+human-formatted table.
+
+## How it works
+
+Every verb accepts `--llm`, each verb that produces a result prints it as JSON or TOON, and the repo
+ships an [`AGENTS.md`](/agents/) contract, so an agent reasons over structured data instead of scraping human
+output. Point the agent at `AGENTS.md` once and it knows the grammar; `--llm` then gives it the board,
+the stack, and the plan as JSON/TOON it can act on without a human in the loop.
+
+<Aside type="note" title="TOON keeps hand-offs cheap">
+`encode-context` compacts uniform arrays into TOON — a denser encoding than raw JSON — so passing
+context to sub-agents costs fewer tokens.
+</Aside>
+
+## Troubleshooting
+
+**A verb printed human output in CI.** Add `--llm`. Every verb accepts it; if one still prints prose,
+you've hit a verb with no JSON result (`init`, `orchestrate`, `autopilot`, `brief`) — that's expected.
+
+**The agent doesn't know the verbs.** It hasn't read the contract. Have it read `AGENTS.md` and
+`cckit.config.json` once at the start of the run.
+
+**Hand-offs are burning tokens.** Pipe the JSON through `cckit encode-context` before handing it to a
+sub-agent; TOON is smaller than the equivalent JSON.
+
+## Related guides
+
+<CardGrid>
+  <LinkCard title="Run agents unattended overnight" href="/development/run-unattended/" description="Many issues at once on your own machine, under a cap." />
+  <LinkCard title="Set up cckit in a repo" href="/getting-started/initialize/" description="Get the config the --llm verbs resolve against." />
+  <LinkCard title="Run a wave in parallel" href="/development/run-a-wave-in-parallel/" description="Fan out work once the board is read as data." />
+</CardGrid>
+
+<TutorialSchema
+  steps={[
+    { name: 'Prime the headless agent', text: 'Tell the agent there is no human and to consume data, not prose — read state as structured data, pick the highest-priority unblocked issue, and drive it start to finish.' },
+    { name: 'Consume every verb as data', text: 'cckit sync --llm returns the board and what is unblocked as TOON; scan --llm returns the stack and kit state as JSON; plan --llm returns the wave plan as TOON.' },
+    { name: 'Compact context for sub-agents', text: 'Pipe uniform arrays through cckit encode-context to compact them into TOON so hand-offs to sub-agents stay token-lean.' },
+  ]}
+  faqs={[
+    { q: 'A verb printed human output in CI', a: 'Add --llm. Every verb accepts it; a verb with no JSON result (init, orchestrate, autopilot, brief) will still print prose, which is expected.' },
+    { q: "The agent doesn't know the verbs", a: 'It has not read the contract. Have it read AGENTS.md and cckit.config.json once at the start of the run.' },
+    { q: 'Hand-offs are burning tokens', a: 'Pipe the JSON through cckit encode-context before handing it to a sub-agent; TOON is smaller than the equivalent JSON.' },
+  ]}
+/>

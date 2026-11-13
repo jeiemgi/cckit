@@ -1,0 +1,92 @@
+---
+title: Actualiza una página que ya existe
+description: "Cambia una página que se aprobó antes: describe el cambio, lee la revisión de exactamente lo que cambió y apruébala."
+tutorial:
+  job: cambiar una página que se aprobó antes
+  difficulty: beginner
+  time: "15 min"
+  prerequisites:
+    - { text: "La página es parte del proyecto y se aprobó antes", link: "Delega tu primera pieza", href: "/es/marketing/your-first-piece/" }
+    - { text: "Sabes cómo se lee y se aprueba una revisión", link: "Revisión y aprobación", href: "/es/marketing/review-and-approval/" }
+  ogTag: Marketing
+  related: [marketing/ask-for-changes, marketing/review-and-approval, marketing/go-live]
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+import Chat from '../../../../components/Chat.astro';
+import Outcomes from '../../../../components/Outcomes.astro';
+import TutorialMeta from '../../../../components/TutorialMeta.astro';
+
+<TutorialMeta />
+
+Una página aprobada está terminada. Cuando la panadería cambia su horario o se queda sin un pan,
+el cambio es una pieza de trabajo nueva, con su propia revisión, para que quien aprueba lea solo
+lo que cambió. La página del menú de Semana Santa de Pilot Light se aprobó hace dos semanas; ahora
+se acerca el Viernes Santo y un pan se agotó.
+
+**Quién lo hace:** tú describes el cambio. Tu asistente lo hace mientras tanto. Tu colega aprueba.
+
+**Lo que vas a tener al final:** la página actualizada como parte de la versión compartida, y el
+cambio anotado como una pieza propia.
+
+<Steps>
+
+1. **Di cuál es la página y qué cambia.** Nombra la página y enumera cada cambio. Tu asistente lo
+   anota como una pieza de trabajo nueva y la empieza.
+
+   <Chat
+     title="delegar una actualización de la página del menú de Semana Santa"
+     say="La página del menú de Semana Santa necesita dos cambios. Agrega el horario del Viernes Santo, de 8 a 12, y pon que el pan de nuez está agotado."
+     means="Nada es público. La página que se aprobó queda como está hasta que se apruebe este cambio."
+   >
+     Lo anoté como una actualización de la página del menú de Semana Santa y ya empecé. Parto de la
+     página tal como está hoy en el proyecto. Te aviso cuando haya un enlace para revisar.
+   </Chat>
+
+2. **Espera el enlace.** Igual que con una pieza nueva, tu asistente revisa que el sitio sigue
+   funcionando antes de abrir una revisión. Si esa comprobación falla, o si no cambió nada, no se
+   abre ninguna revisión y tu asistente te dice por qué.
+
+3. **Lee qué cambió.** La revisión muestra los cambios, con el texto nuevo en verde, y no la
+   página completa. Si primero lo quieres con palabras sencillas, pídelo.
+
+   <Chat
+     title="preguntar qué cambió en la página del menú de Semana Santa"
+     say="¿Qué cambió en la página del menú de Semana Santa? Con palabras sencillas."
+     means="Compara la lista con la revisión. La que cuenta es la revisión."
+   >
+     Dos cambios. Se agregó una línea con el horario del Viernes Santo, de 8 a 12. El pan de nuez
+     ahora aparece como agotado.
+   </Chat>
+
+4. **Aprueba y termina.** Quien aprueba lee la revisión como se describe en
+   [Revisión y aprobación](/es/marketing/review-and-approval/). Cuando esté aprobada, díselo a tu
+   asistente y él termina la pieza (mira
+   [Después de la aprobación](/es/marketing/review-and-approval/#después-de-la-aprobación)).
+
+</Steps>
+
+Una página que no se hizo con cckit funciona igual, siempre que sea parte del proyecto: nombra la
+página y di qué cambia.
+
+<Aside type="note" title="Aprobada no quiere decir publicada">
+La página actualizada no está en línea hasta que alguien la ponga. Mira
+[Pon en línea una pieza aprobada](/es/marketing/go-live/).
+</Aside>
+
+<Outcomes title="Para la persona técnica: los dos comandos detrás del paso 1">
+
+```text
+cckit task new "Actualizar la página del menú de Semana Santa" --body "<la página y cada cambio>"
+cckit task run <id>
+```
+
+`cckit task new` imprime el id de la tarea, y `<id>` es ese id. `cckit task run` arma un solo
+objetivo con el título y las notas de la tarea, así que las notas tienen que nombrar la página. La
+puerta de la tarea es `--check`, o si no `tasks.check` en la configuración del proyecto. Si la
+puerta falla, no se abre ninguna revisión. La tarea anterior de la página está terminada, y
+`cckit task start` rechaza una tarea terminada; por eso el cambio es una tarea nueva.
+
+</Outcomes>
+
+Siguiente: [Revisión y aprobación](/es/marketing/review-and-approval/)

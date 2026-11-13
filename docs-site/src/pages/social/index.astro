@@ -1,12 +1,12 @@
 ---
-// Index for the Instagram / Stories card templates — one link per tutorial. The 1200×630 link cards
+// Index for the Instagram / Stories card templates — one link per guide that sets `tutorial:` frontmatter. The 1200×630 link cards
 // for LinkedIn / X / Facebook are automatic (/og/…); this page is only the manual-post IG kit.
 import { getCollection } from 'astro:content';
 
 const entries = await getCollection('docs');
 const tutorials = entries
-  .filter((e) => e.id.startsWith('tutorials/') && e.data.tutorial)
-  .map((e) => ({ slug: e.id.replace(/^tutorials\//, ''), title: e.data.title, tag: e.data.tutorial.ogTag }))
+  .filter((e) => e.data.tutorial)
+  .map((e) => ({ slug: e.id, title: e.data.title, tag: e.data.tutorial.ogTag }))
   .sort((a, b) => a.title.localeCompare(b.title));
 ---
 
@@ -15,7 +15,7 @@ const tutorials = entries
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex, follow" />
-    <title>Social card kit — cckit tutorials</title>
+    <title>Social card kit — cckit guides</title>
     <style>
       * { box-sizing: border-box; margin: 0; padding: 0; }
       body { background: #0b0f14; color: #c3ced4; font-family: -apple-system, system-ui, sans-serif;
@@ -37,7 +37,7 @@ const tutorials = entries
   <body>
     <main>
       <h1>Social card kit</h1>
-      <p class="lead">Instagram feed (1080×1080) and Story (1080×1920) graphics for each tutorial —
+      <p class="lead">Instagram feed (1080×1080) and Story (1080×1920) graphics for each guide —
         export to PNG and post manually. Link cards for LinkedIn / X / Facebook are generated
         automatically from each page's frontmatter.</p>
       <ul>

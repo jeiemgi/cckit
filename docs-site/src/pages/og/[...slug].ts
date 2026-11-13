@@ -3,7 +3,7 @@ import { OGImageRoute } from 'astro-og-canvas';
 import { trackOf } from '../../lib/tracks';
 
 // One generated 1200×630 social card per docs page. The Head override points each page's og:image /
-// twitter:image at /og/<id>.png. Tutorials fold their eyebrow (Tutorial · <tag> · <difficulty> ·
+// twitter:image at /og/<id>.png. Guides fold their eyebrow (Guide · <tag> · <difficulty> ·
 // <time>) into the card's second line so a security tutorial and a parallel-work tutorial don't
 // share one anonymous image in the feed.
 const entries = await getCollection('docs');
@@ -15,7 +15,7 @@ export const { getStaticPaths, GET } = await OGImageRoute({
   getImageOptions: (_id, entry) => {
     const t = entry.data.tutorial;
     const eyebrow = t
-      ? ['Tutorial', t.ogTag, `${t.difficulty} · ${t.time}`].filter(Boolean).join(' · ')
+      ? ['Guide', t.ogTag, `${t.difficulty} · ${t.time}`].filter(Boolean).join(' · ')
       : 'cckit';
     return {
       title: entry.data.title,

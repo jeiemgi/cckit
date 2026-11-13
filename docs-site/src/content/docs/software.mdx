@@ -1,0 +1,85 @@
+---
+title: "How an agency builds software"
+description: "What the Software track is for, the process in six steps (set up, plan, design, build, review, ship) with each step linking to its area, and where a new reader starts."
+---
+
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+import SearchStart from '../../components/SearchStart.astro';
+
+<SearchStart kind="software" />
+
+An agent can write a feature in minutes. What a team loses when it works that fast is the thread:
+what was asked for, who took it, what was checked, and what reached the users. An agency keeps that
+thread with a process. Work is written down before it starts, each change is made apart from the
+others, somebody other than the author checks it, and a person decides when it ships.
+
+cckit is that process for a team whose work is done by agents. You decide what gets built and you
+approve it. The agents do the steps in between, and GitHub keeps the record: an issue for every
+piece of work, a pull request for every change.
+
+These docs follow the process in the order a team works through it.
+
+## The process in six steps
+
+1. **Set up.** An agent that opens your repository knows nothing about your team: which branch you
+   integrate on, which roles you have, which rules you follow. You install the tool once and run
+   `cckit init` in the project, and that description is written down for every later session.
+   Go to [Getting started](/getting-started/).
+
+2. **Plan.** "Build the billing page" is too large to hand to anyone. The team splits it into
+   pieces that can each be reviewed, writes each one as a GitHub issue, and puts them in an order.
+   You approve the plan before any code exists.
+   Go to [Project management](/project-management/).
+
+3. **Design.** When five agents each pick a spacing value, the product looks like five products.
+   Every visual question goes to one owner, the designer, and the team gives feedback on the
+   running interface.
+   Go to [Design](/design/).
+
+4. **Build.** Two changes made in the same folder overwrite each other. Each issue gets its own
+   copy of the code and its own branch with `cckit start <issue>`, so several agents can build at
+   the same time without touching each other's work.
+   Go to [Development](/development/).
+
+5. **Review.** The author of a change is the wrong one to judge it. Before a change can merge, the
+   project's checks run on it, an agent reviewer reads it and every finding gets an answer, and for
+   a change you can see, QA opens it in a running copy of the app.
+   Go to [Review](/review/).
+
+6. **Ship.** Merging is the one step that changes what everyone else builds on, so it is a decision
+   and has an owner. After the merge, the issue is closed, the leftover branches are removed, and a
+   release is cut when you choose.
+   Go to [Ship](/ship/).
+
+Every area is laid out the same way: why the step exists, who does it, which tools plug in, the
+commands, then step-by-step guides. Memory between sessions is an optional extra with an area of
+its own, after the six: [Memory](/memory/).
+
+## Who does the work
+
+A software project starts with eight roles, each filled by an agent: project manager, tech lead,
+designer, devops, backend, frontend, QA and security. You are the owner. You approve the plan and
+the merge, and nothing in the process takes those two away from you.
+[The team: you and the agents](/philosophy/the-team/) says what each role owns.
+
+## The tools cckit plugs in
+
+cckit does not build its own tracker, model, memory or review surface. It uses the ones a team
+already trusts and connects them:
+
+- **GitHub**, through the `gh` command, holds the issues, the pull requests and the board (the list of work and its status).
+- **Claude Code or Codex** is the agent that runs the work. cckit does not include a model.
+
+Four optional tools add memory between sessions, plan pages, code search and a local model. Each
+is installed only after you agree. Their names, and how each is installed, are on
+[Integrations](/integrations/).
+
+## Where to start
+
+<CardGrid>
+  <LinkCard title="New to cckit: set it up" href="/getting-started/" description="The three things a project needs before an agent can work in it, and the two guides that put them in place." />
+  <LinkCard title="You already have a repository" href="/getting-started/existing-repo/" description="Add cckit to a project without restructuring it." />
+  <LinkCard title="Looking for a command or a flag" href="/reference/" description="The reference pages: every verb, config key, skill and rule." />
+</CardGrid>
+
+Why the author built cckit, in his own words: [The idea](/philosophy/).

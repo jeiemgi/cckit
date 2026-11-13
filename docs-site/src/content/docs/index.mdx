@@ -1,43 +1,34 @@
 ---
 title: cckit — a project OS for coding agents
-description: Be the architect — cckit runs the mechanics. The full GitHub work lifecycle as a CLI that turns your Git into retrievable, efficient context, drivable by Claude Code and any agent.
+description: "You decide what gets made and you approve it; agents do the work in between. cckit is the process that keeps that work in order: each piece is planned, made in its own space, reviewed and approved, and GitHub keeps the record. A command-line tool and a set of skills for Claude Code and other agents."
 template: splash
+hero:
+  title: You decide what gets made. Agents do the work in between.
+  tagline: cckit is the process that keeps that work in order. Each piece is planned, made in its own space, reviewed and approved, and GitHub keeps the record of every step. It is a command-line tool and a set of skills for Claude Code and other agents.
 ---
 
-import { Image } from 'astro:assets';
 import { LinkButton } from '@astrojs/starlight/components';
-import banner from '../../assets/hero-banner.png';
 import SiteSchema from '../../components/SiteSchema.astro';
+import SearchStart from '../../components/SearchStart.astro';
 
 <SiteSchema />
 
-<div class="hero-banner">
-  <Image
-    src={banner}
-    alt="cckit — the full GitHub work lifecycle as a CLI, drivable by Claude Code and any agent"
-    loading="eager"
-  />
-</div>
+<SearchStart kind="home" />
 
-<p class="hero-tagline">
-  <strong>You decide what gets made and you approve it. cckit runs the steps in between.</strong><br />
-  cckit is a command-line tool and a set of skills for Claude Code and other agents. It takes each
-  piece of work through one cycle on GitHub: planned, drafted in its own space, reviewed, approved,
-  cleaned up.
-</p>
+<p class="hero-tagline">Pick the kind of work your team does.</p>
 
 <div class="doors">
-  <a class="door" data-track="software" href="/getting-started/">
+  <a class="door" data-track="software" href="/software/">
     <span class="door-kicker">Software</span>
-    <span class="door-title">Ship code with agents</span>
-    <span class="door-text">For developers. Issues, worktrees, pull requests, review gates and parallel waves, driven from the terminal or from Claude Code.</span>
-    <span class="door-go">Open the Quickstart</span>
+    <span class="door-title">Build software the way an agency does</span>
+    <span class="door-text">For teams that ship code. Six steps, in order: set up, plan, design, build, review, ship. Each one says why it exists, who does it and which command runs it.</span>
+    <span class="door-go">See the six steps</span>
   </a>
   <a class="door" data-track="marketing" href="/marketing/">
     <span class="door-kicker">Marketing</span>
-    <span class="door-title">Write, review and approve content</span>
-    <span class="door-text">For marketing teams. Posts, pages, campaigns and brand voice, by talking to Claude. No terminal.</span>
-    <span class="door-go">See what it does for your team</span>
+    <span class="door-title">Hand over a page, a site or a campaign</span>
+    <span class="door-text">For marketing teams. Say what you want in a paragraph, and get back a link to look at and approve. The process runs behind it. No terminal.</span>
+    <span class="door-go">See what you can hand over</span>
   </a>
 </div>
 
@@ -45,6 +36,5 @@ import SiteSchema from '../../components/SiteSchema.astro';
 
 <div class="hero-actions">
   <LinkButton href="/philosophy/" variant="secondary">Why I built this</LinkButton>
-  <LinkButton href="/tutorials/" variant="secondary">All tutorials</LinkButton>
   <LinkButton href="https://github.com/jeiemgi/cckit" variant="minimal" icon="external">GitHub</LinkButton>
 </div>

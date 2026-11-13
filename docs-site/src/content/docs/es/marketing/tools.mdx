@@ -1,0 +1,108 @@
+---
+title: "Las herramientas que conectamos"
+description: "Las herramientas que cckit conecta y lo que cada una hace por ti: Claude Code, GitHub, la lista de tareas, las páginas de revisión, la memoria opcional y las habilidades de diseño. cckit las conecta; las hacen otras personas."
+---
+
+import Outcomes from '../../../../components/Outcomes.astro';
+
+Delegar una pieza toma un solo pedido porque hay unas cuantas herramientas conectadas detrás.
+Esta página dice qué hace cada una por ti, quién la hace y si tu equipo tiene que hacer algo para
+tenerla. cckit las conecta; las hacen otras personas. La persona técnica las conecta
+cuando se [entregan las llaves](/es/marketing/get-set-up/).
+
+## Qué hace cada herramienta por ti
+
+### Claude Code: donde delegas el trabajo
+
+Claude Code es la app con la que hablas, y tu asistente vive en ella. Le describes la pieza y tu
+asistente la planea, la escribe, la construye y mantiene al día la lista de tareas. La hace Anthropic. Cada persona que escribe la
+necesita en su computadora; basta con la app de escritorio.
+
+La instalación de marketing agrega tres métodos escritos que tu asistente sigue: uno para escribir
+textos, uno para la [voz de marca](/es/marketing/brand-voice/) y uno para
+[planear una campaña](/es/marketing/campaigns/). También agrega el modo de lenguaje sencillo, en
+el que tu asistente dice "borrador", "revisión" y "aprobar".
+
+### GitHub: donde se guarda el trabajo y donde apruebas
+
+GitHub guarda el proyecto y su historial, y aloja la página donde lees el resultado, comentas y
+apruebas. Lo hace GitHub. Cada persona que escribe y cada persona que aprueba necesita una cuenta
+con acceso al proyecto. Quien aprueba no necesita nada más: basta un navegador.
+
+### La lista de tareas: lo que delegaste y cómo va
+
+La lista de piezas se guarda dentro del proyecto, en una carpeta llamada `tasks/`, con un archivo
+pequeño por pieza. Esta parte es de cckit. No hay que instalar nada ni abrir otra cuenta. Nunca
+abres esos archivos: le preguntas a tu asistente "¿cómo vamos?" o "¿qué sigue?".
+
+Una persona técnica puede pasar la lista a GitHub. La diferencia que te importa es cómo se revisa
+una campaña, y está descrita en
+[Varias piezas, un objetivo](/es/marketing/campaigns/#si-tu-persona-técnica-pasó-la-lista-de-tareas-a-github).
+
+### Páginas de revisión: planes que respondes en el navegador
+
+Un plan es difícil de juzgar como un mensaje largo en una conversación. Cuando tu asistente propone el
+plan de una campaña o te pide elegir entre opciones, abre una página en tu navegador donde puedes
+comentar cada parte y mandar tu respuesta.
+
+La herramienta detrás de esas páginas es Lavish, software de código abierto hecho por otra
+persona. Viene activada por defecto y la página se sirve desde tu propia computadora. Necesita
+Node.js ahí, que la persona técnica comprueba durante la instalación. Sin ella, o si no hay
+navegador, tu asistente muestra el mismo plan en la conversación, así que no se pierde nada. Esto es
+para planes y decisiones. La revisión de un borrador terminado ocurre en GitHub.
+
+### Memoria: el proyecto recuerda tus decisiones
+
+Sin memoria, cada conversación con tu asistente parte de lo que está escrito en el proyecto: la voz de
+marca, la lista de tareas, los borradores. Para la mayoría de los equipos eso alcanza.
+
+MemPalace agrega una memoria que lleva decisiones y contexto de una conversación a la siguiente, para
+que no expliques dos veces la misma decisión. cckit la adopta; no la construye. Es software
+independiente de código abierto, funciona en tu computadora y no pide cuenta. La instalación de
+marketing la deja **apagada**. Una persona técnica la enciende y la instala. La parte automática
+funciona solo en Claude Code.
+
+### Habilidades de diseño: cómo se diseña una página
+
+cckit incluye una habilidad de diseño propia, `page-design`. Coordina tres habilidades de diseño
+hechas por otras personas: `impeccable` fija la dirección y las reglas contra el aspecto genérico
+de lo generado, `emil-design-eng` cubre la interacción y el movimiento, y `web-design-guidelines`
+audita la página terminada. Antes de construir escribe un resumen de diseño corto, y la revisión
+dice qué habilidades de diseño se cargaron en esa ejecución.
+
+Ninguna de las cuatro queda activa tras la instalación. La persona técnica las activa una vez:
+`cckit add page-design`, luego `cckit add` para cada una de las tres y `cckit doctor --fix`, que
+pregunta antes de instalar cualquier cosa. En la única ejecución registrada, la misma landing page
+de la panadería tardó unos siete minutos con las habilidades y menos de tres sin ellas, y usó unas
+ocho veces más tokens. El resumen nombró un concepto, dos tipografías y una paleta, y enumeró ocho
+patrones genéricos que rechazó.
+
+## Qué tienes que hacer tú
+
+| Herramienta | La hace | ¿Activa tras la instalación? | Necesitas |
+| --- | --- | --- | --- |
+| Claude Code | Anthropic | Sí | La app en tu computadora |
+| GitHub | GitHub | Sí | Una cuenta con acceso al proyecto |
+| Lista de tareas | cckit | Sí | Nada |
+| Páginas de revisión | Lavish | Sí | Un navegador, y Node.js en tu computadora |
+| Memoria | MemPalace | No | Que una persona técnica la encienda |
+| Habilidades de diseño | Otros autores | No, se instalan con consentimiento | Un sí, una vez |
+
+## Lo que no está conectado
+
+No hay ninguna herramienta conectada para publicar, programar publicaciones, mandar correos ni
+analítica. cckit termina en una pieza aprobada, y esas tareas siguen en las herramientas que tu
+equipo ya usa. Mira [después de la aprobación](/es/marketing/review-and-approval/#después-de-la-aprobación).
+
+<Outcomes title="Para la persona técnica">
+
+Estas páginas están en inglés y escritas para gente de desarrollo.
+
+- Cómo se activan e instalan las integraciones, y quién hace cada una: [Integrations](/integrations/) (en inglés)
+- La lista de tareas en el proyecto: [Tasks without GitHub issues](/project-management/light-tasks/) (en inglés)
+- Las páginas de revisión y cómo apagarlas: [Plans you answer on a page](/project-management/plan-pages/) (en inglés)
+- Encender la memoria: [Why an agent team needs memory](/memory/) (en inglés)
+
+</Outcomes>
+
+Siguiente: [Define tu voz de marca](/es/marketing/brand-voice/)

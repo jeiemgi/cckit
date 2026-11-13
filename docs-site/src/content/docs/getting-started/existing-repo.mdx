@@ -1,0 +1,184 @@
+---
+title: Add cckit to an existing repo
+description: Bring cckit to a project that already has its own structure, step by step, without restructuring it.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
+
+A project that has been running for a while already has a layout, a history, and often a
+`.claude/` folder somebody copied in by hand. The worry with any new tool is that it will rearrange
+all of that. cckit does not: it adds its own config, records the cckit files that are already
+there, and leaves everything else where it is.
+
+**What you will have at the end:** the repository set up for cckit, every cckit file in it on
+cckit's list of files it manages, and your own code, notes and plans untouched.
+
+**Who does it:** one person with a terminal, or your agent. Every step is a single command, so your
+agent can run the whole adoption and report back.
+
+The Bakery site, the example project of these guides, is here an older copy of the site that
+somebody pasted a `.claude/` folder into by hand. Each step starts with the sentence you say to
+your agent in the chat, then the command it runs. No output is shown on this page, because the
+real Bakery project was set up by `cckit init`, not adopted.
+
+## Steps
+
+Run these in order from inside the repository.
+
+### 1 · `scan`: see where you stand
+
+<Chat
+  title="checking what the old Bakery site repository contains"
+  say="Look at this repository before you change anything. What is in it, and does it already have cckit files?"
+  ran="cckit scan"
+  means="Scan only reads. It reports the state of the cckit files."
+>
+  I read the repository and reported its stack and the state of its cckit files. Nothing was written.
+</Chat>
+
+<Outcomes of="cckit scan">
+
+| State | Meaning |
+| --- | --- |
+| `configured` | cckit already runs here |
+| `partial` or `claude-only` | some cckit files exist but are not recorded as cckit's |
+| `none` | a repository with no cckit files |
+
+</Outcomes>
+
+### 2 · `init`: only when there is nothing yet
+
+<Chat
+  title="setting up cckit in a repository that has none"
+  say="This repository has no cckit files yet. Set it up from a profile."
+  ran="cckit init"
+  means="For a `none` repository, init writes the config and a `.claude/` folder from a profile."
+>
+  I wrote the project config and a `.claude/` folder from the profile you picked.
+</Chat>
+
+Skip this step when `scan` says `configured`. [Initialize a project](/getting-started/initialize/)
+covers the questions it asks.
+
+### 3 · `adopt`: take ownership of files already there
+
+<Chat
+  title="adopting the hand-copied cckit files of the Bakery site"
+  say="The pasted .claude folder should count as cckit's. Show me what you would record, then record it."
+  ran={["cckit adopt --dry-run", "cckit adopt"]}
+  means="Adopt writes no content. It records each file at its current hash in the manifest."
+>
+  I previewed first, then recorded the cckit files that were already in the repository. Your own
+  code, notes and plans were not claimed.
+</Chat>
+
+This is the step for a repository that got its cckit files by hand: a copied `.claude/`, an old
+init, skills a teammate pasted in. The files are present, but the **manifest**, cckit's record of
+which files it owns, does not know them, so an upgrade (`cckit init --upgrade`) and the uninstall
+script (`scripts/kit-remove.sh`) will not touch them. `adopt` records each at its current hash. It
+never claims your `knowledge/`, plans or app code.
+
+### 4 · `migrate`: fix an old layout
+
+<Chat
+  title="moving the old layout of the Bakery site to the current one"
+  say="Is the layout old? Show me the moves before you make any."
+  ran="cckit migrate --dry-run"
+  means="Running migrate again changes nothing. The dry run prints the moves and writes nothing."
+>
+  I ran the preview and wrote nothing. It lists the moves from the old cckit layout to the current
+  one; say yes and I will run `cckit migrate` to apply them.
+</Chat>
+
+### 5 · `update`: check the version
+
+<Chat
+  title="checking whether the Bakery site trails the installed cckit"
+  say="Is this project behind the cckit installed on this computer?"
+  ran="cckit update"
+  means="If it trails the installed version, follow Update a project."
+>
+  I checked the version and changed nothing. If the project is behind, the steps are in
+  [Update a project](/getting-started/update/).
+</Chat>
+
+### 6 · `doctor`: confirm the basics
+
+<Chat
+  title="confirming the tools for the Bakery site"
+  say="Check the tools and the GitHub sign-in."
+  ran="cckit doctor"
+  means="It checks that the required tools and the `gh` sign-in are in place."
+>
+  I ran the doctor. It reports what is missing and the command that fixes it.
+</Chat>
+
+<Aside type="note" title="What is the manifest?">
+The manifest is cckit's list of which files in your repository it owns and manages. Files outside
+it (your app code, your `knowledge/`, your plans) are never touched by an upgrade or by the uninstall script, `scripts/kit-remove.sh`, which
+deletes only what the manifest lists.
+`adopt` is how you add cckit files that are already present to that list.
+</Aside>
+
+## Check it worked
+
+<Chat
+  title="checking the adoption of the Bakery site"
+  say="Is everything cckit's own recorded now? Where does the project stand?"
+  ran={["cckit adopt --check", "cckit status"]}
+  means="`adopt --check` lists cckit files not yet recorded and writes nothing."
+>
+  Nothing is left unrecorded, and the status ran without an error. The board is empty because no work
+  is in flight yet.
+</Chat>
+
+`cckit adopt --check` should list nothing. `cckit status` should run without an error; on a fresh
+adoption it has little to report, because no work is in flight yet. Then look at `git status`:
+the only changes are cckit's own config and files.
+
+## Do it all in one go
+
+<Chat
+  title="adopting the old Bakery site repository in one request"
+  say="Bring cckit into this existing project without disturbing its layout. Look at what's already here, add its config, and record the kit-shaped files the repo already has. Then confirm everything's wired up."
+  ran={["cckit scan", "cckit init", "cckit adopt", "cckit status"]}
+  means="Your existing files and structure are untouched. Only cckit's own config was added."
+>
+  I scanned the repository, wrote the config, recorded the cckit files that were already there, and
+  checked the status. Nothing else moved.
+</Chat>
+
+## Why it is safe to run
+
+- **It adds; it does not rewrite.** `scan` only reads. `init` writes only its own files:
+  the project config (`.claude/kit.config.json`; `cckit.config.json` at the root for a Codex-only project) and `.claude/`. `adopt` records the cckit files you already have, so cckit
+  manages them in place and does not duplicate them. No company, framework or repository layout is
+  built into cckit.
+- **Every step does nothing when there is nothing to do.** The three that touch files (`init`,
+  `adopt`, `migrate`) can be previewed with a dry run and never overwrite content they do not own.
+
+## Make the adoption itself an issue
+
+In this process every change starts as an issue. The issue says what and why before any code
+exists, and the branch, the pull request and the review all hang off it, so the work can be traced,
+reviewed and undone. Adoption can follow the same path: one issue, one branch, one pull request,
+with `cckit start <issue>` and `cckit pr <issue> "<summary>"`, and the issue records which of the
+six steps applied to this repository.
+
+`cckit start <issue>` takes an issue number, so the branch, the worktree and the pull request each
+start from one.
+
+## Troubleshooting
+
+**`adopt` did not pick up a file I expected.** It records only files under `.claude/skills`,
+`.claude/rules`, `.claude/agents`, `.claude/commands`, `.claude/hooks`, `.claude/lib`,
+`.agents/skills` and `.agents/rules`, plus `.claude/statusline.sh` and `.claude/settings.json`.
+`cckit adopt --check` lists the ones not yet recorded and writes nothing.
+
+**I already ran `init` elsewhere.** Running `init` on a repository that is already configured
+leaves your existing config in place and does not overwrite it.
+
+**The board looks empty.** That is expected on a fresh adoption: no issues are in flight yet. Start
+one with [Take an issue to merged](/development/issue-to-merged-pr/).

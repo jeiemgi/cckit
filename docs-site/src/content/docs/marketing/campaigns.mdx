@@ -1,97 +1,166 @@
 ---
-title: Plan and run a campaign
-description: Turn one marketing goal into a campaign plan, break it into pieces of work, and take every piece to approved.
+title: Several pieces, one goal
+description: "Hand over a campaign: one goal becomes a plan you approve, the pieces are delegated under it, and each piece comes back as a review link."
+tutorial:
+  job: hand over a campaign of several pieces under one goal
+  difficulty: intermediate
+  time: "20 min"
+  prerequisites:
+    - { text: "Your brand voice is set", link: "brand voice", href: "/marketing/brand-voice/" }
+    - { text: "You have taken one piece to approved", link: "one piece", href: "/marketing/your-first-piece/" }
+  ogTag: Marketing
+  related: [marketing/your-first-piece, marketing/review-and-approval, marketing/where-things-stand]
 ---
 
 import { Steps, Aside } from '@astrojs/starlight/components';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
+import TutorialMeta from '../../../components/TutorialMeta.astro';
 
-A campaign is one goal and several pieces that serve it: a landing page, three emails, five social
-posts. cckit keeps them together under one plan, so you can see what is done and what is left.
+<TutorialMeta />
 
-**Before you start:** you have taken [one piece to approved](/marketing/your-first-piece/), and
-your [brand voice](/marketing/brand-voice/) is set.
+A campaign is several pieces delegated under one goal: a landing page, three emails, five social
+posts. They have to tell one story and be ready together. Planned under one goal, they show what
+is written, what is stuck and what is left. At Pilot Light Bakery the Easter menu page is approved
+and online; "Easter week" is the campaign that sends neighbours to it.
+
+**Who does it:** you state the goal and approve the plan. The planner assistant proposes the
+pieces and keeps the list. Each piece is then handed over like
+[your first one](/marketing/your-first-piece/), one at a time.
+
+**What you will have at the end:** an approved campaign plan saved in the project, every piece on
+the task list, and each piece taken to approved.
+
+**Before you start:** your [brand voice](/marketing/brand-voice/) is set, because the plan takes
+its audience and its message from it. You have taken
+[one piece to approved](/marketing/your-first-piece/), because every piece of a campaign moves the
+same way.
 
 <Steps>
 
-1. **State the goal.**
+1. **State the goal.** One goal, one audience and one date are enough to start. Your assistant
+   asks for what is missing. A goal needs a number and a date; a second goal or a second audience
+   is a second campaign.
 
-   <div class="cckit-prompt">
+   <Chat
+     title="stating the goal of the Easter week campaign"
+     say="I want to plan a campaign for Easter. The goal is 100 Easter loaf pre-orders by March 20. It is for the neighbours who follow our Instagram and are on the shop's mailing list."
+     means="You gave one goal with a number and a date, one audience and no second goal."
+   >
+     That is one goal, one audience and one date. Before I plan: where does an order happen, at the
+     counter, by phone or on the site? The plan needs to say where each piece sends people.
+   </Chat>
 
-   ```text title="Say this to Claude"
-   Plan a campaign. The goal is 200 sign-ups for our spring workshop by April 15. The audience is small-business owners in our newsletter and on Instagram.
-   ```
+2. **Read the plan.** Your assistant proposes the campaign: the message, the pieces, the order and
+   what each piece is for. The plan opens as a page in your browser where you can comment and
+   answer. When no browser is available, it is shown in the chat.
 
-   </div>
+   <Chat
+     title="reading the Easter week plan"
+     say="Orders happen on the Easter menu page. Show me the plan."
+     means="The page is for reading and answering. Nothing is created yet."
+   >
+     The plan is open in your browser. The Easter menu page is already approved, so it is in the
+     plan as done. Two pieces are new: a post about the loaf and a post about the ordering
+     deadline. Both send people to the menu page. Comment on any part and send your answer.
+   </Chat>
 
-   One goal, one audience and one date are enough to start. Claude asks for what is missing.
+3. **Change it until it is right.** Remove pieces you will not make. Add the ones it missed.
+   Nothing has been created yet.
 
-2. **Read the plan.** Claude proposes the campaign: the message, the pieces, the order and what
-   each piece is for. The plan opens as a page in your browser where you can comment and answer.
-   When no browser is available, it is shown in the conversation.
+   <Chat
+     title="changing the Easter week plan"
+     say="Add a third post about collection day."
+     means="Change the plan until you would be happy to approve it."
+   >
+     Added. The plan now has the menu page and three posts: the loaf, the ordering deadline and
+     collection day. Nothing is created yet.
+   </Chat>
 
-3. **Change it until it is right.** Remove pieces you will not make. Add the ones it missed. Nothing
-   has been created yet.
+4. **Approve the plan.** Your assistant records the campaign and one piece of work for each new
+   piece in the plan. Nothing is recorded before you say yes.
 
-4. **Approve the plan.**
+   <Chat
+     title="approving the Easter week plan"
+     say="The plan is good. Go ahead and set it up."
+     means="The plan and the list of its pieces go into one review."
+   >
+     The campaign "Easter week" and its three posts are written down. I opened one review with the
+     plan and the list; here is the link for your colleague. Once it is approved, the three posts
+     are on the shared list as not started.
+   </Chat>
 
-   <div class="cckit-prompt">
+5. **Hand over the pieces.** Each piece goes the way
+   [your first one](/marketing/your-first-piece/) did.
 
-   ```text title="Say this to Claude"
-   The plan is good. Create the campaign and its pieces.
-   ```
+   <Chat
+     title="starting the first post of Easter week"
+     say="What is next in the campaign? Build it."
+     means="One piece at a time, each with its own draft."
+   >
+     Next is the post about the Easter loaf. I have started it and I will tell you when there is a
+     link to review.
+   </Chat>
 
-   </div>
+6. **Wait for the link.** Each piece comes back with its own review.
 
-   Claude records the campaign and one piece of work for each piece in the plan. Nothing is
-   recorded before you say yes. How the pieces are recorded and reviewed depends on where your
-   project keeps its task list: see [Two ways a campaign is tracked](#two-ways-a-campaign-is-tracked).
+   <Chat
+     title="getting the review link for the first Easter week post"
+     say="How is the post about the loaf coming along?"
+     means="Each piece has its own draft and its own review."
+   >
+     The post about the Easter loaf is ready, and here is the review link. Two posts are left: the
+     ordering deadline and collection day.
+   </Chat>
 
-5. **Work through the pieces.** You write each piece the way you wrote
-   [your first one](/marketing/your-first-piece/): outline, draft, edits.
-
-   <div class="cckit-prompt">
-
-   ```text title="Say this to Claude"
-   What is next in the campaign? Let's write it.
-   ```
-
-   </div>
-
-6. **Ask for a review.** With the task list in the project, ask when each piece is ready, as you
-   did for your first piece. With the task list on GitHub, ask once, when every piece is written:
-
-   <div class="cckit-prompt">
-
-   ```text title="Say this to Claude"
-   The campaign is ready. Ask for the review.
-   ```
-
-   </div>
-
-   That one review covers all the pieces, so the approver reads them side by side and can check
-   that they tell one story.
-
-7. **Approved.** With the task list in the project, finish each piece when its review is approved.
-   With the task list on GitHub, once the campaign review says approved:
-
-   <div class="cckit-prompt">
-
-   ```text title="Say this to Claude"
-   The campaign review is approved. Finish the campaign.
-   ```
-
-   </div>
-
-   Claude makes the approved pieces part of the shared version and marks the campaign and every
-   piece under it done.
+7. **Approved.** Once a piece is approved, tell your assistant so, and it finishes the piece (see
+   [After approval](/marketing/review-and-approval/#after-approval)). Then ask for the next one,
+   until none is left.
 
 </Steps>
 
-## Two ways a campaign is tracked
+## See where a campaign stands
 
-The marketing setup keeps the task list in the project. The technical person can switch it to
-GitHub. To find out which one yours uses, ask Claude: "Does this project keep its task list in the
-project or on GitHub?"
+<Chat
+  title="checking where Easter week stands"
+  say="Where are we on the campaign? What is done, what is being written and what is waiting for someone?"
+  means="This covers one campaign. The page “See where everything stands” covers the whole project."
+>
+  Easter week: the menu page is done, the post about the loaf is waiting for review, and two posts
+  have not started. The review of the loaf post is waiting for your colleague.
+</Chat>
+
+## Good to know
+
+- **Research before you plan.** Ask your assistant to look at what competitors are saying, or to
+  check a claim, before the plan is written. It reports its sources.
+- **A plan holds at most eight pieces.** More than that is two campaigns.
+
+<Aside type="note">
+Sending the emails and scheduling the posts are outside cckit. The campaign ends when its pieces
+are approved.
+</Aside>
+
+## After the campaign
+
+When the goal's date has passed, tell your assistant the number you measured. It records it in
+the plan. cckit does not measure it for you, and a campaign with no number is recorded as not
+measured.
+
+<Chat
+  title="recording the Easter week result"
+  say="Easter week is over. We took 112 pre-orders. Put that in the plan."
+  means="The number is yours. cckit does not measure it."
+>
+  Recorded: 112 pre-orders against the goal of 100.
+</Chat>
+
+## If your technical person moved the task list to GitHub
+
+The marketing setup keeps the task list in the project, and the steps above describe that. The
+technical person can switch it to GitHub. If you are not sure which one you have, ask them.
+
+<Outcomes title="What changes with the task list on GitHub">
 
 | | Task list in the project | Task list on GitHub |
 | --- | --- | --- |
@@ -99,27 +168,16 @@ project or on GitHub?"
 | **How the pieces are reviewed** | One at a time. Each piece has its own draft and its own review. | Together. The pieces share one draft and get one review at the end. |
 | **How many at once** | No limit. | Two campaigns in progress is the default limit. The technical person can change it. |
 
-## See where a campaign stands
-
-<div class="cckit-prompt">
-
-```text title="Say this to Claude"
-Where are we on the campaign? What is done, what is in draft and what is waiting for someone?
-```
-
-</div>
-
-## Good to know
-
+- **Asking for the review.** With the task list on GitHub, ask once, when every piece is written:
+  "The campaign is ready. Ask for the review." That one review covers all the pieces, so the
+  approver reads them side by side and can check that they tell one story.
+- **Finishing.** Once the campaign review says approved, say "The campaign review is approved.
+  Finish the campaign." Your assistant makes the approved pieces part of the shared version and
+  marks the campaign and every piece under it done.
 - **Finish a campaign only when every piece is written.** With the task list on GitHub, finishing
   the campaign marks every piece under it done, including one nobody wrote. With the task list in
   the project, each piece is finished on its own, so an unwritten piece stays on the list.
-- **Research before you plan.** Ask Claude to look at what competitors are saying, or to check a
-  claim, before the plan is written. It reports its sources.
 
-<Aside type="note">
-Sending the emails and scheduling the posts are outside cckit. The campaign ends when its pieces
-are approved.
-</Aside>
+</Outcomes>
 
-Next: [Who does what](/marketing/who-does-what/)
+Next: [See where everything stands](/marketing/where-things-stand/)

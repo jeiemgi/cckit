@@ -1,14 +1,14 @@
-{"id":"ret-01","q":"How do I cut a release, and what does release-please do on main?","expect":"docs-site/src/content/docs/releasing.mdx"}
-{"id":"ret-02","q":"How does an effort differ from a single task, and how are waves ordered?","expect":["docs-site/src/content/docs/efforts-and-waves.mdx","docs-site/src/content/docs/wave.mdx"]}
+{"id":"ret-01","q":"How do I cut a release, and what does release-please do on main?","expect":"docs-site/src/content/docs/ship/releasing.mdx"}
+{"id":"ret-02","q":"How does an effort differ from a single task, and how are waves ordered?","expect":["docs-site/src/content/docs/project-management/efforts-and-waves.mdx","docs-site/src/content/docs/effort-reference.mdx","docs-site/src/content/docs/development/waves.mdx"]}
 {"id":"ret-03","q":"Which hooks does cckit install and what does each one block?","expect":"docs-site/src/content/docs/hooks.mdx"}
-{"id":"ret-04","q":"How do I give Claude Code memory that persists across sessions?","expect":["docs-site/src/content/docs/memory.mdx","docs-site/src/content/docs/tutorials/give-claude-code-persistent-memory.mdx"]}
+{"id":"ret-04","q":"How do I give Claude Code memory that persists across sessions?","expect":["docs-site/src/content/docs/memory/index.mdx","docs-site/src/content/docs/memory/install-mempalace.mdx"]}
 {"id":"ret-05","q":"Where is every config key documented, for example worktree.installPaths?","expect":"docs-site/src/content/docs/config-and-permissions.mdx"}
-{"id":"ret-06","q":"Which lint gates turn a repeated AI-review finding into a permanent check?","expect":"docs-site/src/content/docs/review-gates.mdx"}
-{"id":"ret-07","q":"I deleted one of the kit's rule files on purpose. How do I keep the project upgrade from putting it back?","expect":"docs-site/src/content/docs/update.mdx"}
-{"id":"ret-08","q":"I pulled dozens of new commits into my cckit clone, yet upgrading my project says it is already current. Why are the newer templates not arriving?","expect":["docs-site/src/content/docs/install-matrix.mdx","docs-site/src/content/docs/update.mdx"]}
+{"id":"ret-06","q":"Which lint gates turn a repeated AI-review finding into a permanent check?","expect":"docs-site/src/content/docs/review/gates.mdx"}
+{"id":"ret-07","q":"I deleted one of the kit's rule files on purpose. How do I keep the project upgrade from putting it back?","expect":"docs-site/src/content/docs/getting-started/update.mdx"}
+{"id":"ret-08","q":"I pulled dozens of new commits into my cckit clone, yet upgrading my project says it is already current. Why are the newer templates not arriving?","expect":["docs-site/src/content/docs/install-matrix.mdx","docs-site/src/content/docs/getting-started/update.mdx"]}
 {"id":"ret-09","q":"When the headless single-objective runner stops, which exit code means a round changed nothing, and what are the other stop reasons?","expect":"docs-site/src/content/docs/agent-compatibility.mdx"}
 {"id":"ret-10","q":"The kit's own pre-push gate never ran when a cckit command did the pushing. Why not, and what does a real git hook receive in that case?","expect":"docs-site/src/content/docs/hooks.mdx"}
-{"id":"ret-11","q":"A machine that launched parallel workers is gone for good. How long before the branches it was holding can be taken by another run?","expect":"docs-site/src/content/docs/wave.mdx"}
-{"id":"ret-12","q":"Where are an effort's build time and token figures written when it closes, and what does an empty field in that record mean?","expect":"docs-site/src/content/docs/efforts-and-waves.mdx"}
-{"id":"ret-13","q":"The version shown on the documentation website did not change after a release. How do I publish the site by hand?","expect":"docs-site/src/content/docs/releasing.mdx"}
-{"id":"ret-14","q":"How much always-loaded text may one skill's listing carry, and why is that measured in bytes and not characters?","expect":"docs-site/src/content/docs/review-gates.mdx"}
+{"id":"ret-11","q":"A machine that launched parallel workers is gone for good. How long before the branches it was holding can be taken by another run?","expect":"docs-site/src/content/docs/wave-reference.mdx"}
+{"id":"ret-12","q":"Where are an effort's build time and token figures written when it closes, and what does an empty field in that record mean?","expect":"docs-site/src/content/docs/effort-reference.mdx"}
+{"id":"ret-13","q":"The version shown on the documentation website did not change after a release. How do I publish the site by hand?","expect":"docs-site/src/content/docs/releasing-cckit.mdx"}
+{"id":"ret-14","q":"How much always-loaded text may one skill's listing carry, and why is that measured in bytes and not characters?","expect":"docs-site/src/content/docs/review/gates.mdx"}

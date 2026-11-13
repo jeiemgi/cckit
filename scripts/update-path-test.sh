@@ -5,7 +5,7 @@
 # Builds a project the way an OLDER cckit left it (a `task-*` skill dir, a config at an earlier
 # kitVersion in the project's own formatting, a tracked settings.json that predates the mail hook),
 # adds the customizations a real project has (an edited rule, hook, script and CLAUDE.md, paths
-# registered under `upgrade.removed`), and runs the path docs-site/src/content/docs/update.mdx
+# registered under `upgrade.removed`), and runs the path docs-site/src/content/docs/getting-started/update.mdx
 # gives a user, through bin/cckit:
 #
 #   cckit update  ->  cckit migrate  ->  cckit init --upgrade --dry-run  ->  cckit init --upgrade
@@ -30,7 +30,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source=/dev/null
 . "$ROOT/scripts/lib/test-env.sh" && test_env_seal
 CCKIT="$ROOT/bin/cckit"
-PAGE="$ROOT/docs-site/src/content/docs/update.mdx"
+PAGE="$ROOT/docs-site/src/content/docs/getting-started/update.mdx"
 fail=0
 t()     { if [ "$2" = "$3" ]; then echo "ok: $1"; else echo "FAIL: $1 -> got '[$2]' want '[$3]'"; fail=1; fi; }
 has()   { if grep -qF -- "$3" <<<"$2"; then echo "ok: $1"; else echo "FAIL: $1 -> '$3' not in: $2"; fail=1; fi; }

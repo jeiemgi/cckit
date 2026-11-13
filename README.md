@@ -12,7 +12,7 @@
 [![Docs](https://img.shields.io/badge/docs-cckit.dev-0A7E8C.svg)](https://cckit.dev)
 [![Platforms: macOS · Linux · WSL](https://img.shields.io/badge/platforms-macOS%20%C2%B7%20Linux%20%C2%B7%20WSL-555.svg)](#platforms--requirements)
 
-**[📖 Documentation](https://cckit.dev)** · [The idea](https://cckit.dev/philosophy/) · [Tutorials](https://cckit.dev/tutorials/) · [Quick start](#quick-start) · [Contributing](CONTRIBUTING.md) · [Code of Conduct](CODE_OF_CONDUCT.md)
+**[📖 Documentation](https://cckit.dev)** · [The idea](https://cckit.dev/philosophy/) · [Guides](https://cckit.dev/software/) · [Quick start](#quick-start) · [Contributing](CONTRIBUTING.md) · [Code of Conduct](CODE_OF_CONDUCT.md)
 
 The whole idea in one line:
 
@@ -80,7 +80,7 @@ cd cckit && ./scripts/install.sh    # symlinks bin/cckit onto your PATH
 | Linux | ✅ native |
 | Windows | ✅ via WSL or Git Bash (not native cmd/PowerShell) |
 
-Requirements: `bash` 4+, `git`, and `gh` (GitHub CLI) authenticated. `jq` recommended.
+Requirements: `bash` 3.2+, `git`, `gh` (GitHub CLI) authenticated, `jq` and `perl`. `cckit doctor` checks each one.
 
 ## Quick start
 
@@ -152,7 +152,7 @@ names the command; `cckit migrate` moves an old layout to the current one;
 add or modify; `cckit init --upgrade` applies it and prints that same list as `Changed on disk`.
 Existing files and every path under `upgrade.removed` are kept, and a version bump alone changes one
 line of the config. The path, with what it changes and what it never touches:
-[Update a project](https://cckit.dev/update/).
+[Update a project](https://cckit.dev/getting-started/update/).
 
 
 ## Set up a project: `cckit init`
@@ -416,7 +416,7 @@ cckit task run <id> --check "pnpm build"       # start + ONE headless agent roun
   `cckit task default` prints `light` or `issues`. The `campaign` skill reads it to record a
   campaign's pieces as light tasks or as an effort's sub-issues.
 
-Guide: [Light tasks](https://cckit.dev/light-tasks/).
+Guide: [Light tasks](https://cckit.dev/project-management/light-tasks/).
 
 ### Marketing profile
 
@@ -447,7 +447,7 @@ cckit task finish <id> "<summary>" --all               # open the pull request; 
 cckit task run <id>                                    # or hand the piece to a headless agent: one round, then the pull request
 ```
 
-Guide: [Initialize → The marketing profile](https://cckit.dev/initialize/#the-marketing-profile).
+Guide: [cckit init reference → The marketing profile](https://cckit.dev/init-reference/#the-marketing-profile).
 
 ### Pages are built with named design skills
 
@@ -603,7 +603,7 @@ run` and the tmux wave worker export `CCKIT_HEADLESS=1`), a headless agent sessi
 with no display. `reviewPages.enabled: false` (`cckit add lavish --set enable=no`) turns pages off,
 and `CCKIT_PAGES=terminal` does it for one command. A plan page before `cckit effort start` is
 recommended; `effort start` checks nothing.
-→ [Review pages](https://cckit.dev/review-pages/)
+→ [Review pages](https://cckit.dev/project-management/plan-pages/)
 
 For review by a person on the running app, `cckit qa` drives one review stack per lane — a lane is
 an issue number, so an effort's worktree is one lane. Declare how the project boots once
@@ -623,7 +623,7 @@ cckit qa lanes             # read-only table of every lane: branch, ports, up, v
 ```
 
 Set `captain.mergePolicy.requireQa` and `cckit watch` holds a PR until a pass is recorded against
-its current head. Off by default. → [the QA lane](https://cckit.dev/qa-lane/)
+its current head. Off by default. → [the QA lane](https://cckit.dev/review/qa-lane/)
 
 ## Driven by agents
 
@@ -672,7 +672,7 @@ project; `.claude/skills/` and `.claude/rules/` here are the subset cckit applie
 delegation and issue lifecycle (`issue-lifecycle.md`: deliverables are native sub-issues, an
 approved plan is executed without re-confirming each merge, and a close op — not `Closes #N` —
 closes the issue) and merge safety (`merge-safety.md`: bring a branch onto the current base before
-merging, ship a coupled chain as one PR, re-run the gate on the integration branch) and authoring (`authoring.md`: docs and README change with the behaviour, a pasted prompt carries no issue number, a summary names the work and drops machine flags) and review pages (`review-pages.md`: a plan, a decision or a grilling round opens as a page, terminal output where there is no browser, the answer written back — see [Review pages](https://cckit.dev/review-pages/)) and the shared checkout (`shared-checkout.md`: the primary checkout is never moved by hand, all work happens in a worktree, a freshly merged verb is called from a current worktree — see [Multi-session safety](https://cckit.dev/multi-session/) and the [install & update matrix](https://cckit.dev/install-matrix/)). Every shipped rule is listed in [Rules cckit ships](https://cckit.dev/rules/) — `gate-and-review.md` (the gate blocks the push and its output goes on the PR; every AI-reviewer finding is fixed or rebutted before the merge) ships to projects and is skipped here.
+merging, ship a coupled chain as one PR, re-run the gate on the integration branch) and authoring (`authoring.md`: docs and README change with the behaviour, a pasted prompt carries no issue number, a summary names the work and drops machine flags) and review pages (`review-pages.md`: a plan, a decision or a grilling round opens as a page, terminal output where there is no browser, the answer written back — see [Review pages](https://cckit.dev/project-management/plan-pages/)) and the shared checkout (`shared-checkout.md`: the primary checkout is never moved by hand, all work happens in a worktree, a freshly merged verb is called from a current worktree — see [Multi-session safety](https://cckit.dev/development/many-sessions/) and the [install & update matrix](https://cckit.dev/install-matrix/)). Every shipped rule is listed in [Rules cckit ships](https://cckit.dev/rules/) — `gate-and-review.md` (the gate blocks the push and its output goes on the PR; every AI-reviewer finding is fixed or rebutted before the merge) ships to projects and is skipped here.
 It is a subset on purpose: several templates target stacks cckit does not have.
 `scripts/self-install-test.sh` holds the manifest, the reason for every skip, and the assertion that
 the installed copies have not drifted from their templates.
@@ -680,19 +680,20 @@ the installed copies have not drifted from their templates.
 ## Documentation
 
 Full docs live at **[cckit.dev](https://cckit.dev)** — start with
-[the idea](https://cckit.dev/philosophy/) if you want the why. The
-[tutorials](https://cckit.dev/tutorials/) are step-by-step "How to X with Claude Code"
-guides, each labelled **Beginner / Intermediate / Advanced** and carrying a **"Copy as Markdown"
+[the idea](https://cckit.dev/philosophy/) if you want the why. The Software track starts at
+[cckit.dev/software](https://cckit.dev/software/). Each area holds its own step-by-step guides;
+most are labelled **Beginner / Intermediate / Advanced** and carry a **"Copy as Markdown"
 prompt** you can paste straight into Claude Code. The
 [cookbook](https://cckit.dev/cookbook/) holds lifecycle recipes, and the
 [CLI reference](https://cckit.dev/cli-reference/) covers every verb.
 
 The site has two tracks, switched from the top bar. **Software** is for developers: its sidebar
-lists 20 pages in four groups (Start, Ship one issue, Ship many at once, Look it up), and every
-other page is linked from [All guides](https://cckit.dev/guides/) or
-[All tutorials](https://cckit.dev/tutorials/). **[Marketing](https://cckit.dev/marketing/)** is
-seven pages for a marketing team that works by talking to Claude and never opens a terminal; the
-same seven pages are in Spanish at [cckit.dev/es/marketing](https://cckit.dev/es/marketing/).
+lists 43 pages in the order a team works in (Start here, Philosophy, Getting started, Project
+management, Design, Development, Review, Ship, then the optional Memory area and Reference), with
+only the current group open. Every other page is linked from its area's "More guides" page or from
+[All reference pages](https://cckit.dev/reference/). **[Marketing](https://cckit.dev/marketing/)** is
+ten pages for a marketing team that works by talking to Claude and never opens a terminal; the
+same ten pages are in Spanish at [cckit.dev/es/marketing](https://cckit.dev/es/marketing/).
 `pnpm build` in `docs-site/` fails when a Marketing page says "worktree", "branch" or "PR" outside
 its glossary page.
 
@@ -730,7 +731,7 @@ cckit/
 Every `skills:` entry in `templates/agents/*.md` has to resolve: `scripts/agent-skills-lint.sh` (a
 step of `bash scripts/check.sh`) fails on a name that is not under `skills/` or `templates/skills/`,
 not a `plugin:skill` reference, and not declared third-party in `scripts/agent-skills-external.txt`.
-See [Codified review gates](https://cckit.dev/review-gates/).
+See [Codified review gates](https://cckit.dev/review/gates/).
 
 `cckit init` also scaffolds `benchmarks/` — a per-project **documentation benchmark** that scores how
 well an agent finds and uses your own canonical docs (retrieval / adversarial / abstain / quality

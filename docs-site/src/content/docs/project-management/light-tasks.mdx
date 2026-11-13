@@ -1,0 +1,339 @@
+---
+title: Tasks without GitHub issues
+description: Plan and track work without GitHub issues — a task list that lives in the project as one file per task, with a worktree per task and a pull request for review.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import Tag from '../../../components/Tag.astro';
+import TagRow from '../../../components/TagRow.astro';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
+
+<TagRow kinds={["flow", "command"]} />
+
+Not every team plans in GitHub issues. A marketing team planning posts and pages may have no
+GitHub habit at all, and asking it to learn labels, milestones and a board before it can write
+down "draft the spring newsletter" stops the work before it starts. The team still needs what a
+board gives: one list, an order, and a way to tell what is in progress from what is done.
+
+A **light task** gives that without an issue. The list lives in the project, in a `tasks/` folder,
+one file per task. `cckit task` creates tasks, shows what is next, gives each task its own worktree
+and branch, and opens the pull request that reviews it.
+
+**What you get:** a task list anyone on the team can read in the project folder, where each task
+has a state worked out from git, and each finished task is reviewed in a pull request.
+
+**Who does it:** anyone on the team adds tasks. A person or an agent takes one and finishes it. A
+reviewer approves the pull request.
+
+**Tools that plug in:** none for the list itself, which is part of cckit. Review uses GitHub pull
+requests.
+
+Use light tasks when the team does not track its work in GitHub issues. Use
+[issues](/development/) and [efforts](/project-management/efforts-and-waves/) when it does. Both
+can live in one project: `cckit new`, `cckit start` and `cckit pr` act on issues; `cckit task …`
+acts on light tasks.
+
+<Aside type="note" title="What still needs GitHub">
+The task list needs no GitHub account. Review does: finishing a task opens a pull request, and the
+person who approves it needs a GitHub account.
+</Aside>
+
+## The loop
+
+The Bakery site tracks its Easter work this way, with no GitHub issues.
+
+## 1. Create a task
+
+<Chat
+  title="adding a menu page task to the Bakery site list"
+  say="Add a task: a menu page with the full list of bakes."
+  ran='cckit task new "Menu page with the full list of bakes"'
+  means="The id is what every later command takes."
+>
+  Added. cckit gave the task an id and wrote `tasks/<id>.md`, a file in the project.
+</Chat>
+
+## 2. See what is next
+
+<Chat
+  title="asking what is next on the Bakery site list"
+  say="What is open, and what should I take next?"
+  ran={["cckit task next", "cckit task list"]}
+  means="next prints the task to take next and the command that starts it. list prints every open task and its state."
+>
+  The menu page is the one to take next. It is a draft: written down in this folder and not started
+  yet.
+</Chat>
+
+## 3. Take it
+
+<Chat
+  title="taking the menu page task"
+  say="I will take the menu page task."
+  ran="cckit task start <id>"
+  output={[
+    "[tdf42] started — the draft lives in <project>/.claude/worktrees/light+tdf42-menu-page-with-the-full-list-of-bakes",
+    "…",
+    "[tdf42] moved tasks/tdf42.md onto the task branch",
+    "[tdf42] the team's list now shows this task as in progress",
+    "[tdf42] when the draft is ready for review: cckit task finish tdf42 \"<summary>\" --all",
+  ]}
+  means="A worktree is a separate folder for this task, on a branch named light/<id>-<slug>. Do the work there."
+>
+  The task has its own folder. I will work there, and the team's list shows it as in progress.
+</Chat>
+
+## 4. Finish it
+
+<Chat
+  title="finishing the menu page task"
+  say="The menu page is ready for review."
+  ran='cckit task finish <id> "What was done, in one line"'
+  means="Files you created are listed but not included unless you add --all."
+>
+  I marked the task done on its branch, pushed it and opened a pull request for review.
+</Chat>
+
+## 5. Review and merge
+
+The reviewer approves the pull request on GitHub. When it merges, the task is done for everyone:
+`cckit task list --all` shows it as `done`. In a project whose config sets
+[`pr.bodyStyle: "content"`](/config-and-permissions/#content-work), the pull request body carries a
+review checklist for a draft: read it through, facts and links checked, voice matches the brand
+guide, only this piece's files changed.
+
+`take` is the same verb as `start`, and `done` the same as `finish`. An id can be shortened to any
+prefix that matches one task.
+
+## Hand a task to an agent
+
+`cckit task run` does steps 3 and 4 with a headless agent in between.
+
+<Chat
+  title="handing the menu page task to an agent"
+  say="Hand the menu page task to an agent. It has to pass the build and the lint, and do not merge it."
+  ran='cckit task run <id> --check "pnpm build && pnpm lint"'
+  output={[
+    "[tdf42] started — the draft lives in <project>/.claude/worktrees/light+tdf42-menu-page-with-the-full-list-of-bakes",
+    "…",
+    "[tdf42] the assistant is working on this task now (check before review: pnpm build && pnpm lint)",
+    "autopilot run: light/tdf42-menu-page-with-the-full-list-of-bakes · agent claude · max-iters 5 · max-seconds 900 · max-tokens none",
+    "autopilot run: round 1 (bound 900s)",
+    "autopilot run: stopped - reason=done rounds=1 elapsed=62s tokens=421592 (the agent exited 0 after round 1)",
+    "…",
+    "[task] ready for review — open the link and approve it there",
+    "…",
+    "exit 0",
+  ]}
+  means="Exit 0: the round changed files, the gate passed and the pull request is open. It does not merge."
+>
+  The menu page is built, the build and lint passed, and the pull request is open for you to
+  review. I did not merge it.
+</Chat>
+
+<Outcomes title="What cckit task run does, step by step">
+
+1. It starts the task, or reuses the task's worktree when it was started before.
+2. It runs ONE headless objective there through [`cckit autopilot run`](/development/run-one-objective-unattended/):
+   the task's title, then the notes from the task file. The agent is `claude` unless `--agent codex`.
+3. It runs the gate. The gate is `--check "<cmd>"`, else
+   [`tasks.check`](/config-and-permissions/#light-tasks) in the config, else none.
+4. It finishes the task with `--all` and prints the pull request link. It does not merge.
+
+</Outcomes>
+
+<Outcomes of="cckit task run">
+
+| What happened | Exit | Pull request |
+| --- | --- | --- |
+| the round changed files and the gate passed | 0 | opened, or the open one reported |
+| the task is already in `review` | 0 | the open one reported; no agent is started |
+| the round changed nothing | 5 | none |
+| the gate failed | 6 | none |
+| the agent failed (3), a limit was reached (4), the run was interrupted (130) | as listed | none |
+| the pull request could not be opened | 7 | none; run the same command again |
+
+</Outcomes>
+
+<Outcomes title="After a failure, and the flags of cckit task run">
+
+On a non-zero exit the last line on stderr names the reason, and the work so far stays on the
+task's branch. Running `cckit task run <id>` again starts over from the task record: a stopped
+earlier run is discarded, not resumed.
+
+- `--no-finish` stops after the gate: nothing is sent for review. Send it later with
+  `cckit task finish <id> "<summary>" --all`.
+- `--max-seconds N` bounds the round (default 900 seconds). `--max-iters N` is passed to the run;
+  with no stop condition a run is one round.
+- `--agent-arg <arg>`, repeatable, passes one argument to the agent CLI. cckit adds no permission
+  flag: an agent that must edit files gets its own flag here, or from the project's agent settings.
+
+</Outcomes>
+
+## Check that it worked
+
+<Chat
+  title="asking whether anything is left to take on the Bakery site list"
+  say="Is anything left to take?"
+  ran={[
+    { cmd: "cckit task next", output: "(nothing to take — create a task with: cckit task new \"<title>\")" },
+    {
+      cmd: "cckit task list",
+      output: [
+        "ID      STATE   PRIO TITLE",
+        "tb643   review  p1   Rebuild the bakery landing page",
+        "tdf42   review  p2   Menu page with the full list of bakes",
+      ],
+    },
+  ]}
+  means="A task in review is not offered by next: its pull request is waiting for a reviewer."
+>
+  Nothing is waiting to be taken: both open tasks are already in review.
+</Chat>
+
+- `cckit task list` shows the task as `doing` after `cckit task start`, and as `review` after
+  `cckit task finish`.
+- Once the pull request merges, `cckit task list --all` shows it as `done`. The task is done when
+  the pull request merges; `cckit task finish` never merges.
+
+## Making light tasks the default
+
+A project that tracks all its work this way sets
+[`tasks.default`](/config-and-permissions/#light-tasks) to `light`:
+
+```bash
+cckit task default     # prints: light   or: issues
+```
+
+With `light`, a bare `cckit next` prints what `cckit task next` prints. `cckit next` with an
+argument, and `cckit new` / `cckit start` / `cckit pr`, still act on GitHub issues.
+
+## Work the list in one go
+
+<Chat
+  title="working the Bakery site task list in one go"
+  say="Show me the light tasks in this project and what is next. I will pick one. Start the one I pick, do the work in its folder, and when I say it is ready, send it for review and give me the pull request link. Do not merge it."
+  ran={["cckit task list", "cckit task next", "cckit task start <id>", 'cckit task finish <id> "<summary>"']}
+  means="Merging stays with the reviewer."
+>
+  Here is the list and what is next. Tell me which task to start.
+</Chat>
+
+## Plain language
+
+With [`plainLanguage.enabled`](/config-and-permissions/#content-work) set to `true`, the lines
+`cckit task` prints while it works leave out worktree, branch and pull request:
+
+| Verb | Default line | Plain line |
+| --- | --- | --- |
+| `new` | `file: tasks/<id>.md (a draft: only in this checkout until it is started or shared)` | `file: tasks/<id>.md (only on this computer until you start it or share the list)` |
+| `start` | `created worktree <path> (branch light/<id>-<slug> from origin/<base>)` | `started — the draft lives in <path>` |
+| `start` | `pushed light/<id>-<slug> — the team's list now shows the task as doing` | `the team's list now shows this task as in progress` |
+| `start` | `when the work is ready: cckit task finish <id> "<summary>"` | `when the draft is ready for review: cckit task finish <id> "<summary>" --all` |
+| `finish` | — | `ready for review — open the link and approve it there` |
+
+What a program reads is the same in both: `start` still prints `<worktree>|<branch>|<id>` on
+stdout, `finish` still prints `✓ <url>`, and `--llm` output does not change.
+
+`cckit task list` prints the same state words in both modes. In plain-language mode, when a task
+is in the `draft` state, it adds one line under the table:
+`draft = the task is on this computer only: not started, not on the shared list yet`. The
+`plain-language` rule tells the agent to say "not started" for that state, because in the rest of
+the rule "the draft" is the piece being written. The rule lists a wording for every state.
+
+## States
+
+`cckit task list` derives each task's state from where its file is and what it says. Nothing else
+records it.
+
+| State | Meaning |
+| --- | --- |
+| `draft` | The file exists only in this checkout. Teammates do not see it yet. |
+| `todo` | The file is on the base branch. Anyone can take it. |
+| `shared` | `cckit task share` committed the file on a `light/share-…` branch and that pull request has not merged. It becomes `todo` when it does; until then `start` refuses it. |
+| `doing` | A `light/<id>-…` branch exists: someone started it. |
+| `review` | That branch's copy says `done`: the pull request is waiting. |
+| `done` | The base branch's copy says `done`: the pull request merged. |
+| `dropped` | The base branch's copy says `dropped`: someone edited `status:` by hand to abandon the task, and that edit merged. A task that never reached the base branch is abandoned by deleting its `light/<id>-…` branch. |
+
+`list` hides `done` and `dropped` unless you pass `--all`. `list` and `next` fetch from `origin`
+first; offline they show the last fetched state and say so.
+
+[`cckit status`](/cli-reference/#light-tasks) shows the same states as counts, plus the tasks
+that need someone to act (`review`, `doing`, `draft`, `shared`). It reads local git and does not
+fetch.
+
+`cckit task start` cuts the task's branch from the base branch. When the repository has no such
+branch, here or on origin, it stops and prints the fix: `cckit init --yes` creates the branch and
+pushes it, or `github.baseBranch` in the config is pointed at a branch that exists.
+
+## Sharing a backlog
+
+A task created with `cckit task new` is a **draft**: a file in the checkout you ran it in. It
+reaches the team one of three ways.
+
+| You want to | Do |
+| --- | --- |
+| start the task now | `cckit task start <id>` — the draft moves onto the task's branch and merges with the work |
+| share tasks nobody has started | `cckit task share "<summary>"` — one pull request that adds every draft in this checkout to the base branch as `todo` |
+| add a task while working on something else | run `cckit task new` inside that worktree — the file ships with that branch's pull request |
+
+`start` and `share` remove the draft from the checkout they ran in once it is committed on a
+branch, so the checkout stays clean.
+
+After `share`, the tasks are listed as `shared` until the pull request merges. If the push or the
+pull request fails, `share` exits 1 and the tasks stay committed on the share branch; run
+`cckit task share` again to retry. With no new drafts it pushes that branch and opens its pull
+request, or prints the one already open.
+
+## The task file
+
+```text
+id: t3f9a
+title: Write the spring newsletter
+status: todo
+priority: p2
+kind: task
+created: 2026-11-12
+
+Free-form notes after the first blank line.
+```
+
+One `key: value` per line up to the first blank line. You can write or edit a task file by hand;
+the file name is `<id>.md` and the id is a lowercase letter followed by 1 to 11 lowercase letters
+or digits.
+
+**Why one file per task.** Two people adding tasks on two branches must not produce a merge
+conflict. Two lines appended to one shared file land on the same spot and conflict; two new files
+never touch each other. Ids are not counters for the same reason: two branches would both create
+"task 7".
+
+**Why the folder is tracked.** The list is part of the project's history: who added a task, and
+which pull request finished it, read from `git log tasks/`. The folder is `tasks/` unless
+[`tasks.dir`](/config-and-permissions/#light-tasks) names another.
+
+## Branches and cleanup
+
+A light task's branch is `light/<id>-<slug>`. The id starts with a letter, so the branch is never
+read as an issue number. [`cckit gc`](/cli-reference/#housekeeping-and-output) reports the branch
+as `PROTECTED: light task <id> still OPEN` until the task is done or dropped on the base branch —
+including a task that was started and has no commit yet. After the pull request merges, `cckit
+merge <pr>` or `cckit cleanup` removes the branch and its worktree like any other.
+
+## Where tasks can live
+
+cckit reads and writes tasks through one interface, the **task source**. One source ships: `file`,
+described on this page. A source for another store — a project-management tool, a memory store —
+is a single file, `scripts/lib/task-source-<name>.sh`, that defines `task_<name>_list`, `_get`,
+`_create`, `_on_start`, `_on_finish` and `_state`; `tasks.source` in the config selects it. The
+verbs, the branch form and the cleanup protection do not change. The contract is the header of
+`scripts/lib/task-source.sh`.
+
+## What light tasks do not do
+
+- No session claim: two sessions on one machine that start the same task share one worktree.
+- No [QA lane](/review/qa-lane/): a lane is keyed by an issue number.
+- No dependencies between tasks, no board, no labels. `priority` orders `next`; nothing else does.
+- No move to GitHub issues. The files stay in the repository, so the history is kept; a command
+  that files an issue from a task does not exist yet.

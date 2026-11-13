@@ -1,127 +1,126 @@
 ---
-title: Your first piece, start to approved
-description: One blog post from idea to approved with cckit, by talking to Claude. No terminal.
+title: Hand over your first piece
+description: Hand over one piece end to end with one request to your assistant, look at the review link, and take it to approved.
+tutorial:
+  job: hand over one piece end to end and take it to approved
+  difficulty: beginner
+  time: "10 min"
+  prerequisites:
+    - { text: "The keys are given and the project is open in the chat with your assistant", link: "The keys are given", href: "/marketing/get-set-up/" }
+  ogTag: Marketing
+  related: [marketing/write-together, marketing/ask-for-changes, marketing/review-and-approval, marketing/brand-voice]
 ---
 
 import { Steps, Aside } from '@astrojs/starlight/components';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
+import TutorialMeta from '../../../components/TutorialMeta.astro';
 
-This page follows one blog post from the idea to the moment it is approved. Every other piece of
-work, from a landing page to a product description, moves the same way.
+<TutorialMeta />
 
-**Before you start:** the project is [set up](/marketing/get-set-up/) and open in Claude Code.
+The first time, hand over something small and complete: one landing page, one post, one section
+of a site. You describe it, your assistant builds it in the background and returns a review link,
+and a person approves it. Pilot Light Bakery's project is set up and empty, and the first thing the
+shop needs is a landing page.
+
+**Who does it:** you describe the piece and read the result. Your assistant and its helpers build.
+Your colleague approves; if you work alone, you finish it yourself (step 3 says how).
+
+**What you will have at the end:** the piece as part of the shared version of the project, and the
+task marked done.
+
+**Before you start:** the [keys are given](/marketing/get-set-up/) and the project is open in the
+chat with your assistant.
 
 <Steps>
 
-1. **Tell Claude what you want to make.**
+1. **Describe the piece in one paragraph.** Say what it is and what goes on it. Your assistant
+   writes it down as a task and starts building:
 
-   <div class="cckit-prompt">
+   <Chat
+     title="handing over the Pilot Light Bakery landing page"
+     say="I need a landing page for my bakery, Pilot Light. At the top the name and a short line about us, then three breads with prices, our opening hours and a contact form. Can you build it?"
+     means="Nothing is public yet. You will get a link, read the page and approve it or ask for changes."
+   >
+     I wrote it down as a task and started building. I will tell you when there is a link.
+   </Chat>
 
-   ```text title="Say this to Claude"
-   I want to write a blog post announcing our spring workshop. Record it as a new piece of work and start a draft for it.
+   <Outcomes title="For the technical person: the two commands behind this step">
+
+   ```text
+   cckit task new "<title of the piece>" --body "<what goes on the page>"
+   cckit task run <id>
    ```
 
-   </div>
+   `cckit task new` prints the task's id, and `<id>` is that id. The notes after `--body` are the
+   paragraph about what goes on the page.
 
-   Claude adds the piece to the task list your team shares, with a title and a short description,
-   and starts a draft for it. A draft is your own copy to work in. Nothing in it changes the shared
-   version until the piece is approved.
+   </Outcomes>
 
-2. **Agree on an outline.**
+2. **Wait for the link.** Your assistant tells you when the page is ready and gives you one link.
+   Before it does, it checks that the site still works; when that check fails, or when nothing
+   changed, no review is opened and your assistant says why.
 
-   <div class="cckit-prompt">
+   One round of a landing page like this one took under three minutes in a real run with nobody
+   stepping in; a second page, a menu, took about one minute.
 
-   ```text title="Say this to Claude"
-   Propose an outline for this post. The reader is a small-business owner who has not heard of us. The one thing I want them to do is sign up for the workshop.
-   ```
+3. **Look at the result.** Open the review link. [Review and approval](/marketing/review-and-approval/)
+   says what the page shows. If you want something changed, say it:
 
-   </div>
+   <Chat
+     title="asking for changes on the Pilot Light Bakery landing page"
+     say="The line at the top is too long. Use 'Bread baked this morning'. And add a photo of the shop."
+     means="You only describe what to change. The review link stays the same, and nothing is approved by itself."
+   >
+     The line at the top is changed and the review is updated. I could not add a photo: there is
+     none in the project. Send me one and I will add it.
+   </Chat>
 
-   Change the outline until it is right. Say what to cut, what to move and what is missing.
+   **Who approves.** Send the link to your colleague. GitHub does not let the person who asked for
+   a review approve it, so a second person reads the page and clicks **Approve**. If you work
+   alone there is no second reader: you read the review yourself and finish it, either by telling
+   your assistant the page is fine or with the green **Merge pull request** button on the review
+   page.
 
-3. **Write the draft.**
-
-   <div class="cckit-prompt">
-
-   ```text title="Say this to Claude"
-   Write the first draft from that outline. Follow our brand voice.
-   ```
-
-   </div>
-
-   Claude writes the post as a file in the project and tells you where it is. Edit it together:
-   "make the opening shorter", "this paragraph sounds like an ad", "add the date and the price".
-   If your team has [set its brand voice](/marketing/brand-voice/), Claude reads it before it
-   writes.
-
-4. **Ask for a review.**
-
-   <div class="cckit-prompt">
-
-   ```text title="Say this to Claude"
-   This is ready. Save it and ask for a review.
-   ```
-
-   </div>
-
-   Claude saves the draft, sends it to GitHub and gives you a link. That link is the review: one
-   page that shows what the post says and where teammates can comment.
-
-5. **A teammate reviews it.** Send the link to the person who approves. On that page they open
-   the **Files changed** tab, comment on any line, then click **Review changes** and choose
-   **Approve** or **Request changes**. GitHub does not let the person who asked for the review
-   approve it, so the approver is someone else.
-
-6. **Apply the changes, if any.**
-
-   <div class="cckit-prompt">
-
-   ```text title="Say this to Claude"
-   Read the review comments on this post and apply them. Tell me which ones you did not apply and why.
-   ```
-
-   </div>
-
-   The review page updates by itself. The reviewer looks again.
-
-7. **Approved.** Once the review says approved:
-
-   <div class="cckit-prompt">
-
-   ```text title="Say this to Claude"
-   The review is approved. Finish this piece.
-   ```
-
-   </div>
-
-   Claude makes the approved draft part of the shared version, marks the piece done and tidies up
-   the draft. The approver can also finish it from the review page with the green
-   **Merge pull request** button (some projects label it **Squash and merge**). The piece is then
-   approved and done; the draft's folder stays on your computer until you ask Claude to clean up.
+4. **Approved.** Once it is approved, tell your assistant so, and it finishes the piece: the page
+   becomes part of the shared version and the task is marked done. See
+   [After approval](/marketing/review-and-approval/#after-approval).
 
 </Steps>
 
-<Aside type="note" title="Approved is not published">
-cckit stops at approved. Getting the post onto your site happens the way it does today.
-</Aside>
+For a page, your assistant loads the design skills described on
+[The tools we plug in](/marketing/tools/#design-skills-how-a-page-is-designed) and writes a short
+design brief before it builds. The review says which design skills were loaded in that run. A
+page built this way takes longer: in the one run on record, about seven minutes where the plain
+run took under three.
+
+You never edit code. Nothing is approved by itself, and cckit does not publish: the result is an
+approved site that works, and putting it on a public address is a separate step.
+
+## Check that it worked
+
+Ask "Where are we?". The landing page is no longer listed as in progress or waiting for a review,
+and it counts as done.
 
 ## Coming back to a piece
 
-Drafts survive closing the app. Open the project again and say:
+Pieces you have started are still there after you close the app. Open the project again and say:
 
-<div class="cckit-prompt">
+<Chat
+  title="coming back to the Bakery site the next day"
+  say="Where are we? Show me what I have started and anything waiting for a review."
+  means="Then say which one to continue. To pick new work instead, say: “Show me what is ready and I will pick.”"
+>
+  The landing page is done. You have one piece in progress, the post about the new rye loaf.
+  Nothing is waiting for a review. Do you want to continue the post?
+</Chat>
 
-```text title="Say this to Claude"
-Where are we? Show me my drafts and anything waiting for a review.
-```
+<Aside type="note" title="Approved is not published">
+cckit stops at approved. See [after approval](/marketing/review-and-approval/#after-approval), and
+[Put an approved piece online](/marketing/go-live/) for what to hand the person who publishes.
+</Aside>
 
-</div>
+Want to shape a post sentence by sentence instead of handing it over? See
+[Write a piece together](/marketing/write-together/).
 
-Then say which one to continue.
-
-## What stays with people
-
-- **Approving.** A teammate approves on the review page. Claude finishes a piece only after you
-  tell it the review is approved.
-- **Publishing.** That is outside cckit.
-
-Next: [Set your brand voice](/marketing/brand-voice/) · [Plan and run a campaign](/marketing/campaigns/)
+Next: [Write a piece together](/marketing/write-together/)

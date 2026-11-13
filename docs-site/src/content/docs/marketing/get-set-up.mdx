@@ -1,82 +1,118 @@
 ---
-title: Get set up
-description: The one-time setup of cckit for a marketing team. Someone technical does the first part; you check that it worked.
+title: Give the keys
+description: The one-time setup that lets cckit handle the rest. A technical person sets up Claude Code, a GitHub account and the project once; afterwards you work in plain words.
 ---
 
-import { Steps, Aside } from '@astrojs/starlight/components';
+import { Steps } from '@astrojs/starlight/components';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
 
-Setup happens once per project. It has two parts: a part for someone technical, and a part for you.
+"The keys" are the accounts and the project that cckit needs in order to work for you: Claude
+Code, a GitHub account and the project itself. You give them once. After that, cckit handles
+the process behind each piece.
 
-## What you need
+The example on these pages is one shop: Pilot Light Bakery, a neighbourhood bakery on Alder Row.
+Its owner sells bread and pastries, has never opened a terminal, and works with one colleague at
+the counter, who reads and approves what goes on the site. Their project is called the Bakery
+site.
 
-- **A project on GitHub** where your content lives or will live. cckit starts from a project that
-  already exists; it does not create a website.
-- **A GitHub account** for each person who writes or approves, with access to that project.
+The setup is done once and it needs a terminal. That is why a technical person does it: a
+developer on your team, an agency contact or a freelancer, for about half an hour. After it,
+nobody on the team needs a terminal again.
+
+**What you will have at the end:** a project you can open in Claude Code, where your assistant
+speaks in plain language, knows the four assistants and answers "Where are we?".
+
+What each connected tool does for you is on [The tools we plug in](/marketing/tools/).
+
+## The keys
+
 - **Claude Code** on your computer. The desktop app is enough.
-- **Someone technical for about half an hour**: a developer on your team, an agency contact, a
-  freelancer.
+- **A GitHub account** for each person who writes or approves, with access to the project. An
+  approver needs only a browser.
+- **The project.** For a new website, the setup creates it. For an existing project, it adds to
+  it.
 
 ## Part 1: for the technical person
 
 This part uses a terminal. If that is not you, send this section to the person who will do it.
 
-<Steps>
+<Outcomes title="For the technical person: install cckit and create the project">
 
 1. **Install cckit and sign in to GitHub** on the marketer's computer:
-   [Install cckit](/install/), then [Check your platform](/check-your-platform/).
+   [Install and check](/getting-started/install/).
 
-2. **Open the project in Claude Code and run the setup with the marketing profile:**
+2. **Create the project with the marketing profile.** For a new website:
 
    ```text
-   /kit-init marketing
+   cckit init <folder> --profile marketing --recipe nextjs-shadcn --yes
    ```
 
-   The marketing profile installs the writing, brand voice and campaign skills, the four roles
-   (planner, editor, designer, researcher) and the plain-language mode, in which Claude says
-   "draft", "review" and "approve" and keeps developer terms out of the conversation unless asked.
-   From a terminal the same setup is `cckit init --profile marketing`. What the setup writes and
-   asks is on [Initialize cckit](/initialize/).
+   In a real run this one command created a working Next.js and shadcn project, a private GitHub
+   repository, and the labels and settings, after one confirmation. For a project that already
+   exists, run `cckit init --profile marketing` inside it, or `/kit-init marketing` in Claude
+   Code. What it installs, and what to do if a part did not run, is in the
+   [cckit init reference](/init-reference/#the-marketing-profile).
 
-   The setup lists its git and GitHub steps and asks once before running them. Say yes. Those
-   steps save the setup files into the shared version every draft starts from and send them to
-   GitHub, so each new draft and each teammate's copy of the project has them. On a project that
-   is new on GitHub they also create that shared version, named `develop`; a project that is
-   already on GitHub keeps the one it has.
+3. **Give every writer and approver access** to the project on GitHub, and decide who approves.
+   A setup where one person asks for work and another approves works from day one.
 
-   If the last lines of the output say `Git and GitHub setup: not run`, run `cckit init --yes` in
-   the project folder. The lines after it name what was left undone. Until that has run, a new
-   draft starts without the setup files, and Claude works in it without the team's rules.
+**A private repository on a free GitHub plan.** Protection of the shared version is not available
+on a private repository on a free GitHub plan. The setup says so when it skips that step. The
+project works without it.
 
-3. **Give every writer and approver access** to the project on GitHub.
+</Outcomes>
 
-</Steps>
+<Outcomes title="For the technical person: what runs when they say it">
 
-<Aside type="tip" title="Approvals">
-Decide now who approves. A setup where one person writes and another approves works from day one.
-</Aside>
+<div data-table="grid">
 
-## Part 2: for you
+| What they say | What runs |
+| --- | --- |
+| "Where are we?" | `cckit status` |
+| "Show me what I have started and anything waiting for a review." | `cckit task list` |
+| "What is next?" | `cckit task next` |
+| "I need a landing page for …" | `cckit task new "<title>" --body "<what goes on the page>"`, then `cckit task run <id>` |
+| "Let's start the draft." | `cckit task start <id>` |
+| "Save it and ask for a review." | `cckit task finish <id> "<summary>" --all` |
+| "It is approved. Can you wrap it up?" | `cckit merge <pr>` |
+| "I want to plan a campaign." | the campaign skill; the plan opens with `cckit page open <html-file>` and the answer is saved with `cckit page answer` |
+
+</div>
+
+Reading review comments and editing a draft are done by the assistant itself, not by a `cckit`
+verb. The full verb list is in the [CLI reference](/cli-reference/).
+
+</Outcomes>
+
+## Part 2: for you, and the check that it worked
 
 <Steps>
 
-1. **Open the project in Claude Code.** The technical person shows you where it is the first time.
+1. **Open the project in your assistant's app.** The technical person shows you where it is the
+   first time.
 
-2. **Ask Claude where things stand:**
+2. **Ask where things stand.** On a new project the list is short or empty.
 
-   ```text
-   Where are we?
-   ```
+   <Chat
+     title="asking where things stand on the new Bakery site"
+     say="Where are we?"
+     means="An answer means the setup works."
+   >
+     The Bakery site is set up. Nothing is in progress and nothing is waiting for a review.
+   </Chat>
 
-   Claude answers with what is in progress, what is waiting for a review and what needs cleaning
-   up. Your pieces are in that answer: how many are waiting for a review, in progress or not
-   started, and which ones need someone to act. On a new project the list is short or empty. An
-   answer means the setup works.
+3. **Ask what you can hand over.**
 
-3. **Ask what you can do:**
-
-   ```text
-   I am on the marketing team and I do not use developer tools. What can I ask you to do in this project?
-   ```
+   <Chat
+     title="asking what can be handed over for the bakery"
+     say="What can I ask you to do here?"
+     means="You do not need the list by heart. Ask again whenever you are unsure."
+   >
+     You can hand me a page, a post or a whole campaign for the bakery. Describe it in plain words.
+     I write it down, build it in the background and give you a link to review. You approve it or ask
+     for changes. I do not put anything online.
+   </Chat>
 
 </Steps>
 
@@ -84,10 +120,10 @@ Decide now who approves. A setup where one person writes and another approves wo
 
 | What you see | What to do |
 | --- | --- |
-| Claude says it cannot reach GitHub, or asks you to sign in | Ask the technical person to redo step 1 of Part 1. |
-| Claude says it cannot start a draft because the shared version (`develop` or `main`) does not exist | The git and GitHub part of the setup did not run. Ask the technical person to run `cckit init --yes` in the project folder (step 2 of Part 1). |
-| In a new draft Claude does not know the roles, the brand voice skill or the plain-language mode | The setup files were never saved into the shared version. The fix is the same: `cckit init --yes` in the project folder, then start the draft again. |
-| Claude answers with developer terms you do not know | Say "Explain that in plain language." The words are on [Words you will hear](/marketing/words-you-will-hear/). |
-| Claude asks permission to run something | Read what it says it will do. Creating a draft, saving your work and asking for a review are expected. If you are unsure, say no and ask it to explain. |
+| Your assistant says it cannot reach GitHub, or asks you to sign in | Ask the technical person to redo step 1 of Part 1. |
+| Your assistant says it cannot start a draft | Part of the setup did not run. Send the technical person [this link](/init-reference/#the-marketing-profile). |
+| Your assistant does not know the roles, the brand voice or the plain-language mode | The same cause. Send the technical person [the same link](/init-reference/#the-marketing-profile), then try again. |
+| Your assistant answers with developer terms you do not know | Say "Explain that in plain language." The words are on [Words you will hear](/marketing/words-you-will-hear/). |
+| Your assistant asks permission to run something | Read what it says it will do. Creating a draft, saving your work and asking for a review are expected. If you are unsure, say no and ask it to explain. |
 
-Next: [Your first piece, start to approved](/marketing/your-first-piece/).
+Next: [The tools we plug in](/marketing/tools/)

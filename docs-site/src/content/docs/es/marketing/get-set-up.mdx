@@ -1,99 +1,131 @@
 ---
-title: Prepara todo
-description: La preparación de cckit para un equipo de marketing, que se hace una sola vez. Una persona técnica hace la primera parte; tú compruebas que funcionó.
+title: Entrega las llaves
+description: La instalación de una sola vez que deja que cckit se encargue del resto. Una persona técnica deja listos Claude Code, una cuenta de GitHub y el proyecto; después trabajas con tus propias palabras.
 ---
 
-import { Steps, Aside } from '@astrojs/starlight/components';
+import { Steps } from '@astrojs/starlight/components';
+import Chat from '../../../../components/Chat.astro';
+import Outcomes from '../../../../components/Outcomes.astro';
 
-La preparación se hace una vez por proyecto. Tiene dos partes: una para alguien con perfil técnico
-y otra para ti.
+"Las llaves" son las cuentas y el proyecto que cckit necesita para trabajar por ti: Claude Code,
+una cuenta de GitHub y el proyecto mismo. Las entregas una vez. Después, cckit se encarga del
+proceso que hay detrás de cada pieza.
 
-## Qué necesitas
+El ejemplo de estas páginas es un solo negocio: Pilot Light, una panadería de barrio en Alder Row.
+Su dueña vende pan y repostería, nunca ha abierto una terminal y trabaja con una colega en el
+mostrador, que lee y aprueba lo que va al sitio. Su proyecto se llama el sitio de la panadería.
 
-- **Un proyecto en GitHub** donde vive o va a vivir tu contenido. cckit parte de un proyecto que ya
-  existe; no crea un sitio web.
-- **Una cuenta de GitHub** para cada persona que escribe o aprueba, con acceso a ese proyecto.
-- **Claude Code** en tu computadora. Con la aplicación de escritorio basta.
-- **Una persona técnica durante una media hora**: alguien de desarrollo en tu equipo, tu contacto
-  en la agencia, un freelance.
+La instalación se hace una vez y necesita una terminal. Por eso la hace una persona técnica:
+alguien de desarrollo de tu equipo, un contacto de la agencia o un freelance, y le toma como media
+hora. Después, nadie del equipo vuelve a necesitar una terminal.
+
+**Lo que vas a tener al final:** un proyecto que puedes abrir en Claude Code, donde tu asistente
+habla con palabras sencillas, conoce a los cuatro asistentes y responde a "¿Cómo vamos?".
+
+Lo que hace por ti cada herramienta conectada está en
+[Las herramientas que conectamos](/es/marketing/tools/).
+
+## Las llaves
+
+- **Claude Code** en tu computadora. Basta con la app de escritorio.
+- **Una cuenta de GitHub** para cada persona que escribe o aprueba, con acceso al proyecto. Quien
+  aprueba solo necesita un navegador.
+- **El proyecto.** Para un sitio web nuevo, la instalación lo crea. Si ya existe, le agrega lo
+  necesario.
 
 ## Parte 1: para la persona técnica
 
-Esta parte usa una terminal. Si no eres tú, envíale esta sección a quien la vaya a hacer. Las
+Esta parte usa una terminal. Si eso no es lo tuyo, pásale esta sección a quien lo vaya a hacer. Las
 páginas enlazadas aquí están en inglés.
 
-<Steps>
+<Outcomes title="Para la persona técnica: instalar cckit y crear el proyecto">
 
-1. **Instala cckit e inicia sesión en GitHub** en la computadora de quien va a escribir:
-   [Install cckit](/install/) (en inglés) y después
-   [Check your platform](/check-your-platform/) (en inglés).
+1. **Instala cckit e inicia sesión en GitHub** en tu computadora (la de quien va a escribir):
+   [Install and check](/getting-started/install/) (en inglés).
 
-2. **Abre el proyecto en Claude Code y corre la preparación con el perfil de marketing:**
-
-   ```text
-   /kit-init marketing
-   ```
-
-   El perfil de marketing instala las habilidades de redacción, voz de marca y campañas, los cuatro
-   roles (planeación, edición, diseño e investigación) y el modo de lenguaje sencillo, en el que
-   Claude dice "borrador", "revisión" y "aprobar" y deja los términos de desarrollo fuera de la
-   conversación salvo que se los pidan. Desde una terminal, la misma preparación es
-   `cckit init --profile marketing`. Lo que la preparación escribe y pregunta está en
-   [Initialize cckit](/initialize/) (en inglés).
-
-   La preparación enumera sus pasos de git y GitHub y pregunta una sola vez antes de correrlos. Di
-   que sí. Esos pasos guardan los archivos de la preparación en la versión compartida de la que
-   sale cada borrador y los envían a GitHub, para que cada borrador nuevo y la copia del proyecto
-   de cada persona del equipo los tenga. En un proyecto nuevo en GitHub también crean esa versión
-   compartida, llamada `develop`; un proyecto que ya está en GitHub conserva la que tiene.
-
-   Si las últimas líneas de la salida dicen `Git and GitHub setup: not run`, corre
-   `cckit init --yes` en la carpeta del proyecto. Las líneas que siguen dicen qué quedó sin hacer.
-   Mientras eso no haya corrido, un borrador nuevo empieza sin los archivos de la preparación, y
-   Claude trabaja en él sin las reglas del equipo.
-
-3. **Da acceso al proyecto en GitHub** a todas las personas que escriben o aprueban.
-
-</Steps>
-
-<Aside type="tip" title="Aprobaciones">
-Decidan desde ahora quién aprueba. Con una persona que escribe y otra que aprueba ya se puede
-trabajar desde el primer día.
-</Aside>
-
-## Parte 2: para ti
-
-<Steps>
-
-1. **Abre el proyecto en Claude Code.** La primera vez, la persona técnica te muestra dónde está.
-
-2. **Pregúntale a Claude cómo van las cosas:**
+2. **Crea el proyecto con el perfil de marketing.** Para un sitio web nuevo:
 
    ```text
-   ¿En qué vamos?
+   cckit init <folder> --profile marketing --recipe nextjs-shadcn --yes
    ```
 
-   Claude responde con lo que está en curso, lo que espera revisión y lo que hay que limpiar. Tus
-   piezas están en esa respuesta: cuántas esperan revisión, cuántas están en curso o sin empezar,
-   y cuáles necesitan que alguien haga algo. En un proyecto nuevo la lista es corta o está vacía.
-   Si responde, la preparación funciona.
+   En una prueba real este comando creó un proyecto Next.js con shadcn que funciona, un
+   repositorio privado en GitHub, y las etiquetas y los ajustes, con una sola confirmación. Si el
+   proyecto ya existe, ejecuta `cckit init --profile marketing` dentro de él, o `/kit-init marketing`
+   en Claude Code. Qué instala, y qué hacer si una parte no se ejecutó, está en la
+   [cckit init reference](/init-reference/#the-marketing-profile) (en inglés).
 
-3. **Pregunta qué puedes hacer:**
+3. **Dale acceso al proyecto en GitHub** a cada persona que escribe o aprueba, y decide quién
+   aprueba. Un equipo donde una persona pide el trabajo y otra lo aprueba funciona desde el
+   primer día.
 
-   ```text
-   Soy del equipo de marketing y no uso herramientas de desarrollo. ¿Qué te puedo pedir en este proyecto?
-   ```
+**Un repositorio privado en un plan gratuito de GitHub.** La protección de la versión compartida
+no está disponible en un repositorio privado con un plan gratuito de GitHub. La instalación lo
+avisa cuando se salta ese paso. El proyecto funciona sin ella.
 
-</Steps>
+</Outcomes>
 
-## Si algo no sale bien
+<Outcomes title="Para la persona técnica: qué se ejecuta cuando lo dicen">
 
-| Lo que ves | Qué hacer |
+<div data-table="grid">
+
+| Lo que dicen | Qué se ejecuta |
 | --- | --- |
-| Claude dice que no puede conectarse a GitHub, o te pide iniciar sesión | Pídele a la persona técnica que repita el paso 1 de la Parte 1. |
-| Claude dice que no puede abrir un borrador porque la versión compartida (`develop` o `main`) no existe | La parte de git y GitHub de la preparación no corrió. Pídele a la persona técnica que corra `cckit init --yes` en la carpeta del proyecto (paso 2 de la Parte 1). |
-| En un borrador nuevo Claude no conoce los roles, la habilidad de voz de marca ni el modo de lenguaje sencillo | Los archivos de la preparación nunca se guardaron en la versión compartida. El arreglo es el mismo: `cckit init --yes` en la carpeta del proyecto, y luego abrir el borrador otra vez. |
-| Claude responde con términos de desarrollo que no conoces | Dile "Explícamelo con palabras sencillas". Las palabras están en [Palabras que vas a escuchar](/es/marketing/words-you-will-hear/). |
-| Claude pide permiso para ejecutar algo | Lee lo que dice que va a hacer. Crear un borrador, guardar tu trabajo y pedir una revisión es lo esperado. Si dudas, di que no y pídele que te explique. |
+| "¿Cómo vamos?" | `cckit status` |
+| "Muéstrame lo que tengo empezado y lo que espera revisión." | `cckit task list` |
+| "¿Qué sigue?" | `cckit task next` |
+| "Necesito una landing page para …" | `cckit task new "<título>" --body "<lo que lleva la página>"`, después `cckit task run <id>` |
+| "Empecemos el borrador." | `cckit task start <id>` |
+| "Guárdala y pide la revisión." | `cckit task finish <id> "<resumen>" --all` |
+| "Ya está aprobada. ¿La dejas terminada?" | `cckit merge <pr>` |
+| "Quiero planear una campaña." | la habilidad de campañas; el plan se abre con `cckit page open <archivo-html>` y la respuesta se guarda con `cckit page answer` |
 
-Siguiente: [Tu primera pieza, de la idea a la aprobación](/es/marketing/your-first-piece/).
+</div>
+
+Leer los comentarios de una revisión y editar un borrador lo hace el propio asistente, no un verbo
+de `cckit`. La lista completa de verbos está en la [referencia de la CLI](/cli-reference/) (en inglés).
+
+</Outcomes>
+
+## Parte 2: para ti, y la comprobación de que funcionó
+
+<Steps>
+
+1. **Abre el proyecto en la app de tu asistente.** La primera vez, la persona técnica te muestra
+   dónde está.
+
+2. **Pregunta cómo van las cosas.** En un proyecto nuevo la lista es corta o está vacía.
+
+   <Chat
+     title="preguntar cómo va el sitio nuevo de la panadería"
+     say="¿Cómo vamos?"
+     means="Si responde, la instalación funciona."
+   >
+     El sitio de la panadería está listo. No hay nada en curso y nada espera revisión.
+   </Chat>
+
+3. **Pregunta qué puedes delegar.**
+
+   <Chat
+     title="preguntar qué se puede delegar para la panadería"
+     say="¿Qué te puedo pedir aquí?"
+     means="No hace falta que te sepas la lista de memoria. Vuelve a preguntar cuando tengas dudas."
+   >
+     Puedes delegarme una página, una publicación o una campaña completa para la panadería. Descríbela
+     con tus palabras. La anoto, la hago mientras tú sigues con lo tuyo y te doy un enlace para revisar. Tú la
+     apruebas o pides cambios. Yo no pongo nada en línea.
+   </Chat>
+
+</Steps>
+
+## Si algo no anda bien
+
+| Qué ves | Qué hacer |
+| --- | --- |
+| Tu asistente dice que no puede conectarse a GitHub, o te pide iniciar sesión | Pídele a la persona técnica que repita el paso 1 de la Parte 1. |
+| Tu asistente dice que no puede abrir un borrador | Una parte de la instalación no se ejecutó. Mándale a la persona técnica [este enlace](/init-reference/#the-marketing-profile) (en inglés). |
+| Tu asistente no conoce los roles, la voz de marca ni el modo de lenguaje sencillo | Es la misma causa. Mándale a la persona técnica [el mismo enlace](/init-reference/#the-marketing-profile) y vuelve a intentar. |
+| Tu asistente responde con términos de desarrollo que no conoces | Dile "Explícamelo con palabras sencillas". Las palabras están en [Palabras que vas a escuchar](/es/marketing/words-you-will-hear/). |
+| Tu asistente te pide permiso para ejecutar algo | Lee lo que dice que va a hacer. Crear un borrador, guardar tu trabajo y pedir una revisión son cosas esperadas. Si tienes dudas, di que no y pídele que te lo explique. |
+
+Siguiente: [Las herramientas que conectamos](/es/marketing/tools/)

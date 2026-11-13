@@ -1,0 +1,93 @@
+---
+title: Update a page that already exists
+description: "Change a page that was approved earlier: describe the change, read the review of exactly what changed, approve it."
+tutorial:
+  job: change a page that was approved earlier
+  difficulty: beginner
+  time: "15 min"
+  prerequisites:
+    - { text: "The page is part of the project and was approved earlier", link: "Hand over your first piece", href: "/marketing/your-first-piece/" }
+    - { text: "You know how a review is read and approved", link: "Review and approval", href: "/marketing/review-and-approval/" }
+  ogTag: Marketing
+  related: [marketing/ask-for-changes, marketing/review-and-approval, marketing/go-live]
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
+import TutorialMeta from '../../../components/TutorialMeta.astro';
+
+<TutorialMeta />
+
+An approved page is finished. When the bakery changes its hours or runs out of a bread, the change
+is a new piece of work with its own review, so the person who approves reads only what changed.
+Pilot Light Bakery's Easter menu page was approved two weeks ago; now Good Friday is close and one
+loaf has sold out.
+
+**Who does it:** you describe the change. Your assistant builds it in the background. Your
+colleague approves.
+
+**What you will have at the end:** the updated page as part of the shared version, and the change
+recorded as its own piece.
+
+<Steps>
+
+1. **Name the page and say what changes.** Say which page it is and list every change. Your
+   assistant writes it down as a new piece of work and starts it.
+
+   <Chat
+     title="handing over an update to the Easter menu page"
+     say="The Easter menu page needs two changes. Add our Good Friday opening hours, 8 to 12, and say the walnut loaf is sold out."
+     means="Nothing is public. The page that was approved stays as it is until this change is approved."
+   >
+     I wrote it down as an update to the Easter menu page and started it. It works from the page as
+     it is in the project now. I will tell you when there is a link to review.
+   </Chat>
+
+2. **Wait for the link.** As with a new piece, your assistant checks that the site still works
+   before it opens a review. When that check fails, or when nothing changed, no review opens and
+   your assistant says why.
+
+3. **Read what changed.** The review shows the changes, with new text in green, and not the whole
+   page. If you want it in plain words first, ask.
+
+   <Chat
+     title="asking what changed on the Easter menu page"
+     say="What changed on the Easter menu page? In plain words."
+     means="Check the list against the review. The review is the one that counts."
+   >
+     Two changes. A line was added with the Good Friday opening hours, 8 to 12. The walnut loaf is
+     now marked sold out.
+   </Chat>
+
+4. **Approve and finish.** The approver reads the review as described in
+   [Review and approval](/marketing/review-and-approval/). Once it is approved, tell your
+   assistant so, and it finishes the piece (see
+   [After approval](/marketing/review-and-approval/#after-approval)).
+
+</Steps>
+
+A page that was not made through cckit works the same way, as long as it is part of the project:
+name the page and say what changes.
+
+<Aside type="note" title="Approved is not published">
+The updated page is not online until someone puts it there. See
+[Put an approved piece online](/marketing/go-live/).
+</Aside>
+
+<Outcomes title="For the technical person: the two commands behind step 1">
+
+```text
+cckit task new "Update the Easter menu page" --body "<the page and every change>"
+cckit task run <id>
+```
+
+`cckit task new` prints the task's id, and `<id>` is that id. `cckit task run` builds one
+objective from the task's title and notes, so the notes must name the page. The task's gate is
+`--check`, else `tasks.check` in the project config. A failing gate opens no review. The earlier
+task for the page is done, and `cckit task start` refuses a done task, which is why the change is
+a new task.
+
+</Outcomes>
+
+Next: [Review and approval](/marketing/review-and-approval/)

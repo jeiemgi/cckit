@@ -1,19 +1,77 @@
 ---
-// TutorialMeta — the header block under a tutorial's title. Read entirely from the page's `tutorial:`
-// frontmatter (via Starlight route data) so an author drops <TutorialMeta /> in with no props:
-//   1. a "prompt bar" (Clerk-quickstart style) with a Copy-as-Markdown button,
-//   2. a "Before you start" card for cold traffic that may not know what cckit / Claude Code is,
-//   3. a "This tutorial" card: difficulty · read-time · prerequisites.
-// The two cards use Starlight's own <CardGrid>/<Card> so their layout, equal height, and content
-// spacing come from the design system (no hand-rolled grid). The copied prompt links the docs
-// (agent contract, CLI reference, install) and this page's URL so Claude reads them and learns the
-// cckit CLI; it never hardcodes issue numbers.
-import { Card, CardGrid } from '@astrojs/starlight/components';
+// TutorialMeta — the panel under a guide's title. Read entirely from the page's `tutorial:`
+// frontmatter (via Starlight route data) so an author drops <TutorialMeta /> in with no props.
+// One bordered panel, three regions:
+//   1. a facts line: difficulty and read time,
+//   2. "Before you start": the prerequisites as a checklist of full sentences,
+//   3. "Let your agent do it": one button that copies a prompt pointing the agent at this guide.
+// A prerequisite is a string, or { text, link, href }: `link` is the words that become a link (found
+// inside `text`, else appended after it); backticks in `text` become inline code.
+// The copied prompt links the docs (agent contract, CLI reference, install) and this page's URL so
+// the agent reads them and learns the cckit CLI; it never hardcodes issue numbers.
+import { trackOf } from '../lib/tracks';
 
 const route = Astro.locals.starlightRoute;
 const data = route?.entry?.data ?? {};
 const t = data.tutorial;
-const diffLabel = { beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced' };
+
+const es = route?.locale === 'es';
+const marketing = trackOf(Astro.url.pathname) === 'marketing';
+const who = marketing ? (es ? 'tu asistente' : 'your assistant') : 'your agent';
+
+const diffLabel = es
+  ? { beginner: 'Guía para empezar', intermediate: 'Guía intermedia', advanced: 'Guía avanzada' }
+  : { beginner: 'Beginner guide', intermediate: 'Intermediate guide', advanced: 'Advanced guide' };
+const S = es
+  ? {
+      aria: 'Sobre esta guía',
+      read: 'de lectura',
+      before: 'Antes de empezar',
+      newTo: '¿Primera vez con cckit? Empieza por',
+      newLink: 'Qué puedes delegar',
+      newHref: '/es/marketing/',
+      agent: 'Deja que tu asistente lo haga',
+      blurb:
+        'Copia un mensaje que lleva a tu asistente a esta guía. Pégalo en el chat y sigue los pasos, contándote qué hizo cada uno.',
+      button: 'Copiar el mensaje',
+      copied: 'Copiado ✓',
+      buttonAria: 'Copiar esta guía como mensaje para tu asistente',
+    }
+  : {
+      aria: 'About this guide',
+      read: 'read',
+      before: 'Before you start',
+      newTo: 'New to cckit? Read',
+      newLink: marketing ? 'What you can hand over' : 'Getting started',
+      newHref: marketing ? '/marketing/' : '/getting-started/',
+      agent: marketing ? 'Let your assistant do it' : 'Let your agent do it',
+      blurb: `Copy a prompt that points ${who} at this guide. Paste it in the chat and it follows the steps, telling you what each one did.`,
+      button: 'Copy the prompt',
+      copied: 'Copied ✓',
+      buttonAria: `Copy this guide as a prompt for ${who}`,
+    };
+// "New to cckit? Read Getting started first." — the trailing word differs per language.
+const newEnd = es ? ' antes.' : ' first.';
+
+type Part = { kind: 'text' | 'code' | 'link'; value: string };
+/** Split an item into text / inline-code / link parts. */
+function parts(item: string | { text: string; link?: string; href?: string }): { parts: Part[]; href?: string } {
+  const text = typeof item === 'string' ? item : item.text;
+  const link = typeof item === 'string' ? undefined : item.link;
+  const href = typeof item === 'string' ? undefined : item.href;
+  const out: Part[] = text.split('`').map((value, i) => ({ kind: i % 2 ? 'code' : 'text', value }) as Part);
+  if (link && href) {
+    const at = out.findIndex((p) => p.kind === 'text' && p.value.includes(link));
+    if (at >= 0) {
+      const [before, after] = [out[at].value.slice(0, out[at].value.indexOf(link)), out[at].value.slice(out[at].value.indexOf(link) + link.length)];
+      out.splice(at, 1, { kind: 'text', value: before }, { kind: 'link', value: link }, { kind: 'text', value: after });
+    } else {
+      out.push({ kind: 'text', value: ' ' }, { kind: 'link', value: link });
+    }
+  }
+  return { parts: out.filter((p) => p.value !== ''), href };
+}
+const items = (t?.prerequisites ?? []).map(parts);
 
 const DOCS = 'https://cckit.dev';
 const pageUrl = new URL(Astro.url.pathname, Astro.site ?? DOCS).href;
@@ -21,66 +79,54 @@ const pageUrl = new URL(Astro.url.pathname, Astro.site ?? DOCS).href;
 const copyMarkdown = t
   ? `I want to: ${t.job}.
 
-Follow this cckit tutorial and do it in my repo, step by step:
+Follow this cckit guide and do it in my repo, step by step:
 ${pageUrl}
 
-cckit is a CLI that drives the whole GitHub work lifecycle from Claude Code. If you don't already
-know its commands, read these first, then follow the tutorial above:
+cckit is a CLI that drives the whole GitHub work lifecycle from your coding agent's chat. If you
+don't already know its commands, read these first, then follow the guide above:
 - Agent contract (the command grammar): ${DOCS}/agents/
 - CLI reference: ${DOCS}/cli-reference/
-- Install cckit: ${DOCS}/install/
+- Install cckit: ${DOCS}/getting-started/install/
 
-Read the board with \`cckit sync\` before acting, use the exact commands from the tutorial, and run
+Read the board with \`cckit sync\` before acting, use the exact commands from the guide, and run
 them as we go — telling me what each one did.
 `
   : '';
 ---
 {t && (
-  <div class="tut-header">
-    <div class="tut-promptbar">
-      <div class="tut-promptbar-copy">
-        <span class="tut-promptbar-mark" aria-hidden="true">❯_</span>
-        <div class="tut-promptbar-text">
-          <strong>Do this with Claude&nbsp;Code</strong>
-          <span>Copy a prompt that links the cckit docs so Claude learns the CLI, then follows these steps.</span>
-        </div>
-      </div>
-      <button type="button" class="tut-copy" data-copy-md={copyMarkdown} aria-label="Copy this tutorial as a Claude Code prompt">
-        <svg class="tut-copy-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-        </svg>
-        <span class="tut-copy-label">Copy as Markdown</span>
-      </button>
+  <aside class="tut" aria-label={S.aria}>
+    <p class="tut-facts">{diffLabel[t.difficulty] ?? t.difficulty} · {t.time} {S.read}</p>
+    <div class="tut-grid">
+      <section class="tut-col" aria-labelledby="tut-needs">
+        <h2 class="tut-h" id="tut-needs">{S.before}</h2>
+        {items.length > 0 && (
+          <ul class="tut-list">
+            {items.map((it) => (
+              <li>
+                {it.parts.map((p) =>
+                  p.kind === 'code' ? <code>{p.value}</code>
+                  : p.kind === 'link' ? <a href={it.href}>{p.value}</a>
+                  : p.value,
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+        <p class="tut-new">{S.newTo} <a href={S.newHref}>{S.newLink}</a>{newEnd}</p>
+      </section>
+      <section class="tut-col" aria-labelledby="tut-agent">
+        <h2 class="tut-h" id="tut-agent">{S.agent}</h2>
+        <p>{S.blurb}</p>
+        <button type="button" class="tut-copy" data-copy-md={copyMarkdown} data-copied-label={S.copied} aria-label={S.buttonAria}>
+          <svg class="tut-copy-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+          </svg>
+          <span class="tut-copy-label">{S.button}</span>
+        </button>
+      </section>
     </div>
-
-    <CardGrid>
-      <Card title="Before you start" icon="rocket">
-        <div class="tut-links">
-          <a href="/install/">Install cckit</a>
-          <a href="/getting-started/">Quickstart: your first lifecycle</a>
-        </div>
-      </Card>
-      <Card title="This tutorial" icon="open-book">
-        <div class="tut-meta" data-difficulty={t.difficulty}>
-          <span class="tut-badge tut-diff">{diffLabel[t.difficulty] ?? t.difficulty}</span>
-          <span class="tut-badge tut-time">{t.time} read</span>
-          {t.prerequisites.length > 0 && (
-            <span class="tut-pre">
-              <span class="tut-pre-label">Needs</span>
-              {t.prerequisites.map((p) =>
-                p === 'cckit installed and initialized' ? (
-                  <span class="tut-chip tut-chip-link">cckit <a href="/install/">installed</a> &amp; <a href="/initialize/">initialized</a></span>
-                ) : (
-                  <code class="tut-chip">{p}</code>
-                ),
-              )}
-            </span>
-          )}
-        </div>
-      </Card>
-    </CardGrid>
-  </div>
+  </aside>
 )}
 
 <script is:inline>
@@ -92,7 +138,7 @@ them as we go — telling me what each one did.
     const done = () => {
       if (!label) return;
       const prev = label.textContent;
-      label.textContent = 'Copied ✓';
+      label.textContent = btn.getAttribute('data-copied-label') || 'Copied ✓';
       btn.classList.add('is-copied');
       setTimeout(() => { label.textContent = prev; btn.classList.remove('is-copied'); }, 1600);
     };
@@ -109,70 +155,77 @@ them as we go — telling me what each one did.
 </script>
 
 <style>
-  .tut-header { display: flex; flex-direction: column; gap: 1rem; margin: 0.6rem 0 1.9rem; }
-
-  /* Prompt bar — full-width call to action, styled off the Starlight accent. */
-  .tut-promptbar {
+  .tut {
+    margin: 0.5rem 0 2rem;
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: 0.75rem;
+    background: color-mix(in srgb, var(--sl-color-gray-6) 55%, transparent);
+  }
+  /* Starlight's flow margin (`* + *`) would misalign the two columns. */
+  .tut :global(:where(section, div, ul, li, h2, p)) { margin-top: 0; }
+  .tut-facts {
+    margin: 0;
+    padding: 0.7rem 1.5rem;
+    font-size: var(--sl-text-sm);
+    line-height: 1.5;
+    color: var(--sl-color-gray-3);
+    border-bottom: 1px solid var(--sl-color-hairline);
+  }
+  .tut-grid { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .tut-col { padding: 1.25rem 1.5rem 1.4rem; min-width: 0; }
+  .tut-col + .tut-col { border-top: 1px solid var(--sl-color-hairline); }
+  @media (min-width: 50em) {
+    .tut-grid { grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); }
+    .tut-col + .tut-col { border-top: 0; border-inline-start: 1px solid var(--sl-color-hairline); }
+  }
+  .tut :global(h2.tut-h) {
+    margin: 0 0 0.6rem;
+    font-size: 1rem;
+    line-height: 1.4;
+    font-weight: 600;
+    letter-spacing: 0;
+    color: var(--sl-color-white);
+  }
+  .tut-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; max-width: none; }
+  .tut-list li {
+    margin: 0;
+    padding-inline-start: 1.75rem;
     position: relative;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.85rem 1.25rem;
-    padding: 1rem 1.15rem;
-    border-radius: 12px;
-    border: 1px solid var(--sl-color-accent-low);
-    background:
-      linear-gradient(120deg, color-mix(in srgb, var(--sl-color-accent-low) 55%, transparent), transparent 70%),
-      var(--sl-color-bg-sidebar);
-    overflow: hidden;
+    font-size: 1rem;
+    line-height: 1.5;
+    color: var(--sl-color-gray-2);
   }
-  .tut-promptbar-copy { display: flex; align-items: center; gap: 0.85rem; min-width: 15rem; flex: 1 1 20rem; }
-  .tut-promptbar-mark {
-    font-family: var(--sl-font-mono); font-size: 1.35rem; line-height: 1;
-    color: var(--sl-color-text-accent); opacity: 0.85; flex: none;
+  .tut-list li::before {
+    content: '';
+    position: absolute;
+    inset-inline-start: 0;
+    top: 0.2rem;
+    width: 1rem;
+    height: 1rem;
+    border: 1.5px solid var(--sl-color-gray-3);
+    border-radius: 0.25rem;
   }
-  .tut-promptbar-text { display: flex; flex-direction: column; gap: 0.15rem; }
-  .tut-promptbar-text strong { color: var(--sl-color-white); font-size: var(--sl-text-base); }
-  .tut-promptbar-text span { font-size: var(--sl-text-sm); color: var(--sl-color-gray-3); }
-
+  .tut-list :global(li + li) { margin-top: 0; }
+  .tut-col p { margin: 0; font-size: 0.9375rem; line-height: 1.55; color: var(--sl-color-gray-2); max-width: none; }
+  .tut-col p.tut-new { margin-top: 0.9rem; font-size: var(--sl-text-sm); color: var(--sl-color-gray-3); }
   .tut-copy {
-    display: inline-flex; align-items: center; gap: 0.45rem; flex: none;
-    font: inherit; font-size: var(--sl-text-sm); font-weight: 600; cursor: pointer;
-    padding: 0.5rem 0.95rem; border-radius: 8px;
+    margin-top: 0.9rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    padding: 0 1.1rem;
+    font: inherit;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: 0.5rem;
     border: 1px solid var(--sl-color-accent);
-    color: var(--sl-color-text-invert); background: var(--sl-color-accent);
-    transition: background 0.15s ease, filter 0.15s ease;
+    color: var(--sl-color-text-invert);
+    background: var(--sl-color-accent);
   }
   .tut-copy:hover { filter: brightness(1.08); }
   .tut-copy.is-copied { background: var(--sl-color-accent-high); border-color: var(--sl-color-accent-high); }
+  .tut-copy:focus-visible { outline: 2px solid var(--sl-color-text-accent); outline-offset: 2px; }
   .tut-copy-icon { flex: none; }
-
-  /* Give both cards equal breathing room; the grid + equal height come from Starlight's CardGrid. */
-  .tut-header :global(.card) { height: 100%; }
-  .tut-links { display: flex; flex-direction: column; gap: 0.4rem; }
-  .tut-links a { font-weight: 600; }
-
-  .tut-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.7rem; font-size: var(--sl-text-sm); }
-  .tut-badge {
-    font-family: var(--sl-font-mono); font-size: var(--sl-text-xs); letter-spacing: 0.04em;
-    padding: 0.15rem 0.6rem; border-radius: 999px;
-    border: 1px solid var(--sl-color-hairline); color: var(--sl-color-gray-2); white-space: nowrap;
-  }
-  .tut-diff { color: var(--sl-color-text-accent); border-color: var(--sl-color-accent-low); }
-  .tut-meta[data-difficulty='advanced'] .tut-diff { color: #d9a441; border-color: #d9a44166; }
-  .tut-pre { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
-  .tut-pre-label {
-    font-family: var(--sl-font-mono); font-size: var(--sl-text-xs); text-transform: uppercase;
-    letter-spacing: 0.12em; color: var(--sl-color-gray-3);
-  }
-  .tut-chip {
-    font-size: var(--sl-text-xs); background: var(--sl-color-bg-inline-code);
-    border: 1px solid var(--sl-color-hairline); border-radius: 6px; padding: 0.05rem 0.45rem;
-  }
-  .tut-chip-link {
-    display: inline-flex; align-items: center; gap: 0.28rem;
-    font-family: var(--sl-font); color: var(--sl-color-gray-2); white-space: nowrap;
-  }
-  .tut-chip-link a { font-weight: 600; }
 </style>

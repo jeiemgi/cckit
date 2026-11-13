@@ -28,7 +28,7 @@ t "skill: it does not demand an approval marker nothing writes" 0 \
 t "schema: night declares its five keys" '["floors","gate","grantors","neverWaivable","refuseLabels"]' \
   "$(jq -c '.properties.night.properties | keys' "$ROOT/kit.config.schema.json" 2>/dev/null)"
 for doc in README.md AGENTS.md docs-site/src/content/docs/config-and-permissions.mdx \
-  docs-site/src/content/docs/skills.mdx docs-site/src/content/docs/tutorials/run-claude-code-unattended.mdx; do
+  docs-site/src/content/docs/skills.mdx docs-site/src/content/docs/development/run-unattended.mdx; do
   t "docs: $doc covers night mode" yes "$(grep -qi 'night mode' "$ROOT/$doc" && echo yes || echo no)"
 done
 t "docs: the config page documents who may grant" yes \

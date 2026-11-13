@@ -28,7 +28,7 @@ row, installs nothing and changes no exit code, and `cckit add lavish --set enab
 | `impeccable` | Design direction for a page: plan it, set type, layout and colour, flag the look of a generated page. Step 1 of [`page-design`](/skills/#page-design). | `designDirection.provider` = `impeccable` | any repo; installed for Claude Code | [pbakaus](https://github.com/pbakaus/impeccable) |
 | `emil-design-eng` | Interaction and motion rules for a chosen design. Step 2 of `page-design`. | `designMotion.provider` = `emil-design-eng` | any repo; installed for Claude Code | [Emil Kowalski](https://github.com/emilkowalski/skills) |
 | `web-design-guidelines` | An audit of a finished page's code: accessibility, focus, reduced motion. Step 3 of `page-design`. | `designAudit.provider` = `web-design-guidelines` | any repo; installed for Claude Code; needs network on every run | [Vercel](https://github.com/vercel-labs/agent-skills) |
-| `lavish` | [Review pages](/review-pages/): a plan, a decision or a grilling round opens as a page you annotate and answer. | `reviewPages.enabled` — on unless `false` | any repo, any machine; a session with no browser prints to the terminal | [Kun Chen](https://github.com/kunchenguid/lavish-axi) |
+| `lavish` | [Review pages](/project-management/plan-pages/): a plan, a decision or a grilling round opens as a page you annotate and answer. | `reviewPages.enabled` — on unless `false` | any repo, any machine; a session with no browser prints to the terminal | [Kun Chen](https://github.com/kunchenguid/lavish-axi) |
 
 `cckit add` with no name prints this list for the repo you are in, each row marked `on` or `off`,
 and says which ones do not apply here.
@@ -162,10 +162,10 @@ Graft makes a daily npm version check and one batched anonymous usage ping;
 
 ### Lavish
 
-The page tool behind [review pages](/review-pages/). cckit runs it through `npx -y lavish-axi`, so
+The page tool behind [review pages](/project-management/plan-pages/). cckit runs it through `npx -y lavish-axi`, so
 nothing stays installed, and no API key is read. `cckit add lavish` also writes
 `.claude/rules/review-pages.md`; every profile already ships that rule. What opens a page, the
-terminal fallback and where answers are written: [Review pages](/review-pages/).
+terminal fallback and where answers are written: [Review pages](/project-management/plan-pages/).
 
 <Aside type="note" title="Not affiliated">
 Lavish (`lavish-axi`) is open-source software (MIT) by [Kun Chen](https://github.com/kunchenguid/lavish-axi),
@@ -227,4 +227,4 @@ affiliated with any of them.
 Write `integrations/<id>.json` against `integrations/integration.schema.json`, then run
 `bash scripts/lib/integrations.sh --validate`: it prints one `<id>: <field>: <problem>` line per
 problem. The field list is in [Config & permissions → Integrations](/config-and-permissions/#integrations).
-The steps, with a worked descriptor: [Add your own tool as an integration](/tutorials/add-your-own-integration/).
+The steps, with a worked descriptor: [Add your own tool as an integration](/development/add-your-own-integration/).

@@ -1,0 +1,100 @@
+---
+title: Ask for changes to a piece
+description: Change a piece that is still in draft or in review, in plain words, and hand a reviewer's comments to your assistant. Nothing is approved until a person says so.
+tutorial:
+  job: change a piece that is in draft or in review and pass on a reviewer's comments
+  difficulty: beginner
+  time: "10 min"
+  prerequisites:
+    - { text: "A piece is in draft or waiting for a review", link: "See where everything stands", href: "/marketing/where-things-stand/" }
+    - { text: "You know how a piece is reviewed", link: "Review and approval", href: "/marketing/review-and-approval/" }
+  ogTag: Marketing
+  related: [marketing/where-things-stand, marketing/update-a-page, marketing/review-and-approval]
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
+import TutorialMeta from '../../../components/TutorialMeta.astro';
+
+<TutorialMeta />
+
+A piece is rarely right the first time. The price is off, the line at the top is too long, a reviewer
+wants a line moved. You say what to change in plain words and your assistant changes it. After
+the landing page, Pilot Light Bakery handed over an Easter menu page; its review is open and the
+colleague at the counter is reading it.
+
+**Who does it:** you say what to change. Your assistant makes the change and updates the review.
+Your colleague approves.
+
+**What you will have at the end:** the same review, updated, and a reviewer who can read it again.
+
+<Steps>
+
+1. **Say what to change.** Say which piece and what you want, as you would to a colleague.
+
+   <Chat
+     title="changing the price and the deadline on the Easter menu page"
+     say="On the Easter menu page the Easter loaf should be €6, not €7. And move the ordering deadline to Friday."
+     means="You do not edit anything. The review link stays the same."
+   >
+     Done. The Easter loaf is now €6 and the ordering deadline is Friday. I updated the review, and
+     the link is the one you already sent.
+   </Chat>
+
+2. **Look before you change.** When you are not sure, ask for options first. Nothing changes until
+   you pick one.
+
+   <Chat
+     title="asking for other opening lines for the Easter menu page"
+     say="I am not sure about the line at the top of the Easter menu page. Show me two other options, and do not change anything yet."
+     means="Asking for options changes nothing. Say which one you want when you are ready."
+   >
+     Two options: "Baked this morning, on the table for Easter" and "Easter bread, still warm".
+     The page keeps its current line until you choose.
+   </Chat>
+
+3. **Hand over a reviewer's comments.** When the approver asked for changes, your assistant reads
+   their comments and applies them. It tells you which ones it did not apply.
+
+   <Chat
+     title="applying the reviewer's comments on the Easter menu page"
+     say="My colleague left comments on the Easter menu page. Read them and apply them, and tell me which ones you did not apply and why."
+     means="You decide what to change. Your assistant reports every comment it left alone."
+   >
+     I applied the comment about the opening line and the one about the price. I left one alone: it
+     asks for a photo of the Easter loaf, and there is no photo in the project. Send me one and I
+     will add it.
+   </Chat>
+
+4. **Tell the approver.** Send them a short message that the same link is updated. The page
+   refreshes by itself and the approver reads it again. This repeats until the answer is
+   **Approve**. After that, [finish the piece](/marketing/review-and-approval/#after-approval).
+
+</Steps>
+
+<Aside type="caution" title="A finished piece is closed">
+Once a piece is approved and finished, it is closed. A change to it is a new piece with its own
+review: see [Update a page that already exists](/marketing/update-a-page/).
+</Aside>
+
+<Outcomes title="For the technical person: what runs">
+
+<div data-table="grid">
+
+| What you say | What runs |
+| --- | --- |
+| A change to a piece in review | `cckit task finish <id> "<summary>" --all` |
+| Work on the piece again | `cckit task start <id>` |
+
+</div>
+
+`cckit task finish` commits the tracked changes, pushes them and, when a review is already open,
+reports it instead of creating a second one. `--all` also adds new files. `cckit task start`
+reuses the draft's folder when it exists and refuses a task that is done. `cckit task run` is not
+used here: a task that is already in review starts no agent. Reading the reviewer's comments and
+editing the draft are done by the assistant itself, not by a `cckit` verb.
+
+</Outcomes>
+
+Next: [Update a page that already exists](/marketing/update-a-page/)

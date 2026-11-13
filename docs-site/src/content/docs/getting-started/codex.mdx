@@ -1,0 +1,267 @@
+---
+title: Use cckit with Codex
+description: Install cckit's Codex adapter in a repo, confirm the CLI and the hooks with the doctor, trust the hooks in Codex, then run issues in parallel and one headless objective with Codex as the agent.
+tutorial:
+  job: use cckit with Codex
+  difficulty: intermediate
+  time: "8 min"
+  prerequisites:
+    - { text: "cckit is installed", link: "installed", href: "/getting-started/install/" }
+    - "The Codex CLI is installed and runs from your terminal"
+    - "The GitHub CLI (`gh`) is signed in"
+    - "tmux is installed, if you want to run several issues at once"
+  ogTag: Codex
+  keywords: [codex cli github workflow, codex worktrees, cckit codex adapter, run codex in parallel]
+  related: [getting-started/initialize, development/run-a-wave-in-parallel, development/run-one-objective-unattended]
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
+import TutorialMeta from '../../../components/TutorialMeta.astro';
+import TutorialSchema from '../../../components/TutorialSchema.astro';
+
+<TutorialMeta />
+
+The process does not depend on which agent runs it. A team that works in Codex needs the same
+things a Claude Code team gets: the instructions, the rules, the skills and the guards that stop a
+commit on the base branch. Codex reads them from different files, so cckit has an adapter that
+writes them where Codex looks.
+
+**What you will have at the end:** a repository where Codex follows the same process.
+`cckit init --adapter codex` writes `AGENTS.md`, the skills and rules under `.agents/`, and the
+guard hooks under `.codex/`. After that, the commands that launch an agent take `--agent codex`.
+
+The Bakery site, the example project of these guides, is here worked in Codex. Each step starts with
+the sentence you say to your agent in the chat, then the command it runs.
+
+Steps 1 to 4 are the setup. Steps 5 to 7 are three ways to work once it is in place; stop after
+any of them.
+
+## Steps
+
+### 1 · Preview what the adapter writes
+
+<Chat
+  title="previewing the Codex adapter for the Bakery site"
+  say="The Bakery site already runs cckit with Claude Code. Show me what the Codex setup would add to it. Do not write anything yet."
+  ran="cckit init --upgrade --adapter codex --dry-run"
+  output={[
+    "-> DRY RUN — nothing will be written. Plan for <project>:",
+    "  (UPGRADE: existing files are PRESERVED; only genuinely-missing files are added; config keys merged.)",
+    "…",
+    "  Adapters: claude codex   (adding to stored: claude)",
+    "…",
+    "  Would change (37 added, 1 modified):",
+    "    A .agents/rules/authoring.md",
+    "…",
+    "    A .agents/skills/brand-voice/SKILL.md",
+    "…",
+    "    M .claude/kit.config.json",
+    "…",
+    "    A .codex/agents/designer.toml",
+    "…",
+    "    A .codex/hooks.json",
+    "    A .codex/hooks/guard-base-branch-commit.sh",
+    "…",
+    "    A AGENTS.md",
+    "",
+    "  A = added · M = modified. Measured by running the upgrade on a temporary copy; <project> was not written.",
+    "Re-run without --dry-run to apply.",
+  ]}
+  means="A dry run prints the plan and writes nothing. On a project that already runs cckit, the preview is the upgrade form and its list is headed Would change."
+>
+  Nothing was written. Adding Codex would add `AGENTS.md`, the rules and skills under `.agents/`,
+  and the hooks and agents under `.codex/`. One existing file would change: the project config,
+  which records the second adapter. The Claude Code files stay as they are.
+</Chat>
+
+On a repository with no cckit yet, the preview is
+`cckit init --profile software --adapter codex --dry-run`. It lists `cckit.config.json`,
+`AGENTS.md`, `.agents/rules/`, `.agents/skills/`, `.codex/hooks/`, `.codex/hooks.json` and
+`.codex/agents/` under `Would write:`, and no `.claude/` directory, because a Codex-only install
+writes none.
+
+### 2 · Install it
+
+<Chat
+  title="installing the Codex adapter in the Bakery site"
+  say="That looks right. Install the Codex setup and keep the Claude Code files as they are."
+  ran="cckit init --upgrade --adapter codex"
+  means="The upgrade form adds Codex and leaves the Claude Code files as they are."
+>
+  I added the Codex adapter and left the Claude Code files untouched.
+</Chat>
+
+<Outcomes of="cckit init" title="Which install line fits which repo">
+
+Pick the line that matches the repo:
+
+```bash frame="terminal"
+cckit init --profile software --adapter codex   # a repo with no cckit yet
+cckit init --upgrade --adapter codex            # a repo that already runs cckit with Claude Code
+cckit init --profile software --adapter both    # a new repo that will use both agents
+```
+
+The upgrade form adds Codex and leaves the Claude Code files as they are.
+
+</Outcomes>
+
+### 3 · Check the CLI and the hooks
+
+<Chat
+  title="checking the Codex CLI and hooks for the Bakery site"
+  say="Is Codex installed here, and are the cckit hooks registered for it?"
+  ran="cckit doctor --agents"
+  means="The command makes no network call and exits 1 when the Codex CLI is not on PATH."
+>
+  The doctor shows a `codex` row with the CLI version and a `codex hooks` row reading
+  `registered in .codex/hooks.json`.
+</Chat>
+
+### 4 · Trust the hooks, then commit them
+
+Codex skips a project hook until you approve it. Open Codex in the repo, run `/hooks`, and trust
+the entries cckit registered. That step is yours: the doctor cannot read the trust state.
+
+<Chat
+  title="committing the Codex adapter files of the Bakery site"
+  say="Commit the Codex files so every worktree cut from the base branch carries them."
+  ran={["git add .codex .agents AGENTS.md", 'git commit -m "chore: add the cckit Codex adapter"']}
+  means="A worktree cut from a branch that lacks these files has no `.codex/` directory."
+>
+  I committed `.codex/`, `.agents/` and `AGENTS.md`.
+</Chat>
+
+### 5 · Work one issue
+
+Start Codex in the repo and hand it the loop:
+
+<Chat
+  title="working one Bakery site issue in Codex"
+  say="Read AGENTS.md. Sync the board with cckit and show me what is unblocked. I will pick one issue; start it with cckit, work in the worktree it prints, and open the pull request with cckit when the project's gate passes. Do not merge."
+  ran={["cckit sync", "cckit start <issue>", 'cckit pr <issue> "<summary>"']}
+  means="You pick the issue and Codex does not merge. Merging stays a decision for a person."
+>
+  I synced the board and listed what is unblocked. Once you pick one, I start it, work in its
+  worktree and open the pull request when the gate passes.
+</Chat>
+
+### 6 · Run several issues in parallel
+
+<Chat
+  title="running three Bakery site issues at once in Codex"
+  say="Run the issues I picked in parallel with Codex, one worktree each. Show me the plan first, then launch, and tell me how each one ended."
+  ran={[
+    "cckit wave --adapter codex",
+    "cckit orchestrate --agent codex --dry-run <issues…>",
+    "cckit orchestrate --agent codex --detach <issues…>",
+    "cckit orchestrate --results --wait 3600",
+  ]}
+  means="`orchestrate` creates one worktree and one Codex session per issue, at most 4 at once."
+>
+  I printed the launch plan, launched one Codex session per issue, and waited for the results. The
+  dry run prints `DRY RUN - would launch <n> flow(s)` and creates no worktree and no pane.
+</Chat>
+
+`cckit wave` prints the launch commands for the adapter, `orchestrate --dry-run` prints the plan,
+`--detach` launches, and `orchestrate --results` reads how each worker ended.
+
+### 7 · Run one objective with no terminal
+
+<Chat
+  title="running one Bakery site objective with Codex"
+  say="Make the failing tests pass, unattended, with Codex. Preview the run first."
+  ran={[{
+    cmd: 'cckit autopilot run --agent codex --agent-arg -s --agent-arg workspace-write --objective "make the failing tests pass" --until "<your test command>" --dry-run',
+    output: "'codex' exec --json '-s' 'workspace-write' -",
+  }]}
+  means="cckit adds no permission flag of its own: the sandbox mode is yours to name with `--agent-arg`."
+>
+  I ran the preview. It prints the command it would start and the limits, and starts nothing.
+</Chat>
+
+`cckit autopilot run` starts `codex exec` one round at a time and stops on limits checked by cckit,
+from inside the issue's worktree.
+
+## Check it worked
+
+<Chat
+  title="confirming the Codex setup of the Bakery site"
+  say="Is the Codex setup healthy?"
+  ran="cckit doctor --agents"
+  means="It exits 0 when both rows are there. The doctor cannot read whether Codex trusts the hooks."
+>
+  The `codex` row shows the CLI version and the `codex hooks` row reads
+  `registered in .codex/hooks.json`.
+</Chat>
+
+To see for yourself that the hooks are trusted, try a commit on the base branch from a Codex
+session: the guard should refuse it.
+
+## How it works
+
+Both adapters render from one set of templates, so a rule or a skill says the same thing to both
+agents. What differs is where the files go and how hooks are registered: Codex reads
+`.codex/hooks.json`, and cckit merges its entries into that file without removing yours.
+
+`export CCKIT_AGENT=codex` makes Codex the default for `orchestrate`, `autopilot` and
+`autopilot run`, so `--agent codex` can be left off. The project's stored adapter choice sets the
+default for `cckit wave`.
+
+- File by file, what each adapter writes:
+  [Install matrix](/install-matrix/#what-cckit-init-writes-claude-code-codex-or-both).
+- How the hooks are registered and merged: [Hooks → Codex](/hooks/#codex).
+- What is shared and what is not: [Adapters](/adapters/#claude-and-codex-support) and the
+  [compatibility inventory](/agent-compatibility/).
+
+<Aside type="caution" title="What is not verified for Codex">
+The guard hooks are tested against the event JSON Codex documents, with stub binaries. No live
+Codex session has fired them, so treat a Codex guard as unproven until you have seen it block a
+commit on the base branch in your own repo. The memory hooks are not installed for Codex: they
+read Claude Code transcripts. The full list of limits is on the
+[Adapters](/adapters/#claude-and-codex-support) page.
+</Aside>
+
+## Troubleshooting
+
+**`cckit doctor --agents` exits 1.** The Codex CLI is not on `PATH` in this shell. Install it, or
+open a shell where `command -v codex` prints a path.
+
+**The doctor warns that the Codex hooks are not registered.** `.codex/hooks.json` is missing
+cckit's entries. Run `cckit init --upgrade`, the command the doctor names.
+
+**A guard did not fire in Codex.** The hooks are registered and not yet trusted. Run `/hooks` in
+Codex and approve them. The doctor can read the registration; it cannot read the trust state.
+
+**A worktree has no `.codex/` directory.** The adapter files were never committed, so the branch
+the worktree was cut from does not contain them. Commit them on the base branch.
+
+**The repo already had an `AGENTS.md`.** A fresh init keeps an existing `AGENTS.md`. Pass
+`--force` to replace it, or merge the generated content by hand.
+
+## Related guides
+
+<CardGrid>
+  <LinkCard title="Initialize a project" href="/getting-started/initialize/" description="The init step, in full." />
+  <LinkCard title="Run a wave of issues in parallel" href="/development/run-a-wave-in-parallel/" description="The wave loop the Codex launch commands plug into." />
+  <LinkCard title="Run one objective unattended" href="/development/run-one-objective-unattended/" description="Every limit and stop reason of the headless run." />
+</CardGrid>
+
+<TutorialSchema
+  steps={[
+    { name: 'Preview what the adapter writes', text: 'cckit init --profile software --adapter codex --dry-run prints the files it would write and writes nothing.' },
+    { name: 'Install it', text: 'cckit init --profile software --adapter codex for a new repo, or cckit init --upgrade --adapter codex to add Codex to a repo that already runs cckit.' },
+    { name: 'Check the CLI and the hooks', text: 'cckit doctor --agents prints a codex row and a codex hooks row, offline, and exits 1 when the CLI is absent.' },
+    { name: 'Trust the hooks, then commit them', text: 'Run /hooks in Codex to trust the project hooks, then commit .codex/, .agents/ and AGENTS.md.' },
+    { name: 'Work one issue', text: 'Start Codex in the repo and have it sync the board, start the issue you pick and open the pull request with cckit.' },
+    { name: 'Run several issues in parallel', text: 'cckit orchestrate --agent codex --detach <issues…> launches one worktree and one Codex session per issue; cckit orchestrate --results reads how each ended.' },
+    { name: 'Run one objective with no terminal', text: 'cckit autopilot run --agent codex starts codex exec one round at a time and stops on limits checked by cckit.' },
+  ]}
+  faqs={[
+    { q: 'cckit doctor --agents exits 1', a: 'The Codex CLI is not on PATH in this shell.' },
+    { q: 'A guard did not fire in Codex', a: 'Codex skips a project hook until it is trusted. Run /hooks in Codex and approve the hooks cckit registered.' },
+    { q: 'A worktree has no .codex/ directory', a: 'The adapter files were not committed on the base branch the worktree was cut from.' },
+    { q: 'Does a Codex-only install write a .claude/ directory?', a: 'No. The config is cckit.config.json at the repository root and the adapter files are under .agents/ and .codex/.' },
+  ]}
+/>

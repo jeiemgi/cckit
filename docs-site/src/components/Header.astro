@@ -1,0 +1,120 @@
+---
+// Header override. Left to right on a desktop: the wordmark, the search (centred, up to 34rem), then
+// the right group: Software / Marketing switch, version text and GitHub icon (Software pages only,
+// see SocialIcons.astro), theme picker, language picker (Marketing pages only, see LanguageSelect.astro).
+// On a phone: wordmark, spacer, switch, search icon, then Starlight's menu button (which lives outside
+// this component); version, GitHub, theme and language sit in the mobile menu footer.
+import config from 'virtual:starlight/user-config';
+import LanguageSelect from 'virtual:starlight/components/LanguageSelect';
+import Search from 'virtual:starlight/components/Search';
+import SiteTitle from 'virtual:starlight/components/SiteTitle';
+import SocialIcons from 'virtual:starlight/components/SocialIcons';
+import ThemeSelect from 'virtual:starlight/components/ThemeSelect';
+import TrackSwitch from './TrackSwitch.astro';
+
+// Render the search only when Pagefind or a Search override (DocSearch) is on, as Starlight does.
+const shouldRenderSearch =
+  config.pagefind || config.components.Search !== '@astrojs/starlight/components/Search.astro';
+---
+
+<div class="header">
+  <div class="title-wrapper sl-flex">
+    <SiteTitle />
+  </div>
+  <div class="search-wrapper sl-flex print:hidden" data-header-search>
+    {shouldRenderSearch && <Search />}
+  </div>
+  <div class="right-group sl-flex print:hidden">
+    <TrackSwitch />
+    <div class="header-extras sl-hidden md:sl-flex">
+      <div class="sl-flex social-icons">
+        <SocialIcons />
+      </div>
+      <ThemeSelect />
+      <LanguageSelect />
+    </div>
+  </div>
+</div>
+
+<script>
+  // The visible text of the search trigger names an example question for the track. Starlight's
+  // `search.label` string carries the English Software text and the Spanish Marketing text; the one
+  // case it cannot carry is English Marketing, and Spanish pages that are English Software copies.
+  const TEXT: Record<string, Record<string, string>> = {
+    software: { en: 'Search, or ask: how do I start a task?', es: 'Search, or ask: how do I start a task?' },
+    marketing: { en: 'Search, or ask: how do I review a piece?', es: 'Busca o pregunta: ¿cómo reviso una pieza?' },
+  };
+  const track = () => document.querySelector('meta[name="cckit-track"]')?.getAttribute('content') ?? 'software';
+  const lang = () => (document.documentElement.lang || 'en').slice(0, 2);
+  function apply() {
+    const text = TEXT[track()]?.[lang()] ?? TEXT.software.en;
+    const root = document.querySelector('[data-header-search]');
+    if (!root) return;
+    // DocSearch: the placeholder span; Pagefind: the span after the magnifier in the open button.
+    const span =
+      root.querySelector<HTMLElement>('.DocSearch-Button-Placeholder') ??
+      root.querySelector<HTMLElement>('button[data-open-modal] > span');
+    if (span && span.textContent !== text) span.textContent = text;
+    const btn = root.querySelector<HTMLElement>('.DocSearch-Button, button[data-open-modal]');
+    if (btn && btn.getAttribute('aria-label') !== text) btn.setAttribute('aria-label', text);
+  }
+  apply();
+  // DocSearch replaces its button once its script has loaded: re-apply after each such change.
+  const root = document.querySelector('[data-header-search]');
+  if (root) new MutationObserver(apply).observe(root, { childList: true, subtree: true });
+</script>
+
+<style>
+  @layer starlight.core {
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      height: 100%;
+    }
+    .title-wrapper {
+      /* Long titles must not cover the search and menu buttons on narrow screens. */
+      overflow: clip;
+      padding: 0.25rem;
+      margin: -0.25rem;
+      min-width: 0;
+      margin-inline-end: auto;
+    }
+    .right-group {
+      gap: 0.75rem;
+      align-items: center;
+      order: 1;
+    }
+    .header-extras {
+      gap: 1rem;
+      align-items: center;
+    }
+    .social-icons {
+      gap: 0.75rem;
+      align-items: center;
+    }
+    .search-wrapper {
+      order: 2;
+    }
+    @media (min-width: 50rem) {
+      .header {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        gap: 1rem;
+        align-content: center;
+      }
+      .title-wrapper {
+        margin-inline-end: 0;
+      }
+      .search-wrapper {
+        order: 0;
+        justify-content: center;
+        min-width: 0;
+      }
+      .right-group {
+        order: 0;
+        gap: 1rem;
+      }
+    }
+  }
+</style>

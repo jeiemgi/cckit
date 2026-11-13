@@ -1,0 +1,209 @@
+---
+title: QA on a running stack
+description: cckit qa starts the project, opens the changed screen, records a pass or fail against the reviewed commit, and can hold the merge on it.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
+
+Tests pass and the diff reads well, and the save button still does nothing when a person clicks
+it. Some defects only show on the running product. With several agents each building a change,
+trying each one by hand means stopping your own server, switching branches, installing, starting
+again, and remembering which commit you looked at.
+
+The QA lane removes that work. `cckit qa` starts the project for one change on its own ports,
+waits until it answers, opens the screen the change touched, and writes down your pass or fail
+against the exact commit you tried. The captain can then refuse to merge until that pass exists.
+
+**Who does it:** a person. The verdict is your judgement of the running result; an agent builds
+the change and names the screen to open.
+
+**What plugs in:** your project's own start command. cckit does **not** boot your project by
+guessing and does **not** write a boot script. It asks once how the review stack boots, saves the
+answers under `qa` in the kit config, and owns the rest: the ports, the readiness check, the URL,
+the stop, the verdict. A **stack** here is everything the project needs running to be tried: the
+web app, and its API if it has one. A **readiness check** is an address cckit requests until it
+answers, to know the stack is up.
+
+<Aside type="note" title="What a lane is">
+A **lane** is one review stack, keyed by an **issue number**: the number in the current branch
+name, or `--lane <n>`. Run `cckit qa up` inside an effort's worktree and the lane is that effort —
+one stack for the whole effort PR, not one per sub-issue agent. Every `cckit qa` subcommand takes
+`--lane`.
+</Aside>
+
+## The review loop
+
+### 1. Declare the stack, once per project
+
+<Chat
+  title="telling cckit how the Bakery site boots for review"
+  say="Set up QA for the Bakery site. It starts with pnpm dev on port 3000, and the menu page is the screen I want to see."
+  ran="cckit add qa --answers answers.json"
+  means="This is asked once per project. The answers are saved under qa in the kit config. See Declare how the project boots below."
+>
+  Done. The start command, the port, the readiness check and the landing route are saved in the
+  project config.
+</Chat>
+
+### 2. Bring the lane up
+
+<Chat
+  title="starting the Bakery site for the menu page change"
+  say="Start the Bakery site for the menu page change."
+  ran="cckit qa up"
+  means="Exit 0 means every address you listed as a readiness check answered."
+>
+  The Bakery site is running on its own port for this change, and every readiness check answered.
+</Chat>
+
+### 3. Open the screen the change touched
+
+<Chat
+  title="opening the menu page"
+  say="Open the menu page."
+  ran="cckit qa open"
+  means="It opens the screen the pull request names, or the qa.route you declared."
+>
+  The menu page is open in your browser, on the copy running for this change.
+</Chat>
+
+### 4. Record the verdict
+
+<Chat
+  title="recording that the menu page passes QA"
+  say="The menu page looks right. Mark it as passed."
+  ran={[
+    "cckit qa verdict pass",
+    { cmd: "cckit qa verdict", output: "pass" },
+  ]}
+  means="The verdict is written against the commit you looked at. For a fail, add --note with what is wrong."
+>
+  Recorded. QA passed on the commit you looked at, and the pull request carries one QA verdict
+  comment.
+</Chat>
+
+To record a fail with a note:
+
+```sh
+cckit qa verdict fail --note "the save button stays disabled after a valid edit"
+```
+
+### 5. Stop the lane
+
+<Chat
+  title="freeing the ports after QA on the Bakery site"
+  say="I am done looking. Stop it."
+  ran="cckit qa stop"
+  means="Stopping exits 0 only when nothing listens on the lane's ports."
+>
+  The Bakery site for this change is stopped and its ports are free.
+</Chat>
+
+### See every lane
+
+<Chat
+  title="listing the lanes of the Bakery site"
+  say="Is anything running for QA on the Bakery site right now?"
+  ran="cckit qa lanes"
+  output="no QA lanes — cckit start <issue> gives an issue its port slot, cckit qa up launches its stack"
+  means="cckit qa lanes only reads. It lists every change that has a port slot, a launch record or a verdict."
+>
+  Nothing is running and no change has a verdict yet.
+</Chat>
+
+**How to check it worked:** `cckit qa verdict` with no argument prints `pass` and exits `0`, and
+the pull request carries one `QA verdict` comment.
+
+Every flag, exit code and environment variable of the five subcommands is in the
+[cckit qa reference](/qa-reference/).
+
+## Declare how the project boots
+
+The `qa` module is an interview of five questions. In Claude Code, run `/kit-add qa`. Without the
+skill, write the answers to a JSON file and pass it to the script, as in step 1:
+
+```sh
+cckit add qa --answers answers.json
+```
+
+```json
+{
+  "command": "pnpm dev:stack",
+  "ports": "WEB_PORT=3000, API_PORT=4000",
+  "readiness": "WEB_PORT=/, API_PORT=/health",
+  "route": "/dashboard",
+  "credentialEnv": "QA_EMAIL, QA_PASSWORD"
+}
+```
+
+<Outcomes of="the qa answers" title="What each answer is saved as">
+
+| Answer | Saved as | Rules |
+| --- | --- | --- |
+| `command` | `qa.command` (string) | Required. A missing command fails the add and writes nothing. |
+| `ports` | `qa.ports` — `[{env, base}]` | Comma-separated `NAME=port`. A name with no port gets `3000 + its position`. |
+| `readiness` | `qa.readiness` — `[{env, path}]` | Comma-separated `PORT_VAR=path`, one probe per service. A name with no path probes `/`. |
+| `route` | `qa.route` (string) | Where a reviewer lands when the work declares no route. Default `/`. |
+| `credentialEnv` | `qa.credentialEnv` — `[name]` | Env var **names** only. An answer carrying a value (`QA_PASSWORD=...`) is refused and nothing is written. |
+
+</Outcomes>
+
+The file written is a root `cckit.config.json` when the project has one, otherwise
+`.claude/kit.config.json`. When that file already exists and the kit does not track it — every
+`cckit init` config — the script prints the diff and asks `overwrite? [y/N]` on stdin.
+
+The full key reference is in [Config & permissions](/config-and-permissions/#the-qa-lane).
+
+## Hold the merge on a QA pass
+
+<Chat
+  title="making the Bakery site wait for a QA pass before merging"
+  say="Don't merge anything on the Bakery site until I have passed it in QA."
+  ran="jq .captain.mergePolicy .claude/kit.config.json"
+  means="Requiring a pass is off by default. Declaring a qa block does not turn it on."
+>
+  I turned on `requireQa` under `captain.mergePolicy` and read it back. From now on the captain
+  holds a pull request with no QA pass on its current head.
+</Chat>
+
+<Outcomes of="cckit watch" title="The two QA verdicts of cckit watch">
+
+`cckit watch` reads the verdict. Two captain verdicts come from it:
+
+| Verdict | Action | When |
+| --- | --- | --- |
+| `QA_FAILING` | `fix` | A fail is recorded against the PR's current head. Blocks whether or not QA is required. |
+| `QA_MISSING` | `verify` | QA is required and no pass is recorded against the PR's current head. A pass on an older head counts as missing. |
+
+</Outcomes>
+
+Requiring a pass is **off by default** and declaring a `qa` block does not turn it on. Opt in under
+`captain.mergePolicy`:
+
+```json
+{ "captain": { "mergePolicy": { "requireQa": true } } }
+```
+
+```json
+{ "captain": { "mergePolicy": { "requireQa": ["flow:ui"] } } }
+```
+
+`true` covers every PR; a list of label names covers only the PRs carrying one of them. Env
+overrides and ordering against the agent review stage are in
+[Holding merges for a QA pass](/config-and-permissions/#holding-merges-for-a-qa-pass).
+
+## Not built yet
+
+- **Signing in.** `qa.credentialEnv` is recorded, and no verb reads it. `cckit qa open` lands on
+  the route; a route behind a login shows the app's sign-in page.
+- **Acting on a lane from the list.** `cckit qa lanes` is a read-only table. There is no screen
+  with buttons to open or judge a lane, and no wait screen before the first lane arrives; each
+  lane is driven with `--lane <n>`.
+
+## Links to learn more
+
+- [cckit qa reference](/qa-reference/): each subcommand, its exit codes, the events and the environment variables.
+- [Config & permissions](/config-and-permissions/#the-qa-lane): every `qa.*` key.
+- [Run work in parallel waves](/development/waves/): the loop the captain runs.

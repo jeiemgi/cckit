@@ -1,0 +1,159 @@
+---
+title: Run work in parallel waves
+description: What cckit wave proposes, how the work is dispatched to parallel agents, and how results are collected.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import CopilotFanout from '../../../components/diagrams/CopilotFanout';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
+
+A plan with twelve issues does not have to take twelve turns. Some of those issues wait on
+others, and the rest are ready now and touch different files. Working the ready ones one after
+another wastes the time an agency saves by putting several people on a project.
+
+The risk in doing them together is collision: two agents in one folder, or two agents pushing to
+one branch. A wave is how cckit runs the ready work at the same time and keeps every agent in its
+own copy of the code.
+
+<CopilotFanout client:only="react" />
+
+## What a wave is
+
+A **wave** is the set of issues that nothing is blocking right now: everything ready to be worked
+in parallel. [How work is written down](/project-management/#the-three-units) defines it beside
+the issue and the effort.
+
+`cckit wave` looks at your open efforts, works out that set, and writes a **brief**: one task per
+issue, each scoped to its own isolated worktree so the parallel work cannot collide. It runs
+nothing itself. It hands the brief to the agent, and the agent does the work.
+
+## Who does what
+
+- **You** decide that a wave runs, and you can read the brief first.
+- **The driving agent** is the agent you are talking to in the chat. It reads the brief and starts the
+  workers.
+- **The workers** are one agent per issue. Each implements its issue in its own worktree and opens
+  a pull request.
+- **The captain** is whoever drives the approved plan; here it is the command `cckit watch`. It
+  checks the pull requests the workers opened and merges the clean ones.
+  [Tech lead, PM and captain](/project-management/roles/#the-captain) says what else can play the
+  role and when it stops to ask.
+
+The tools underneath are the agent runtime (Claude Code or Codex) and, when cckit launches the
+workers itself, a terminal multiplexer: tmux by default, or Herdr with `--runtime herdr`. cckit
+builds neither.
+
+## One turn of the loop
+
+### 1. Propose the wave
+
+`cckit wave` reads the board, finds the issues unblocked right now, and writes the brief: one
+worker task per issue, each in its own worktree.
+
+<Chat
+  title="asking which Bakery site issues can run in parallel"
+  say="What can run in parallel on the Bakery site right now?"
+  ran="cckit wave"
+  means="This only writes the brief. Nothing has started, and you can read it first."
+>
+  Two issues are unblocked: the opening hours and the contact form. I wrote one task for each, each
+  scoped to its own worktree so they cannot collide.
+</Chat>
+
+### 2. Fan out
+
+The driving agent starts one worker per issue from that brief. They run at the same time, in
+separate worktrees, each implementing its issue and opening a pull request. How a worker is
+started depends on the runtime: [Dispatch per runtime](/wave-reference/#dispatch-per-runtime).
+
+### 3. Gate and merge
+
+The captain checks every open pull request. The clean ones (checks passing, no conflicts) are
+merged; the rest are reported with what to fix.
+
+<Chat
+  title="merging the clean pull requests of the wave"
+  say="Check the pull requests the workers opened and merge the clean ones."
+  ran="cckit watch --merge"
+  means="One pass. A pull request that is not clean is reported with what to fix and the rest are not held up."
+>
+  The opening hours pull request is merged. The contact form one is not: its lint check fails on
+  one file, and I left it open with that named.
+</Chat>
+
+Each `cckit watch --merge` is one pass; `cckit watch --merge --loop` repeats passes until one
+merges nothing, or after 10.
+
+### 4. Advance
+
+Merging this wave's pull requests frees the issues that depended on them. Ask for the wave again
+and the loop repeats until there is nothing left to propose.
+
+
+
+<Aside type="note" title="Why a brief, not a launcher">
+cckit emits the plan as instructions and the agent enacts it. In Claude Code that keeps the work
+inside the agent's own tools — Task subagents, worktrees, background runs — instead of a separate
+process you can't see.
+</Aside>
+
+## When cckit launches the workers
+
+Under Codex, or when you want the workers in terminal panes, `cckit orchestrate <issues…>` creates
+the worktree for each issue, skips an issue whose blocker is still open, launches at most `--cap`
+workers and records how each one ended. `cckit orchestrate --results` reads that back as
+`success`, `failure` or `interrupted` per issue. Before it starts a pane it claims every branch in
+the wave, and it refuses the launch when a live worker already owns one of them.
+
+The result values, the exit codes and the branch claim are in the
+[Waves reference](/wave-reference/).
+
+## The commands
+
+<div data-table="grid">
+
+| What you say | What runs |
+| ------- | ------- |
+| "What can run in parallel right now?" | `cckit wave` |
+| "Only for this effort." | `cckit wave --effort <N>` |
+| "Write the brief for Codex." | `cckit wave --adapter <claude\|codex\|both>` |
+| "Launch these issues in cckit worktrees." | `cckit orchestrate <issues…>` |
+| "How did each worker end?" | `cckit orchestrate --results` |
+| "Check the pull requests and merge the clean ones." | `cckit watch --merge` |
+| "Keep checking until nothing else merges." | `cckit watch --loop` |
+
+</div>
+
+Every flag of these verbs is in the [CLI reference](/cli-reference/#plan-and-drive-a-wave).
+
+## Going further
+
+Two optional stages sit between a worker's pull request and the merge. Neither is needed for a
+first wave.
+
+- **An agent reviewer.** If you have configured
+  [a review stage](/config-and-permissions/#the-agent-review-stage), a pull request the captain
+  would merge goes to a reviewer first and waits for its verdict: one extra turn of the loop, not
+  a separate command. `cckit receipt show <issue> review` prints what the reviewer decided.
+- **A person looking at the running app.** The [QA lane](/review/qa-lane/) starts one copy of the
+  app per change (a lane): `cckit qa up`, then `cckit qa open`, then
+  `cckit qa verdict <pass|fail>`. With `captain.mergePolicy.requireQa` set, the captain holds a
+  pull request until `cckit qa verdict pass` is recorded against its latest commit.
+  `cckit qa lanes` shows every lane's ports and verdicts.
+- **The plan as data.** `cckit plan --llm` prints the wave plan in a form a program reads.
+
+## Guides and related pages
+
+- [Run a wave in parallel](/development/run-a-wave-in-parallel/): the steps, with the prompt to
+  paste.
+- [Waves reference](/wave-reference/): dispatch per runtime, collecting results, one writer per
+  branch.
+- [Run agents unattended overnight](/development/run-unattended/): the same loop with nobody
+  watching.
+- [Efforts and waves in practice](/project-management/efforts-and-waves/): where the waves come
+  from.
+- [QA on a running stack](/review/qa-lane/): review a lane on a running app and record the
+  verdict the captain reads.
+- [Driving cckit from agents](/agents/): everything an agent can call.
+

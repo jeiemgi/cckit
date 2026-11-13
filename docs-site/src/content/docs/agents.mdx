@@ -87,7 +87,7 @@ source is one file, `templates/agents/<role>.md`.
 Two lints in `scripts/check.sh` read the templates. `scripts/agent-skills-lint.sh` fails on a
 `skills:` entry that is neither a skill cckit ships (`skills/`, `templates/skills/`), a
 `plugin:skill` reference, nor a line in `scripts/agent-skills-external.txt` — see
-[Codified review gates](/review-gates/#agent-skills-lint--every-agent-skill-resolves). A line in
+[Lint gates: baselines](/config-and-permissions/#agent-skills-lint--every-agent-skill-resolves). A line in
 that file is a statement that the name is intended; it does not check that the skill is installed
 on your machine. `scripts/agent-template-lint.sh` fails on a template whose `name:` is not its file
 name or whose `description:` is empty, the two fields Codex refuses a custom agent without.

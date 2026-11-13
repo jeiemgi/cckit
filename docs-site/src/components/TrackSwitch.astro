@@ -1,5 +1,5 @@
 ---
-// The top-bar switch between the two tracks of the docs: Software and Marketing. Two plain links
+// The top-bar switch (placed by Header.astro) between the two tracks of the docs: Software and Marketing. Two plain links
 // inside a labelled <nav>, so it works with the keyboard (Tab, Enter) and without JavaScript; the
 // entry of the track the current page belongs to carries aria-current. The track comes from the
 // page's path (src/lib/tracks.ts).
@@ -15,7 +15,7 @@ const tracks = [
   {
     id: 'software',
     label: 'Software',
-    href: '/getting-started/',
+    href: '/software/',
     name: es ? 'Software (en inglés)' : undefined,
     hreflang: es ? 'en' : undefined,
   },
@@ -47,7 +47,6 @@ const tracks = [
     flex: none;
     gap: 0.125rem;
     padding: 0.125rem;
-    margin-inline-start: 0.75rem;
     border: 1px solid var(--sl-color-hairline-light);
     border-radius: 999px;
     background: var(--sl-color-bg);
@@ -56,7 +55,8 @@ const tracks = [
     display: inline-flex;
     align-items: center;
     gap: 0.4em;
-    padding: 0.2rem 0.65rem;
+    min-height: 2rem;
+    padding: 0 0.75rem;
     border-radius: 999px;
     font-size: var(--sl-text-sm);
     font-weight: 500;
@@ -87,14 +87,15 @@ const tracks = [
   a[data-track='software'] .dot { background: var(--cckit-track-software); }
   a[data-track='marketing'] .dot { background: var(--cckit-track-marketing); }
 
-  /* Narrow screens: the title, the switch, search and the menu button share one row. */
-  @media (max-width: 30rem) {
-    .track-switch { margin-inline-start: 0.5rem; }
-    a { padding: 0.15rem 0.45rem; font-size: var(--sl-text-xs); }
+  /* Narrow screens: wordmark, switch, search and the menu button share one row. The links stay 36px tall. */
+  @media (max-width: 49.99rem) {
+    a { min-height: 2.25rem; padding: 0.5rem 0.7rem; }
     .dot { display: none; }
   }
+  @media (max-width: 30rem) {
+    a { font-size: var(--sl-text-xs); }
+  }
   @media (max-width: 22rem) {
-    .track-switch { margin-inline-start: 0.35rem; }
-    a { padding: 0.15rem 0.3rem; }
+    a { padding: 0.5rem 0.45rem; }
   }
 </style>

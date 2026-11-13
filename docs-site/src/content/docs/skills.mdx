@@ -15,7 +15,7 @@ A **skill** is a packaged instruction set Claude Code can run. Every skill here 
 `/` (for example `/kit-next`) — that's the <Tag kind="skill" text>Skill</Tag> tag. Some also trigger
 when you just **describe the task in plain words** — that's the
 <Tag kind="conversational" text>Conversational</Tag> tag. New to the tags? See
-[How to read this guide](/how-to-read/).
+[How to read this guide](/tags/).
 
 ## Everyday loop
 
@@ -53,7 +53,7 @@ when you just **describe the task in plain words** — that's the
 
 | Skill | Activates | What it does |
 | ----- | --------- | ------------ |
-| `kit-effort-new` | <Tag kind="skill" /> | Create an effort: a parent plus sub-issues. Shows the plan as a [review page](/review-pages/) first. |
+| `kit-effort-new` | <Tag kind="skill" /> | Create an effort: a parent plus sub-issues. Shows the plan as a [review page](/project-management/plan-pages/) first. |
 | `kit-effort-start` | <Tag kind="skill" /> | Open the effort branch the subs merge into. |
 | `kit-effort-pr` | <Tag kind="skill" /> | Open the one PR for the whole effort. |
 | `kit-effort-close` | <Tag kind="skill" /> | Thin caller of `cckit effort close` — the one close op: merge, close, board Done, GC. |
@@ -71,6 +71,7 @@ when you just **describe the task in plain words** — that's the
 | `kit-security-sweep` | <Tag kind="skill" /> | Audit for injection, auth, CORS/CSP, deps. |
 | `kit-digest` | <Tag kind="skill" /> | Pre-digest long inputs with a local model. |
 | `kit-ux-audit` | <Tag kind="skill" /> | Graph-driven UX audit: flows, DS consistency, a11y. |
+| `kit-annotate` | <Tag kind="skill" /> | Set up click-to-annotate feedback on a running React app (Agentation), then triage the notes. Claude Code only. |
 
 </div>
 
@@ -84,7 +85,7 @@ when you just **describe the task in plain words** — that's the
 | `kit-customize` | <Tag kind="conversational" /> | Add or edit agents and skills in a project. |
 | `kit-contribute` | <Tag kind="conversational" /> | Open a PR to contribute your additions upstream. |
 | `kit-onboard` | <Tag kind="skill" /> | First-contact setup on a new machine. |
-| `kit-page` | <Tag kind="conversational" /> | Open a plan, a decision or a grilling round as a [review page](/review-pages/), fall back to the terminal where there is no browser, and write the answer back. |
+| `kit-page` | <Tag kind="conversational" /> | Open a plan, a decision or a grilling round as a [review page](/project-management/plan-pages/), fall back to the terminal where there is no browser, and write the answer back. |
 | `kit-add` | <Tag kind="conversational" /> | Add an [integration](/integrations/) or a module: list what can be added, ask the descriptor's one question, run `cckit add`. |
 
 </div>
@@ -135,13 +136,13 @@ One goal, one plan file, and the pieces that deliver it. The skill does not writ
    approver — asking one question at a time.
 3. Writes the plan to the plans folder from `references/plan-template.md`. Its **Pieces** table
    has one row per piece, at most eight, each with a kind, one reader action and an order.
-4. Shows the plan for approval, as a [review page](/review-pages/) where there is a browser.
+4. Shows the plan for approval, as a [review page](/project-management/plan-pages/) where there is a browser.
    Nothing is recorded before the approver says yes.
 5. Records the pieces in the list `cckit task default` names:
 
 | `cckit task default` prints | Pieces become | The plan is reviewed as |
 | --- | --- | --- |
-| `light` | one [light task](/light-tasks/) per piece, created inside the plan task's folder | one pull request carrying the plan file and every piece's task file (`cckit task finish <id> "<summary>" --all`) |
+| `light` | one [light task](/project-management/light-tasks/) per piece, created inside the plan task's folder | one pull request carrying the plan file and every piece's task file (`cckit task finish <id> "<summary>" --all`) |
 | `issues` | one sub-issue per piece of an effort (`cckit effort new … --kind campaign`) | the effort's one pull request |
 
 `tasks.default` in the config decides which; see [Light tasks](/config-and-permissions/#light-tasks).

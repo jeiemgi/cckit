@@ -1,26 +1,41 @@
 ---
 title: Who does what
-description: The people on a marketing team using cckit, the four assistants Claude brings, and who decides what.
+description: The people on a marketing team using cckit, the four assistants that come with the project, and who decides what.
 ---
 
-Two groups do the work: the people on your team, and the assistants Claude brings to the project.
-People decide. Assistants prepare.
+import Chat from '../../../components/Chat.astro';
+
+When you hand work over, the assistants do the preparing and people keep the decisions. This page
+says who does each part, so a piece always has one person holding it.
+
+Two groups take part: the people on your team, and the assistants that come with the project.
+People decide. Assistants prepare. The examples on these pages come from one shop, Pilot Light
+Bakery: its owner writes, and the colleague at the counter approves.
 
 ## People
 
 | Person | Does | Needs |
 | --- | --- | --- |
-| **Writer** (you) | Says what to make, shapes the draft with Claude, asks for a review. | Claude Code and a GitHub account. |
+| **Writer** (you) | Says what to make, answers your assistant's questions, sends the review link. | Claude Code and a GitHub account. |
 | **Approver** | Reads the review, comments, approves or asks for changes. | A GitHub account. A browser is enough. |
-| **Technical person** | Sets the project up once. Fixes access problems. | A terminal. See [Get set up](/marketing/get-set-up/). |
+| **Technical person** | Sets the project up once. Fixes access problems. | A terminal. See [Give the keys](/marketing/get-set-up/). |
 
 One person can be writer on one piece and approver on another. The same person should not approve
-their own piece.
+their own piece. The reason is on [Review and approval](/marketing/review-and-approval/).
 
 ## Assistants
 
-The marketing profile gives Claude four roles. You do not call them by name; Claude hands work to
-the right one. You can also ask for one directly: "have the researcher check this number".
+The marketing profile gives your assistant four roles. You do not call them by name; your
+assistant hands work to the right one. You can also ask for one directly:
+
+<Chat
+  title="asking the researcher to check a claim about the Easter loaf"
+  say="Can the researcher check this line before I use it? “Sweet braided loaves have been baked for Easter for centuries.” I want the sources."
+  means="The researcher owns facts and sources. You still decide whether the line stays in the post."
+>
+  I passed it to the researcher. It will come back with what it found, where each fact comes from
+  and anything it could not confirm.
+</Chat>
 
 | Assistant | Owns | Ask it for |
 | --- | --- | --- |
@@ -29,14 +44,17 @@ the right one. You can also ask for one directly: "have the researcher check thi
 | **Designer** | How things look: layout, color, type, images. | Feedback on a page layout, a description of the visual a post needs. |
 | **Researcher** | Facts and sources. | A competitor scan, a fact check, a short brief with sources. |
 
+Your assistant designs and builds pages. No design tool is connected, so it does not make photos,
+logos or illustrations: you supply those, and the designer describes the visual a piece needs.
+
 ## Who decides
 
 | Decision | Who |
 | --- | --- |
 | What to make | The writer, or whoever sets the team's priorities. |
-| What a draft says | The writer. Claude proposes; you accept or change. |
-| Whether a piece is approved | The approver. Never Claude. |
+| What a draft says | The writer. Your assistant proposes; you accept or change. |
+| Whether a piece is approved | The approver. Never your assistant. |
 | The brand voice | The team, through a review. See [Set your brand voice](/marketing/brand-voice/). |
 | When and where it is published | Your team, outside cckit. |
 
-Next: [Words you will hear](/marketing/words-you-will-hear/)
+Next: [Give the keys](/marketing/get-set-up/)

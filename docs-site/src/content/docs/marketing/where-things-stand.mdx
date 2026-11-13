@@ -1,0 +1,124 @@
+---
+title: See where everything stands
+description: Ask your assistant what is being written, what waits for a review, what is done and what is next, for the whole project or for one piece.
+tutorial:
+  job: see what is in progress, in review and done across the project
+  difficulty: beginner
+  time: "5 min"
+  prerequisites:
+    - { text: "The keys are given and the project is open in the chat with your assistant", link: "The keys are given", href: "/marketing/get-set-up/" }
+    - { text: "At least one piece has been handed over, or the lists are empty", link: "Hand over your first piece", href: "/marketing/your-first-piece/" }
+  ogTag: Marketing
+  related: [marketing/your-first-piece, marketing/ask-for-changes, marketing/campaigns]
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
+import TutorialMeta from '../../../components/TutorialMeta.astro';
+
+<TutorialMeta />
+
+Pieces pile up: a post waiting for a review, a post half written, a post nobody has started. You
+do not keep that list. You ask your assistant, and it reads the project. Pilot Light Bakery is a
+few days into Easter week: one post is with the approver, one is being written, one has not
+started.
+
+**Who does it:** you ask. Your assistant reads the project and answers. Nothing changes when you
+ask.
+
+**What you will have at the end:** you know what is yours to do next and what is waiting for
+someone else.
+
+<Steps>
+
+1. **Ask where things stand.**
+
+   <Chat
+     title="asking where things stand on the Bakery site"
+     say="Where are we?"
+     means="In progress means the piece is being written. Waiting for review means another person has to read it."
+   >
+     The Bakery site has one piece in progress, the post about the ordering deadline, and one piece
+     waiting for review, the post about the Easter loaf. Nothing else is open.
+   </Chat>
+
+2. **See every piece and where it is.**
+
+   <Chat
+     title="listing every piece of the Bakery site"
+     say="Show me all our pieces and where each one is."
+     means="Each piece has one state. Finished pieces appear only when you ask for them. The states are listed below."
+   >
+     Three open pieces. Post about the Easter loaf: waiting for review. Post about the ordering
+     deadline: in progress. Post about collection day: not started.
+   </Chat>
+
+   <Outcomes title="All 7 states a piece can be in">
+
+   | What your assistant says | What it means |
+   | --- | --- |
+   | Not started, and only on this computer so far | The piece is noted on this computer only. The team has not seen it. |
+   | Waiting to be added to the shared list | The piece was sent to the team in a review that is not approved yet. |
+   | Not started | The piece is on the shared list and nobody has started it. |
+   | In progress | A draft for the piece has been started and is being written. |
+   | Waiting for review | The draft is marked done and a review is open. A person has to read it. |
+   | Done | The review was approved and the piece is part of the shared version. |
+   | Dropped | The piece was cancelled. It is listed only when you ask for finished and cancelled pieces too. |
+
+   "The draft" always means the piece being written. A piece nobody has started has no draft yet,
+   whatever a list on GitHub calls it.
+
+   </Outcomes>
+
+3. **Ask what is next.**
+
+   <Chat
+     title="asking what to hand over next on the Bakery site"
+     say="What is next?"
+     means="It offers only pieces nobody has started. A piece in progress or waiting for review is not offered."
+   >
+     Next is the post about collection day: it is the oldest piece nobody has started. Do you want
+     me to start it?
+   </Chat>
+
+4. **Ask what is waiting for you.**
+
+   <Chat
+     title="asking what waits for a person on the Bakery site"
+     say="Is anything waiting for me?"
+     means="A piece waiting for review waits for an approver. A piece in progress waits for whoever is writing it."
+   >
+     The post about the Easter loaf is waiting for your colleague, who has not read it yet. The
+     post about the ordering deadline is in progress, so it is waiting for you: tell me when it is
+     ready and I will ask for the review.
+   </Chat>
+
+</Steps>
+
+<Outcomes title="For the technical person: what runs">
+
+<div data-table="grid">
+
+| What you say | What runs |
+| --- | --- |
+| "Where are we?" | `cckit status` |
+| "Show me all our pieces and where each one is." | `cckit task list` |
+| "Show me the finished ones too." | `cckit task list --all` |
+| "What is next?" | `cckit task next` |
+
+</div>
+
+`cckit status` counts the light tasks by state, lists the ones somebody has to act on (`review`,
+`doing`, `draft`, `shared`), and adds open reviews that wait for a person. `cckit task list` reads
+the state from git and makes no GitHub call. None of the four writes anything. `cckit task next`
+picks by priority first (`--priority p0` to `p3` on `cckit task new`), then by the day the piece
+was recorded. The verbs are in the [CLI reference](/cli-reference/).
+
+The state words the commands print, in the order of the table above: `draft`, `shared`, `todo`,
+`doing`, `review`, `done`, `dropped`. With the plain-language mode on, the assistant says the
+words in the table's first column.
+
+</Outcomes>
+
+Next: [Words you will hear](/marketing/words-you-will-hear/)

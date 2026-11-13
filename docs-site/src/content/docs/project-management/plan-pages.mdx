@@ -1,0 +1,226 @@
+---
+title: Plans you answer on a page
+description: A plan, a decision with options or a grilling round opens as a page you annotate and answer — on by default, terminal output where there is no browser, and the answer written back to the issue or to a file.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import TagRow from '../../../components/TagRow.astro';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
+
+<TagRow kinds={["flow", "command"]} />
+
+A plan that scrolls past in a terminal is hard to judge. You cannot set two options side by side,
+you cannot mark the one line you disagree with, and the answer you type is gone when the session
+ends. Then the agent builds from a plan nobody really read, and a week later nobody can say what
+was approved.
+
+So for the moments when a person has to decide, the agent stops printing and opens a **review
+page**: an HTML page in your browser where you read the plan, compare the options, annotate, and
+answer. The answer is then written to the issue, or to a file in the repository, where it outlasts
+the session.
+
+**What you get:** a plan or a decision you answered on a page, and a record of that answer on the
+issue it belongs to.
+
+**Who does it:** the agent writes and opens the page. You answer it. The agent records the answer.
+
+**The tool that plugs in:** the page tool is
+[Lavish](https://github.com/kunchenguid/lavish-axi), third-party software that cckit runs through
+`npx`. It is described by `integrations/lavish.json`, like every other
+[integration](/integrations/). cckit does not build a page tool. Review pages are **on by default
+in every project**.
+
+## What opens as a page
+
+Three kinds of agent output are for comparing, annotating and answering:
+
+| Kind | When the agent opens one |
+| --- | --- |
+| `plan` | before implementation: an effort's scope, a forward plan, a migration order |
+| `decision` | a choice with two or more options you have to pick from |
+| `grill` | a grilling round: the questions that stress-test a plan or an idea |
+
+Everything else stays in the terminal: status, a one-line answer, a diff.
+
+## The two paths
+
+| | Page | Terminal |
+| --- | --- | --- |
+| When | an attended session on a machine with a browser | every other session, and any project that turned pages off |
+| `cckit page mode` prints | `page` | `terminal: <reason>` |
+| What you see | the plan, the options or the questions as a page, with controls to answer | the same content printed in the terminal |
+| Where you answer | on the page | in the conversation |
+| Where the answer is recorded | the issue, or a file | the issue, or a file |
+| Exit code | 0 | 0 |
+
+The terminal path is never an error. `cckit page open` exits 0 when it prints instead of opening,
+so an unattended run does not stop on it.
+
+## The loop
+
+The Bakery site's launch plan is the example: the owner answers it on a page.
+
+## 1. The agent asks whether a page can open
+
+<Chat
+  title="checking whether the Bakery site launch plan can open as a page"
+  say="Put the launch plan on a page so I can answer it there."
+  ran="cckit page mode"
+  output="page"
+  means="page: this session can open one. On every other session it prints terminal and the reason, and the plan is printed in the chat instead."
+>
+  This session has a browser, so I will show the plan on a page.
+</Chat>
+
+## 2. On `page`, it writes the page and opens it
+
+<Chat
+  title="opening the Bakery site launch plan page"
+  say="Go ahead and open it."
+  ran="cckit page open .lavish/<name>.html --fallback .lavish/<name>.md"
+  means="The HTML goes under .lavish/, with the same content as markdown beside it. If the page tool exits non-zero, open prints the markdown and still exits 0."
+>
+  The plan is open in your browser. The same text is saved as markdown next to it.
+</Chat>
+
+<Outcomes title="Flags and what the first open writes">
+
+Flags after `--` go to the page tool (`cckit page open <file> -- --reopen`). The first open
+adds `.lavish/` to the repository's local exclude file (`.git/info/exclude`), so pages never
+show in `git status`; that file is not tracked and not pushed.
+
+</Outcomes>
+
+## 3. It waits for your answer
+
+<Chat
+  title="waiting for the owner's answer on the Bakery site plan"
+  say="I will answer on the page. Tell me when you have it."
+  ran="cckit page poll .lavish/<name>.html"
+  means="poll, reply and end hand their arguments to the page tool unchanged."
+>
+  I am waiting for your answer on the page.
+</Chat>
+
+## 4. It writes the answer back
+
+<Chat
+  title="recording the Bakery site plan answer"
+  say="I picked the option with the contact form last. Record it."
+  ran='cckit page answer --kind plan --title "<what was decided>" --issue <issue> --body-file <file>'
+  means="This step runs on the terminal path too."
+>
+  Your answer is recorded as a comment on the issue, with the kind and the title, so it outlasts
+  this session.
+</Chat>
+
+On `terminal`, step 2 is "print it in the terminal" and step 3 is the conversation.
+
+## Check that it worked
+
+- `cckit page mode` prints `page` in the session where you expect a page, or `terminal: <reason>`
+  with the reason it will not open one.
+- After you answer, the issue has one new comment carrying the kind and the title, or
+  `docs/answers/` has one new file. `cckit page answer` exits `0`.
+
+## When a session has no page
+
+`cckit page mode` checks these in order and stops at the first that holds:
+
+| # | Condition | Result |
+| --- | --- | --- |
+| 1 | `CCKIT_PAGES` is `terminal`, `off`, `0`, `false` or `no` | terminal |
+| 2 | `reviewPages.enabled` is `false` in the project config | terminal |
+| 3 | `CI` is set (and not `false` or `0`) | terminal |
+| 4 | `CCKIT_HEADLESS` is set (and not `0`) | terminal |
+| 5 | Claude Code reports a headless session: `CLAUDE_CODE_SESSION_ATTENDED=0`, or `CLAUDE_CODE_ENTRYPOINT` starting with `sdk` (what `claude -p` sets) | terminal |
+| 6 | `SSH_CONNECTION` or `SSH_TTY` is set | terminal: the browser would open on the remote host |
+| 7 | not macOS, and neither `DISPLAY` nor `WAYLAND_DISPLAY` is set | terminal |
+| 8 | no agent session (`CLAUDECODE` unset) and none of stdin, stdout, stderr is a terminal | terminal |
+| 9 | neither `lavish-axi` nor `npx` is on `PATH` | terminal |
+| | none of the above | page |
+
+`CCKIT_PAGES=page` skips rows 3 to 8, for an attended session the check misreads. It does not
+override the config switch in row 2, and it does not conjure a browser: do not set it in a run
+nobody is watching.
+
+Who sets `CCKIT_HEADLESS`:
+
+| Run | How it gets there |
+| --- | --- |
+| `cckit autopilot run` | exported before each round's agent process starts |
+| `cckit orchestrate` and `cckit autopilot` on tmux | exported by the wave worker that runs each pane's agent |
+| night mode | the executor prompt tells the agent to run every `cckit page` command with `CCKIT_HEADLESS=1` |
+| `cckit orchestrate --runtime herdr` | not set by cckit — Herdr starts the agent process. Set `CCKIT_PAGES=terminal` in the Herdr environment |
+
+<Aside type="caution" title="Codex and other agents">
+Row 8 recognises an agent session by `CLAUDECODE`, which Claude Code sets. An agent that runs
+commands with no terminal attached and sets no such variable gets `terminal`. In an attended
+session of another agent, export `CCKIT_PAGES=page`.
+</Aside>
+
+## Where an answer is written
+
+`cckit page answer` takes `--kind` (`plan`, `decision` or `grill`), `--title`, an optional
+`--issue <n>`, and the answer as `--body-file <file>` or on stdin.
+
+| Project | Destination |
+| --- | --- |
+| `github.repo` is set in the config **and** `--issue` is given | one comment on that issue |
+| no `github.repo`, or no `--issue` | a file, `docs/answers/<date>-<kind>-<slug>.md` in the work tree |
+
+The file is written and not committed: commit it with the change it belongs to. Recording the same
+kind, title and body twice writes nothing the second time; a different body under the same title is
+a new comment, or a new file with a `-2` suffix.
+
+Exit codes: `0` written or already recorded · `1` the comment or the file could not be written ·
+`2` a usage error (unknown kind, no title, an empty body, a non-numeric issue, a directory outside
+the repo).
+
+## Config
+
+| Key | Default | What it does |
+| --- | --- | --- |
+| `reviewPages.enabled` | *(unset — on)* | `false` turns review pages off: the three kinds print to the terminal and the page tool is never started. |
+| `reviewPages.answers` | *(unset)* | `issue` or `file` fixes where an answer goes. `issue` requires `--issue`. Unset: the table above decides. |
+| `reviewPages.answersDir` | `docs/answers` | Directory, relative to the repo root, for answers written as files. A path that leaves the repo is refused. |
+
+```bash
+cckit add lavish --set enable=no    # writes reviewPages.enabled: false
+cckit add lavish                    # writes reviewPages.enabled: true, and the review-pages rule
+CCKIT_PAGES=terminal cckit page open .lavish/<name>.html   # off for one command
+```
+
+## A plan page before an effort starts
+
+Recommended, not required. `/kit-effort-new` shows the plan as a page before it creates anything
+and records the approval on the parent issue, but `cckit effort start` reads no page and no answer:
+it starts the effort either way.
+
+## What tells the agent
+
+| Piece | Where | What it says |
+| --- | --- | --- |
+| the `review-pages` rule | every profile; `.claude/rules/review-pages.md` (and `.agents/rules/` under Codex) | the three kinds, the four commands, the limits |
+| the `kit-page` skill | the Claude Code plugin | the full procedure, with the page tool's playbook per kind |
+| `kit-plan-next`, `kit-effort-new` | the Claude Code plugin | present the choice or the plan as a page, then record the answer |
+
+A project scaffolded before this rule shipped gets it from `cckit init --upgrade`.
+
+## The doctor row
+
+`cckit doctor` lists Lavish under Integrations in every project that has not turned it off.
+
+| State | Row | Exit code |
+| --- | --- | --- |
+| `lavish-axi` or `npx` on `PATH` | `ok  Lavish  installed (<path>)` | unchanged |
+| neither, and the project never set `reviewPages.enabled` | `-  Lavish  not installed — on by default, falls back without it…` | unchanged: not a failure, and `--fix` installs nothing |
+| neither, and the config says `reviewPages.enabled: true` | `FAIL  Lavish  missing — npm install -g lavish-axi` | 1; `--fix` installs it, with consent recorded as `install:lavish` |
+
+<Aside type="note" title="Not affiliated">
+Lavish (`lavish-axi`) is open-source software (MIT) by [Kun Chen](https://github.com/kunchenguid/lavish-axi),
+run from its public npm package. cckit is not affiliated with its author and vendors none of its
+code. The page is served by a local server the tool starts on your machine. Its `share` command
+publishes a page to a third-party host; cckit never calls it.
+</Aside>

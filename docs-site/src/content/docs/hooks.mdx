@@ -90,7 +90,7 @@ version of its template, or the hash recorded in `.claude/kit.manifest.json`. A 
 is kept and listed as **Drifted** in the upgrade summary, for you to compare with the template.
 A registration that is already in `.claude/settings.json` is left in the block and position it is
 in; the file is rewritten only when a registration had to be added, and the summary then lists it
-as modified. The whole path is in [Update a project](/update/).
+as modified. The whole path is in [Update a project](/getting-started/update/).
 
 ## Codex
 
@@ -121,8 +121,8 @@ scripts read (`hook_event_name`, `cwd`, `tool_input.command`) and documents the 
   scripts the registration points at.
 - **Memory.** `mempal_save.sh` and `mempal_precompact.sh` mine `~/.claude/projects/`, the Claude
   Code transcript store. No Codex transcript format has been validated against `mempalace mine`, so
-  the memory hooks are not installed for Codex. See [Memory](/memory/#codex).
-- **`cckit remove`** deletes the hook scripts it installed and a `hooks.json` it created and you
+  the memory hooks are not installed for Codex. See [How cckit uses memory](/memory/how-cckit-uses-it/#under-codex).
+- **The uninstall script, `scripts/kit-remove.sh`,** deletes the hook scripts it installed and a `hooks.json` it created and you
   never edited. Entries merged into a `hooks.json` of your own stay; delete those by hand.
 
 What is tested: `scripts/hook-adapter-test.sh` feeds each installed hook the event JSON each

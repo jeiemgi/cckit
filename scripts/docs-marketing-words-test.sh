@@ -37,7 +37,7 @@ if command -v node >/dev/null 2>&1; then
   t "clean pages print nothing" "$out" ""
 
   # A lowercase "pr" inside a word or a URL slug is not the word PR.
-  printf 'See [the tutorial](/tutorials/take-a-github-issue-to-a-merged-pr/) to approve and improve.\n' > "$docs/marketing/slug.mdx"
+  printf 'See [the tutorial](/development/issue-to-merged-pr/) to approve and improve.\n' > "$docs/marketing/slug.mdx"
   out="$(node "$CHECK" "$docs" 2>&1)"; rc=$?
   t "a pr slug and 'approve' are not hits" "$rc" "0"
 

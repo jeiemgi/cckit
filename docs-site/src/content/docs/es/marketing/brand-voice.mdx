@@ -1,21 +1,43 @@
 ---
 title: Define tu voz de marca
-description: Escribe una vez en el proyecto tu voz de marca, tus mensajes clave y las frases prohibidas, para que todos los borradores que escribe Claude las sigan.
+description: Escribe una vez en el proyecto tu voz de marca, tus mensajes clave y las frases prohibidas, para que todos los borradores que escribe tu asistente las sigan.
+tutorial:
+  job: dejar la voz de marca por escrito una vez para que todos los borradores la sigan
+  difficulty: beginner
+  time: "15 min"
+  prerequisites:
+    - { text: "Las llaves están entregadas y el proyecto está abierto en el chat con tu asistente", link: "Las llaves están entregadas", href: "/es/marketing/get-set-up/" }
+    - "Dos o tres piezas que para ti suenan bien, y una que suena mal"
+  ogTag: Marketing
+  related: [marketing/your-first-piece, marketing/campaigns]
 ---
 
 import { Steps, Aside } from '@astrojs/starlight/components';
+import Chat from '../../../../components/Chat.astro';
+import TutorialMeta from '../../../../components/TutorialMeta.astro';
 
-Una voz de marca que vive en la cabeza de alguien hay que explicarla de nuevo en cada conversación.
-Con el perfil de marketing la escribes una vez, en el proyecto. Claude la lee antes de escribir o
-planear cualquier cosa.
+<TutorialMeta />
+
+Sin una voz por escrito, cada borrador vuelve sonando a anuncio y tú corriges lo mismo una y otra
+vez. Hay que explicársela a tu asistente de nuevo en cada conversación, y cada pieza delegada la
+corrige quien se acuerda de cómo era. Escrita una vez, cada pieza empieza en la voz correcta. El
+proyecto de la panadería Pilot Light es nuevo, y su voz es lo primero que se escribe en él.
+
+**Quién lo hace:** el equipo decide la voz. Tu asistente hace las preguntas y deja las respuestas
+por escrito, y el asistente de edición compara los borradores con ellas.
+
+**Lo que vas a tener al final:** un archivo aprobado en el proyecto, `brand/voice.md`, que tu
+asistente lee antes de escribir un borrador o planear una campaña.
+
+Esto cubre solo la voz escrita. El logo, el color y la identidad visual no entran aquí.
 
 ## Qué se registra
 
 | Parte | Qué responde | Ejemplo |
 | --- | --- | --- |
-| **Voz** | ¿Cómo sonamos? | "Directa y cercana. Frases cortas. Hablamos de tú, nunca de 'usuarios'." |
-| **Mensajes clave** | ¿Con qué queremos que se quede siempre quien nos lee? | "Listo en un día. Sin contrato." |
-| **Frases prohibidas** | ¿Qué no decimos nunca? | "Revolucionario", "líder del mercado", signos de admiración en los titulares. |
+| **Voz** | ¿Cómo sonamos? | "Cercana y sencilla. Frases cortas. Hablamos de tú." Por ejemplo: "Pasa, el pan todavía está tibio." |
+| **Mensajes clave** | ¿Con qué queremos que se quede siempre quien nos lee? | "Horneado cada mañana: los hornos se prenden a las 5." |
+| **Frases prohibidas** | ¿Qué no decimos nunca? | "Artesanal", "excelencia", signos de admiración en los titulares. |
 
 ## Defínela
 
@@ -23,45 +45,83 @@ planear cualquier cosa.
 
 1. **Empieza la conversación.**
 
-   <div class="cckit-prompt">
-
-   ```text title="Dile esto a Claude"
-   Ayúdame a definir nuestra voz de marca para este proyecto. Pregúntame lo que necesites saber, una pregunta a la vez.
-   ```
-
-   </div>
+   <Chat
+     title="empezar la voz de marca de la panadería"
+     say="Ayúdame a definir nuestra voz de marca para este proyecto. Pregúntame lo que necesites saber, una pregunta a la vez."
+     means="Tu asistente lee primero el proyecto y solo pregunta lo que el proyecto no responde."
+   >
+     Claro. El proyecto es nuevo, así que todavía no tengo nada que leer. Mi primera pregunta:
+     cuando entra un vecino, ¿cómo le hablas en el mostrador?
+   </Chat>
 
 2. **Responde con ejemplos.** Pega dos o tres piezas que para ti suenan bien y una que suena mal.
-   Los ejemplos le dicen más a Claude que los adjetivos.
+   Los ejemplos le dicen más a tu asistente que los adjetivos.
 
-3. **Lee lo que Claude escribió.** Te muestra la voz, los mensajes clave y las frases prohibidas
-   antes de guardarlos. Corrige lo que no esté bien.
+   <Chat
+     title="dar ejemplos de la voz de la panadería"
+     say="Esto suena a nosotros: “Pasa, el pan todavía está tibio.” y “Pídelo antes del jueves, recógelo el sábado.” Esto no: “¡Vive nuestra excelencia en panadería artesanal!”"
+     means="Un ejemplo malo sirve tanto como los buenos."
+   >
+     Gracias. Escucho frases cortas, una invitación y nada de exageración. Una pregunta más: ¿le
+     hablamos de "tú" a quien compra, o hablamos de "nuestros invitados"?
+   </Chat>
+
+3. **Lee lo que tu asistente escribió.** Te muestra la voz, los mensajes clave y las frases
+   prohibidas antes de guardarlos. Corrige lo que no esté bien. Un mensaje clave necesita su
+   prueba: una cifra, un cliente, un hecho. El que no la tiene queda registrado como no
+   comprobado, y tu asistente no lo afirma como un hecho en un borrador.
+
+   <Chat
+     title="leer la voz de la panadería antes de guardarla"
+     say="Muéstrame lo que escribiste antes de guardarlo."
+     means="No se guarda nada hasta que lo digas. Corrige lo que no esté bien."
+   >
+     Voz: cercana y sencilla, frases cortas, hablamos de "tú". Mensaje clave: "Horneado fresco cada
+     mañana", con su prueba: los hornos se encienden a las 5. Registrado como no comprobado: "El
+     mejor pan del barrio", porque todavía no tiene prueba, así que no lo voy a afirmar como un
+     hecho en un borrador. Prohibido: "artesanal", "excelencia" y signos de admiración en los
+     titulares.
+   </Chat>
 
 4. **Envíala a revisión.** La voz de marca es contenido como cualquier otro: pasa por un borrador y
    una revisión, para que el equipo esté de acuerdo antes de que aplique para todos.
 
-   <div class="cckit-prompt">
-
-   ```text title="Dile esto a Claude"
-   Guarda la voz de marca y pide una revisión.
-   ```
-
-   </div>
+   <Chat
+     title="enviar la voz de la panadería a revisión"
+     say="Guarda la voz de marca y pide una revisión."
+     means="Una vez aprobada, todos los borradores y todos los planes de campaña de este proyecto parten de ella."
+   >
+     Guardada como brand/voice.md en un borrador propio, y la revisión está abierta. Aquí está el
+     enlace para tu colega.
+   </Chat>
 
 </Steps>
 
-Una vez aprobada, todos los borradores y todos los planes de campaña de este proyecto parten de
-ella.
+## Comprueba que funcionó
 
-## Comprueba que un borrador la sigue
+Abre una conversación nueva y pide un borrador sin describir la voz. Si el borrador suena bien y
+evita las frases prohibidas, la voz ya está en su lugar.
 
-<div class="cckit-prompt">
+<Chat
+  title="comprobar que la voz está en su lugar"
+  say="Escribe dos líneas para anunciar el menú de Semana Santa."
+  means="No describiste la voz, así que el borrador salió del archivo."
+>
+  Las roscas de Pascua ya están en el horno. Pídelas antes del jueves, recógelas el sábado. Sigue
+  la voz: frases cortas, "tú" y ninguna de las palabras prohibidas.
+</Chat>
 
-```text title="Dile esto a Claude"
-Revisa este borrador contra nuestra voz de marca. Enumera cada frase que la rompe y propón una corrección para cada una.
-```
+Para comparar un borrador con ella:
 
-</div>
+<Chat
+  title="comparar un borrador con la voz de la panadería"
+  say="Revisa este borrador contra nuestra voz de marca. Enumera cada frase que la rompe y propón una corrección para cada una."
+  means="El asistente de edición hace la comparación. Tú decides qué correcciones te quedas."
+>
+  Dos frases rompen la voz. "Vive nuestra panadería artesanal" usa una palabra prohibida, así que
+  propongo "Pasa y huele el pan". El signo de admiración del titular está prohibido, así que
+  propongo un punto.
+</Chat>
 
 ## Cámbiala después
 
@@ -69,8 +129,8 @@ La voz se cambia igual que se definió: di qué debe cambiar, lee el resultado y
 El historial de cada cambio queda en el proyecto, con quién lo aprobó.
 
 <Aside type="tip">
-Mantén la lista de frases prohibidas corta y específica. "Sin tecnicismos" es difícil de comprobar.
-"Nunca decimos 'apalancar'" es fácil.
+Mantén la lista de frases prohibidas corta y específica. "Sin exagerar" es difícil de comprobar.
+"Nunca decimos 'artesanal'" es fácil.
 </Aside>
 
-Siguiente: [Planea y lleva una campaña](/es/marketing/campaigns/)
+Siguiente: [Delega tu primera pieza](/es/marketing/your-first-piece/)
