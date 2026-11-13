@@ -86,6 +86,8 @@
 #   cckit qa verdict [pass|fail] [--lane N] [--note T] [--shot F]   record the verdict against the
 #                                   reviewed commit (PR comment upserted, a fail mailed to the builder);
 #                                   with no pass|fail, read it back: pass · fail · stale · none
+#   cckit qa lanes [--llm]          read-only table of every lane: branch, ports, up (listeners on
+#                                   its ports), verdict (pass · fail · stale · none), worktree
 #   cckit completions [bash|zsh]    print a shell-completion script to source
 #   cckit help
 set -eu

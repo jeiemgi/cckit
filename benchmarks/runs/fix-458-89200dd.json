@@ -1,0 +1,184 @@
+{
+  "version": "fix/458@89200dd",
+  "date": "2026-11-12",
+  "model": "claude-haiku-5-5",
+  "total": 18,
+  "pass": 18,
+  "score_pct": 100,
+  "results": [
+    {
+      "set": "retrieval.jsonl",
+      "tier": "retrieval",
+      "id": "ret-01",
+      "got": "docs-site/src/content/docs/releasing.mdx",
+      "expect": "docs-site/src/content/docs/releasing.mdx",
+      "pass": true,
+      "latency_ms": 7000
+    },
+    {
+      "set": "retrieval.jsonl",
+      "tier": "retrieval",
+      "id": "ret-02",
+      "got": "docs-site/src/content/docs/efforts-and-waves.mdx",
+      "expect": [
+        "docs-site/src/content/docs/efforts-and-waves.mdx",
+        "docs-site/src/content/docs/wave.mdx"
+      ],
+      "pass": true,
+      "latency_ms": 13000
+    },
+    {
+      "set": "retrieval.jsonl",
+      "tier": "retrieval",
+      "id": "ret-03",
+      "got": "docs-site/src/content/docs/hooks.mdx",
+      "expect": "docs-site/src/content/docs/hooks.mdx",
+      "pass": true,
+      "latency_ms": 10000
+    },
+    {
+      "set": "retrieval.jsonl",
+      "tier": "retrieval",
+      "id": "ret-04",
+      "got": "docs-site/src/content/docs/tutorials/give-claude-code-persistent-memory.mdx",
+      "expect": [
+        "docs-site/src/content/docs/memory.mdx",
+        "docs-site/src/content/docs/tutorials/give-claude-code-persistent-memory.mdx"
+      ],
+      "pass": true,
+      "latency_ms": 8000
+    },
+    {
+      "set": "retrieval.jsonl",
+      "tier": "retrieval",
+      "id": "ret-05",
+      "got": "docs-site/src/content/docs/config-and-permissions.mdx",
+      "expect": "docs-site/src/content/docs/config-and-permissions.mdx",
+      "pass": true,
+      "latency_ms": 9000
+    },
+    {
+      "set": "retrieval.jsonl",
+      "tier": "retrieval",
+      "id": "ret-06",
+      "got": "docs-site/src/content/docs/review-gates.mdx",
+      "expect": "docs-site/src/content/docs/review-gates.mdx",
+      "pass": true,
+      "latency_ms": 9000
+    },
+    {
+      "set": "new.jsonl",
+      "tier": "retrieval",
+      "id": "new-01",
+      "got": "docs-site/src/content/docs/qa-lane.mdx",
+      "expect": "docs-site/src/content/docs/qa-lane.mdx",
+      "pass": true,
+      "latency_ms": 9000
+    },
+    {
+      "set": "new.jsonl",
+      "tier": "retrieval",
+      "id": "new-02",
+      "got": "docs-site/src/content/docs/integrations.mdx",
+      "expect": "docs-site/src/content/docs/integrations.mdx",
+      "pass": true,
+      "latency_ms": 9000
+    },
+    {
+      "set": "new.jsonl",
+      "tier": "retrieval",
+      "id": "new-03",
+      "got": "docs-site/src/content/docs/install-matrix.mdx",
+      "expect": "docs-site/src/content/docs/install-matrix.mdx",
+      "pass": true,
+      "latency_ms": 8000
+    },
+    {
+      "set": "new.jsonl",
+      "tier": "retrieval",
+      "id": "new-04",
+      "got": "docs-site/src/content/docs/multi-session.mdx",
+      "expect": "docs-site/src/content/docs/multi-session.mdx",
+      "pass": true,
+      "latency_ms": 7000
+    },
+    {
+      "set": "new.jsonl",
+      "tier": "retrieval",
+      "id": "new-05",
+      "got": "docs-site/src/content/docs/rules.mdx",
+      "expect": "docs-site/src/content/docs/rules.mdx",
+      "pass": true,
+      "latency_ms": 7000
+    },
+    {
+      "set": "new.jsonl",
+      "tier": "retrieval",
+      "id": "new-06",
+      "got": "docs-site/src/content/docs/releasing.mdx",
+      "expect": "docs-site/src/content/docs/releasing.mdx",
+      "pass": true,
+      "latency_ms": 8000
+    },
+    {
+      "set": "adversarial.jsonl",
+      "tier": "adversarial",
+      "id": "adv-01",
+      "got": "docs-site/src/content/docs/multi-session.mdx",
+      "expect": "docs-site/src/content/docs/multi-session.mdx",
+      "pass": true,
+      "latency_ms": 9000
+    },
+    {
+      "set": "adversarial.jsonl",
+      "tier": "adversarial",
+      "id": "adv-02",
+      "got": "docs-site/src/content/docs/tutorials/run-claude-code-unattended.mdx",
+      "expect": [
+        "docs-site/src/content/docs/tutorials/run-claude-code-unattended.mdx",
+        "docs-site/src/content/docs/config-and-permissions.mdx"
+      ],
+      "pass": true,
+      "latency_ms": 10000
+    },
+    {
+      "set": "adversarial.jsonl",
+      "tier": "adversarial",
+      "id": "adv-03",
+      "got": "docs-site/src/content/docs/qa-lane.mdx",
+      "expect": [
+        "docs-site/src/content/docs/qa-lane.mdx",
+        "docs-site/src/content/docs/debug.mdx"
+      ],
+      "pass": true,
+      "latency_ms": 7000
+    },
+    {
+      "set": "abstain.jsonl",
+      "tier": "abstain",
+      "id": "abs-01",
+      "got": "NONE",
+      "expect": "NONE",
+      "pass": true,
+      "latency_ms": 8000
+    },
+    {
+      "set": "abstain.jsonl",
+      "tier": "abstain",
+      "id": "abs-02",
+      "got": "NONE",
+      "expect": "NONE",
+      "pass": true,
+      "latency_ms": 9000
+    },
+    {
+      "set": "abstain.jsonl",
+      "tier": "abstain",
+      "id": "abs-03",
+      "got": "NONE",
+      "expect": "NONE",
+      "pass": true,
+      "latency_ms": 8000
+    }
+  ]
+}
