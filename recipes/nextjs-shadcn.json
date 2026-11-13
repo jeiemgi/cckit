@@ -1,0 +1,48 @@
+{
+  "id": "nextjs-shadcn",
+  "label": "Web app — Next.js + shadcn/ui",
+  "summary": "A website or web app you can open in the browser right away: pages, a ready-made set of buttons and forms, and one command to run it.",
+  "fits": "most new products — a landing page, a dashboard, an online tool, a store front.",
+  "recommended": true,
+  "profile": "software",
+  "stack": "nextjs",
+  "packageManager": "pnpm",
+  "folderName": "^[a-z0-9][a-z0-9._-]*$",
+  "requires": [
+    { "command": "node", "why": "Node.js runs the app; install it from https://nodejs.org (version 20.9 or newer)" },
+    { "command": "pnpm", "why": "pnpm downloads the app's packages; install it with: npm install -g pnpm" }
+  ],
+  "steps": [
+    {
+      "label": "Create the Next.js app",
+      "run": "pnpm create next-app@latest . --ts --tailwind --eslint --app --no-src-dir --import-alias \"@/*\" --use-pnpm --disable-git --no-agents-md --no-agent-feedback --yes",
+      "note": "Every choice is passed as a flag so a saved create-next-app preference cannot change the result. --disable-git: cckit init makes the repository and the first commit. --no-agents-md: the agent instruction files are the ones cckit writes. --no-agent-feedback: nothing is prepared for sending to a third party without the user asking."
+    },
+    {
+      "label": "Add shadcn/ui (design system) with its default look",
+      "run": "pnpm dlx shadcn@latest init --defaults --yes",
+      "note": "--defaults is `--template=next --preset=base-nova` in shadcn 4.23.0. It writes components.json, lib/utils.ts, the theme variables in app/globals.css and components/ui/button.tsx."
+    },
+    {
+      "label": "Add the basic components: card, input, label",
+      "run": "pnpm dlx shadcn@latest add card input label --yes"
+    }
+  ],
+  "verify": { "run": "pnpm build" },
+  "start": "pnpm dev",
+  "produces": ["package.json", "app/page.tsx", "components.json", "components/ui/button.tsx", "lib/utils.ts"],
+  "lastVerified": "2026-11-12",
+  "verifiedWith": { "create-next-app": "16.4.6", "shadcn": "4.23.0", "pnpm": "12.3.4", "node": "22.23.2" },
+  "sources": [
+    "https://nextjs.org/docs/app/api-reference/cli/create-next-app",
+    "https://ui.shadcn.com/docs/cli",
+    "https://ui.shadcn.com/docs/installation/next"
+  ],
+  "recheck": {
+    "drifts": [
+      "the create-next-app flag names (--no-agents-md, --no-agent-feedback, --disable-git, --no-src-dir)",
+      "what `shadcn init --defaults` expands to",
+      "the component names passed to `shadcn add`"
+    ]
+  }
+}

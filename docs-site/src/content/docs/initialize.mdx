@@ -14,13 +14,101 @@ yet, give yourself a real first task to run through the kit.
 
 ## 1 · Initialize the kit on a project
 
-From the root of the repo you want to work in:
+In a terminal, from the folder you want to work in, or naming the folder a new project should get:
 
 ```bash
-cckit init
+cckit init            # this folder
+cckit init my-app     # a new project in ./my-app (created for you)
 ```
 
-That's the whole setup. `cckit init` writes two things:
+You do not need to know git or GitHub to answer what it asks. init says what it found, asks in plain
+language, and every question has one answer marked **(Recommended)**: press Enter to take it.
+
+### What init does, in order
+
+<Steps>
+
+1. **It names the folder, before writing anything.**
+
+   | The folder is | What happens |
+   | --- | --- |
+   | a git repository with a GitHub remote | the kit is added, then the setup steps that are still missing |
+   | a git repository with no remote | the same, and the GitHub repository is created |
+   | a project (for example a `package.json`) with no git | the same, starting from `git init` |
+   | files, but nothing that marks a project | it asks: set it up here, start a new project in its own folder, or stop |
+   | empty, or not there yet | it asks whether this is a new project and what it starts from |
+   | your home folder, `~/Desktop`, `~/Documents`, `~/Downloads` or `/` | nothing is ever set up there. It asks whether this is a new project and which folder it gets |
+
+2. **A new project starts from a recipe.** One ships today: **Next.js + shadcn/ui** (`nextjs-shadcn`),
+   a web app you can open in the browser, installed with pnpm. You can also pick an empty project.
+
+3. **It asks whether the project needs a database.** One option ships today: **Supabase**. Choosing it
+   adds the two Supabase packages, the files `lib/supabase/client.ts` and `lib/supabase/server.ts`,
+   and a `.env.local` file that names the two values the app needs.
+
+4. **It adds the kit files** (the list is under [What the kit writes](#what-the-kit-writes)).
+
+5. **It lists the git and GitHub steps and asks once.** After you say yes:
+
+   | Step | Skipped when |
+   | --- | --- |
+   | Start version control (`git init`, branch `main`) and save the first version | the folder is already a repository / it already has a commit |
+   | Create the GitHub repository. Private unless you pass `--public` | the folder is already connected to one |
+   | Create the branch `develop`, push it, and make it the default branch of a repository init created | GitHub already has it. An existing repository keeps its default branch |
+   | Add the labels and milestones the workflow uses | they exist. Only missing ones are created |
+   | Turn on "automatically delete head branches" | it is on |
+   | Protect the base branch: pull request required, branch up to date, linear history, no force-push | it is protected. On a free personal account GitHub refuses protection for a private repository (HTTP 403): init reports the step as skipped with that reason and carries on |
+   | Read the Projects v2 field ids | the project has no board |
+   | Print the `cckit doctor` report | never |
+
+6. **It ends with a result line**: how many steps were done, skipped and failed. A failed step does not
+   stop the later ones. Fix it and run `cckit init` again: finished steps are skipped, so on a project
+   that is fully set up a re-run changes nothing.
+
+</Steps>
+
+### The database keys: you type them, cckit never sees them
+
+When you choose Supabase, init opens a guide page in your browser
+(`databases/supabase/guide.html`, with `npx -y lavish-axi`). With no browser session (no terminal,
+SSH, CI) it prints the same steps in the terminal. The page shows how to create the Supabase project
+and where each value is:
+
+| Name in `.env.local` | What it is | Where it is |
+| --- | --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | the Project URL | your project → **Connect** |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | the publishable key (`sb_publishable_…`) | your project → **Connect**, or **Settings → API Keys** |
+
+init writes the two names with placeholders. You replace the placeholders yourself. cckit does not
+print the values, read them back or put them in a commit, and git ignores `.env.local`. The guide
+carries the date its steps were last checked against the Supabase documentation.
+
+### Without a terminal
+
+An agent or a script has no terminal to answer on. Three flags cover it:
+
+```bash
+cckit init my-app --dry-run --recipe nextjs-shadcn --database supabase   # print every step; write nothing
+cckit init my-app --answers answers.json --yes                           # answers from a file; setup confirmed
+cckit init --profile software --no-github                                # the kit files only
+```
+
+- `--answers <file>` is a JSON object keyed by question: `new_project` (`yes` / `no`), `folder_use`
+  (`here` / `new` / `cancel`), `project_name`, `location`, `recipe`, `database_needed` (`yes` / `no`),
+  `database`, `profile`. A question the file leaves out takes the recommended answer, and the output
+  says so. A value that is not one of the choices exits 2 before anything is written.
+- `--yes` confirms the git and GitHub steps. With no terminal and no `--yes` they do not run: the
+  kit files are written and the last lines say how to run the setup.
+- `--no-github` leaves git and GitHub out entirely. `--recipe <id>` and `--database <id>` choose
+  without a question; `--public` creates the repository public.
+- With neither a terminal nor an answers file, a home folder exits 2 and `--profile` is required.
+
+Recipes and database options are data: one JSON file each in `recipes/` and `databases/` of the kit.
+A database option is offered only when it ships its guide page and its setup test.
+
+### What the kit writes
+
+`cckit init` writes two things:
 
 - **`cckit.config.json`** — your repo, owner, and base branch. Nothing is hardcoded; every verb reads from here.
 - **`.claude/`** — agents, hooks, rules, and settings, so Claude Code and cckit know how to drive *this* project.

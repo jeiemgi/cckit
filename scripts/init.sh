@@ -3,12 +3,20 @@
 # Substitutes {{VARS}} and resolves <!-- IF:FLAG --> blocks from a role profile.
 #
 # Usage:
-#   scripts/init.sh --profile software --name "My App" [flags]
+#   scripts/init.sh [<folder>] [flags]                # guided setup: detect, ask, scaffold, git + GitHub
+#   scripts/init.sh --profile software --no-github    # scaffold only, nothing outside the folder
 #   scripts/init.sh --upgrade --target <dir>          # merge new features into an existing setup
 #
-# Flags (all optional except --profile; sensible defaults derived otherwise):
-#   --profile <software|content|research|minimal>   role profile (required unless --upgrade)
-#   --target <dir>            project root to scaffold into       (default: $PWD)
+# Flags (all optional; sensible defaults derived otherwise):
+#   <folder> | --target <dir> project folder (created when missing)  (default: $PWD)
+#   --no-github               scaffold only: no git init, no commit, no GitHub write
+#   --yes                     run the git + GitHub setup without asking (required with no terminal)
+#   --public                  create the GitHub repository public       (default: private)
+#   --answers <file>          JSON {"<question key>":"<answer>"} for the guided questions
+#   --recipe <id|none>        start a NEW project from recipes/<id>.json
+#   --database <id|none>      add the database option databases/<id>.json
+#   --profile <software|content|research|minimal>   role profile (asked when a terminal or an
+#                             answers file is there; else required unless --upgrade)
 #   --name <str>              human project name                  (default: target basename)
 #   --slug <str>             short slug / mempalace wing          (default: lowercased basename)
 #   --repo <owner/repo>       GitHub repo                          (default: <owner>/<slug>)
@@ -254,11 +262,14 @@ PROFILE=""; TARGET="$PWD"; NAME=""; SLUG=""; REPO=""; GH_OWNER=""; OWNER_NAME=""
 PROJECT_NUMBER=""; PLANS_FORMAT=""; PLANS_DIR=""; MEMORY=""; LANG_PREF="English"; FORCE=0
 SPECKIT=""; PREPUSH_CMD=""; LOCAL_LAYER=""; LOCAL_EXPLICIT=0; DRY_RUN=0; UPGRADE=0
 ADAPTER_ARG=""    # --adapter as typed; resolved to ADAPTERS below (stored selection wins on upgrade)
+# Guided setup (#456): the folder as typed, the git + GitHub steps, the advisor's answers.
+FOLDER_GIVEN=0; NO_GITHUB=0; ASSUME_YES=0; REPO_VISIBILITY="private"; INIT_ANSWERS=""
+RECIPE_ARG=""; DATABASE_ARG=""
 SKILL_PREFIX=""   # namespace applied to kit-namespaced skill templates (from kit.config .skillPrefix on upgrade)
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --profile) PROFILE="$2"; shift 2 ;;
-    --target) TARGET="$2"; shift 2 ;;
+    --target) TARGET="$2"; FOLDER_GIVEN=1; shift 2 ;;
     --name) NAME="$2"; shift 2 ;;
     --slug) SLUG="$2"; shift 2 ;;
     --repo) REPO="$2"; shift 2 ;;
@@ -276,8 +287,16 @@ while [[ $# -gt 0 ]]; do
     --upgrade) UPGRADE=1; shift ;;
     --dry-run) DRY_RUN=1; shift ;;
     --adapter) ADAPTER_ARG="$2"; shift 2 ;;
-    -h|--help) sed -n '2,31p' "$0"; exit 0 ;;
-    *) echo "x unknown flag: $1" >&2; exit 1 ;;
+    --no-github) NO_GITHUB=1; shift ;;
+    --yes|-y) ASSUME_YES=1; shift ;;
+    --public) REPO_VISIBILITY="public"; shift ;;
+    --answers) INIT_ANSWERS="$2"; shift 2 ;;
+    --recipe) RECIPE_ARG="$2"; shift 2 ;;
+    --database) DATABASE_ARG="$2"; shift 2 ;;
+    -h|--help) sed -n '2,40p' "$0"; exit 0 ;;
+    -*) echo "x unknown flag: $1" >&2; exit 1 ;;
+    *) if [[ $FOLDER_GIVEN -eq 1 ]]; then echo "x one folder only (got '$TARGET' and '$1')" >&2; exit 1; fi
+       TARGET="$1"; FOLDER_GIVEN=1; shift ;;
   esac
 done
 
@@ -291,6 +310,22 @@ if [[ -n "$ADAPTER_ARG" ]]; then
 fi
 ADAPTERS="${ADAPTERS_NEW:-claude}"   # fresh init; --upgrade replaces this with the stored selection
 ADAPTER_ADDED=0
+
+# ---- guided setup: name the folder, ask what is missing (#456) -------------
+# Before anything is written. `--upgrade` never enters it: an upgrade works on a project that is
+# already set up and asks nothing.
+# shellcheck source=/dev/null
+. "$KIT_ROOT/scripts/lib/init-guide.sh"
+# shellcheck source=/dev/null
+. "$KIT_ROOT/scripts/lib/init-github.sh"
+INIT_CLASS=""; INIT_NEW=0; INIT_ALREADY=0; RECIPE_FILE=""; DB_FILE=""; DB_STACK=""; SETUP_RUN=0
+if [[ $UPGRADE -eq 0 ]]; then
+  if [[ -n "$INIT_ANSWERS" && ! -f "$INIT_ANSWERS" ]]; then echo "x --answers: no such file: $INIT_ANSWERS" >&2; exit 2; fi
+  if [[ -n "$INIT_ANSWERS" ]] && ! jq -e 'type == "object"' "$INIT_ANSWERS" >/dev/null 2>&1; then
+    echo "x --answers: $INIT_ANSWERS is not a JSON object of {\"question\": \"answer\"}" >&2; exit 2
+  fi
+  init_guide_resolve
+fi
 
 # Installed plugin version -> recorded into kit.config as kitVersion (drives /kit-update checks).
 PLUGIN_VERSION="$(jq -r '.version // "0.0.0"' "$KIT_ROOT/.claude-plugin/plugin.json" 2>/dev/null || echo "0.0.0")"
@@ -382,8 +417,9 @@ PROFILE_FILE="$KIT_ROOT/profiles/$PROFILE.json"
 [[ -f "$PROFILE_FILE" ]] || { echo "x no such profile: $PROFILE ($PROFILE_FILE)"; exit 1; }
 
 # ---- resolve target + defaults ------------------------------------------
-mkdir -p "$TARGET"
-TARGET="$(cd "$TARGET" && pwd)"
+# A folder that is not there yet is created when the first file is written, not here: a dry run
+# and a declined confirmation leave nothing behind (#456).
+if [[ -d "$TARGET" ]]; then TARGET="$(cd "$TARGET" && pwd)"; else TARGET="$(init_abs_path "$TARGET")"; fi
 BASENAME="$(basename "$TARGET")"
 # Prefer the ACTUAL repo name from the git remote — the local directory is often cloned/renamed to a
 # different name — and only fall back to the directory basename (#73).
@@ -400,6 +436,9 @@ if [[ -z "$GH_OWNER" ]]; then GH_OWNER="$(gh api user --jq .login 2>/dev/null ||
 [[ -z "$OWNER_NAME" ]] && OWNER_NAME="${GH_OWNER:-owner}"
 # Prefer the project's ACTUAL GitHub remote over an <owner>/<dir-basename> guess — the local
 # directory name often differs from the repo name (would target a non-existent repo otherwise).
+if [[ -z "$REPO" && $INIT_ALREADY -eq 1 ]]; then
+  REPO="$(jq -r '.github.repo // empty' "$(adapter_config_existing "$TARGET")" 2>/dev/null || true)"
+fi
 [[ -z "$REPO" ]] && REPO="$(cd "$TARGET" 2>/dev/null && gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || true)"
 [[ -z "$REPO" && -n "$GH_OWNER" ]] && REPO="$GH_OWNER/$SLUG"
 [[ -z "$REPO" ]] && REPO="$SLUG"
@@ -429,6 +468,16 @@ if [[ -z "$BASE_BRANCH" ]]; then
   fi
 fi
 [[ -z "$BASE_BRANCH" ]] && BASE_BRANCH="$(cd "$TARGET" 2>/dev/null && gh repo view --json defaultBranchRef -q .defaultBranchRef.name 2>/dev/null || true)"
+# The git + GitHub setup (#456) runs when it is wanted AND confirmed: --yes, or a terminal to ask
+# on. A dry run plans as if it were confirmed. A project with no `origin` remote that the setup is
+# about to give a repository integrates on `develop` (main stays the release branch).
+SETUP_WANTED=0; SETUP_BASE_CHOSEN=0
+if [[ $UPGRADE -eq 0 && $NO_GITHUB -eq 0 ]] && { [[ $ASSUME_YES -eq 1 || $DRY_RUN -eq 1 ]] || _ig_tty; }; then
+  SETUP_WANTED=1
+fi
+if [[ -z "$BASE_BRANCH" && $SETUP_WANTED -eq 1 ]] && [[ -z "$(git -C "$TARGET" remote get-url origin 2>/dev/null || true)" ]]; then
+  BASE_BRANCH="develop"; SETUP_BASE_CHOSEN=1
+fi
 [[ -z "$BASE_BRANCH" ]] && BASE_BRANCH="main"
 
 # profile defaults
@@ -657,6 +706,64 @@ hook_write() {  # <src> <dest>
   return 0
 }
 
+# ---- git + GitHub setup: the whole plan first, then ONE confirmation (#456) ----
+# Nothing has been written yet. --yes confirms; a terminal is asked once; with neither, the setup
+# does not run and the run says so at the end (re-run with --yes). A dry run only prints the plan.
+IG_TARGET="$TARGET"; IG_REPO="$REPO"; IG_BASE="$BASE_BRANCH"; IG_VISIBILITY="$REPO_VISIBILITY"
+IG_PROJECTS_V2="$PROJECTS_V2"; IG_KIT_ROOT="$KIT_ROOT"; IG_DOCTOR=1
+[[ "${KIT_INIT_PREFLIGHT:-1}" == "0" ]] && IG_DOCTOR=0   # the fixture tests' switch: no doctor, no network
+SETUP_DECLINED=0
+if [[ $SETUP_WANTED -eq 1 && $DRY_RUN -eq 0 ]]; then
+  echo ""
+  echo "cckit init is about to set up \"$NAME\" in $TARGET"
+  [[ -n "$RECIPE_FILE" ]] && echo "  Starting point: $(jq -r .label "$RECIPE_FILE")"
+  [[ -n "$DB_FILE" ]] && echo "  Database: $(jq -r .label "$DB_FILE")"
+  echo "  Git and GitHub setup:"
+  init_setup_plan | sed 's/^/  /'
+  if [[ $ASSUME_YES -eq 1 ]]; then
+    SETUP_RUN=1
+  else
+    printf '\nGo ahead? [Y/n]  (n = only the files in the folder; nothing is created on GitHub) '
+    IFS= read -r _setup_ok || _setup_ok="n"
+    case "$_setup_ok" in ""|y|Y|yes|Yes|YES) SETUP_RUN=1 ;; *) SETUP_DECLINED=1 ;; esac
+  fi
+  # Declined: the project keeps the base branch it would have had without the setup.
+  if [[ $SETUP_RUN -eq 0 && $SETUP_BASE_CHOSEN -eq 1 ]]; then BASE_BRANCH="main"; IG_BASE="main"; fi
+fi
+
+# _init_finish — the closing lines of a guided run: the database guide, why the setup did not run
+# (when it did not), the step totals. Exits 1 when a step failed, 0 otherwise.
+_init_finish() {
+  local _d _s _f
+  if [[ -n "$DB_FILE" ]]; then database_guide "$DB_FILE" "$TARGET"; fi
+  if [[ $UPGRADE -eq 0 && $NO_GITHUB -eq 0 && $SETUP_RUN -eq 0 ]]; then
+    echo ""
+    if [[ $SETUP_DECLINED -eq 1 ]]; then
+      echo "Git and GitHub setup: not run (you answered no). To run it later: cckit init --yes   (inside $TARGET)"
+    else
+      echo "Git and GitHub setup: not run — there is no terminal to confirm on."
+      echo "  To run it: cckit init --yes   (inside $TARGET).  To leave it out on purpose: --no-github."
+    fi
+  fi
+  if [[ -n "$INIT_STEP_LOG" ]]; then
+    _d="$(printf '%s' "$INIT_STEP_LOG" | grep -c '^  \[done' || true)"
+    _s="$(printf '%s' "$INIT_STEP_LOG" | grep -c '^  \[skipped' || true)"
+    _f="$(printf '%s' "$INIT_STEP_LOG" | grep -c '^  \[failed' || true)"
+    echo ""
+    echo "Result: $_d done · $_s skipped (already there, or not available) · $_f failed"
+    if [[ "$_f" -gt 0 ]]; then
+      printf '%s' "$INIT_STEP_LOG" | grep '^  \[failed'
+      echo "Fix what failed and run cckit init again: finished steps are skipped."
+    fi
+  fi
+  if [[ -n "$RECIPE_FILE" && $INIT_FAILED -eq 0 ]]; then
+    _s="$(jq -r '.start // empty' "$RECIPE_FILE")"
+    [[ -n "$_s" ]] && echo "To see the project running: cd $TARGET && $_s"
+  fi
+  [[ $INIT_FAILED -gt 0 ]] && exit 1
+  exit 0
+}
+
 # ---- dry run: print the plan and exit, writing nothing -------------------
 if [[ $DRY_RUN -eq 1 ]]; then
   echo "-> DRY RUN — nothing will be written. Plan for $TARGET:"
@@ -678,6 +785,24 @@ if [[ $DRY_RUN -eq 1 ]]; then
     upgrade_dry_run "$TARGET" "$KIT_ROOT/scripts/init.sh" "${_INIT_ARGS[@]}" || exit $?
     echo ""
     echo "  A = added · M = modified. Measured by running the upgrade on a temporary copy; $TARGET was not written."
+    echo "Re-run without --dry-run to apply."
+    exit 0
+  fi
+  # A project that already has the kit files (#456): a real run leaves them alone, so the plan is
+  # the database option and the setup steps, not the file list.
+  if [[ $INIT_ALREADY -eq 1 && ( $SETUP_WANTED -eq 1 || -n "$DB_FILE" ) ]]; then
+    echo "  cckit files: already there ($CONFIG_REL) — a run leaves them as they are (--upgrade merges in new kit features)."
+    echo ""
+    if [[ -n "$DB_FILE" ]]; then
+      echo "  Database option $(jq -r .id "$DB_FILE") would add what is missing of:"
+      database_plan "$DB_FILE" "$DB_STACK"
+      echo ""
+    fi
+    if [[ $SETUP_WANTED -eq 1 ]]; then
+      echo "  Git and GitHub setup would run these steps (nothing is written to GitHub by a dry run):"
+      init_setup_plan | sed 's/^/  /'
+      echo ""
+    fi
     echo "Re-run without --dry-run to apply."
     exit 0
   fi
@@ -729,14 +854,61 @@ if [[ $DRY_RUN -eq 1 ]]; then
   echo ""
   echo "  Onboarding would offer (opt-in): gh auth$([[ "$MEMORY_BOOL" == "true" ]] && echo " · MemPalace (mempalace-mcp)") · gws (if you use Google Workspace) · local model layer (--local on: NL chores at \$0 via mlx_lm.server)"
   echo ""
+  if [[ -n "$RECIPE_FILE" ]]; then
+    echo "  Recipe $(jq -r .id "$RECIPE_FILE") would run, in $TARGET:"
+    recipe_plan "$RECIPE_FILE"
+    echo ""
+  fi
+  if [[ -n "$DB_FILE" ]]; then
+    echo "  Database option $(jq -r .id "$DB_FILE") would add:"
+    database_plan "$DB_FILE" "$DB_STACK"
+    echo ""
+  fi
+  if [[ $SETUP_WANTED -eq 1 ]]; then
+    echo "  Git and GitHub setup would run these steps (nothing is written to GitHub by a dry run):"
+    init_setup_plan | sed 's/^/  /'
+    echo ""
+  elif [[ $NO_GITHUB -eq 1 ]]; then
+    echo "  Git and GitHub setup: off (--no-github)."
+    echo ""
+  fi
   echo "Re-run without --dry-run to write these files."
   exit 0
 fi
 
 # ---- guard ---------------------------------------------------------------
 if [[ -e "$KITCFG" && $FORCE -eq 0 && $UPGRADE -eq 0 ]]; then
+  # A re-run of the guided setup on a project that already has the kit files (#456): the files are
+  # left as they are, and only the steps that are still missing run.
+  if [[ $SETUP_RUN -eq 1 || -n "$DB_FILE" ]]; then
+    echo ""
+    echo "-> $TARGET already has the cckit files ($CONFIG_REL)"
+    init_step skipped "cckit files" "already there (cckit init --upgrade merges in new kit features)"
+    if [[ -n "$DB_FILE" ]]; then database_apply "$DB_FILE" "$DB_STACK" "$TARGET"; fi
+    if [[ $SETUP_RUN -eq 1 ]]; then init_setup_run; fi
+    _init_finish
+  fi
   echo "  $TARGET already initialized ($CONFIG_REL). Re-run with --upgrade to merge in new features (preserves your edits), or --force to overwrite generated files."
   exit 1
+fi
+
+# ---- recipe + database: the project itself, before the kit files (#456) ---
+# The recipe's generators want an empty folder, so they run first; the kit files land on top.
+if [[ -n "$RECIPE_FILE" ]]; then
+  echo ""
+  echo "-> Starting point: $(jq -r .label "$RECIPE_FILE")  (this downloads packages and can take a few minutes)"
+  if ! recipe_run "$RECIPE_FILE" "$TARGET"; then
+    echo "" >&2
+    echo "x The starting point could not be built, so nothing else was set up." >&2
+    echo "  Fix the problem shown above, delete the folder $TARGET, and run cckit init again." >&2
+    exit 1
+  fi
+fi
+if [[ -n "$DB_FILE" ]]; then
+  echo ""
+  echo "-> Database: $(jq -r .label "$DB_FILE")"
+  mkdir -p "$TARGET"
+  database_apply "$DB_FILE" "$DB_STACK" "$TARGET"
 fi
 
 # ---- init banner (fresh init only; not on --upgrade) ---------------------
@@ -1306,10 +1478,18 @@ else
   echo ""
   echo "Next steps:"
   echo "  1. Review $(adapter_instructions "${ADAPTERS%% *}") and $CONFIG_REL"
+  if [[ $SETUP_RUN -eq 0 ]]; then
   echo "  2. ./scripts/setup-labels.sh && ./scripts/setup-milestones.sh   # seed the repo"
-  [[ "$PROJECTS_V2" == "true" ]] && echo "  3. ./scripts/capture-project-ids.sh   # cache Projects v2 field IDs"
+  if [[ "$PROJECTS_V2" == "true" ]]; then echo "  3. ./scripts/capture-project-ids.sh   # cache Projects v2 field IDs"; fi
+  fi
   [[ "$LOCAL_ON" == "true" ]] && echo "  4. /kit-doctor   # local model layer: installs mlx-lm (recipe: integrations/mlx-lm.json) + starts mlx_lm.server"
   adapter_has "$ADAPTERS" codex && echo "  · Codex: commit .codex/, then run /hooks in Codex and trust the project hooks — Codex skips them until you do."
+fi
+
+# ---- git + GitHub setup, then the closing report (#456) --------------------
+if [[ $UPGRADE -eq 0 ]]; then
+  if [[ $SETUP_RUN -eq 1 ]]; then init_setup_run; fi
+  _init_finish
 fi
 
 exit 0
