@@ -14,6 +14,10 @@
 # Benchmark check (#452): the version needs a recorded checkpoint in benchmarks/runs/<version>.json
 # and its last checkpoint must not score lower than the checkpoint recorded before it. Otherwise
 # the release is refused (exit 1), in a dry run as well. --skip-bench-check overrides, and says so.
+# The runs are always read from this repo's benchmarks/ dir. BENCH_DIR is NOT honoured here: it is
+# the variable `cckit bench` reads, and one left exported for another project would move the
+# release check to that project's runs without a word. KIT_RELEASE_BENCH_DIR points the check
+# elsewhere (the tests use it), and the release prints the directory when it is set.
 # Env: TAP_DIR=~/Dev/jeiemgi/homebrew-cckit (where the tap repo is cloned)
 set -euo pipefail
 
@@ -41,7 +45,8 @@ echo "== cckit publish $tag  (mode: $mode) =="
 
 # 0. Benchmark check: refuse a version with no recorded checkpoint, or one that scores lower than
 # the checkpoint before it. Runs before anything is written, and in a dry run too.
-bench_out="$(BENCH_DIR="${BENCH_DIR:-$root/benchmarks}" bash "$root/scripts/benchmark/checkpoint.sh" check "$VERSION" 2>&1)" && bench_rc=0 || bench_rc=$?
+[ -z "${KIT_RELEASE_BENCH_DIR:-}" ] || echo "! benchmark runs read from KIT_RELEASE_BENCH_DIR=$KIT_RELEASE_BENCH_DIR"
+bench_out="$(BENCH_DIR="${KIT_RELEASE_BENCH_DIR:-$root/benchmarks}" bash "$root/scripts/benchmark/checkpoint.sh" check "$VERSION" 2>&1)" && bench_rc=0 || bench_rc=$?
 printf '%s\n' "$bench_out"
 if [ "$bench_rc" -ne 0 ]; then
   if [ "$SKIP_BENCH" = 1 ]; then

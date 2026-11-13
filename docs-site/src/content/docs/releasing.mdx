@@ -85,11 +85,16 @@ what it showed, run again. A version can hold several.
 | last checkpoint scores lower than the checkpoint recorded before it | refused, exit 1 |
 | last checkpoint scores the same or higher | proceeds |
 | first checkpoint ever recorded | proceeds |
+| any `X.Y.Z.json` in `benchmarks/runs/` is not a checkpoint file | refused, exit 1; the file is named |
 
 "The checkpoint recorded before it" is the previous checkpoint of the same version, or the last
 checkpoint of the previous version when the version has only one. `--skip-bench-check` releases
 anyway; the output then carries the reason and the line
 `! benchmark check OVERRIDDEN by --skip-bench-check`.
+
+The release reads the runs in cckit's own `benchmarks/runs/`. `BENCH_DIR`, which `cckit bench` reads,
+does not move the release check. `KIT_RELEASE_BENCH_DIR=<dir>` does, and the release then prints
+`! benchmark runs read from KIT_RELEASE_BENCH_DIR=<dir>`.
 
 <Aside type="caution" title="Where the refusal applies">
 The refusal is in `cckit release`, the local path. Merging the Release PR does not run it: the

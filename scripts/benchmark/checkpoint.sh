@@ -17,7 +17,8 @@
 #       Every recorded checkpoint, oldest first.
 #   checkpoint.sh check <X.Y.Z>
 #       The release gate. Exit 0 when the version's last checkpoint scores at least as high as the
-#       checkpoint recorded before it; exit 1 when the version has no checkpoint, or it scores lower.
+#       checkpoint recorded before it; exit 1 when the version has no checkpoint, or it scores lower;
+#       exit 2 on a usage error or a run file that is not a checkpoint file.
 #   checkpoint.sh page [--out <file>] [--check]
 #       Print the results page (markdown) built from the run files; --out writes it; --check exits 1
 #       when the file on disk differs from what the run files produce.
@@ -35,6 +36,12 @@ DIR="$(bench_dir)"
 RUNS="$DIR/runs"
 PROJECT_ROOT="$(cd "$DIR/.." 2>/dev/null && pwd)"
 
+usage() { sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//'; }
+
+# A flag that takes a value, given as the last argument, has none: refuse it. Without this check
+# `shift 2` fails on one remaining argument, shifts nothing, and the parse loop never ends.
+need_value() { [ "$2" -ge 2 ] || { echo "checkpoint $1: $3 needs a value" >&2; return 2; }; }
+
 is_version() { printf '%s' "$1" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; }
 
 # Recorded versions, oldest first (numeric per field: 0.10.0 sorts after 0.9.0).
@@ -48,11 +55,17 @@ cp_versions() {
   done | sort -t. -k1,1n -k2,2n -k3,3n
 }
 
-# One JSON array of every checkpoint, oldest first, each tagged with its version.
+# One JSON array of every checkpoint, oldest first, each tagged with its version. Returns 2, with
+# the file named on stderr, when a run file is not a checkpoint file.
 cp_all() {
   local v files=()
   while IFS= read -r v; do [ -n "$v" ] && files+=("$RUNS/$v.json"); done < <(cp_versions)
   [ "${#files[@]}" -gt 0 ] || { printf '[]'; return 0; }
+  # One unreadable file would make every verdict, list and page silently empty: name it and stop.
+  for v in "${files[@]}"; do
+    jq -e 'type == "object" and (.checkpoints | type == "array")' "$v" >/dev/null 2>&1 \
+      || { echo "checkpoint.sh: $v is not a checkpoint file (invalid JSON, or no .checkpoints array)" >&2; return 2; }
+  done
   jq -s -c '[ .[] | .version as $v | (.checkpoints // [])[] | . + {version: $v} ]' "${files[@]}"
 }
 
@@ -60,6 +73,10 @@ cp_all() {
 cmd_record() {
   local version="" passes=1 model="" commit="" ref="" date_s="" note="" froms=() tmp i f
   while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --from|--passes|--model|--commit|--ref|--date|--note) need_value record "$#" "$1" || return 2 ;;
+      -h|--help) usage; return 0 ;;
+    esac
     case "$1" in
       --from)    froms+=("${2:-}"); shift 2 ;;
       --from=*)  froms+=("${1#*=}"); shift ;;
@@ -82,6 +99,8 @@ cmd_record() {
   done
   is_version "$version" || { echo "checkpoint record: version must be X.Y.Z (got '${version}')" >&2; return 2; }
   printf '%s' "$passes" | grep -Eq '^[1-9][0-9]*$' || { echo "checkpoint record: --passes must be a positive integer" >&2; return 2; }
+
+  cp_all >/dev/null || return 2   # an unreadable run file is reported before anything is run or written
 
   tmp="$(mktemp -d)" || return 2
   # shellcheck disable=SC2064
@@ -140,6 +159,10 @@ cmd_record() {
     . as $passes
     | [ $passes[] | select(.dry == true) ] as $dry
     | if ($dry | length) > 0 then error("a --dry run has no scores to record") else . end
+    # run.sh stores an empty answer only when the model backend failed (a real answer is a path or
+    # NONE). Such a run measures the backend, not the docs, and an empty answer passes the abstain tier.
+    | ( [ $passes[].results[] | select((.got // "") == "") ] | length ) as $noanswer
+    | if $noanswer > 0 then error("\($noanswer) answer(s) are empty: the model backend returned nothing, so there is no score to record") else . end
     # One row per question, in the order the first pass asked them.
     | ( [ $passes[].results[] ] | group_by(.set + "|" + (.id|tostring)) ) as $groups
     | ( [ $passes[0].results[] | .set + "|" + (.id|tostring) ] ) as $order
@@ -187,7 +210,7 @@ cmd_record() {
 cmd_list() {
   local json=0 all
   for a in "$@"; do case "$a" in --json|--llm) json=1 ;; *) echo "checkpoint list: unknown arg '$a'" >&2; return 2 ;; esac; done
-  all="$(cp_all)"
+  all="$(cp_all)" || return 2
   if [ "$json" -eq 1 ]; then
     printf '%s' "$all" | jq -c '[ .[] | del(.results) ]'
     return 0
@@ -204,12 +227,12 @@ cmd_list() {
 cmd_check() {
   local version="${1:-}" all
   is_version "$version" || { echo "checkpoint check: version must be X.Y.Z (got '${version}')" >&2; return 2; }
+  all="$(cp_all)" || return 2
   if [ ! -f "$RUNS/$version.json" ] || [ "$(jq '(.checkpoints // []) | length' "$RUNS/$version.json" 2>/dev/null || echo 0)" -eq 0 ]; then
     echo "benchmark check: no recorded checkpoint for $version (expected $RUNS/$version.json)"
     echo "  record one: cckit bench checkpoint $version"
     return 1
   fi
-  all="$(cp_all)"
   local verdict line
   line="$(printf '%s' "$all" | jq -r --arg v "$version" '
     . as $a
@@ -240,7 +263,9 @@ cp_page_path() {
 }
 
 cp_render_page() {
-  cp_all | jq -r '
+  local all
+  all="$(cp_all)" || return 2
+  printf '%s' "$all" | jq -r '
     def cell: tostring | gsub("[\r\n]+"; " ") | gsub("\\|"; "\\|") | gsub("<"; "&lt;") | gsub("\\{"; "&#123;");
     def code: tostring | gsub("[\r\n]+"; " ") | gsub("`"; "") | gsub("\\|"; "\\|") | .[0:120] | "`" + . + "`";
     def docs: if type == "array" then map(code) | join(" or ") else code end;
@@ -288,7 +313,7 @@ cmd_page() {
   local out="" check=0
   while [ "$#" -gt 0 ]; do
     case "$1" in
-      --out)   out="${2:-}"; shift 2 ;;
+      --out)   need_value page "$#" "$1" || return 2; out="$2"; shift 2 ;;
       --out=*) out="${1#*=}"; shift ;;
       --check) check=1; shift ;;
       *)       echo "checkpoint page: unknown arg '$1'" >&2; return 2 ;;
@@ -297,7 +322,9 @@ cmd_page() {
   [ -n "$out" ] || [ "$check" -eq 0 ] || out="$(cp_page_path)"
   if [ "$check" -eq 1 ]; then
     [ -n "$out" ] || { echo "checkpoint page --check: no page configured (benchmark.config.json resultsPage) and no --out" >&2; return 2; }
-    if [ -f "$out" ] && [ "$(cp_render_page)" = "$(cat "$out")" ]; then
+    local want
+    want="$(cp_render_page)" || return 2
+    if [ -f "$out" ] && [ "$want" = "$(cat "$out")" ]; then
       echo "benchmark results page is current: $out"; return 0
     fi
     echo "benchmark results page is stale: $out" >&2
@@ -306,7 +333,7 @@ cmd_page() {
   fi
   if [ -n "$out" ]; then
     mkdir -p "$(dirname "$out")"
-    cp_render_page > "$out.tmp.$$" && mv "$out.tmp.$$" "$out"
+    cp_render_page > "$out.tmp.$$" && mv "$out.tmp.$$" "$out" || { rm -f "$out.tmp.$$"; return 2; }
   else
     cp_render_page
   fi
@@ -318,6 +345,6 @@ case "$sub" in
   list)   cmd_list "$@" ;;
   check)  cmd_check "$@" ;;
   page)   cmd_page "$@" ;;
-  -h|--help|"") sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//'; [ -n "$sub" ] && exit 0 || exit 2 ;;
+  -h|--help|"") usage; [ -n "$sub" ] && exit 0 || exit 2 ;;
   *) echo "checkpoint.sh: unknown subcommand '$sub' (record|list|check|page)" >&2; exit 2 ;;
 esac

@@ -45,7 +45,11 @@ was being built. Write these files with `cckit bench checkpoint <X.Y.Z>`, not by
 
 `cckit bench check <X.Y.Z>` compares `pass`/`total` of the version's last checkpoint with the
 checkpoint recorded before it, as fractions. `cckit release <X.Y.Z>` refuses on a missing file or a
-lower score. Files whose name is not `X.Y.Z.json` are ignored.
+lower score. Files whose name is not `X.Y.Z.json` are ignored. A file named `X.Y.Z.json` that is not
+valid JSON with a `checkpoints` array stops every checkpoint verb with exit 2 and its path on stderr.
+
+A run with an empty `got` is refused (exit 2): `cckit bench run` stores an empty answer only when
+the model backend failed.
 
 The public page `docs-site/src/content/docs/benchmark-results.md` is generated from these files
 (`cckit bench page`); `scripts/benchmark/checkpoint-test.sh` fails when it differs.

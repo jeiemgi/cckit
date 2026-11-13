@@ -82,6 +82,16 @@ bash "$CP" record 1.2.0 --from "$FIX/missing.json" >/dev/null 2>&1;        t "re
 jq '.dry = true | .results = []' "$FIX/run-3of3.json" > "$FIX/run-dry.json"
 bash "$CP" record 1.2.0 --from "$FIX/run-dry.json" >/dev/null 2>&1;        t "record refuses a --dry run" "$?" "2"
 bash "$CP" record 1.2.0 --passes 0 >/dev/null 2>&1;                        t "record refuses --passes 0" "$?" "2"
+# An empty answer is what run.sh stores when the model backend failed; it is not a score.
+jq '.results[0].got = ""' "$FIX/run-3of3.json" > "$FIX/run-noanswer.json"
+out="$(bash "$CP" record 1.2.0 --from "$FIX/run-noanswer.json" 2>&1)";   t "record refuses a run with an empty answer" "$?" "2"
+has "the empty-answer refusal says why" "$out" "the model backend returned nothing"
+# A flag given last with no value is a usage error, not an endless parse loop (5 s watchdog).
+for flag in --from --passes --model --commit --ref --date --note; do
+  perl -e 'alarm 5; exec @ARGV' bash "$CP" record 1.2.0 "$flag" >/dev/null 2>&1; t "record: $flag with no value exits 2" "$?" "2"
+done
+perl -e 'alarm 5; exec @ARGV' bash "$CP" page --out >/dev/null 2>&1;      t "page: --out with no value exits 2" "$?" "2"
+has "record --help prints the usage" "$(bash "$CP" record --help 2>&1)" "checkpoint.sh record <X.Y.Z>"
 t "a refused record leaves the file unchanged" "$(cat "$RUNS/1.2.0.json")" "$before"
 
 # ---- 5. list ---------------------------------------------------------------
@@ -103,6 +113,23 @@ bash "$CP" check 1.3.0 >/dev/null 2>&1;  t "check: a later, higher checkpoint cl
 bash "$CP" check 1.2.0 >/dev/null 2>&1;  t "check: a later version does not change an earlier verdict" "$?" "0"
 bash "$CP" check bogus >/dev/null 2>&1;  t "check: a non X.Y.Z version is a usage error" "$?" "2"
 
+# A run file that is not a checkpoint file is named, exit 2: no blank verdict, no empty list or page.
+P5="$FIX/p5"; new_project "$P5"
+cp5() { BENCH_DIR="$P5/benchmarks" bash "$CP" "$@" 2>&1; }
+cp5 record 1.0.0 --from "$FIX/run-3of3.json" >/dev/null
+cp5 page --out "$FIX/p5-page.md" >/dev/null; p5_page="$(cat "$FIX/p5-page.md")"
+printf '{bad' > "$P5/benchmarks/runs/0.9.0.json"
+out="$(cp5 check 1.0.0)";  t "check: an unreadable run file is exit 2" "$?" "2"
+has "check: the unreadable file is named" "$out" "runs/0.9.0.json is not a checkpoint file"
+cp5 list >/dev/null;       t "list: an unreadable run file is exit 2" "$?" "2"
+cp5 page >/dev/null;       t "page: an unreadable run file is exit 2" "$?" "2"
+cp5 page --out "$FIX/p5-page.md" >/dev/null; t "page --out: an unreadable run file is exit 2" "$?" "2"
+t "page --out: the page on disk is left as it was" "$(cat "$FIX/p5-page.md")" "$p5_page"
+cp5 record 1.0.0 --from "$FIX/run-3of3.json" >/dev/null; t "record: an unreadable run file is exit 2" "$?" "2"
+t "record: nothing was appended" "$(jq '.checkpoints | length' "$P5/benchmarks/runs/1.0.0.json")" "1"
+out="$(KIT_RELEASE_BENCH_DIR="$P5/benchmarks" bash "$PUBLISH" 1.0.0 2>&1)"; t "release: an unreadable run file refuses (exit 1)" "$?" "1"
+has "release: the unreadable file is named" "$out" "is not a checkpoint file"
+
 # First version ever recorded has nothing to compare against.
 P2="$FIX/p2"; new_project "$P2"
 BENCH_DIR="$P2/benchmarks" bash "$CP" record 0.1.0 --from "$FIX/run-1of3.json" >/dev/null 2>&1
@@ -121,7 +148,7 @@ cp3 check 0.10.0; t "check: 0.10.0 last checkpoint 1/3 is lower than 4/6" "$?" "
 
 # ---- 7. cckit release (publish.sh) refuses on the same verdict --------------
 # Dry runs only: publish.sh prints its plan and changes nothing.
-rel() { BENCH_DIR="$1" bash "$PUBLISH" "$2" ${3:+"$3"} 2>&1; }
+rel() { KIT_RELEASE_BENCH_DIR="$1" bash "$PUBLISH" "$2" ${3:+"$3"} 2>&1; }
 out="$(rel "$P/benchmarks" 9.9.9)";      t "release: missing run refuses (exit 1)" "$?" "1"
 has "release: missing run says why" "$out" "no recorded checkpoint for 9.9.9"
 has "release: refusal names the override flag" "$out" "--skip-bench-check"
@@ -142,6 +169,13 @@ out="$(rel "$P3/benchmarks" 0.10.0 --skip-bench-check)";  t "release: override p
 has "release: override on a lower score is printed" "$out" "OVERRIDDEN by --skip-bench-check"
 out="$(rel "$P/benchmarks" 1.3.0 --skip-bench-check)"
 case "$out" in *OVERRIDDEN*) rc=1 ;; *) rc=0 ;; esac; t "release: a passing check prints no override" "$rc" "0"
+has "release: a redirected runs dir is printed" "$out" "benchmark runs read from KIT_RELEASE_BENCH_DIR=$P/benchmarks"
+# BENCH_DIR belongs to `cckit bench`; the release reads this repo's own runs whatever it is set to.
+# $P has no 9.9.9 run, so a release that honoured BENCH_DIR would be refused for 9.9.9 from $P.
+own_v="$(basename "$(ls "$ROOT"/benchmarks/runs/*.json | head -1)" .json)"
+out="$(BENCH_DIR="$FIX/nowhere" bash "$PUBLISH" "$own_v" 2>&1)"
+case "$out" in *"$FIX/nowhere"*) rc=1 ;; *) rc=0 ;; esac; t "release: BENCH_DIR does not move the release check" "$rc" "0"
+has "release: with BENCH_DIR set the check still reads this repo's runs" "$out" "benchmark check: $own_v checkpoint"
 
 # ---- 8. the results page is generated from the run files --------------------
 page="$FIX/page.md"
