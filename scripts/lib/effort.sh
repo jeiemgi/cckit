@@ -33,6 +33,14 @@ if [[ -z "${KIT_REPO:-}" ]]; then
   fi
   unset _eff_root
 fi
+# The kind vocabulary (kinds.sh): effort_pr_title takes the commit type from kit_kind_commit_type.
+if ! command -v kit_kind_commit_type >/dev/null 2>&1; then
+  _eff_kinds="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)/kinds.sh"
+  # shellcheck source=/dev/null
+  [ -f "$_eff_kinds" ] && . "$_eff_kinds"
+  unset _eff_kinds
+fi
+
 EFFORT_REPO="${EFFORT_REPO:-${KIT_REPO:-}}"
 
 # Link a child issue as a native GitHub sub-issue of a parent.
@@ -194,7 +202,7 @@ EOF_ROWS
 #   scope  the `flow:<flow>` label, else the name's leading [Flow] tag; lowercased, and dropped
 #          when it is not a valid Conventional Commit scope. The tag is peeled from the name.
 #   type   the explicit <type> (`effort pr --type`), else the `kind:` label mapped as kto_pr_title
-#          maps it (kind:task and anything unknown -> feat; a `bug` label -> fix).
+#          maps it (kind:task and anything unknown -> feat; a content kind -> docs; a `bug` label -> fix).
 # A full parent title is accepted — the "[Effort] N · " prefix is peeled so the id is never doubled.
 # pr.titleStyle = issue-title (KIT_PR_TITLE_STYLE) keeps the non-conventional form, for a repo with
 # no commitlint gate: "[Role] [#N] <name>" (the role prefix only when <role_display> is given).
@@ -219,11 +227,16 @@ effort_pr_title() {
   printf '%s' "$scope" | grep -qE '^[a-z0-9][a-z0-9._/-]*$' || scope=""
   if [ -z "$ctype" ]; then
     kind="$(printf '%s' "$labels" | tr ',' '\n' | sed -n 's/^kind://p' | head -1)"
-    case "$kind" in
-      feat|chore|docs|ci|test|perf|refactor|fix) ctype="$kind" ;;
-      bug) ctype=fix ;;
-      *)   ctype=feat ;;
-    esac
+    if command -v kit_kind_commit_type >/dev/null 2>&1; then
+      ctype="$(kit_kind_commit_type "$kind")"     # kinds.sh: a content kind titles as `docs`
+    else
+      case "$kind" in
+        feat|chore|docs|ci|test|perf|refactor|fix) ctype="$kind" ;;
+        bug) ctype=fix ;;
+        post|campaign|brand|research) ctype=docs ;;
+        *)   ctype=feat ;;
+      esac
+    fi
     case ",$labels," in *,bug,*) ctype=fix ;; esac
   fi
   if [ -n "$scope" ]; then printf '%s(%s): %s [#%s]' "$ctype" "$scope" "$name" "$num"

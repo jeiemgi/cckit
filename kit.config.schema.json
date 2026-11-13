@@ -121,6 +121,12 @@
           "default": "file",
           "description": "The task source `cckit task` and `cckit gc` read. `file` (default, the one source shipped): one tracked file per task under `tasks.dir`. Another name loads `scripts/lib/task-source-<name>.sh`, which must define `task_<name>_list`, `_get`, `_create`, `_on_start`, `_on_finish` and `_state`. KIT_TASKS_SOURCE overrides it per invocation."
         },
+        "default": {
+          "type": "string",
+          "enum": ["issues", "light"],
+          "default": "issues",
+          "description": "Which task list is this project's default. issues (default): GitHub issues, through `cckit new` / `cckit start` / `cckit pr`. light: the `cckit task` list. With light, a bare `cckit next` prints what `cckit task next` prints, and the campaign skill records a campaign's pieces as light tasks instead of sub-issues. Both lists stay usable whatever the value. `cckit task default` prints it. The marketing profile sets light."
+        },
         "dir": {
           "type": "string",
           "default": "tasks",
@@ -128,11 +134,26 @@
         }
       }
     },
+    "plainLanguage": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "enabled": { "type": "boolean", "default": false, "description": "Plain language mode. `cckit init` installs the `plain-language` rule while this is true: the agent says draft, review and approve, and names worktree, branch and pull request only when asked. `cckit task` words its progress lines the same way (its `--llm` output and its stdout are unchanged). The marketing profile turns it on; `cckit init --plain-language on|off` sets it for any profile. On `--upgrade` the stored value wins over the profile default." }
+      }
+    },
+    "kinds": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "content": { "type": "boolean", "default": false, "description": "When true, `scripts/setup-labels.sh` (and the label step of `cckit init`) provisions the content kind labels `kind:post`, `kind:campaign`, `kind:brand` and `kind:research`. The content and marketing profiles set it. The kinds are accepted by `--kind` with or without this key: a content kind starts on a branch prefix from the closed set (post and brand: `task/`, campaign: `plan/`, research: `spike/`) and titles its PR `docs:`." }
+      }
+    },
     "pr": {
       "type": "object",
       "additionalProperties": true,
       "properties": {
         "titleStyle": { "type": "string", "enum": ["conventional", "issue-title"], "default": "conventional", "description": "How `cckit pr` titles a single-issue PR. conventional (default): a Conventional Commits subject derived from the kind label, which release-please and a commitlint gate read. issue-title: the issue title, verbatim. `cckit effort pr` follows the same key: conventional gives `type(scope): name [#N]` and refuses a title that fails commitlint; issue-title gives `[Role] [#N] name`, unchecked." },
+        "bodyStyle": { "type": "string", "enum": ["code", "content"], "default": "code", "description": "The wording of the PR body `cckit pr`, `cckit effort pr` and `cckit task finish` generate. code (default): a Verification checklist that names the diff. content: a Review checklist for a draft (read it through, facts and links checked, voice matches the brand guide, only the files for this piece changed). `Closes #N`, the summary and the role signature are the same in both. The content and marketing profiles set content." },
         "orchestratorSection": { "type": "boolean", "default": false, "description": "When true, `cckit pr` opens the PR body with a two-line `## For the orchestrator` section: the issue number and what to review." }
       }
     },

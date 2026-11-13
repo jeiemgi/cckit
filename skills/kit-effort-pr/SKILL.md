@@ -45,7 +45,8 @@ title, labels and milestone → composes the title with `effort_pr_title` as
 before any `gh` call, a title without `[#N]` or one `commitlint_check` rejects → opens the PR with the body below → adds the PR to the board at In Review (+ Role) and moves
 the parent to In Review. A failed board add prints a warning; it is never silent.
 
-Body: `## For the orchestrator` (+ `Closes #N`) · `## Summary` · `## For agents` · `## Verification`.
+Body: `## For the orchestrator` (+ `Closes #N`) · `## Summary` · `## For agents` · `## Verification`
+(`## Review` when the config sets `pr.bodyStyle: content`).
 
 ## Output
 

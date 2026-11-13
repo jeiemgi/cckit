@@ -5,6 +5,14 @@
 - **GitHub issues** in `{{GH_REPO}}`<!-- IF:PROJECTS_V2 --> + the Projects v2 board (`https://github.com/users/{{GH_OWNER}}/projects/{{PROJECT_NUMBER}}`)<!-- /IF:PROJECTS_V2 -->
 - **Never** maintain task lists in markdown files. Use `gh issue` + the `task-*` skills so state stays in one place.
 - Always re-fetch from `gh` — never trust a stale session snapshot.
+<!-- IF:LIGHT_TASKS -->
+- **This project's default list is light tasks** (`tasks.default: "light"`). Work is recorded with
+  `cckit task new`, listed with `cckit task list`, started with `cckit task start <id>` and sent for
+  review with `cckit task finish <id> "<summary>" --all`, which opens the pull request (`--all`
+  includes the files created for the task; without it a new draft is left out). The issue loop
+  below applies only to work {{OWNER_NAME}} asks to track as a GitHub issue. `tasks/` is that list
+  and `cckit task` keeps it: the "never maintain task lists in markdown" line does not cover it.
+<!-- /IF:LIGHT_TASKS -->
 
 ## Roles
 
@@ -15,6 +23,8 @@ The role determines which agent owns the work. Spawn that agent for the actual e
 ## Kinds
 
 `task` · `plan` · `adr` · `scaffold` · `spike` — drives the branch prefix `<kind>/<N>-<slug>`.
+Content kinds `post` · `campaign` · `brand` · `research` are labels only: the branch starts on
+`task/` · `plan/` · `task/` · `spike/`.
 
 ## Priorities
 

@@ -137,6 +137,13 @@ for k in $KIT_KINDS; do
   effort_new --kind "$k" "kind vocabulary effort" >/dev/null 2>&1 && rc=0 || rc=1
   t "--kind $k is accepted" "$rc" "0"
 done
+for k in $KIT_CONTENT_KINDS; do
+  : > "$GH_LOG"; printf '0' > "$GH_N"
+  effort_new --kind "$k" "content kind effort" >/dev/null 2>&1 && rc=0 || rc=1
+  t "--kind $k (content kind) is accepted" "$rc" "0"
+  tc "$GH_LOG" "issue create .*--label effort,ctx:[SMLX]+,kind:$k," "--kind $k labels the parent kind:$k"
+done
+t  "effort_pr_title: a content kind titles as docs" "$(effort_pr_title 115 'spring launch' 'kind:campaign')" "docs: spring launch [#115]"
 : > "$GH_LOG"; printf '0' > "$GH_N"
 err="$(effort_new --kind bug "bad kind effort" 2>&1 >/dev/null)" && rc=0 || rc=1
 t  "--kind rejects a value outside the closed set"   "$rc" "1"

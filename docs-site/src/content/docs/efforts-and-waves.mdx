@@ -62,7 +62,10 @@ The slug is a *derived* convenience, not a second source of truth. `--slug` only
 
 - **`cckit effort new`** — flags (`--flow`, `--role`, `--priority`, `--kind`, …) may appear in **any
   position**, before or after the name and sub specs. `--kind` sets the `kind:` label on the parent
-  and every sub: one of `feat fix task chore security scaffold ci adr spike plan` (default `task`).
+  and every sub: one of `feat fix task chore security scaffold ci adr spike plan` (default `task`),
+  or a content kind (`post`, `campaign`, `brand`, `research`). A content kind is a label only:
+  `cckit start` cuts its branch on `task/`, `plan/`, `task/` and `spike/` respectively, and its PR
+  is titled `docs:`.
   That is the closed set `cckit start` uses as the branch prefix (`<kind>/<N>-<slug>`), so a value
   outside it is refused before anything is created; an issue that already carries such a label
   starts on a `task/` branch, with a warning. The `--flow` values (the `[Flow]`

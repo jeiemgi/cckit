@@ -186,8 +186,8 @@ effort_new() {
   # --kind picks the kind:<k> label on the parent and every sub (default task). It is validated
   # against the closed set (kinds.sh) before anything is created: `cckit start` turns the label into
   # the branch prefix, so a value outside the set would yield a branch the hygiene hook rejects.
-  if command -v kit_kind_valid >/dev/null 2>&1 && ! kit_kind_valid "$kind"; then
-    echo "effort_new: --kind must be one of: $KIT_KINDS (got '$kind')" >&2; return 1
+  if command -v kit_kind_label_valid >/dev/null 2>&1 && ! kit_kind_label_valid "$kind"; then
+    echo "effort_new: --kind must be one of: $KIT_KINDS $KIT_CONTENT_KINDS (got '$kind')" >&2; return 1
   fi
   [ -n "$kind" ] || { echo "effort_new: --kind needs a value" >&2; return 1; }
 
@@ -830,6 +830,16 @@ _eff_pr_body() {
   if [ -n "$role" ] && command -v role_signature >/dev/null 2>&1; then
     sig="$(role_signature "$role" 2>/dev/null || true)"
   fi
+  # pr.bodyStyle = content (KIT_PR_BODY_STYLE, #418): draft-and-review wording for content work.
+  # `Closes #N`, the Summary and the For agents block are the same in both styles.
+  if [ "${KIT_PR_BODY_STYLE:-code}" = "content" ]; then
+    printf '## For the orchestrator\n\nEffort #%s — one PR for the whole effort. Review: the summary below and the changed files.\n\nCloses #%s\n\n' "$num" "$num"
+    printf '## Summary\n\n%s\n\n' "${summary:-_(no summary given — pass --summary)_}"
+    printf '## For agents\n\n%s\n\n' "${for_agents:-See #$num for the goal, scope, and entry points.}"
+    printf '## Review\n\n- [ ] Every piece the summary lists is in the changed files\n- [ ] Facts, names, numbers and links are checked\n- [ ] The voice matches the brand guide\n- [ ] Only the files for this work changed\n- [ ] Labels + milestone match the parent issue\n'
+    [ -n "$sig" ] && printf '\n%s\n' "$sig"
+    return 0
+  fi
   printf '## For the orchestrator\n\nEffort #%s — one PR for the whole effort. Review: the summary below + the diff.\n\nCloses #%s\n\n' "$num" "$num"
   printf '## Summary\n\n%s\n\n' "${summary:-_(no summary given — pass --summary)_}"
   printf '## For agents\n\n%s\n\n' "${for_agents:-See #$num for the goal, scope, and entry points.}"
@@ -935,7 +945,7 @@ _eo_board_done() {
 # .claude/rules/ is matched by BASENAME, not as a directory (#218): init.sh writes a rule only from
 # templates/rules/<name>.md, so any other file there is the project's own and no /kit-update can
 # touch it. The list is the templates/rules basenames; effort-ops-test.sh fails when they differ.
-_EO_KIT_MANAGED_RE='^(scripts/(lib/|kit$|kit-)|\.claude/(skills|hooks|lib|agents)/|\.claude/rules/(authoring|branch-naming|code-retrieval|communication-style|delegation-brief|design-routing|effort-model|gate-and-review|issue-lifecycle|knowledge-base|mempalace|merge-safety|naming-and-ids|plan-next|plan-output-format|react-annotate|review-pages|risk-tiered-review|shared-checkout|skill-gaps|task-management)\.md$)'
+_EO_KIT_MANAGED_RE='^(scripts/(lib/|kit$|kit-)|\.claude/(skills|hooks|lib|agents)/|\.claude/rules/(authoring|branch-naming|code-retrieval|communication-style|delegation-brief|design-routing|effort-model|gate-and-review|issue-lifecycle|knowledge-base|mempalace|merge-safety|naming-and-ids|plain-language|plan-next|plan-output-format|react-annotate|review-pages|risk-tiered-review|shared-checkout|skill-gaps|task-management)\.md$)'
 
 # _eo_knowledge_ingest <num> <trace_dir> <root> — optional post-close knowledge-ingest hook. Runs a
 # project-configured command (github/effort.knowledgeIngestHook, or KIT_EFFORT_KNOWLEDGE_HOOK) with

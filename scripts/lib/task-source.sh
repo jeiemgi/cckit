@@ -10,6 +10,9 @@
 # Selecting a source: `tasks.source` in the project config (default `file`); KIT_TASKS_SOURCE in the
 # environment wins per invocation.
 #
+# `tasks.default` is a different question — whether the project's DEFAULT list is this one (`light`)
+# or GitHub issues (`issues`, the default). task_default_name answers it.
+#
 # Adding a source `<name>` (lowercase letters, digits, `_`): add scripts/lib/task-source-<name>.sh
 # defining the functions below, then set `tasks.source` to `<name>`. Nothing else changes: the verbs,
 # the branch form and the gc protection are source-independent.
@@ -60,6 +63,18 @@ _task_source_cfg() {
 task_source_name() {
   if [ -n "${KIT_TASKS_SOURCE:-}" ]; then printf '%s' "$KIT_TASKS_SOURCE"; return 0; fi
   _task_source_cfg '.tasks.source' file
+}
+
+# task_default_name — which task list is this project's default: `light` (the `cckit task` list) or
+# `issues` (GitHub issues). `tasks.default` in the project config; anything else, or no key, is
+# `issues`, with a warning for a value that is neither. `cckit next` and the campaign skill read it
+# to pick their lane; both lists stay usable whatever it says.
+task_default_name() {
+  local v; v="$(_task_source_cfg '.tasks.default' issues)"
+  case "$v" in
+    light|issues) printf '%s' "$v" ;;
+    *) echo "⚠ tasks.default '$v' is neither 'light' nor 'issues' — using 'issues'" >&2; printf 'issues' ;;
+  esac
 }
 
 # task_source_dir — the tracked directory the file source keeps tasks in, relative to the checkout

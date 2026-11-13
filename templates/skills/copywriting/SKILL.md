@@ -11,6 +11,12 @@ You are an expert conversion copywriter. Your goal is to write marketing copy th
 
 ## Before Writing
 
+**Read the brand voice first:**
+If `brand/voice.md` exists (the `brand-voice` skill writes it), read it before anything else. Its
+`## Voice`, `## Key messages`, `## Banned phrasings` and `## Words we use` sections are decided:
+write within them and do not ask the person to decide them again. A key message marked `unproven`
+is not stated as fact.
+
 **Check for product marketing context first:**
 If `.agents/product-marketing.md` exists (or `.claude/product-marketing.md`, or the legacy `product-marketing-context.md` filename, in older setups), read it before asking questions. Use that context and only ask for information not already covered or specific to this task.
 
@@ -198,7 +204,8 @@ Examples:
 
 ## Voice and Tone
 
-Before writing, establish:
+If `brand/voice.md` exists, its `## Voice` section answers the questions below: use it. Otherwise,
+before writing, establish:
 
 **Formality level:**
 - Casual/conversational

@@ -475,14 +475,16 @@ The kit carries no project's layout. Both keys are config, and the fallback is a
 | --- | --- | --- |
 | `pr.titleStyle` | `conventional` | `conventional`: a Conventional Commits title derived from the issue's kind label, which release-please and a commitlint gate read. `issue-title`: the issue title, verbatim. `cckit effort pr` follows the same key: `conventional` gives `type(scope): name [#N]` and refuses a title that fails commitlint; `issue-title` gives `[Role] [#N] name`, unchecked. |
 | `pr.orchestratorSection` | `false` | `true` opens the PR body with a two-line `## For the orchestrator` section: the issue number and what to review. |
+| `pr.bodyStyle` | `code` | The wording of the body `cckit pr`, `cckit effort pr` and `cckit task finish` generate. `code`: a `## Verification` checklist that names the diff. `content`: a `## Review` checklist for a draft — see [Content work](#content-work). |
 
 ## Light tasks
 
-[`cckit task`](/light-tasks/) tracks work without GitHub issues. Two keys, both optional:
+[`cckit task`](/light-tasks/) tracks work without GitHub issues. Three keys, all optional:
 
 ```json
 {
   "tasks": {
+    "default": "light",
     "source": "file",
     "dir": "tasks"
   }
@@ -491,11 +493,59 @@ The kit carries no project's layout. Both keys are config, and the fallback is a
 
 | Key | Default | What it does |
 | --- | --- | --- |
+| `tasks.default` | `issues` | Which list is the project's default: `issues` (GitHub issues) or `light` (the `cckit task` list). With `light`, a bare `cckit next` prints what `cckit task next` prints, and the `campaign` skill records a campaign's pieces as light tasks. `cckit next` with any argument still asks about issues, and both lists stay usable whatever the value. `cckit task default` prints it. A value that is neither is read as `issues`, with a warning. The `marketing` profile sets `light`; on `cckit init --upgrade` the stored value is kept. |
 | `tasks.source` | `file` | Where task records live. `file` is the one source cckit ships: one tracked file per task. Another name `<name>` loads `scripts/lib/task-source-<name>.sh`; a name with no such file is refused with exit 1. `KIT_TASKS_SOURCE` overrides it per invocation. |
 | `tasks.dir` | `tasks` | The tracked directory the `file` source keeps tasks in, relative to the project root. An absolute path, or one that climbs out of the project, is ignored with a warning and `tasks` is used. `KIT_TASKS_DIR` overrides it per invocation. |
 
 Keep the directory tracked: the list is shared through git, so a gitignored directory would leave
 every task a local draft.
+
+## Content work
+
+Keys the `content` and `marketing` profiles set at `cckit init`. A project on another profile can
+add them by hand.
+
+| Profile | `kinds.content` | `pr.bodyStyle` | `plainLanguage.enabled` | `tasks.default` |
+| --- | --- | --- | --- | --- |
+| `content` | `true` | `content` | not written (off) | not written (`issues`) |
+| `marketing` | `true` | `content` | `true` | `light` |
+| the other four | not written | not written | not written | not written |
+
+A key that is "not written" is absent from the config, and its default applies.
+
+| Key | Default | What it does |
+| --- | --- | --- |
+| `pr.bodyStyle` | `code` | `content` gives generated pull request bodies draft-and-review wording. Details below. |
+| `plainLanguage.enabled` | `false` | `true` installs the [`plain-language`](/rules/#plain-language) rule at `cckit init` and rewords the progress lines of `cckit task`. Set by `cckit init --plain-language on\|off`; the `marketing` profile turns it on and the `content` profile leaves it off. On `--upgrade` the stored value wins over the profile default. |
+| `kinds.content` | `false` | `true` makes `scripts/setup-labels.sh` — and the label step of `cckit init` — provision the four content kind labels: `kind:post`, `kind:campaign`, `kind:brand`, `kind:research`. The kinds work without the key; it only decides whether the labels are created. |
+
+A content kind is a label, never a branch prefix. `cckit start` maps it onto the closed set of
+branch kinds, and `cckit pr` takes the commit type from it:
+
+| `kind:` label | Branch `cckit start` cuts | PR title type |
+| --- | --- | --- |
+| `post` | `task/<N>-<slug>` | `docs:` |
+| `campaign` | `plan/<N>-<slug>` | `docs:` |
+| `brand` | `task/<N>-<slug>` | `docs:` |
+| `research` | `spike/<N>-<slug>` | `docs:` |
+
+`pr.bodyStyle: "content"` (see [PR conventions](#pr-conventions)) changes the generated pull
+request body for a reviewer who is not a developer. `Closes #N`, the summary and the role
+signature are the same in both styles; the checklist and two headings differ:
+
+| | `code` | `content` |
+| --- | --- | --- |
+| Checklist heading | `## Verification` | `## Review` |
+| Checklist | Reproduced manually · No unrelated files in the diff · Labels match the issue · If plan deliverable: opened in browser, styles render | Read the draft from start to finish · Facts, names, numbers and links are checked · The voice matches the brand guide · Only the files for this piece changed |
+| Other headings | `## Notes for review` · `## Out of scope` | `## Notes for the reviewer` · `## Not in this piece` |
+| `cckit task finish` body | "its diff carries the task record with `status: done`" | the same checklist, then "Approving and merging this pull request marks the task done" |
+
+`cckit effort pr` keeps `## For agents` in both styles and, under `content`, replaces its
+`## Verification` list (which ends in "Local lint/typecheck pass") with a `## Review` list.
+
+The branch set `cckit gc` and the SessionStart hygiene hook parse is unchanged, so a live branch of
+a content-kind issue keeps the same issue-open protection as any other
+(`scripts/lib/content-kinds-gc-test.sh`).
 
 ## Effort WIP limit
 
