@@ -772,6 +772,819 @@
           "pass": true
         }
       ]
+    },
+    {
+      "n": 4,
+      "date": "2026-11-13",
+      "ref": "feat/452-benchmarks-run-and-are-published-with-ev",
+      "commit": "5ae1132",
+      "model": "claude-haiku-5-5",
+      "passes": 1,
+      "questions": 55,
+      "total": 55,
+      "pass": 50,
+      "score_pct": 90,
+      "tiers": {
+        "abstain": {
+          "total": 9,
+          "pass": 9
+        },
+        "adversarial": {
+          "total": 14,
+          "pass": 12
+        },
+        "retrieval": {
+          "total": 32,
+          "pass": 29
+        }
+      },
+      "note": "",
+      "results": [
+        {
+          "set": "retrieval.jsonl",
+          "tier": "retrieval",
+          "id": "ret-01",
+          "q": "How do I cut a release, and what does release-please do on main?",
+          "expect": "docs-site/src/content/docs/ship/releasing.mdx",
+          "got": "docs-site/src/content/docs/ship/releasing.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 13000,
+          "pass": true
+        },
+        {
+          "set": "retrieval.jsonl",
+          "tier": "retrieval",
+          "id": "ret-02",
+          "q": "How does an effort differ from a single task, and how are waves ordered?",
+          "expect": [
+            "docs-site/src/content/docs/project-management/efforts-and-waves.mdx",
+            "docs-site/src/content/docs/effort-reference.mdx",
+            "docs-site/src/content/docs/development/waves.mdx"
+          ],
+          "got": "docs-site/src/content/docs/project-management/efforts-and-waves.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 6000,
+          "pass": true
+        },
+        {
+          "set": "retrieval.jsonl",
+          "tier": "retrieval",
+          "id": "ret-03",
+          "q": "Which hooks does cckit install and what does each one block?",
+          "expect": "docs-site/src/content/docs/hooks.mdx",
+          "got": "docs-site/src/content/docs/hooks.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 10000,
+          "pass": true
+        },
+        {
+          "set": "retrieval.jsonl",
+          "tier": "retrieval",
+          "id": "ret-04",
+          "q": "How do I give Claude Code memory that persists across sessions?",
+          "expect": [
+            "docs-site/src/content/docs/memory/index.mdx",
+            "docs-site/src/content/docs/memory/install-mempalace.mdx"
+          ],
+          "got": "docs-site/src/content/docs/memory/install-mempalace.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 8000,
+          "pass": true
+        },
+        {
+          "set": "retrieval.jsonl",
+          "tier": "retrieval",
+          "id": "ret-05",
+          "q": "Where is every config key documented, for example worktree.installPaths?",
+          "expect": "docs-site/src/content/docs/config-and-permissions.mdx",
+          "got": "docs-site/src/content/docs/config-and-permissions.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 7000,
+          "pass": true
+        },
+        {
+          "set": "retrieval.jsonl",
+          "tier": "retrieval",
+          "id": "ret-06",
+          "q": "Which lint gates turn a repeated AI-review finding into a permanent check?",
+          "expect": "docs-site/src/content/docs/review/gates.mdx",
+          "got": "docs-site/src/content/docs/review/gates.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 8000,
+          "pass": true
+        },
+        {
+          "set": "retrieval.jsonl",
+          "tier": "retrieval",
+          "id": "ret-07",
+          "q": "I deleted one of the kit's rule files on purpose. How do I keep the project upgrade from putting it back?",
+          "expect": "docs-site/src/content/docs/getting-started/update.mdx",
+          "got": "docs-site/src/content/docs/getting-started/update.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 7000,
+          "pass": true
+        },
+        {
+          "set": "retrieval.jsonl",
+          "tier": "retrieval",
+          "id": "ret-08",
+          "q": "I pulled dozens of new commits into my cckit clone, yet upgrading my project says it is already current. Why are the newer templates not arriving?",
+          "expect": [
+            "docs-site/src/content/docs/install-matrix.mdx",
+            "docs-site/src/content/docs/getting-started/update.mdx"
+          ],
+          "got": "docs-site/src/content/docs/install-matrix.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 8000,
+          "pass": true
+        },
+        {
+          "set": "retrieval.jsonl",
+          "tier": "retrieval",
+          "id": "ret-09",
+          "q": "When the headless single-objective runner stops, which exit code means a round changed nothing, and what are the other stop reasons?",
+          "expect": "docs-site/src/content/docs/agent-compatibility.mdx",
+          "got": "docs-site/src/content/docs/development/run-one-objective-unattended.mdx",
+          "passed": 0,
+          "asked": 1,
+          "latency_ms": 9000,
+          "pass": false
+        },
+        {
+          "set": "retrieval.jsonl",
+          "tier": "retrieval",
+          "id": "ret-10",
+          "q": "The kit's own pre-push gate never ran when a cckit command did the pushing. Why not, and what does a real git hook receive in that case?",
+          "expect": "docs-site/src/content/docs/hooks.mdx",
+          "got": "docs-site/src/content/docs/hooks.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 8000,
+          "pass": true
+        },
+        {
+          "set": "retrieval.jsonl",
+          "tier": "retrieval",
+          "id": "ret-11",
+          "q": "A machine that launched parallel workers is gone for good. How long before the branches it was holding can be taken by another run?",
+          "expect": "docs-site/src/content/docs/wave-reference.mdx",
+          "got": "docs-site/src/content/docs/wave-reference.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 7000,
+          "pass": true
+        },
+        {
+          "set": "retrieval.jsonl",
+          "tier": "retrieval",
+          "id": "ret-12",
+          "q": "Where are an effort's build time and token figures written when it closes, and what does an empty field in that record mean?",
+          "expect": "docs-site/src/content/docs/effort-reference.mdx",
+          "got": "docs-site/src/content/docs/effort-reference.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 9000,
+          "pass": true
+        },
+        {
+          "set": "retrieval.jsonl",
+          "tier": "retrieval",
+          "id": "ret-13",
+          "q": "The version shown on the documentation website did not change after a release. How do I publish the site by hand?",
+          "expect": "docs-site/src/content/docs/releasing-cckit.mdx",
+          "got": "docs-site/src/content/docs/releasing-cckit.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 6000,
+          "pass": true
+        },
+        {
+          "set": "retrieval.jsonl",
+          "tier": "retrieval",
+          "id": "ret-14",
+          "q": "How much always-loaded text may one skill's listing carry, and why is that measured in bytes and not characters?",
+          "expect": "docs-site/src/content/docs/review/gates.mdx",
+          "got": "docs-site/src/content/docs/review/gates.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 9000,
+          "pass": true
+        },
+        {
+          "set": "new.jsonl",
+          "tier": "retrieval",
+          "id": "new-01",
+          "q": "How do I boot one QA stack per wave and record a QA verdict before merge?",
+          "expect": "docs-site/src/content/docs/review/qa-lane.mdx",
+          "got": "docs-site/src/content/docs/review/qa-lane.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 8000,
+          "pass": true
+        },
+        {
+          "set": "new.jsonl",
+          "tier": "retrieval",
+          "id": "new-02",
+          "q": "How do I add an optional third-party tool such as a code graph to my project?",
+          "expect": "docs-site/src/content/docs/integrations.mdx",
+          "got": "docs-site/src/content/docs/integrations.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 10000,
+          "pass": true
+        },
+        {
+          "set": "new.jsonl",
+          "tier": "retrieval",
+          "id": "new-03",
+          "q": "Which files does a Codex-only install of cckit write, compared with a Claude Code install?",
+          "expect": "docs-site/src/content/docs/install-matrix.mdx",
+          "got": "docs-site/src/content/docs/install-matrix.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 9000,
+          "pass": true
+        },
+        {
+          "set": "new.jsonl",
+          "tier": "retrieval",
+          "id": "new-04",
+          "q": "How does cckit stop two live sessions from starting work on the same issue?",
+          "expect": "docs-site/src/content/docs/development/many-sessions.mdx",
+          "got": "docs-site/src/content/docs/development/many-sessions.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 6000,
+          "pass": true
+        },
+        {
+          "set": "new.jsonl",
+          "tier": "retrieval",
+          "id": "new-05",
+          "q": "Which rules does cckit ship into a project, and which of them are path-scoped?",
+          "expect": "docs-site/src/content/docs/rules.mdx",
+          "got": "docs-site/src/content/docs/rules.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 6000,
+          "pass": true
+        },
+        {
+          "set": "new.jsonl",
+          "tier": "retrieval",
+          "id": "new-06",
+          "q": "How do I cherry-pick an already merged fix onto the release branch as a hotfix?",
+          "expect": "docs-site/src/content/docs/ship/releasing.mdx",
+          "got": "docs-site/src/content/docs/ship/releasing.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 6000,
+          "pass": true
+        },
+        {
+          "set": "new.jsonl",
+          "tier": "retrieval",
+          "id": "new-07",
+          "q": "Our repository belongs to an organization, so nobody comments as its owner. Whose approval comment can authorize an overnight unattended run?",
+          "expect": "docs-site/src/content/docs/config-and-permissions.mdx",
+          "got": "docs-site/src/content/docs/config-and-permissions.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 7000,
+          "pass": true
+        },
+        {
+          "set": "new.jsonl",
+          "tier": "retrieval",
+          "id": "new-08",
+          "q": "The list of review stacks shows one as only partly up. What is being checked there, and does it tell me the app is usable?",
+          "expect": "docs-site/src/content/docs/qa-reference.mdx",
+          "got": "docs-site/src/content/docs/qa-reference.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 7000,
+          "pass": true
+        },
+        {
+          "set": "new.jsonl",
+          "tier": "retrieval",
+          "id": "new-09",
+          "q": "The effort planner calls GitHub once per effort. Can it read the open efforts from data my project already keeps on disk?",
+          "expect": [
+            "docs-site/src/content/docs/effort-reference.mdx",
+            "docs-site/src/content/docs/config-and-permissions.mdx"
+          ],
+          "got": "docs-site/src/content/docs/effort-reference.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 11000,
+          "pass": true
+        },
+        {
+          "set": "new.jsonl",
+          "tier": "retrieval",
+          "id": "new-10",
+          "q": "Can my project veto the closing of an effort with a script of its own, and what happens when that script is missing?",
+          "expect": [
+            "docs-site/src/content/docs/effort-reference.mdx",
+            "docs-site/src/content/docs/config-and-permissions.mdx"
+          ],
+          "got": "docs-site/src/content/docs/config-and-permissions.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 9000,
+          "pass": true
+        },
+        {
+          "set": "new.jsonl",
+          "tier": "retrieval",
+          "id": "new-11",
+          "q": "My statusline polls the board every few seconds. How do I keep it from calling GitHub on every poll?",
+          "expect": [
+            "docs-site/src/content/docs/cli-reference.mdx",
+            "docs-site/src/content/docs/cookbook.mdx"
+          ],
+          "got": "docs-site/src/content/docs/cli-reference.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 11000,
+          "pass": true
+        },
+        {
+          "set": "new.jsonl",
+          "tier": "retrieval",
+          "id": "new-12",
+          "q": "A leftover working copy has no branch checked out at all. How does the cleanup report classify it, and when is it removed?",
+          "expect": "docs-site/src/content/docs/cli-reference.mdx",
+          "got": "docs-site/src/content/docs/cli-reference.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 6000,
+          "pass": true
+        },
+        {
+          "set": "new.jsonl",
+          "tier": "retrieval",
+          "id": "new-13",
+          "q": "The guard scripts installed for Codex never fire. What do I have to do inside Codex first, and can cckit doctor confirm that they run?",
+          "expect": "docs-site/src/content/docs/hooks.mdx",
+          "got": "docs-site/src/content/docs/getting-started/codex.mdx",
+          "passed": 0,
+          "asked": 1,
+          "latency_ms": 9000,
+          "pass": false
+        },
+        {
+          "set": "new.jsonl",
+          "tier": "retrieval",
+          "id": "new-14",
+          "q": "Starting a third effort was refused. What counts as an effort being underway, and does one a colleague started on another machine count?",
+          "expect": [
+            "docs-site/src/content/docs/effort-reference.mdx",
+            "docs-site/src/content/docs/project-management/efforts-and-waves.mdx",
+            "docs-site/src/content/docs/config-and-permissions.mdx",
+            "docs-site/src/content/docs/cli-reference.mdx"
+          ],
+          "got": "docs-site/src/content/docs/effort-reference.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 8000,
+          "pass": true
+        },
+        {
+          "set": "new.jsonl",
+          "tier": "retrieval",
+          "id": "new-15",
+          "q": "After launching several workers at once, how do I read how each one ended, and what does exit status 3 from that read mean?",
+          "expect": [
+            "docs-site/src/content/docs/wave-reference.mdx",
+            "docs-site/src/content/docs/development/waves.mdx",
+            "docs-site/src/content/docs/cli-reference.mdx"
+          ],
+          "got": "docs-site/src/content/docs/wave-reference.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 11000,
+          "pass": true
+        },
+        {
+          "set": "new.jsonl",
+          "tier": "retrieval",
+          "id": "new-16",
+          "q": "I said yes to installing an optional tool. Where is that yes stored, and how do I take it back?",
+          "expect": "docs-site/src/content/docs/integrations.mdx",
+          "got": "docs-site/src/content/docs/integrations.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 6000,
+          "pass": true
+        },
+        {
+          "set": "new.jsonl",
+          "tier": "retrieval",
+          "id": "new-17",
+          "q": "The session-start notice says my project is ahead of the installed tool. What does that mean, and should I downgrade the project?",
+          "expect": [
+            "docs-site/src/content/docs/install-matrix.mdx",
+            "docs-site/src/content/docs/getting-started/update.mdx"
+          ],
+          "got": "docs-site/src/content/docs/install-matrix.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 7000,
+          "pass": true
+        },
+        {
+          "set": "new.jsonl",
+          "tier": "retrieval",
+          "id": "new-18",
+          "q": "Which pull requests does the ordinary merge command refuse outright, and what do I run for them?",
+          "expect": [
+            "docs-site/src/content/docs/project-management/efforts-and-waves.mdx",
+            "docs-site/src/content/docs/effort-reference.mdx",
+            "docs-site/src/content/docs/cli-reference.mdx"
+          ],
+          "got": "docs-site/src/content/docs/ship/merge-and-close.mdx",
+          "passed": 0,
+          "asked": 1,
+          "latency_ms": 11000,
+          "pass": false
+        },
+        {
+          "set": "adversarial.jsonl",
+          "tier": "adversarial",
+          "id": "adv-01",
+          "q": "Two of my helpers grabbed the same ticket at once. What in the tool prevents that?",
+          "expect": "docs-site/src/content/docs/development/many-sessions.mdx",
+          "got": "docs-site/src/content/docs/development/many-sessions.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 6000,
+          "pass": true
+        },
+        {
+          "set": "adversarial.jsonl",
+          "tier": "adversarial",
+          "id": "adv-02",
+          "q": "I want the thing to keep working while I sleep, but with a spending ceiling. Where is that explained step by step?",
+          "expect": [
+            "docs-site/src/content/docs/development/run-unattended.mdx",
+            "docs-site/src/content/docs/config-and-permissions.mdx"
+          ],
+          "got": "docs-site/src/content/docs/development/run-unattended.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 8000,
+          "pass": true
+        },
+        {
+          "set": "adversarial.jsonl",
+          "tier": "adversarial",
+          "id": "adv-03",
+          "q": "My project never opens a browser to check the change actually works before it lands. What part covers that?",
+          "expect": [
+            "docs-site/src/content/docs/review/qa-lane.mdx",
+            "docs-site/src/content/docs/development/browser-debug.mdx"
+          ],
+          "got": "docs-site/src/content/docs/review/qa-lane.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 9000,
+          "pass": true
+        },
+        {
+          "set": "adversarial.jsonl",
+          "tier": "adversarial",
+          "id": "adv-04",
+          "q": "The folder I originally cloned into is sitting on somebody's feature branch and I did not put it there. Should I switch it back myself?",
+          "expect": "docs-site/src/content/docs/development/many-sessions.mdx",
+          "got": "docs-site/src/content/docs/development/many-sessions.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 8000,
+          "pass": true
+        },
+        {
+          "set": "adversarial.jsonl",
+          "tier": "adversarial",
+          "id": "adv-05",
+          "q": "The bot merged a pull request that showed no conflicts, and it silently wiped out a teammate's change that had landed just before it. Why does that happen, and which GitHub setting stops it?",
+          "expect": "docs-site/src/content/docs/rules.mdx",
+          "got": "docs-site/src/content/docs/ship/index.mdx",
+          "passed": 0,
+          "asked": 1,
+          "latency_ms": 10000,
+          "pass": false
+        },
+        {
+          "set": "adversarial.jsonl",
+          "tier": "adversarial",
+          "id": "adv-06",
+          "q": "I ran a subcommand minutes after it was merged and was told it does not exist. Nothing is wrong with the code. What is going on?",
+          "expect": [
+            "docs-site/src/content/docs/development/many-sessions.mdx",
+            "docs-site/src/content/docs/install-matrix.mdx",
+            "docs-site/src/content/docs/rules.mdx"
+          ],
+          "got": "docs-site/src/content/docs/development/many-sessions.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 8000,
+          "pass": true
+        },
+        {
+          "set": "adversarial.jsonl",
+          "tier": "adversarial",
+          "id": "adv-07",
+          "q": "What do I set so the agent that checks a pull request can also push its fixes to that same branch?",
+          "expect": "docs-site/src/content/docs/config-and-permissions.mdx",
+          "got": "docs-site/src/content/docs/config-and-permissions.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 13000,
+          "pass": true
+        },
+        {
+          "set": "adversarial.jsonl",
+          "tier": "adversarial",
+          "id": "adv-08",
+          "q": "My work was merged days ago but its ticket still shows as open on the tracker. Why did the merge not close it?",
+          "expect": "docs-site/src/content/docs/rules.mdx",
+          "got": "docs-site/src/content/docs/ship/index.mdx",
+          "passed": 0,
+          "asked": 1,
+          "latency_ms": 10000,
+          "pass": false
+        },
+        {
+          "set": "adversarial.jsonl",
+          "tier": "adversarial",
+          "id": "adv-09",
+          "q": "The person testing the running app approved the change, and then one more commit was pushed. Does that approval still count?",
+          "expect": [
+            "docs-site/src/content/docs/qa-reference.mdx",
+            "docs-site/src/content/docs/review/qa-lane.mdx",
+            "docs-site/src/content/docs/config-and-permissions.mdx"
+          ],
+          "got": "docs-site/src/content/docs/qa-reference.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 9000,
+          "pass": true
+        },
+        {
+          "set": "adversarial.jsonl",
+          "tier": "adversarial",
+          "id": "adv-10",
+          "q": "How do I get the command that opens the review stack to log in with the test account I declared?",
+          "expect": "docs-site/src/content/docs/review/qa-lane.mdx",
+          "got": "docs-site/src/content/docs/review/qa-lane.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 9000,
+          "pass": true
+        },
+        {
+          "set": "adversarial.jsonl",
+          "tier": "adversarial",
+          "id": "adv-11",
+          "q": "An agent is busy in another terminal on the same machine. How do I interrupt it and tell it to change course?",
+          "expect": [
+            "docs-site/src/content/docs/cookbook.mdx",
+            "docs-site/src/content/docs/development/many-sessions.mdx"
+          ],
+          "got": "docs-site/src/content/docs/cookbook.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 8000,
+          "pass": true
+        },
+        {
+          "set": "adversarial.jsonl",
+          "tier": "adversarial",
+          "id": "adv-12",
+          "q": "Does the size label on an issue decide which model its worker runs on?",
+          "expect": [
+            "docs-site/src/content/docs/cli-reference.mdx",
+            "docs-site/src/content/docs/config-and-permissions.mdx",
+            "docs-site/src/content/docs/agents.mdx"
+          ],
+          "got": "docs-site/src/content/docs/agents.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 8000,
+          "pass": true
+        },
+        {
+          "set": "adversarial.jsonl",
+          "tier": "adversarial",
+          "id": "adv-13",
+          "q": "Two laptops report the same release number, yet one is missing commands the other has. How can that be?",
+          "expect": "docs-site/src/content/docs/install-matrix.mdx",
+          "got": "docs-site/src/content/docs/install-matrix.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 12000,
+          "pass": true
+        },
+        {
+          "set": "adversarial.jsonl",
+          "tier": "adversarial",
+          "id": "adv-14",
+          "q": "The process that watches pull requests merged one that had no test runs at all. How do I make it treat that as unverified?",
+          "expect": [
+            "docs-site/src/content/docs/config-and-permissions.mdx",
+            "docs-site/src/content/docs/rules.mdx"
+          ],
+          "got": "docs-site/src/content/docs/config-and-permissions.mdx",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 6000,
+          "pass": true
+        },
+        {
+          "set": "abstain.jsonl",
+          "tier": "abstain",
+          "id": "abs-01",
+          "q": "What does the cckit enterprise tier cost per seat?",
+          "expect": "NONE",
+          "got": "NONE",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 7000,
+          "pass": true
+        },
+        {
+          "set": "abstain.jsonl",
+          "tier": "abstain",
+          "id": "abs-02",
+          "q": "How do I deploy cckit to a Kubernetes cluster with Helm?",
+          "expect": "NONE",
+          "got": "NONE",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 5000,
+          "pass": true
+        },
+        {
+          "set": "abstain.jsonl",
+          "tier": "abstain",
+          "id": "abs-03",
+          "q": "Which Slack channel do I post in to reach cckit support?",
+          "expect": "NONE",
+          "got": "NONE",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 10000,
+          "pass": true
+        },
+        {
+          "set": "abstain.jsonl",
+          "tier": "abstain",
+          "id": "abs-04",
+          "q": "How do I make cckit open merge requests on GitLab?",
+          "expect": "NONE",
+          "got": "NONE",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 6000,
+          "pass": true
+        },
+        {
+          "set": "abstain.jsonl",
+          "tier": "abstain",
+          "id": "abs-05",
+          "q": "cckit cleanup deleted a branch I still needed. Which cckit command brings it back?",
+          "expect": "NONE",
+          "got": "NONE",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 12000,
+          "pass": true
+        },
+        {
+          "set": "abstain.jsonl",
+          "tier": "abstain",
+          "id": "abs-06",
+          "q": "Which port does cckit's web dashboard listen on by default?",
+          "expect": "NONE",
+          "got": "NONE",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 9000,
+          "pass": true
+        },
+        {
+          "set": "abstain.jsonl",
+          "tier": "abstain",
+          "id": "abs-07",
+          "q": "After how many days are old lines rotated out of kit-events.jsonl?",
+          "expect": "NONE",
+          "got": "NONE",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 8000,
+          "pass": true
+        },
+        {
+          "set": "abstain.jsonl",
+          "tier": "abstain",
+          "id": "abs-08",
+          "q": "How do I run the QA lane's review stack inside Docker containers?",
+          "expect": "NONE",
+          "got": "NONE",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 12000,
+          "pass": true
+        },
+        {
+          "set": "abstain.jsonl",
+          "tier": "abstain",
+          "id": "abs-09",
+          "q": "Which command exports a wave's results as a CSV file?",
+          "expect": "NONE",
+          "got": "NONE",
+          "passed": 1,
+          "asked": 1,
+          "latency_ms": 6000,
+          "pass": true
+        }
+      ],
+      "verbs": [
+        {
+          "verb": "status",
+          "runs": 3,
+          "min_ms": 22870,
+          "median_ms": 24103,
+          "gh_calls": 38
+        },
+        {
+          "verb": "sync",
+          "runs": 3,
+          "min_ms": 1536,
+          "median_ms": 1547,
+          "gh_calls": 2
+        },
+        {
+          "verb": "next",
+          "runs": 3,
+          "min_ms": 26342,
+          "median_ms": 31425,
+          "gh_calls": 47
+        },
+        {
+          "verb": "plan",
+          "runs": 3,
+          "min_ms": 28404,
+          "median_ms": 28715,
+          "gh_calls": 47
+        },
+        {
+          "verb": "gc",
+          "runs": 3,
+          "min_ms": 16773,
+          "median_ms": 19102,
+          "gh_calls": 31
+        },
+        {
+          "verb": "effort plan",
+          "runs": 3,
+          "min_ms": 1937,
+          "median_ms": 1953,
+          "gh_calls": 4
+        },
+        {
+          "verb": "claims",
+          "runs": 3,
+          "min_ms": 227,
+          "median_ms": 230,
+          "gh_calls": 0
+        },
+        {
+          "verb": "task list",
+          "runs": 3,
+          "min_ms": 578,
+          "median_ms": 597,
+          "gh_calls": 0
+        },
+        {
+          "verb": "qa lanes",
+          "runs": 3,
+          "min_ms": 69,
+          "median_ms": 69,
+          "gh_calls": 0
+        }
+      ]
     }
   ]
 }
