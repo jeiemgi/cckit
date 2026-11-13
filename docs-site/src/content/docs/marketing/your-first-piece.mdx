@@ -1,14 +1,14 @@
 ---
 title: Hand over your first piece
-description: Hand over one piece end to end with one sentence to your assistant, look at the review link, approve. Or write it together, step by step.
+description: Hand over one piece end to end with one request to your assistant, look at the review link, and take it to approved.
 tutorial:
   job: hand over one piece end to end and take it to approved
   difficulty: beginner
-  time: "20 min"
+  time: "10 min"
   prerequisites:
     - { text: "The keys are given and the project is open in the chat with your assistant", link: "The keys are given", href: "/marketing/get-set-up/" }
   ogTag: Marketing
-  related: [marketing/brand-voice, marketing/campaigns, marketing/ask-for-changes, marketing/update-a-page]
+  related: [marketing/write-together, marketing/ask-for-changes, marketing/review-and-approval, marketing/brand-voice]
 ---
 
 import { Steps, Aside } from '@astrojs/starlight/components';
@@ -20,36 +20,35 @@ import TutorialMeta from '../../../components/TutorialMeta.astro';
 
 The first time, hand over something small and complete: one landing page, one post, one section
 of a site. You describe it, your assistant builds it in the background and returns a review link,
-and you approve it. The example on this page is the Bakery site, a neighbourhood bakery's website.
+and a person approves it. Pilot Light Bakery's project is set up and empty, and the first thing the
+shop needs is a landing page.
 
-**Who does it:** you describe and approve. Your assistant and its helpers build.
+**Who does it:** you describe the piece and read the result. Your assistant and its helpers build.
+Your colleague approves; if you work alone, you finish it yourself (step 3 says how).
 
-**What you will have at the end:** the piece as an approved version in the project, and the task
-marked done.
+**What you will have at the end:** the piece as part of the shared version of the project, and the
+task marked done.
 
 **Before you start:** the [keys are given](/marketing/get-set-up/) and the project is open in the
 chat with your assistant.
 
-## Option 1: hand it over
-
 <Steps>
 
 1. **Describe the piece in one paragraph.** Say what it is and what goes on it. Your assistant
-   records it as a task and starts building:
+   writes it down as a task and starts building:
 
    <Chat
-     title="handing over the bakery landing page"
-     say="Record a new task: a landing page for a bakery. A hero with the name and a tagline, three products with prices, opening hours, and a contact form. Then run it."
-     means="Nothing is public yet. You read the page and approve it or ask for changes."
+     title="handing over the Pilot Light Bakery landing page"
+     say="I need a landing page for my bakery, Pilot Light. At the top the name and a short line about us, then three breads with prices, our opening hours and a contact form. Can you build it?"
+     means="Nothing is public yet. You will get a link, read the page and approve it or ask for changes."
    >
-     Recorded as a task called "A landing page for a bakery", and I have started it. It runs in the
-     background. I will tell you when there is a link to review.
+     I wrote it down as a task and started building. I will tell you when there is a link.
    </Chat>
 
    <Outcomes title="For the technical person: the two commands behind this step">
 
    ```text
-   cckit task new "A landing page for a bakery" --body "<what goes on the page>"
+   cckit task new "<title of the piece>" --body "<what goes on the page>"
    cckit task run <id>
    ```
 
@@ -58,43 +57,34 @@ chat with your assistant.
 
    </Outcomes>
 
-2. **Wait for the link.**
+2. **Wait for the link.** Your assistant tells you when the page is ready and gives you one link.
+   Before it does, it checks that the site still works; when that check fails, or when nothing
+   changed, no review is opened and your assistant says why.
+
+   One round of a landing page like this one took under three minutes in a real run with nobody
+   stepping in; a second page, a menu, took about one minute.
+
+3. **Look at the result.** Open the review link. [Review and approval](/marketing/review-and-approval/)
+   says what the page shows. If you want something changed, say it:
 
    <Chat
-     title="waiting for the bakery landing page"
-     say="How is the landing page coming along?"
-     means="The project's check passes before the review is opened. When the check fails, or when nothing changed, no review is opened and your assistant says why."
+     title="asking for changes on the Pilot Light Bakery landing page"
+     say="The line at the top is too long. Use 'Bread baked this morning'. And add a photo of the shop."
+     means="You only describe what to change. The review link stays the same, and nothing is approved by itself."
    >
-     It is ready. The page has the four sections you asked for and the project's check passed, so I
-     opened a review. Here is the link to look at it.
+     The line at the top is changed and the review is updated. I could not add a photo: there is
+     none in the project. Send me one and I will add it.
    </Chat>
 
-   One unattended round of a landing page like this one took under three minutes in a real run; a
-   second page, a menu, took about one minute.
+   **Who approves.** Send the link to your colleague. GitHub does not let the person who asked for
+   a review approve it, so a second person reads the page and clicks **Approve**. If you work
+   alone there is no second reader: you read the review yourself and finish it, either by telling
+   your assistant the page is fine or with the green **Merge pull request** button on the review
+   page.
 
-3. **Look at the result and approve.** Open the review link. See
-   [Review and approval](/marketing/review-and-approval/) for what the page shows. If you want
-   changes, say so:
-
-   <Chat
-     title="asking for changes on the bakery landing page"
-     say="Read the review comments on this task and apply them. Tell me which ones you did not apply and why."
-     means="You only describe what to change. Nothing merges by itself."
-   >
-     I read the comments and applied the ones I could. The tagline is now the one you suggested. I
-     did not apply the comment asking for a photo of the shop, because there is no photo in the
-     project yet. Send me one and I will add it.
-   </Chat>
-
-4. **Approved.** Approving and merging the review marks the task done:
-
-   <Chat
-     title="finishing the bakery landing page"
-     say="The review is approved. Finish this piece."
-     means="Approved is not online. Putting the page on a public address is a separate step."
-   >
-     Done. The landing page is part of the project now and the task is marked done.
-   </Chat>
+4. **Approved.** Once it is approved, tell your assistant so, and it finishes the piece: the page
+   becomes part of the shared version and the task is marked done. See
+   [After approval](/marketing/review-and-approval/#after-approval).
 
 </Steps>
 
@@ -103,110 +93,25 @@ For a page, Claude loads the design skills described on [The tools we plug in](/
 and writes a short design brief before it builds. The review says which design skills were loaded
 in that run.
 
-You never edit code. Nothing merges by itself, and cckit does not publish: the result is an
-approved site that builds, and putting it on a public address is a separate step.
-
-## Option 2: write it together
-
-Use this for a piece you want to shape sentence by sentence, such as a blog post. You work with
-your assistant and its editor helper in a draft of your own, and the approved version does not
-change until the piece is approved.
-
-<Steps>
-
-1. **Tell your assistant what you want to make and start the draft.**
-
-   <Chat
-     title="starting a blog post for the bakery"
-     say="I want to write a blog post announcing our Easter menu. Record it as a new piece of work and start a draft for it."
-     means="The draft is yours alone. The approved version of the site does not change."
-   >
-     Recorded as a new piece of work, and the draft is open. Tell me who should read the post and
-     what you want them to do.
-   </Chat>
-
-2. **Agree on an outline.**
-
-   <Chat
-     title="agreeing on an outline for the Easter post"
-     say="Propose an outline for this post. The reader is a neighbour who has not tried our bread. The one thing I want them to do is order an Easter loaf."
-     means="Change the outline until it is right: what to cut, what to move, what is missing."
-   >
-     Here is an outline: a short opening about the Easter loaf, what goes in it, when you can
-     collect it, and one line on how to order. Do you want the story of the recipe before the
-     ordering line?
-   </Chat>
-
-3. **Write the draft.**
-
-   <Chat
-     title="writing the first draft of the Easter post"
-     say="Write the first draft from that outline. Follow our brand voice."
-     means="Edit it together: “make the opening shorter”, “this paragraph sounds like an ad”, “add the date and the price”."
-   >
-     The first draft is written as a file in the project, and I will tell you where it is. I wrote
-     it in the brand voice your team set.
-   </Chat>
-
-   If your team has [set its brand voice](/marketing/brand-voice/), your assistant reads it first.
-
-4. **Ask for a review.**
-
-   <Chat
-     title="asking for a review of the Easter post"
-     say="This is ready. Save it and ask for a review."
-     means="Your assistant saves the draft, sends it to GitHub and gives you a link."
-   >
-     Saved, and the review is open. Here is the link to send to the person who approves.
-   </Chat>
-
-5. **A teammate reviews it, and you apply the changes.** Send the link to the person who
-   approves. GitHub does not let the person who asked for the review approve it, so the approver
-   is someone else. Then:
-
-   <Chat
-     title="applying the reviewer's comments on the Easter post"
-     say="Read the review comments on this post and apply them. Tell me which ones you did not apply and why."
-     means="You decide what to change. Your assistant reports every comment it left alone."
-   >
-     I applied the comments about the opening and the price. I left one comment alone: it asks for
-     a second photo, and there is none in the project. Do you want to add one?
-   </Chat>
-
-6. **Approved.** Once the review says approved:
-
-   <Chat
-     title="finishing the Easter post"
-     say="The review is approved. Finish this piece."
-     means="The approver can also finish it from the review page with the green Merge pull request button (some projects label it Squash and merge)."
-   >
-     Done. The approved draft is part of the shared version, the piece is marked done and I
-     tidied up the draft.
-   </Chat>
-
-</Steps>
+You never edit code. Nothing is approved by itself, and cckit does not publish: the result is an
+approved site that works, and putting it on a public address is a separate step.
 
 ## Check that it worked
 
-<Chat
-  title="checking that the piece is done"
-  say="Where are we?"
-  means="The piece is no longer listed as in progress or waiting for a review, and it counts as done."
->
-  The Easter post is done. Nothing is in progress and nothing is waiting for a review.
-</Chat>
+Ask "Where are we?". The landing page is no longer listed as in progress or waiting for a review,
+and it counts as done.
 
 ## Coming back to a piece
 
-Drafts survive closing the app. Open the project again and say:
+Pieces you have started are still there after you close the app. Open the project again and say:
 
 <Chat
-  title="coming back to the bakery drafts"
-  say="Where are we? Show me my drafts and anything waiting for a review."
+  title="coming back to the Bakery site the next day"
+  say="Where are we? Show me what I have started and anything waiting for a review."
   means="Then say which one to continue. To pick new work instead, say: “Show me what is ready and I will pick.”"
 >
-  You have one draft, the Easter post, and one review waiting, the landing page. Which one do you
-  want to continue?
+  The landing page is done. You have one piece in progress, the post about the new rye loaf.
+  Nothing is waiting for a review. Do you want to continue the post?
 </Chat>
 
 <Aside type="note" title="Approved is not published">
@@ -214,4 +119,7 @@ cckit stops at approved. See [after approval](/marketing/review-and-approval/#af
 [Put an approved piece online](/marketing/go-live/) for what to hand the person who publishes.
 </Aside>
 
-Next: [Several pieces, one goal](/marketing/campaigns/)
+Want to shape a post sentence by sentence instead of handing it over? See
+[Write a piece together](/marketing/write-together/).
+
+Next: [Write a piece together](/marketing/write-together/)

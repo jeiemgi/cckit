@@ -87,8 +87,11 @@ Three other roles shape a build without writing it:
 
 ## Which tools plug in
 
-cckit adopts tools for building and writes none of them. Each one is optional, and cckit works
-without it.
+Four optional tools can help an agent build: see [Integrations](/integrations/). You need none of
+them for your first change. cckit adopts them and writes none of them.
+
+<details>
+<summary>The four tools and how you reach each one</summary>
 
 | Tool | What it gives the agent | How you reach it |
 | --- | --- | --- |
@@ -97,7 +100,11 @@ without it.
 | mlx-lm | a local model that shortens a long file before it is read | [`cckit digest`](/development/local-model-digest/) |
 | tmux or Herdr | one terminal pane per parallel agent | [`cckit orchestrate`](/development/waves/) |
 
-mlx-lm runs on Apple silicon only. The agent itself is Claude Code or Codex. GitHub is reached through the `gh` command. The full
+mlx-lm runs on Apple silicon only.
+
+</details>
+
+The agent itself is Claude Code or Codex. GitHub is reached through the `gh` command. The full
 list of optional tools, with who makes each one, is on [Integrations](/integrations/).
 
 ## The commands
@@ -133,13 +140,6 @@ For many at once:
 
 Every flag is in the [CLI reference](/cli-reference/).
 
-## The pull request carries its own proof
-
-A pull request should show that the checks passed, not claim it. The agent attaches the output of
-the checks to the pull request as comments, one per check, so a reviewer does not run them again.
-The helper behind it and its settings are under
-[Evidence on the pull request](/config-and-permissions/#evidence-on-the-pull-request).
-
 ## Guides
 
 Start with the first one. It is the path on this page, run for real.
@@ -151,3 +151,10 @@ Start with the first one. It is the path on this page, run for real.
   <LinkCard title="Let the agent see the page" href="/development/browser-debug/" description="Give an agent screenshots and logs of a running page." />
   <LinkCard title="More development guides" href="/development/more-guides/" description="Unattended runs, CI, code search, local models, hooks, skills and integrations." />
 </CardGrid>
+
+## The pull request carries its own proof
+
+A pull request should show that the checks passed, not claim it. The agent attaches the output of
+the checks to the pull request as comments, one per check, so a reviewer does not run them again.
+The helper behind it and its settings are under
+[Evidence on the pull request](/config-and-permissions/#evidence-on-the-pull-request).

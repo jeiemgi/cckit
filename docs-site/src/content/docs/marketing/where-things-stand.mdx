@@ -1,8 +1,8 @@
 ---
 title: See where everything stands
-description: Ask your assistant what is in draft, what waits for a review, what is done and what is next, for the whole project or for one piece.
+description: Ask your assistant what is being written, what waits for a review, what is done and what is next, for the whole project or for one piece.
 tutorial:
-  job: see what is in draft, in review and done across the project
+  job: see what is in progress, in review and done across the project
   difficulty: beginner
   time: "5 min"
   prerequisites:
@@ -19,10 +19,10 @@ import TutorialMeta from '../../../components/TutorialMeta.astro';
 
 <TutorialMeta />
 
-Pieces pile up: a landing page waiting for a review, a post in draft, a menu page nobody has
-started. You do not keep that list. You ask your assistant, and it reads the project. The example
-is the Bakery site, a neighbourhood bakery's website, a few days after the landing page went to
-review.
+Pieces pile up: a post waiting for a review, a post half written, a post nobody has started. You
+do not keep that list. You ask your assistant, and it reads the project. Pilot Light Bakery is a
+few days into Easter week: one post is with the approver, one is being written, one has not
+started.
 
 **Who does it:** you ask. Your assistant reads the project and answers. Nothing changes when you
 ask.
@@ -32,16 +32,15 @@ someone else.
 
 <Steps>
 
-1. **Ask where things stand.** The answer is short: what is in progress, what waits for a review
-   and what needs cleaning up.
+1. **Ask where things stand.**
 
    <Chat
      title="asking where things stand on the Bakery site"
      say="Where are we?"
-     means="A draft is yours alone. Waiting for a review means another person has to read it."
+     means="In progress means the piece is being written. Waiting for review means another person has to read it."
    >
-     The Bakery site has one piece in draft, the Easter menu page, and one piece waiting for a
-     review, the landing page. Nothing else is open and there is nothing to clean up.
+     The Bakery site has one piece in progress, the post about the ordering deadline, and one piece
+     waiting for review, the post about the Easter loaf. Nothing else is open.
    </Chat>
 
 2. **See every piece and where it is.**
@@ -51,21 +50,24 @@ someone else.
      say="Show me all our pieces and where each one is."
      means="Each piece has one state. Finished pieces appear only when you ask for them. The states are listed below."
    >
-     Three open pieces. Landing page: waiting for a review. Easter menu page: in draft. Post about
-     the Easter loaf: not started.
+     Three open pieces. Post about the Easter loaf: waiting for review. Post about the ordering
+     deadline: in progress. Post about collection day: not started.
    </Chat>
 
    <Outcomes title="All 7 states a piece can be in">
 
-   | What you hear | What it means |
+   | What your assistant says | What it means |
    | --- | --- |
-   | `draft` | The piece is written down on this computer only. The team has not seen it. |
-   | `todo` | The piece is on the shared list and nobody has started it. |
-   | `shared` | The piece was sent to the team in a review that is not approved yet. |
-   | `doing` | A draft for the piece has been started and is being worked on. |
-   | `review` | The draft is marked done and a review is open. A person has to read it. |
-   | `done` | The review was approved and the piece is part of the shared version. |
-   | `dropped` | The piece was cancelled. It is listed only when you ask for finished and cancelled pieces too. |
+   | Not started, and only on this computer so far | The piece is noted on this computer only. The team has not seen it. |
+   | Waiting to be added to the shared list | The piece was sent to the team in a review that is not approved yet. |
+   | Not started | The piece is on the shared list and nobody has started it. |
+   | In progress | A draft for the piece has been started and is being written. |
+   | Waiting for review | The draft is marked done and a review is open. A person has to read it. |
+   | Done | The review was approved and the piece is part of the shared version. |
+   | Dropped | The piece was cancelled. It is listed only when you ask for finished and cancelled pieces too. |
+
+   "The draft" always means the piece being written. A piece nobody has started has no draft yet,
+   whatever a list on GitHub calls it.
 
    </Outcomes>
 
@@ -74,10 +76,10 @@ someone else.
    <Chat
      title="asking what to hand over next on the Bakery site"
      say="What is next?"
-     means="It picks by priority first, then by the day the piece was recorded."
+     means="It offers only pieces nobody has started. A piece in progress or waiting for review is not offered."
    >
-     Next is the post about the Easter loaf. It is the highest priority among the pieces nobody
-     has started. Do you want me to start it?
+     Next is the post about collection day: it is the oldest piece nobody has started. Do you want
+     me to start it?
    </Chat>
 
 4. **Ask what is waiting for you.**
@@ -85,10 +87,11 @@ someone else.
    <Chat
      title="asking what waits for a person on the Bakery site"
      say="Is anything waiting for me?"
-     means="Pieces in review wait for an approver, and a draft waits for whoever wrote it."
+     means="A piece waiting for review waits for an approver. A piece in progress waits for whoever is writing it."
    >
-     The landing page is waiting for an approver. Nobody has read it yet. The Easter menu page is a
-     draft, so it is waiting for you to ask for a review.
+     The post about the Easter loaf is waiting for your colleague, who has not read it yet. The
+     post about the ordering deadline is in progress, so it is waiting for you: tell me when it is
+     ready and I will ask for the review.
    </Chat>
 
 </Steps>
@@ -108,9 +111,14 @@ someone else.
 
 `cckit status` counts the light tasks by state, lists the ones somebody has to act on (`review`,
 `doing`, `draft`, `shared`), and adds open reviews that wait for a person. `cckit task list` reads
-the state from git and makes no GitHub call. None of the four writes anything. The verbs are in
-the [CLI reference](/cli-reference/).
+the state from git and makes no GitHub call. None of the four writes anything. `cckit task next`
+picks by priority first (`--priority p0` to `p3` on `cckit task new`), then by the day the piece
+was recorded. The verbs are in the [CLI reference](/cli-reference/).
+
+The state words the commands print, in the order of the table above: `draft`, `shared`, `todo`,
+`doing`, `review`, `done`, `dropped`. With the plain-language mode on, the assistant says the
+words in the table's first column.
 
 </Outcomes>
 
-Next: [Ask for changes to a piece](/marketing/ask-for-changes/)
+Next: [Words you will hear](/marketing/words-you-will-hear/)

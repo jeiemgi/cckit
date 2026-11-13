@@ -1,14 +1,14 @@
 ---
 title: Delega tu primera pieza
-description: Delega una pieza de principio a fin con una frase a tu asistente, mira el enlace de revisión y aprueba. O escríbela junto con tu asistente, paso a paso.
+description: Delega una pieza de principio a fin con un solo pedido a tu asistente, mira el enlace de revisión y llévala hasta la aprobación.
 tutorial:
   job: delegar una pieza de principio a fin y llevarla hasta la aprobación
   difficulty: beginner
-  time: "20 min"
+  time: "10 min"
   prerequisites:
     - { text: "Las llaves están entregadas y el proyecto está abierto en el chat con tu asistente", link: "Las llaves están entregadas", href: "/es/marketing/get-set-up/" }
   ogTag: Marketing
-  related: [marketing/brand-voice, marketing/campaigns, marketing/ask-for-changes, marketing/update-a-page]
+  related: [marketing/write-together, marketing/ask-for-changes, marketing/review-and-approval, marketing/brand-voice]
 ---
 
 import { Steps, Aside } from '@astrojs/starlight/components';
@@ -18,39 +18,38 @@ import TutorialMeta from '../../../../components/TutorialMeta.astro';
 
 <TutorialMeta />
 
-La primera vez, delega algo pequeño y completo: una landing page, una entrada, una sección de un
-sitio. Lo describes, tu asistente lo construye por detrás y te devuelve un enlace de revisión, y tú
-lo apruebas. El ejemplo de esta página es el sitio de la panadería, la página web de una panadería
-de barrio.
+La primera vez, delega algo pequeño y completo: una landing page, una publicación, una sección de
+un sitio. Tú la describes, tu asistente la hace mientras tanto y te devuelve un enlace de
+revisión, y una persona la aprueba. El proyecto de la panadería Pilot Light ya está instalado y
+vacío, y lo primero que necesita el negocio es una landing page.
 
-**Quién lo hace:** tú describes y apruebas. Tu asistente y sus ayudantes construyen.
+**Quién lo hace:** tú describes la pieza y lees el resultado. Tu asistente y sus ayudantes la
+hacen. Tu colega aprueba; si trabajas por tu cuenta, la terminas tú (el paso 3 dice cómo).
 
-**Lo que vas a tener al final:** la pieza como versión aprobada en el proyecto, y la tarea marcada
-como terminada.
+**Lo que vas a tener al final:** la pieza como parte de la versión compartida del proyecto, y la
+tarea marcada como terminada.
 
 **Antes de empezar:** las [llaves están entregadas](/es/marketing/get-set-up/) y el proyecto está
 abierto en el chat con tu asistente.
 
-## Opción 1: delegarla
-
 <Steps>
 
-1. **Describe la pieza en un párrafo.** Di qué es y qué lleva. Tu asistente la registra como una
-   tarea y empieza a construirla:
+1. **Describe la pieza en un párrafo.** Di qué es y qué lleva. Tu asistente la anota como una
+   tarea y empieza a hacerla:
 
    <Chat
-     title="delegar la landing page de la panadería"
-     say="Registra una tarea nueva: una landing page para una panadería. Una portada con el nombre y un eslogan, tres productos con precios, el horario y un formulario de contacto. Y luego ejecútala."
-     means="Todavía nada es público. Tú lees la página y la apruebas, o pides cambios."
+     title="delegar la landing page de la panadería Pilot Light"
+     say="Necesito una landing page para mi panadería, Pilot Light. Arriba el nombre y una frase corta sobre nosotros, después tres panes con sus precios, el horario y un formulario de contacto. ¿Me la armas?"
+     means="Todavía nada es público. Vas a recibir un enlace, leer la página y aprobarla o pedir cambios."
    >
-     Registrada como una tarea llamada “Una landing page para una panadería”, y ya la empecé. Corre
-     por detrás. Te aviso cuando haya un enlace para revisar.
+     La anoté como una tarea y ya empecé. La voy haciendo mientras tanto y te aviso cuando haya un
+     enlace.
    </Chat>
 
    <Outcomes title="Para la persona técnica: los dos comandos detrás de este paso">
 
    ```text
-   cckit task new "Una landing page para una panadería" --body "<lo que lleva la página>"
+   cckit task new "<título de la pieza>" --body "<lo que lleva la página>"
    cckit task run <id>
    ```
 
@@ -59,48 +58,37 @@ abierto en el chat con tu asistente.
 
    </Outcomes>
 
-2. **Espera el enlace.**
+2. **Espera el enlace.** Tu asistente te avisa cuando la página está lista y te da un enlace.
+   Antes revisa que el sitio sigue funcionando; si esa comprobación falla, o si no cambió nada,
+   no se abre ninguna revisión y tu asistente te dice por qué.
+
+   En una prueba real, una landing page como esta salió en menos de tres minutos, en una pasada
+   sin que nadie interviniera; una segunda página, un menú, tardó cerca de un minuto.
+
+3. **Mira el resultado.** Abre el enlace de revisión.
+   [Revisión y aprobación](/es/marketing/review-and-approval/) dice qué muestra esa página. Si
+   quieres cambiar algo, dilo:
 
    <Chat
-     title="esperar la landing page de la panadería"
-     say="¿Cómo va la landing page?"
-     means="La comprobación del proyecto pasa antes de abrir la revisión. Si la comprobación falla, o si no cambió nada, no se abre ninguna revisión y tu asistente dice por qué."
+     title="pedir cambios en la landing page de la panadería Pilot Light"
+     say="La frase de arriba está muy larga. Pon 'Pan horneado esta mañana'. Y agrega una foto del local."
+     means="Tú solo dices qué cambiar. El enlace de la revisión sigue siendo el mismo, y nada se aprueba solo."
    >
-     Está lista. La página tiene las cuatro secciones que pediste y la comprobación del proyecto
-     pasó, así que abrí una revisión. Aquí está el enlace para verla.
+     Ya cambié la frase de arriba y actualicé la revisión. La foto no la pude agregar: no hay
+     ninguna en el proyecto. Mándame una y la agrego.
    </Chat>
 
-   En una prueba real, una ronda sin supervisión de una landing page como esta tardó menos de tres
-   minutos; una segunda página, un menú, tardó cerca de un minuto.
+   **Quién aprueba.** Mándale el enlace a tu colega. GitHub no deja que apruebe la misma persona
+   que pidió la revisión, así que una segunda persona lee la página y hace clic en **Approve**. Si
+   trabajas por tu cuenta no hay una segunda lectura: lees la revisión y la terminas tú, ya sea
+   diciéndole a tu asistente que la página está bien o con el botón verde **Merge pull request**
+   de la página de la revisión.
 
-3. **Mira el resultado y aprueba.** Abre el enlace de revisión. Mira
-   [Revisión y aprobación](/es/marketing/review-and-approval/) para saber qué muestra la página.
-   Si quieres cambios, dilo:
-
-   <Chat
-     title="pedir cambios en la landing page de la panadería"
-     say="Lee los comentarios de la revisión de esta tarea y aplícalos. Dime cuáles no aplicaste y por qué."
-     means="Tú solo describes qué cambiar. Nada se integra solo."
-   >
-     Leí los comentarios y apliqué los que pude. El eslogan ahora es el que sugeriste. No apliqué
-     el comentario que pide una foto del local, porque todavía no hay ninguna foto en el proyecto.
-     Mándame una y la agrego.
-   </Chat>
-
-4. **Aprobado.** Aprobar e integrar la revisión marca la tarea como terminada:
-
-   <Chat
-     title="terminar la landing page de la panadería"
-     say="La revisión está aprobada. Termina esta pieza."
-     means="Aprobado no es en línea. Ponerla en una dirección pública es otro paso."
-   >
-     Listo. La landing page ya es parte del proyecto y la tarea quedó marcada como terminada.
-   </Chat>
+4. **Aprobada.** Cuando esté aprobada, díselo a tu asistente y él termina la pieza: la página pasa
+   a ser parte de la versión compartida y la tarea queda marcada como terminada. Mira
+   [Después de la aprobación](/es/marketing/review-and-approval/#después-de-la-aprobación).
 
 </Steps>
-
-Nunca editas código. Nada se integra solo, y cckit no publica: el resultado es un sitio aprobado
-que compila, y ponerlo en una dirección pública es otro paso.
 
 {/* VERIFY-504 */}
 Para una página, Claude carga las habilidades de diseño descritas en
@@ -108,111 +96,35 @@ Para una página, Claude carga las habilidades de diseño descritas en
 y escribe un resumen de diseño corto antes de construir. La revisión dice qué habilidades de
 diseño se cargaron en esa ejecución.
 
-## Opción 2: escribirla juntos
-
-Úsala para una pieza que quieres moldear frase por frase, como una entrada de blog. Trabajas con
-tu asistente y su ayudante de edición en un borrador propio, y la versión aprobada no cambia hasta
-que la pieza se aprueba.
-
-<Steps>
-
-1. **Dile a tu asistente qué quieres hacer y abre el borrador.**
-
-   <Chat
-     title="empezar una entrada de blog para la panadería"
-     say="Quiero escribir una entrada de blog que anuncie nuestro menú de Pascua. Regístrala como una pieza de trabajo nueva y abre un borrador."
-     means="El borrador es solo tuyo. La versión aprobada del sitio no cambia."
-   >
-     Registrada como una pieza de trabajo nueva, y el borrador está abierto. Dime quién va a leer
-     la entrada y qué quieres que haga.
-   </Chat>
-
-2. **Acuerden un esquema.**
-
-   <Chat
-     title="acordar el esquema de la entrada de Pascua"
-     say="Propón un esquema para esta entrada. El lector es un vecino que todavía no ha probado nuestro pan. Lo único que quiero es que encargue una rosca de Pascua."
-     means="Cámbialo hasta que esté bien: qué quitar, qué mover, qué falta."
-   >
-     Este es el esquema: una apertura corta sobre la rosca de Pascua, qué lleva, cuándo se puede
-     recoger y una línea sobre cómo encargarla. ¿Quieres la historia de la receta antes de la línea
-     para encargar?
-   </Chat>
-
-3. **Escribe el borrador.**
-
-   <Chat
-     title="escribir el primer borrador de la entrada de Pascua"
-     say="Escribe el primer borrador a partir de ese esquema. Sigue nuestra voz de marca."
-     means="Edítenla juntos: “haz más corto el arranque”, “este párrafo suena a anuncio”, “agrega la fecha y el precio”."
-   >
-     El primer borrador está escrito como un archivo en el proyecto, y te digo dónde está. Lo
-     escribí con la voz de marca que definió tu equipo.
-   </Chat>
-
-   Si tu equipo [definió su voz de marca](/es/marketing/brand-voice/), tu asistente la lee antes.
-
-4. **Pide una revisión.**
-
-   <Chat
-     title="pedir una revisión de la entrada de Pascua"
-     say="Esto está listo. Guárdalo y pide una revisión."
-     means="Tu asistente guarda el borrador, lo envía a GitHub y te da un enlace."
-   >
-     Guardado, y la revisión está abierta. Aquí está el enlace para mandárselo a quien aprueba.
-   </Chat>
-
-5. **Un compañero la revisa y tú aplicas los cambios.** Manda el enlace a quien aprueba. GitHub no
-   deja que quien pidió la revisión la apruebe, así que quien aprueba es otra persona. Después:
-
-   <Chat
-     title="aplicar los comentarios del revisor en la entrada de Pascua"
-     say="Lee los comentarios de la revisión de esta entrada y aplícalos. Dime cuáles no aplicaste y por qué."
-     means="Tú decides qué cambiar. Tu asistente te dice cada comentario que dejó sin aplicar."
-   >
-     Apliqué los comentarios sobre la apertura y el precio. Dejé uno sin aplicar: pide una segunda
-     foto y no hay ninguna en el proyecto. ¿Quieres agregar una?
-   </Chat>
-
-6. **Aprobada.** Cuando la revisión dice aprobada:
-
-   <Chat
-     title="terminar la entrada de Pascua"
-     say="La revisión está aprobada. Termina esta pieza."
-     means="Quien aprueba también puede terminarla desde la página de revisión con el botón verde Merge pull request (en algunos proyectos dice Squash and merge)."
-   >
-     Listo. El borrador aprobado pasó a la versión compartida, la pieza quedó marcada como
-     terminada y ordené el borrador.
-   </Chat>
-
-</Steps>
+Tú nunca editas código. Nada se aprueba solo, y cckit no publica: el resultado es un sitio
+aprobado y que funciona, y ponerlo en una dirección pública es otro paso.
 
 ## Comprueba que funcionó
 
-<Chat
-  title="comprobar que la pieza está terminada"
-  say="¿Cómo vamos?"
-  means="La pieza ya no aparece como en curso ni como esperando revisión, y cuenta como terminada."
->
-  La entrada de Pascua está terminada. Nada está en curso y nada espera una revisión.
-</Chat>
+Pregunta "¿Cómo vamos?". La landing page ya no aparece como en curso ni como esperando revisión,
+y cuenta como terminada.
 
 ## Volver a una pieza
 
-Los borradores sobreviven al cierre de la app. Abre el proyecto otra vez y di:
+Lo que empezaste no se pierde al cerrar la app. Abre el proyecto otra vez y di:
 
 <Chat
-  title="volver a los borradores de la panadería"
-  say="¿Cómo vamos? Muéstrame mis borradores y todo lo que espera una revisión."
-  means="Luego di cuál continuar. Para elegir trabajo nuevo, di: “Muéstrame qué está listo y yo elijo.”"
+  title="volver al sitio de la panadería al día siguiente"
+  say="¿Cómo vamos? Muéstrame lo que tengo empezado y lo que espera revisión."
+  means="Después di con cuál quieres seguir. Para elegir trabajo nuevo, di: “Muéstrame lo que está listo para empezar y yo elijo.”"
 >
-  Tienes un borrador, la entrada de Pascua, y una revisión esperando, la landing page. ¿Con cuál
-  quieres seguir?
+  La landing page está terminada. Tienes una pieza en curso, la publicación sobre el nuevo pan de
+  centeno. Nada espera revisión. ¿Seguimos con la publicación?
 </Chat>
 
-<Aside type="note" title="Aprobado no es publicado">
-cckit termina en aprobado. Mira [después de la aprobación](/es/marketing/review-and-approval/#después-de-la-aprobación) y
-[Pon en línea una pieza aprobada](/es/marketing/go-live/) para saber qué entregarle a quien publica.
+<Aside type="note" title="Aprobada no quiere decir publicada">
+cckit llega hasta la aprobación. Mira
+[después de la aprobación](/es/marketing/review-and-approval/#después-de-la-aprobación), y
+[Pon en línea una pieza aprobada](/es/marketing/go-live/) para saber qué entregarle a quien
+publica.
 </Aside>
 
-Siguiente: [Varias piezas, un objetivo](/es/marketing/campaigns/)
+¿Prefieres armar una publicación frase por frase en vez de delegarla? Mira
+[Escribe una pieza en conjunto](/es/marketing/write-together/).
+
+Siguiente: [Escribe una pieza en conjunto](/es/marketing/write-together/)

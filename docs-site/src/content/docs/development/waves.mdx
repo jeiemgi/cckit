@@ -78,20 +78,12 @@ merged; the rest are reported with what to fix.
   ran="cckit watch --merge"
   means="One pass. A pull request that is not clean is reported with what to fix and the rest are not held up."
 >
-  I checked the open pull requests. The ones that passed are merged, and I listed the others with
-  what to fix.
+  The opening hours pull request is merged. The contact form one is not: its lint check fails on
+  one file, and I left it open with that named.
 </Chat>
 
 Each `cckit watch --merge` is one pass; `cckit watch --merge --loop` repeats passes until one
 merges nothing, or after 10.
-
-If you have configured [a review stage](/config-and-permissions/#the-agent-review-stage), a PR
-the captain would merge goes to a reviewer first and waits for its verdict: one extra turn of
-the loop, not a separate command.
-
-A person can review the running app the same way: the [QA lane](/review/qa-lane/) brings one stack up
-per lane, and with `captain.mergePolicy.requireQa` set the captain holds a PR until
-`cckit qa verdict pass` is recorded against its current head.
 
 ### 4. Advance
 
@@ -130,14 +122,26 @@ The result values, the exit codes and the branch claim are in the
 | "How did each worker end?" | `cckit orchestrate --results` |
 | "Check the pull requests and merge the clean ones." | `cckit watch --merge` |
 | "Keep checking until nothing else merges." | `cckit watch --loop` |
-| "Give me the plan as data." | `cckit plan --llm` |
-| "What did the reviewer decide on this issue?" | `cckit receipt show <issue> review` |
-| "Bring up the app so I can review this lane." | `cckit qa up` → `cckit qa open` → `cckit qa verdict <pass\|fail>` |
-| "Show every lane's ports and verdicts." | `cckit qa lanes` |
 
 </div>
 
 Every flag of these verbs is in the [CLI reference](/cli-reference/#plan-and-drive-a-wave).
+
+## Going further
+
+Two optional stages sit between a worker's pull request and the merge. Neither is needed for a
+first wave.
+
+- **An agent reviewer.** If you have configured
+  [a review stage](/config-and-permissions/#the-agent-review-stage), a pull request the captain
+  would merge goes to a reviewer first and waits for its verdict: one extra turn of the loop, not
+  a separate command. `cckit receipt show <issue> review` prints what the reviewer decided.
+- **A person looking at the running app.** The [QA lane](/review/qa-lane/) starts one copy of the
+  app per change (a lane): `cckit qa up`, then `cckit qa open`, then
+  `cckit qa verdict <pass|fail>`. With `captain.mergePolicy.requireQa` set, the captain holds a
+  pull request until `cckit qa verdict pass` is recorded against its latest commit.
+  `cckit qa lanes` shows every lane's ports and verdicts.
+- **The plan as data.** `cckit plan --llm` prints the wave plan in a form a program reads.
 
 ## Guides and related pages
 

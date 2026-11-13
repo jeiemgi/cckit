@@ -21,12 +21,12 @@ name it and makes the agent run it.
 
 <Chat
   title="naming the check that proves a change to the Bakery site is sound"
-  say="What one command proves a change to the Bakery site is sound? It has to fail when anything is wrong."
+  say="Run the build and the linter together, as one command that fails when either fails, and tell me if they pass."
   ran="pnpm build && pnpm lint"
   means="This is the gate. A change is ready for review when it exits 0, and not before."
 >
-  For this site the build and the linters are the check, joined into one line that exits non-zero
-  on any failure. That line is the gate.
+  Both passed. For this site the build and the linter are the check, joined into one line that
+  exits non-zero on any failure. That line is the gate.
 </Chat>
 
 <Outcomes of="a gate command" title="Other examples of a gate command">
@@ -63,6 +63,11 @@ types `git push`, the hook runs the command first and stops the push if it fails
 
 </Outcomes>
 
+The Bakery site was already set up, without the flag. For a project like that there is no cckit
+command that adds the hook yet: `cckit init --upgrade` does not install it (see
+[Limits](#limits)). Run the gate in CI (step 3), which covers every pull request, and see
+[Hooks](/hooks/) for what the hook is and where it is registered.
+
 ### 3. Run it in CI too
 
 The hook covers the agent's machine. A CI workflow that runs the same command on every pull request
@@ -77,7 +82,7 @@ findings into checks](/review/gates/).
 
 <Chat
   title="proving the check stops a bad push on the Bakery site"
-  say="Push a branch where a test fails, so I can see the check stop it."
+  say="Push a branch with a lint error, so I can see the check stop it."
   ran="git push"
   means="If the push goes through, the hook is not installed. See Limits below."
 >

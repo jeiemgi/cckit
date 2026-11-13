@@ -5,16 +5,31 @@ description: Entrégale a cckit una página con contenido, una landing page, una
 
 import { CardGrid, LinkCard, Aside } from '@astrojs/starlight/components';
 import SearchStart from '../../../../components/SearchStart.astro';
-import Outcomes from '../../../../components/Outcomes.astro';
+import Chat from '../../../../components/Chat.astro';
 
 <SearchStart kind="marketing-es" />
 
 Delegas una pieza de trabajo: una página con contenido, una landing page, una app pequeña, un
-sitio web, una publicación. Cuentas con tus palabras lo que quieres. cckit lo construye por
-detrás y te devuelve un enlace para mirar. Lo lees y lo apruebas o pides cambios.
+sitio web, una publicación. Cuentas con tus palabras lo que quieres. cckit lo hace mientras tú
+sigues con lo tuyo y te devuelve un enlace para mirar. Lo lees y lo apruebas o pides cambios.
 
-Los pasos intermedios (borradores, comprobaciones, revisión) ocurren por detrás. No los ejecutas y
-no necesitas aprenderlos. [Qué pasa después de que lo delegas](/es/marketing/how-we-work/) los
+<Chat
+  title="la dueña de la panadería Pilot Light pide una landing page"
+  say="Necesito una landing page para mi panadería, Pilot Light. Arriba el nombre y una frase corta sobre nosotros, después tres panes con sus precios, el horario y un formulario de contacto. ¿Me la armas?"
+  means="Ese párrafo fue todo el pedido. Nada es público: el enlace es para ti y para quien aprueba."
+>
+  Ya está lista. La página tiene las cuatro partes que pediste, y antes de mostrártela revisé que
+  el sitio sigue funcionando. Aquí está el enlace para que la veas. Para la frase corta puse "Pan
+  para Alder Row, recién salido del horno antes de que despierte la calle"; dime si quieres otra.
+</Chat>
+
+<Aside type="note" title="Lo probamos">
+Un párrafo que describía la landing page de una panadería volvió como un enlace de revisión en
+menos de tres minutos. Nadie editó código.
+</Aside>
+
+Los pasos intermedios (borradores, comprobaciones, revisión) ocurren por detrás. No los haces tú y
+no necesitas aprenderlos. [Qué pasa una vez que lo delegas](/es/marketing/how-we-work/) los
 cuenta en breve, para que sepas en qué estás confiando.
 
 ## Dónde actúas tú
@@ -23,74 +38,53 @@ cuenta en breve, para que sepas en qué estás confiando.
    sola vez. [Entrega las llaves](/es/marketing/get-set-up/)
 2. **Di qué quieres.** Basta un párrafo: qué es la página o la pieza y qué lleva.
    [Delega tu primera pieza](/es/marketing/your-first-piece/)
-3. **Lee lo que regresó.** Una tarea delegada corre sin detenerse a preguntar. Donde tu párrafo
-   podía entenderse de dos maneras elige una, y en la revisión ves cuál.
+3. **Lee lo que te devuelve.** Una pieza delegada se hace sin detenerse a preguntar. Donde tu
+   párrafo podía entenderse de dos maneras, tu asistente elige una, y en la revisión ves cuál.
 4. **Aprueba.** Abres el enlace, lees y apruebas o pides cambios. Decide una persona, nunca
    tu asistente. [Revisión y aprobación](/es/marketing/review-and-approval/)
 
 ## Lo que recibes
 
-Un enlace a una versión del trabajo que puedes mirar y, cuando dices que sí, una versión aprobada.
-El proyecto recuerda tu voz de marca y, con la memoria opcional activada, las decisiones que
-tomaste en sesiones anteriores. Mira [Las herramientas que conectamos](/es/marketing/tools/).
+Un enlace a una versión del trabajo que puedes mirar y, cuando una persona dice que sí, una pieza
+aprobada. El proyecto recuerda tu voz de marca y, con la memoria opcional activada, las decisiones
+que tomaste en conversaciones anteriores. Mira
+[Las herramientas que conectamos](/es/marketing/tools/).
 
 ## Después de la primera pieza
 
-- [Mira cómo va todo](/es/marketing/where-things-stand/): borradores, piezas que esperan revisión,
-  piezas terminadas.
-- [Pide cambios en una pieza](/es/marketing/ask-for-changes/): cambia una pieza que está en
-  borrador o en revisión.
+- [Escribe una pieza en conjunto](/es/marketing/write-together/): arma una publicación frase por
+  frase.
+- [Pide cambios en una pieza](/es/marketing/ask-for-changes/): cambia una pieza que se está
+  escribiendo o está en revisión.
 - [Actualiza una página que ya existe](/es/marketing/update-a-page/): un cambio sobre una pieza ya
   aprobada.
 - [Pon en línea una pieza aprobada](/es/marketing/go-live/): qué entregarle a quien publica.
+- [Varias piezas, un objetivo](/es/marketing/campaigns/): una campaña que se planea junta y se
+  aprueba pieza por pieza.
+- [Mira cómo va todo](/es/marketing/where-things-stand/): piezas en curso, piezas que esperan
+  revisión, piezas terminadas.
 
 ## Lo que cckit no hace
 
-- **No publica.** El resultado es un sitio aprobado que compila. Ponerlo en una dirección pública
-  es otro paso, que hace la persona técnica o tu servicio de hosting.
-- **No aprueba por ti.** En este flujo nada se integra solo.
-- **No se salta la preparación.** Alguien técnico entrega las llaves una vez, y la primera
-  preparación requiere una terminal.
-
-<Aside type="note" title="Comprobado en una prueba real">
-Un solo comando tomó una tarea escrita en un párrafo, "una landing page para una panadería" con
-portada, tres productos con precios, horario y un formulario de contacto, y devolvió un enlace de
-revisión. Una ronda sin supervisión tardó menos de tres minutos, y la comprobación del proyecto
-pasó antes de abrir la revisión. La persona no editó código.
-</Aside>
+- **No publica.** El resultado es un sitio aprobado y que funciona. Ponerlo en una dirección
+  pública es otro paso, que hace la persona técnica o tu servicio de hosting.
+- **No aprueba por ti.** Nada se aprueba solo.
+- **No se salta la instalación.** Alguien técnico entrega las llaves una vez, y esa primera
+  instalación necesita una terminal.
 
 ## Por dónde empezar
 
 <CardGrid>
-  <LinkCard title="Todavía no hay nada preparado" href="/es/marketing/get-set-up/" description="Entrega las llaves: lo que hace la persona técnica una vez y lo que necesitas después." />
+  <LinkCard title="Todavía no hay nada instalado" href="/es/marketing/get-set-up/" description="Entrega las llaves: lo que hace la persona técnica una vez y lo que necesitas después." />
   <LinkCard title="El proyecto está listo" href="/es/marketing/your-first-piece/" description="Delega tu primera pieza: descríbela, recibe un enlace, aprueba." />
   <LinkCard title="Te mandaron un enlace de revisión" href="/es/marketing/review-and-approval/" description="Revisión y aprobación: cómo leer, comentar y decidir." />
   <LinkCard title="Varias piezas, un objetivo" href="/es/marketing/campaigns/" description="Delega una campaña: las piezas se planean juntas y se aprueban una por una." />
 </CardGrid>
 
-<Outcomes title="Para la persona técnica: qué corre cuando lo dices">
-
-<div data-table="grid">
-
-| Lo que dices | Lo que corre |
-| --- | --- |
-| "¿Cómo vamos?" | `cckit status` |
-| "Muéstrame mis borradores y lo que espera revisión." | `cckit task list` |
-| "¿Qué sigue?" | `cckit task next` |
-| "Registra una tarea nueva: …" | `cckit task new "<título>" --body "<lo que lleva la página>"` |
-| "Ejecútala." | `cckit task run <id>` |
-| "Empieza un borrador para esta pieza." | `cckit task start <id>` |
-| "Guárdalo y pide una revisión." | `cckit task finish <id> "<resumen>" --all` |
-| "La revisión está aprobada. Termina esta pieza." | `cckit merge <pr>` |
-| "Planea una campaña." | la habilidad de campañas; el plan se abre con `cckit page open <archivo-html>` y tu respuesta se guarda con `cckit page answer` |
-
-</div>
-
-Leer los comentarios de una revisión y editar un borrador lo hace el propio asistente, no un verbo
-de `cckit`. La lista completa de verbos está en la [referencia de la CLI](/cli-reference/) (en inglés).
-
-</Outcomes>
-
 Hay dos páginas de consulta: [Quién hace qué](/es/marketing/who-does-what/) enumera a las
 personas y a los asistentes, y [Palabras que vas a escuchar](/es/marketing/words-you-will-hear/)
-traduce las palabras de desarrollo que puedes encontrar en GitHub.
+traduce las palabras de desarrollo que puedes encontrar en GitHub. Los comandos que hay detrás de
+cada pedido están, para la persona técnica, en
+[Entrega las llaves](/es/marketing/get-set-up/#parte-1-para-la-persona-técnica).
+
+Siguiente: [Qué pasa una vez que lo delegas](/es/marketing/how-we-work/)

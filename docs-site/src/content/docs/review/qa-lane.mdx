@@ -40,7 +40,7 @@ one stack for the whole effort PR, not one per sub-issue agent. Every `cckit qa`
 <Chat
   title="telling cckit how the Bakery site boots for review"
   say="Set up QA for the Bakery site. It starts with pnpm dev on port 3000, and the menu page is the screen I want to see."
-  ran="scripts/kit-add.sh qa --answers answers.json"
+  ran="cckit add qa --answers answers.json"
   means="This is asked once per project. The answers are saved under qa in the kit config. See Declare how the project boots below."
 >
   Done. The start command, the port, the readiness check and the landing route are saved in the
@@ -107,7 +107,7 @@ cckit qa verdict fail --note "the save button stays disabled after a valid edit"
   title="listing the lanes of the Bakery site"
   say="Is anything running for QA on the Bakery site right now?"
   ran="cckit qa lanes"
-  output="No QA lanes — cckit start <issue> gives an issue its port slot, cckit qa up launches its stack"
+  output="no QA lanes — cckit start <issue> gives an issue its port slot, cckit qa up launches its stack"
   means="cckit qa lanes only reads. It lists every change that has a port slot, a launch record or a verdict."
 >
   Nothing is running and no change has a verdict yet.
@@ -125,7 +125,7 @@ The `qa` module is an interview of five questions. In Claude Code, run `/kit-add
 skill, write the answers to a JSON file and pass it to the script, as in step 1:
 
 ```sh
-scripts/kit-add.sh qa --answers answers.json
+cckit add qa --answers answers.json
 ```
 
 ```json

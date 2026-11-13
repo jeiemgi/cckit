@@ -44,20 +44,49 @@ any of them.
 
 <Chat
   title="previewing the Codex adapter for the Bakery site"
-  say="Show me what the Codex setup would add to the Bakery site. Do not write anything yet."
-  ran="cckit init --profile software --adapter codex --dry-run"
-  means="A dry run prints the plan and writes nothing."
+  say="The Bakery site already runs cckit with Claude Code. Show me what the Codex setup would add to it. Do not write anything yet."
+  ran="cckit init --upgrade --adapter codex --dry-run"
+  output={[
+    "-> DRY RUN — nothing will be written. Plan for <project>:",
+    "  (UPGRADE: existing files are PRESERVED; only genuinely-missing files are added; config keys merged.)",
+    "…",
+    "  Adapters: claude codex   (adding to stored: claude)",
+    "…",
+    "  Would change (37 added, 1 modified):",
+    "    A .agents/rules/authoring.md",
+    "…",
+    "    A .agents/skills/brand-voice/SKILL.md",
+    "…",
+    "    M .claude/kit.config.json",
+    "…",
+    "    A .codex/agents/designer.toml",
+    "…",
+    "    A .codex/hooks.json",
+    "    A .codex/hooks/guard-base-branch-commit.sh",
+    "…",
+    "    A AGENTS.md",
+    "",
+    "  A = added · M = modified. Measured by running the upgrade on a temporary copy; <project> was not written.",
+    "Re-run without --dry-run to apply.",
+  ]}
+  means="A dry run prints the plan and writes nothing. On a project that already runs cckit, the preview is the upgrade form and its list is headed Would change."
 >
-  I ran the dry run. It lists `cckit.config.json`, `AGENTS.md`, `.agents/rules/`, `.agents/skills/`,
-  `.codex/hooks/`, `.codex/hooks.json` and `.codex/agents/` under `Would write:`, and no `.claude/`
-  directory, because a Codex-only install writes none.
+  Nothing was written. Adding Codex would add `AGENTS.md`, the rules and skills under `.agents/`,
+  and the hooks and agents under `.codex/`. One existing file would change: the project config,
+  which records the second adapter. The Claude Code files stay as they are.
 </Chat>
+
+On a repository with no cckit yet, the preview is
+`cckit init --profile software --adapter codex --dry-run`. It lists `cckit.config.json`,
+`AGENTS.md`, `.agents/rules/`, `.agents/skills/`, `.codex/hooks/`, `.codex/hooks.json` and
+`.codex/agents/` under `Would write:`, and no `.claude/` directory, because a Codex-only install
+writes none.
 
 ### 2 · Install it
 
 <Chat
   title="installing the Codex adapter in the Bakery site"
-  say="That looks right. Install the Codex setup. The repository already runs cckit with Claude Code, so keep those files as they are."
+  say="That looks right. Install the Codex setup and keep the Claude Code files as they are."
   ran="cckit init --upgrade --adapter codex"
   means="The upgrade form adds Codex and leaves the Claude Code files as they are."
 >

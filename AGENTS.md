@@ -217,10 +217,12 @@ current entry of the top-bar switch (`docs-site/src/lib/tracks.ts`, `docs-site/s
   tutorials section: a step-by-step page is a guide in its area.
 - **The sidebar is curated.** `sidebar` in `docs-site/astro.config.mjs` lists 43 Software pages:
   one "Start here" link, eight area groups and a Reference group, every group collapsed except the
-  one holding the current page. The Marketing list is 14 pages in six groups (How it works, Get set up,
-  Plan, Make a piece, Review and approve, Look things up) after a "Start here" link, nested in the
-  `Marketing` entry; `src/routeData.ts` unwraps it and opens every group. The sidebar group icons in
-  `theme.css` apply to Software only. The site has 86 English pages (72 Software, 14 Marketing). A new
+  one holding the current page. The Marketing list is 15 pages in six groups (How it works, Get set up,
+  Make a piece, Review and approve, Plan, Look things up) after a "Start here" link, nested in the
+  `Marketing` entry; `src/routeData.ts` unwraps it and opens every group. Each Marketing page ends
+  with a `Next:` link to the following sidebar entry; move a page and its neighbours' links move
+  with it, in both languages. The sidebar group icons in
+  `theme.css` apply to Software only. The site has 87 English pages (72 Software, 15 Marketing). A new
   Software page is not added to the sidebar by default: link a guide from its area's
   `more-guides.mdx` (`development/`, `review/`) and a reference page from `reference.mdx`.
 - **A guide step leads with a conversation window.** `<Chat>` (`docs-site/src/components/Chat.astro`)

@@ -76,7 +76,7 @@ releases are cut from `main`.
   title="promoting the week's work to the release branch"
   say="That is enough for the launch. Open the pull request that promotes develop to main."
   ran='cckit pr <issue> "<summary>" --base main'
-  means="From a branch cut from the base branch. An explicit --base wins over github.baseBranch, and the labels, milestone and board steps run as for any other pull request. Setting KIT_BASE_BRANCH=main in the environment does not do this: the config file is read after it."
+  means="From a branch cut from the base branch. An explicit --base wins over github.baseBranch, and the labels, milestone and board steps run as for any other pull request. KIT_BASE_BRANCH=main set for that one command also targets main; --base is the form to use because it is explicit and is not inherited by later commands."
 >
   The promotion pull request is open against `main`.
 </Chat>

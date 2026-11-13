@@ -34,9 +34,22 @@ to your agent in the chat. In Claude Code the same steps exist as the skills `/k
 No agent role is involved yet. The roles arrive with the profile:
 [The team: you and the agents](/philosophy/the-team/).
 
+## The guides
+
+Start with the first two, in order. The other three are for when you need them.
+
+<CardGrid>
+  <LinkCard title="1 · Install and check" href="/getting-started/install/" description="Put cckit on your machine, then let cckit doctor confirm the tools and the GitHub sign-in." />
+  <LinkCard title="2 · Initialize a project" href="/getting-started/initialize/" description="Run cckit init, pick the profile that matches your team, and run a first real task." />
+  <LinkCard title="Add cckit to an existing repo" href="/getting-started/existing-repo/" description="For a project that already has its own structure, or cckit files copied in by hand." />
+  <LinkCard title="Use cckit with Codex" href="/getting-started/codex/" description="The same process with Codex as the agent." />
+  <LinkCard title="Update a project" href="/getting-started/update/" description="Bring a project set up by an older cckit to the installed version." />
+</CardGrid>
+
 ## The tools that plug in
 
-cckit is a set of bash scripts over tools you may already have. It builds none of them.
+cckit runs on tools you may already have and builds none of them. It is itself a set of bash
+scripts.
 
 - **`git`, `gh`, `jq` and `perl`** are required. `gh` is GitHub's command-line tool; `jq` reads
   JSON; `cckit init` stops without `perl`.
@@ -54,26 +67,14 @@ cckit is a set of bash scripts over tools you may already have. It builds none o
 | --- | --- |
 | "Check that this computer has what cckit needs." | `cckit doctor`: the required tools and the GitHub sign-in |
 | "Set up the Bakery site." | `cckit init`: the config, the profile, and the git and GitHub steps |
-| "What is already in this repository?" | `cckit scan`: what a repository contains, before anything is written |
-| "Take ownership of the cckit files already here." | `cckit adopt`: records the cckit files a repository already has, without changing them |
-| "Is the project behind the installed cckit?" | `cckit update`: says whether it is |
-| "Bring the project up to the installed version." | `cckit init --upgrade` |
 
 </div>
 
-Every flag of these commands is in the [CLI reference](/cli-reference/).
-
-## The guides
-
-Start with the first two, in order. The other three are for when you need them.
-
-<CardGrid>
-  <LinkCard title="1 · Install and check" href="/getting-started/install/" description="Put cckit on your machine, then let cckit doctor confirm the tools and the GitHub sign-in." />
-  <LinkCard title="2 · Initialize a project" href="/getting-started/initialize/" description="Run cckit init, pick the profile that matches your team, and run a first real task." />
-  <LinkCard title="Add cckit to an existing repo" href="/getting-started/existing-repo/" description="For a project that already has its own structure, or cckit files copied in by hand." />
-  <LinkCard title="Use cckit with Codex" href="/getting-started/codex/" description="The same process with Codex as the agent." />
-  <LinkCard title="Update a project" href="/getting-started/update/" description="Bring a project set up by an older cckit to the installed version." />
-</CardGrid>
+A repository that already has files of its own, or cckit files copied in by hand, uses
+`cckit scan` and `cckit adopt`: [Add cckit to an existing repo](/getting-started/existing-repo/).
+A project set up by an older cckit uses `cckit update` and `cckit init --upgrade`:
+[Update a project](/getting-started/update/). Every flag of these commands is in the
+[CLI reference](/cli-reference/).
 
 When the project is set up, the next step of the process is planning the work:
 [Project management](/project-management/).

@@ -110,16 +110,11 @@ Drop `--dry-run`. Add a token ceiling, a gate and the PR step when you want them
   title="running the menu page objective unattended"
   say="Run it for real: stop after 5 rounds, 30 minutes or 400000 tokens, run the full gate at the end, and open the pull request if it passes."
   ran={'cckit autopilot run --objective "make the menu page build and lint clean" --until "pnpm build && pnpm lint" --check "pnpm build && pnpm lint" --max-iters 5 --max-seconds 1800 --max-tokens 400000 --agent-arg --permission-mode --agent-arg acceptEdits --publish --summary "<one-line summary>"'}
-  output={[
-    "…",
-    "autopilot run: round 1 (bound 900s)",
-    "autopilot run: stopped - reason=done rounds=1 elapsed=62s tokens=421592 (the agent exited 0 after round 1)",
-    "…",
-  ]}
   means="`--check` runs once after the completion check passes; if it fails, nothing is published. `--publish` then opens the pull request with `cckit pr`, unless the branch already has one."
 >
-  The run stopped with reason done after one round. The completion check passes. The pull request is
-  the next step; I did not merge anything, a run never merges.
+  The run stopped with reason done: the completion check passed after a round, and the gate passed
+  after it. The run then opened the pull request through `cckit pr`. I did not merge anything; a
+  run never merges.
 </Chat>
 
 ### 6. Read how it ended

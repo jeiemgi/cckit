@@ -43,35 +43,40 @@ You do not name a number. The agent reads the board and takes the first issue no
 
 <Chat
   title="taking the next ready issue on the Bakery site"
-  say="Check the board and pick the next issue that's ready. Take it all the way to a merged PR: work it on its own isolated branch, keep the change focused, and open the pull request. When it's merged, clean up and tell me the PR link."
+  say="What's the next issue that's ready? Start it."
   ran={['cckit next', 'cckit start <issue>']}
   means="Nothing is committed yet. The change will live in its own worktree, a separate folder with its own copy of the code, until the pull request merges."
 >
   The next ready issue is the menu page, the `/menu` page with every bake and its price. I started it in
-  its own worktree on its own branch. When the project uses a GitHub board, the issue moves to In Progress.
+  its own worktree on its own branch.
 </Chat>
+
+When the project uses a GitHub Projects board, `cckit start` also moves the issue to In Progress.
 
 ### 2. The agent makes the change
 
-It works in that folder and nothing else, and runs the project's checks until they pass.
+It works in that folder and nothing else, and runs the project's checks until they pass. Then it
+reports: the menu page is built, the checks pass, shall I open the pull request?
 
 ### 3. The agent opens the pull request
 
 <Chat
   title="opening the pull request for the menu page"
-  say="The menu page is done. Open the pull request."
+  say="Yes, open it."
   ran={'cckit pr <issue> "<summary>"'}
   means="This is where you look at the work. The checks run on the pull request, and you or a reviewing agent read the change."
 >
   The pull request for the menu page is open and links the issue with a `Closes` line. The checks are
-  running on it. When the project uses a board, the issue moves to In Review.
+  running on it.
 </Chat>
+
+When the project uses a board, `cckit pr` also moves the issue to In Review.
 
 ### 4. Merge, close and clean up
 
-Once the review passes, the agent first brings the branch onto the current base branch, shows you
-what the diff deletes and runs the gate again. `cckit merge` does not do that for a branch that is
-behind and has no conflict. The commands are in
+Merging is your decision. Other changes may have merged since this one started. Before merging,
+the agent updates the branch with them, shows you anything the change would delete, and runs the
+project's checks (the gate) again. The commands are in
 [Land one pull request](/ship/merge-and-close/#land-one-pull-request).
 
 <Chat
@@ -82,6 +87,14 @@ behind and has no conflict. The commands are in
 >
   Merged. The issue is closed, and I removed the branch and the worktree.
 </Chat>
+
+<Outcomes title="What cckit merge does not do for you">
+
+`cckit merge` does not update a branch that is behind the base branch and has no conflict: it
+merges the pull request as GitHub has it. That is why the agent updates the branch and runs the
+gate first.
+
+</Outcomes>
 
 <Outcomes title="If the pull request was merged another way">
 
@@ -115,7 +128,7 @@ same issue number, and no step wires them together by hand. The board steps appl
 project uses a GitHub Projects board.
 
 Whether an agent may merge on its own is your decision, not the tool's. By default the agent
-stops after opening the pull request. The [Review](/review/) area covers who approves, and
+stops after opening the pull request, which is why step 4 starts with you saying so. The [Review](/review/) area covers who approves, and
 [Merge, close and clean up](/ship/merge-and-close/) covers the last step in detail.
 
 <Aside type="tip" title="One issue, one worktree">
@@ -150,7 +163,7 @@ merged and its issue is closed. Finish the merge and the close first, then run c
 
 <TutorialSchema
   steps={[
-    { name: 'Ask for the next ready issue', text: 'Ask the agent to read the board and take the first unblocked issue to merged on its own isolated branch, keeping the change focused.' },
+    { name: 'Ask for the next ready issue', text: 'Ask the agent which issue is ready next and tell it to start that one.' },
     { name: 'The agent starts the issue', text: 'cckit next finds the issue; cckit start <issue> makes the worktree and branch.' },
     { name: 'The agent makes the change', text: 'The change is made in the new worktree and the project checks are run until they pass.' },
     { name: 'The agent opens the pull request', text: 'cckit pr <issue> "<summary>" commits, pushes and opens the pull request.' },

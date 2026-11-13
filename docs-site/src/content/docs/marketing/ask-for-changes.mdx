@@ -19,13 +19,13 @@ import TutorialMeta from '../../../components/TutorialMeta.astro';
 
 <TutorialMeta />
 
-A piece is rarely right the first time. The price is off, the tagline is too long, a reviewer
-wants a line moved. You say what to change in plain words and your assistant changes it. The
-example is the Easter menu page of the Bakery site, a neighbourhood bakery's website, while its
-review is open.
+A piece is rarely right the first time. The price is off, the line at the top is too long, a reviewer
+wants a line moved. You say what to change in plain words and your assistant changes it. After
+the landing page, Pilot Light Bakery handed over an Easter menu page; its review is open and the
+colleague at the counter is reading it.
 
 **Who does it:** you say what to change. Your assistant makes the change and updates the review.
-A person other than you approves.
+Your colleague approves.
 
 **What you will have at the end:** the same review, updated, and a reviewer who can read it again.
 
@@ -35,10 +35,10 @@ A person other than you approves.
 
    <Chat
      title="changing the price and the deadline on the Easter menu page"
-     say="On the Easter menu page, change the Easter loaf price to 6 and move the ordering deadline to Friday. Update the review."
+     say="On the Easter menu page the Easter loaf should be €6, not €7. And move the ordering deadline to Friday."
      means="You do not edit anything. The review link stays the same."
    >
-     Done. The Easter loaf is now 6 and the ordering deadline is Friday. I updated the review, and
+     Done. The Easter loaf is now €6 and the ordering deadline is Friday. I updated the review, and
      the link is the one you already sent.
    </Chat>
 
@@ -46,12 +46,12 @@ A person other than you approves.
    you pick one.
 
    <Chat
-     title="asking for other taglines for the Easter menu page"
-     say="Show me two other taglines for the Easter menu page. Do not change anything yet."
+     title="asking for other opening lines for the Easter menu page"
+     say="I am not sure about the line at the top of the Easter menu page. Show me two other options, and do not change anything yet."
      means="Asking for options changes nothing. Say which one you want when you are ready."
    >
      Two options: "Baked this morning, on the table for Easter" and "Easter bread, still warm".
-     The page keeps its current tagline until you choose.
+     The page keeps its current line until you choose.
    </Chat>
 
 3. **Hand over a reviewer's comments.** When the approver asked for changes, your assistant reads
@@ -59,7 +59,7 @@ A person other than you approves.
 
    <Chat
      title="applying the reviewer's comments on the Easter menu page"
-     say="Read the review comments on the Easter menu page and apply them. Tell me which ones you did not apply and why."
+     say="My colleague left comments on the Easter menu page. Read them and apply them, and tell me which ones you did not apply and why."
      means="You decide what to change. Your assistant reports every comment it left alone."
    >
      I applied the comment about the opening line and the one about the price. I left one alone: it
@@ -84,7 +84,7 @@ review: see [Update a page that already exists](/marketing/update-a-page/).
 
 | What you say | What runs |
 | --- | --- |
-| "Update the review." | `cckit task finish <id> "<summary>" --all` |
+| A change to a piece in review | `cckit task finish <id> "<summary>" --all` |
 | Work on the piece again | `cckit task start <id>` |
 
 </div>

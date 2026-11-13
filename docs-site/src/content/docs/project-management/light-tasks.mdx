@@ -59,20 +59,11 @@ The Bakery site tracks its Easter work this way, with no GitHub issues.
 <Chat
   title="asking what is next on the Bakery site list"
   say="What is open, and what should I take next?"
-  ran={[
-    { cmd: "cckit task next", output: "(nothing to take — create a task with: cckit task new \"<title>\")" },
-    {
-      cmd: "cckit task list",
-      output: [
-        "ID      STATE   PRIO TITLE",
-        "tb643   review  p1   Rebuild the bakery landing page",
-        "tdf42   review  p2   Menu page with the full list of bakes",
-      ],
-    },
-  ]}
+  ran={["cckit task next", "cckit task list"]}
   means="next prints the task to take next and the command that starts it. list prints every open task and its state."
 >
-  Nothing is waiting to be taken: both open tasks are already in review.
+  The menu page is the one to take next. It is a draft: written down in this folder and not started
+  yet.
 </Chat>
 
 ## 3. Take it
@@ -83,6 +74,7 @@ The Bakery site tracks its Easter work this way, with no GitHub issues.
   ran="cckit task start <id>"
   output={[
     "[tdf42] started — the draft lives in <project>/.claude/worktrees/light+tdf42-menu-page-with-the-full-list-of-bakes",
+    "…",
     "[tdf42] moved tasks/tdf42.md onto the task branch",
     "[tdf42] the team's list now shows this task as in progress",
     "[tdf42] when the draft is ready for review: cckit task finish tdf42 \"<summary>\" --all",
@@ -180,6 +172,25 @@ earlier run is discarded, not resumed.
 </Outcomes>
 
 ## Check that it worked
+
+<Chat
+  title="asking whether anything is left to take on the Bakery site list"
+  say="Is anything left to take?"
+  ran={[
+    { cmd: "cckit task next", output: "(nothing to take — create a task with: cckit task new \"<title>\")" },
+    {
+      cmd: "cckit task list",
+      output: [
+        "ID      STATE   PRIO TITLE",
+        "tb643   review  p1   Rebuild the bakery landing page",
+        "tdf42   review  p2   Menu page with the full list of bakes",
+      ],
+    },
+  ]}
+  means="A task in review is not offered by next: its pull request is waiting for a reviewer."
+>
+  Nothing is waiting to be taken: both open tasks are already in review.
+</Chat>
 
 - `cckit task list` shows the task as `doing` after `cckit task start`, and as `review` after
   `cckit task finish`.

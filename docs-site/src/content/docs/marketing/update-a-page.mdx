@@ -1,6 +1,6 @@
 ---
 title: Update a page that already exists
-description: "Change a page that was approved earlier: record the change as a new piece, read the review of exactly what changed, approve it."
+description: "Change a page that was approved earlier: describe the change, read the review of exactly what changed, approve it."
 tutorial:
   job: change a page that was approved earlier
   difficulty: beginner
@@ -19,63 +19,51 @@ import TutorialMeta from '../../../components/TutorialMeta.astro';
 
 <TutorialMeta />
 
-An approved page is finished. When the bakery changes its Easter hours or its prices, the change
+An approved page is finished. When the bakery changes its hours or runs out of a bread, the change
 is a new piece of work with its own review, so the person who approves reads only what changed.
-The example is the Easter menu page of the Bakery site, a neighbourhood bakery's website, two
-weeks after it was approved.
+Pilot Light Bakery's Easter menu page was approved two weeks ago; now Good Friday is close and one
+loaf has sold out.
 
-**Who does it:** you describe the change and approve it. Your assistant builds it in the
-background. A person other than you approves.
+**Who does it:** you describe the change. Your assistant builds it in the background. Your
+colleague approves.
 
-**What you will have at the end:** the updated page as an approved version in the project, and the
-change recorded as its own piece.
+**What you will have at the end:** the updated page as part of the shared version, and the change
+recorded as its own piece.
 
 <Steps>
 
 1. **Name the page and say what changes.** Say which page it is and list every change. Your
-   assistant records it as a new piece of work and starts it.
+   assistant writes it down as a new piece of work and starts it.
 
    <Chat
      title="handing over an update to the Easter menu page"
-     say="Record a new task: update the Easter menu page. Add Good Friday opening hours, 8 to 12, and change the Easter loaf price to 6. Then run it."
+     say="The Easter menu page needs two changes. Add our Good Friday opening hours, 8 to 12, and say the walnut loaf is sold out."
      means="Nothing is public. The page that was approved stays as it is until this change is approved."
    >
-     Recorded as "Update the Easter menu page", and I have started it. It works from the page as it
-     is in the project now. I will tell you when there is a link to review.
+     I wrote it down as an update to the Easter menu page and started it. It works from the page as
+     it is in the project now. I will tell you when there is a link to review.
    </Chat>
 
-2. **Wait for the link.**
-
-   <Chat
-     title="waiting for the Easter menu update"
-     say="How is the Easter menu update coming along?"
-     means="The project's check passes before a review opens. When it fails, or when nothing changed, no review opens and your assistant says why."
-   >
-     It is ready. The project's check passed and I opened a review. Here is the link to look at it.
-   </Chat>
+2. **Wait for the link.** As with a new piece, your assistant checks that the site still works
+   before it opens a review. When that check fails, or when nothing changed, no review opens and
+   your assistant says why.
 
 3. **Read what changed.** The review shows the changes, with new text in green, and not the whole
    page. If you want it in plain words first, ask.
 
    <Chat
      title="asking what changed on the Easter menu page"
-     say="List what changed on the Easter menu page, in plain words."
+     say="What changed on the Easter menu page? In plain words."
      means="Check the list against the review. The review is the one that counts."
    >
-     Two changes. The Easter loaf price went from 7 to 6. A line was added with the Good Friday
-     opening hours, 8 to 12.
+     Two changes. A line was added with the Good Friday opening hours, 8 to 12. The walnut loaf is
+     now marked sold out.
    </Chat>
 
 4. **Approve and finish.** The approver reads the review as described in
-   [Review and approval](/marketing/review-and-approval/). Once it says approved:
-
-   <Chat
-     title="finishing the Easter menu update"
-     say="The review is approved. Finish this piece."
-     means="Approved is not online. Putting the page on a public address is a separate step."
-   >
-     Done. The updated page is part of the shared version and the update is marked done.
-   </Chat>
+   [Review and approval](/marketing/review-and-approval/). Once it is approved, tell your
+   assistant so, and it finishes the piece (see
+   [After approval](/marketing/review-and-approval/#after-approval)).
 
 </Steps>
 
@@ -102,4 +90,4 @@ a new task.
 
 </Outcomes>
 
-Next: [Put an approved piece online](/marketing/go-live/)
+Next: [Review and approval](/marketing/review-and-approval/)

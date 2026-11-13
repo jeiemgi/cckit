@@ -1,0 +1,96 @@
+---
+title: Write a piece together
+description: Shape a post sentence by sentence with your assistant, in a draft of your own, then ask for a review and take it to approved.
+tutorial:
+  job: write one piece with your assistant, step by step, and take it to approved
+  difficulty: beginner
+  time: "20 min"
+  prerequisites:
+    - { text: "You have handed over one piece", link: "Hand over your first piece", href: "/marketing/your-first-piece/" }
+  ogTag: Marketing
+  related: [marketing/your-first-piece, marketing/brand-voice, marketing/ask-for-changes, marketing/review-and-approval]
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import Chat from '../../../components/Chat.astro';
+import TutorialMeta from '../../../components/TutorialMeta.astro';
+
+<TutorialMeta />
+
+Handing a piece over is right for a page. A post you care about sentence by sentence is better
+written together: you and your assistant work in a draft of your own, and the shared version does
+not change until the piece is approved. On the Bakery site the landing page is approved; now the
+owner of Pilot Light Bakery wants a post about the new rye loaf.
+
+**Who does it:** you decide what the post says. Your assistant and its editor helper propose and
+write. Your colleague approves.
+
+**What you will have at the end:** the post as part of the shared version, and the piece marked
+done.
+
+<Steps>
+
+1. **Say what you want to make.**
+
+   <Chat
+     title="starting a post about the new rye loaf"
+     say="I want to write a post about our new seeded rye loaf. Note it as a new piece and let's start the draft."
+     means="The draft is yours alone. The shared version of the site does not change."
+   >
+     I added it to the task list and started the draft. Who should read the post, and what do you
+     want them to do after reading it?
+   </Chat>
+
+2. **Agree on an outline.**
+
+   <Chat
+     title="agreeing on an outline for the rye loaf post"
+     say="The reader is a neighbour who has not tried our bread. I want them to come in on Saturday and try the rye. Propose an outline."
+     means="Change the outline until it is right: what to cut, what to move, what is missing."
+   >
+     Here is an outline: a short opening about the rye, what goes in it, when it comes out of the
+     oven on Saturday, and one line inviting the reader in. Do you want the story of the recipe
+     before the invitation?
+   </Chat>
+
+3. **Write the draft.**
+
+   <Chat
+     title="writing the first draft of the rye loaf post"
+     say="No story, keep it short. Write the first draft from that outline, in our brand voice."
+     means="Edit it together: “make the opening shorter”, “this paragraph sounds like an ad”, “add the price”."
+   >
+     The first draft is written, without the recipe story. It follows the brand voice your team
+     set: short sentences, "you", no hype. Here it is.
+   </Chat>
+
+   If your team has [set its brand voice](/marketing/brand-voice/), your assistant reads it first.
+
+4. **Ask for a review.**
+
+   <Chat
+     title="asking for a review of the rye loaf post"
+     say="This is ready. Save it and ask for a review."
+     means="Your assistant saves the draft, sends it to GitHub and gives you a link."
+   >
+     I saved the draft and it is ready for review. Here is the link to send to your colleague.
+   </Chat>
+
+5. **Your colleague reviews it, and you apply the changes.** Send the link to the person who
+   approves. GitHub does not let the person who asked for the review approve it, so the approver
+   is someone else; if you work alone, see
+   [If you work alone](/marketing/review-and-approval/#if-you-work-alone). When comments come back,
+   hand them to your assistant as on
+   [Ask for changes to a piece](/marketing/ask-for-changes/).
+
+6. **Approved.** Once it is approved, tell your assistant so, and it finishes the piece (see
+   [After approval](/marketing/review-and-approval/#after-approval)).
+
+</Steps>
+
+## Check that it worked
+
+Ask "Where are we?". The post is no longer listed as in progress or waiting for a review, and it
+counts as done.
+
+Next: [Ask for changes to a piece](/marketing/ask-for-changes/)

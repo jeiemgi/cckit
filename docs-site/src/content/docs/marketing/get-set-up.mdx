@@ -3,18 +3,22 @@ title: Give the keys
 description: The one-time setup that lets cckit handle the rest. A technical person sets up Claude Code, a GitHub account and the project once; afterwards you work in plain words.
 ---
 
-import { Steps, Aside } from '@astrojs/starlight/components';
+import { Steps } from '@astrojs/starlight/components';
 import Chat from '../../../components/Chat.astro';
 import Outcomes from '../../../components/Outcomes.astro';
 
 "The keys" are the accounts and the project that cckit needs in order to work for you: Claude
 Code, a GitHub account and the project itself. You give them once. After that, cckit handles
-the process behind each piece. The example on these pages is the Bakery site, a neighbourhood
-bakery's website.
+the process behind each piece.
 
-There is setup, and it takes a terminal. That is why a technical person does it: a developer on
-your team, an agency contact or a freelancer, for about half an hour. After it, nobody on the team
-needs a terminal again.
+The example on these pages is one shop: Pilot Light Bakery, a neighbourhood bakery on Alder Row.
+Its owner sells bread and pastries, has never opened a terminal, and works with one colleague at
+the counter, who reads and approves what goes on the site. Their project is called the Bakery
+site.
+
+The setup is done once and it needs a terminal. That is why a technical person does it: a
+developer on your team, an agency contact or a freelancer, for about half an hour. After it,
+nobody on the team needs a terminal again.
 
 **What you will have at the end:** a project you can open in Claude Code, where your assistant
 speaks in plain language, knows the four assistants and answers "Where are we?".
@@ -53,12 +57,33 @@ This part uses a terminal. If that is not you, send this section to the person w
 3. **Give every writer and approver access** to the project on GitHub, and decide who approves.
    A setup where one person asks for work and another approves works from day one.
 
+**A private repository on a free GitHub plan.** Protection of the shared version is not available
+on a private repository on a free GitHub plan. The setup says so when it skips that step. The
+project works without it.
+
 </Outcomes>
 
-<Aside type="caution" title="A private repository on a free GitHub plan">
-Protection of the main line is not available on a private repository on a free GitHub plan. The
-setup says so when it skips that step. The project works without it.
-</Aside>
+<Outcomes title="For the technical person: what runs when they say it">
+
+<div data-table="grid">
+
+| What they say | What runs |
+| --- | --- |
+| "Where are we?" | `cckit status` |
+| "Show me what I have started and anything waiting for a review." | `cckit task list` |
+| "What is next?" | `cckit task next` |
+| "I need a landing page for …" | `cckit task new "<title>" --body "<what goes on the page>"`, then `cckit task run <id>` |
+| "Let's start the draft." | `cckit task start <id>` |
+| "Save it and ask for a review." | `cckit task finish <id> "<summary>" --all` |
+| "It is approved. Can you wrap it up?" | `cckit merge <pr>` |
+| "I want to plan a campaign." | the campaign skill; the plan opens with `cckit page open <html-file>` and the answer is saved with `cckit page answer` |
+
+</div>
+
+Reading review comments and editing a draft are done by the assistant itself, not by a `cckit`
+verb. The full verb list is in the [CLI reference](/cli-reference/).
+
+</Outcomes>
 
 ## Part 2: for you, and the check that it worked
 
@@ -67,27 +92,25 @@ setup says so when it skips that step. The project works without it.
 1. **Open the project in your assistant's app.** The technical person shows you where it is the
    first time.
 
-2. **Ask where things stand.** Your assistant answers with what is in progress, what is waiting
-   for a review and what needs cleaning up. On a new project the list is short or empty.
+2. **Ask where things stand.** On a new project the list is short or empty.
 
    <Chat
      title="asking where things stand on the new Bakery site"
      say="Where are we?"
      means="An answer means the setup works."
    >
-     The Bakery site is set up. Nothing is in progress and nothing is waiting for a review. There
-     is nothing to clean up yet.
+     The Bakery site is set up. Nothing is in progress and nothing is waiting for a review.
    </Chat>
 
 3. **Ask what you can hand over.**
 
    <Chat
      title="asking what can be handed over for the bakery"
-     say="I am on the marketing team and I do not use developer tools. What can I hand over to you in this project?"
+     say="What can I ask you to do here?"
      means="You do not need the list by heart. Ask again whenever you are unsure."
    >
      You can hand me a page, a post or a whole campaign for the bakery. Describe it in plain words.
-     I record it, build it in the background and give you a link to review. You approve it or ask
+     I write it down, build it in the background and give you a link to review. You approve it or ask
      for changes. I do not put anything online.
    </Chat>
 

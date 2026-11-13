@@ -1,8 +1,8 @@
 ---
 title: Mira cómo va todo
-description: Pregúntale a tu asistente qué está en borrador, qué espera una revisión, qué está terminado y qué sigue, en todo el proyecto o en una sola pieza.
+description: Pregúntale a tu asistente qué se está escribiendo, qué espera una revisión, qué está terminado y qué sigue, en todo el proyecto o en una sola pieza.
 tutorial:
-  job: ver qué está en borrador, en revisión y terminado en todo el proyecto
+  job: ver qué está en curso, en revisión y terminado en todo el proyecto
   difficulty: beginner
   time: "5 min"
   prerequisites:
@@ -19,84 +19,90 @@ import TutorialMeta from '../../../../components/TutorialMeta.astro';
 
 <TutorialMeta />
 
-Las piezas se acumulan: una landing page que espera revisión, una publicación en borrador, una
-página de menú que nadie ha empezado. No llevas esa lista tú. Se la preguntas a tu asistente, y él
-lee el proyecto. El ejemplo es el sitio de la panadería, la página web de una panadería de barrio,
-unos días después de que la landing page pasó a revisión.
+Las piezas se acumulan: una publicación que espera revisión, una a medio escribir, una que nadie
+ha empezado. Esa lista no la llevas tú. Le preguntas a tu asistente, y él lee el proyecto. La
+panadería Pilot Light lleva unos días de la campaña de Semana Santa: una publicación está con
+quien aprueba, otra se está escribiendo y otra no ha empezado.
 
-**Quién lo hace:** tú preguntas. Tu asistente lee el proyecto y responde. Al preguntar no cambia
+**Quién lo hace:** tú preguntas. Tu asistente lee el proyecto y responde. Preguntar no cambia
 nada.
 
-**Lo que vas a tener al final:** sabes qué te toca hacer a ti y qué espera a otra persona.
+**Lo que vas a tener al final:** sabes qué te toca hacer ahora y qué está esperando a otra
+persona.
 
 <Steps>
 
-1. **Pregunta cómo van las cosas.** La respuesta es corta: qué está en curso, qué espera revisión
-   y qué hay que limpiar.
+1. **Pregunta cómo van las cosas.**
 
    <Chat
      title="preguntar cómo va el sitio de la panadería"
      say="¿Cómo vamos?"
-     means="Un borrador es solo tuyo. Esperar revisión quiere decir que otra persona tiene que leerlo."
+     means="En curso quiere decir que la pieza se está escribiendo. Esperando revisión quiere decir que otra persona tiene que leerla."
    >
-     El sitio de la panadería tiene una pieza en borrador, la página del menú de Pascua, y una pieza
-     que espera revisión, la landing page. No hay nada más abierto y no hay nada que limpiar.
+     El sitio de la panadería tiene una pieza en curso, la publicación sobre la fecha límite para
+     encargar, y una pieza esperando revisión, la publicación sobre la rosca de Pascua. No hay
+     nada más abierto.
    </Chat>
 
 2. **Mira todas las piezas y en qué punto está cada una.**
 
    <Chat
-     title="listar todas las piezas del sitio de la panadería"
+     title="enumerar todas las piezas del sitio de la panadería"
      say="Muéstrame todas nuestras piezas y en qué punto está cada una."
-     means="Cada pieza tiene un estado. Las piezas terminadas solo aparecen cuando las pides. Los estados están abajo."
+     means="Cada pieza tiene un solo estado. Las terminadas aparecen solo cuando las pides. Los estados están abajo."
    >
-     Tres piezas abiertas. Landing page: espera revisión. Página del menú de Pascua: en borrador.
-     Publicación sobre la rosca de Pascua: sin empezar.
+     Tres piezas abiertas. Publicación sobre la rosca de Pascua: esperando revisión. Publicación
+     sobre la fecha límite para encargar: en curso. Publicación sobre el día de entrega: sin
+     empezar.
    </Chat>
 
    <Outcomes title="Los 7 estados en que puede estar una pieza">
 
-   | Lo que escuchas | Qué significa |
+   | Lo que dice tu asistente | Qué significa |
    | --- | --- |
-   | `draft` | La pieza está escrita solo en esta computadora. El equipo todavía no la ve. |
-   | `todo` | La pieza está en la lista compartida y nadie la ha empezado. |
-   | `shared` | La pieza se mandó al equipo en una revisión que todavía no está aprobada. |
-   | `doing` | Ya se empezó un borrador de la pieza y se está trabajando en él. |
-   | `review` | El borrador está marcado como terminado y hay una revisión abierta. Una persona tiene que leerlo. |
-   | `done` | La revisión se aprobó y la pieza ya es parte de la versión compartida. |
-   | `dropped` | La pieza se canceló. Solo aparece cuando pides también las piezas terminadas y canceladas. |
+   | Sin empezar, y por ahora solo en esta computadora | La pieza está anotada solo en esta computadora. El equipo todavía no la ve. |
+   | Esperando a que la agreguen a la lista compartida | La pieza se mandó al equipo en una revisión que todavía no está aprobada. |
+   | Sin empezar | La pieza está en la lista compartida y nadie la ha empezado. |
+   | En curso | Ya se empezó un borrador de la pieza y se está escribiendo. |
+   | Esperando revisión | El borrador está marcado como terminado y hay una revisión abierta. Una persona tiene que leerlo. |
+   | Terminada | La revisión se aprobó y la pieza ya es parte de la versión compartida. |
+   | Descartada | La pieza se canceló. Solo aparece cuando pides también las piezas terminadas y canceladas. |
+
+   "El borrador" siempre es la pieza que se está escribiendo. Una pieza que nadie ha empezado
+   todavía no tiene borrador, la llame como la llame una lista en GitHub.
 
    </Outcomes>
 
 3. **Pregunta qué sigue.**
 
    <Chat
-     title="preguntar qué sigue en el sitio de la panadería"
+     title="preguntar qué delegar ahora en el sitio de la panadería"
      say="¿Qué sigue?"
-     means="Elige primero por prioridad y después por el día en que se registró la pieza."
+     means="Solo ofrece piezas que nadie ha empezado. Una pieza en curso o esperando revisión no se ofrece."
    >
-     Sigue la publicación sobre la rosca de Pascua. Es la de mayor prioridad entre las piezas que
-     nadie ha empezado. ¿Quieres que la empiece?
+     Sigue la publicación sobre el día de entrega: es la más antigua de las que nadie ha empezado.
+     ¿Quieres que la empiece?
    </Chat>
 
-4. **Pregunta qué está esperando por ti.**
+4. **Pregunta qué te está esperando.**
 
    <Chat
      title="preguntar qué espera a una persona en el sitio de la panadería"
-     say="¿Hay algo esperando por mí?"
-     means="Las piezas en revisión esperan a quien aprueba, y un borrador espera a quien lo escribió."
+     say="¿Hay algo esperándome?"
+     means="Una pieza esperando revisión espera a quien aprueba. Una pieza en curso espera a quien la está escribiendo."
    >
-     La landing page espera a quien aprueba. Nadie la ha leído todavía. La página del menú de Pascua
-     es un borrador, así que espera que pidas una revisión.
+     La publicación sobre la rosca de Pascua espera a tu colega, que todavía no la lee. La
+     publicación sobre la fecha límite para encargar está en curso, así que te espera a ti: dime
+     cuando esté lista y pido la revisión.
    </Chat>
 
 </Steps>
 
-<Outcomes title="Para la persona técnica: qué corre">
+<Outcomes title="Para la persona técnica: qué se ejecuta">
 
 <div data-table="grid">
 
-| Lo que dices | Lo que corre |
+| Lo que dices | Qué se ejecuta |
 | --- | --- |
 | "¿Cómo vamos?" | `cckit status` |
 | "Muéstrame todas nuestras piezas y en qué punto está cada una." | `cckit task list` |
@@ -108,8 +114,14 @@ nada.
 `cckit status` cuenta las tareas ligeras por estado, enumera las que alguien tiene que atender
 (`review`, `doing`, `draft`, `shared`) y agrega las revisiones abiertas que esperan a una persona.
 `cckit task list` lee el estado desde git y no hace ninguna llamada a GitHub. Ninguno de los cuatro
-escribe nada. Los verbos están en la [referencia de la CLI](/cli-reference/) (en inglés).
+escribe nada. `cckit task next` elige primero por prioridad (`--priority p0` a `p3` en
+`cckit task new`) y después por el día en que se anotó la pieza. Los verbos están en la
+[referencia de la CLI](/cli-reference/) (en inglés).
+
+Las palabras de estado que imprimen los comandos, en el orden de la tabla de arriba: `draft`,
+`shared`, `todo`, `doing`, `review`, `done`, `dropped`. Con el modo de lenguaje sencillo activado,
+el asistente dice las palabras de la primera columna.
 
 </Outcomes>
 
-Siguiente: [Pide cambios en una pieza](/es/marketing/ask-for-changes/)
+Siguiente: [Palabras que vas a escuchar](/es/marketing/words-you-will-hear/)

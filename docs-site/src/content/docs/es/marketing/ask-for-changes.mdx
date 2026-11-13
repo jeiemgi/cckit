@@ -19,13 +19,13 @@ import TutorialMeta from '../../../../components/TutorialMeta.astro';
 
 <TutorialMeta />
 
-Una pieza casi nunca queda bien a la primera. El precio no es el correcto, el eslogan es muy
-largo, quien revisa quiere mover una línea. Dices qué cambiar con palabras sencillas y tu
-asistente lo cambia. El ejemplo es la página del menú de Pascua del sitio de la panadería, la
-página web de una panadería de barrio, mientras su revisión está abierta.
+Una pieza casi nunca queda bien a la primera. El precio no es el correcto, la frase de arriba es
+muy larga, quien revisa quiere mover una línea. Dices qué cambiar con palabras sencillas y tu
+asistente lo cambia. Después de la landing page, la panadería Pilot Light delegó una página con el
+menú de Semana Santa; su revisión está abierta y la colega del mostrador la está leyendo.
 
 **Quién lo hace:** tú dices qué cambiar. Tu asistente hace el cambio y actualiza la revisión.
-Aprueba una persona distinta de ti.
+Tu colega aprueba.
 
 **Lo que vas a tener al final:** la misma revisión, actualizada, y una persona que puede volver a
 leerla.
@@ -35,11 +35,11 @@ leerla.
 1. **Di qué cambiar.** Di qué pieza y qué quieres, como se lo dirías a un colega.
 
    <Chat
-     title="cambiar el precio y la fecha límite en la página del menú de Pascua"
-     say="En la página del menú de Pascua, cambia el precio de la rosca a 6 y mueve la fecha límite para pedir al viernes. Actualiza la revisión."
+     title="cambiar el precio y la fecha límite en la página del menú de Semana Santa"
+     say="En la página del menú de Semana Santa la rosca de Pascua va a €6, no a €7. Y pasa la fecha límite para encargar al viernes."
      means="Tú no editas nada. El enlace de la revisión sigue siendo el mismo."
    >
-     Listo. La rosca de Pascua ahora cuesta 6 y la fecha límite para pedir es el viernes. Actualicé
+     Listo. La rosca de Pascua ahora cuesta €6 y la fecha límite para encargar es el viernes. Actualicé
      la revisión, y el enlace es el que ya mandaste.
    </Chat>
 
@@ -47,20 +47,20 @@ leerla.
    hasta que elijas una.
 
    <Chat
-     title="pedir otros eslóganes para la página del menú de Pascua"
-     say="Muéstrame dos eslóganes distintos para la página del menú de Pascua. Todavía no cambies nada."
+     title="pedir otras frases de apertura para la página del menú de Semana Santa"
+     say="No me convence la frase de arriba de la página del menú de Semana Santa. Muéstrame otras dos opciones, y todavía no cambies nada."
      means="Pedir opciones no cambia nada. Di cuál quieres cuando estés lista o listo."
    >
-     Dos opciones: "Horneado esta mañana, en tu mesa para Pascua" y "Pan de Pascua, todavía tibio".
-     La página conserva su eslogan actual hasta que elijas.
+     Dos opciones: "Horneado esta mañana, en tu mesa para Pascua" y "Rosca de Pascua, todavía tibia".
+     La página conserva su frase actual hasta que elijas.
    </Chat>
 
 3. **Pasa los comentarios de quien revisa.** Cuando quien aprueba pidió cambios, tu asistente lee
    sus comentarios y los aplica. Te dice cuáles no aplicó.
 
    <Chat
-     title="aplicar los comentarios de quien revisa la página del menú de Pascua"
-     say="Lee los comentarios de la revisión de la página del menú de Pascua y aplícalos. Dime cuáles no aplicaste y por qué."
+     title="aplicar los comentarios de quien revisa la página del menú de Semana Santa"
+     say="Mi colega dejó comentarios en la página del menú de Semana Santa. Léelos y aplícalos, y dime cuáles no aplicaste y por qué."
      means="Tú decides qué cambiar. Tu asistente avisa de cada comentario que dejó sin aplicar."
    >
      Apliqué el comentario sobre la frase de apertura y el del precio. Dejé uno sin aplicar: pide
@@ -81,13 +81,13 @@ nueva, con su propia revisión: mira
 [Actualiza una página que ya existe](/es/marketing/update-a-page/).
 </Aside>
 
-<Outcomes title="Para la persona técnica: qué corre">
+<Outcomes title="Para la persona técnica: qué se ejecuta">
 
 <div data-table="grid">
 
-| Lo que dices | Lo que corre |
+| Lo que dices | Qué se ejecuta |
 | --- | --- |
-| "Actualiza la revisión." | `cckit task finish <id> "<resumen>" --all` |
+| Un cambio en una pieza en revisión | `cckit task finish <id> "<resumen>" --all` |
 | Volver a trabajar en la pieza | `cckit task start <id>` |
 
 </div>
@@ -96,7 +96,7 @@ nueva, con su propia revisión: mira
 hay una revisión abierta, la reporta en vez de crear una segunda. `--all` agrega también los
 archivos nuevos. `cckit task start` reutiliza la carpeta del borrador si existe y rechaza una tarea
 que ya está terminada. Aquí no se usa `cckit task run`: una tarea que ya está en revisión no
-arranca ningún agente. Leer los comentarios de quien revisa y editar el borrador lo hace el propio
+inicia ningún agente. Leer los comentarios de quien revisa y editar el borrador lo hace el propio
 asistente, no un verbo de `cckit`.
 
 </Outcomes>
