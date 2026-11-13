@@ -100,6 +100,7 @@ cckit init --profile software --no-github   # scaffold only: nothing outside the
                               #   and one specialist agent per role from the same role source:
                               #   .claude/agents/<role>/AGENT.md and .codex/agents/<role>.toml
 cckit add                     # list the optional integrations + modules; `cckit add <name>` switches one on
+                              #   `cckit add page-design`: the page-design skill, in a project that already exists
                               #   `cckit add graft`: code-graph retrieval + the code-retrieval rule
                               #   `cckit add lavish --set enable=no`: turn review pages off (on by default)
 cckit page mode               # `page`, or `terminal: <why>` — can this session show a review page?
@@ -474,8 +475,19 @@ It holds the order and the rules; it contains none of their content.
   continue with cckit's own minimum rules for that step. The missing skill is never reported as
   used.
 
-**Where it is installed.** The marketing profile, the `nextjs-shadcn` recipe, and any project whose
-config sets `tasks.design: true` (then `cckit init --upgrade`).
+**Where it is installed.** `cckit init` installs it with the marketing profile and the
+`nextjs-shadcn` recipe. In a project that already exists:
+
+```bash
+cckit add page-design
+```
+
+That sets `tasks.design: true` in the project config and copies the skill into the skills folder of
+each adapter the project selects (`.claude/skills/page-design/`, `.agents/skills/page-design/`). It
+asks nothing, needs no version bump, and keeps a copy that is already there. `cckit init --upgrade`
+does not do this for a project already at the installed version: it answers `already at <version>`
+and adds nothing. With `tasks.design: true` and no skill folder, `cckit doctor` prints a failing
+`page-design skill` row that names the command.
 
 **Install the three skills in a project.** They are optional and cckit never installs them
 unasked. Each is an integration: `cckit add` switches it on, `cckit doctor --fix` installs it with
@@ -499,9 +511,11 @@ They install for Claude Code, into the project. The `skills` CLI needs Node.js 2
 `~/.impeccable/bin/`, fetches visual directions from the impeccable.style catalogue when a new
 design starts, and its installer can add a hook that runs on every UI file the agent edits.
 
-**Not verified.** The three install commands were assembled from each project's own documentation
-on 2026-11-13 and were not run by cckit's authors; the monthly integrations check is what runs
-them. No page built with the three skills installed has been compared with one built without them
+**What one run showed.** One run is on record: on 2026-11-13 `cckit doctor --fix` installed all three in a Next.js project, with no terminal prompt. `impeccable` also wrote four `.claude/agents/impeccable-*.md` files, the `skills` CLI wrote `skills-lock.json`, and `.claude/settings.json` was not modified, so no design hook was added in that run. The doctor names those extra files on the row of
+an install it has just made. Other versions of the installers are not covered by that run; the
+monthly integrations check is what re-runs the commands.
+
+**Not verified.** No page built with the three skills installed has been compared with one built without them
 yet, so this section describes what the skill instructs, not a measured result.
 
 **What the review shows.** For a page task, `cckit task run` records which skills the run loaded

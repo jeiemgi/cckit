@@ -135,6 +135,10 @@ t "no third-party design skill is vendored" "$(ls -d "$ROOT/templates/skills/imp
 for k in post campaign brand research; do
   kit_kind_label_valid "$k"; t "kind $k is accepted" "$?" "0"
 done
+# the designer agent lists page-design, in its skills and in its routing table
+dg="$ROOT/templates/agents/designer.md"
+t "designer: page-design is in the skills frontmatter" "$(sed -n '1,/^---$/{/^---$/!p;}' "$dg" | sed -n '2,$p' | grep -c '^  - page-design$')" "1"
+has "designer: the routing table sends a page to page-design" "$(cat "$dg")" '| Build or change a page                  | `page-design`'
 
 [ "$fail" -eq 0 ] && echo "ALL OK (content skills)" || echo "content skills: FAILURES"
 exit "$fail"

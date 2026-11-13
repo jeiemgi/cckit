@@ -104,7 +104,7 @@ The skills above ship with the plugin. `cckit init` also copies these into the p
 | `copywriting` | content, marketing | Write or rewrite a page meant to persuade: homepage, landing, pricing, feature, headline, call to action. The `editor` agent lists it in `skills:`, so the Editor follows it for marketing copy. |
 | [`brand-voice`](#brand-voice) | marketing | Record the brand's voice, key messages and banned phrasings in `brand/voice.md`; check a draft against it. `copywriting` reads the file before it writes. |
 | [`campaign`](#campaign) | marketing | Turn one goal into a campaign plan, get it approved, then record its pieces as light tasks or as an effort's sub-issues. |
-| [`page-design`](#page-design) | marketing; any project with `tasks.design: true` (the `nextjs-shadcn` recipe sets it) | Build or change a page with three named third-party design skills in a fixed order — `impeccable`, `emil-design-eng`, `web-design-guidelines` — with a design brief before any code and a self-review after. |
+| [`page-design`](#page-design) | marketing; the `nextjs-shadcn` recipe; an existing project with `cckit add page-design` | Build or change a page with three named third-party design skills in a fixed order — `impeccable`, `emil-design-eng`, `web-design-guidelines` — with a design brief before any code and a self-review after. |
 | `speckit` | software | Install or identify Spec Kit and drive the spec-driven lifecycle. |
 | `feature-build-refine` | software | Build strategy for a Next.js + RefineDev project; applies only when the stack matches. |
 | `supabase-patterns` | software | Supabase access conventions; applies only when the project uses Supabase. |
@@ -185,6 +185,11 @@ reads which skills the run loaded from the events the agent CLI prints and puts 
 pull request, with `docs/design/<id>.md` named beside it. A page task is a task whose kind is
 `page` (`cckit task new --kind page "<title>"`), or any task in a project whose config sets
 `tasks.design: true`.
+
+In a project that already exists, `cckit add page-design` sets that key and copies the skill into
+the skills folder of each adapter the project selects. It needs no version bump: `cckit init
+--upgrade` adds nothing to a project already at the installed version. With the key on and the
+folder absent, `cckit doctor` prints a failing `page-design skill` row naming the command.
 
 <Aside type="caution" title="Not measured yet">
 No page built with the three skills installed has been compared with one built without them. This

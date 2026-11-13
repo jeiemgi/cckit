@@ -554,7 +554,7 @@ EOF
   if _lt_page_task "$kind"; then
     page=1
     if [ ! -f "$wt/.claude/skills/page-design/SKILL.md" ] && [ ! -f "$wt/.agents/skills/page-design/SKILL.md" ]; then
-      echo "⚠ task $id is a page task and the page-design skill is not in this project — add it with: cckit init --upgrade (with tasks.design: true in the config, or the marketing profile)" >&2
+      echo "⚠ task $id is a page task and the page-design skill is not in this project — add it with: cckit add page-design" >&2
     fi
   fi
   body=""

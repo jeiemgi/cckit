@@ -201,12 +201,15 @@ per its documentation, a copy under `.agents/skills/<id>/`, a link at `.claude/s
 entry in `skills-lock.json`. Commit what the install wrote. A Codex-only project is not covered:
 the descriptors install and detect the Claude Code location only.
 
-<Aside type="caution" title="Not verified by a run">
-The three install commands were assembled from each project's documentation and were not run by
-cckit's authors. Unverified: that `npx impeccable install --providers=claude --scope=project`
-asks nothing when there is no terminal, and whether it adds its design hook without being asked;
-and the exact files the `skills` CLI writes for `-a claude-code`. The pack's own README documents
-only the whole-pack install; `--skill` is an option of the `skills` CLI. The
+`page-design` itself is not an integration: it is cckit's own skill. `cckit add page-design` copies
+it into an existing project and sets `tasks.design: true`; see [Skills](/skills/#page-design).
+
+<Aside type="caution" title="Verified by one run">
+One run is on record: on 2026-11-13 `cckit doctor --fix` installed all three in a Next.js project, with no terminal prompt. `impeccable` also wrote four `.claude/agents/impeccable-*.md` files, the `skills` CLI wrote `skills-lock.json`, and `.claude/settings.json` was not modified, so no design hook was added in that run. The doctor names
+those extra files on the row of an install it has just made (the descriptor's `alsoWrites`), so
+they are not first met in `git status`. Not recorded in that run: whether the `skills` CLI also
+wrote a copy under `.agents/skills/`. Other versions of the installers are not covered. The pack's
+own README documents only the whole-pack install; `--skill` is an option of the `skills` CLI. The
 [monthly check](#the-recipes-are-re-checked-every-month) is what runs these commands. Installing
 `impeccable` as a Claude Code plugin (`/plugin marketplace add pbakaus/impeccable`) works too, and
 the doctor then still reports it missing, because a plugin leaves no file in `.claude/skills/`.

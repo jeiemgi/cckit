@@ -123,6 +123,8 @@ rejects "bootstrap without a command"  '.install[0].bootstrap = {"manager":"brew
 rejects "bootstrap by an unknown manager" '.install[0].bootstrap = {"manager":"apt","run":"apt install npm"}' "install[0].bootstrap.manager: must be one of"
 rejects "empty detect.bin"             '.detect.bin = ""'                   "detect.bin: must not be empty"
 rejects "empty afterInstall"           '.afterInstall = ""'                 "afterInstall: must not be empty"
+rejects "empty alsoWrites"             '.alsoWrites = []'                   "alsoWrites"
+rejects "alsoWrites that is not a list" '.alsoWrites = "skills-lock.json"'   "alsoWrites"
 
 printf '{ not json' > "$mdir/fixture-tool.json"
 out="$(integration_validate "$mdir/fixture-tool.json" 2>&1)"; r=$?
@@ -338,7 +340,8 @@ for id in impeccable emil-design-eng web-design-guidelines; do
   t "$id: one npx candidate" "$(jq -r '[.install[].manager] | join(" ")' "$d")" "npx"
   t "$id: names a licence" "$(jq -r '.attribution.license | length > 0' "$d")" "true"
   t "$id: not affiliated" "$(jq -r '.attribution.affiliated' "$d")" "false"
-  t "$id: the install note says what was not run" "$(jq -r '.install[0].note | test("not run by cckit|Not run by cckit")' "$d")" "true"
+  t "$id: the install note dates the one run on record" "$(jq -r '.install[0].note | test("One run is on record, on 2026-11-13")' "$d")" "true"
+  t "$id: alsoWrites names what that run wrote besides the skill" "$(jq -r '.alsoWrites | length > 0' "$d")" "true"
 done
 t "the three design keys are three capabilities" \
   "$(for id in impeccable emil-design-eng web-design-guidelines; do integration_config_key "$ROOT/integrations/$id.json"; done | tr '\n' ' ')" \

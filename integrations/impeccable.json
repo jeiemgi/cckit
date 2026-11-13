@@ -12,14 +12,15 @@
     {
       "manager": "npx",
       "run": "npx -y impeccable install --providers=claude --scope=project",
-      "note": "`--providers` and `--scope` are the flags the vendor README gives for scripts (read 2026-11-13, commit c4cd1924c3). Not run by cckit's authors: whether this form asks nothing on a terminal-less run, and whether it adds the design hook without being asked, is unverified. The runner gives the installer no stdin, so a prompt ends the install as failed, not as accepted. The Claude Code plugin route (`/plugin marketplace add pbakaus/impeccable`) also works, and leaves no file this descriptor's detect can see."
+      "note": "`--providers` and `--scope` are the flags the vendor README gives for scripts (read 2026-11-13, commit c4cd1924c3). One run is on record, on 2026-11-13, through `cckit doctor --fix` in a Next.js project: the install finished with no terminal, wrote .claude/skills/impeccable/ and four .claude/agents/impeccable-*.md files, and left .claude/settings.json unmodified, so no design hook was added. Other versions of the installer are not covered by that run. The runner gives the installer no stdin, so a prompt ends the install as failed, not as accepted. The Claude Code plugin route (`/plugin marketplace add pbakaus/impeccable`) also works, and leaves no file this descriptor's detect can see."
     }
   ],
   "verify": {
     "run": "test -f .claude/skills/impeccable/SKILL.md || test -f \"$HOME/.claude/skills/impeccable/SKILL.md\"",
     "failsOn": "The skill file is in neither this project nor ~/.claude/skills. A file check only: it does not start the engine binary."
   },
-  "afterInstall": "reload the agent session so it lists the skill, read the hook the installer may have added to .claude/settings.json, and commit .claude/skills/impeccable",
+  "afterInstall": "reload the agent session so it lists the skill, check `git status` for a change to .claude/settings.json (a design hook), and commit .claude/skills/impeccable with the agents files",
+  "alsoWrites": [".claude/agents/impeccable-*.md (agent definitions, four in the run of 2026-11-13)"],
   "recheck": {
     "cadence": "monthly",
     "drifts": [

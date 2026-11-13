@@ -12,14 +12,15 @@
     {
       "manager": "npx",
       "run": "npx -y skills@latest add vercel-labs/agent-skills --skill web-design-guidelines -a claude-code -y",
-      "note": "`npx skills add vercel-labs/agent-skills --skill web-design-guidelines -a claude-code` is the example in the `skills` CLI README; `-y` (skip prompts) is from its docs/commands.md (both read 2026-11-13). This exact command was not run by cckit's authors. Per the CLI's docs it installs into the current project (`-g` would make it global): a copy under .agents/skills/, a link at .claude/skills/web-design-guidelines, and an entry in skills-lock.json."
+      "note": "`npx skills add vercel-labs/agent-skills --skill web-design-guidelines -a claude-code` is the example in the `skills` CLI README; `-y` (skip prompts) is from its docs/commands.md (both read 2026-11-13). One run is on record, on 2026-11-13, through `cckit doctor --fix` in a Next.js project: the skill landed in .claude/skills/web-design-guidelines and skills-lock.json was written; whether .agents/skills/ got a copy was not recorded. Per the CLI's docs it installs into the current project (`-g` would make it global): a copy under .agents/skills/, a link at .claude/skills/web-design-guidelines, and an entry in skills-lock.json."
     }
   ],
   "verify": {
     "run": "test -f .claude/skills/web-design-guidelines/SKILL.md || test -f \"$HOME/.claude/skills/web-design-guidelines/SKILL.md\"",
     "failsOn": "The skill file is in neither this project nor ~/.claude/skills. A file check only: it does not prove the rules can be fetched."
   },
-  "afterInstall": "reload the agent session so it lists the skill, and commit .agents/skills/web-design-guidelines, .claude/skills/web-design-guidelines and skills-lock.json",
+  "afterInstall": "reload the agent session so it lists the skill, and commit .claude/skills/web-design-guidelines, skills-lock.json and .agents/skills/web-design-guidelines when it exists",
+  "alsoWrites": ["skills-lock.json"],
   "uninstall": "npx -y skills@latest remove web-design-guidelines -a claude-code -y",
   "recheck": {
     "cadence": "monthly",
