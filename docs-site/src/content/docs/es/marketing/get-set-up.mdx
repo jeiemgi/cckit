@@ -41,6 +41,12 @@ páginas enlazadas aquí están en inglés.
    `cckit init --profile marketing`. Lo que la preparación escribe y pregunta está en
    [Initialize cckit](/initialize/) (en inglés).
 
+   La preparación enumera sus pasos de git y GitHub y pregunta una sola vez antes de correrlos. Di
+   que sí: uno de ellos crea `develop`, la versión compartida de la que sale cada borrador. Si las
+   últimas líneas de la salida dicen `Git and GitHub setup: not run`, corre `cckit init --yes` en
+   la carpeta del proyecto. Mientras eso no haya corrido, abrir un borrador falla: cckit avisa que
+   `develop` no existe.
+
 3. **Da acceso al proyecto en GitHub** a todas las personas que escriben o aprueban.
 
 </Steps>
@@ -78,6 +84,7 @@ trabajar desde el primer día.
 | Lo que ves | Qué hacer |
 | --- | --- |
 | Claude dice que no puede conectarse a GitHub, o te pide iniciar sesión | Pídele a la persona técnica que repita el paso 1 de la Parte 1. |
+| Claude dice que no puede abrir un borrador porque `develop` no existe | La parte de git y GitHub de la preparación no corrió. Pídele a la persona técnica que corra `cckit init --yes` en la carpeta del proyecto (paso 2 de la Parte 1). |
 | Claude responde con términos de desarrollo que no conoces | Dile "Explícamelo con palabras sencillas". Las palabras están en [Palabras que vas a escuchar](/es/marketing/words-you-will-hear/). |
 | Claude pide permiso para ejecutar algo | Lee lo que dice que va a hacer. Crear un borrador, guardar tu trabajo y pedir una revisión es lo esperado. Si dudas, di que no y pídele que te explique. |
 

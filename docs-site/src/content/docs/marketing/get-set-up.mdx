@@ -37,6 +37,11 @@ This part uses a terminal. If that is not you, send this section to the person w
    From a terminal the same setup is `cckit init --profile marketing`. What the setup writes and
    asks is on [Initialize cckit](/initialize/).
 
+   The setup lists its git and GitHub steps and asks once before running them. Say yes: one of
+   them creates `develop`, the shared version every draft starts from. If the last lines of the
+   output say `Git and GitHub setup: not run`, run `cckit init --yes` in the project folder.
+   Until that has run, starting a draft fails: cckit reports that `develop` does not exist.
+
 3. **Give every writer and approver access** to the project on GitHub.
 
 </Steps>
@@ -73,6 +78,7 @@ Decide now who approves. A setup where one person writes and another approves wo
 | What you see | What to do |
 | --- | --- |
 | Claude says it cannot reach GitHub, or asks you to sign in | Ask the technical person to redo step 1 of Part 1. |
+| Claude says it cannot start a draft because `develop` does not exist | The git and GitHub part of the setup did not run. Ask the technical person to run `cckit init --yes` in the project folder (step 2 of Part 1). |
 | Claude answers with developer terms you do not know | Say "Explain that in plain language." The words are on [Words you will hear](/marketing/words-you-will-hear/). |
 | Claude asks permission to run something | Read what it says it will do. Creating a draft, saving your work and asking for a review are expected. If you are unsure, say no and ask it to explain. |
 
