@@ -1,13 +1,15 @@
 ---
 title: Install & update matrix
-description: "Every way cckit gets onto a machine, what each one puts on disk, how it updates, when a restart is needed, and how to read a kitVersion that is not a released tag."
+description: "What each install writes: every route that puts cckit on a machine, the files cckit init writes into a project for Claude Code, Codex or both, how each updates, when a restart is needed, and how to read a kitVersion that is not a released tag."
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
 [Installing cckit](/install/) gets you a working `cckit`. This page is the reference behind it:
-what each install route leaves on disk, what moves it forward, and why two machines that both say
-`0.9.0` can be running different code. Every claim names the script that implements it.
+what each install route leaves on your machine, which files `cckit init` writes into a project for
+a Claude Code install, a Codex-only install or both, what moves each of them forward, and why two
+machines that both say `0.9.0` can be running different code. Every claim names the script that
+implements it.
 
 ## Three things carry a version
 
@@ -60,6 +62,37 @@ readlink "$(command -v cckit)"        # a path into a clone you work in = this a
 clone's **current branch** (line 47), at most once per four hours unless `--force`
 (`CCKIT_SELF_UPDATE_THROTTLE`, line 34), always exiting 0. No verb and no hook calls it — run it by
 path. Because it pulls the current branch, it does not rescue a clone parked on a stale branch.
+
+## What `cckit init` writes: Claude Code, Codex, or both
+
+The routes above put the CLI on a machine. `cckit init --adapter <claude|codex|both>` then writes
+the project's files, and the adapter decides which. The default is `claude`.
+
+| | `claude` | `codex` |
+| --- | --- | --- |
+| Instruction file | `CLAUDE.md` | `AGENTS.md` |
+| Skills | `.claude/skills/<name>/SKILL.md` | `.agents/skills/<name>/SKILL.md` |
+| Rules | `.claude/rules/*.md` | `.agents/rules/*.md`, listed by path in `AGENTS.md` |
+| Specialist agents | `.claude/agents/<role>/AGENT.md` | `.codex/agents/<role>.toml` |
+| Hooks and guards | `.claude/hooks/`, registered in `.claude/settings*.json` | `.codex/hooks/`, registered in `.codex/hooks.json` ([details](/hooks/#codex)) |
+| Memory hooks | `.claude/hooks/mempal_*.sh` (with `--memory on`) | not installed |
+| Statusline, settings | `.claude/statusline.sh`, `.claude/settings*.json` | not installed |
+| Config (when it is the only adapter) | `.claude/kit.config.json` | `cckit.config.json` |
+| Ownership manifest (when it is the only adapter) | `.claude/kit.manifest.json` | `.cckit/kit.manifest.json` |
+
+- **A Codex-only install writes no `.claude/` directory.** Its config sits at the repository root
+  and its manifest under `.cckit/`.
+- **`both` writes both columns.** Config and manifest stay where the first install put them, so a
+  project that started as `claude` and added Codex keeps `.claude/kit.config.json`.
+- **Some files do not depend on the adapter.** Every install also gets the kit's helper scripts
+  under `scripts/` and `knowledge/INDEX.md`.
+- **A pre-existing `AGENTS.md` is kept** by a fresh init unless `--force` is passed.
+- **Every file written is recorded in the ownership manifest with its hash.** A file you edited
+  reads as modified; an upgrade preserves it and `cckit remove` keeps it.
+
+`cckit init --dry-run` prints the exact list for your project before anything is written. How the
+two adapters render from one set of templates, and what the Codex adapter does not do yet:
+[Adapters](/adapters/#claude-and-codex-support).
 
 ## Updating a project
 
