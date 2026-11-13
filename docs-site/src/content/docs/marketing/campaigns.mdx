@@ -1,0 +1,113 @@
+---
+title: Plan and run a campaign
+description: Turn one marketing goal into a campaign plan, break it into pieces of work, and take every piece to approved.
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+A campaign is one goal and several pieces that serve it: a landing page, three emails, five social
+posts. cckit keeps them together under one plan, so you can see what is done and what is left.
+
+**Before you start:** you have taken [one piece to approved](/marketing/your-first-piece/), and
+your [brand voice](/marketing/brand-voice/) is set.
+
+<Steps>
+
+1. **State the goal.**
+
+   <div class="cckit-prompt">
+
+   ```text title="Say this to Claude"
+   Plan a campaign. The goal is 200 sign-ups for our spring workshop by April 15. The audience is small-business owners in our newsletter and on Instagram.
+   ```
+
+   </div>
+
+   One goal, one audience and one date are enough to start. Claude asks for what is missing.
+
+2. **Read the plan.** Claude proposes the campaign: the message, the pieces, the order and what
+   each piece is for. The plan opens as a page in your browser where you can comment and answer.
+   When no browser is available, it is shown in the conversation.
+
+3. **Change it until it is right.** Remove pieces you will not make. Add the ones it missed. Nothing
+   has been created yet.
+
+4. **Approve the plan.**
+
+   <div class="cckit-prompt">
+
+   ```text title="Say this to Claude"
+   The plan is good. Create the campaign and its pieces.
+   ```
+
+   </div>
+
+   Claude adds the campaign to the task list, with each piece under it. Your team sees all of
+   them, and the campaign shows how many pieces are done.
+
+5. **Work through the pieces.** You write each piece the way you wrote
+   [your first one](/marketing/your-first-piece/): outline, draft, edits. The pieces of a campaign
+   share one draft and are reviewed together at the end, so you do not ask for a review after each
+   one.
+
+   <div class="cckit-prompt">
+
+   ```text title="Say this to Claude"
+   What is next in the campaign? Let's write it.
+   ```
+
+   </div>
+
+6. **Ask for the campaign review.** When the pieces are written:
+
+   <div class="cckit-prompt">
+
+   ```text title="Say this to Claude"
+   The campaign is ready. Ask for the review.
+   ```
+
+   </div>
+
+   The campaign gets one review that covers all its pieces, so the approver reads them side by
+   side and can check that they tell one story.
+
+7. **Approved.** Once the review says approved:
+
+   <div class="cckit-prompt">
+
+   ```text title="Say this to Claude"
+   The campaign review is approved. Finish the campaign.
+   ```
+
+   </div>
+
+   Claude makes the approved pieces part of the shared version and marks the campaign and every
+   piece under it done.
+
+</Steps>
+
+## See where a campaign stands
+
+<div class="cckit-prompt">
+
+```text title="Say this to Claude"
+Where are we on the campaign? What is done, what is in draft and what is waiting for someone?
+```
+
+</div>
+
+## Good to know
+
+- **A piece that is not finished stays visible.** Each piece is its own entry in the list, so closing the
+  campaign with a piece still open does not hide it.
+- **Two campaigns at a time is the default limit.** Finishing one before starting a third keeps
+  reviews short. The technical person can change the limit.
+- **Research before you plan.** Ask Claude to look at what competitors are saying, or to check a
+  claim, before the plan is written. It reports its sources.
+
+<Aside type="note">
+Sending the emails and scheduling the posts are outside cckit. The campaign ends when its pieces
+are approved.
+</Aside>
+
+Next: [Who does what](/marketing/who-does-what/)

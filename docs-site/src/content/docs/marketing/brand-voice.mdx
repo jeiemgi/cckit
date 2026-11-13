@@ -1,0 +1,74 @@
+---
+title: Set your brand voice
+description: Write your brand voice, key messages and banned phrasings down once in the project, so every draft Claude writes follows them.
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+A brand voice that lives in someone's head has to be explained again in every conversation. With
+the marketing profile you write it down once, in the project. Claude reads it before it writes or
+plans anything.
+
+## What gets recorded
+
+| Part | What it answers | Example |
+| --- | --- | --- |
+| **Voice** | How do we sound? | "Direct and warm. Short sentences. We say 'you', never 'users'." |
+| **Key messages** | What do we always want the reader to take away? | "Set up in a day. No contract." |
+| **Banned phrasings** | What do we never say? | "Revolutionary", "best-in-class", exclamation marks in headlines. |
+
+## Set it
+
+<Steps>
+
+1. **Start the conversation.**
+
+   <div class="cckit-prompt">
+
+   ```text title="Say this to Claude"
+   Help me set our brand voice for this project. Ask me what you need to know, one question at a time.
+   ```
+
+   </div>
+
+2. **Answer with examples.** Paste two or three pieces you think sound right, and one that sounds
+   wrong. Examples tell Claude more than adjectives do.
+
+3. **Read what Claude wrote back.** It shows you the voice, the key messages and the banned
+   phrasings before it saves them. Correct anything that is off.
+
+4. **Send it for review.** The brand voice is content like any other: it goes through a draft and
+   a review, so the team agrees on it before it applies to everyone.
+
+   <div class="cckit-prompt">
+
+   ```text title="Say this to Claude"
+   Save the brand voice and ask for a review.
+   ```
+
+   </div>
+
+</Steps>
+
+Once it is approved, every draft and every campaign plan in this project starts from it.
+
+## Check that a draft follows it
+
+<div class="cckit-prompt">
+
+```text title="Say this to Claude"
+Check this draft against our brand voice. List every sentence that breaks it and propose a fix for each.
+```
+
+</div>
+
+## Change it later
+
+The voice changes the same way it was set: say what should change, read the result, ask for a
+review. The history of every change stays in the project, with who approved it.
+
+<Aside type="tip">
+Keep the banned list short and specific. "No jargon" is hard to check. "Never say 'leverage'" is easy.
+</Aside>
+
+Next: [Plan and run a campaign](/marketing/campaigns/)

@@ -1,0 +1,69 @@
+---
+title: Words you will hear
+description: The developer words behind draft, review and approved, in plain language, each with the Software page that explains it in full.
+---
+
+cckit was built for software teams, and its tools use their words. With the marketing profile
+Claude speaks in plain language, but the developer words still appear on GitHub, in messages from
+developers and when you ask Claude for detail. This page maps each one to the word you already
+use.
+
+You do not need to learn them to do your work.
+
+## The four you will meet first
+
+<div class="cckit-nowrap-2">
+
+| Plain word | Developer word | What it is |
+| --- | --- | --- |
+| **Draft** | **branch** | A separate line of changes for one piece of work. What you write in it stays apart from the shared version until it is approved. More: [The GitHub cycle](/github-cycle/) |
+| **Review** | **pull request**, **PR** | The page on GitHub where a draft is read, commented on and approved. "Open a PR" means "ask for a review". More: [Issue to merged PR](/tutorials/take-a-github-issue-to-a-merged-pr/) |
+| **Piece of work**, **task** | **issue** | The record of one thing to make: a title, a description and whether it is open or closed. More: [The GitHub cycle](/github-cycle/) |
+| **Approved** | **merged** | The draft's changes are part of the shared version. To "merge" is to finish an approved piece. More: [Review gates](/review-gates/) |
+
+</div>
+
+## The rest
+
+<div class="cckit-nowrap-2">
+
+| Plain word | Developer word | What it is |
+| --- | --- | --- |
+| Project | repository, repo | The folder that holds your content and its whole history, kept on GitHub. More: [Quickstart](/getting-started/) |
+| The shared version | base branch, `main`, `develop` | The version everyone agrees on. Drafts start from it and return to it. More: [The GitHub cycle](/github-cycle/) |
+| A draft's own folder | worktree | A separate folder on your computer for one draft, so two drafts never mix. Claude creates and removes it. More: [Efforts, waves and worktrees](/efforts-and-waves/) |
+| Saved change | commit | One saved step in a draft, with a note saying what changed. More: [The GitHub cycle](/github-cycle/) |
+| Send to GitHub | push | Copy your saved changes from your computer to GitHub so others can see them. More: [The GitHub cycle](/github-cycle/) |
+| Campaign | effort | Several pieces of work under one plan, approved together. More: [Break a feature into an effort](/tutorials/break-a-feature-into-an-effort/) |
+| A piece in a campaign | sub-issue | One entry under the campaign's entry. More: [Efforts, waves and worktrees](/efforts-and-waves/) |
+| Tag | label | A colored tag on a piece of work: its kind, its priority, who it is for. More: [Config and permissions](/config-and-permissions/) |
+| Stage | milestone | A named stage a piece of work belongs to, such as Draft or Review. More: [Config and permissions](/config-and-permissions/) |
+| Setup | profile | The set of skills, roles and rules installed for a kind of team. Yours is the marketing profile. More: [Initialize cckit](/initialize/) |
+| A method Claude follows | skill | A written method Claude follows for one job, such as writing copy or planning a campaign. More: [Skills cckit ships](/skills/) |
+| Assistant | agent, sub-agent | A role Claude takes on for part of the work: planner, editor, designer, researcher. More: [Who does what](/marketing/who-does-what/) |
+| Automatic check | hook, gate | Something that runs by itself before a change is saved or approved, such as a check for passwords left in a file. More: [Hooks](/hooks/) |
+| Typed command | CLI, terminal | The text window developers type commands into. The technical person uses it during setup. More: [CLI reference](/cli-reference/) |
+
+</div>
+
+## Sentences, translated
+
+| You hear | It means |
+| --- | --- |
+| "I opened a PR for the spring post." | "The spring post is ready for review. Here is the link." |
+| "Can you review my PR?" | "Please read my draft and approve it or tell me what to change." |
+| "It's merged." | "It is approved and part of the content now." |
+| "It's on a branch." | "It is still a draft." |
+| "There's a conflict." | "Two drafts changed the same lines. Ask Claude to sort it out, and read what it proposes." |
+| "CI is red." | "An automatic check failed. Ask Claude what failed and whether it can fix it." |
+
+## When Claude uses a word you do not know
+
+Say:
+
+```text
+Explain that in plain language.
+```
+
+The Software pages linked above are written for developers. Read them when you are curious, not
+because you have to.

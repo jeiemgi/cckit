@@ -169,6 +169,17 @@ export default defineConfig({
           { label: 'All tutorials', slug: 'tutorials' },
           { label: 'All guides', slug: 'guides' },
         ]},
+        // Marketing: 7 pages for a reader who never opens a terminal. The middleware shows these
+        // as a flat list, without the group heading, on every page under /marketing/.
+        { label: 'Marketing', items: [
+          { label: 'What cckit does for you', slug: 'marketing' },
+          { label: 'Get set up', slug: 'marketing/get-set-up' },
+          { label: 'Your first piece', slug: 'marketing/your-first-piece' },
+          { label: 'Set your brand voice', slug: 'marketing/brand-voice' },
+          { label: 'Plan and run a campaign', slug: 'marketing/campaigns' },
+          { label: 'Who does what', slug: 'marketing/who-does-what' },
+          { label: 'Words you will hear', slug: 'marketing/words-you-will-hear' },
+        ]},
       ],
     }),
     // Starlight uses this sitemap integration instead of its default when one is present. Keep the
