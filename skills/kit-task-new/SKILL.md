@@ -21,7 +21,7 @@ One flow → creates a GitHub issue **and** (if Projects v2 is enabled) adds it 
 | ---------- | -------- | --------------------------------------------- |
 | Title      | ✓        | Format: `[<role>] <imperative summary>`       |
 | Role       | ✓        | One of the project's `roles` (see kit.config) |
-| Kind       | ✓        | feat / fix / task / chore / security / scaffold / ci / adr / spike / plan — the closed set; it becomes the branch prefix |
+| Kind       | ✓        | feat / fix / task / chore / security / scaffold / ci / adr / spike / plan — the closed set; it becomes the branch prefix. Content work: post / campaign / brand / research — labels only, started on task/ plan/ task/ spike/ |
 | Priority   | ✓        | p1 / p2 / p3                                  |
 | Milestone  | ✓        | One of the project's `milestones`             |
 | Plan link  | optional | Path under the project's plans dir            |

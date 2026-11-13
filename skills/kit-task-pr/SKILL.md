@@ -46,5 +46,5 @@ The function prints `✓ <PR-URL>`.
 - `--base <branch>` wins over the configured base; exporting `KIT_BASE_BRANCH` does not (`load_kit_config` re-reads it from the config). `--base` with no value exits 2 before the commit and the push
 - PR mirrors issue labels · if no milestone, the op omits it (no block)
 - Commits **tracked** changes only; untracked files are listed and left alone (`git add` them first if they belong), so a copied `.env.local` never reaches a PR
-- Title and body follow `pr.titleStyle` and `pr.orchestratorSection` in the config (`config-and-permissions` docs)
+- Title and body follow `pr.titleStyle`, `pr.orchestratorSection` and `pr.bodyStyle` in the config (`config-and-permissions` docs). `pr.bodyStyle: content` gives a `## Review` checklist for a draft in place of `## Verification`
 - If `gh pr create` fails because the branch hasn't diverged, the op surfaces the error verbatim (likely forgot to commit)

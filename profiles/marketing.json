@@ -1,0 +1,56 @@
+{
+  "name": "marketing",
+  "label": "Marketing team",
+  "description": "Campaigns, posts, brand and research for a team that does not use git: work is planned on a task list in the project, drafted, reviewed and approved, in plain language.",
+  "agents": [
+    "pm",
+    "editor",
+    "designer",
+    "researcher"
+  ],
+  "skills": [
+    "morning-briefing",
+    "copywriting",
+    "brand-voice",
+    "campaign",
+    "karpathy-guidelines",
+    "concrete"
+  ],
+  "rules": [
+    "branch-naming",
+    "communication-style",
+    "plain-language",
+    "design-routing",
+    "knowledge-base",
+    "mempalace",
+    "plan-output-format",
+    "effort-model",
+    "issue-lifecycle",
+    "merge-safety",
+    "gate-and-review",
+    "authoring",
+    "shared-checkout",
+    "task-management",
+    "review-pages"
+  ],
+  "roles": [
+    "PM",
+    "Editor",
+    "Designer",
+    "Researcher"
+  ],
+  "milestones": [
+    "Outline",
+    "Draft",
+    "Review",
+    "Publish"
+  ],
+  "defaults": {
+    "plans_format": "markdown",
+    "memory": "off",
+    "content_kinds": "on",
+    "pr_body": "content",
+    "plain_language": "on",
+    "tasks": "light"
+  }
+}

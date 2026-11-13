@@ -20,7 +20,7 @@
 #               [--superseded-by N]  close the issue with a reason + summary comment; board Done
 #   cckit new [--role R --kind K --priority P --milestone M --blocked-by "#1" --body B|--body-file F] "<title>"
 #                                   file ONE issue: labels + board (Todo) in one step (never raw gh issue create)
-#   cckit task <new|list|next|start|finish|share>   light tasks: work tracked in the project, no GitHub issue
+#   cckit task <new|list|next|start|finish|share|default>   light tasks: work tracked in the project, no GitHub issue
 #     task new [--priority pN --kind K --body B|--body-file F] "<title>"   record a task (one file
 #         under tasks/; a draft in this checkout until it is started or shared)
 #     task list [--all] · task next   every open task and its state · the one to take next
@@ -29,6 +29,8 @@
 #         the task is done when that PR merges (alias: done). --all also commits new files
 #     task share ["<summary>"]        one pull request that adds this checkout's drafts to the base;
 #         they list as shared until it merges. Re-run to retry a share whose push or PR failed
+#     task default                    print light | issues: the project's default list (tasks.default).
+#         With light, a bare `cckit next` prints what `cckit task next` prints
 #   cckit merge [<pr>] [--merge|--rebase]   merge the PR (squash by default; rebases on conflict), close
 #                                   its issues, GC the branch, update the PR's base (develop or effort/<N>);
 #                                   refuses an effort/* head: that PR merges with cckit effort close <N>
@@ -419,6 +421,19 @@ case "$cmd" in
     # Everyday-dev helper: surface the unblocked set + the one command to start the top issue.
     # shellcheck source=/dev/null
     source "$LIB/kit-config.sh" && load_kit_config
+    # tasks.default = light (the marketing profile): a bare `cckit next` answers from the light
+    # task list — the same output as `cckit task next`. Any argument (`--effort <N>`, a filter)
+    # asks about issues and takes the issue path, as does every project whose default is issues.
+    if [ "$#" -eq 0 ]; then
+      # shellcheck source=/dev/null
+      source "$LIB/task-source.sh"
+      if [ "$(task_default_name)" = "light" ]; then
+        # shellcheck source=/dev/null
+        source "$LIB/worktree-issue.sh"; source "$LIB/light-task.sh"
+        lt_cli next
+        exit $?
+      fi
+    fi
     # shellcheck source=/dev/null
     source "$LIB/next.sh"; next_issue "$@"
     ;;
