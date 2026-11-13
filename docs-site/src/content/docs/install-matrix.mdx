@@ -5,7 +5,7 @@ description: "What each install writes: every route that puts cckit on a machine
 
 import { Aside } from '@astrojs/starlight/components';
 
-[Installing cckit](/install/) gets you a working `cckit`. This page is the reference behind it:
+[Installing cckit](/getting-started/install/) gets you a working `cckit`. This page is the reference behind it:
 what each install route leaves on your machine, which files `cckit init` writes into a project for
 a Claude Code install, a Codex-only install or both, what moves each of them forward, and why two
 machines that both say `0.9.0` can be running different code. Every claim names the script that
@@ -52,7 +52,7 @@ and if that clone is also where you develop, **`cckit` on PATH is as old as the 
 parked on**. Park it on a branch cut last week and `cckit` loses every verb merged since.
 
 That is the situation the [`shared-checkout` rule](/rules/#shared-checkout) and
-[Multi-session safety](/multi-session/) cover. Check what you have:
+[Multi-session safety](/development/many-sessions/) cover. Check what you have:
 
 ```bash
 readlink "$(command -v cckit)"        # a path into a clone you work in = this applies to you
@@ -97,7 +97,7 @@ two adapters render from one set of templates, and what the Codex adapter does n
 ## Updating a project
 
 Updating the install does not touch a project that was already scaffolded. Two steps do that.
-[Update a project](/update/) is the full path — check, migrate, preview, apply, confirm — with what
+[Update a project](/getting-started/update/) is the full path — check, migrate, preview, apply, confirm — with what
 the upgrade changes and what it never touches.
 
 1. **`cckit update` reports; it changes nothing.** The verb runs `scripts/kit-version-check.sh`

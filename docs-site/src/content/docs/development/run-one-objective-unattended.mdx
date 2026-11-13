@@ -1,0 +1,179 @@
+---
+title: How to run one objective unattended with hard limits
+description: Hand Claude Code or Codex one objective on one branch with no terminal attached. cckit autopilot run starts the agent a round at a time and stops it in code on a completion check, a round count, a time limit or a token ceiling.
+tutorial:
+  job: run one objective unattended with hard limits
+  difficulty: advanced
+  time: "8 min"
+  prerequisites: ["cckit installed and initialized", "the claude or codex CLI on PATH", "a command that exits 0 when the work is done"]
+  ogTag: Unattended
+  keywords: [claude code headless loop, claude -p until tests pass, codex exec loop, bounded ai agent run]
+  related: [development/run-unattended, getting-started/codex, development/issue-to-merged-pr]
+---
+
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import TagRow from '../../../components/TagRow.astro';
+import TutorialMeta from '../../../components/TutorialMeta.astro';
+import TutorialSchema from '../../../components/TutorialSchema.astro';
+
+<TagRow kinds={["flow"]} />
+
+<TutorialMeta />
+
+**What you'll run:** one agent, one branch, one objective, and nobody watching. `cckit autopilot
+run` starts the agent with no terminal (`claude -p` or `codex exec`), one round at a time. After
+every round, code decides whether another round starts. Nothing the agent says ends or extends the
+run, and the run never merges and never closes an issue.
+
+## Steps
+
+<Steps>
+
+1. **Start the issue and enter its worktree.** A run works on the current branch and refuses the
+   base branch:
+
+   ```bash frame="terminal"
+   cckit start <issue>
+   cd <the worktree path it prints>
+   ```
+
+2. **Choose the completion check.** It is a command that exits 0 when the objective is met: the
+   test command, a linter, a script of your own. Run it once by hand. It should fail now, for the
+   reason the objective describes.
+
+3. **Print the plan.** A dry run starts nothing and writes nothing:
+
+   ```bash frame="terminal"
+   cckit autopilot run --objective "make the failing tests pass" \
+     --until "<your test command>" --max-iters 3 --dry-run
+   ```
+
+   You should see the branch and issue, the agent command, the limits, the completion check and
+   the state file path:
+
+   ```text
+   agent   : 'claude' -p --output-format json   < prompt on stdin
+   limits  : max-iters 3 · max-seconds 3600 · round-seconds 900 · max-tokens none
+   until   : <your test command>
+   ```
+
+4. **Give the agent permission to edit.** cckit adds no permission flag. A run that must change
+   files names its own, one `--agent-arg` per word:
+
+   ```bash frame="terminal"
+   # Claude Code
+   --agent-arg --permission-mode --agent-arg acceptEdits
+   # Codex
+   --agent codex --agent-arg -s --agent-arg workspace-write
+   ```
+
+   Run the dry run again with those flags and read the `agent` line: it is the exact command that
+   will start.
+
+5. **Run it.** Drop `--dry-run`. Add a token ceiling, a gate and the PR step when you want them:
+
+   ```bash frame="terminal"
+   cckit autopilot run --objective "make the failing tests pass" \
+     --until "<your test command>" --check "<your gate command>" \
+     --max-iters 5 --max-seconds 1800 --max-tokens 400000 \
+     --agent-arg --permission-mode --agent-arg acceptEdits \
+     --publish --summary "<one-line summary>"
+   ```
+
+   `--check` runs once after the completion check passes; if it fails, nothing is published.
+   `--publish` then opens the pull request with `cckit pr`, unless the branch already has one.
+
+6. **Read how it ended.** The exit code is the stop reason:
+
+   | Exit | Stop reason | What to do |
+   | --- | --- | --- |
+   | `0` | `done` | The completion check passed, and the gate when given. Review the branch or the PR. |
+   | `3` | `agent-failed` | The agent exited non-zero. Read its output, fix the cause. |
+   | `4` | `limit-iters`, `limit-seconds`, `limit-tokens`, `usage-unknown` | A limit was reached. Resume with a higher one, or stop. |
+   | `5` | `no-progress` | A round changed neither `HEAD` nor the working tree. Rewrite the objective. |
+   | `6` | `check-failed` | The gate failed. Nothing was published. |
+   | `7` | `publish-failed` | The work passed and `cckit pr` did not open the PR. Run it by hand. |
+   | `130` | `interrupted` | A signal killed the run or the agent. |
+   | `2` | *(refusal)* | A bad flag, the base branch, an unsupported agent, or a run already live on this branch. Nothing was written. |
+
+7. **Resume a stopped run.** Round, time and token counts carry over, so raise the limit that
+   stopped it:
+
+   ```bash frame="terminal"
+   cckit autopilot run --resume --max-iters 8
+   cckit autopilot run --fresh --objective "<text>" --until "<cmd>"   # discard the state, start over
+   ```
+
+</Steps>
+
+## How it works
+
+The state of a run is one JSON file per branch under `.cckit/autopilot/`, written at every stop
+with the reason, the round count, the elapsed seconds, the usage and the resume command. The
+directory sits at the root of the repo and is shared by every worktree. `cckit init` adds
+`.cckit/` to `.gitignore`. In a project scaffolded before it did, `git check-ignore .cckit/`
+prints nothing: add the line `.cckit/` yourself.
+
+Without `--until`, the run ends when the agent exits 0 after a round that changed something. With
+it, the command's exit code is the only thing that ends the run as `done`.
+
+Two limits behave differently from the others:
+
+- **Tokens are checked between rounds**, from the usage the agent CLI prints. A round in flight is
+  not cut off by tokens, so one round can pass the ceiling by its own size. Bound a single round
+  with `--round-seconds`. A round that prints no usage stops the run with `usage-unknown`.
+- **There is no cost limit.** Codex prints no cost and cckit applies no price list.
+
+Which limits are enforced, partly enforced or unsupported, with the test behind each:
+[Unattended run limits](/agent-compatibility/#unattended-run-limits). Every flag is printed by
+`cckit autopilot run --help`; the verb's row is in the [CLI reference](/cli-reference/).
+
+<Aside type="caution" title="Tested with stub agents">
+The limits are tested by stopping a stub agent in `scripts/autopilot-run-test.sh`. The reference
+page states that no limit has been run against a live agent. Start with a low `--max-iters` and
+a short `--max-seconds` on a branch you can discard.
+</Aside>
+
+## Troubleshooting
+
+**`an objective is required` and exit 2.** A new run needs `--objective "<text>"` or
+`--prompt-file <f>`.
+
+**`nothing to resume` and exit 2.** No stopped run is recorded for this branch. Start one without
+`--resume`.
+
+**The run stops after one round with `no-progress`.** The agent could not edit files. Add the
+permission flags from step 4 and check the `agent` line of a dry run.
+
+**The run stops with `usage-unknown`.** `--max-tokens` is set and a round printed no usage, so the
+ceiling could not be read. Remove `--max-tokens` and bound the run with `--max-iters` and
+`--max-seconds`.
+
+**A start is refused because an earlier agent is still alive.** A previous run's agent process is
+still running on this branch. Wait for it to exit, or stop that process yourself, then resume.
+
+## Related tutorials
+
+<CardGrid>
+  <LinkCard title="Run Claude Code unattended overnight" href="/development/run-unattended/" description="Many issues at once, in panes, under a concurrency cap." />
+  <LinkCard title="Use cckit with Codex" href="/getting-started/codex/" description="Install the Codex adapter the --agent codex form needs." />
+  <LinkCard title="Take a GitHub issue to a merged PR" href="/development/issue-to-merged-pr/" description="The same loop with a person at the keyboard." />
+</CardGrid>
+
+<TutorialSchema
+  steps={[
+    { name: 'Start the issue and enter its worktree', text: 'cckit start <issue>, then cd into the worktree it prints. A run refuses the base branch.' },
+    { name: 'Choose the completion check', text: 'Pick a command that exits 0 when the objective is met, and confirm it fails now.' },
+    { name: 'Print the plan', text: 'cckit autopilot run --objective "<text>" --until "<cmd>" --max-iters 3 --dry-run prints the agent command, limits and state file. Nothing starts.' },
+    { name: 'Give the agent permission to edit', text: 'cckit adds no permission flag. Pass your own with --agent-arg, one per word.' },
+    { name: 'Run it', text: 'Drop --dry-run. Add --max-tokens, --check and --publish --summary as needed.' },
+    { name: 'Read how it ended', text: 'Exit 0 done, 3 agent failed, 4 limit, 5 no progress, 6 gate failed, 7 publish failed, 130 interrupted, 2 refused.' },
+    { name: 'Resume a stopped run', text: 'cckit autopilot run --resume with a higher limit continues with counters carried over.' },
+  ]}
+  faqs={[
+    { q: 'Does cckit autopilot run merge the pull request?', a: 'No. A run never merges and never closes an issue. With --publish it opens the pull request and stops.' },
+    { q: 'The run stops after one round with no-progress', a: 'The agent changed neither HEAD nor the working tree, usually because it had no permission to edit. Pass a permission flag with --agent-arg.' },
+    { q: 'Is --max-tokens a hard ceiling?', a: 'It is checked between rounds from the usage the agent CLI prints, so one round can overshoot it. Bound a single round with --round-seconds.' },
+    { q: 'The run stops with usage-unknown', a: 'A round printed no usage while --max-tokens was set. Remove --max-tokens and use --max-iters and --max-seconds.' },
+  ]}
+/>

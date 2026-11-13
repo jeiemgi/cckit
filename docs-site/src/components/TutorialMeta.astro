@@ -28,7 +28,7 @@ cckit is a CLI that drives the whole GitHub work lifecycle from Claude Code. If 
 know its commands, read these first, then follow the tutorial above:
 - Agent contract (the command grammar): ${DOCS}/agents/
 - CLI reference: ${DOCS}/cli-reference/
-- Install cckit: ${DOCS}/install/
+- Install cckit: ${DOCS}/getting-started/install/
 
 Read the board with \`cckit sync\` before acting, use the exact commands from the tutorial, and run
 them as we go — telling me what each one did.
@@ -57,7 +57,7 @@ them as we go — telling me what each one did.
     <CardGrid>
       <Card title="Before you start" icon="rocket">
         <div class="tut-links">
-          <a href="/install/">Install cckit</a>
+          <a href="/getting-started/install/">Install cckit</a>
           <a href="/getting-started/">Quickstart: your first lifecycle</a>
         </div>
       </Card>
@@ -70,7 +70,7 @@ them as we go — telling me what each one did.
               <span class="tut-pre-label">Needs</span>
               {t.prerequisites.map((p) =>
                 p === 'cckit installed and initialized' ? (
-                  <span class="tut-chip tut-chip-link">cckit <a href="/install/">installed</a> &amp; <a href="/initialize/">initialized</a></span>
+                  <span class="tut-chip tut-chip-link">cckit <a href="/getting-started/install/">installed</a> &amp; <a href="/getting-started/initialize/">initialized</a></span>
                 ) : (
                   <code class="tut-chip">{p}</code>
                 ),

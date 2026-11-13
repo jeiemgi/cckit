@@ -1,0 +1,33 @@
+---
+title: All reference pages
+description: One list of every reference page that is not in the sidebar.
+---
+
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+The sidebar's Reference group lists the five pages most readers look things up in: the
+[CLI reference](/cli-reference/), [Config and permissions](/config-and-permissions/),
+[Integrations](/integrations/), [Skills cckit ships](/skills/) and [Rules cckit ships](/rules/).
+The pages below are not in the sidebar. Each is one click from here, and search finds all of them.
+
+## How cckit is driven
+
+<CardGrid>
+  <LinkCard title="Driving cckit from agents" href="/agents/" description="The machine-readable surface — every verb's --llm mode and the AGENTS.md contract." />
+  <LinkCard title="Adapters" href="/adapters/" description="The agnostic core and the per-agent adapters." />
+  <LinkCard title="Claude and Codex compatibility" href="/agent-compatibility/" description="Shared behavior and the current gaps between the two adapters." />
+  <LinkCard title="Hooks" href="/hooks/" description="Each hook cckit sets up, the event it runs on and what it does." />
+  <LinkCard title="Install & update matrix" href="/install-matrix/" description="What each install route writes, how each updates, and when a restart is needed." />
+  <LinkCard title="Cookbook" href="/cookbook/" description="Short, copy-paste recipes for the things you'll do again and again." />
+</CardGrid>
+
+## About these docs and the project
+
+<CardGrid>
+  <LinkCard title="Tags" href="/tags/" description="What the coloured tags on a page mean, and a directory of everything each tag marks." />
+  <LinkCard title="Documentation benchmark" href="/benchmark/" description="Score how well a project finds and uses its own docs." />
+  <LinkCard title="Benchmark results" href="/benchmark-results/" description="The benchmark score recorded at every checkpoint of every release." />
+  <LinkCard title="Showcase" href="/showcase/" description="Real command output captured as screenshots." />
+  <LinkCard title="Built with cckit badge" href="/badge/" description="A badge for the README of a project built with cckit." />
+  <LinkCard title="Disclaimer & trademarks" href="/disclaimer/" description="cckit is independent and not affiliated with Anthropic." />
+</CardGrid>

@@ -43,7 +43,7 @@ FREEZE_PRESET=(--window --padding 20 --width 920 --height 400 --wrap 90 --font.s
   echo
   echo 'A short visual tour of cckit — each shot is a real command run for real, captured at the same'
   echo 'size. For the **full command list** (copyable), see the [CLI reference](/cli-reference/); to'
-  echo 'see how the verbs fit together, start with [the GitHub cycle](/github-cycle/).'
+  echo 'see how the verbs fit together, start with [the GitHub cycle](/development/).'
   echo
 } > "$GALLERY"
 

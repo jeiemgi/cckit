@@ -130,7 +130,7 @@ cckit asks before it changes anything in a repo it has not worked in before.
 
 - **A config or `.claude/` file is proposed before it is written.** `cckit add <module>` and `cckit migrate` go through one machine (`scripts/lib/kit-operate.sh`): show the change, ask, apply, record. `KIT_DRY_RUN=1` previews and writes nothing; `KIT_ASSUME_YES=1` skips the question, and still keeps a file you edited. `cckit init --dry-run` prints the scaffold plan and writes nothing.
 - **A third-party tool installs only with recorded consent.** Your yes to `cckit doctor` (its prompt, or `--fix`) is written as one `install:<id>` line in `.cckit/consent` (gitignored). That file holds install consent and nothing else: no other verb reads or writes it. See [Integrations](/integrations/#what-your-yes-records).
-- **The secret and privacy guard always runs** before anything is committed or published. It is not optional and no consent bypasses it — see [Security](/security/).
+- **The secret and privacy guard always runs** before anything is committed or published. It is not optional and no consent bypasses it — see [Security](/review/secret-guard/).
 - **Destructive or irreversible operations** (force-push, repo create, history rewrite) always require a separate, explicit confirmation.
 
 ## Captain merge policy
@@ -306,7 +306,7 @@ with no verdict prints that, names both keys that close it, and goes quiet once 
 </Aside>
 
 <Aside type="tip" title="Not the same thing as review-lint">
-[Codified review gates](/review-gates/) are static linters that run inside `scripts/check.sh` —
+[Codified review gates](/review/gates/) are static linters that run inside `scripts/check.sh` —
 patterns earned from past review findings, enforced on every commit. This page's review stage is an
 **agent** reading a diff. Neither replaces the other.
 </Aside>
@@ -316,7 +316,7 @@ patterns earned from past review findings, enforced on every commit. This page's
 `cckit qa` reads one block, `qa`, written by the `qa` module interview (`/kit-add qa`, or
 `scripts/kit-add.sh qa --answers <file>`). cckit records how the project's review stack boots; it
 does not guess a boot command and does not write a boot script. The walkthrough is the
-[QA lane guide](/qa-lane/).
+[QA lane guide](/review/qa-lane/).
 
 ```json
 {
@@ -482,7 +482,7 @@ in a shared checkout — writing `node_modules` and a lockfile into another sess
 
 ## Light tasks
 
-[`cckit task`](/light-tasks/) tracks work without GitHub issues. Three keys, all optional:
+[`cckit task`](/project-management/light-tasks/) tracks work without GitHub issues. Three keys, all optional:
 
 ```json
 {
@@ -580,7 +580,7 @@ refusal leaves no branch, no worktree and no board change. It is not read-free: 
 origin, and a `<slug>` argument was resolved before it, which can run `gh issue list`. Re-running
 `cckit effort start` on an effort that is *already* in progress is never gated — it adds no WIP.
 `cckit start <issue>` (a plain task worktree) has no WIP limit. Full behaviour:
-[Only so many efforts at once](/efforts-and-waves/#only-so-many-efforts-at-once).
+[Only so many efforts at once](/project-management/efforts-and-waves/#only-so-many-efforts-at-once).
 
 ## Integrations
 
@@ -631,7 +631,7 @@ refused by the validator.
 | `local.enabled` | *(unset — off)* | `true` switches on `integrations/mlx-lm.json`: `cckit doctor` installs the runtime on Apple silicon and starts `mlx_lm.server` on `local.port` (default `8080`) with `local.model`. |
 | `local.port` | `8080` | The port `mlx_lm.server` listens on. |
 | `local.model` | `mlx-community/Qwen3-8B-4bit` | The model the server loads. The first start downloads it. |
-| `reviewPages.enabled` | *(unset — on)* | `false` turns [review pages](/review-pages/) off: plans, decisions and grills print to the terminal. `integrations/lavish.json` sets `config.default: true`, so the unset key is on. |
+| `reviewPages.enabled` | *(unset — on)* | `false` turns [review pages](/project-management/plan-pages/) off: plans, decisions and grills print to the terminal. `integrations/lavish.json` sets `config.default: true`, so the unset key is on. |
 | `reviewPages.answers` | *(unset)* | `issue` or `file`: where `cckit page answer` writes. Unset: a comment on the issue when `github.repo` is set and `--issue` is given, else a file. |
 | `reviewPages.answersDir` | `docs/answers` | Directory, relative to the repo root, for answers written as files. |
 | `local.dismissed` | *(unset)* | The `kitVersion` at which the "local layer down" session notice was dismissed. Written by `cckit doctor --dismiss-local`. |
@@ -643,7 +643,7 @@ refused by the validator.
 The registry is the `integrations/` directory of the cckit install. `KIT_INTEGRATIONS_DIR` names
 another directory for one invocation: it replaces the registry and does not add to it, and it must
 also hold `integration.schema.json`. Walkthrough:
-[Add your own tool as an integration](/tutorials/add-your-own-integration/).
+[Add your own tool as an integration](/development/add-your-own-integration/).
 
 ### Switching one on: `cckit add`
 
@@ -1110,7 +1110,7 @@ RECEIPT
 ```
 
 The stage is one of `build` · `review` · `design` · `docs` · `qa` · `none`. `qa` is the stage
-`cckit qa verdict` writes — see [the QA lane](/qa-lane/#record-the-verdict--cckit-qa-verdict).
+`cckit qa verdict` writes — see [the QA lane](/review/qa-lane/#record-the-verdict--cckit-qa-verdict).
 
 One JSON file per attempt, under `.cckit/receipts/`, keyed `<issue>-<stage>-<attempt>`. The
 directory resolves from the repo's shared git dir, so a receipt a worker writes inside its own

@@ -1,0 +1,123 @@
+---
+title: Adopting cckit
+description: Issue-driven, incremental adoption of cckit in any repo.
+---
+
+import { CardGrid, LinkCard, Steps, Aside } from '@astrojs/starlight/components';
+import Tag from '../../../components/Tag.astro';
+import TagRow from '../../../components/TagRow.astro';
+
+<TagRow kinds={["flow", "command"]} />
+
+Bring cckit to any repo, one issue at a time, without restructuring what's already there.
+
+Adoption is **issue-driven** and incremental: file an issue for it, then walk the steps below. Every step is a single cckit verb, so an agent can perform the whole adoption unattended and report back.
+
+## The flow
+
+Run these in order from inside the repo.
+
+```sh
+cckit scan      # 1. detect the repo's stack + kit state
+cckit init      # 2. scaffold cckit.config.json + .claude/  (greenfield only)
+cckit adopt     # 3. record kit-shaped files the repo ALREADY has
+cckit migrate   # 4. reshuffle any old kit layout to the current one
+cckit update    # 5. report whether the project is behind the installed cckit (behind? see /getting-started/update/)
+cckit doctor    # 6. preflight: deps + gh auth are in place
+```
+
+## What each step does
+
+<Steps>
+
+1. **`scan` — where you stand.** It reports the kit state: `configured` (cckit already runs here), `partial` or `claude-only` (some kit-shaped files exist but aren't owned), or `none` (greenfield).
+
+2. **`init` — greenfield only.** For a `none` repo, it writes the config and a `.claude/` folder from a profile. Skip it if `scan` says `configured`.
+
+3. **`adopt` — take ownership of files already there.** This is the bridge for a repo that imported the kit by hand (copied a `.claude/`, ran an old init, a teammate pasted skills). The files are present but the **manifest** — cckit's record of which files it owns — doesn't know them, so `update` and `remove` won't touch them. `adopt` records each at its current hash. It writes no content; it only takes ownership. Dry-run first; it never claims your `knowledge/`, plans, or app code.
+
+4. **`migrate` — fix layout drift.** It reshuffles an old kit layout to the current one, and survives repeated runs unchanged.
+
+5. **`update` — check your version.** It reports whether the project trails the installed cckit version.
+
+6. **`doctor` — confirm the basics.** It checks deps and `gh` auth are in place.
+
+</Steps>
+
+<Aside type="note" title="What is the manifest?">
+The manifest is cckit's list of which files in your repo it owns and manages. Files outside it — your app code, your `knowledge/`, your plans — are never touched by `update` or `remove`. `adopt` is how you add already-present kit files to that list.
+</Aside>
+
+## Why issue-driven
+
+Every change starts as an issue. The issue says *what*
+and *why* before any code exists; the branch, the PR, and the review all hang off it, so the work is
+traceable, reviewable, and reversible. (Adoption itself follows this path: one issue → one branch →
+one PR via `cckit start` / `cckit pr`, with the issue recording which steps applied to this repo.)
+
+`cckit start <issue>` takes an issue number, so the branch, the worktree and the PR each start
+from one.
+
+## Idempotent and safe
+
+Every step is a no-op when there is nothing to do. The file-touching ones (`init`, `adopt`, `migrate`) are dry-run-previewable and never overwrite content they don't own.
+
+## Adopt a repo by asking Claude Code
+
+**What you'll do:** bring cckit into a project that already has its own layout — nothing above the kit
+is restructured. cckit looks at what's already there, adds its config, and records the kit-shaped
+files the repo already has, then shows the board.
+
+### Steps
+
+<Steps>
+
+1. **Ask Claude to adopt the repo.**
+
+   <div class="cckit-prompt">
+
+   ```text frame="terminal" title="Prompt to paste"
+   Bring cckit into this existing project without disturbing its layout. Look at what's already here,
+   add its config, and record the kit-shaped files the repo already has. Then confirm everything's
+   wired up.
+   ```
+
+   </div>
+
+2. **cckit scans, scaffolds, and adopts.**
+
+   ```bash frame="terminal"
+   cckit scan      # detect the repo's stack + current kit state
+   cckit init      # scaffold cckit.config.json + .claude/
+   cckit adopt     # record kit-shaped files the repo already has
+   cckit status    # confirm the board + worktrees + handoff view
+   ```
+
+3. **Confirm nothing else moved.** `status` shows the board, any worktrees, and the handoff view.
+   Your existing files and structure are untouched — only cckit's own config was added.
+
+</Steps>
+
+### How it works
+
+Adoption is deliberately additive. `scan` reads your stack and current state so cckit knows what it's
+joining; `init` writes only its own `cckit.config.json` and `.claude/`; `adopt` records the
+kit-shaped files you already have so cckit manages them in place instead of duplicating them.
+
+<Aside type="tip" title="Additive, not a rewrite">
+No company, framework, or repo layout is baked into cckit. Adoption adds a config and records what
+exists; it never reshapes your project.
+</Aside>
+
+### Troubleshooting
+
+**`adopt` didn't pick up a file I expected.** It records only files under `.claude/skills`,
+`.claude/rules`, `.claude/agents`, `.claude/commands`, `.claude/hooks`, `.claude/lib`,
+`.agents/skills` and `.agents/rules`, plus `.claude/statusline.sh` and `.claude/settings.json`.
+`cckit adopt --check` lists the ones not yet recorded and writes nothing.
+
+**I already ran `init` elsewhere.** `init` is idempotent — running it on an already-configured repo
+leaves your existing config in place rather than overwriting it.
+
+**The board looks empty.** That's expected on a fresh adoption — there are no issues in flight yet.
+Start one with the [single-issue lifecycle](/development/issue-to-merged-pr/).

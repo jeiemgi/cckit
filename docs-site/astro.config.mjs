@@ -60,10 +60,52 @@ export default defineConfig({
   // Live domain. cckit.dev is the production canonical home; canonical + OG resolve
   // against it. cckit.vercel.app and www.cckit.dev redirect here (308, set on the Vercel project).
   site: 'https://cckit.dev',
-  // Keep old docs URLs alive after renames.
+  // Keep old docs URLs alive after renames. Every target is a page, never another redirect. The
+  // site builds static, so each entry is a meta-refresh page and an #anchor on the old URL is lost.
+  // /copilot (`cckit copilot` became `cckit wave`) and /run-your-first-lifecycle predate the move of
+  // the area pages under their area (effort 493); the rest are that move.
   redirects: {
-    '/copilot': '/wave/', // `cckit copilot` → `cckit wave`
-    '/run-your-first-lifecycle': '/initialize/', // lifecycle page reframed as the init tutorial
+    '/adoption': '/getting-started/existing-repo/',
+    '/check-your-platform': '/getting-started/install/',
+    '/copilot': '/development/waves/',
+    '/debug': '/development/browser-debug/',
+    '/efforts-and-waves': '/project-management/efforts-and-waves/',
+    '/github-cycle': '/development/',
+    '/guides': '/reference/',
+    '/how-to-read': '/tags/',
+    '/initialize': '/getting-started/initialize/',
+    '/install': '/getting-started/install/',
+    '/light-tasks': '/project-management/light-tasks/',
+    '/multi-session': '/development/many-sessions/',
+    '/qa-lane': '/review/qa-lane/',
+    '/releasing': '/ship/releasing/',
+    '/review-gates': '/review/gates/',
+    '/review-pages': '/project-management/plan-pages/',
+    '/run-your-first-lifecycle': '/getting-started/initialize/',
+    '/security': '/review/secret-guard/',
+    '/tutorials': '/software/',
+    '/tutorials/add-your-own-integration': '/development/add-your-own-integration/',
+    '/tutorials/adopt-cckit-in-an-existing-repo': '/getting-started/existing-repo/',
+    '/tutorials/break-a-feature-into-an-effort': '/project-management/break-a-feature-into-an-effort/',
+    '/tutorials/control-what-claude-code-can-do': '/review/control-what-agents-can-do/',
+    '/tutorials/debug-a-web-page-with-claude-code': '/development/browser-debug/',
+    '/tutorials/drive-claude-code-headless-in-ci': '/development/headless-in-ci/',
+    '/tutorials/extend-claude-code-with-skills': '/development/extend-with-skills/',
+    '/tutorials/find-code-with-a-code-graph': '/development/code-graph/',
+    '/tutorials/give-claude-code-persistent-memory': '/memory/install-mempalace/',
+    '/tutorials/have-an-agent-review-before-a-merge': '/review/agent-review/',
+    '/tutorials/keep-private-data-out-of-ai-commits': '/review/keep-private-data-out/',
+    '/tutorials/run-checks-with-cckit-hooks': '/development/checks-with-hooks/',
+    '/tutorials/run-claude-code-unattended': '/development/run-unattended/',
+    '/tutorials/run-issues-in-parallel-with-a-wave': '/development/run-a-wave-in-parallel/',
+    '/tutorials/run-one-objective-unattended': '/development/run-one-objective-unattended/',
+    '/tutorials/set-up-cckit-in-a-repo': '/getting-started/initialize/',
+    '/tutorials/stop-claude-committing-secrets': '/review/stop-committing-secrets/',
+    '/tutorials/summarize-long-files-with-a-local-model': '/development/local-model-digest/',
+    '/tutorials/take-a-github-issue-to-a-merged-pr': '/development/issue-to-merged-pr/',
+    '/tutorials/use-cckit-with-codex': '/getting-started/codex/',
+    '/update': '/getting-started/update/',
+    '/wave': '/development/waves/',
   },
   vite: { define: { __CCKIT_VERSION__: JSON.stringify(pkg.version) } },
   // External links open in a new tab (safely) and get an "opens externally" icon via CSS
@@ -87,7 +129,7 @@ export default defineConfig({
     starlight({
       title: 'cckit',
       // Two languages, one translated section. English is served at the root; Spanish under /es/.
-      // Only the 7 Marketing pages exist in Spanish (src/content/docs/es/marketing/). Starlight
+      // Only the 10 Marketing pages exist in Spanish (src/content/docs/es/marketing/). Starlight
       // still builds an English fallback copy of every other page under /es/; those copies are
       // kept out of the sitemap below and marked noindex by the route middleware, and the language
       // picker is rendered on Marketing pages only (src/components/LanguageSelect.astro).
@@ -160,46 +202,84 @@ export default defineConfig({
       // Per-track sidebars: this one array holds the entries of both tracks, and the route
       // middleware keeps only the entries of the track a page belongs to (src/routeData.ts).
       routeMiddleware: './src/routeData.ts',
-      // Software: 20 entries in 4 groups, grouped by the job the reader is doing. Every other
-      // Software page stays reachable by search and from the "All tutorials" / "All guides" pages.
+      // Software: 42 entries. One link to the track's entry page, then the areas in the order a team
+      // works in, then Reference. Every group is collapsed; Starlight opens the group that holds the
+      // current page. A Software page that is not listed here is linked from its area's "More
+      // guides" page or from /reference/, and search covers all of them.
       sidebar: [
-        { label: 'Start', items: [
-          { label: 'Overview', slug: 'index' },
-          { label: 'Quickstart', slug: 'getting-started', badge: { text: 'Start here', variant: 'success' } },
-          { label: 'Install', slug: 'install' },
-          { label: 'Initialize', slug: 'initialize' },
+        { label: 'Start here', slug: 'software' },
+        { label: 'Philosophy', collapsed: true, items: [
+          { label: 'The idea', slug: 'philosophy' },
+          { label: 'The team: you and the agents', slug: 'philosophy/the-team' },
         ]},
-        { label: 'Ship one issue', items: [
-          { label: 'The GitHub cycle', slug: 'github-cycle' },
-          { label: 'Issue to merged PR', slug: 'tutorials/take-a-github-issue-to-a-merged-pr' },
-          { label: 'Review gates', slug: 'review-gates' },
-          { label: 'Hooks', slug: 'hooks' },
-          { label: 'Security and secret guard', slug: 'security' },
+        { label: 'Getting started', collapsed: true, items: [
+          { label: 'What you set up, and why', slug: 'getting-started' },
+          { label: 'Install and check', slug: 'getting-started/install' },
+          { label: 'Initialize a project', slug: 'getting-started/initialize' },
+          { label: 'Add cckit to an existing repo', slug: 'getting-started/existing-repo' },
+          { label: 'Use cckit with Codex', slug: 'getting-started/codex' },
+          { label: 'Update a project', slug: 'getting-started/update' },
         ]},
-        { label: 'Ship many at once', items: [
-          { label: 'Efforts, waves and worktrees', slug: 'efforts-and-waves' },
-          { label: 'Break a feature into an effort', slug: 'tutorials/break-a-feature-into-an-effort' },
-          { label: 'Run a wave in parallel', slug: 'tutorials/run-issues-in-parallel-with-a-wave' },
-          { label: 'Run unattended', slug: 'tutorials/run-claude-code-unattended' },
-          { label: 'Releasing', slug: 'releasing' },
+        { label: 'Memory', collapsed: true, items: [
+          { label: 'Why an agent team needs memory', slug: 'memory' },
+          { label: 'Install MemPalace', slug: 'memory/install-mempalace' },
+          { label: 'How cckit uses memory', slug: 'memory/how-cckit-uses-it' },
         ]},
-        { label: 'Look it up', items: [
+        { label: 'Project management', collapsed: true, items: [
+          { label: 'Units of work, in Scrum terms', slug: 'project-management' },
+          { label: 'Tech lead, PM and captain', slug: 'project-management/roles' },
+          { label: 'Plans you answer on a page', slug: 'project-management/plan-pages' },
+          { label: 'Efforts and waves in practice', slug: 'project-management/efforts-and-waves' },
+          { label: 'Tasks without GitHub issues', slug: 'project-management/light-tasks' },
+          { label: 'Break a feature into an effort', slug: 'project-management/break-a-feature-into-an-effort' },
+        ]},
+        { label: 'Design', collapsed: true, items: [
+          { label: 'Why design has one owner', slug: 'design' },
+          { label: 'Annotate the running interface', slug: 'design/annotate-the-ui' },
+          { label: 'Run a UX audit', slug: 'design/ux-audit' },
+        ]},
+        { label: 'Development', collapsed: true, items: [
+          { label: 'How one change is built', slug: 'development' },
+          { label: 'Let the agent see the page', slug: 'development/browser-debug' },
+          { label: 'Run work in parallel waves', slug: 'development/waves' },
+          { label: 'Many sessions, one repository', slug: 'development/many-sessions' },
+          { label: 'Take an issue to merged', slug: 'development/issue-to-merged-pr' },
+          { label: 'More development guides', slug: 'development/more-guides' },
+        ]},
+        { label: 'Review', collapsed: true, items: [
+          { label: 'Why nothing merges unreviewed', slug: 'review' },
+          { label: 'Review gates', slug: 'review/gates' },
+          { label: 'QA on a running stack', slug: 'review/qa-lane' },
+          { label: 'The secret guard', slug: 'review/secret-guard' },
+          { label: 'Agent review before a merge', slug: 'review/agent-review' },
+          { label: 'More review guides', slug: 'review/more-guides' },
+        ]},
+        { label: 'Ship', collapsed: true, items: [
+          { label: 'Why merging is a decision', slug: 'ship' },
+          { label: 'Merge, close and clean up', slug: 'ship/merge-and-close' },
+          { label: 'Cut a release', slug: 'ship/releasing' },
+        ]},
+        { label: 'Reference', collapsed: true, items: [
           { label: 'CLI reference', slug: 'cli-reference' },
           { label: 'Config and permissions', slug: 'config-and-permissions' },
+          { label: 'Integrations', slug: 'integrations' },
           { label: 'Skills cckit ships', slug: 'skills' },
-          { label: 'Driving cckit from agents', slug: 'agents' },
-          { label: 'All tutorials', slug: 'tutorials' },
-          { label: 'All guides', slug: 'guides' },
+          { label: 'Rules cckit ships', slug: 'rules' },
+          { label: 'All reference pages', slug: 'reference' },
         ]},
-        // Marketing: 7 pages for a reader who never opens a terminal. The middleware shows these
-        // as a flat list, without the group heading, on every page under /marketing/.
+        // Marketing: 10 pages in the order of the process, for a reader who never opens a terminal.
+        // The middleware shows these as a flat list, without the group heading, on every page
+        // under /marketing/.
         { label: 'Marketing', translations: { es: 'Marketing' }, items: [
-          { label: 'What cckit does for you', translations: { es: 'Qué hace cckit por ti' }, slug: 'marketing' },
+          { label: 'What this is for', translations: { es: 'Para qué sirve esto' }, slug: 'marketing' },
+          { label: 'How we work', translations: { es: 'Cómo trabajamos' }, slug: 'marketing/how-we-work' },
+          { label: 'Who does what', translations: { es: 'Quién hace qué' }, slug: 'marketing/who-does-what' },
           { label: 'Get set up', translations: { es: 'Prepara todo' }, slug: 'marketing/get-set-up' },
-          { label: 'Your first piece', translations: { es: 'Tu primera pieza' }, slug: 'marketing/your-first-piece' },
+          { label: 'The tools we plug in', translations: { es: 'Las herramientas que conectamos' }, slug: 'marketing/tools' },
           { label: 'Set your brand voice', translations: { es: 'Define tu voz de marca' }, slug: 'marketing/brand-voice' },
           { label: 'Plan and run a campaign', translations: { es: 'Planea y lleva una campaña' }, slug: 'marketing/campaigns' },
-          { label: 'Who does what', translations: { es: 'Quién hace qué' }, slug: 'marketing/who-does-what' },
+          { label: 'A piece, idea to approved', translations: { es: 'Una pieza, de la idea a la aprobación' }, slug: 'marketing/your-first-piece' },
+          { label: 'Review and approval', translations: { es: 'Revisión y aprobación' }, slug: 'marketing/review-and-approval' },
           { label: 'Words you will hear', translations: { es: 'Palabras que vas a escuchar' }, slug: 'marketing/words-you-will-hear' },
         ]},
       ],

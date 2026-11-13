@@ -1,12 +1,12 @@
 ---
-// Index for the Instagram / Stories card templates — one link per tutorial. The 1200×630 link cards
+// Index for the Instagram / Stories card templates — one link per guide that sets `tutorial:` frontmatter. The 1200×630 link cards
 // for LinkedIn / X / Facebook are automatic (/og/…); this page is only the manual-post IG kit.
 import { getCollection } from 'astro:content';
 
 const entries = await getCollection('docs');
 const tutorials = entries
-  .filter((e) => e.id.startsWith('tutorials/') && e.data.tutorial)
-  .map((e) => ({ slug: e.id.replace(/^tutorials\//, ''), title: e.data.title, tag: e.data.tutorial.ogTag }))
+  .filter((e) => e.data.tutorial)
+  .map((e) => ({ slug: e.id, title: e.data.title, tag: e.data.tutorial.ogTag }))
   .sort((a, b) => a.title.localeCompare(b.title));
 ---
 

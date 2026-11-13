@@ -1,0 +1,168 @@
+---
+title: How to give Claude Code a code graph with Graft
+description: Switch on cckit's optional Graft integration so Claude Code asks an index where code lives and who calls a symbol. Four commands, one consent, and what each one prints.
+tutorial:
+  job: give Claude Code a code graph with Graft
+  difficulty: intermediate
+  time: "6 min"
+  prerequisites: ["cckit installed and initialized", "Node.js with npm", "a repo with code in a language Graft indexes"]
+  ogTag: Integrations
+  keywords: [claude code code search, code graph for ai agents, graft claude code, find where code is handled]
+  related: [development/add-your-own-integration, memory/install-mempalace, development/local-model-digest]
+---
+
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import TagRow from '../../../components/TagRow.astro';
+import TutorialMeta from '../../../components/TutorialMeta.astro';
+import TutorialSchema from '../../../components/TutorialSchema.astro';
+
+<TagRow kinds={["flow"]} />
+
+<TutorialMeta />
+
+**What you'll set up:** a local index of your code that the agent queries before it greps. Graft
+is a third-party tool; cckit switches it on, installs it after your yes, and writes the rule that
+tells the agent which question goes to which Graft verb. The index is built by parsing your files
+on your machine: no model is called and no API key is needed.
+
+## Steps
+
+<Steps>
+
+1. **See what this repo can add.** With no name, `cckit add` lists every integration and marks
+   each one `on` or `off`:
+
+   ```bash frame="terminal"
+   cckit add
+   ```
+
+   You should see a `graft` row ending in `[off]`.
+
+2. **Preview the change.** A dry run writes nothing and installs nothing:
+
+   ```bash frame="terminal"
+   KIT_DRY_RUN=1 cckit add graft
+   ```
+
+   It prints the config diff (one new key, `codeGraph.provider`), the rule file it would write,
+   the install commands in the order they would be tried, and the command that wires Graft into
+   the repo.
+
+3. **Switch it on.** `cckit add graft` asks one question. On yes it sets the key and writes one
+   rule file:
+
+   ```bash frame="terminal"
+   cckit add graft
+   ```
+
+   You should see `Graft is on: codeGraph.provider = "graft". Nothing was installed.` and
+   `rule written: …/.claude/rules/code-retrieval.md`.
+
+4. **Install it.** The doctor prints one row per integration that is switched on, and asks before
+   it installs a missing one:
+
+   ```bash frame="terminal"
+   cckit doctor         # in a terminal: asks, then installs on yes
+   cckit doctor --fix   # installs without the prompt
+   ```
+
+   Under **Integrations** you should see a `Graft` row reading `installed`. Your yes is recorded
+   as the line `install:graft` in `.cckit/consent`, at the root of the repo. `cckit init` adds
+   `.cckit/` to `.gitignore`. In a project where `git check-ignore .cckit/` prints nothing, add
+   the line `.cckit/` yourself so the file is never committed.
+
+5. **Wire it into the repo.** The doctor leaves this step to you and prints the command:
+
+   ```bash frame="terminal"
+   graft init --agents claude --no-statusline --no-global
+   ```
+
+   It writes its hooks, a skill and an MCP entry inside the repo, builds the graph into `graft/`
+   and adds `graft/` to `.gitignore`. Then restart Claude Code so the new session loads them.
+
+6. **Check the graph, then use it.**
+
+   ```bash frame="terminal"
+   graft check          # exit 0: the graph matches the code
+   ```
+
+   <div class="cckit-prompt">
+
+   ```text frame="terminal" title="Prompt to paste"
+   Using the code graph, tell me where this repo handles authentication and what calls it. Say
+   which graft command you ran for each answer.
+   ```
+
+   </div>
+
+</Steps>
+
+## How it works
+
+`cckit add graft` records a choice; it does not install. The install runs from the doctor, from
+the commands listed in `integrations/graft.json`, and only after your yes for that repo. The rule
+file `.claude/rules/code-retrieval.md` routes each kind of question to one Graft verb and falls
+back to plain search, without an error, when the graph is missing or the file is in a language
+Graft does not index.
+
+The two flags on `graft init` keep the change inside the project. `--no-global` stops Graft
+writing to your home directory, which would change every repo on the machine. `--no-statusline`
+leaves the statusline alone.
+
+- The list of integrations and what your yes records: [Integrations](/integrations/).
+- The question-to-verb table, the files `graft init` writes and how to remove them:
+  [Code-graph retrieval: Graft](/config-and-permissions/#code-graph-retrieval-graft).
+
+<Aside type="note" title="Graft is not part of cckit">
+Graft is open-source software (MIT) by [NanoNets / Trail](https://github.com/trailhq/Trail-Code),
+installed from its public npm package. cckit is not affiliated with either and does not maintain
+Graft; report Graft bugs to its own repository. Per the vendor README, Graft makes a daily npm
+version check and sends one batched anonymous usage ping. `graft telemetry disable` or
+`DO_NOT_TRACK=1` turns the ping off. cckit sets neither. `graft build --deep` is the one Graft
+command that calls a model, under your own key, and cckit never runs it.
+</Aside>
+
+## Troubleshooting
+
+**`cckit add graft` says "not offered here".** The repo has no file in a language Graft indexes. A
+repo of only shell scripts is the usual case: Graft has no shell grammar. The command exits 0 and
+writes nothing.
+
+**The doctor reports Graft missing and exits 1.** It ran with no terminal and no `--fix`, so
+nothing was installed. Run `cckit doctor --fix`.
+
+**`graft --version` fails with `No native build was found`.** Graft was installed with pnpm. On
+Apple silicon with Node 22 that install exits 0 and the binary then cannot load. Remove it and
+install with `npm install -g @nanonets/graft`, the command the doctor tries first.
+
+**`graft check` prints `NO GRAPH` and exits 1.** The wire step has not run in this repo, or
+`graft/` was deleted. Run `graft build`, or the `graft init` command from step 5.
+
+**The agent still greps.** Start a new session after `graft init`, and confirm
+`.claude/rules/code-retrieval.md` exists. For a file in a language Graft does not index, grep is
+the expected behaviour.
+
+## Related tutorials
+
+<CardGrid>
+  <LinkCard title="Add your own tool as an integration" href="/development/add-your-own-integration/" description="Describe a tool that is not in the list, and let the doctor install it." />
+  <LinkCard title="Give Claude Code persistent project memory" href="/memory/install-mempalace/" description="The memory integration, switched on the same way." />
+  <LinkCard title="Summarize long files with a local model" href="/development/local-model-digest/" description="The local model integration, for Apple silicon." />
+</CardGrid>
+
+<TutorialSchema
+  steps={[
+    { name: 'See what this repo can add', text: 'Run cckit add with no name. It lists every integration, each marked on or off.' },
+    { name: 'Preview the change', text: 'KIT_DRY_RUN=1 cckit add graft prints the config diff, the rule file, the install commands in order and the wire command. Nothing is written.' },
+    { name: 'Switch it on', text: 'cckit add graft asks one question, sets codeGraph.provider to graft and writes .claude/rules/code-retrieval.md. Nothing is installed.' },
+    { name: 'Install it', text: 'cckit doctor asks, then installs Graft; cckit doctor --fix installs without the prompt. The yes is recorded as install:graft in .cckit/consent.' },
+    { name: 'Wire it into the repo', text: 'Run graft init --agents claude --no-statusline --no-global, then restart Claude Code.' },
+    { name: 'Check the graph, then use it', text: 'graft check exits 0 when the graph matches the code. Ask the agent a where-is question.' },
+  ]}
+  faqs={[
+    { q: 'cckit add graft says "not offered here"', a: 'The repo has no file in a language Graft indexes, for example a repo of only shell scripts. The command exits 0 and writes nothing.' },
+    { q: 'The doctor reports Graft missing and exits 1', a: 'It ran with no terminal and no --fix, so nothing was installed. Run cckit doctor --fix.' },
+    { q: 'graft --version fails with "No native build was found"', a: 'Graft was installed with pnpm, which does not load on Apple silicon with Node 22. Install it with npm install -g @nanonets/graft.' },
+    { q: 'graft check prints NO GRAPH', a: 'The wire step has not run in this repo, or graft/ was deleted. Run graft build or the graft init command again.' },
+  ]}
+/>

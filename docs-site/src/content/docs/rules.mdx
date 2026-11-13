@@ -84,7 +84,7 @@ To scope a rule of your own, add a `paths:` list to its frontmatter:
   it would not load until a matching file had already been read.
 
 Resident rules count against the 150k characters of instruction files Claude Code loads per
-session. [`instruction-budget-lint`](/review-gates/#instruction-budget-lint--what-every-session-loads)
+session. [`instruction-budget-lint`](/review/gates/#instruction-budget-lint--what-every-session-loads)
 is the gate on that total; its `--report` lists the resident and the path-scoped files separately.
 
 ## plain-language
@@ -120,7 +120,7 @@ writes `"plainLanguage": {"enabled": true}` and the rule. `--plain-language off`
 also on the `marketing` profile, whose default is on.
 On `cckit init --upgrade` the stored switch wins: a project that set it to `false` and deleted the
 rule does not get the rule back, and one whose switch is on gets a missing rule file restored. The
-same switch rewords the progress lines of [`cckit task`](/light-tasks/#plain-language).
+same switch rewords the progress lines of [`cckit task`](/project-management/light-tasks/#plain-language).
 
 ## Rules that came from a correction
 
@@ -212,7 +212,7 @@ pr_attach_evidence <pr-number> gate.log "gate"
 
 See [Captain merge policy](/config-and-permissions/#captain-merge-policy),
 [the agent review stage](/config-and-permissions/#the-agent-review-stage) and
-[Codified review gates](/review-gates/) for the lint that turns a recurring finding into a gate.
+[Codified review gates](/review/gates/) for the lint that turns a recurring finding into a gate.
 
 ### authoring
 
@@ -238,7 +238,7 @@ What each one asks for in practice:
 
 ### review-pages
 
-`templates/rules/review-pages.md` — which output goes to a [review page](/review-pages/) and how.
+`templates/rules/review-pages.md` — which output goes to a [review page](/project-management/plan-pages/) and how.
 
 | Part | What it says |
 | --- | --- |
@@ -264,5 +264,5 @@ primary checkout as their last step. With the checkout already on the base and c
 nothing and fast-forwards; both lines end in `|| true`, so a dirty or re-parked checkout is left
 stale without a message.
 
-[Multi-session safety](/multi-session/) lists what sessions share and what cckit already isolates;
+[Multi-session safety](/development/many-sessions/) lists what sessions share and what cckit already isolates;
 the [install & update matrix](/install-matrix/) says which install routes put PATH inside a clone.

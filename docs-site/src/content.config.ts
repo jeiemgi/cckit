@@ -19,7 +19,7 @@ const tutorial = z
     ogTag: z.string().optional(),
     // Extra target keywords (kept out of the visible copy; used for meta + intent tracking).
     keywords: z.array(z.string()).default([]),
-    // Slugs of sibling tutorials for the internal-link cluster.
+    // Page ids of sibling guides (e.g. development/issue-to-merged-pr) for the internal-link cluster.
     related: z.array(z.string()).default([]),
   })
   .optional();

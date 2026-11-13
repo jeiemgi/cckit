@@ -24,7 +24,7 @@ You are initializing the current project with the **claude-kit** setup. The kit 
    - If it's a single project (a `.git` here, or one app), continue here.
    - Suggest a layout that favors the kit — `CLAUDE.md` + `.claude/` at the project root, plans under
      `docs/plans/`, the kit's `scripts/` alongside; **one repo = one kit setup**. See
-     [Initialize → What the kit writes](https://cckit.dev/initialize/#what-the-kit-writes).
+     [Initialize → What the kit writes](https://cckit.dev/getting-started/initialize/#what-the-kit-writes).
 
    **Then gather inputs.** If `$ARGUMENTS` already names a profile and the key values, use them.
    Otherwise ask the user with `AskUserQuestion`:

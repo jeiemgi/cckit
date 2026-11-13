@@ -1,0 +1,367 @@
+---
+title: Initialize cckit
+description: Set cckit up in a project with one command — then let Claude surface your first real task and run it end to end.
+---
+
+import { Steps, Tabs, TabItem, Aside, FileTree } from '@astrojs/starlight/components';
+import Tag from '../../../components/Tag.astro';
+import TagRow from '../../../components/TagRow.astro';
+
+<TagRow kinds={["command", "conversational"]} />
+
+You've installed cckit. Now set it up in a project — and, even if that project has no issues or notes
+yet, give yourself a real first task to run through the kit.
+
+## 1 · Initialize the kit on a project
+
+In a terminal, from the folder you want to work in, or naming the folder a new project should get:
+
+```bash
+cckit init            # this folder
+cckit init my-app     # a new project in ./my-app (created for you)
+```
+
+You do not need to know git or GitHub to answer what it asks. init says what it found, asks in plain
+language, and every question has one answer marked **(Recommended)**: press Enter to take it.
+
+### What init does, in order
+
+<Steps>
+
+1. **It names the folder, before writing anything.**
+
+   | The folder is | What happens |
+   | --- | --- |
+   | a git repository with a GitHub remote | the kit is added, then the setup steps that are still missing |
+   | a git repository with no remote | the same, and the GitHub repository is created |
+   | a project (for example a `package.json`) with no git | the same, starting from `git init` |
+   | files, but nothing that marks a project | it asks: set it up here, start a new project in its own folder, or stop |
+   | empty, or not there yet | it asks whether this is a new project and what it starts from |
+   | your home folder, `~/Desktop`, `~/Documents`, `~/Downloads` or `/` | nothing is ever set up there. It asks whether this is a new project and which folder it gets |
+
+2. **A new project starts from a recipe.** One ships today: **Next.js + shadcn/ui** (`nextjs-shadcn`),
+   a web app you can open in the browser, installed with pnpm. You can also pick an empty project.
+
+3. **It asks whether the project needs a database.** One option ships today: **Supabase**. Choosing it
+   adds the two Supabase packages, the files `lib/supabase/client.ts` and `lib/supabase/server.ts`,
+   and a `.env.local` file that names the two values the app needs.
+
+4. **It adds the kit files** (the list is under [What the kit writes](#what-the-kit-writes)).
+
+5. **It lists the git and GitHub steps and asks once.** After you say yes:
+
+   | Step | Skipped when |
+   | --- | --- |
+   | Start version control (`git init`, branch `main`) and save the first version, the kit files included | the folder is already a repository / it already has a commit |
+   | Save the kit files as one commit on the base branch (`chore: add the cckit project files`), on a repository that already had commits. Only the files init writes go in: no env file, nothing git ignores, no script of your own under `scripts/`, nothing you had staged | the project config is already tracked. With the folder on another branch than the base, the step fails and names the branch to switch to |
+   | Create the GitHub repository. Private unless you pass `--public` | the folder is already connected to one |
+   | Create the branch `develop`, push it, and make it the default branch of a repository init created. When GitHub already has the base branch, push the kit files commit to it | GitHub has the branch and nothing is waiting to be pushed. An existing repository keeps its default branch |
+   | Add the labels and milestones the workflow uses | they exist. Only missing ones are created |
+   | Turn on "automatically delete head branches" | it is on |
+   | Protect the base branch: pull request required, branch up to date, linear history, no force-push | it is protected. On a free personal account GitHub refuses protection for a private repository (HTTP 403): init reports the step as skipped with that reason and carries on |
+   | Read the Projects v2 field ids | the project has no board |
+   | Print the `cckit doctor` report | never |
+
+6. **It ends with a result line**: how many steps were done, skipped and failed. A failed step does not
+   stop the later ones. Fix it and run `cckit init` again: finished steps are skipped, so on a project
+   that is fully set up a re-run changes nothing.
+
+</Steps>
+
+### The database keys: you type them, cckit never sees them
+
+When you choose Supabase, init opens a guide page in your browser
+(`databases/supabase/guide.html`, with `npx -y lavish-axi`). With no browser session (no terminal,
+SSH, CI) it prints the same steps in the terminal. The page shows how to create the Supabase project
+and where each value is:
+
+| Name in `.env.local` | What it is | Where it is |
+| --- | --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | the Project URL | your project → **Connect** |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | the publishable key (`sb_publishable_…`) | your project → **Connect**, or **Settings → API Keys** |
+
+init writes the two names with placeholders. You replace the placeholders yourself. cckit does not
+print the values, read them back or put them in a commit, and git ignores `.env.local`. The guide
+carries the date its steps were last checked against the Supabase documentation.
+
+### Without a terminal
+
+An agent or a script has no terminal to answer on. Three flags cover it:
+
+```bash
+cckit init my-app --dry-run --recipe nextjs-shadcn --database supabase   # print every step; write nothing
+cckit init my-app --answers answers.json --yes                           # answers from a file; setup confirmed
+cckit init --profile software --no-github                                # the kit files only
+cckit init --profile content --plain-language on --no-github             # + the plain-language rule
+```
+
+- `--answers <file>` is a JSON object keyed by question: `new_project` (`yes` / `no`), `folder_use`
+  (`here` / `new` / `cancel`), `project_name`, `location`, `recipe`, `database_needed` (`yes` / `no`),
+  `database`, `profile`. A question the file leaves out takes the recommended answer, and the output
+  says so. A value that is not one of the choices exits 2 before anything is written.
+- `--yes` confirms the git and GitHub steps. With no terminal and no `--yes` they do not run: the
+  kit files are written and the last lines say how to run the setup. They also name what the run
+  left undone: `Not done: the cckit files are not committed.` with the command that commits them
+  (`cckit init --yes`, or the `git add … && git commit` line after `--no-github`), and
+  `Not done: the branch '<base>' … does not exist in this repository.` when `cckit start` and
+  `cckit task start` would have nothing to cut from. The run still exits 0.
+- The base branch written to the config, when the setup does not run: the repository's default
+  branch on GitHub; else `main` when the repository has it or has no commit yet; else the branch
+  that is checked out. It is never a branch the repository lacks.
+- `--no-github` leaves git and GitHub out entirely. `--recipe <id>` and `--database <id>` choose
+  without a question; `--public` creates the repository public.
+- With neither a terminal nor an answers file, a home folder exits 2 and `--profile` is required.
+
+Recipes and database options are data: one JSON file each in `recipes/` and `databases/` of the kit.
+A database option is offered only when it ships its guide page and its setup test.
+
+### Profiles
+
+A profile is one JSON file in the kit's `profiles/` folder: the agents, skills, rules, roles and
+milestones a project starts with, plus a few defaults. The guided setup asks for it ("What kind of
+work is this project?"); `--profile <name>` and the `profile` key of an answers file name it
+directly.
+
+| Profile | For | Roles |
+| --- | --- | --- |
+| `software` | a software product | PM, Tech Lead, Designer, DevOps, Backend, Frontend, QA, Security |
+| `content` | writing and publishing, tracked in GitHub issues | PM, Editor, Designer, Researcher |
+| `marketing` | a marketing team that does not use git | PM, Editor, Designer, Researcher |
+| `research` | research and analysis | PM, Researcher, Analyst |
+| `automation` | workflow automation | PM, Automation, Generalist |
+| `minimal` | the smallest setup | PM, Generalist |
+
+`cckit init --profile <name> --no-github --dry-run` prints everything a profile would write and
+writes nothing.
+
+#### The marketing profile
+
+```bash
+cckit init --profile marketing --no-github     # the kit files only
+cckit init my-campaigns --profile marketing    # guided: folder, git and GitHub setup too
+```
+
+It is the `content` profile plus what a team that does not use git needs:
+
+| It adds | What that changes |
+| --- | --- |
+| `tasks.default: "light"` | Work is tracked as [light tasks](/project-management/light-tasks/) — one file per task in the project, no GitHub issue per task. A bare `cckit next` answers from that list. `CLAUDE.md` opens its task section with the four `cckit task` steps. |
+| the `plain-language` rule, `plainLanguage.enabled: true` | The agent says draft, review and approve, and names worktree, branch and pull request only when asked. `cckit task` words its progress lines the same way. See [plain-language](/rules/#plain-language). |
+| the `brand-voice` skill | Records the voice, key messages and banned phrasings in `brand/voice.md`. |
+| the `campaign` skill | Turns one goal into a plan file and its pieces. |
+| the `effort-model` rule | For a campaign tracked as an effort with sub-issues, when the team uses GitHub issues for it. |
+
+Like `content`, it sets `kinds.content: true` (the `kind:post`, `kind:campaign`, `kind:brand` and
+`kind:research` labels) and `pr.bodyStyle: "content"` (a review checklist for a draft in generated
+pull request bodies) — see [Content work](/config-and-permissions/#content-work).
+
+Review is still a pull request, which cckit opens; the person who approves it needs a GitHub
+account. Setting the project up needs a terminal once.
+
+### What the kit writes
+
+`cckit init` writes two things:
+
+- **`cckit.config.json`** — your repo, owner, and base branch. Nothing is hardcoded; every verb reads from here.
+- **`.claude/`** — agents, hooks, rules, and settings, so Claude Code and cckit know how to drive *this* project.
+
+Afterwards your repo looks roughly like this — your own files are untouched, cckit just adds its own:
+
+<FileTree>
+- your-repo/
+  - cckit.config.json    your repo, owner, base branch
+  - .claude/
+    - kit.config.json    profile + enabled features
+    - settings.local.json    hook registrations
+    - hooks/
+      - repo-hygiene.sh    SessionStart: stale branches/worktrees
+      - guard-base-branch-commit.sh    block commits to the base branch
+      - kit_version_check.sh    notice when you're behind
+    - agents/    role agents the kit ships
+    - skills/    the /kit-\* skills
+    - rules/    house rules for Claude Code
+    - lib/    shared helpers (kit-sigil.sh, …)
+  - … your existing files, unchanged
+</FileTree>
+
+init also adds these lines to `.gitignore` (each once; an existing file keeps its other lines):
+`.claude/settings.local.json`, the ownership manifest (`.claude/kit.manifest.json`), `.kann/`,
+`.cckit/` (cckit's local state: consent, session mail, the handoff note, autopilot runs) and
+`.claude/worktrees/` (the folders `cckit start` and `cckit task start` create). None of them is
+ever part of a commit.
+
+The instruction file (`CLAUDE.md`, or `AGENTS.md` for Codex) is rendered for the project: its
+pull-request section names the project's base branch, its skills table carries each skill's
+description, and in a project whose task list is light tasks (`tasks.default: "light"`) its "Task
+management" section names the task files under `tasks/` as the source of truth, not GitHub issues.
+
+The closing "Next steps" follow the task list too. A light-task project is told to add its first
+task (`cckit task new "<title>"`) and start it; the `./scripts/setup-labels.sh &&
+./scripts/setup-milestones.sh` line is printed only for a project that tracks work in GitHub
+issues and did not run the git and GitHub steps.
+
+### Claude Code, Codex, or both
+
+`cckit init` installs the Claude Code adapter unless you say otherwise:
+
+```bash
+cckit init --profile software --adapter codex   # or: claude (default) · both
+```
+
+| `--adapter` | Instructions | Skills and rules | Config | Hooks, guards, agents |
+| --- | --- | --- | --- | --- |
+| `claude` | `CLAUDE.md` | `.claude/skills/`, `.claude/rules/` | `.claude/kit.config.json` | `.claude/hooks/`, `.claude/agents/` |
+| `codex` | `AGENTS.md` | `.agents/skills/`, `.agents/rules/` | `cckit.config.json` | `.codex/hooks/`, `.codex/agents/` |
+| `both` | both files | both trees | where the first install put it | both |
+
+Both adapters render from the same templates, so a rule or skill reads the same in either tree. A
+Codex-only project gets no `.claude/` directory. If the repo already has its own `AGENTS.md`, a fresh
+init keeps it and tells you; `--force` replaces it.
+
+The choice is stored as `adapters` in the config. `cckit init --upgrade` keeps it, and
+`cckit init --upgrade --adapter codex` adds the second adapter without rewriting the first one's
+files. Every path each adapter writes:
+[install matrix](/install-matrix/#what-cckit-init-writes-claude-code-codex-or-both). How the
+adapters work and their current limits: [Adapters](/adapters/#choosing-adapters-at-install).
+
+<Aside type="tip" title="Want to see what's already there first?">
+Run `cckit scan` before `init` — it reports the repo's stack and whether any kit-shaped files already exist.
+</Aside>
+
+<Aside type="note" title="Where those rules and skills come from">
+`.claude/rules/*.md` and `.claude/skills/*/SKILL.md` are copies of the kit's own
+`templates/rules/` and `templates/skills/`, selected by your profile and filled in with your project's
+values. They become **yours** once written: `cckit init --upgrade` preserves every file that already
+exists and only adds missing ones, so your edits survive an upgrade. Run `cckit init --dry-run`
+to see the exact list before anything is written. [Rules cckit ships](/rules/) says what each rule
+governs and which profiles carry it.
+
+A rule with no `paths:` frontmatter loads into every session. When you add a rule that covers one
+kind of file, open it with `paths:` (a list of globs) so it loads only when a matching file is read;
+`scripts/instruction-budget-lint.sh`, scaffolded with the rules, fails the gate when the resident
+set passes 150k or a rule grows past 200 lines. See [Codified review gates](/review/gates/).
+</Aside>
+
+## 2 · No issues yet? Have Claude find your first one
+
+A fresh board is empty. Instead of inventing a task, point Claude at the code and let it surface
+**real** work — then open a cckit issue for each finding, so you have something concrete to run.
+
+Pick an angle and paste the prompt into Claude Code:
+
+<Tabs syncKey="first-task">
+  <TabItem label="Security review">
+    <div class="cckit-prompt">
+
+    ```text frame="terminal" title="Prompt to paste"
+    Analyze this repository for security threats — injection, auth gaps, secret handling, and
+    unsafe dependencies.
+
+    For each real finding, open a cckit issue (use the task-new skill) with a clear title, the
+    file, and a concrete fix. Skip anything speculative.
+    ```
+
+    </div>
+  </TabItem>
+  <TabItem label="Best-practice audit">
+    <div class="cckit-prompt">
+
+    ```text frame="terminal" title="Prompt to paste"
+    Review this repository for code-quality and best-practice gaps — dead code, missing tests,
+    inconsistent error handling, risky patterns.
+
+    For each actionable item, open a cckit issue with a clear title and the fix you'd make.
+    ```
+
+    </div>
+  </TabItem>
+</Tabs>
+
+Claude reads the repo and the **task-new** skill files one issue per finding — that's a
+<Tag kind="conversational" text>conversational</Tag> trigger, you just described the job. Your board
+now has real, scoped work to practice on.
+
+## 3 · Run one, end to end
+
+With issues on the board, the everyday loop is short. Run it on one finding to learn the ergonomics:
+
+<Steps>
+
+1. **See what's unblocked** — `cckit next` picks the issue to start and prints its start command.
+
+2. **Start it** — `cckit start <issue>` makes an isolated worktree and branch, so the change stays separate from `main`.
+
+3. **Make the change** — implement the fix; run your checks until they pass.
+
+4. **Open the pull request** — `cckit pr <issue> "what changed"` commits, pushes, and opens the PR.
+
+5. **Merge and clean up** — merge the PR, then `cckit gc` reports the merged branch and worktree as prunable and `cckit cleanup` removes them.
+
+</Steps>
+
+```bash
+cckit next                 # the next issue + how to start it
+cckit start 1              # isolated worktree + branch for issue #1
+cckit pr 1 "fix the thing" # commit, push, open the PR
+cckit gc                   # report prunable merged branches + worktrees
+```
+
+When you've got many issues at
+once, [Wave](/development/waves/) fans a whole batch out to parallel agents and merges them for you.
+
+## Set it up by asking Claude Code
+
+**What you'll set up:** cckit reads everything from a single `cckit.config.json`. In three commands
+it scaffolds that config and a `.claude/` folder, preflights your dependencies and GitHub auth, and
+shows you the stack it detected — so you know it's ready before you run any real work. You describe
+the goal; Claude Code triggers the commands.
+
+### Steps
+
+<Steps>
+
+1. **Ask Claude to set it up.** You don't name the commands — describe the intent.
+
+   <div class="cckit-prompt">
+
+   ```text frame="terminal" title="Prompt to paste"
+   Set up cckit in this repository and confirm it's ready to use. Scaffold its config,
+   check my GitHub access, and show me what it detected about the stack.
+   ```
+
+   </div>
+
+2. **cckit scaffolds the config.** Under the hood it runs:
+
+   ```bash frame="terminal"
+   cckit init     # scaffold cckit.config.json + .claude/
+   cckit doctor   # preflight: deps + gh auth
+   cckit scan     # show the detected stack + kit state
+   ```
+
+3. **Verify it's ready.** `doctor` prints a green check for `git`, `gh` (authenticated), and `jq`;
+   `scan` prints the detected language and framework. If both look right, cckit is live in the repo.
+
+</Steps>
+
+### How it works
+
+cckit is portable by design — no company, framework, or repo is baked in. Everything it needs comes
+from `cckit.config.json`, which `init` scaffolds and every other verb reads. That's why setup is just
+"scaffold, preflight, confirm": once the config exists and your tools are present, every later
+command resolves against it.
+
+<Aside type="tip" title="Nothing above the kit is touched">
+`init` only adds cckit's own files. Your existing project layout is left exactly as it is.
+</Aside>
+
+### Troubleshooting
+
+**`doctor` says `gh` isn't authenticated.** Run `gh auth login` once, then re-run the setup prompt.
+cckit uses your existing GitHub CLI session; it never stores a token of its own.
+
+**`scan` detected the wrong stack.** The detection is a starting point you can correct — open
+`cckit.config.json` and adjust the project fields; every verb will pick up the change.
+
+**`jq` is missing.** cckit runs without optional tools, but `jq` is required for the
+JSON paths. Install it (`brew install jq` / your package manager) and re-run `doctor`.
