@@ -106,5 +106,51 @@ grep -q 'Retrieval score: 33%\*\* — of 3 questions' "$FIX/RESULTS.md"; t "repo
 grep -q 'Answer quality' "$FIX/RESULTS.md";                            t "report without quality set omits quality line" "$?" "1"
 mv "$FIX/bench/quality.jsonl.off" "$FIX/bench/quality.jsonl"
 
+# ---- 12. the quality tier grades a full answer, not a path --------------------
+# run-quality.sh used to call bench_ask, which returns ONE path (the last non-empty line of the
+# reply). A path covers no rubric point, so every claim scored 0 whatever the docs said. The stub
+# answers in two lines and its judge returns 1 only when both lines reached it.
+QSTUB="$FIX/qstub"; mkdir -p "$QSTUB"
+cat > "$QSTUB/claude" <<'STUBEOF'
+#!/bin/sh
+cat >/dev/null
+case "$2" in
+  *"Grade an answer"*) case "$2" in *"line one"*"line two"*) echo 1 ;; *) echo 0 ;; esac ;;
+  *"answering a question"*) printf 'line one\nline two\n' ;;
+  *) echo NONE ;;
+esac
+STUBEOF
+chmod +x "$QSTUB/claude"
+q_mean="$(PATH="$QSTUB:$PATH" BENCH_BACKEND=claude bash "$HERE/run-quality.sh" --json --answers "$FIX/answers" 2>/dev/null | jq -r '.mean == 1')"
+t "quality: the judge sees the whole answer" "$q_mean" "true"
+t "quality: --answers keeps the graded answer" "$(wc -l < "$FIX/answers/q1.txt" 2>/dev/null | tr -d ' ')" "2"
+
+# An empty answer (backend failed or timed out) scores 0 and never reaches the judge.
+cat > "$QSTUB/claude" <<'STUBEOF'
+#!/bin/sh
+cat >/dev/null
+case "$2" in *"Grade an answer"*) echo 1 ;; esac
+STUBEOF
+q_mean="$(PATH="$QSTUB:$PATH" BENCH_BACKEND=claude bash "$HERE/run-quality.sh" --json 2>/dev/null | jq -r '.mean == 0 and .count == 1')"
+t "quality: an empty answer scores 0" "$q_mean" "true"
+
+# ---- 13. cckit's own sets point at pages that exist --------------------------
+# benchmarks/ scores cckit's own docs. A renamed or deleted page turns its questions into
+# guaranteed failures that read as a retrieval regression, so the paths are checked offline here.
+REPO="$(cd "$HERE/../.." && pwd)"
+# Only in cckit's own checkout: a consuming project's sets use paths relative to its knowledge dir.
+if [ -f "$REPO/bin/cckit" ] && [ -f "$REPO/benchmarks/benchmark.config.json" ]; then
+  missing="$(cd "$REPO" && for f in benchmarks/*.jsonl; do
+      grep -vE '^[[:space:]]*(#|$)' "$f" | jq -r '[.expect // empty, .source // empty] | flatten | .[]'
+    done | grep -v '^NONE$' | sort -u | while IFS= read -r p; do [ -f "$p" ] || printf '%s\n' "$p"; done)"
+  t "own sets: every expect/source path exists" "$missing" ""
+  dupes="$(cd "$REPO" && cat benchmarks/*.jsonl | grep -vE '^[[:space:]]*(#|$)' | jq -r '.id' | sort | uniq -d)"
+  t "own sets: ids are unique" "$dupes" ""
+  (cd "$REPO" && BENCH_DIR="$REPO/benchmarks" bash "$HERE/run.sh" --dry >/dev/null 2>&1);         t "own sets: run --dry" "$?" "0"
+  (cd "$REPO" && BENCH_DIR="$REPO/benchmarks" bash "$HERE/run-quality.sh" --dry >/dev/null 2>&1); t "own sets: quality --dry" "$?" "0"
+  nosrc="$(cd "$REPO" && grep -vE '^[[:space:]]*(#|$)' benchmarks/quality.jsonl 2>/dev/null | jq -r 'select((.source // "") == "") | .id')"
+  t "own sets: every quality record cites its source page" "$nosrc" ""
+fi
+
 [ "$fail" -eq 0 ] && echo "ALL OK" || echo "SOME FAILED"
 exit "$fail"

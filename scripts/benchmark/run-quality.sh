@@ -2,16 +2,20 @@
 # benchmark/run-quality.sh — the quality judge tier.
 #
 # Beyond "did the agent find the doc", this measures "was the answer correct + complete". For each
-# claim-style record the model answers headlessly (bench_ask-style, but a full answer), then a judge
-# scores that answer 0..1 against the record's `must` rubric. The rubric de-biases the judge: it
+# claim-style record the model answers headlessly (bench_answer: a full answer, not a path), then a
+# judge scores that answer 0..1 against the record's `must` rubric. The rubric de-biases the judge: it
 # grades coverage of the required points, not tone. The tier score is the mean.
 #
 # Usage:
-#   benchmark/run-quality.sh [--set <file>] [--dir <benchmarks>] [--dry] [--json]
+#   benchmark/run-quality.sh [--set <file>] [--dir <benchmarks>] [--dry] [--json] [--answers <dir>]
 #
-#   --dry   validate every record has a claim + a non-empty `must` rubric; call NO model; exit 0.
-#   --set   run one quality set; else every tier:"quality" set in benchmark.config.json (or every
-#           *quality*.jsonl in the dir).
+#   --dry      validate every record has a claim + a non-empty `must` rubric; call NO model; exit 0.
+#   --set      run one quality set; else every tier:"quality" set in benchmark.config.json (or
+#              every *quality*.jsonl in the dir).
+#   --answers  keep each graded answer as <dir>/<id>.txt, to read why a claim scored what it did.
+#
+# A record may carry extra keys (`source`: the page its rubric was written from). Only `claim` and
+# `must` are read here.
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -20,7 +24,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/lib/model.sh"
 
-DRY=0; JSON=0; ONE_SET=""
+DRY=0; JSON=0; ONE_SET=""; ANSWERS_DIR=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --dry)        DRY=1; shift ;;
@@ -29,7 +33,9 @@ while [ "$#" -gt 0 ]; do
     --set=*)      ONE_SET="${1#*=}"; shift ;;
     --dir)        BENCH_DIR="$2"; export BENCH_DIR; shift 2 ;;
     --dir=*)      BENCH_DIR="${1#*=}"; export BENCH_DIR; shift ;;
-    -h|--help)    sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --answers)    ANSWERS_DIR="${2:-}"; shift 2 ;;
+    --answers=*)  ANSWERS_DIR="${1#*=}"; shift ;;
+    -h|--help)    sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *)            echo "run-quality.sh: unknown arg '$1'" >&2; exit 2 ;;
   esac
 done
@@ -71,8 +77,16 @@ for file in "${SETS[@]}"; do
       continue
     fi
 
-    answer="$(bench_ask "$claim" "$KDIR")"
-    score="$(bench_judge "$claim" "$answer" "$must")"
+    answer="$(bench_answer "$claim" "$KDIR")"
+    if [ -n "$ANSWERS_DIR" ]; then
+      mkdir -p "$ANSWERS_DIR" && printf '%s\n' "$answer" > "$ANSWERS_DIR/$id.txt"
+    fi
+    # No answer (backend failed or timed out) covers no point. Do not spend a judge call on it.
+    if [ -n "$answer" ]; then
+      score="$(bench_judge "$claim" "$answer" "$must")"
+    else
+      score="0"
+    fi
     N=$((N+1))
     SUM="$(awk -v a="$SUM" -v b="$score" 'BEGIN{printf "%.4f", a+b}')"
     RESULTS_JSON="$(printf '%s' "$RESULTS_JSON" | jq -c \

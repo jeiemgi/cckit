@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # benchmark/lib/model.sh — the pluggable model backend for the benchmark harness.
 #
-# Two entry points, both cascade-shaped so the backend is swappable with NO hard dependency on a
+# Three entry points, all cascade-shaped so the backend is swappable with NO hard dependency on a
 # specific provider:
-#   bench_ask   "<question>"                 -> prints ONE repo-relative doc path, or "NONE"
-#   bench_judge "<claim>" "<answer>" "<must>" -> prints a score in [0,1]
+#   bench_ask    "<question>"                 -> prints ONE repo-relative doc path, or "NONE"
+#   bench_answer "<question>"                 -> prints the model's full answer from the docs
+#   bench_judge  "<claim>" "<answer>" "<must>" -> prints a score in [0,1]
 #
 # Backend selection (first that applies wins), driven by env so a project overrides without editing:
 #   BENCH_BACKEND=mock                  deterministic, offline (tests + --dry); never calls a model
@@ -90,6 +91,25 @@ If no document genuinely answers it, reply with exactly: NONE"
   out="$(printf '%s' "$out" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//; s/^["`'\'']//; s/["`'\'']$//')"
   [ -n "$out" ] || out="NONE"
   printf '%s' "$out"
+}
+
+# ---- bench_answer ----------------------------------------------------------
+# Ask the model to ANSWER a question from the docs — the whole answer, every line of it. The quality
+# tier grades this text. bench_ask is the wrong call there: it returns one path, and a path covers
+# none of a rubric's points. $2 = knowledge dir (for the prompt). Prints nothing when the backend
+# fails or times out; the caller scores an empty answer 0.
+bench_answer() {
+  local question="$1" kdir="${2:-knowledge}" prompt
+  prompt="You are answering a question about this project from its own documentation.
+
+QUESTION:
+$question
+
+Read the documents under '$kdir/' and answer from what they state. Give the complete answer: every
+condition, default, exit code and command the documents give for it. Do not add anything they do not
+state. End with one line naming the document(s) you used, as repo-relative paths. If the documents
+do not cover the question, say so."
+  _bench_complete "$prompt" || return 1
 }
 
 # ---- bench_judge -----------------------------------------------------------
