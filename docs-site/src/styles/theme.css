@@ -214,8 +214,7 @@ body {
 	border-radius: 999px;
 }
 
-/* Action links below the banner: one centered row, the accent lives on the
-   primary "Get started" button only (≤10% accent budget). */
+/* Secondary links below the two doors: one centered row. */
 .hero-actions {
 	display: flex;
 	flex-wrap: wrap;
@@ -225,20 +224,60 @@ body {
 	margin-top: 1.75rem;
 }
 
-/* Disabled "coming soon" pill — the future cckit.dev domain isn't live yet, so it
-   reads as an inert, muted chip beside the real action buttons (no href, no accent). */
-.coming-soon {
-	display: inline-flex;
-	align-items: center;
-	gap: 0.4em;
-	padding: 0.4rem 0.85rem;
-	font-size: var(--sl-text-sm);
-	color: var(--sl-color-gray-3);
-	border: 1px dashed var(--sl-color-hairline);
-	border-radius: 999px;
-	cursor: not-allowed;
-	user-select: none;
+/* The two doors on the home page: one entry per docs track. Each door is one link; its top edge
+   and its label take that track's colour (blue for Software, red for Marketing) on every theme. */
+.doors {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+	gap: 1rem;
+	margin-top: 2rem;
 }
+.sl-markdown-content .door {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	padding: 1.25rem 1.4rem 1.4rem;
+	color: var(--sl-color-text);
+	text-decoration: none;
+	background: var(--sl-color-bg-sidebar);
+	border: 1px solid var(--sl-color-hairline-light);
+	border-top: 3px solid var(--door);
+	border-radius: 0.75rem;
+	box-shadow: var(--sl-shadow-sm);
+	transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.door[data-track='software'] { --door: var(--cckit-track-software); }
+.door[data-track='marketing'] { --door: var(--cckit-track-marketing); }
+.sl-markdown-content .door:hover {
+	border-color: var(--door);
+	box-shadow: var(--sl-shadow-md);
+}
+.door:focus-visible {
+	outline: 2px solid var(--door);
+	outline-offset: 3px;
+}
+.door-kicker {
+	font-size: var(--sl-text-sm);
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--door);
+}
+.door-title {
+	font-size: var(--sl-text-h4);
+	font-weight: 600;
+	line-height: 1.25;
+	color: var(--sl-color-white);
+}
+.door-text { line-height: 1.6; }
+.door-go {
+	margin-top: auto;
+	padding-top: 0.5rem;
+	font-weight: 600;
+	color: var(--door);
+}
+.door-go::after { content: ' \2192'; }
+
 
 /* Header version badge — a quiet, monospace pill before the social icons. Tells readers which
    cckit version these docs describe; links to the releases list for older versions. */

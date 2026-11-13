@@ -5,7 +5,8 @@
 // page's path (src/lib/tracks.ts).
 import { trackOf } from '../lib/tracks';
 
-const current = trackOf(Astro.url.pathname);
+// The home page is the door to both tracks, so neither entry is current there.
+const current = Astro.url.pathname === '/' ? undefined : trackOf(Astro.url.pathname);
 const tracks = [
   { id: 'software', label: 'Software', href: '/getting-started/' },
   { id: 'marketing', label: 'Marketing', href: '/marketing/' },

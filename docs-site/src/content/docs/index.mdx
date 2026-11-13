@@ -5,7 +5,7 @@ template: splash
 ---
 
 import { Image } from 'astro:assets';
-import { CardGrid, LinkCard, LinkButton } from '@astrojs/starlight/components';
+import { LinkButton } from '@astrojs/starlight/components';
 import banner from '../../assets/hero-banner.png';
 import SiteSchema from '../../components/SiteSchema.astro';
 
@@ -20,62 +20,29 @@ import SiteSchema from '../../components/SiteSchema.astro';
 </div>
 
 <p class="hero-tagline">
-  <strong>You bring the ideas and the architecture. cckit runs the mechanics.</strong><br />
-  Old-school issue tracking, carried into the age of agentic development — your Git becomes retrievable, efficient context. <a href="/philosophy/">Why I built this →</a>
+  <strong>You decide what gets made and you approve it. cckit runs the steps in between.</strong><br />
+  cckit is a command-line tool and a set of skills for Claude Code and other agents. It takes each
+  piece of work through one cycle on GitHub: planned, drafted in its own space, reviewed, approved,
+  cleaned up.
 </p>
 
-<div class="hero-actions">
-  <LinkButton href="/getting-started/" icon="right-arrow" iconPlacement="end">Get started</LinkButton>
-  <LinkButton href="/how-to-read/" variant="secondary">How to read this guide</LinkButton>
-  <LinkButton href="https://github.com/jeiemgi/cckit" variant="minimal" icon="external">GitHub</LinkButton>
-  <span class="coming-soon" aria-disabled="true" title="cckit.dev — coming soon">cckit.dev · coming soon</span>
+<div class="doors">
+  <a class="door" data-track="software" href="/getting-started/">
+    <span class="door-kicker">Software</span>
+    <span class="door-title">Ship code with agents</span>
+    <span class="door-text">For developers. Issues, worktrees, pull requests, review gates and parallel waves, driven from the terminal or from Claude Code.</span>
+    <span class="door-go">Open the Quickstart</span>
+  </a>
+  <a class="door" data-track="marketing" href="/marketing/">
+    <span class="door-kicker">Marketing</span>
+    <span class="door-title">Write, review and approve content</span>
+    <span class="door-text">For marketing teams. Posts, pages, campaigns and brand voice, by talking to Claude. No terminal.</span>
+    <span class="door-go">See what it does for your team</span>
+  </a>
 </div>
 
-## Tutorials
-
-Step-by-step **“How to X with Claude Code”** guides — each one titled the way you'd search for it, answered in the first screen, then taken start to finish. [Browse all tutorials →](/tutorials/)
-
-### Get started
-
-<CardGrid>
-  <LinkCard title="Set up cckit in a Git repo" href="/tutorials/set-up-cckit-in-a-repo/" description="Scaffold config, check GitHub access, confirm the stack. · Beginner · 4 min" />
-  <LinkCard title="Add cckit to an existing repo" href="/tutorials/adopt-cckit-in-an-existing-repo/" description="Bring cckit to a project that already has structure. · Beginner · 5 min" />
-  <LinkCard title="Use cckit with Codex" href="/tutorials/use-cckit-with-codex/" description="Install the Codex adapter, trust its hooks, and run waves and headless runs with Codex. · Intermediate · 8 min" />
-</CardGrid>
-
-### Ship work
-
-<CardGrid>
-  <LinkCard title="Take a GitHub issue to a merged PR" href="/tutorials/take-a-github-issue-to-a-merged-pr/" description="One issue, end to end: worktree → PR → close → cleanup. · Beginner · 6 min" />
-  <LinkCard title="Break a big feature into an effort" href="/tutorials/break-a-feature-into-an-effort/" description="A parent issue plus sub-issues, shipped as one PR. · Intermediate · 7 min" />
-  <LinkCard title="Have an agent review a PR before it merges" href="/tutorials/have-an-agent-review-before-a-merge/" description="A read-only reviewer reads each PR the captain would merge; a fail blocks it. · Advanced · 8 min" />
-</CardGrid>
-
-### Run in parallel
-
-<CardGrid>
-  <LinkCard title="Run a wave of issues in parallel" href="/tutorials/run-issues-in-parallel-with-a-wave/" description="Fan unblocked issues out, then gate and merge the clean PRs. · Intermediate · 7 min" />
-  <LinkCard title="Run Claude Code unattended overnight" href="/tutorials/run-claude-code-unattended/" description="Clear a backlog hands-off, capped, pinged only on a blocker. · Advanced · 8 min" />
-  <LinkCard title="Run one objective unattended with hard limits" href="/tutorials/run-one-objective-unattended/" description="One agent, one branch, stopped in code on a check, a round count, time or tokens. · Advanced · 8 min" />
-  <LinkCard title="Drive Claude Code headless in CI" href="/tutorials/drive-claude-code-headless-in-ci/" description="Consume every verb as JSON/TOON from a bot. · Advanced · 6 min" />
-</CardGrid>
-
-### Security
-
-<CardGrid>
-  <LinkCard title="Stop Claude Code from committing secrets" href="/tutorials/stop-claude-committing-secrets/" description="Wire cckit's secret guard as a pre-commit hook. · Beginner · 5 min" />
-  <LinkCard title="Keep private & company data out of AI commits" href="/tutorials/keep-private-data-out-of-ai-commits/" description="Declare a denylist so your private terms are never committed. · Beginner · 5 min" />
-  <LinkCard title="Control what Claude Code is allowed to do" href="/tutorials/control-what-claude-code-can-do/" description="The permission gate: read-only by default, explicit consent to mutate. · Intermediate · 5 min" />
-</CardGrid>
-
-### Concepts & extending
-
-<CardGrid>
-  <LinkCard title="Give Claude Code persistent project memory" href="/tutorials/give-claude-code-persistent-memory/" description="Wake up already knowing the project — decisions persist across sessions. · Intermediate · 6 min" />
-  <LinkCard title="Give Claude Code a code graph with Graft" href="/tutorials/find-code-with-a-code-graph/" description="Switch on the Graft integration so the agent asks an index where code lives. · Intermediate · 6 min" />
-  <LinkCard title="Summarize long files with a local model" href="/tutorials/summarize-long-files-with-a-local-model/" description="Digest a long log, transcript or page on your own Mac before the agent reads it. · Intermediate · 7 min" />
-  <LinkCard title="Add your own tool as an integration" href="/tutorials/add-your-own-integration/" description="Describe a tool in one JSON file so the doctor can install it after a yes. · Advanced · 10 min" />
-  <LinkCard title="Run checks automatically with cckit hooks" href="/tutorials/run-checks-with-cckit-hooks/" description="The right check fires at the right moment, no reminders. · Beginner · 5 min" />
-  <LinkCard title="Let Claude Code debug a web page" href="/tutorials/debug-a-web-page-with-claude-code/" description="Screenshots, console, network, and Lighthouse as agent commands. · Intermediate · 5 min" />
-  <LinkCard title="Extend Claude Code with cckit skills" href="/tutorials/extend-claude-code-with-skills/" description="Run and author /kit- skills for the whole lifecycle. · Beginner · 5 min" />
-</CardGrid>
+<div class="hero-actions">
+  <LinkButton href="/philosophy/" variant="secondary">Why I built this</LinkButton>
+  <LinkButton href="/tutorials/" variant="secondary">All tutorials</LinkButton>
+  <LinkButton href="https://github.com/jeiemgi/cckit" variant="minimal" icon="external">GitHub</LinkButton>
+</div>
