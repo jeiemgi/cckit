@@ -95,6 +95,8 @@ export default defineConfig({
         // Head override swaps the single global og.png for a per-page generated card
         // (/og/<id>.png). Its per-page og:image/twitter:image replace the global ones below.
         Head: './src/components/Head.astro',
+        // SiteTitle override appends the Software / Marketing switch to the top bar.
+        SiteTitle: './src/components/SiteTitle.astro',
         ...(DEV ? { PageSidebar: './src/components/DevAnnotate.astro' } : {}),
       },
       description: 'Be the architect — cckit runs the mechanics. The full GitHub work lifecycle as a CLI that turns your Git into retrievable, efficient context, drivable by Claude Code and any agent.',

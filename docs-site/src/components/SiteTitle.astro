@@ -1,0 +1,10 @@
+---
+// SiteTitle override — Starlight's default title, followed by the Software / Marketing switch.
+// The title slot is the one header slot that shows at every width; the right-hand group, where
+// the theme picker sits, is hidden on narrow screens.
+import Default from '@astrojs/starlight/components/SiteTitle.astro';
+import TrackSwitch from './TrackSwitch.astro';
+---
+
+<Default><slot /></Default>
+<TrackSwitch />
