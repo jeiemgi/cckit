@@ -5,7 +5,10 @@ tutorial:
   job: run one objective unattended with hard limits
   difficulty: advanced
   time: "8 min"
-  prerequisites: ["cckit installed and initialized", "the claude or codex CLI on PATH", "a command that exits 0 when the work is done"]
+  prerequisites:
+    - { text: "cckit is installed and set up in this project", link: "Set it up", href: "/getting-started/initialize/" }
+    - "The `claude` or `codex` CLI is installed and runs from your terminal"
+    - "You have a command that exits 0 when the work is done"
   ogTag: Unattended
   keywords: [claude code headless loop, claude -p until tests pass, codex exec loop, bounded ai agent run]
   related: [development/run-unattended, getting-started/codex, development/issue-to-merged-pr]

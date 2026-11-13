@@ -140,7 +140,15 @@ export default defineConfig({
       },
       // Algolia DocSearch (when ALGOLIA_* env vars are set); otherwise the default Pagefind search.
       plugins: HAS_DOCSEARCH
-        ? [starlightDocSearch({ appId: ALGOLIA.appId, apiKey: ALGOLIA.apiKey, indexName: ALGOLIA.indexName })]
+        ? [
+            starlightDocSearch({
+              appId: ALGOLIA.appId,
+              apiKey: ALGOLIA.apiKey,
+              indexName: ALGOLIA.indexName,
+              // Send search events (clicks, conversions) to the DocSearch index.
+              insights: true,
+            }),
+          ]
         : [],
       // Wrap long code lines instead of a horizontal scrollbar (the long copilot prompts especially).
       expressiveCode: { defaultProps: { wrap: true } },
@@ -155,8 +163,11 @@ export default defineConfig({
         // Head override swaps the single global og.png for a per-page generated card
         // (/og/<id>.png). Its per-page og:image/twitter:image replace the global ones below.
         Head: './src/components/Head.astro',
-        // SiteTitle override appends the Software / Marketing switch to the top bar.
-        SiteTitle: './src/components/SiteTitle.astro',
+        // Header override lays out the top bar: wordmark, centred search, Software / Marketing switch,
+        // version, GitHub, theme and language (src/components/Header.astro).
+        Header: './src/components/Header.astro',
+        // ThemeProvider override: Marketing opens light when the reader has not chosen a theme.
+        ThemeProvider: './src/components/ThemeProvider.astro',
         // LanguageSelect override shows the picker on Marketing pages only.
         LanguageSelect: './src/components/LanguageSelect.astro',
         ...(DEV ? { PageSidebar: './src/components/DevAnnotate.astro' } : {}),

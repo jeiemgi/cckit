@@ -24,6 +24,19 @@ export const onRequest = defineRouteMiddleware((context) => {
 	// Marketing is one short list: drop the group heading and show its pages directly.
 	route.sidebar = track === 'marketing' ? own.flatMap((e) => (e.type === 'group' ? e.entries : [e])) : own;
 
+	// Marketing is short enough to read whole: every group is open (Software keeps its collapsed groups).
+	if (track === 'marketing') {
+		const open = (list: Entry[]) => {
+			for (const e of list) {
+				if (e.type === 'group') {
+					e.collapsed = false;
+					open(e.entries);
+				}
+			}
+		};
+		open(route.sidebar);
+	}
+
 	// Software groups are collapsed, and Starlight opens the one that holds the current page. A page
 	// that is not in the sidebar (a guide listed on its area's "More guides" page, a reference page
 	// listed on /reference/) opens the group it belongs to: the group whose pages share its first

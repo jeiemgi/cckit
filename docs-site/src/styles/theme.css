@@ -6,7 +6,9 @@
    rust on the color wheel, so "not Anthropic" is structural, not incidental; the steel
    (desaturated) variant keeps it technical and calm rather than tropical or neon. Accent is
    a ≤10% spotlight (links + active state only); everything else is cool-tinted neutral.
-   Dark-by-default (devs read beside a dark editor); the light theme is the same brand by day.
+   The theme follows the reader's operating system (`prefers-color-scheme`) unless they picked one in
+   the theme menu; Marketing pages open light when nothing is stored (src/components/ThemeProvider.astro).
+   The light theme is the same brand by day.
    Override Starlight's CSS custom properties below. Color tokens are hex for predictability;
    fonts use system stacks only (portable — no web-font downloads, no dependencies). */
 
@@ -16,12 +18,12 @@
 	/* Neutrals — cool-charcoal, tinted toward the accent hue. No pure #000. */
 	--sl-color-white: #f1f6f7; /* highest-contrast text */
 	--sl-color-gray-1: #e3e9eb;
-	--sl-color-gray-2: #b5c0c4; /* body text */
-	--sl-color-gray-3: #889399; /* muted / secondary */
-	--sl-color-gray-4: #515b61;
-	--sl-color-gray-5: #2d363a;
-	--sl-color-gray-6: #1a2125; /* panels, inline-code, hairlines */
-	--sl-color-black: #0e1316; /* page background */
+	--sl-color-gray-2: #c0cace; /* body text */
+	--sl-color-gray-3: #95a0a6; /* muted / secondary */
+	--sl-color-gray-4: #58636a;
+	--sl-color-gray-5: #333d42;
+	--sl-color-gray-6: #1f272c; /* panels, inline-code, hairlines */
+	--sl-color-black: #151b1f; /* page background */
 
 	/* Accent — steel cyan (≤10% of the surface: links + active states) */
 	--sl-color-accent-low: #0f3038; /* selection / subtle accent fill */
@@ -33,8 +35,8 @@
 	--sl-color-text-accent: #7ecdda; /* link text — AA on the dark page bg */
 	--sl-color-text-invert: var(--sl-color-black);
 	--sl-color-bg: var(--sl-color-black);
-	--sl-color-bg-nav: #0b1013; /* chrome recedes a touch below content */
-	--sl-color-bg-sidebar: #0b1013;
+	--sl-color-bg-nav: #11171a; /* chrome recedes a touch below content */
+	--sl-color-bg-sidebar: #11171a;
 	--sl-color-bg-inline-code: var(--sl-color-gray-6);
 	--sl-color-bg-accent: var(--sl-color-accent);
 
@@ -44,9 +46,9 @@
 	--cckit-track-marketing: #f08a9b;
 
 	/* Hairlines — tighter and quieter than the default black-on-black */
-	--sl-color-hairline-light: #2f383c;
-	--sl-color-hairline: #232b2f;
-	--sl-color-hairline-shade: #161d20;
+	--sl-color-hairline-light: #364046;
+	--sl-color-hairline: #2a3338;
+	--sl-color-hairline-shade: #1c2327;
 
 	--sl-color-backdrop-overlay: hsla(198, 22%, 6%, 0.72);
 
@@ -153,11 +155,12 @@ body {
 	letter-spacing: -0.012em;
 }
 
-/* The site title (cckit) is a CLI name — set it in the mono face so the
-   wordmark reads as a tool, not a brand logotype. Sober, on-identity. */
+/* The site title (cckit) is set in the sans face, bold: a name, not a terminal prompt. */
 .site-title {
-	font-family: var(--__sl-font-mono);
+	font-family: var(--sl-font);
+	font-weight: 700;
 	letter-spacing: -0.02em;
+	font-size: 1.25rem;
 }
 
 /* ── Homepage hero ────────────────────────────────────────────────────── */
@@ -176,18 +179,7 @@ body {
 	border: 0;
 }
 
-/* Banner: full-width within the splash column, framed by a quiet hairline.
-   Short by design (3:1) — a header, not a tall billboard. */
-.hero-banner img {
-	display: block;
-	width: 100%;
-	height: auto;
-	border-radius: 0.75rem;
-	border: 1px solid var(--sl-color-hairline);
-	box-shadow: var(--sl-shadow-md);
-}
-
-/* Philosophy tagline under the banner — the one line that reveals the "you're the architect,
+/* Tagline under the hero — the one line that reveals the "you're the architect,
    cckit runs the mechanics" idea, linking to the human-written /philosophy/ page. */
 .hero-tagline {
 	max-width: 44rem;
@@ -259,8 +251,8 @@ body {
 .door-kicker {
 	font-size: var(--sl-text-sm);
 	font-weight: 600;
-	letter-spacing: 0.04em;
-	text-transform: uppercase;
+	letter-spacing: 0;
+	text-transform: none;
 	color: var(--door);
 }
 .door-title {
@@ -286,27 +278,29 @@ body {
 }
 
 
-/* Header version badge — a quiet, monospace pill before the social icons. Tells readers which
-   cckit version these docs describe; links to the releases list for older versions. */
+/* Header version — quiet text, not a pill. Tells readers which cckit version these docs describe;
+   links to the releases list for older versions. Hidden on Marketing (see below). */
 .site-version {
 	display: inline-flex;
 	align-items: center;
-	padding: 0.15rem 0.5rem;
-	margin-inline-end: 0.5rem;
-	font-family: var(--__sl-font-mono, ui-monospace, monospace);
-	font-size: var(--sl-text-xs);
-	font-weight: 600;
+	padding: 0.5rem 0.25rem;
+	font-family: var(--sl-font);
+	font-size: var(--sl-text-sm);
+	font-weight: 500;
 	line-height: 1.4;
-	color: var(--sl-color-accent);
-	background-color: var(--sl-color-accent-low);
-	border: 1px solid var(--sl-color-hairline);
-	border-radius: 999px;
+	color: var(--sl-color-gray-3);
+	background: none;
+	border: 0;
 	text-decoration: none;
 	white-space: nowrap;
 }
 .site-version:hover {
 	color: var(--sl-color-white);
-	background-color: var(--sl-color-accent);
+	background: none;
+	text-decoration: underline;
+}
+:root:has(meta[name='cckit-track'][content='marketing']) .site-version {
+	display: none;
 }
 
 /* ── Card icons — unify to the steel-cyan identity ────────────────────── */
@@ -320,22 +314,6 @@ body {
 	background-color: var(--sl-color-accent-low) !important;
 	color: var(--sl-color-accent) !important;
 	border: 1px solid var(--sl-color-hairline) !important;
-}
-
-/* ── Home splash: banner is the visual hero ───────────────────────────── */
-/* The hero banner image carries the title visually, so the auto-generated
-   page <h1> is hidden on the home only (scoped via :has) — it stays in the DOM
-   as the single semantic h1 for SEO/a11y. No duplicate headings. */
-:where(body):has(.hero-banner) h1#_top {
-	position: absolute;
-	width: 1px;
-	height: 1px;
-	margin: -1px;
-	padding: 0;
-	overflow: hidden;
-	clip: rect(0, 0, 0, 0);
-	white-space: nowrap;
-	border: 0;
 }
 
 /* ── Activation tags ──────────────────────────────────────────────────── */
@@ -533,9 +511,8 @@ h1 .cckit-tag, h2 .cckit-tag, h3 .cckit-tag { font-size: 0.65em; }
 }
 .sl-markdown-content .cckit-record {
 	margin: 0;
-	padding: 0.7rem 1rem 0.8rem;
+	padding: 0.9rem 1.1rem 1rem;
 	border: 1px solid var(--sl-color-hairline);
-	border-inline-start: 3px solid var(--sl-color-accent);
 	border-radius: 0.5rem;
 	background: color-mix(in srgb, var(--sl-color-gray-6) 55%, transparent);
 }
@@ -547,30 +524,38 @@ h1 .cckit-tag, h2 .cckit-tag, h3 .cckit-tag { font-size: 0.65em; }
 	gap: 0.15rem 1rem;
 }
 .cckit-record__kicker { order: 2; }
-.cckit-record__kicker,
+/* The repeated kicker ("Bucket", "Output") stays for screen readers and leaves the screen. */
+.cckit-record__kicker {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+}
 .cckit-record__label {
-	font-size: var(--sl-text-xs);
-	font-weight: 600;
-	letter-spacing: 0.06em;
-	text-transform: uppercase;
+	font-size: 0.875rem;
+	font-weight: 500;
+	letter-spacing: 0;
+	text-transform: none;
 	color: var(--sl-color-gray-3);
 }
 .cckit-record__title {
-	font-size: var(--sl-text-base);
+	font-size: 1rem;
 	font-weight: 600;
 	color: var(--sl-color-white);
 	overflow-wrap: anywhere;
 }
 .sl-markdown-content .cckit-record__body {
-	margin: 0.5rem 0 0;
-	padding: 0.5rem 0 0;
-	border-top: 1px solid var(--sl-color-hairline);
+	margin: 0.35rem 0 0;
+	padding: 0;
+	border-top: 0;
 	display: grid;
 	gap: 0.35rem;
 }
 .cckit-record__line {
 	display: grid;
-	grid-template-columns: minmax(0, 8rem) minmax(0, 1fr);
+	grid-template-columns: minmax(0, 9rem) minmax(0, 1fr);
 	gap: 0.25rem 1rem;
 	align-items: baseline;
 	margin: 0;
@@ -753,4 +738,142 @@ h1 .cckit-tag, h2 .cckit-tag, h3 .cckit-tag { font-size: 0.65em; }
 /* 10 · Reference — list */
 .top-level > li:nth-child(10) > details > summary .group-label {
 	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 6h13'/%3E%3Cpath d='M8 12h13'/%3E%3Cpath d='M8 18h13'/%3E%3Cpath d='M3 6h.01'/%3E%3Cpath d='M3 12h.01'/%3E%3Cpath d='M3 18h.01'/%3E%3C/svg%3E");
+}
+
+/* ── Reading size, measure and headings (stage 1 of the calmer look) ──── */
+:root {
+	--sl-line-height: 1.7;
+	--cckit-measure: 40rem;
+}
+@media (min-width: 50em) {
+	:root {
+		--sl-text-h1: 2.25rem;
+		--sl-text-h2: 1.625rem;
+		--sl-text-h3: 1.3125rem;
+		--sl-text-h4: 1.125rem;
+		--sl-text-h5: 1rem;
+	}
+	/* Body is 17px on a desktop. Setting --sl-text-body on :root does not reach the paragraphs. */
+	.sl-markdown-content {
+		font-size: 1.0625rem;
+	}
+	/* "On this page" links */
+	starlight-toc a,
+	mobile-starlight-toc a {
+		font-size: 0.875rem;
+	}
+}
+@media (max-width: 49.99em) {
+	:root {
+		--sl-text-h1: 1.875rem;
+		--sl-text-h2: 1.5rem;
+		--sl-text-h3: 1.25rem;
+		--sl-text-h4: 1.0625rem;
+	}
+}
+/* Prose holds ~80 characters a line. Code blocks, cards and the chat window keep the full column. */
+.sl-markdown-content > :where(p, ul, ol:not(.sl-steps), blockquote),
+.sl-steps > li > :where(p, ul) {
+	max-width: var(--cckit-measure);
+}
+.sl-markdown-content :not(pre) > code {
+	font-size: 0.875em;
+}
+.sidebar-content .top-level details ul a {
+	font-size: 0.9375rem;
+	padding-block: 0.375rem;
+}
+
+/* The current sidebar item: a quiet tint, not the loudest block on the page. */
+.sidebar-content a[aria-current='page'],
+.sidebar-content a[aria-current='page']:hover,
+.sidebar-content a[aria-current='page']:focus {
+	background: var(--sl-color-accent-low);
+	color: var(--sl-color-white);
+}
+
+/* Asides: a thin rule and a calm fill; caution and danger keep their tint. */
+.starlight-aside {
+	border-radius: 0.5rem;
+	border-inline-start-width: 3px;
+}
+.starlight-aside--note,
+.starlight-aside--tip {
+	background: color-mix(in srgb, var(--sl-color-gray-6) 55%, transparent);
+}
+
+/* A command block with no title is just a block: no empty window bar with three dots. */
+.expressive-code .frame.is-terminal:not(.has-title) .header {
+	display: none;
+}
+.expressive-code .frame.is-terminal:not(.has-title) pre {
+	border-radius: 0.5rem;
+	border-top-width: 1px;
+}
+
+/* ── Header: search trigger ───────────────────────────────────────────── */
+/* The trigger sits in the middle of the top bar, 34rem at most. Pagefind and DocSearch share the look. */
+@media (min-width: 50rem) {
+	.header sl-doc-search {
+		width: 100%;
+		max-width: 34rem;
+	}
+	.header .DocSearch-Button,
+	.header site-search button[data-open-modal] {
+		width: 100%;
+		max-width: 34rem;
+		height: 2.75rem;
+		padding-inline: 0.9rem;
+		border: 1px solid var(--sl-color-hairline-light);
+		border-radius: 0.625rem;
+		background: var(--sl-color-black);
+		color: var(--sl-color-gray-3);
+		font-size: 1rem;
+	}
+	.header .DocSearch-Button:hover,
+	.header site-search button[data-open-modal]:hover {
+		border-color: var(--sl-color-gray-3);
+		color: var(--sl-color-gray-2);
+	}
+	.header .DocSearch-Button-Placeholder {
+		font-size: 1rem;
+	}
+}
+@media (max-width: 49.99rem) {
+	/* Phone: the trigger is an icon, 44px square. */
+	.header .DocSearch-Button,
+	.header site-search button[data-open-modal] {
+		width: 2.75rem;
+		height: 2.75rem;
+		justify-content: center;
+		font-size: var(--sl-text-xl);
+	}
+}
+
+/* ── Home hero (Starlight `hero:` frontmatter): centred, a heading rather than a billboard ── */
+.hero {
+	grid-template-columns: minmax(0, 1fr);
+	padding-block: 2rem 0.5rem;
+}
+.hero .stack {
+	text-align: center;
+}
+.hero .copy {
+	align-items: center;
+}
+.hero h1 {
+	font-size: clamp(2rem, 1.2rem + 2.6vw, 3rem);
+	text-wrap: balance;
+}
+.hero .copy > * {
+	max-width: 40rem;
+}
+.hero .tagline {
+	font-size: 1.125rem;
+	line-height: 1.6;
+}
+
+/* Search chips: list items are not prose. */
+.sl-markdown-content .sstart-chips > li {
+	margin: 0;
 }

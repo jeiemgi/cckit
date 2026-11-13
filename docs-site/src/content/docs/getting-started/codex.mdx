@@ -5,7 +5,11 @@ tutorial:
   job: use cckit with Codex
   difficulty: intermediate
   time: "8 min"
-  prerequisites: ["cckit installed", "the Codex CLI on PATH", "gh authenticated", "tmux for parallel runs"]
+  prerequisites:
+    - { text: "cckit is installed", link: "installed", href: "/getting-started/install/" }
+    - "The Codex CLI is installed and runs from your terminal"
+    - "The GitHub CLI (`gh`) is signed in"
+    - "tmux is installed, if you want to run several issues at once"
   ogTag: Codex
   keywords: [codex cli github workflow, codex worktrees, cckit codex adapter, run codex in parallel]
   related: [getting-started/initialize, development/run-a-wave-in-parallel, development/run-one-objective-unattended]

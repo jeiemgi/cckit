@@ -2,29 +2,18 @@
 title: cckit — a project OS for coding agents
 description: "You decide what gets made and you approve it; agents do the work in between. cckit is the process that keeps that work in order: each piece is planned, made in its own space, reviewed and approved, and GitHub keeps the record. A command-line tool and a set of skills for Claude Code and other agents."
 template: splash
+hero:
+  title: You decide what gets made. Agents do the work in between.
+  tagline: cckit is the process that keeps that work in order. Each piece is planned, made in its own space, reviewed and approved, and GitHub keeps the record of every step. It is a command-line tool and a set of skills for Claude Code and other agents.
 ---
 
-import { Image } from 'astro:assets';
 import { LinkButton } from '@astrojs/starlight/components';
-import banner from '../../assets/hero-banner.png';
 import SiteSchema from '../../components/SiteSchema.astro';
+import SearchStart from '../../components/SearchStart.astro';
 
 <SiteSchema />
 
-<div class="hero-banner">
-  <Image
-    src={banner}
-    alt="cckit — the full GitHub work lifecycle as a CLI, drivable by Claude Code and any agent"
-    loading="eager"
-  />
-</div>
-
-<p class="hero-tagline">
-  <strong>You decide what gets made and you approve it. Agents do the work in between.</strong><br />
-  cckit is the process that keeps that work in order. Each piece is planned, made in its own
-  space, reviewed and approved, and GitHub keeps the record of every step. It is a command-line
-  tool and a set of skills for Claude Code and other agents.
-</p>
+<SearchStart kind="home" />
 
 <p class="hero-tagline">Pick the kind of work your team does.</p>
 
@@ -38,7 +27,7 @@ import SiteSchema from '../../components/SiteSchema.astro';
   <a class="door" data-track="marketing" href="/marketing/">
     <span class="door-kicker">Marketing</span>
     <span class="door-title">Write, review and approve content</span>
-    <span class="door-text">For marketing teams. One process for posts, pages, campaigns and brand voice, done by talking to Claude. No terminal.</span>
+    <span class="door-text">For marketing teams. One process for posts, pages, campaigns and brand voice, done by talking to your assistant. No terminal.</span>
     <span class="door-go">See how the work moves</span>
   </a>
 </div>

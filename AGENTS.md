@@ -233,6 +233,18 @@ current entry of the top-bar switch (`docs-site/src/lib/tracks.ts`, `docs-site/s
   heading). Smaller tables stay tables. To keep a grid, wrap the table in
   `<div data-table="grid">` (`docs-site/src/lib/rehype-record-tables.mjs`, tested by
   `scripts/docs-record-tables-test.sh`).
+- **The header is one component.** `docs-site/src/components/Header.astro` lays out the top bar:
+  wordmark, centred search, then the Software / Marketing switch (`TrackSwitch.astro`), version text
+  and GitHub icon (Software only, `SocialIcons.astro`), theme picker, language picker (Marketing
+  only). The switch lives there, not in `SiteTitle` (no override of that remains). On a phone the
+  switch, the search icon and the menu button share one row.
+- **`SearchStart.astro` is the search entry** on the home page and on `software.mdx`,
+  `marketing/index.mdx` and `es/marketing/index.mdx`. Its chips are defined in that file, one list
+  per track and language; every chip is a real link, and a script upgrades the click to open search
+  with the chip's text. Check each chip's target exists when you edit the lists.
+- **`tutorial.prerequisites` are full sentences.** An item is a string or `{ text, link, href }`
+  (`link` is the words inside `text` that become the link; backticks make inline code), rendered as
+  the checklist in `TutorialMeta.astro`.
 - **No page URL changes without a redirect** in `redirects` in `docs-site/astro.config.mjs`, and
   the `expect` paths in `benchmarks/*.jsonl` follow a moved file in the same commit.
 

@@ -5,7 +5,10 @@ tutorial:
   job: have an agent review a pull request before the captain merges it
   difficulty: advanced
   time: "8 min"
-  prerequisites: ["cckit installed and initialized", "the claude or codex CLI on PATH", "an open pull request whose branch names its issue"]
+  prerequisites:
+    - { text: "cckit is installed and set up in this project", link: "Set it up", href: "/getting-started/initialize/" }
+    - "The `claude` or `codex` CLI is installed and runs from your terminal"
+    - "There is an open pull request whose branch names its issue"
   ogTag: Review
   keywords: [ai code review before merge, claude code review agent, automated pr review gate, codex review]
   related: [development/run-a-wave-in-parallel, development/run-one-objective-unattended, review/control-what-agents-can-do]

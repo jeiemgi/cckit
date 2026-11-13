@@ -5,7 +5,10 @@ tutorial:
   job: add a tool that is not in cckit's integration list
   difficulty: advanced
   time: "10 min"
-  prerequisites: ["cckit installed and initialized", "git and jq", "a tool with a one-line install command"]
+  prerequisites:
+    - { text: "cckit is installed and set up in this project", link: "Set it up", href: "/getting-started/initialize/" }
+    - "`git` and `jq` are installed"
+    - "The tool you add has a one-line install command"
   ogTag: Integrations
   keywords: [cckit integration descriptor, add a tool to cckit, optional tool installer]
   related: [development/code-graph, development/local-model-digest, memory/install-mempalace]
