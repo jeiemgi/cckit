@@ -20,10 +20,10 @@ import TutorialSchema from '../../../components/TutorialSchema.astro';
 
 <TutorialMeta />
 
-**What you'll do:** clear an unblocked backlog unattended, a few issues at a time. cckit orchestrates
-parallel worktrees and drives each issue through to merged. You **always dry-run first** so you can
-see the launch plan before anything is created, then let it run and only get pinged on a genuine
-blocker.
+**What you'll do:** clear an unblocked backlog unattended, a few issues at a time. cckit launches
+each issue in its own worktree; the agent driving the run reviews and merges each PR. You **always
+dry-run first** so you can see the launch plan before anything is created, then let it run and only
+get pinged on a genuine blocker.
 
 ## Steps
 
@@ -81,10 +81,10 @@ a whole backlog with nobody watching → `cckit autopilot`.
 ## How it works
 
 `orchestrate` takes a specific set of issue numbers and runs them in isolated worktrees, capped so
-only N run at once and the rest queue. `autopilot` is the hands-off version: it picks the next
-unblocked issues itself and keeps going. The **dry-run** is the safety rail — it resolves the plan and
-prints exactly what *would* launch without creating a single branch, so you approve the shape before
-committing to it.
+only N run at once and the rest queue. `autopilot` picks the unblocked issues itself and launches
+them through `orchestrate`, detached; reviewing and merging each PR is the driving agent's job, not
+the script's. The **dry-run** resolves the plan and prints what *would* launch without creating a
+branch, so you approve it before anything runs.
 
 <Aside type="caution" title="Always dry-run first">
 Unattended runs create real branches, worktrees, and PRs. Seeing the plan first is how you (and the
@@ -120,8 +120,9 @@ rather than guessing. Resolve it, then re-run; the merged work isn't repeated.
 **Too many worktrees at once.** Lower `--cap`. A smaller cap trades wall-clock for less load and
 fewer merge conflicts on a busy repo.
 
-**A queued issue never started.** It was blocked by one still in flight. `cckit sync` shows what's
-gating it; it starts automatically once its blocker merges.
+**A queued issue never started.** It was skipped because an issue it is `blocked_by` is still open, or
+it was queued past `--cap`. `orchestrate` prints both lists and starts neither later: `cckit sync`
+shows what's gating it, and you run it again once the blocker has merged or a slot is free.
 
 ## Related tutorials
 
@@ -135,11 +136,11 @@ gating it; it starts automatically once its blocker merges.
   steps={[
     { name: 'Dry-run the launch plan', text: 'Ask to see the launch plan before anything runs. cckit orchestrate --dry-run resolves and prints the plan without creating anything.' },
     { name: 'Launch with a concurrency cap', text: 'Once the plan looks right, run cckit orchestrate --cap 3 with the issue numbers to launch at most three concurrent worktrees; the rest queue.' },
-    { name: 'Or let autopilot pick the work', text: 'For a fully unattended run, cckit autopilot --cap 3 auto-selects ready issues and drives each to merged, pinging you only on a genuine blocker.' },
+    { name: 'Or let autopilot pick the work', text: 'For a fully unattended run, cckit autopilot --cap 3 auto-selects ready issues and launches them; the driving agent merges each PR and pings you only on a genuine blocker.' },
   ]}
   faqs={[
     { q: 'It stopped on a blocker', a: 'By design, unattended runs ping you only on a genuine blocker rather than guessing. Resolve it and re-run; merged work is not repeated.' },
     { q: 'Too many worktrees at once', a: 'Lower --cap. A smaller cap trades wall-clock for less load and fewer merge conflicts on a busy repo.' },
-    { q: 'A queued issue never started', a: 'It was blocked by one still in flight. cckit sync shows what is gating it; it starts automatically once its blocker merges.' },
+    { q: 'A queued issue never started', a: 'It was skipped because an issue it is blocked_by is still open, or it was queued past --cap. orchestrate starts neither later: cckit sync shows what is gating it, and you run it again once the blocker has merged or a slot is free.' },
   ]}
 />

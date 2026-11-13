@@ -9,11 +9,9 @@ import TagRow from '../../components/TagRow.astro';
 
 <TagRow kinds={["command"]} />
 
-A project's docs are only worth writing if they can be **found and used**. The documentation
-benchmark measures exactly that: it asks a cold agent your project's own questions and scores whether
-it points at the **right canonical document** — the same way a new teammate or an AI assistant would
-have to. Run it on a kit version bump (or any docs change) to catch regressions in retrieval,
-routing, and knowledge findability before they ship.
+The documentation benchmark asks a cold agent your project's own questions and scores whether it
+points at the **right canonical document**. Run it on a kit version bump (or any docs change) to
+catch a retrieval regression before it ships.
 
 cckit ships the **generic machinery** (`scripts/benchmark/`) plus an **example dataset + schema**
 (`benchmarks/`). The datasets are per-project fixtures — each project brings its own questions and
@@ -48,8 +46,8 @@ makes it safe for CI and the per-round no-mistakes gate. A live run scores again
 model backend and exits non-zero on any retrieval failure, so autopilot and CI notice a regression.
 
 <Aside type="tip" title="RESULTS.md">
-`cckit bench report` produces a plain, low-jargon `RESULTS.md`: what was tested, what passed, and one
-headline score. It's meant to be readable by someone who has never seen the harness.
+`cckit bench report` produces `RESULTS.md`: what was tested, what passed, and one headline score. It
+is written for someone who has never seen the harness.
 </Aside>
 
 ## Checkpoints per release
@@ -197,11 +195,8 @@ The backend has **no hard dependency on a provider**. Selection is by environmen
 Two scripts wire the harness into unattended objective runs (see [autopilot](/efforts-and-waves/)):
 
 - **`scripts/benchmark/gate.sh`** — the per-round no-mistakes bundle: `bash -n` on every harness
-  script, `--dry` on every set, and the project's `knowledge-lint`. Nothing may be broken by an edit.
+  script, `--dry` on every set, and the project's `knowledge-lint`.
 - **`scripts/benchmark/stop-check.sh`** — the `Stop=Both` predicate for `/loop --until`: it exits 0
   only when the suite has reached its record-count target **and** the gate has passed *N* rounds in
   a row. A broken round resets the streak, so the loop can never stop on a round that grew the suite
   but broke it.
-
-That lets an objective loop grow + harden the sets each round, fix any canonical-doc drift, re-verify,
-and never break anything — stopping only when it's both big enough and clean.

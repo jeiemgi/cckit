@@ -10,12 +10,12 @@ import TagRow from '../../components/TagRow.astro';
 <TagRow kinds={["flow", "conversational"]} />
 
 <Aside type="tip" title="cckit stays out of your way">
-You trigger cckit by **describing intent**, not by reciting commands — the agent already knows the verbs from `AGENTS.md`. cckit is quiet by design: it prints little and just does each step. So when a verb **errors**, take it seriously — it usually means something is genuinely off. That's also the best moment to [report it or contribute a fix](https://github.com/jeiemgi/cckit).
+You trigger cckit by **describing intent**, not by reciting commands — the agent already knows the verbs from `AGENTS.md`. cckit is quiet by design: it prints little and does each step. So when a verb **errors**, take it seriously — it usually means something is off. You can [report it or contribute a fix](https://github.com/jeiemgi/cckit).
 </Aside>
 
 This cookbook is written for **AI agents** (Claude Code and any coding agent) driving cckit — and for the humans steering them. Each recipe gives you three things:
 
-- **The prompt** — plain-intent text you hand the agent. You describe the goal in your own words; the agent triggers cckit for you. You don't name the commands — that's the point.
+- **The prompt** — plain-intent text you hand the agent. You describe the goal in your own words; the agent triggers cckit for you.
 - **What cckit does** — the commands cckit runs under the hood, shown so you can see what happened. You rarely type these yourself.
 - **Configure** — any one-time setup the recipe assumes.
 
@@ -64,7 +64,7 @@ cckit scan --llm  # verify detected stack + kit state (JSON)
 
 ## Ship one issue end-to-end
 
-The core lifecycle: isolated worktree → PR → close → clean up. Each step is one verb, correct by construction — the agent runs them in order and does not improvise branch or PR plumbing.
+The core lifecycle: isolated worktree → PR → close → clean up. Each step is one verb — the agent runs them in order and does not improvise branch or PR plumbing.
 
 **Prompt:**
 

@@ -63,8 +63,8 @@ then ship the whole thing as one pull request.
 applies the `ctx/kind/priority/role/flow` labels, and lints every title up front — so a bad sub name
 fails before anything is created. cckit reads the sub-issues' *blocked-by* links and sorts them into
 **waves**: everything unblocked runs together, dependents wait their turn. Each effort also gets a
-memorable **slug** handle (`effort/<N>-<slug>`), so `start`, `pr`, and `close` accept the slug or the
-number interchangeably.
+**slug** handle (`effort/<N>-<slug>`), so `start`, `pr`, and `close` accept the slug or the
+number.
 
 <Aside type="note" title="The number stays canonical">
 The slug is a convenience; the GitHub issue number is still what the sub-issues, PRs, and labels all
@@ -80,8 +80,9 @@ belongs in the body, not the title.
 **Two sub-issues keep colliding.** They touch the same files, so they belong in different waves. Add
 a *blocked-by* link between them; cckit will schedule the dependent one in a later wave.
 
-**Flags were treated as sub-issues.** Pass `--flow`, `--role`, and `--priority` **before** the effort
-name, not after the sub list — the parser reads flags first, then everything else as sub-specs.
+**Flags were treated as sub-issues.** Update cckit: the current parser reads `--flow`, `--role`, and
+`--priority` wherever they occur and refuses an unknown flag. On an older version, pass them
+**before** the effort name, not after the sub list.
 
 ## Related tutorials
 
@@ -100,6 +101,6 @@ name, not after the sub list — the parser reads flags first, then everything e
   faqs={[
     { q: 'A sub title was rejected', a: 'cckit lints every title up front (<= 6 words, no jargon) and aborts before creating a half-effort. Shorten the failing sub name; detail belongs in the body.' },
     { q: 'Two sub-issues keep colliding', a: 'They touch the same files, so they belong in different waves. Add a blocked-by link and cckit schedules the dependent one later.' },
-    { q: 'Flags were treated as sub-issues', a: 'Pass --flow, --role and --priority before the effort name, not after the sub list — the parser reads flags first, then everything else as sub-specs.' },
+    { q: 'Flags were treated as sub-issues', a: 'Update cckit: the current parser reads --flow, --role and --priority wherever they occur and refuses an unknown flag. On an older version, pass them before the effort name, not after the sub list.' },
   ]}
 />

@@ -58,9 +58,9 @@ is [TOON](/agents/)-encoded, so results stay small in the agent's context.
 ## How it works
 
 `cckit debug` wraps chrome-devtools-axi (by Kun Chen), a self-contained Chrome DevTools bridge for
-agents. cckit only auto-detects and forwards to it — it never tracks the bridge's evolving subcommand
-surface, so args pass straight through. Because it's optional and auto-detected, a missing Node or
-Chrome degrades cleanly to a `0` exit with instructions rather than breaking a run.
+agents. cckit detects it and forwards to it; it keeps no list of the bridge's subcommands, so args
+pass straight through. With Node or Chrome missing, `cckit debug` prints how to enable the bridge and
+exits `0`.
 
 <Aside type="tip" title="Pin or wrap the command">
 Override what cckit invokes with `export CCKIT_AXI=<command>` — useful for a pinned version or a
@@ -76,8 +76,8 @@ Chrome, then re-check; cckit won't hard-fail without them.
 capture (full network log) is still large. Ask for the specific artifact — one screenshot, the
 console only — rather than everything.
 
-**A subcommand isn't recognized.** cckit forwards args verbatim to the bridge; the subcommand surface
-is the bridge's, not cckit's. Check the [axi docs](https://github.com/kunchenguid/chrome-devtools-axi).
+**A subcommand isn't recognized.** cckit forwards args verbatim to the bridge; the subcommands
+are the bridge's, not cckit's. Check the [axi docs](https://github.com/kunchenguid/chrome-devtools-axi).
 
 ## Related tutorials
 
@@ -96,6 +96,6 @@ is the bridge's, not cckit's. Check the [axi docs](https://github.com/kunchengui
   faqs={[
     { q: "cckit debug --check says it's unavailable", a: 'Node/npx or Chrome is missing. Install both and re-check; cckit will not hard-fail without them.' },
     { q: "The agent's context filled with output", a: 'Results are TOON-encoded to stay compact, but a broad capture is still large. Ask for the specific artifact — one screenshot, the console only — rather than everything.' },
-    { q: "A subcommand isn't recognized", a: 'cckit forwards args verbatim; the subcommand surface belongs to chrome-devtools-axi, not cckit. Check the axi docs.' },
+    { q: "A subcommand isn't recognized", a: 'cckit forwards args verbatim; the subcommands belong to chrome-devtools-axi, not cckit. Check the axi docs.' },
   ]}
 />

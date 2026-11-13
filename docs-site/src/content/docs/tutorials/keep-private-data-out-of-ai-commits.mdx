@@ -48,17 +48,16 @@ nothing project-specific is baked into the kit.
 
    ```bash frame="terminal"
    git add . && git commit -m "test"
-   # ✗ blocked: private term "acme-internal" found in a tracked file
+   # x secret-guard: private term 'acme-internal' present: <file>:<line>:<the matching line>
    ```
 
 </Steps>
 
 ## How it works
 
-The guard checks code, docs, the cookbook, examples, and templates — every commit, every time — and
-your denylist is checked alongside the built-in rules for keys and env files. Because the list lives
-in `.cckit/privacy-denylist` (gitignored) and cckit ships it empty, the kit stays agnostic: you
-declare what's private to you, and nothing about your org is ever hardcoded upstream.
+On every commit the pre-commit hook passes the staged files to the guard, and your denylist is
+checked alongside the built-in rules for keys and env files. The list lives in
+`.cckit/privacy-denylist`, which is gitignored.
 
 <Aside type="tip" title="This pairs with the built-in guard">
 The denylist extends the same guard that already blocks keys, `.pem`/`.key` files, JWTs, and

@@ -232,7 +232,7 @@ Run `cckit scan` before `init` — it reports the repo's stack and whether any k
 `.claude/rules/*.md` and `.claude/skills/*/SKILL.md` are copies of the kit's own
 `templates/rules/` and `templates/skills/`, selected by your profile and filled in with your project's
 values. They become **yours** once written: `cckit init --upgrade` preserves every file that already
-exists and only adds genuinely missing ones, so your edits survive an upgrade. Run `cckit init --dry-run`
+exists and only adds missing ones, so your edits survive an upgrade. Run `cckit init --dry-run`
 to see the exact list before anything is written. [Rules cckit ships](/rules/) says what each rule
 governs and which profiles carry it.
 
@@ -295,7 +295,7 @@ With issues on the board, the everyday loop is short. Run it on one finding to l
 
 4. **Open the pull request** — `cckit pr <issue> "what changed"` commits, pushes, and opens the PR.
 
-5. **Merge and clean up** — merge the PR, then `cckit gc` prunes the merged branch and worktree.
+5. **Merge and clean up** — merge the PR, then `cckit gc` reports the merged branch and worktree as prunable and `cckit cleanup` removes them.
 
 </Steps>
 
@@ -303,8 +303,8 @@ With issues on the board, the everyday loop is short. Run it on one finding to l
 cckit next                 # the next issue + how to start it
 cckit start 1              # isolated worktree + branch for issue #1
 cckit pr 1 "fix the thing" # commit, push, open the PR
-cckit gc                   # prune merged branches + worktrees
+cckit gc                   # report prunable merged branches + worktrees
 ```
 
-That's the ergonomics — one command per step, the same every time. When you've got many issues at
+When you've got many issues at
 once, [Wave](/wave/) fans a whole batch out to parallel agents and merges them for you.

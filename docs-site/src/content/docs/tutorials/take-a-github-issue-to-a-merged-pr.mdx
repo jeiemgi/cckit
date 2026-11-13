@@ -60,8 +60,8 @@ plumbing.
 
 ## How it works
 
-The lifecycle is one source of truth: starting an issue creates an isolated worktree and branch, so
-the change can't collide with anything else you're running. The PR, the board columns, and the branch
+Starting an issue creates an isolated worktree and branch, so the change can't collide with
+anything else you're running. The PR, the board columns, and the branch
 all reference the same issue number — you never wire them up by hand, which is what "correct by
 construction" means here.
 
@@ -73,8 +73,8 @@ repo until the PR merges — see [Efforts, waves & worktrees](/efforts-and-waves
 ## Troubleshooting
 
 **A verb errored.** cckit is quiet by design — it prints little and just does each step. So when a
-verb errors, take it seriously; it usually means something is genuinely off (a missing dependency,
-a dirty tree, an auth gap). Read the message before retrying.
+verb errors, it usually means something is off (a missing dependency, a dirty tree, an auth
+gap). Read the message before retrying.
 
 **The change touched more than the issue.** Keep the worktree focused on the one issue. If scope
 grew, split it into an [effort](/tutorials/break-a-feature-into-an-effort/) with sub-issues instead.
@@ -97,7 +97,7 @@ is still open, finish the merge first, then run cleanup.
     { name: 'Confirm and clean up', text: 'When the PR merges, gc prunes the branch and worktree. cckit sync shows the current board and what is unblocked next.' },
   ]}
   faqs={[
-    { q: 'A cckit verb errored', a: 'cckit is quiet by design, so an error usually means something is genuinely off — a missing dependency, a dirty tree, or an auth gap. Read the message before retrying.' },
+    { q: 'A cckit verb errored', a: 'cckit is quiet by design, so an error usually means something is off — a missing dependency, a dirty tree, or an auth gap. Read the message before retrying.' },
     { q: 'The change touched more than the issue', a: 'Keep the worktree focused on one issue. If scope grew, split it into an effort with sub-issues.' },
     { q: "gc didn't remove the branch", a: 'gc --prune only removes branches whose PR has merged. Finish the merge first, then run cleanup.' },
   ]}

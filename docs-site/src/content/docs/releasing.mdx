@@ -25,8 +25,8 @@ release-please reads every Conventional Commit since the last tag and picks the 
 | --- | --- | --- |
 | `feat!:` / `type!:` / a `BREAKING CHANGE:` footer | **major** | `1.4.2 → 2.0.0` |
 | `feat:` | **minor** | `1.4.2 → 1.5.0` |
-| `fix:` / `perf:` / `refactor:` / `revert:` / anything else | **patch** | `1.4.2 → 1.4.3` |
-| no commits since the tag | **none** | no release |
+| `fix:` / `perf:` / `refactor:` / `revert:` | **patch** | `1.4.2 → 1.4.3` |
+| only `docs:` / `chore:` / `style:` / `test:` / `ci:` / `build:` or untyped commits, or no commits since the tag | **none** | no release |
 
 Check what the next version would be at any time:
 
@@ -36,7 +36,7 @@ cckit release --next        # or: scripts/lib/version-bump.sh --next
 
 ## Cutting a release (merge the Release PR)
 
-`.github/workflows/release-please.yml` runs on every push to `main`. It doesn't ship anything on its own — it keeps a single **Release PR** open (titled `chore(main): release X.Y.Z`) and rewrites it as more work lands. So you can merge, merge, merge, then release once by merging that PR when the batch is ready.
+`.github/workflows/release-please.yml` runs on every push to `main`. It doesn't ship anything on its own — it keeps a single **Release PR** open (titled `chore(main): release X.Y.Z`) and rewrites it as more work lands.
 
 <Steps>
 
@@ -155,9 +155,9 @@ produces a patch release there. Merge it with `cckit merge <pr>`.
 
 Publishing is automatic once the Release PR is merged — the `publish` job in `release-please.yml` runs `npm publish` and bumps the [jeiemgi/homebrew-cckit](https://github.com/jeiemgi/homebrew-cckit) tap (recomputing the formula `sha256`).
 
-**npm uses OIDC trusted publishing** — no long-lived `NPM_TOKEN`. GitHub Actions mints a short-lived OIDC token per run (`id-token: write`) that npm exchanges for publish rights, and the tarball is signed with [provenance](https://docs.npmjs.com/generating-provenance-statements) automatically. Nothing to rotate or leak. It needs a **one-time setup** on npmjs.com (below) and npm ≥ 11.5.1 (the job upgrades npm before publishing).
+**npm uses OIDC trusted publishing** — no long-lived `NPM_TOKEN`. GitHub Actions mints a short-lived OIDC token per run (`id-token: write`) that npm exchanges for publish rights, and the tarball is signed with [provenance](https://docs.npmjs.com/generating-provenance-statements) automatically. It needs a **one-time setup** on npmjs.com (below) and npm ≥ 11.5.1 (the job upgrades npm before publishing).
 
-The **Homebrew** channel is still gated on a repo secret and simply skipped if it's absent — either of:
+The **Homebrew** channel is still gated on a repo secret and skipped if it's absent — either of:
   - **GitHub App (preferred)** — `HOMEBREW_APP_ID` + `HOMEBREW_APP_PRIVATE_KEY` for an app with **Contents: write** installed on `homebrew-cckit`. The workflow mints a short-lived, tap-scoped token per run — nothing to expire or rotate by hand.
   - `HOMEBREW_TAP_TOKEN` — legacy fallback: a PAT with push access to the tap repo (`contents:write`). Used only when the app secrets are absent.
 

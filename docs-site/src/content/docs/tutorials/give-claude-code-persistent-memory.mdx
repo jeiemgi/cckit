@@ -47,7 +47,7 @@ leaving 95%+ of the window for real work.
    Prefer to do it by hand? `pipx install mempalace`. MemPalace is one of cckit's
    [integrations](/integrations/): the same commands live in `integrations/mempalace.json`.
 
-3. **That's it.** Every session now loads a wing-scoped wake-up header plus your project's recent
+3. **Confirm the wake-up loads.** Every session now loads a wing-scoped wake-up header plus your project's recent
    decisions. The full recall/record protocol lives in the scaffolded `.claude/rules/mempalace.md` —
    you never have to say "remember this".
 
@@ -55,11 +55,10 @@ leaving 95%+ of the window for real work.
 
 ## How it works
 
-Memory is first-class in the lifecycle, not a bolt-on. Four hooks wire it into every session:
+Four hooks wire memory into every session:
 `SessionStart` loads a wing-scoped wake-up, `Stop` files the finished session, `PreCompact` sweeps to
 memory before the window compresses, and `SessionEnd` catches unsynced work if a session ends
-abruptly. Each project gets **one wing**, so memories never bleed across repos, and `cckit doctor`
-keeps the layer healthy as the kit evolves.
+abruptly. Each project gets **one wing**, so memories never bleed across repos.
 
 <Aside type="tip" title="Built on MemPalace — credit where it's due">
 The memory engine, palace format, and MCP server are the work of the open-source

@@ -67,9 +67,9 @@ on your machine: no model is called and no API key is needed.
    ```
 
    Under **Integrations** you should see a `Graft` row reading `installed`. Your yes is recorded
-   as the line `install:graft` in `.cckit/consent`, at the root of the repo. `cckit init` does not
-   add `.cckit/` to `.gitignore`: when `git check-ignore .cckit/` prints nothing, add the line
-   `.cckit/` yourself so the file is never committed.
+   as the line `install:graft` in `.cckit/consent`, at the root of the repo. `cckit init` adds
+   `.cckit/` to `.gitignore`. In a project where `git check-ignore .cckit/` prints nothing, add
+   the line `.cckit/` yourself so the file is never committed.
 
 5. **Wire it into the repo.** The doctor leaves this step to you and prints the command:
 
