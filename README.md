@@ -162,6 +162,20 @@ The drift check flags `.claude/rules/` files only when the kit ships a rule of t
 The metrics judge reads its hosted endpoint from `CCKIT_MODEL_URL` / `CCKIT_MODEL` / `CCKIT_MODEL_TOKEN`; a project
 with its own variables names them in the config (`model.urlEnv` / `model.modelEnv` / `model.tokenEnv` — env var
 names, never values).
+
+**The effort metrics record.** `cckit effort close` appends one JSON line per effort to
+`<git-common-dir>/effort-metrics/records.jsonl`: diff signals (`files`, `added`, `removed`, `commits`), a build time
+and a token count, each with the source it came from. Nothing in it is estimated — a figure with no source is `null`.
+
+| Field | Source | `null` when |
+| --- | --- | --- |
+| `build_seconds` + `build_source` | `effort-start`: close time minus the stamp `cckit effort start` writes to `effort-metrics/<N>.start` when it creates the branch. `first-commit`: with no stamp (an effort started before the stamp existed, or on another machine), close time minus the author time of the oldest commit on the effort branch | the branch has no stamp and no commit of its own |
+| `tokens_real` + `tokens_source` | `transcripts`: the sessions listed in `<git-common-dir>/kit-usage.jsonl`, summed from their Claude transcripts. cckit ships no writer for that log, so this applies only where a project keeps one. `autopilot-run`: the usage the runtime printed during `cckit autopilot run` on the effort branch and its `sub/<N><letter>` branches, read from `.cckit/autopilot/*.json`. Interactive sessions are not in that figure | neither source has a figure; `tokens_null_reason` says which: `no-usage-source`, `no-session-matched`, or `autopilot-usage-unknown` (a run whose rounds printed no usage — a partial sum would be an undercount) |
+| `cost_real_usd` + `cost_source` | `list-price` for a transcript sum; `runtime` for the cost Claude prints in a headless run | no token figure, or the runtime printed no cost (Codex) |
+
+Records written before the source fields existed have no `build_source`, `tokens_source` or `tokens_null_reason` key;
+they are left as written.
+
 `cckit merge` refuses a PR whose head is an `effort/*` branch and names `cckit effort close <N>`: its squash would
 skip that snapshot. `KIT_FORCE=1 cckit merge <pr>` merges anyway, with a warning.
 Before the squash deletes `effort/<N>-…` it re-targets every open PR based on that branch to the base branch

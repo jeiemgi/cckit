@@ -101,6 +101,17 @@ The slug is a *derived* convenience, not a second source of truth. `--slug` only
   means `scripts/lib/`, `scripts/kit*`, `.claude/{skills,hooks,lib,agents}/`, and the rule files the
   kit ships under `.claude/rules/`. A rule the project wrote itself is not flagged: `cckit init`
   and `/kit-update` only write rules that have a template, so they cannot overwrite it.
+- **The metrics record.** The close appends one JSON line per effort to
+  `<git-common-dir>/effort-metrics/records.jsonl`. Each measured field names its source, and a
+  field with no source is `null`, never an estimate.
+
+  | Field | Source | `null` when |
+  | --- | --- | --- |
+  | `build_seconds`, `build_source` | `effort-start`: close time minus the stamp `cckit effort start` writes to `effort-metrics/<N>.start` when it creates the branch. `first-commit`: with no stamp, close time minus the author time of the oldest commit on the effort branch | the branch has no stamp and no commit of its own |
+  | `tokens_real`, `tokens_source` | `transcripts`: the sessions listed in `<git-common-dir>/kit-usage.jsonl`, summed from their Claude transcripts — cckit ships no writer for that log, so this applies where a project keeps one. `autopilot-run`: the usage the runtime printed during `cckit autopilot run` on the effort branch and its `sub/<N><letter>` branches; interactive sessions are not counted | neither source has a figure. `tokens_null_reason` is `no-usage-source`, `no-session-matched`, or `autopilot-usage-unknown` (a run whose rounds printed no usage) |
+  | `cost_real_usd`, `cost_source` | `list-price` for a transcript sum, `runtime` for the cost a headless Claude run printed | no token figure, or the runtime printed no cost |
+
+  Records written before the source fields existed lack those three keys and are left as written.
 - **`cckit merge` refuses an effort PR.** A PR whose head is an `effort/*` branch is refused before
   anything is rebased or merged, and the message names `cckit effort close <N>`: a plain squash
   would destroy the per-sub commits without the snapshot above. `KIT_FORCE=1 cckit merge <pr>`

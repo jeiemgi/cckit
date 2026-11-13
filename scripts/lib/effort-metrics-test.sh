@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# effort-metrics-test.sh — covers _em_token_sum's branch ∪ time-window attribution (#124). Token
+# effort-metrics-test.sh — covers capture_effort_metrics' build-time and token sources (#453, at the
+# end of this file) and _em_token_sum's branch ∪ time-window attribution (#124). Token
 # actuals must count sessions that match the effort BRANCH as well as sessions that fall inside the
 # effort's build WINDOW [start,end] — the window recovers sessions logged before the branch field
 # existed or from a detached/worktree checkout. Hermetic: a throwaway repo + a stubbed usage log +
@@ -130,6 +131,105 @@ _judge_case() {  # _judge_case <label> <shell> [flag]
 _judge_case bash bash
 if command -v zsh >/dev/null 2>&1; then _judge_case zsh zsh --no-rcs
 else echo "skip: zsh absent — zsh judge env-name case not run"; fi
+
+# ── #453: capture records build time and tokens from sources that exist, and says why not ───────
+# One probe script, run under bash and zsh. Each case builds its own repo (no usage log unless the
+# case writes one) and prints `<case>: <fields>` lines read back below.
+cat > "$tmp/cap.sh" <<'CAP'
+LIB="$1"; work="$2"
+. "$LIB/effort-metrics.sh"
+mkrepo() {  # mkrepo <dir> <effort-branch> — main + one commit on the branch, authored 1000s ago
+  git init -q -b main "$1" && cd "$1" || exit 1
+  git config user.email t@t; git config user.name t; git config commit.gpgsign false
+  git commit -q --allow-empty -m init
+  git checkout -q -b "$2"
+  echo x > f.txt; git add f.txt
+  GIT_AUTHOR_DATE="@$(( $(date -u +%s) - 1000 )) +0000" git commit -q -m work
+}
+last() { tail -1 "$(git rev-parse --git-common-dir)/effort-metrics/records.jsonl"; }
+near() { awk -v v="$1" -v w="$2" 'BEGIN{ if (v ~ /^[0-9]+$/ && v >= w && v < w + 120) print "near"; else print "off:" v }'; }
+export KIT_STATE_DIR="$work/state-none"
+
+# (a) no stamp → oldest commit on the branch; no usage source → null with the reason.
+mkrepo "$work/a" effort/5-x
+old='{"effort":1,"branch":"effort/1-old","captured_at":"2026-07-03T03:21:43Z","build_seconds":null,"signals":{"files":2,"added":5,"removed":1,"commits":1},"tokens_real":null,"cost_real_usd":null,"cost_source":null,"tokens_est":null,"cost_est_usd":null,"difficulty_auto":1,"score_auto":null,"difficulty_judge":null,"score_judge":null,"synced_to_graph":false}'
+mkdir -p .git/effort-metrics; printf '%s\n' "$old" > .git/effort-metrics/records.jsonl
+capture_effort_metrics 5 main 2>/dev/null
+echo "a: $(last | jq -r '"\(.build_source) \(.tokens_real) \(.tokens_source) \(.tokens_null_reason) \(.cost_real_usd) \(.cost_source)"') $(near "$(last | jq -r .build_seconds)" 1000)"
+[ "$(head -1 .git/effort-metrics/records.jsonl)" = "$old" ] && echo "a-old: kept" || echo "a-old: rewritten"
+echo "a-rows: $(wc -l < .git/effort-metrics/records.jsonl | tr -d ' ')"
+echo "a-recal: $(jq -r '"\(.model.n_efforts) \(.model.median_build_seconds != null)"' .git/effort-metrics/estimator.json)"
+
+# (b) the stamp wins over the commit, and a second record_effort_start keeps it.
+mkrepo "$work/b" effort/6-x
+record_effort_start 6
+[ -s .git/effort-metrics/6.start ] && echo "b-stamp: written" || echo "b-stamp: missing"
+echo $(( $(date -u +%s) - 500 )) > .git/effort-metrics/6.start
+record_effort_start 6
+capture_effort_metrics 6 main 2>/dev/null
+echo "b: $(last | jq -r .build_source) $(near "$(last | jq -r .build_seconds)" 500)"
+[ -e .git/effort-metrics/6.start ] && echo "b-clean: left" || echo "b-clean: removed"
+
+# (c) a branch with no commit of its own and no stamp → build_seconds stays null.
+git init -q -b main "$work/c" && cd "$work/c" && git config user.email t@t && git config user.name t
+git commit -q --allow-empty -m init; git checkout -q -b effort/8-x
+capture_effort_metrics 8 main 2>/dev/null
+echo "c: $(last | jq -r '"\(.build_seconds) \(.build_source)"')"
+
+# (d) autopilot run state: the effort branch + its sub branch are summed; sub/70a-… is another effort.
+mkrepo "$work/d" effort/7-y
+export KIT_STATE_DIR="$work/state-d"; mkdir -p "$KIT_STATE_DIR/autopilot"
+printf '{"branch":"effort/7-y","rounds":2,"usage":{"tokens":300,"cost_usd":0.02}}\n' > "$KIT_STATE_DIR/autopilot/effort_7-y.json"
+printf '{"branch":"sub/7a-z","rounds":1,"usage":{"tokens":150,"cost_usd":0.01}}\n'   > "$KIT_STATE_DIR/autopilot/sub_7a-z.json"
+printf '{"branch":"sub/70a-q","rounds":1,"usage":{"tokens":999,"cost_usd":9}}\n'     > "$KIT_STATE_DIR/autopilot/sub_70a-q.json"
+printf '{"branch":"sub/7b-w","rounds":0,"usage":{"tokens":"unknown","cost_usd":"unknown"}}\n' > "$KIT_STATE_DIR/autopilot/sub_7b-w.json"
+capture_effort_metrics 7 main 2>/dev/null
+echo "d: $(last | jq -r '"\(.tokens_real) \(.tokens_source) \(.tokens_null_reason) \(.cost_real_usd) \(.cost_source)"')"
+# a runtime that prints no cost (Codex): tokens stay, cost is null
+printf '{"branch":"sub/7a-z","rounds":1,"usage":{"tokens":150,"cost_usd":"unknown"}}\n' > "$KIT_STATE_DIR/autopilot/sub_7a-z.json"
+capture_effort_metrics 7 main 2>/dev/null
+echo "d-nocost: $(last | jq -r '"\(.tokens_real) \(.tokens_source) \(.cost_real_usd) \(.cost_source)"')"
+# a run whose rounds printed no usage: no partial sum
+printf '{"branch":"sub/7a-z","rounds":1,"usage":{"tokens":"unknown","cost_usd":"unknown"}}\n' > "$KIT_STATE_DIR/autopilot/sub_7a-z.json"
+capture_effort_metrics 7 main 2>/dev/null
+echo "d-unknown: $(last | jq -r '"\(.tokens_real) \(.tokens_source) \(.tokens_null_reason) \(.cost_real_usd)"')"
+
+# (e) a usage log that lists no session for this effort.
+export KIT_STATE_DIR="$work/state-none"
+mkrepo "$work/e" effort/9-x
+printf '{"session":"ZZZ","branch":"other/1-y","ts":"2001-01-01T00:00:00Z"}\n' > .git/kit-usage.jsonl
+capture_effort_metrics 9 main 2>/dev/null
+echo "e: $(last | jq -r '"\(.tokens_real) \(.tokens_null_reason)"')"
+
+# (f) a usage log that does list one: the transcript sum, labelled.
+mkrepo "$work/f" effort/10-x
+printf '{"session":"FFF","branch":"effort/10-x","ts":"2001-01-01T00:00:00Z"}\n' > .git/kit-usage.jsonl
+printf '{"message":{"usage":{"input_tokens":100,"output_tokens":10}}}\n' > "$HOME/.claude/projects/FFF.jsonl"
+capture_effort_metrics 10 main 2>/dev/null
+echo "f: $(last | jq -r '"\(.tokens_real) \(.tokens_source) \(.tokens_null_reason) \(.cost_source)"')"
+CAP
+_cap_case() {  # _cap_case <label> <shell> [flag]
+  local label="$1" out work; shift
+  work="$(mktemp -d "$tmp/cap.XXXXXX")"
+  out="$( cd "$tmp" && "$@" "$tmp/cap.sh" "$LIB" "$work" 2>&1 )"
+  g() { printf '%s\n' "$out" | sed -n "s/^$1: //p"; }
+  t "$label: no stamp → build time from the oldest branch commit" "$(g a)" "first-commit null null no-usage-source null null near"
+  t "$label: an existing record line is left byte-identical"      "$(g a-old)" "kept"
+  t "$label: capture appends exactly one row"                     "$(g a-rows)" "2"
+  t "$label: recalibration reads old + new rows, build median set" "$(g a-recal)" "2 true"
+  t "$label: record_effort_start writes the stamp"                "$(g b-stamp)" "written"
+  t "$label: the stamp wins and a second start keeps it"          "$(g b)" "effort-start near"
+  t "$label: capture removes the stamp"                           "$(g b-clean)" "removed"
+  t "$label: no stamp and no commit → build_seconds null"         "$(g c)" "null null"
+  t "$label: autopilot runs of the effort + its subs are summed"  "$(g d)" "450 autopilot-run null 0.03 runtime"
+  t "$label: a run with no printed cost keeps cost null"          "$(g d-nocost)" "450 autopilot-run null null"
+  t "$label: a run with unknown usage gives null, not a partial sum" "$(g d-unknown)" "null null autopilot-usage-unknown null"
+  t "$label: a usage log with no matching session says so"        "$(g e)" "null no-session-matched"
+  t "$label: a matching session is summed from its transcript"    "$(g f)" "110 transcripts null list-price"
+}
+_cap_case bash bash
+if command -v zsh >/dev/null 2>&1; then _cap_case zsh zsh --no-rcs
+else echo "skip: zsh absent — zsh capture case not run"; fi
 
 [ "$fail" -eq 0 ] && echo "ALL OK (effort-metrics)" || echo "effort-metrics: FAILURES"
 exit "$fail"
