@@ -6,6 +6,7 @@ import starlightDocSearch from '@astrojs/starlight-docsearch';
 import react from '@astrojs/react';
 import sitemap from '@astrojs/sitemap';
 import rehypeExternalLinks from 'rehype-external-links';
+import marketingWords from './src/integrations/marketing-words.mjs';
 
 // .env files are NOT injected into process.env inside astro.config.mjs. Vercel DOES populate
 // process.env from the project's env vars at build, so prefer that; locally, fall back to parsing
@@ -75,6 +76,8 @@ export default defineConfig({
     }),
   },
   integrations: [
+    // Stops `astro build` when a Marketing page says worktree, branch or PR.
+    marketingWords(),
     react(),
     starlight({
       title: 'cckit',
