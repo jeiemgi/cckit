@@ -2,7 +2,7 @@
 # shellcheck shell=bash
 # light-task-test.sh — `cckit task <new|list|next|start|finish|share>` end to end (#450), against a
 # stubbed gh, a throwaway repo and a bare remote. Covers every verb in human and `--llm` form, the
-# derived states (draft → doing → review → done), the move of a draft onto its branch, the pull
+# derived states (draft → doing → review → done; shared), the move of a draft onto its branch, the pull
 # request `finish` opens (no `Closes`, title ending in the task id), the gc protection of a live
 # `light/<id>-<slug>` branch and its release once the task is done on the base branch, a second
 # clone refused on a task already taken, two branches adding tasks merging without a conflict, and
@@ -36,7 +36,7 @@ case "$1 $2" in
       *" --head "*) [ -n "$GH_OPEN_URL" ] && echo "$GH_OPEN_URL" ;;
       *) [ -n "$GH_PR_INDEX" ] && printf '%b' "$GH_PR_INDEX" ;;
     esac ;;
-  "pr create") echo "https://github.com/o/r/pull/77" ;;
+  "pr create") [ -n "${GH_CREATE_FAIL:-}" ] && exit 1; echo "https://github.com/o/r/pull/77" ;;
   "issue view") echo "issue lookups are not expected for a light task" >&2; exit 1 ;;
   *) exit 0 ;;
 esac
@@ -193,7 +193,32 @@ t "the share branch carries both tasks and nothing else" "$(git diff --name-only
   "$(printf 'tasks/%s.md\ntasks/%s.md\n' "$C" "$D" | sort | tr '\n' ' ')"
 has "the share PR title counts the tasks" "$(grep '^pr create' "$GH_LOG")" "--title chore(tasks): add 2 tasks [share-"
 t "share leaves the checkout clean" "$(git status --porcelain)" ""
-t "share with no drafts is a no-op" "$("$CCKIT" task share 2>&1)" "(no drafts to share in this checkout)"
+t "shared tasks stay listed, as shared, on the share branch" "$("$CCKIT" task list --llm | jq -r --arg id "$C" '.[] | select(.id == $id) | .state + " " + .branch')" "shared $SB"
+t "next does not offer a shared task" "$("$CCKIT" task next --llm | jq -r --arg c "$C" --arg d "$D" 'if . == null then "none" elif .id == $c or .id == $d then "shared" else "other" end')" "none"
+out="$("$CCKIT" task start "$C" 2>&1)"; t "start refuses a task whose share PR has not merged" "$?" "1"
+has "the refusal names the share branch" "$out" "share pull request ($SB)"
+[ -d "$tmp/mate/.claude/worktrees/light+$C-brief-the-designer" ] && { echo "FAIL: the refused start left a worktree"; fail=1; } || echo "ok: the refused start made no worktree"
+: > "$GH_LOG"
+out="$(GH_OPEN_URL="https://github.com/o/r/pull/77" "$CCKIT" task share 2>/dev/null)"
+t "share with no new drafts reports the open share PR" "$out" "✓ https://github.com/o/r/pull/77"
+t "and does not create a second one" "$(grep -c '^pr create' "$GH_LOG")" "0"
+# The share PR merges: the tasks are todo, and a share with nothing pending is a no-op.
+( cd "$tmp/merger" && git fetch -q origin && git checkout -q develop && git pull -q origin develop \
+  && git merge -q --squash "origin/$SB" >/dev/null 2>&1 && git commit -q -m "chore(tasks): add 2 tasks (#78)" \
+  && git push -q origin develop ) 2>/dev/null
+t "after the share PR merges the task is todo" "$("$CCKIT" task list --llm | jq -r --arg id "$C" '.[] | select(.id == $id) | .state')" "todo"
+t "share with nothing pending is a no-op" "$("$CCKIT" task share 2>&1)" "(no drafts to share in this checkout)"
+# A share whose pull request could not be opened keeps its tasks listed, and a re-run retries it.
+G="$("$CCKIT" task new "Order the banners" --llm | jq -r .id)"
+out="$(GH_CREATE_FAIL=1 "$CCKIT" task share 2>&1)"; t "share exits 1 when the PR cannot be opened" "$?" "1"
+has "the failure says how to retry" "$out" "run the same command again to retry"
+t "the task of a failed share is still listed" "$("$CCKIT" task list --llm | jq -r --arg id "$G" '.[] | select(.id == $id) | .state')" "shared"
+: > "$GH_LOG"
+out="$("$CCKIT" task share --llm)"
+t "re-running share opens the PR for the pending branch" "$(printf '%s' "$out" | jq -r '[.verb, .ok, .url] | join(" ")')" "task share true https://github.com/o/r/pull/77"
+has "the retried PR lists the pending task" "$(grep '^pr create' "$GH_LOG")" "\`$G\`"
+out="$(cd "$WTB" && GH_CREATE_FAIL=1 "$CCKIT" task finish "fix: launch posts scheduled" 2>&1)"; t "finish exits 1 when the PR cannot be opened" "$?" "1"
+has "finish says the branch is pushed and how to retry" "$out" "the branch is pushed; run the same command again to retry"
 t "the share branch is not a task" "$(. "$LIB/kit-config.sh" && load_kit_config && . "$LIB/worktree-issue.sh" && wt_protected_reason "$SB" o/r)" ""
 
 # ── two branches each add a task: the merge is clean ────────────────────────────────────────────

@@ -26,6 +26,8 @@
 #   review           a `light/<id>-<slug>` branch exists and its copy says `done`
 #   doing            a `light/<id>-<slug>` branch exists
 #   todo             the base branch has the file
+#   shared           a `light/share-<stamp>` branch has the file and the base branch does not yet:
+#                    `cckit task share` committed it and its pull request has not merged
 #   draft            only this checkout has the file (not committed anywhere a teammate can see)
 # The base branch is read as `origin/<base>` when that ref exists, else the local `<base>`.
 # Branches are local heads first, then the cached `origin/light/*` refs. No op here uses the
@@ -65,10 +67,27 @@ _tsf_branch() {
 
 _tsf_closed() { case "$1" in done|dropped) return 0 ;; esac; return 1; }
 
-# _tsf_ids — every task id visible from this checkout: its tasks dir, the base branch, and the
-# `light/*` branches.
+# _tsf_share_refs — every `light/share-<stamp>` ref: local heads first, then the cached origin ones.
+_tsf_share_refs() {
+  git for-each-ref --format='%(refname:short)' 'refs/heads/light/share-*' \
+    'refs/remotes/origin/light/share-*' 2>/dev/null
+}
+
+# _tsf_share_ref <id> — the first share ref whose tree carries the task's file, or nothing.
+_tsf_share_ref() {
+  local top dir r
+  top="$(_tsf_top)" || return 0
+  [ -n "$top" ] || return 0
+  dir="$(task_source_dir)"
+  _tsf_share_refs | while IFS= read -r r; do
+    if git -C "$top" cat-file -e "$r:$dir/$1.md" 2>/dev/null; then printf '%s' "$r"; break; fi
+  done
+}
+
+# _tsf_ids — every task id visible from this checkout: its tasks dir, the base branch, the
+# `light/*` branches, and the files a `light/share-*` branch carries.
 _tsf_ids() {
-  local top dir base
+  local top dir base r
   top="$(_tsf_top)" || return 0
   [ -n "$top" ] || return 0
   dir="$(task_source_dir)"; base="$(_tsf_base_ref)"
@@ -77,6 +96,9 @@ _tsf_ids() {
     if [ -n "$base" ]; then
       git -C "$top" ls-tree --name-only "$base" "$dir/" 2>/dev/null | grep '\.md$' | sed 's|.*/||; s/\.md$//'
     fi
+    _tsf_share_refs | while IFS= read -r r; do
+      git -C "$top" ls-tree --name-only "$r" "$dir/" 2>/dev/null || true
+    done | grep '\.md$' | sed 's|.*/||; s/\.md$//'
     git for-each-ref --format='%(refname)' refs/heads/light/ refs/remotes/origin/light/ 2>/dev/null \
       | sed -E 's#^refs/(heads|remotes/origin)/light/##; s/-.*$//'
   } | while IFS= read -r id; do
@@ -86,7 +108,7 @@ _tsf_ids() {
 
 # _tsf_row <id> — the task's TSV row; rc 1 when no copy of the file can be read.
 _tsf_row() {
-  local id="$1" top dir base rel br="" c_base="" c_br="" c_wt="" content state s
+  local id="$1" top dir base rel br="" c_base="" c_br="" c_wt="" content state s sr=""
   top="$(_tsf_top)" || return 1
   [ -n "$top" ] || return 1
   dir="$(task_source_dir)"; base="$(_tsf_base_ref)"; rel="$dir/$id.md"
@@ -103,6 +125,8 @@ _tsf_row() {
     if [ "$(printf '%s\n' "$c_br" | _tsf_field status)" = "done" ]; then state="review"; else state="doing"; fi
   elif [ -n "$c_base" ]; then
     state="todo"; content="$c_base"
+  elif sr="$(_tsf_share_ref "$id")" && [ -n "$sr" ]; then
+    state="shared"; br="$sr"; content="$(git -C "$top" show "$sr:$rel" 2>/dev/null || true)"
   elif [ -n "$c_wt" ]; then
     content="$c_wt"; s="$(printf '%s\n' "$c_wt" | _tsf_field status)"
     if _tsf_closed "$s"; then state="$s"; else state="draft"; fi
@@ -119,7 +143,7 @@ _tsf_row() {
     "${br:--}" "$(printf '%s' "${title:-(untitled)}" | tr '\t' ' ')"
 }
 
-# task_file_list — every task, ordered: doing, review, todo, draft, done, dropped; inside a state
+# task_file_list — every task, ordered: doing, review, todo, draft, shared, done, dropped; inside a state
 # by priority, then creation date, then id.
 task_file_list() {
   local id
@@ -127,7 +151,7 @@ task_file_list() {
     [ -n "$id" ] || continue
     _tsf_row "$id" || true
   done | awk -F'\t' '
-    BEGIN { r["doing"] = 1; r["review"] = 2; r["todo"] = 3; r["draft"] = 4; r["done"] = 8; r["dropped"] = 9 }
+    BEGIN { r["doing"] = 1; r["review"] = 2; r["todo"] = 3; r["draft"] = 4; r["shared"] = 5; r["done"] = 8; r["dropped"] = 9 }
     { print (($2 in r) ? r[$2] : 7) "\t" $3 "\t" $5 "\t" $1 "\t" $0 }' \
     | sort -t "$(printf '\t')" -k1,1n -k2,2 -k3,3 -k4,4 | cut -f5-
 }
@@ -155,6 +179,7 @@ _tsf_exists() {
   [ -f "$top/$dir/$id.md" ] && return 0
   [ -n "$base" ] && git -C "$top" cat-file -e "$base:$dir/$id.md" 2>/dev/null && return 0
   [ -n "$(_tsf_branch "$id")" ] && return 0
+  [ -n "$(_tsf_share_ref "$id")" ] && return 0
   return 1
 }
 

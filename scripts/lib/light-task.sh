@@ -12,7 +12,8 @@
 #   finish mark the task done ON ITS BRANCH, commit, push, open the pull request. The task is done
 #          when that pull request merges — review stays a pull request       (alias: done)
 #   share  one pull request that adds this checkout's drafts to the base branch, for a backlog
-#          nobody has started yet
+#          nobody has started yet. The tasks list as `shared` until it merges; run again with no
+#          new drafts, it retries a share whose push or pull request failed
 #
 # Branch form: `light/<id>-<slug>`. `light` is not a kind and <id> starts with a letter, so the
 # branch never parses as an issue number; worktree-issue.sh (wt_task_id) parses it instead, and
@@ -192,6 +193,9 @@ $row
 EOF
   case "$state" in
     done|dropped) echo "✗ task $id is already $state" >&2; return 1 ;;
+    shared)
+      echo "✗ task $id is waiting in a share pull request ($br) — start it once that merges" >&2
+      return 1 ;;
   esac
 
   lbr="$(git -C "$root" for-each-ref --format='%(refname:short)' "refs/heads/light/$id-*" 2>/dev/null | head -1)"
@@ -262,7 +266,10 @@ _lt_pr_title() {
 _lt_open_pr() {
   local wt="$1" branch="$2" title="$3" body="$4" repo base url="" n
   repo="$(_lt_repo)"; base="$(_lt_base)"
-  KIT_PR_BASE="$base" git -C "$wt" push -u origin "$branch" >&2 || return 1
+  if ! KIT_PR_BASE="$base" git -C "$wt" push -u origin "$branch" >&2; then
+    echo "✗ could not push $branch — the commit is kept in $wt; run the same command again to retry" >&2
+    return 1
+  fi
   if cckit_gh_rest; then
     n="$(gh_rest_pr_for_head "$repo" "$branch" 2>/dev/null || true)"
     if [ -n "$n" ]; then url="https://github.com/$repo/pull/$n"; fi
@@ -274,10 +281,14 @@ _lt_open_pr() {
     echo "✓ $url"; return 0
   fi
   if cckit_gh_rest; then
-    url="$(gh_rest_pr_create "$repo" "$base" "$branch" "$title" "$body" "" "")" || return 1
+    url="$(gh_rest_pr_create "$repo" "$base" "$branch" "$title" "$body" "" "")" || url=""
   else
     url="$(gh pr create --repo "$repo" --base "$base" --head "$branch" \
-      --title "$title" --body "$body" --assignee "@me")" || return 1
+      --title "$title" --body "$body" --assignee "@me")" || url=""
+  fi
+  if [ -z "$url" ]; then
+    echo "✗ could not open the pull request for $branch — the branch is pushed; run the same command again to retry" >&2
+    return 1
   fi
   echo "✓ $url"
 }
@@ -336,8 +347,14 @@ EOF
 }
 
 # ── share ───────────────────────────────────────────────────────────────────────────────────────
+# _lt_share_body <ids> <summary> — the share pull request's body.
+_lt_share_body() {
+  printf '## Tasks added\n\n%s\n\n## Summary\n\n%s\n\n## Review\n\nMerging adds these tasks to the shared list as `todo`. No work is included.\n' \
+    "$(printf '%s\n' "$1" | sed 's/^/- `/; s/$/`/')" "$2"
+}
+
 lt_share() {
-  local summary="" a root from base base_ref stamp branch wt ids n pr_title body
+  local summary="" a root from base base_ref stamp branch wt ids n pr_title body rows
   for a in "$@"; do
     case "$a" in
       -h|--help) _lt_usage; return 0 ;;
@@ -351,10 +368,25 @@ lt_share() {
   fi
   root="$(_lt_root)"; from="$(_lt_top)"
   [ -n "$root" ] && [ -n "$from" ] || { echo "✗ task share: not inside a git repository" >&2; return 1; }
-  n="$(task_source_call list | awk -F'\t' '$2 == "draft"' | grep -c . || true)"
-  if [ "$n" -eq 0 ]; then echo "(no drafts to share in this checkout)"; return 0; fi
   base="$(_lt_base)"
   git -C "$root" fetch --quiet origin "$base" 2>/dev/null || true
+  rows="$(task_source_call list)" || return 1
+  n="$(printf '%s\n' "$rows" | awk -F'\t' '$2 == "draft"' | grep -c . || true)"
+  if [ "$n" -eq 0 ]; then
+    # Nothing new. A share branch of this repository whose tasks are not on the base branch yet is
+    # an earlier share: its push or its pull request may have failed, so run that step again. An
+    # open pull request is reported, not re-created.
+    branch="$(printf '%s\n' "$rows" | awk -F'\t' '$2 == "shared" && $6 ~ /^light\/share-/ { print $6; exit }')"
+    wt=""
+    if [ -n "$branch" ]; then wt="$(_lt_worktree_of "$root" "$branch")"; fi
+    if [ -z "$wt" ] || [ ! -d "$wt" ]; then echo "(no drafts to share in this checkout)"; return 0; fi
+    ids="$(printf '%s\n' "$rows" | awk -F'\t' -v b="$branch" '$2 == "shared" && $6 == b { print $1 }')"
+    n="$(printf '%s\n' "$ids" | grep -c . || true)"
+    pr_title="$(git -C "$wt" log -1 --format=%s 2>/dev/null || true)"
+    echo "[task] no new drafts; $n task(s) already committed on $branch" >&2
+    _lt_open_pr "$wt" "$branch" "$pr_title" "$(_lt_share_body "$ids" "${summary:-Adds $n task(s) to the list.}")"
+    return $?
+  fi
   if git -C "$root" show-ref --verify --quiet "refs/remotes/origin/$base"; then base_ref="origin/$base"
   else echo "✗ task share: origin has no branch '$base'" >&2; return 1; fi
   stamp="$(date +%Y%m%d%H%M%S)"
@@ -371,9 +403,8 @@ lt_share() {
   fi
   pr_title="chore(tasks): add $n task$([ "$n" -eq 1 ] || echo s) [share-$stamp]"
   git -C "$wt" commit -q -m "$pr_title" >&2 || { echo "✗ task share: the commit failed in $wt" >&2; return 1; }
-  body="$(printf '## Tasks added\n\n%s\n\n## Summary\n\n%s\n\n## Review\n\nMerging adds these tasks to the shared list as `todo`. No work is included.\n' \
-    "$(printf '%s\n' "$ids" | sed 's/^/- `/; s/$/`/')" "${summary:-Adds $n task(s) to the list.}")"
-  echo "[task] moved $n draft(s) onto $branch" >&2
+  body="$(_lt_share_body "$ids" "${summary:-Adds $n task(s) to the list.}")"
+  echo "[task] moved $n draft(s) onto $branch — 'cckit task list' shows them as shared until the pull request merges" >&2
   _lt_open_pr "$wt" "$branch" "$pr_title" "$body"
 }
 

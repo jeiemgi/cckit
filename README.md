@@ -369,7 +369,7 @@ task under `tasks/`.
 ```bash
 cckit task new "Write the spring newsletter"   # prints the id, writes tasks/<id>.md
 cckit task next                                # the task to take next
-cckit task list                                # every open task: draft · todo · doing · review
+cckit task list                                # every open task: draft · todo · shared · doing · review
 cckit task start <id>                          # worktree + branch light/<id>-<slug> (alias: take)
 cckit task finish <id> "what was done"         # mark done on the branch, push, open the PR (alias: done)
 cckit task share "Q1 backlog"                  # one PR that adds this checkout's drafts to the base

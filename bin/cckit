@@ -27,7 +27,8 @@
 #     task start [--force] [--no-push] <id>   worktree + branch light/<id>-<slug> from the base (alias: take)
 #     task finish [<id>] "<summary>" [--all]  mark it done on its branch, push, open the pull request;
 #         the task is done when that PR merges (alias: done). --all also commits new files
-#     task share ["<summary>"]        one pull request that adds this checkout's drafts to the base
+#     task share ["<summary>"]        one pull request that adds this checkout's drafts to the base;
+#         they list as shared until it merges. Re-run to retry a share whose push or PR failed
 #   cckit merge [<pr>] [--merge|--rebase]   merge the PR (squash by default; rebases on conflict), close
 #                                   its issues, GC the branch, update the PR's base (develop or effort/<N>);
 #                                   refuses an effort/* head: that PR merges with cckit effort close <N>

@@ -88,10 +88,11 @@ records it.
 | --- | --- |
 | `draft` | The file exists only in this checkout. Teammates do not see it yet. |
 | `todo` | The file is on the base branch. Anyone can take it. |
+| `shared` | `cckit task share` committed the file on a `light/share-…` branch and that pull request has not merged. It becomes `todo` when it does; until then `start` refuses it. |
 | `doing` | A `light/<id>-…` branch exists: someone started it. |
 | `review` | That branch's copy says `done`: the pull request is waiting. |
 | `done` | The base branch's copy says `done`: the pull request merged. |
-| `dropped` | Someone set `status: dropped` in the file by hand to abandon the task. |
+| `dropped` | The base branch's copy says `dropped`: someone edited `status:` by hand to abandon the task, and that edit merged. A task that never reached the base branch is abandoned by deleting its `light/<id>-…` branch. |
 
 `list` hides `done` and `dropped` unless you pass `--all`. `list` and `next` fetch from `origin`
 first; offline they show the last fetched state and say so.
@@ -109,6 +110,11 @@ reaches the team one of three ways.
 
 `start` and `share` remove the draft from the checkout they ran in once it is committed on a
 branch, so the checkout stays clean.
+
+After `share`, the tasks are listed as `shared` until the pull request merges. If the push or the
+pull request fails, `share` exits 1 and the tasks stay committed on the share branch; run
+`cckit task share` again to retry. With no new drafts it pushes that branch and opens its pull
+request, or prints the one already open.
 
 ## The task file
 

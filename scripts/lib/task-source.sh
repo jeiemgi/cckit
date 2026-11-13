@@ -26,8 +26,10 @@
 #                                         refuses when the source does not define it.
 #
 # TSV row: <id>\t<state>\t<priority>\t<kind>\t<created>\t<branch>\t<title>
-#   state    draft (only in this checkout) · todo · doing · review · done · dropped
-#   branch   the task's `light/<id>-<slug>` ref, or `-`
+#   state    draft (only in this checkout) · todo · doing · review · done · dropped ·
+#            shared (committed by `cckit task share`, its pull request not merged yet)
+#   branch   the task's `light/<id>-<slug>` ref; for `shared`, the `light/share-<stamp>` ref that
+#            carries it; else `-`
 # No field is ever empty (`-` is the absent marker): tab is IFS whitespace, so an empty field would
 # shift the rest. The title is last and may hold spaces.
 #
