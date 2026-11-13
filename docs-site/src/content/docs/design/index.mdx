@@ -70,8 +70,7 @@ The full list of roles is on [The team](/philosophy/the-team/).
 
 ## Which tools plug in
 
-cckit adopts tools for this work and builds none of them. Two are wired in today, and both are
-about the running interface:
+cckit adopts tools for this work. Two are about the running interface:
 
 - **Agentation**, a click-to-annotate toolbar for React apps. You click an element in your dev
   app and leave a note; Claude Code reads the note with the component and its source path, and
@@ -80,7 +79,9 @@ about the running interface:
 - **chrome-devtools-axi**, a browser bridge. `cckit debug` gives an agent screenshots, console
   and network logs of a page. See [Let the agent see the page](/development/browser-debug/).
 
-No outside design tool is wired in: see [Limits](#limits).
+For building a page, see [`page-design`](/skills/#page-design) and its three design skills on
+[Integrations](/integrations/). No design canvas is wired in: see [Limits](#limits).
+
 ## The commands
 
 Design has no `cckit` verb of its own. The work runs through two skills and one verb:
@@ -107,14 +108,19 @@ Every skill is listed on [Skills](/skills/), and the rule on [Rules](/rules/).
 
 ## Limits
 
-- **No outside design tool is wired in.** cckit has no integration with a design canvas or mockup
-  tool such as Figma; none of the four tools on [Integrations](/integrations/) is a design tool.
-  The designer agent works in the code: the tokens, the components and the running app. If your
-  designs live in an outside tool, a person carries them across.
-- **The designer's craft skills are not shipped.** The designer's role file lists six skills
-  (`emil-design-eng`, `impeccable`, `web-design-guidelines`, `gsap-core`, `gsap-timeline`,
-  `gsap-performance`). All six come from third-party skill packs and are optional. In a fresh
-  project the designer runs without them, on its role instructions alone.
+- **No design canvas is wired in.** cckit has no integration with a design canvas or mockup tool
+  such as Figma. The designer agent works in the code: the tokens, the components and the running
+  app. If your designs live in an outside tool, a person carries them across.
+- **The page skills are off until you turn them on.** `page-design` is cckit's own skill for
+  building a page. It applies three third-party skills in a fixed order: `impeccable`,
+  `emil-design-eng` and `web-design-guidelines`. `cckit add page-design` installs cckit's skill;
+  the three others are [integrations](/integrations/) installed with `cckit add <name>` and
+  `cckit doctor --fix`, which asks first. Without them the designer runs on its role instructions
+  alone. The three `gsap-*` skills in the designer's role file are optional and not installed by
+  cckit.
+- **A page built with the skills costs more.** In the one run on record, the same landing page
+  took 436 seconds and about 4.98M tokens with the skills, against 167 seconds and about 622k
+  without. `web-design-guidelines` fetches its rules from the network on every run.
 - **Annotation is narrow.** It covers React apps (Next.js, Vite, React Router) and Claude Code
   only.
 - **The UX audit reads source, not pixels.** It reasons over the structure of the app. A purely

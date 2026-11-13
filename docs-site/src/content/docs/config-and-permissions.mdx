@@ -591,7 +591,7 @@ comment box yourself, or host the file, set `KIT_EVIDENCE_URL_BASE`, and cckit e
 
 ## Light tasks
 
-[`cckit task`](/project-management/light-tasks/) tracks work without GitHub issues. Three keys, all optional:
+[`cckit task`](/project-management/light-tasks/) tracks work without GitHub issues. Five keys, all optional:
 
 ```json
 {
@@ -608,6 +608,7 @@ comment box yourself, or host the file, set `KIT_EVIDENCE_URL_BASE`, and cckit e
 | `tasks.default` | `issues` | Which list is the project's default: `issues` (GitHub issues) or `light` (the `cckit task` list). With `light`, a bare `cckit next` prints what `cckit task next` prints, and the `campaign` skill records a campaign's pieces as light tasks. `cckit next` with any argument still asks about issues, and both lists stay usable whatever the value. `cckit task default` prints it. A value that is neither is read as `issues`, with a warning. The `marketing` profile sets `light`; on `cckit init --upgrade` the stored value is kept. |
 | `tasks.source` | `file` | Where task records live. `file` is the one source cckit ships: one tracked file per task. Another name `<name>` loads `scripts/lib/task-source-<name>.sh`; a name with no such file is refused with exit 1. `KIT_TASKS_SOURCE` overrides it per invocation. |
 | `tasks.check` | none | The gate `cckit task run <id>` runs after the agent's round when no `--check "<cmd>"` is given: a shell command run in the task's worktree. Exit 0 lets the pull request open; any other exit stops the run with exit 6 and opens none. With no key and no flag there is no gate. The `nextjs-shadcn` recipe writes `pnpm build && pnpm lint`. |
+| `tasks.design` | `false` | With `true`, every task of the project is a page task: `cckit task run` tells the agent to use the [`page-design`](/skills/#page-design) skill, records the skills the run loaded, and the review gets a `## Design` section naming them. A single task is a page task with `cckit task new --kind page`. Set by the `marketing` profile, the `nextjs-shadcn` recipe and `cckit add page-design`. With the key on and the skill folder missing, `cckit doctor` fails and names `cckit add page-design`. |
 | `tasks.dir` | `tasks` | The tracked directory the `file` source keeps tasks in, relative to the project root. An absolute path, or one that climbs out of the project, is ignored with a warning and `tasks` is used. `KIT_TASKS_DIR` overrides it per invocation. |
 
 Keep the directory tracked: the list is shared through git, so a gitignored directory would leave
