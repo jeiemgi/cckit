@@ -99,6 +99,12 @@ t  "effort_start worktree dir is effort+N-slug" \
    ".claude/worktrees/effort+99-demo"
 t  "effort_start bootstrapped the worktree (.env.local copied)" \
    "$(cat "$tmp/work/.claude/worktrees/effort+99-demo/.env.local" 2>/dev/null)" "SECRET=from-root"
+# #453: creating the branch stamps the effort's start; a re-start keeps the stamp it finds.
+start_stamp="$(git rev-parse --git-common-dir)/effort-metrics/99.start"
+t  "effort_start stamps the effort start" "$(grep -cE '^[0-9]+$' "$start_stamp" 2>/dev/null)" "1"
+echo 1000000000 > "$start_stamp"
+effort_start 99 demo >/dev/null 2>&1
+t  "re-running effort_start keeps the start stamp" "$(cat "$start_stamp" 2>/dev/null)" "1000000000"
 
 # move onto the effort branch (its worktree) for pr/close
 cd "$tmp/work/.claude/worktrees/effort+99-demo"
@@ -252,6 +258,10 @@ case "$close_out" in *"PR 41 re-targeted to main"*) echo "ok: close output carri
 tc "$GH_LOG" 'issue close 101'  "effort_close closes sub #101"
 tc "$GH_LOG" 'issue close 99 '  "effort_close closes the parent"
 case "$close_out" in *"metrics:"*) echo "ok: capture_effort_metrics composed into close" ;; *) echo "FAIL: no metrics capture in close"; fail=1 ;; esac
+# #453: the row that close wrote carries a build time measured from the start stamp.
+t  "effort_close records build_seconds from the start stamp" \
+   "$(tail -1 "$records" | jq -r '"\(.effort) \(.build_source) \(.build_seconds | type) \(.build_seconds > 0)"')" \
+   "99 effort-start number true"
 # #148: board Status=Done for the parent + EVERY sub, set by the verb (was skill-only before)
 tc "$BOARD_LOG" 'ITEM-99 SF1 OPT_DONE'  "effort_close sets board Done for the parent"
 tc "$BOARD_LOG" 'ITEM-101 SF1 OPT_DONE' "effort_close sets board Done for sub #101"

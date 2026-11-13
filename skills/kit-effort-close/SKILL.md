@@ -22,7 +22,11 @@ The effort lifecycle's terminal op. Board state, issue state, and the work recor
 1. **Snapshot sub-diffs BEFORE squash** (squash destroys the per-sub-issue commit pairs that ARE
    the work record — effort-model.md "Trace hard rules"), with a **refuse-squash-without-trace**
    backstop (`KIT_FORCE=1` overrides).
-2. **Capture effort metrics** pre-squash (telemetry: live-branch diff + commit signals).
+2. **Capture effort metrics** pre-squash (telemetry: live-branch diff + commit signals). The record
+   also carries `build_seconds` — from the stamp `cckit effort start` wrote, else from the oldest
+   commit on the branch — and `tokens_real` where a usage log or a `cckit autopilot run` state file
+   has a figure. With no source the field is `null` and `tokens_null_reason` names why; nothing is
+   estimated.
 3. **Re-target dependent PRs, then squash-merge** the effort PR. The merge deletes the remote
    effort branch, and GitHub closes — unmerged — any open PR still based on it. So the core first
    lists them (`gh pr list --base effort/<N>-… --state open`) and moves each to the base branch

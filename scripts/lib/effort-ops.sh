@@ -695,6 +695,13 @@ effort_start() {
     local from="origin/$base"; git -C "$root" rev-parse --verify --quiet "$from" >/dev/null 2>&1 || from="$base"
     git -C "$root" worktree add -b "$branch" "$wt" "$from" >/dev/null 2>&1 \
       || { echo "effort_start: failed to create worktree for $branch" >&2; return 1; }
+    # Stamp the effort's start (#453): `effort close` subtracts it for build_seconds. Only here,
+    # where the branch is created — a re-start of an effort begun earlier would stamp a start that
+    # is too late, and capture falls back to the branch's oldest commit instead. Best-effort.
+    _eo_source_metrics
+    if command -v record_effort_start >/dev/null 2>&1; then
+      ( cd "$root" && record_effort_start "$num" ) >/dev/null 2>&1 || true
+    fi
   fi
 
   # Bootstrap the worktree for local dev: copy gitignored env, assign a per-worktree dev port, and
