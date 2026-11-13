@@ -75,7 +75,7 @@ const GA_ENABLED = Boolean(import.meta.env.PUBLIC_GA_MEASUREMENT_ID);
   // brief "Copied" flash. One delegated listener on document covers every table and survives page
   // swaps (the document element persists), so it's wired exactly once.
   document.addEventListener('click', function (e) {
-    var code = e.target && e.target.closest('.sl-markdown-content td code, .sl-markdown-content th code');
+    var code = e.target && e.target.closest('.sl-markdown-content td code, .sl-markdown-content th code, .sl-markdown-content .cckit-record code');
     if (!code || !navigator.clipboard) return;
     navigator.clipboard.writeText(code.textContent || '').then(function () {
       code.setAttribute('data-copied', '');
