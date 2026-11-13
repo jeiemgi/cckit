@@ -21,6 +21,8 @@
     "profiles",
     "templates",
     "integrations",
+    "recipes",
+    "databases",
     "docs",
     "githooks",
     "cckit.config.json",

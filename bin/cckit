@@ -7,7 +7,9 @@
 #   cckit                           resume: print the last session's resume-here handoff
 #   cckit handoff "<note>"          save a resume-here note for the next session
 #   cckit install [bin-dir]         symlink cckit onto your PATH (global install)
-#   cckit init --profile <p>        scaffold cckit.config.json + .claude/ (--profile required)
+#   cckit init [<folder>]           guided setup: detect the folder, ask, scaffold, then git + GitHub after
+#                                   one confirmation (--yes with no terminal; --no-github = scaffold only;
+#                                   --answers FILE, --recipe <id>, --database <id>, --public, --dry-run)
 #                                   --adapter <claude|codex|both> selects the agent (default claude)
 #   cckit start <issue> [slug]      isolated worktree + branch for an issue
 #   cckit pr <issue> <summary> [--base <branch>]   commit + push + open the PR (--base: target <branch>, not the

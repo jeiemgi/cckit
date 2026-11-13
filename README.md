@@ -88,7 +88,11 @@ Requirements: `bash` 4+, `git`, and `gh` (GitHub CLI) authenticated. `jq` recomm
 ```bash
 cckit doctor                  # onboarding preflight: deps, gh auth, and each integration you switched on
                               #   asks before installing; with no terminal and no --fix it only reports
-cckit init --profile software # scaffold cckit.config.json + .claude/ for this repo
+cckit init [<folder>]         # guided setup, end to end: names what the folder is, asks what is
+                              #   missing, scaffolds cckit.config.json + .claude/, then git + GitHub
+                              #   (repository, develop, labels, protection) after ONE confirmation.
+                              #   A new project starts from a recipe. See "Set up a project" below.
+cckit init --profile software --no-github   # scaffold only: nothing outside the folder
                               #   profiles: software · content · research · automation · minimal
                               #   --adapter claude|codex|both picks the agent (default claude);
                               #   codex writes AGENTS.md + .agents/ and no .claude/ tree;
@@ -143,6 +147,65 @@ add or modify; `cckit init --upgrade` applies it and prints that same list as `C
 Existing files and every path under `upgrade.removed` are kept, and a version bump alone changes one
 line of the config. The path, with what it changes and what it never touches:
 [Update a project](https://cckit.dev/update/).
+
+
+## Set up a project: `cckit init`
+
+`cckit init [<folder>]` takes a folder from whatever state it is in to a project `cckit start` can
+work on. It assumes no technical knowledge: it says what it found, asks in plain language, and
+every question has one recommended answer.
+
+**1. It names the folder before writing anything.**
+
+| The folder is | What init does |
+| --- | --- |
+| a git repository with a GitHub remote | scaffolds the kit, then runs the setup steps that are still missing |
+| a git repository with no remote | the same, and creates the GitHub repository |
+| a project (for example a `package.json`) with no git | the same, starting from `git init` |
+| files, but nothing that marks a project | asks: set it up here, start a new project in its own folder, or stop |
+| empty, or not there yet | asks whether this is a new project, then what it starts from |
+| your home directory, `~/Desktop`, `~/Documents`, `~/Downloads`, `/` | never scaffolds there. Asks whether this is a new project and which folder it gets; with no terminal and no answers file it exits 2 |
+
+**2. A new project starts from a recipe.** A recipe is a JSON file in `recipes/`; adding a file adds
+a recipe. One ships: `nextjs-shadcn` (Next.js, shadcn/ui, pnpm). init then asks whether the project
+needs a database and offers the options in `databases/`. One ships: `supabase`. It adds
+`@supabase/supabase-js` and `@supabase/ssr`, `lib/supabase/client.ts` and `lib/supabase/server.ts`,
+and the two variable names in `.env.local` with placeholders. A guide page
+(`databases/supabase/guide.html`) shows where to create the Supabase project and where each value
+is; init opens it with `npx -y lavish-axi` when a browser is available and prints the same steps
+otherwise. You type the values into `.env.local` yourself: cckit never prints or reads them back,
+and git ignores the file.
+
+**3. Git and GitHub, after one confirmation.** init lists every step first, then asks once on a
+terminal. With no terminal it runs them only with `--yes`; without it the kit files are written and
+the run ends by saying the setup did not run.
+
+| Step | Skipped when |
+| --- | --- |
+| `git init` (branch `main`) and the first commit | the folder is a repository / it has a commit |
+| `gh repo create`, private (`--public` for public) | `origin` is set; an existing `<owner>/<name>` is connected instead |
+| branch `develop` created and pushed; default branch on a repository init created | GitHub has the branch / an existing repository keeps its default |
+| labels and milestones | only the missing ones are created |
+| "automatically delete head branches" | already on |
+| protection of the base branch: pull request required, branch up to date, linear history, no force-push | already protected. A plan that refuses it (HTTP 403 on a private repository of a free account) is reported as skipped with that reason |
+| Projects v2 field ids | the project has no board |
+| `cckit doctor` report | never |
+
+Each step prints `done`, `skipped` or `failed`. A failed step does not stop the later ones, and the
+run exits 1 after all of them. A re-run skips what is finished: on a set-up project it changes
+nothing and every line says `skipped`.
+
+```bash
+cckit init my-app                          # guided: answers the questions on a terminal
+cckit init my-app --dry-run --recipe nextjs-shadcn --database supabase   # print every step, write nothing
+cckit init my-app --answers answers.json --yes   # no terminal: answers from a file, setup confirmed
+cckit init --profile software --no-github  # the scaffold alone, as before
+```
+
+`--answers` takes a JSON object keyed by question: `new_project` (`yes`/`no`), `folder_use`
+(`here`/`new`/`cancel`), `project_name`, `location`, `recipe`, `database_needed` (`yes`/`no`),
+`database`, `profile`. A question the file does not answer takes the recommended option, and the
+run says so. `--upgrade` is unchanged and never enters this flow.
 
 ## Efforts and slug handles
 

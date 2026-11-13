@@ -99,11 +99,32 @@ You are initializing the current project with the **claude-kit** setup. The kit 
    - `gws` missing → explain it and ask the user for their install method; **do not guess a package
      name or installer**. Re-check `command -v gws`.
 
-4. **Report** what was written (echo the engine's summary) and surface the printed "Next steps"
-   (seed labels/milestones, capture Projects v2 IDs).
+4. **Report** what was written (echo the engine's summary) and its closing lines.
 
-5. **Offer** to run `./scripts/setup-labels.sh` and `./scripts/setup-milestones.sh` now if a
-   GitHub repo was configured. Ask before running — they mutate the repo.
+5. **Git and GitHub setup.** The engine does this itself: `git init` + first commit, the GitHub
+   repository (private unless `--public`), the base branch `develop`, labels, milestones,
+   delete-head-branches, base-branch protection, Projects v2 ids, the doctor report. You have no
+   terminal, so it runs only with `--yes`, and the scaffold in step 2 ends with "Git and GitHub
+   setup: not run". Show the user the plan first, then run it on their go-ahead:
+
+   ```bash
+   "${CLAUDE_PLUGIN_ROOT}/scripts/init.sh" --target "$PWD" --dry-run   # the steps, nothing written
+   "${CLAUDE_PLUGIN_ROOT}/scripts/init.sh" --target "$PWD" --yes       # run them; finished steps are skipped
+   ```
+
+   Each step prints `done`, `skipped` or `failed`; relay the failed ones with their reason. Pass
+   `--no-github` in step 2 when the user wants the files only. Creating a repository and changing
+   branch protection are outward-facing: never pass `--yes` without the user's go-ahead.
+
+   **A new project.** When the target is an empty folder, a folder with no project in it, or the
+   user's home directory, ask the engine's questions with `AskUserQuestion` (is this a new project,
+   its name and folder, the recipe from `${CLAUDE_PLUGIN_ROOT}/recipes/*.json`, whether it needs a
+   database and which one from `${CLAUDE_PLUGIN_ROOT}/databases/*.json`; each descriptor marks the
+   recommended one), write the answers to a JSON file and pass `--answers <file>`. Keys:
+   `new_project`, `folder_use`, `project_name`, `location`, `recipe`, `database_needed`, `database`,
+   `profile`. Never scaffold into a home directory. For a database, the engine prints the steps to get
+   the credentials; the user types the values into the env file — do not ask for them in chat and do
+   not write them yourself.
 
 6. **Audit stack conformance** (when the `software` profile activated a stack-gated build skill).
    The build skills (`feature-build-refine`, `supabase-patterns`, …) self-activate from
