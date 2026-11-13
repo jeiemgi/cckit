@@ -24,7 +24,7 @@
 # writable.
 #
 #   al_supported <kind>                  rc 0 when the kind has a known headless form
-#   al_headless_cmd <kind> <text|json> [<args, one per line>]
+#   al_headless_cmd <kind> <text|json|events> [<args, one per line>]
 #                                        echo the shell command line; it reads the prompt on stdin
 #   al_run <seconds> <command>           run it on stdin under the bound: rc 124 on expiry (TERM,
 #                                        then KILL), else the command's own exit status
@@ -33,6 +33,9 @@
 #                                        (AL_PIDFILE) still names a live process or process group
 #   al_usage <kind> <output-file>        echo "<input> <output> <cost-usd>" from the runtime's own
 #                                        JSON output; each field is `unknown` when it is not there
+#   al_skills <kind> <output-file>       echo the skills the runtime's own event output shows as
+#                                        loaded, one per line; rc 1 when the output holds no event
+#                                        (the question cannot be answered from it)
 #
 # bash 3.2 + zsh compatible: no arrays, no glob held in a variable.
 # errors: mixed — al_supported/al_headless_cmd/al_usage are pure (al_headless_cmd returns 2 for an
@@ -101,13 +104,20 @@ _al_quote() {
 # `text` is the plain reply (what a reviewer's report is parsed from). `json` asks the runtime for
 # its machine-readable output, which is the only place token usage appears: one result object from
 # `claude -p --output-format json`, JSONL events from `codex exec --json`.
+#
+# `events` asks for every event of the turn, one JSON object per line, which is the only place a
+# tool call appears (#504): `claude -p --output-format stream-json --verbose` (`claude --help`,
+# 2.1.323: stream-json is the "realtime streaming" format of --print). The closing `result` object
+# is still in that stream, so al_usage reads it unchanged. Codex prints events in its one JSON mode
+# already, so `events` and `json` are the same command there.
 al_headless_cmd() {
   local kind="${1:-}" mode="${2:-text}" args_nl="${3:-}" cmd tail="" a
   case "${kind##*/}" in
     claude) cmd="$(_al_quote "$kind") -p"
-            [ "$mode" = "json" ] && cmd="$cmd --output-format json" ;;
+            [ "$mode" = "json" ] && cmd="$cmd --output-format json"
+            [ "$mode" = "events" ] && cmd="$cmd --output-format stream-json --verbose" ;;
     codex)  cmd="$(_al_quote "$kind") exec"
-            [ "$mode" = "json" ] && cmd="$cmd --json"
+            case "$mode" in json|events) cmd="$cmd --json" ;; esac
             tail=" -" ;;
     *) echo "agent-launch: no headless form is known for agent '$kind' (supported: claude, codex)" >&2
        return 2 ;;
@@ -235,6 +245,17 @@ al_usage() {
                 | map(numbers) ) as $in
               | "\(if ($in | length) == 0 then "unknown" else ($in | add) end) \(.usage.output_tokens | if type == "number" then . else "unknown" end) \(.total_cost_usd | if type == "number" then . else "unknown" end)"
             end' "$f" 2>/dev/null)" || got=""
+        # An event stream (`events` mode) is one object per line. A line that is not JSON (a
+        # truncated last line of a killed round) fails the slurp above, so read line by line.
+        if [ -z "$got" ]; then
+          got="$(jq -rRs '
+            [ split("\n")[] | fromjson? | objects | select(.type? == "result" and ((.usage? | type) == "object")) ] | last
+            | if . == null then empty else
+                ( [ .usage.input_tokens, .usage.cache_creation_input_tokens, .usage.cache_read_input_tokens ]
+                  | map(numbers) ) as $in
+                | "\(if ($in | length) == 0 then "unknown" else ($in | add) end) \(.usage.output_tokens | if type == "number" then . else "unknown" end) \(.total_cost_usd | if type == "number" then . else "unknown" end)"
+              end' "$f" 2>/dev/null)" || got=""
+        fi
         ;;
       codex)
         got="$(jq -rRs '
@@ -248,4 +269,67 @@ al_usage() {
   fi
   [ -n "$got" ] || got="unknown unknown unknown"
   printf '%s\n' "$got"
+}
+
+# al_skills <kind> <output-file> — the skills one turn LOADED, one name per line, sorted, as the
+# runtime's own event output shows them (#504). Never what the agent says it used.
+#
+# rc 0: the output held runtime events, so the list is a reading — an empty list means no skill
+#       was loaded. rc 1: no event in the output (text mode, `claude --output-format json`, an
+#       empty or missing file, no jq): which skills were loaded cannot be told from it.
+#
+# What counts as loaded:
+#   claude   an assistant `tool_use` block named `Skill` (the name is `input.skill`), or one named
+#            `Read` whose `input.file_path` ends in `skills/<name>/SKILL.md` — and, for both, a
+#            `tool_result` for that call that is not `is_error`. A call for a skill that is not
+#            installed returns an error result, so asking for a skill is not loading it.
+#   codex    a completed `command_execution` item with `exit_code` 0 whose command names a
+#            `skills/<name>/SKILL.md` file. Codex has no skill tool: it reads the file with a
+#            shell command.
+#
+# The Claude shape (`type: tool_use`, `name: Skill`, `input.skill`) is the one Claude Code stores
+# in its session transcripts. No live headless run confirmed that `stream-json` prints the same
+# objects, and none confirmed the Codex field names: a runtime that prints another shape yields an
+# empty list or rc 1, never a guessed name.
+al_skills() {
+  local kind="${1:-}" f="${2:-}" got=""
+  [ -s "$f" ] || return 1
+  command -v jq >/dev/null 2>&1 || return 1
+  case "${kind##*/}" in
+    claude)
+      got="$(jq -rRs '
+        def skillfile: (capture("(^|/)skills/(?<n>[^/]+)/SKILL\\.md$")? | .n) // empty;
+        [ split("\n")[] | fromjson? | if type == "array" then .[] else . end | objects ] as $ev
+        | [ $ev[] | select(.type? == "system" or .type? == "assistant" or .type? == "user") ] as $rt
+        | if ($rt | length) == 0 then "al:none" else
+            ( [ $rt[] | select(.type == "user") | .message.content? | arrays | .[] | objects
+                | select(.type? == "tool_result" and (.is_error? != true)) | .tool_use_id ] ) as $done
+            | "al:events",
+              ( [ $rt[] | select(.type == "assistant") | .message.content? | arrays | .[] | objects
+                  | select(.type? == "tool_use") | . as $t
+                  | select(any($done[]; . == $t.id))
+                  | if $t.name == "Skill" then ($t.input.skill? | strings)
+                    elif $t.name == "Read" then ($t.input.file_path? | strings | skillfile)
+                    else empty end ]
+                | map(select(length > 0)) | unique | .[] )
+          end' "$f" 2>/dev/null)" || got=""
+      ;;
+    codex)
+      got="$(jq -rRs '
+        [ split("\n")[] | fromjson? | objects ] as $ev
+        | [ $ev[] | select((.type? | type) == "string" and (.type | test("^(thread|turn|item)\\."))) ] as $rt
+        | if ($rt | length) == 0 then "al:none" else
+            "al:events",
+            ( [ $rt[] | select(.type == "item.completed") | .item? | objects
+                | select(.type? == "command_execution" and .exit_code? == 0)
+                | .command? | strings
+                | [ match("(^|[/ \"\u0027=])skills/([A-Za-z0-9._-]+)/SKILL\\.md"; "g") | .captures[1].string ] | .[] ]
+              | unique | .[] )
+          end' "$f" 2>/dev/null)" || got=""
+      ;;
+  esac
+  case "$got" in
+    al:events*) printf '%s\n' "$got" | sed 1d | grep . || true; return 0 ;;
+  esac
+  return 1
 }

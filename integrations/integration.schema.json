@@ -173,6 +173,12 @@
       "minLength": 1,
       "description": "Optional: the one step cckit leaves to the user after a successful install, shown once in the install report."
     },
+    "alsoWrites": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 },
+      "description": "Optional: paths the installer was seen to write besides the one `detect` checks, relative to the project. `cckit doctor` names them on the row of a successful install, so files nobody asked for are not found later in `git status`. List only what a real install showed."
+    },
     "uninstall": {
       "type": "string",
       "description": "Optional command that removes what install + wire added."

@@ -94,6 +94,14 @@ jq '.plainLanguage.enabled = true | .kitVersion = "0.0.1"' "$p/.claude/kit.confi
   && mv "$tmp/cfg.new" "$p/.claude/kit.config.json"
 CLAUDE_PLUGIN_ROOT="$ROOT" bash "$INIT" --upgrade --target "$p" --force >/dev/null 2>&1 < /dev/null
 t "upgrade: a switch that is on restores a missing rule" "$([ -f "$p/.claude/rules/plain-language.md" ] && echo yes || echo no)" "yes"
+# page-design follows tasks.design the same way (#504): absent from a content project, added by an
+# upgrade once the project config sets the key.
+t "content: no page-design without tasks.design" "$([ -e "$p/.claude/skills/page-design" ] && echo yes || echo no)" "no"
+jq '.tasks.design = true | .kitVersion = "0.0.1"' "$p/.claude/kit.config.json" > "$tmp/cfg.new" \
+  && mv "$tmp/cfg.new" "$p/.claude/kit.config.json"
+CLAUDE_PLUGIN_ROOT="$ROOT" bash "$INIT" --upgrade --target "$p" --force >/dev/null 2>&1 < /dev/null
+t "upgrade: tasks.design adds the page-design skill" "$([ -f "$p/.claude/skills/page-design/SKILL.md" ] && echo yes || echo no)" "yes"
+t "upgrade: tasks.design is kept" "$(cfg "$p" '.tasks.design')" "true"
 
 # ── marketing profile ───────────────────────────────────────────────────────────────────────────
 m="$tmp/marketing"; mkdir -p "$m"
@@ -110,10 +118,15 @@ done
 for r in plain-language effort-model task-management review-pages plan-output-format; do
   t "marketing: rule $r" "$([ -f "$m/.claude/rules/$r.md" ] && echo yes)" "yes"
 done
-for s in copywriting brand-voice campaign concrete; do
+for s in copywriting brand-voice campaign page-design concrete; do
   t "marketing: skill $s" "$([ -f "$m/.claude/skills/$s/SKILL.md" ] && echo yes)" "yes"
 done
 t "marketing: brand-voice ships its template" "$([ -f "$m/.claude/skills/brand-voice/references/voice-template.md" ] && echo yes)" "yes"
+t "marketing: page-design ships its references" "$(ls "$m/.claude/skills/page-design/references" 2>/dev/null | tr '\n' ' ')" "design-file-template.md generic-page-patterns.md minimum-rules.md "
+has "marketing: the three design integrations are offered" "$out" "cckit add impeccable && cckit add emil-design-eng && cckit add web-design-guidelines && cckit doctor --fix"
+for s in impeccable emil-design-eng web-design-guidelines; do
+  t "marketing: init installs no third-party skill ($s)" "$([ -e "$m/.claude/skills/$s" ] && echo yes || echo no)" "no"
+done
 t "marketing: campaign ships its plan template" "$([ -f "$m/.claude/skills/campaign/references/plan-template.md" ] && echo yes)" "yes"
 left="$(grep -rlE '\{\{|IF:[A-Z_]+' "$m/CLAUDE.md" "$m/.claude/rules" "$m/.claude/skills" "$m/.claude/agents" 2>/dev/null | sed "s#^$m/##" | tr '\n' ' ')"
 t "marketing: nothing rendered with a leftover placeholder" "$left" ""
@@ -188,8 +201,8 @@ t "upgrade: plain language stays on"        "$(cfg "$m" '.plainLanguage.enabled'
 keys() { jq -c 'keys' "$ROOT/profiles/$1.json"; }
 t "marketing has the same top-level keys as content" "$(keys marketing)" "$(keys content)"
 t "marketing agents == content agents" "$(jq -c .agents "$ROOT/profiles/marketing.json")" "$(jq -c .agents "$ROOT/profiles/content.json")"
-t "marketing skills = content + brand-voice + campaign" \
-  "$(jq -c '.skills - ["brand-voice","campaign"]' "$ROOT/profiles/marketing.json")" "$(jq -c '.skills' "$ROOT/profiles/content.json")"
+t "marketing skills = content + brand-voice + campaign + page-design" \
+  "$(jq -c '.skills - ["brand-voice","campaign","page-design"]' "$ROOT/profiles/marketing.json")" "$(jq -c '.skills' "$ROOT/profiles/content.json")"
 t "marketing rules = content + plain-language + effort-model" \
   "$(jq -c '.rules - ["plain-language","effort-model"]' "$ROOT/profiles/marketing.json")" "$(jq -c '.rules' "$ROOT/profiles/content.json")"
 for f in "$ROOT"/profiles/*.json; do

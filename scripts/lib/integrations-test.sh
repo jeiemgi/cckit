@@ -123,6 +123,8 @@ rejects "bootstrap without a command"  '.install[0].bootstrap = {"manager":"brew
 rejects "bootstrap by an unknown manager" '.install[0].bootstrap = {"manager":"apt","run":"apt install npm"}' "install[0].bootstrap.manager: must be one of"
 rejects "empty detect.bin"             '.detect.bin = ""'                   "detect.bin: must not be empty"
 rejects "empty afterInstall"           '.afterInstall = ""'                 "afterInstall: must not be empty"
+rejects "empty alsoWrites"             '.alsoWrites = []'                   "alsoWrites"
+rejects "alsoWrites that is not a list" '.alsoWrites = "skills-lock.json"'   "alsoWrites"
 
 printf '{ not json' > "$mdir/fixture-tool.json"
 out="$(integration_validate "$mdir/fixture-tool.json" 2>&1)"; r=$?
@@ -265,7 +267,7 @@ done
 
 # The two tools that used to be hardcoded in scripts/kit-doctor.sh (E303.4), one unit test each.
 # They are unlike on purpose: the format has to carry both shapes.
-t "shipped descriptors" "$(integrations_list | tr '\n' ' ')" "graft lavish mempalace mlx-lm "
+t "shipped descriptors" "$(integrations_list | tr '\n' ' ')" "emil-design-eng graft impeccable lavish mempalace mlx-lm web-design-guidelines "
 mp="$ROOT/integrations/mempalace.json"; mlx="$ROOT/integrations/mlx-lm.json"
 integration_validate "$mp" >/dev/null 2>&1;  rc "mempalace validates" "$?" "0"
 t "mempalace: turned on by memory.enabled" "$(integration_config_key "$mp")" "memory.enabled"
@@ -325,6 +327,38 @@ has "wire.kept must be an object" "$bad" "wire.kept: expected object"
 
 t "kit.config.schema.json declares local.enabled" \
   "$(jq -r '.properties.local.properties.enabled.type // "absent"' "$ROOT/kit.config.schema.json")" "boolean"
+# The three design skills `page-design` coordinates (#504). A skill is files, not a binary: detect
+# and verify are file checks in the project and in ~/.claude/skills, and each is off until added.
+for id in impeccable emil-design-eng web-design-guidelines; do
+  d="$ROOT/integrations/$id.json"
+  integration_validate "$d" >/dev/null 2>&1; rc "$id validates" "$?" "0"
+  integration_default_on "$d"; rc "$id: off until added" "$?" "1"
+  t "$id: ON value names the skill" "$(jq -r '.config.value' "$d")" "$id"
+  t "$id: detect is a file check for the skill" "$(jq -r '.detect.run' "$d")" \
+    "test -f .claude/skills/$id/SKILL.md || test -f \"\$HOME/.claude/skills/$id/SKILL.md\""
+  t "$id: verify is the same check" "$(jq -r '.verify.run' "$d")" "$(jq -r '.detect.run' "$d")"
+  t "$id: one npx candidate" "$(jq -r '[.install[].manager] | join(" ")' "$d")" "npx"
+  t "$id: names a licence" "$(jq -r '.attribution.license | length > 0' "$d")" "true"
+  t "$id: not affiliated" "$(jq -r '.attribution.affiliated' "$d")" "false"
+  t "$id: the install note dates the one run on record" "$(jq -r '.install[0].note | test("One run is on record, on 2026-11-13")' "$d")" "true"
+  t "$id: alsoWrites names what that run wrote besides the skill" "$(jq -r '.alsoWrites | length > 0' "$d")" "true"
+done
+t "the three design keys are three capabilities" \
+  "$(for id in impeccable emil-design-eng web-design-guidelines; do integration_config_key "$ROOT/integrations/$id.json"; done | tr '\n' ' ')" \
+  "designDirection.provider designMotion.provider designAudit.provider "
+t "impeccable: the add text names the binary download" "$(jq -r '.why | test("downloaded once into ~/.impeccable/bin/")' "$ROOT/integrations/impeccable.json")" "true"
+t "impeccable: the add text names the catalogue fetch" "$(jq -r '.why | test("impeccable.style catalogue")' "$ROOT/integrations/impeccable.json")" "true"
+t "impeccable: installs into the project, for Claude Code" "$(jq -r '.install[0].run' "$ROOT/integrations/impeccable.json")" "npx -y impeccable install --providers=claude --scope=project"
+t "emil-design-eng: one skill, not the pack" "$(jq -r '.install[0].run' "$ROOT/integrations/emil-design-eng.json")" "npx -y skills@latest add emilkowalski/skills --skill emil-design-eng -a claude-code -y"
+t "web-design-guidelines: one skill" "$(jq -r '.install[0].run' "$ROOT/integrations/web-design-guidelines.json")" "npx -y skills@latest add vercel-labs/agent-skills --skill web-design-guidelines -a claude-code -y"
+t "web-design-guidelines: the licence line says where MIT is stated" "$(jq -r '.attribution.notice | test("holds no LICENSE file")' "$ROOT/integrations/web-design-guidelines.json")" "true"
+# A skill in the project is detected with no tool on PATH; a project without it is not.
+sk="$(mktemp -d)"
+( cd "$sk" && HOME="$sk/home" sh -c "$(jq -r '.detect.run' "$ROOT/integrations/impeccable.json")" ); rc "impeccable: not detected in an empty project" "$?" "1"
+mkdir -p "$sk/.claude/skills/impeccable"; : > "$sk/.claude/skills/impeccable/SKILL.md"
+( cd "$sk" && HOME="$sk/home" sh -c "$(jq -r '.detect.run' "$ROOT/integrations/impeccable.json")" ); rc "impeccable: detected from the project's skill file" "$?" "0"
+rm -rf "$sk"
+
 t "package.json ships integrations/ in the npm tarball" \
   "$(jq -r '.files | index("integrations") != null' "$ROOT/package.json")" "true"
 

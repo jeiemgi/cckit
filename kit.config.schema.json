@@ -131,6 +131,11 @@
           "type": "string",
           "description": "The gate `cckit task run <id>` runs after the agent's round when no `--check` flag is given: a shell command run in the task's worktree. Exit 0 lets the pull request open; any other exit stops the run with exit 6 and opens none. Absent: no gate. The nextjs-shadcn recipe writes `pnpm build && pnpm lint`."
         },
+        "design": {
+          "type": "boolean",
+          "default": false,
+          "description": "true = every task of this project builds or changes a page. `cckit task run` then tells the agent to use the `page-design` skill, records the skills the run loaded from the agent CLI's event output, and the pull request it opens lists them and asks the reviewer to open the page. `cckit init` installs the `page-design` skill where this is true. Absent or false: only a task whose kind is `page` (`cckit task new --kind page`) is a page task. The nextjs-shadcn recipe writes true."
+        },
         "dir": {
           "type": "string",
           "default": "tasks",
@@ -277,6 +282,30 @@
       "description": "Code-graph retrieval: agents query an index of the code instead of grepping the tree. Off when absent. Turned on by an integration descriptor (integrations/<id>.json) whose `config.key` is `codeGraph.provider`.",
       "properties": {
         "provider": { "type": "string", "description": "Which integration provides the code graph, as the descriptor's `config.value` names it. Absent or \"none\" = no code graph; every path that would use one skips." }
+      }
+    },
+    "designDirection": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Design direction for a page: the visual idea, type, layout and colour, and the rules against a generic generated look. Off when absent. Turned on by an integration descriptor whose `config.key` is `designDirection.provider` (integrations/impeccable.json). The `page-design` skill reads the installed skill, not this key.",
+      "properties": {
+        "provider": { "type": "string", "description": "Which integration provides design direction, as the descriptor's `config.value` names it. Absent or \"none\" = `cckit doctor` installs nothing for it." }
+      }
+    },
+    "designMotion": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Interaction and motion craft on a chosen design. Off when absent. Turned on by an integration descriptor whose `config.key` is `designMotion.provider` (integrations/emil-design-eng.json).",
+      "properties": {
+        "provider": { "type": "string", "description": "Which integration provides the motion rules. Absent or \"none\" = `cckit doctor` installs nothing for it." }
+      }
+    },
+    "designAudit": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "The audit of a finished page's code: accessibility, focus, reduced motion. Off when absent. Turned on by an integration descriptor whose `config.key` is `designAudit.provider` (integrations/web-design-guidelines.json).",
+      "properties": {
+        "provider": { "type": "string", "description": "Which integration provides the audit. Absent or \"none\" = `cckit doctor` installs nothing for it." }
       }
     },
     "reviewPages": {

@@ -100,6 +100,7 @@ cckit init --profile software --no-github   # scaffold only: nothing outside the
                               #   and one specialist agent per role from the same role source:
                               #   .claude/agents/<role>/AGENT.md and .codex/agents/<role>.toml
 cckit add                     # list the optional integrations + modules; `cckit add <name>` switches one on
+                              #   `cckit add page-design`: the page-design skill, in a project that already exists
                               #   `cckit add graft`: code-graph retrieval + the code-retrieval rule
                               #   `cckit add lavish --set enable=no`: turn review pages off (on by default)
 cckit page mode               # `page`, or `terminal: <why>` — can this session show a review page?
@@ -174,7 +175,8 @@ every question has one recommended answer.
 **2. A new project starts from a recipe.** A recipe is a JSON file in `recipes/`; adding a file adds
 a recipe. One ships: `nextjs-shadcn` (Next.js, shadcn/ui, pnpm). A recipe's `config` object is
 merged into the project config: `nextjs-shadcn` sets `tasks.check` to `pnpm build && pnpm lint`,
-the gate `cckit task run` uses. init then asks whether the project
+the gate `cckit task run` uses, and `tasks.design` to `true`, which installs the `page-design`
+skill and makes every task of the project a [page task](#pages-are-built-with-named-design-skills). init then asks whether the project
 needs a database and offers the options in `databases/`. One ships: `supabase`. It adds
 `@supabase/supabase-js` and `@supabase/ssr`, `lib/supabase/client.ts` and `lib/supabase/server.ts`,
 and the two variable names in `.env.local` with placeholders. A guide page
@@ -407,6 +409,9 @@ cckit task run <id> --check "pnpm build"       # start + ONE headless agent roun
   gate is `--check "<cmd>"`, else `tasks.check` in the config, else none. A failing gate exits 6
   and a round that changed nothing exits 5; neither opens a pull request. `--no-finish` stops
   before the pull request. A stopped earlier run for the task is discarded. It never merges.
+- **Page tasks.** A task whose kind is `page`, or any task where the config sets
+  `tasks.design: true`, is run with the `page-design` skill, and its pull request lists the skills
+  the run loaded. See [Pages are built with named design skills](#pages-are-built-with-named-design-skills).
 - **Default list.** `tasks.default: "light"` makes a bare `cckit next` answer from this list;
   `cckit task default` prints `light` or `issues`. The `campaign` skill reads it to record a
   campaign's pieces as light tasks or as an effort's sub-issues.
@@ -426,12 +431,16 @@ Guide: [Light tasks](https://cckit.dev/light-tasks/).
   `copywriting` reads it before it writes.
 - **`campaign`**: one goal becomes a plan file and its pieces — light tasks, or an effort's
   sub-issues when `cckit task default` prints `issues`.
+- **`page-design`**: a page is built with three named third-party design skills in a fixed order,
+  with a design brief before the code and a self-review after. See
+  [Pages are built with named design skills](#pages-are-built-with-named-design-skills).
 - **Content kinds** `post`, `campaign`, `brand`, `research` as `kind:` labels, and a pull request
   body with a review checklist for a draft (`pr.bodyStyle: "content"`).
 
 ```bash
 cckit init --profile marketing --no-github --dry-run   # print what it would write
 cckit task new --kind post "<title>"                   # record a piece
+cckit task new --kind page "<title>"                   # record a page: `task run` uses the page-design skill for it
 cckit next                                             # the piece to take next
 cckit task start <id>                                  # a folder and branch for it
 cckit task finish <id> "<summary>" --all               # open the pull request; --all includes new files
@@ -439,6 +448,93 @@ cckit task run <id>                                    # or hand the piece to a 
 ```
 
 Guide: [Initialize → The marketing profile](https://cckit.dev/initialize/#the-marketing-profile).
+
+### Pages are built with named design skills
+
+cckit ships one skill of its own, `page-design`, that coordinates three third-party design skills.
+It holds the order and the rules; it contains none of their content.
+
+| Order | Skill | Decides | Source · licence |
+| --- | --- | --- | --- |
+| 1 | `impeccable` | direction: what the page is for, its type, layout and colour, and what it must not look like | [pbakaus/impeccable](https://github.com/pbakaus/impeccable) · Apache-2.0 |
+| 2 | `emil-design-eng` | interaction and motion on the chosen design | [emilkowalski/skills](https://github.com/emilkowalski/skills) · MIT |
+| 3 | `web-design-guidelines` | the audit of the finished code; its accessibility and reduced-motion findings win a disagreement | [vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills) · MIT per its README (the repository has no LICENSE file) |
+
+**What `page-design` makes the agent do.**
+
+- Write a design brief to `docs/design/<task-id>.md` before any code: the audience, ONE visual
+  idea, type, colour, and at least four concrete patterns of a generic generated page that this
+  page refuses to have (a centred hero with two buttons, three icon cards in a row, one default
+  sans-serif for everything, a fade-in on every section).
+- Apply each skill for what it decides, in the order above.
+- Write a self-review against the brief into the same file after the build.
+- Never use `impeccable`'s live mode in an unattended run.
+- Report the audit as `not run` when its rules cannot be fetched (`web-design-guidelines` fetches
+  them from GitHub on every run), never as passed.
+- When one of the three is not installed: write `<skill>: not installed` in the design file and
+  continue with cckit's own minimum rules for that step. The missing skill is never reported as
+  used.
+
+**Where it is installed.** `cckit init` installs it with the marketing profile and the
+`nextjs-shadcn` recipe. In a project that already exists:
+
+```bash
+cckit add page-design
+```
+
+That sets `tasks.design: true` in the project config and copies the skill into the skills folder of
+each adapter the project selects (`.claude/skills/page-design/`, `.agents/skills/page-design/`). It
+asks nothing, needs no version bump, and keeps a copy that is already there. `cckit init --upgrade`
+does not do this for a project already at the installed version: it answers `already at <version>`
+and adds nothing. With `tasks.design: true` and no skill folder, `cckit doctor` prints a failing
+`page-design skill` row that names the command.
+
+**Install the three skills in a project.** They are optional and cckit never installs them
+unasked. Each is an integration: `cckit add` switches it on, `cckit doctor --fix` installs it with
+your recorded consent.
+
+```bash
+cckit add impeccable && cckit add emil-design-eng && cckit add web-design-guidelines
+cckit doctor --fix
+```
+
+The commands the doctor runs, which also work by hand from the project folder:
+
+```bash
+npx -y impeccable install --providers=claude --scope=project
+npx -y skills@latest add emilkowalski/skills --skill emil-design-eng -a claude-code -y
+npx -y skills@latest add vercel-labs/agent-skills --skill web-design-guidelines -a claude-code -y
+```
+
+They install for Claude Code, into the project. The `skills` CLI needs Node.js 22.20 or later.
+`impeccable` runs an engine binary that ships with it or is downloaded once into
+`~/.impeccable/bin/`, fetches visual directions from the impeccable.style catalogue when a new
+design starts, and its installer can add a hook that runs on every UI file the agent edits.
+
+**What one run showed.** One run is on record: on 2026-11-13 `cckit doctor --fix` installed all three in a Next.js project, with no terminal prompt. `impeccable` also wrote four `.claude/agents/impeccable-*.md` files, the `skills` CLI wrote `skills-lock.json`, and `.claude/settings.json` was not modified, so no design hook was added in that run. The doctor names those extra files on the row of
+an install it has just made. Other versions of the installers are not covered by that run; the
+monthly integrations check is what re-runs the commands.
+
+**Not verified.** No page built with the three skills installed has been compared with one built without them
+yet, so this section describes what the skill instructs, not a measured result.
+
+**What the review shows.** For a page task, `cckit task run` records which skills the run loaded
+from the events the agent CLI prints, not from what the agent says, and the pull request it opens
+carries them:
+
+```text
+## Design
+
+Design skills loaded in this run: page-design, impeccable.
+Design skills not loaded in this run: emil-design-eng, web-design-guidelines.
+Read from the events the agent CLI (claude) printed during the run: a skill is listed when its call returned without an error. What the agent wrote about itself is not used.
+
+Design brief and self-review: `docs/design/<id>.md`.
+```
+
+A run that loaded none says `No design skill was loaded in this run.` A run whose output held no
+event says the list is not known. The review checklist asks the reviewer to open the page in a
+browser and compare it with the brief.
 
 ## Waves — parallel agentic development
 
@@ -615,7 +711,9 @@ cckit/
   routines/ modules/     # scheduled routines + optional modules
   integrations/          # one JSON descriptor per optional third-party tool + its schema
                          #   (mempalace.json, mlx-lm.json, graft.json, lavish.json — the last is on
-                         #   by default and never installed unasked). `cckit doctor` installs each one the
+                         #   by default and never installed unasked; impeccable.json,
+                         #   emil-design-eng.json, web-design-guidelines.json — the design skills
+                         #   the page-design skill coordinates). `cckit doctor` installs each one the
                          #   config switches on through scripts/lib/integration-install.sh, only
                          #   with consent recorded in .cckit/consent (`--fix`, or yes at the prompt)
                          #   scripts/integrations-check.sh installs each one for real and names the

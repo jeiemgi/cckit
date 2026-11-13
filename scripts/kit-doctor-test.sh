@@ -256,4 +256,38 @@ t "--fix -> pnpm install runs" "$(grep -c '^pnpm install' "$log")" "1"
 t "--fix -> the identity header is seeded" "$(ls "$pn/.claude" | grep -c mempal-identity)" "1"
 hasnt "--fix -> not report-only" "$out" "report-only"
 
+# ── 9. page tasks (#504): tasks.design without the page-design skill is a failing row ──────────
+pd="$(project pd '{"adapters":["claude","codex"],"tasks":{"design":true}}')"
+git -C "$pd" init -q   # the codex hooks row reads the repository root
+out="$(doctor "$tmp/h9" "$pd")"; r=$?
+has "tasks.design, no skill -> the claude row names the command" "$out" "missing from .claude/skills/page-design — run: cckit add page-design"
+has "tasks.design, no skill -> one row per selected adapter" "$out" "missing from .agents/skills/page-design — run: cckit add page-design"
+has "tasks.design, no skill -> listed under what is left to do" "$out" "Add the page-design skill (.claude/skills/page-design): cckit add page-design"
+t "tasks.design, no skill -> exit 1" "$r" "1"
+( cd "$pd" && PATH="$sealed" bash "$ROOT/scripts/kit-add.sh" page-design >/dev/null 2>&1 )
+out="$(doctor "$tmp/h9" "$pd")"; r=$?
+hasnt "after cckit add page-design -> no missing row" "$out" "cckit add page-design"
+t "after cckit add page-design -> one ok row per adapter"   "$(printf '%s\n' "$out" | grep -E '^ +ok +page-design skill ' | sed -E 's/^ +//; s/ +/ /g' | tr '\n' '|')"   "ok page-design skill .claude/skills/page-design|ok page-design skill .agents/skills/page-design|"
+t "after cckit add page-design -> exit 0" "$r" "0"
+out="$(doctor "$tmp/h9" "$(project pd-off '{"tasks":{"default":"light"}}')")"
+hasnt "tasks.design unset -> no page-design row" "$out" "page-design"
+
+# ── 10. an installer's extra files are named on the success row (descriptor: alsoWrites) ───────
+# The stub npx stands for the Impeccable installer: it writes the skill file `detect` checks.
+mk npx <<EOF
+#!/bin/sh
+echo "npx \$*" >> "$log"
+mkdir -p .claude/skills/impeccable && echo stub > .claude/skills/impeccable/SKILL.md
+EOF
+im="$(project im '{"designDirection":{"provider":"impeccable"}}')"; : > "$log"
+out="$(doctor "$tmp/h10" "$im" --fix)"; r=$?
+t "impeccable --fix -> the descriptor's command ran" "$(grep -c '^npx -y impeccable install --providers=claude --scope=project$' "$log")" "1"
+has "impeccable --fix -> the row names the agents files" "$out" "Impeccable"
+has "impeccable --fix -> the row names the agents files (text)" "$out" "installed via npx"
+has "impeccable --fix -> also wrote" "$out" "it also wrote: .claude/agents/impeccable-*.md"
+t "impeccable --fix -> exit 0" "$r" "0"
+out="$(doctor "$tmp/h10" "$im" --fix)"
+hasnt "impeccable, second run -> present, nothing claimed as written" "$out" "it also wrote"
+rm -f "$stubs/npx"
+
 [ "$fail" = "0" ] && echo "ALL OK (kit-doctor)" || { echo "kit-doctor: FAILURES"; exit 1; }

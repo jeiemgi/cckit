@@ -258,6 +258,17 @@ t   "no recipe: the config gets no tasks.check" "$(jq -r '.tasks.check // "absen
 run "$tmp" "$tmp/p/mk-site" --profile marketing --recipe demo --no-github
 t   "marketing + recipe: rc 0" "$RC" "0"
 t   "marketing + recipe: tasks.default and tasks.check are both written" "$(jq -c .tasks "$(ls "$tmp/p/mk-site/.claude/kit.config.json" "$tmp/p/mk-site/cckit.config.json" 2>/dev/null | sed -n 1p)")" '{"default":"light","check":"pnpm build && pnpm lint"}'
+# A recipe whose config sets tasks.design installs the page-design skill and offers the three
+# third-party design skills as integrations; nothing third-party is installed by init (#504).
+jq '.id = "demopage" | .recommended = false | .config.tasks.design = true' "$fx/demo.json" > "$fx/demopage.json"
+run "$tmp" "$tmp/p/pg-site" --profile minimal --recipe demopage --no-github
+t   "recipe with tasks.design: rc 0" "$RC" "0"
+t   "recipe with tasks.design: the key is written" "$(jq -r '.tasks.design' "$tmp/p/pg-site/.claude/kit.config.json")" "true"
+yes_if "recipe with tasks.design: page-design is installed with its references" '[ -f "$tmp/p/pg-site/.claude/skills/page-design/SKILL.md" ] && [ -f "$tmp/p/pg-site/.claude/skills/page-design/references/minimum-rules.md" ]'
+has "recipe with tasks.design: the three integrations are offered" "$OUT" "cckit add impeccable && cckit add emil-design-eng && cckit add web-design-guidelines && cckit doctor --fix"
+yes_if "recipe with tasks.design: no third-party skill is installed" '[ ! -e "$tmp/p/pg-site/.claude/skills/impeccable" ] && [ ! -e "$tmp/p/pg-site/.claude/skills/emil-design-eng" ] && [ ! -e "$tmp/p/pg-site/.claude/skills/web-design-guidelines" ]'
+yes_if "a recipe without tasks.design installs no page-design" '[ ! -e "$tmp/p/blank/.claude/skills/page-design" ]'
+rm -f "$fx/demopage.json"
 has "--public: the repository is created public" "$(cat "$GHS/writes.log")" "repo create tester/blank --public"
 t   "empty folder: git init used main, not the user's init.defaultBranch" "$(git -C "$GHS/git/tester/blank.git" for-each-ref --format='%(refname:short)' refs/heads | tr '\n' ' ')" "develop main "
 
