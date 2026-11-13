@@ -1,0 +1,135 @@
+---
+// Chat — one conversation window for a guide step. The reader sees what to say in the chat, the
+// command the agent runs for it (Software only), its real output, the agent's reply and what it means.
+// Rows with a speaker column, not bubbles; every colour is a theme token, so light, dark and the
+// Marketing accent follow without extra rules. Authoring notes: src/components/README-chat.md.
+//
+//   <Chat title="checking the version" say="Is the Bakery site current?" ran="cckit update"
+//         output="up to date" means="Checking changes nothing.">
+//     The Bakery site is on the installed version.
+//   </Chat>
+//
+// Props: title (required, becomes the aria-label) · say (required, also the copy payload) ·
+// ran: a command, or a list of commands or { cmd, output } (Software only, required there) ·
+// output: real output shown under the commands, a string or a list of lines · means: the "What this means" line ·
+// project (default "Bakery site"). The default slot is the agent's reply, written as Markdown.
+// Labels come from the track (Software or Marketing) and the locale, never from the author.
+import { trackOf } from '../lib/tracks';
+
+type Ran = string | { cmd: string; output?: string | string[] };
+interface Props {
+  title: string;
+  say: string;
+  ran?: Ran | Ran[];
+  output?: string | string[];
+  means?: string;
+  project?: string;
+}
+
+const { title, say, ran, means, project } = Astro.props;
+// Output may be a list of lines: MDX strips the indentation of a multi-line string, a list keeps it.
+const text = (o?: string | string[]) => (Array.isArray(o) ? o.join('\n') : o);
+const output = text(Astro.props.output);
+const path = Astro.url.pathname;
+const marketing = trackOf(path) === 'marketing';
+const es = /^\/es(\/|$)/.test(path);
+
+const commands = (ran === undefined ? [] : Array.isArray(ran) ? ran : [ran]).map((r) =>
+  typeof r === 'string' ? { cmd: r, output: undefined } : { cmd: r.cmd, output: text(r.output) },
+);
+if (marketing && (commands.length || output)) {
+  throw new Error(`<Chat title="${title}"> on a Marketing page takes no "ran" or "output": the reader has no terminal.`);
+}
+if (!marketing && !commands.length) {
+  throw new Error(`<Chat title="${title}"> on a Software page needs "ran": the command the agent runs for that sentence.`);
+}
+
+const L = es
+  ? {
+      you: 'Tú dices',
+      runs: 'El agente ejecuta',
+      agent: marketing ? 'Asistente' : 'Agente',
+      means: 'Qué significa',
+      in: marketing ? 'en el chat con tu asistente' : 'en el chat con tu agente',
+      example: 'Conversación de ejemplo',
+      copyMsg: 'Copiar el mensaje',
+      copyCmd: 'Copiar el comando',
+      copied: 'Copiado',
+      project: 'Sitio de la panadería',
+    }
+  : {
+      you: 'You say',
+      runs: 'Agent runs',
+      agent: marketing ? 'Assistant' : 'Agent',
+      means: 'What this means',
+      in: marketing ? 'in the chat with your assistant' : 'in the chat with your agent',
+      example: 'Example conversation',
+      copyMsg: 'Copy the message',
+      copyCmd: 'Copy the command',
+      copied: 'Copied',
+      project: 'Bakery site',
+    };
+const name = project ?? L.project;
+const hasReply = Astro.slots.has('default');
+const copyPayload = commands.map((c) => c.cmd).join('\n');
+---
+
+<figure class="cckit-chat not-content" aria-label={`${L.example}: ${title}`} data-copied={L.copied}>
+  <figcaption class="cckit-chat__head"><strong>{name}</strong> · {L.in}</figcaption>
+  <ol class="cckit-chat__log">
+    <li class="cckit-chat__row cckit-chat__row--you">
+      <span class="cckit-chat__who">{L.you}</span>
+      <div class="cckit-chat__body"><p>{say}</p></div>
+      <button type="button" class="cckit-chat__copy" data-copy={say} aria-label={L.copyMsg} title={L.copyMsg}>
+        <svg class="cckit-chat__ico-copy" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+        <svg class="cckit-chat__ico-done" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>
+      </button>
+    </li>
+    {commands.length > 0 && (
+      <li class="cckit-chat__row cckit-chat__row--ran">
+        <span class="cckit-chat__who">{L.runs}</span>
+        <div class="cckit-chat__body">
+          {commands.map((c) => (
+            <>
+              <code class="cckit-chat__cmd">{c.cmd}</code>
+              {c.output && <pre class="cckit-chat__out"><samp>{c.output}</samp></pre>}
+            </>
+          ))}
+          {output && <pre class="cckit-chat__out"><samp>{output}</samp></pre>}
+        </div>
+        <button type="button" class="cckit-chat__copy" data-copy={copyPayload} aria-label={L.copyCmd} title={L.copyCmd}>
+          <svg class="cckit-chat__ico-copy" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+          <svg class="cckit-chat__ico-done" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>
+        </button>
+      </li>
+    )}
+    {hasReply && (
+      <li class="cckit-chat__row">
+        <span class="cckit-chat__who">{L.agent}</span>
+        <div class="cckit-chat__body"><slot /></div>
+      </li>
+    )}
+  </ol>
+  {means && <p class="cckit-chat__means"><strong>{L.means}:</strong> {means}</p>}
+  <span class="sr-only cckit-chat__live" aria-live="polite"></span>
+</figure>
+
+<script>
+  // One delegated listener for every window on the page.
+  document.addEventListener('click', (event) => {
+    const btn = (event.target as Element | null)?.closest<HTMLButtonElement>('.cckit-chat__copy');
+    if (!btn) return;
+    const fig = btn.closest<HTMLElement>('.cckit-chat');
+    const text = btn.getAttribute('data-copy') ?? '';
+    const done = () => {
+      btn.classList.add('is-copied');
+      const live = fig?.querySelector<HTMLElement>('.cckit-chat__live');
+      if (live) live.textContent = fig?.getAttribute('data-copied') ?? 'Copied';
+      setTimeout(() => {
+        btn.classList.remove('is-copied');
+        if (live) live.textContent = '';
+      }, 1600);
+    };
+    if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(done, () => {});
+  });
+</script>
