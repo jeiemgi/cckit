@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Connect your project to Supabase</title>
+<style>
+  :root { --ink:#1c1917; --soft:#57534e; --line:#e7e5e4; --bg:#fafaf9; --card:#fff; --accent:#c97a2c; --ok:#15803d; --warn:#b3261e; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 40px 20px 80px; }
+  h1 { font-size: 30px; line-height:1.2; margin: 0 0 8px; }
+  h2 { font-size: 20px; margin: 40px 0 12px; }
+  p.lead { color:var(--soft); margin: 0 0 8px; }
+  .meta { color:var(--soft); font-size: 14px; border-top:1px solid var(--line); border-bottom:1px solid var(--line); padding:10px 0; margin: 20px 0 28px; }
+  ol.steps { list-style:none; padding:0; margin:0; counter-reset: step; }
+  li.step { counter-increment: step; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px 20px 18px 64px; margin:0 0 12px; position:relative; min-width:0; }
+  li.step::before { content: counter(step); position:absolute; left:18px; top:18px; width:30px; height:30px; border-radius:50%; background:var(--accent); color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center; }
+  li.step h3 { margin:0 0 4px; font-size:17px; }
+  li.step p { margin:6px 0 0; color:var(--soft); }
+  code, .file { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 14px; background:#f5f5f4; border:1px solid var(--line); border-radius:6px; padding:1px 6px; overflow-wrap:anywhere; }
+  pre { background:#1c1917; color:#fafaf9; border-radius:10px; padding:14px 16px; overflow-x:auto; font-size:14px; line-height:1.5; margin:12px 0 0; }
+  table { width:100%; border-collapse:collapse; background:var(--card); border:1px solid var(--line); border-radius:12px; overflow:hidden; table-layout:fixed; }
+  th, td { text-align:left; vertical-align:top; padding:12px 14px; border-bottom:1px solid var(--line); overflow-wrap:anywhere; }
+  th { font-size:13px; text-transform:uppercase; letter-spacing:.04em; color:var(--soft); background:#f5f5f4; }
+  tr:last-child td { border-bottom:0; }
+  .never { border-left:4px solid var(--warn); background:#fef2f2; border-radius:8px; padding:12px 16px; margin-top:12px; }
+  .good { border-left:4px solid var(--ok); background:#f0fdf4; border-radius:8px; padding:12px 16px; margin-top:12px; }
+  a { color:#9a5a17; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Connect your project to Supabase</h1>
+  <p class="lead">Supabase keeps your app's information (accounts, saved items, orders) on its servers. Your project already has the code that talks to it. What is missing is two values that only you can get: the address of your Supabase project, and a key. This page shows where each one is and where it goes.</p>
+  <p class="lead">It takes about five minutes. A free account is enough.</p>
+  <div class="meta">Last verified: <strong id="last-verified">2026-11-12</strong> against the Supabase documentation (links at the bottom). If the Supabase website looks different from these steps, the documentation link is the current source.</div>
+
+  <h2>The steps</h2>
+  <ol class="steps">
+    <li class="step">
+      <h3>Open Supabase and sign in</h3>
+      <p>Go to <a href="https://supabase.com/dashboard/new/_">https://supabase.com/dashboard/new/_</a>. Sign in, or create a free account first.</p>
+    </li>
+    <li class="step">
+      <h3>Create the project</h3>
+      <p>Fill in the new-project form: a project name, a database password, and the region closest to your users. Save the database password in a password manager; it is <em>not</em> one of the two values below. Create the project and wait until it is ready.</p>
+    </li>
+    <li class="step">
+      <h3>Click “Connect”</h3>
+      <p>On the project page, click <strong>Connect</strong> at the top. The dialog shows the <strong>Project URL</strong> and the <strong>publishable key</strong> for the framework you select. Choose Next.js.</p>
+    </li>
+    <li class="step">
+      <h3>Copy the Project URL into the file</h3>
+      <p>Open the file <span class="file">.env.local</span> in your project folder. Replace the placeholder after <code>NEXT_PUBLIC_SUPABASE_URL=</code> with the Project URL.</p>
+    </li>
+    <li class="step">
+      <h3>Copy the publishable key into the file</h3>
+      <p>The publishable key starts with <code>sb_publishable_</code>. Replace the placeholder after <code>NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=</code> with it. Every key is also listed under <strong>Settings &gt; API Keys</strong>.</p>
+    </li>
+    <li class="step">
+      <h3>Leave the secret keys where they are</h3>
+      <p>Do not put a secret key (it starts with <code>sb_secret_</code>) or the legacy <code>service_role</code> key in this file. Those are for servers only and must never reach a browser.</p>
+    </li>
+    <li class="step">
+      <h3>Save, then start the app again</h3>
+      <p>Save the file. Stop the app if it is running and start it again with <code>pnpm dev</code>, so it reads the new values.</p>
+    </li>
+  </ol>
+
+  <h2>What goes where</h2>
+  <table>
+    <thead><tr><th>Name in the file</th><th>What it is</th><th>Where to find it</th></tr></thead>
+    <tbody>
+      <tr><td><code>NEXT_PUBLIC_SUPABASE_URL</code></td><td>The address of your Supabase project (Project URL)</td><td>Your project &gt; Connect</td></tr>
+      <tr><td><code>NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY</code></td><td>The publishable key, starting with <code>sb_publishable_</code></td><td>Your project &gt; Connect, or Settings &gt; API Keys</td></tr>
+    </tbody>
+  </table>
+
+  <h2>What the file looks like when you are done</h2>
+  <p>The file is <span class="file">.env.local</span>, in the top folder of your project. The parts after each <code>=</code> are yours; these are stand-ins.</p>
+<pre>NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key</pre>
+
+  <div class="good"><strong>The file stays on your computer.</strong> Git ignores <span class="file">.env.local</span>, so it is never uploaded to GitHub. You type the values in yourself: cckit does not read them, print them or send them anywhere.</div>
+  <div class="never"><strong>Never paste a key into a chat, an issue, a commit or a screenshot.</strong> If a secret key leaks, create a new one under Settings &gt; API Keys and delete the old one.</div>
+
+  <h2>Using it in your code</h2>
+  <p>Your project has two small files. Use <span class="file">lib/supabase/client.ts</span> in parts of the app that run in the browser, and <span class="file">lib/supabase/server.ts</span> in parts that run on the server.</p>
+<pre>import { createClient } from "@/lib/supabase/server";
+
+export default async function Page() {
+  const supabase = await createClient();
+  const { data } = await supabase.from("notes").select();
+  return &lt;pre&gt;{JSON.stringify(data, null, 2)}&lt;/pre&gt;;
+}</pre>
+
+  <h2>Sources</h2>
+  <p>
+    <a href="https://supabase.com/docs/guides/getting-started/quickstarts/nextjs">Supabase: Use Supabase with Next.js</a><br>
+    <a href="https://supabase.com/docs/guides/auth/server-side/creating-a-client">Supabase: Creating a Supabase client for SSR</a><br>
+    <a href="https://supabase.com/docs/guides/api/api-keys">Supabase: Understanding API keys</a>
+  </p>
+</main>
+</body>
+</html>
