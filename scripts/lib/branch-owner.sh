@@ -124,7 +124,7 @@ bo_claim() {
   tmp="$(mktemp 2>/dev/null)" || { _bo_unlock "$lock"; echo "bo_claim: no temp file" >&2; return 1; }
   _bo_rows_live "$f" > "$tmp"
 
-  held_owner="$(awk -F"\t" -v b="$branch" '$1==b {print $2; exit}' "$tmp" 2>/dev/null)"
+  held_owner="$(awk -F"\t" -v b="$branch" '$1==b && !hit {print $2; hit=1}' "$tmp" 2>/dev/null)"
   if [ -n "$held_owner" ] && [ "$held_owner" != "$owner" ]; then
     local held_wt
     held_wt="$(awk -F"\t" -v b="$branch" '$1==b {print $5; exit}' "$tmp" 2>/dev/null)"
@@ -170,7 +170,7 @@ bo_owner() {
   local branch="${1:-}" f
   [ -n "$branch" ] || return 2
   f="$(bo_file)"; [ -f "$f" ] || return 0
-  _bo_rows_live "$f" | awk -F"\t" -v b="$branch" '$1==b {print $2; exit}'
+  _bo_rows_live "$f" | awk -F"\t" -v b="$branch" '$1==b && !hit {print $2; hit=1}'
 }
 
 # bo_list — every live lease, one row per line.

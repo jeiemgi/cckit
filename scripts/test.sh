@@ -89,9 +89,9 @@ esac
 tests=(); par=(); ser=()
 while IFS= read -r f; do
   [ -n "$f" ] || continue
-  [ -z "$PATTERN" ] || printf '%s\n' "$f" | grep -qE "$PATTERN" || continue
+  [ -z "$PATTERN" ] || grep -qE "$PATTERN" <<<"$f" || continue
   tests+=("$f")
-  if [ "$JOBS" -gt 1 ] && head -n 30 "$f" | grep -qE '^# test-runner: serial([[:space:]]|$)'; then
+  if [ "$JOBS" -gt 1 ] && grep -qE '^# test-runner: serial([[:space:]]|$)' <<<"$(head -n 30 "$f")"; then
     ser+=("$f")
   else
     par+=("$f")

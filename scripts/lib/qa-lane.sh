@@ -396,7 +396,7 @@ EOF
 qa_route_valid() {
   case "${1:-}" in *'
 '*) return 1 ;; esac
-  printf '%s\n' "${1:-}" | grep -qE "$_QA_ROUTE_RE"
+  grep -qE "$_QA_ROUTE_RE" <<<"${1:-}"
 }
 
 # qa_route_declared — stdin is a PR body; echo the route its first usable `QA route:` line names.
@@ -407,7 +407,7 @@ qa_route_declared() {
   local r=""
   r="$(tr -d '\r' \
         | sed -nE 's/^[[:space:]]*([-*][[:space:]]+)?\**[Qq][Aa] [Rr][Oo][Uu][Tt][Ee]\**:\**[[:space:]]*`?([^`[:space:]]*).*$/\2/p' \
-        | grep -E "$_QA_ROUTE_RE" | head -n 1)"
+        | grep -E "$_QA_ROUTE_RE" | sed -n 1p)"
   [ -n "$r" ] || return 1
   printf '%s\n' "$r"
 }
@@ -811,7 +811,7 @@ EOF
     echo "cckit qa: lane $lane is NOT down — still listening on its ports ($(cut -d= -f2 "$d/ports" 2>/dev/null | tr '\n' ' ')): pid $held" >&2
     foreign=""
     for p in $(printf '%s\n' "$held"); do
-      printf '%s' "$tried" | grep -qx "$p" || foreign="$foreign $p"
+      grep -qx "$p" <<<"$tried" || foreign="$foreign $p"
     done
     if [ "$force" != 1 ] && [ -n "$foreign" ]; then
       echo "  this lane did not launch pid${foreign}, so it was left running. Stop it yourself, or run cckit qa stop --lane $lane --force to stop whatever listens there." >&2
@@ -885,7 +885,7 @@ _qa_verdict_resolve() {
     tip="$(git rev-parse --verify -q "$head^{commit}" 2>/dev/null)" || tip=""
     if [ -z "$tip" ]; then
       # A commit this clone does not have is still a commit: accept a full sha as written.
-      printf '%s\n' "$head" | grep -qE '^[0-9a-f]{40}$' || {
+      grep -qE '^[0-9a-f]{40}$' <<<"$head" || {
         echo "cckit qa verdict: --head '$head' is not a commit here and not a full sha" >&2; return 2; }
       tip="$head"
     fi
@@ -1098,7 +1098,7 @@ _qa_lanes_ids() {
 # _qa_branch_worktree <branch> — the worktree that has <branch> checked out; empty when none does.
 _qa_branch_worktree() {
   git worktree list --porcelain 2>/dev/null \
-    | awk -v b="refs/heads/$1" '/^worktree / { w = substr($0, 10) } $1 == "branch" && $2 == b { print w; exit }'
+    | awk -v b="refs/heads/$1" '/^worktree / { w = substr($0, 10) } $1 == "branch" && $2 == b && !hit { print w; hit = 1 }'
 }
 
 # _qa_lane_ports_now <lane> — the lane's `NAME=port` lines: the ports it was LAUNCHED with when

@@ -442,7 +442,7 @@ effort_chain() {
       # wipe the issue. Only a successful read is edited.
       if ! body="$(_eff_issue_body "$repo" "$next" 2>/dev/null)"; then
         echo "  ✗ could not read #$next's body — 'Depends on #$prev' not recorded" >&2; rc=1
-      elif printf '%s\n' "$body" | grep -qE "^[[:space:]]*- Depends on #${prev}[[:space:]]*$"; then
+      elif grep -qE "^[[:space:]]*- Depends on #${prev}[[:space:]]*$" <<<"$body"; then
         echo "  · #$next already records 'Depends on #$prev'" >&2
       else
         newbody="$(_eff_relations_add "$body" "$prev")"
@@ -650,7 +650,7 @@ effort_start() {
   [ -n "$raw" ] || { echo "effort_start: <slug|effort issue #> required" >&2; return 1; }
   num="$(effort_slug_resolve "$raw")" || { echo "effort_start: could not resolve '$raw' to an effort" >&2; return 1; }
   repo="$(_eff_repo)"; base="$(_eff_base)"
-  root="$(git worktree list --porcelain 2>/dev/null | awk '/^worktree /{print $2; exit}')"
+  root="$(git worktree list --porcelain 2>/dev/null | awk '/^worktree / && !hit {print $2; hit=1}')"
   [ -n "$root" ] || { echo "effort_start: not in a git repo" >&2; return 1; }
 
   # WIP gate (#244) — BEFORE the fetch, the branch, the worktree and the bootstrap, so a refusal
@@ -670,7 +670,7 @@ effort_start() {
       title=""
       # An effort already started keeps its branch: a re-start during an outage must land on
       # effort/<N>-<its slug>, not cut a second branch named after the fallback.
-      slug="$(git -C "$root" for-each-ref --format='%(refname:short)' "refs/heads/effort/$num-*" 2>/dev/null | head -1)"
+      slug="$(git -C "$root" for-each-ref --format='%(refname:short)' "refs/heads/effort/$num-*" 2>/dev/null | sed -n 1p)"
       slug="${slug#effort/"$num"-}"
       echo "effort_start: could not read the title of issue #$num from GitHub (gh exited $title_rc) — continuing with the slug '${slug:-effort}'. To choose the slug: effort start $num <slug>" >&2
     fi
@@ -750,7 +750,7 @@ effort_pr() {
   title="$(printf '%s' "$meta" | jq -r '.title // ""' 2>/dev/null)"
   labels="$(printf '%s' "$meta" | jq -r '[.labels[]?.name] | join(",")' 2>/dev/null)"
   milestone="$(printf '%s' "$meta" | jq -r '.milestone.title // ""' 2>/dev/null)"
-  role="$(printf '%s' "$labels" | tr ',' '\n' | sed -n 's/^role://p' | head -1)"
+  role="$(printf '%s' "$labels" | tr ',' '\n' | sed -n 's/^role://p' | sed -n 1p)"
   role_disp=""
   if [ -n "$role" ] && command -v role_display >/dev/null 2>&1; then
     role_disp="$(role_display "$role" 2>/dev/null || true)"
@@ -1041,13 +1041,13 @@ effort_close() {
       # just the wrong cwd — keep the instruction. If it exists NOWHERE, this is a WAVE-style
       # effort (#164): the subs shipped as individual task PRs squash-merged straight to base, so
       # there is no branch to run from — close via the merged sub PRs instead.
-      if git branch --list "effort/$num-*" 2>/dev/null | grep -q . \
-         || git ls-remote --heads origin "effort/$num-*" 2>/dev/null | grep -q .; then
+      if [ -n "$(git branch --list "effort/$num-*" 2>/dev/null)" ] \
+         || [ -n "$(git ls-remote --heads origin "effort/$num-*" 2>/dev/null)" ]; then
         echo "effort_close: run from the effort/$num-… branch" >&2; return 1
       fi
       _eo_close_wave "$num" "$repo" "$base"; return $? ;;
   esac
-  root="$(git worktree list --porcelain 2>/dev/null | awk '/^worktree /{print $2; exit}')"
+  root="$(git worktree list --porcelain 2>/dev/null | awk '/^worktree / && !hit {print $2; hit=1}')"
   self_wt="$(git rev-parse --show-toplevel 2>/dev/null)"
   _eo_source_metrics
 
@@ -1200,7 +1200,7 @@ _eo_kit_sync_warn() {
 # merged PR diffs in the trace are the work record.
 _eo_close_wave() {
   local num="$1" repo="$2" base="$3" root rows bad trace_dir kit_touched sub
-  root="$(git worktree list --porcelain 2>/dev/null | awk '/^worktree /{print $2; exit}')"
+  root="$(git worktree list --porcelain 2>/dev/null | awk '/^worktree / && !hit {print $2; hit=1}')"
   _eo_source_metrics
 
   # (a) read every sub + the merged PR that closed it, one "sub|state|pr|merge-oid|title" line each

@@ -63,7 +63,7 @@ _kit_banner_detect_mode() {
   local _loc="${LC_ALL:-${LC_CTYPE:-${LANG:-}}}"
   if [ "${KIT_ASCII:-}" = "1" ]; then
     KIT_UNICODE=0
-  elif printf '%s' "$_loc" | grep -qiE 'utf-?8'; then
+  elif grep -qiE 'utf-?8' <<<"$_loc"; then
     KIT_UNICODE=1
   else
     KIT_UNICODE=0
@@ -504,7 +504,7 @@ RULES="$(jq -r '.rules[]' "$PROFILE_FILE")"
 # Listed in templates/skills/NAMESPACED (one name per line) so the marker lives outside the artifact.
 NAMESPACED_SKILLS="$(grep -vE '^\s*(#|$)' "$KIT_ROOT/templates/skills/NAMESPACED" 2>/dev/null || true)"
 _is_namespaced() {  # <skill-name> -> 0 if it takes the prefix
-  printf '%s\n' "$NAMESPACED_SKILLS" | grep -qxF "$1"
+  grep -qxF "$1" <<<"$NAMESPACED_SKILLS"
 }
 # Rewrite a freshly-scaffolded namespaced skill so its own name: + sibling /command refs + sigil
 # label carry $SKILL_PREFIX (template ships bare; the project namespaces). The (?![\w-]) guard stops
@@ -531,7 +531,7 @@ MILESTONES_HUMAN="$(printf '%s' "$MS_NL" | paste -sd '·' - | sed 's/·/ · /g')
 if [[ -n "$PROJECT_NUMBER" ]]; then PROJECTS_V2="true"; PNUM_JSON="$PROJECT_NUMBER"; else PROJECTS_V2="false"; PNUM_JSON="null"; PROJECT_NUMBER="null"; fi
 case "$MEMORY" in on|true|yes) MEMORY_BOOL="true";; *) MEMORY_BOOL="false";; esac
 if [[ "$PLANS_FORMAT" == "none" ]]; then PLANS_ON="false"; else PLANS_ON="true"; fi
-if echo "$ROLES_NL" | grep -qx "Designer"; then DESIGN_ON="true"; else DESIGN_ON="false"; fi
+if grep -qx "Designer" <<<"$ROLES_NL"; then DESIGN_ON="true"; else DESIGN_ON="false"; fi
 CLAUDE_PROJECT_SLUG="$(echo "$TARGET" | sed 's#/#-#g')"
 
 # spec kit
@@ -545,7 +545,7 @@ if [[ -n "$PREPUSH_CMD" ]]; then PREPUSH_ENABLED="true"; else PREPUSH_ENABLED="f
 case "$LOCAL_LAYER" in on|true|yes) LOCAL_ON="true";; *) LOCAL_ON="false";; esac
 
 # stack-gated build skills present in this profile?
-if echo "$SKILLS" | grep -qE '^(feature-build-refine|supabase-patterns)$'; then STACK_SKILLS_ON="true"; else STACK_SKILLS_ON="false"; fi
+if grep -qE '^(feature-build-refine|supabase-patterns)$' <<<"$SKILLS"; then STACK_SKILLS_ON="true"; else STACK_SKILLS_ON="false"; fi
 
 # code graph (an integration, switched on by `cckit add <id>` — never by an init flag). A fresh
 # scaffold therefore has it off; only --upgrade can find it on, in the project's existing config.
@@ -566,7 +566,7 @@ FLAGS_ON=""
 [[ "$CODEGRAPH_ON" == "true" ]]     && FLAGS_ON="${FLAGS_ON}CODEGRAPH,"
 
 # ---- build agent/skill tables -------------------------------------------
-short_desc() { sed -n 's/^description: //p' "$1" | head -1 | cut -c1-92; }
+short_desc() { sed -n 's/^description: //p' "$1" | sed -n 1p | cut -c1-92; }
 AGENT_TABLE="| Agent | Role |
 | ----- | ---- |"
 for a in $AGENTS; do

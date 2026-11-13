@@ -270,7 +270,7 @@ _wt_json_has() {
   if command -v jq >/dev/null 2>&1; then
     jq -e "$filter" "$file" >/dev/null 2>&1
   else
-    tr -d ' \n\t' < "$file" 2>/dev/null | grep -qE "$re"
+    grep -qE "$re" <<<"$(tr -d ' \n\t' < "$file" 2>/dev/null)"
   fi
 }
 
@@ -555,7 +555,7 @@ _wt_pool_find() {
 # mutates). Shows branch / merged-into-develop? / clean? / live-session? / overall reusable?.
 wt_pool_status() {
   local root wtdir wt_path branch locked merged clean owned reusable any=0
-  root="$(git worktree list --porcelain | awk '/^worktree /{print $2; exit}')"
+  root="$(git worktree list --porcelain | awk '/^worktree / && !hit {print $2; hit=1}')"
   [[ -n "$root" ]] || { echo "wt_pool_status: not in a git repo" >&2; return 1; }
   wtdir="$root/.claude/worktrees/"
   git -C "$root" fetch origin "${KIT_BASE_BRANCH:-main}" --quiet 2>/dev/null || true
@@ -598,7 +598,7 @@ wt_start() {
   done
   [[ -n "$num" ]] || { echo "wt_start: issue number required" >&2; return 1; }
 
-  root="$(git worktree list --porcelain | awk '/^worktree /{print $2; exit}')"
+  root="$(git worktree list --porcelain | awk '/^worktree / && !hit {print $2; hit=1}')"
   [[ -n "$root" ]] || { echo "wt_start: not in a git repo" >&2; return 1; }
 
   # Claim check (#384) — BEFORE the issue read, the fetch and `git worktree add`, so a refusal
@@ -658,7 +658,7 @@ wt_start() {
   fi
 
   git -C "$root" fetch origin "${KIT_BASE_BRANCH:-main}" --quiet
-  if git -C "$root" worktree list --porcelain | grep -q "/${kind}+${num}-${slug}$"; then
+  if grep -q "/${kind}+${num}-${slug}$" <<<"$(git -C "$root" worktree list --porcelain)"; then
     echo "[#$num] reusing worktree $wt" >&2
   else
     reused=""

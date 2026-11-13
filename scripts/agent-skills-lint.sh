@@ -68,7 +68,7 @@ external_names() {
   [ -f "$EXTERNAL" ] || return 0
   sed -e 's/#.*$//' -e 's/[[:space:]]*$//' -e 's/^[[:space:]]*//' "$EXTERNAL" | grep -v '^$'
 }
-is_external() { external_names | grep -qxF -- "$1"; }
+is_external() { grep -qxF -- "$1" <<<"$(external_names)"; }
 
 # The allowlist may not name a skill the kit ships.
 while IFS= read -r name; do
@@ -89,10 +89,10 @@ for f in "$AGENTS_DIR"/*.md; do
   while IFS="$(printf '\t')" read -r line entry; do
     [ -n "$entry" ] || continue
     entries=$(( entries + 1 ))
-    if printf '%s' "$entry" | grep -qE '^[a-z0-9][a-z0-9-]*:[a-z0-9][a-z0-9-]*$'; then
+    if grep -qE '^[a-z0-9][a-z0-9-]*:[a-z0-9][a-z0-9-]*$' <<<"$entry"; then
       continue
     fi
-    if printf '%s' "$entry" | grep -qE '^[a-z0-9][a-z0-9-]*$'; then
+    if grep -qE '^[a-z0-9][a-z0-9-]*$' <<<"$entry"; then
       shipped "$entry" && continue
       is_external "$entry" && continue
     fi

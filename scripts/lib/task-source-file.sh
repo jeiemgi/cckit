@@ -60,8 +60,8 @@ _tsf_field() {
 # cached `origin/light/<id>-…`. Nothing when the task has no branch.
 _tsf_branch() {
   local b
-  b="$(git for-each-ref --format='%(refname:short)' "refs/heads/light/$1-*" 2>/dev/null | head -1)"
-  [ -n "$b" ] || b="$(git for-each-ref --format='%(refname:short)' "refs/remotes/origin/light/$1-*" 2>/dev/null | head -1)"
+  b="$(git for-each-ref --format='%(refname:short)' "refs/heads/light/$1-*" 2>/dev/null | sed -n 1p)"
+  [ -n "$b" ] || b="$(git for-each-ref --format='%(refname:short)' "refs/remotes/origin/light/$1-*" 2>/dev/null | sed -n 1p)"
   printf '%s' "$b"
 }
 

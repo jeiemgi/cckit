@@ -149,7 +149,7 @@ adapter_runtime_report() {
   local a ver
   for a in $(printf '%s\n' "${1:-}"); do
     if command -v "$a" >/dev/null 2>&1; then
-      ver="$("$a" --version 2>/dev/null | head -1)"
+      ver="$("$a" --version 2>/dev/null | sed -n 1p)"
       printf '%s\tpresent\t%s\n' "$a" "${ver:-version unknown}"
     else
       printf '%s\tabsent\t\n' "$a"

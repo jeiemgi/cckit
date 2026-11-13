@@ -37,7 +37,7 @@ command -v cckit_gh_rest >/dev/null 2>&1 || cckit_gh_rest() { return 1; }
 
 KIT_GC_REPO="${KIT_GC_REPO:-${KIT_REPO:-}}"
 
-_kit_gc_root() { git worktree list --porcelain 2>/dev/null | awk '/^worktree /{print $2; exit}'; }
+_kit_gc_root() { git worktree list --porcelain 2>/dev/null | awk '/^worktree / && !hit {print $2; hit=1}'; }
 
 # This file's own directory, resolved ONCE at load time — the only point where both shells agree.
 # `BASH_SOURCE` is bash-only; inside a zsh *function* it is unset and `$0` is the function name, so
@@ -105,12 +105,12 @@ _kit_gc_pr_index_failed() {
 
 # _kit_gc_pr_index_unknown <index> — rc 0 when <index> carries the failed-read sentinel.
 _kit_gc_pr_index_unknown() {
-  printf '%s\n' "$1" | grep -q "^?$(printf '\t')UNKNOWN\$"
+  grep -q "^?$(printf '\t')UNKNOWN\$" <<<"$1"
 }
 
 # _kit_gc_pr_for <index> <branch> — first PR line matching <branch> as head (mirrors the old `.[0]`).
 _kit_gc_pr_for() {
-  printf '%s\n' "$1" | awk -F'\t' -v want="$2" '$1==want{print $2; exit}'
+  printf '%s\n' "$1" | awk -F'\t' -v want="$2" '$1==want && !hit {print $2; hit=1}'
 }
 
 # _kit_gc_base_ref — the ref the LANDED checks compare against: `origin/<base>` when that
@@ -164,11 +164,11 @@ _kit_gc_landed_reason() {
   n="$(wt_issue_number "$b")"
   # `[#N]` is the kit's token; `(#N)` is GitHub's own trailing ref (what a squash puts on a PR
   # commit, and what a sub-issue's commit subject carried on a consuming repo's effort). Both name issues.
-  [ -n "$n" ] || n="$(git log --format=%s "$base_ref..$b" 2>/dev/null | grep -oE '[[(]#[0-9]+[])]' | head -1 | tr -dc '0-9')"
+  [ -n "$n" ] || n="$(git log --format=%s "$base_ref..$b" 2>/dev/null | grep -oE '[[(]#[0-9]+[])]' | sed -n 1p | tr -dc '0-9')"
   [ -n "$n" ] || return 0
   state="$(wt_issue_state "$n" "$repo")"
   [ "$state" = closed ] || return 0
-  if printf '%s\n' "$pr_index" | grep -qE "^[a-z]+/${n}-[^	]*	PR#[0-9]+ MERGED\$"; then
+  if grep -qE "^[a-z]+/${n}-[^	]*	PR#[0-9]+ MERGED\$" <<<"$pr_index"; then
     printf '%sissue #%s closed, its PR merged' "$shape" "$n"
   elif pr="$(_kit_gc_issue_merged_pr "$n" "$repo")" && [ -n "$pr" ]; then
     # The index is a 200-PR window; on a repo with hundreds of merged PRs the effort PR that closed
@@ -264,9 +264,9 @@ _kit_gc_classify() {
     echo "UNKNOWN (could not determine — the state read for issue #$n failed; kept, never auto-deleted)"
   elif [ "$tstate" = unknown ]; then
     echo "UNKNOWN (could not determine — the state read for light task $tid failed; kept, never auto-deleted)"
-  elif printf '%s' "$pr" | grep -q 'MERGED'; then
+  elif grep -q 'MERGED' <<<"$pr"; then
     echo "SAFE (${pr}, issue closed/absent — verify level with remote before delete)"
-  elif printf '%s' "$pr" | grep -q 'OPEN'; then
+  elif grep -q 'OPEN' <<<"$pr"; then
     echo "ACTIVE (${pr})"
   elif [ -n "$pr" ]; then
     echo "$pr"
@@ -386,7 +386,7 @@ EOF
 # kit_gc_has_prunable — rc 0 if at least one row is deletable: a branch that is SAFE (its own PR
 # merged) or LANDED (no PR of its own, work already on base), or a LANDED detached worktree.
 kit_gc_has_prunable() {
-  kit_gc_analyze 2>/dev/null | grep -qE '> (SAFE|LANDED) '
+  grep -qE '> (SAFE|LANDED) ' <<<"$(kit_gc_analyze 2>/dev/null)"
 }
 
 # _kit_gc_zombies — echo "<name>\t<branch>\t<staged:yes|no>" for each ZOMBIE worktree: its working
@@ -521,7 +521,7 @@ _kit_gc_remote_ahead() {
 # _kit_gc_only_match <regex> <branch> — rc 0 when <regex> is empty or <branch> matches it (ERE).
 _kit_gc_only_match() {
   [ -n "$1" ] || return 0
-  printf '%s\n' "$2" | grep -qE -- "$1"
+  grep -qE -- "$1" <<<"$2"
 }
 
 # _kit_gc_prune_why <verdict> — echo the reason a prune row prints, or nothing when the verdict is
@@ -694,8 +694,8 @@ kit_gc_cleanup() {
     | awk '/^worktree /{w=$2} /^branch /{print w" "$2}' \
     | while read -r wtpath ref; do
         b="${ref#refs/heads/}"
-        printf '%s\n' "$safe_list" | grep -qxF "$b" \
-          || printf '%s\n' "$landed_list" | sed 's/ (.*//' | grep -qxF "$b" || continue
+        grep -qxF "$b" <<<"$safe_list" \
+          || grep -qxF "$b" <<<"$(printf '%s\n' "$landed_list" | sed 's/ (.*//')" || continue
         if [ -n "$(git -C "$wtpath" status --porcelain 2>/dev/null)" ]; then
           echo "$wtpath [$b] (DIRTY — will be skipped, not destroyed)"
         else

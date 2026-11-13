@@ -117,7 +117,7 @@ kit_resolve_explain() {
   printf 'set by: %s\n' "$origin"
   printf 'layers (far->near):\n'
   for f in ${layers[@]+"${layers[@]}"}; do
-    if printf '%s' "$defs" | grep -qxF "$f"; then printf '  * %s  (defines %s)\n' "$f" "$jqpath"; else printf '    %s\n' "$f"; fi
+    if grep -qxF "$f" <<<"$defs"; then printf '  * %s  (defines %s)\n' "$f" "$jqpath"; else printf '    %s\n' "$f"; fi
   done
 }
 

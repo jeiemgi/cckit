@@ -49,7 +49,7 @@ _kh_usage() { echo 'cckit hotfix <pr|sha> [--base <branch>]   (base defaults to 
 # The PR number a commit subject names: a squash `… (#N)` suffix, or `Merge pull request #N …`.
 # Empty when it names none.
 kto_hotfix_subject_pr() {
-  printf '%s\n' "$1" | sed -nE 's/^Merge pull request #([0-9]+) .*$/\1/p; s/^.* \(#([0-9]+)\)$/\1/p' | head -1
+  printf '%s\n' "$1" | sed -nE 's/^Merge pull request #([0-9]+) .*$/\1/p; s/^.* \(#([0-9]+)\)$/\1/p' | sed -n 1p
 }
 
 kto_hotfix() {
@@ -74,7 +74,7 @@ kto_hotfix() {
   [ -n "$base" ] || { echo "✗ hotfix: --base needs a branch name" >&2; return 2; }
 
   repo="${KIT_TASK_REPO:-${KIT_REPO:-}}"
-  root="$(git worktree list --porcelain 2>/dev/null | awk '/^worktree /{print $2; exit}')"
+  root="$(git worktree list --porcelain 2>/dev/null | awk '/^worktree / && !hit {print $2; hit=1}')"
   [ -n "$root" ] || { echo "✗ hotfix: not in a git repo" >&2; return 1; }
 
   git -C "$root" fetch --quiet origin "$base" 2>/dev/null \
@@ -134,7 +134,7 @@ kto_hotfix() {
   else branch="fix/hotfix-$(git -C "$root" rev-parse --short=7 "$sha")-$slug"; fi
   wt="$root/.claude/worktrees/$(printf '%s' "$branch" | tr '/' '+')"
 
-  if git -C "$root" worktree list --porcelain | grep -qxF "worktree $wt"; then
+  if grep -qxF "worktree $wt" <<<"$(git -C "$root" worktree list --porcelain)"; then
     echo "[hotfix] reusing worktree $wt" >&2
   elif git -C "$root" show-ref --verify --quiet "refs/heads/$branch"; then
     git -C "$root" worktree add "$wt" "$branch" >/dev/null 2>&1 \
@@ -156,7 +156,7 @@ kto_hotfix() {
   fi
   log="$(git -C "$wt" log "origin/$base..HEAD" --format=%B)"
   for c in $(printf '%s\n' "$picks"); do
-    if printf '%s\n' "$log" | grep -qF "(cherry picked from commit $c)"; then
+    if grep -qF "(cherry picked from commit $c)" <<<"$log"; then
       echo "[hotfix] $c is already picked onto $branch" >&2
       had=1
       continue

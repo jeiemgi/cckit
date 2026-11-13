@@ -48,7 +48,7 @@ if [ -n "${KIT_ADD_TEST_INNER:-}" ]; then
   rm -rf "$fresh"
 
   # ── integrations (E303.2): the same entry lists descriptors and switches one on ────────────
-  has() { if printf '%s' "$2" | grep -qF -- "$3"; then echo "ok($KIT_ADD_TEST_INNER): $1"; else echo "FAIL($KIT_ADD_TEST_INNER): $1 -> '$3' not in: $2"; fail=1; fi; }
+  has() { if grep -qF -- "$3" <<<"$2"; then echo "ok($KIT_ADD_TEST_INNER): $1"; else echo "FAIL($KIT_ADD_TEST_INNER): $1 -> '$3' not in: $2"; fail=1; fi; }
   CCKIT="$dir/../bin/cckit"
   reg="$ws/integrations"; mkdir -p "$reg"
   cp "$dir/../integrations/integration.schema.json" "$reg/"

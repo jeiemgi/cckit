@@ -39,7 +39,7 @@ green'
   no  "section stops at the next heading" "$sec" "green"
   no  "section excludes its own heading"  "$sec" "## For agents"
   # the trim runs at both ends, so a lifted section drops in without a stray gap
-  eq  "section trims leading blank"  "$(printf '%s\n' "$sec" | head -1)" "build order matters"
+  eq  "section trims leading blank"  "$(printf '%s\n' "$sec" | sed -n 1p)" "build order matters"
   eq  "section trims trailing blank" "$(printf '%s\n' "$sec" | tail -1)" '- `scripts/lib/a.sh`'
   eq  "absent section is empty"      "$(printf '%s\n' "$body" | kit_brief_section "Nope")" ""
   # heading match is case-insensitive but not a prefix match
@@ -88,7 +88,7 @@ EOF
 - not a gotcha
 EOF
   eq "falls back to the kit template" \
-     "$(kit_brief_gotchas "$tmp/proj" | head -1)" "- template gotcha"
+     "$(kit_brief_gotchas "$tmp/proj" | sed -n 1p)" "- template gotcha"
   cat > "$tmp/proj/.claude/rules/delegation-brief.md" <<'EOF'
 # Delegation brief
 ## Standing gotchas
@@ -99,7 +99,7 @@ EOF
 - not a gotcha
 EOF
   g="$(kit_brief_gotchas "$tmp/proj")"
-  eq  "project rule wins over the template" "$(printf '%s\n' "$g" | head -1)" "- project gotcha"
+  eq  "project rule wins over the template" "$(printf '%s\n' "$g" | sed -n 1p)" "- project gotcha"
   no  "gotchas stop at the next heading"    "$g" "not a gotcha"
   eq  "no rule file yields nothing"         "$(kit_brief_gotchas "$tmp/empty-root")" ""
 

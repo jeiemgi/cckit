@@ -50,11 +50,11 @@ sorted() { printf '%s\n' $1 | sort | tr '\n' ' ' | sed 's/ *$//'; }
 want="$(sorted "$KIT_KINDS")"
 
 # 1. the hygiene hook's accepted branch prefixes == the kind set.
-hook="$(sed -n 's/.*=~ \^(\([a-z|]*\))\/\[0-9\]+-.*/\1/p' "$root/templates/hooks/repo-hygiene.sh.tmpl" | head -1 | tr '|' ' ')"
+hook="$(sed -n 's/.*=~ \^(\([a-z|]*\))\/\[0-9\]+-.*/\1/p' "$root/templates/hooks/repo-hygiene.sh.tmpl" | sed -n 1p | tr '|' ' ')"
 t "hygiene hook prefixes == KIT_KINDS" "$(sorted "$hook")" "$want"
 
 # 2. setup-labels.sh's built-in fallback (used where kinds.sh is not installed) == the kind set.
-fb="$(sed -n 's/.*\${KIT_KINDS:-\([a-z ]*\)}.*/\1/p' "$root/scripts/setup-labels.sh" | head -1)"
+fb="$(sed -n 's/.*\${KIT_KINDS:-\([a-z ]*\)}.*/\1/p' "$root/scripts/setup-labels.sh" | sed -n 1p)"
 t "setup-labels fallback kinds == KIT_KINDS" "$(sorted "$fb")" "$want"
 
 # 3. wt_start routes the label through the closed set rather than using it verbatim.

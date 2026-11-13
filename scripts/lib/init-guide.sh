@@ -90,7 +90,7 @@ init_detect_class() {
     return 0
   fi
   # Nothing but macOS folder metadata is an empty folder.
-  if [ -z "$(find "$d" -mindepth 1 -maxdepth 1 ! -name .DS_Store 2>/dev/null | head -1)" ]; then echo empty; return 0; fi
+  if [ -z "$(find "$d" -mindepth 1 -maxdepth 1 ! -name .DS_Store 2>/dev/null | sed -n 1p)" ]; then echo empty; return 0; fi
   for m in $_IG_MARKERS; do
     [ -e "$d/$m" ] && { echo project-nogit; return 0; }
   done
@@ -576,7 +576,7 @@ init_guide_resolve() {
       *) echo "x A recipe starts a NEW project and needs an empty folder; $TARGET already has files. Run it on a new folder: cckit init <folder> --recipe $(jq -r .id "$RECIPE_FILE")" >&2; exit 2 ;;
     esac
     n="$(jq -r '.folderName // empty' "$RECIPE_FILE")"
-    if [ -n "$n" ] && ! basename "$TARGET" | grep -qE "$n"; then
+    if [ -n "$n" ] && ! grep -qE "$n" <<<"$(basename "$TARGET")"; then
       echo "x This recipe needs a folder name in lowercase letters, digits and dashes; '$(basename "$TARGET")' is not. Try: $(dirname "$TARGET")/$(init_slugify "$(basename "$TARGET")")" >&2
       exit 2
     fi

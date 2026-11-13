@@ -57,7 +57,7 @@ _kit_ii_dir="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
 # shellcheck source=/dev/null
 . "$_kit_ii_dir/kit-state.sh"     # kit_state_file
 
-_kit_ii_id_ok() { printf '%s' "${1:-}" | grep -qE '^[a-z][a-z0-9]*(-[a-z0-9]+)*$'; }
+_kit_ii_id_ok() { grep -qE '^[a-z][a-z0-9]*(-[a-z0-9]+)*$' <<<"${1:-}"; }
 
 # _kit_ii_sh <dir> <command> -> run one descriptor command in dir with ~/.local/bin appended to
 # PATH. stdin is /dev/null so an installer can neither block on a prompt nor eat the caller's

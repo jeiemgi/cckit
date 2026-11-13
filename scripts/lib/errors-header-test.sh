@@ -29,7 +29,7 @@ errors_header() {
   # blanks skipped, comments taken up to the first line of code. A later `# errors:` line in the
   # body is not the file's declaration. A fixed line window would be wrong — two libs carry headers
   # that run past 25 lines.
-  awk 'NR==1 && /^#!/ {next} /^[[:space:]]*#/ {print; next} /^[[:space:]]*$/ {next} {exit}' "$1" | sed -n 's/^# errors:[[:space:]]*\([a-z-]*\).*/\1/p' | head -1
+  awk 'NR==1 && /^#!/ {next} /^[[:space:]]*#/ {print; next} /^[[:space:]]*$/ {next} {exit}' "$1" | sed -n 's/^# errors:[[:space:]]*\([a-z-]*\).*/\1/p' | sed -n 1p
 }
 
 # ── 1. every lib file declares one, and it is in the vocabulary ────────────────────────────────

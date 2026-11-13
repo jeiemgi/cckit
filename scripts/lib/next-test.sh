@@ -77,7 +77,7 @@ t   "human: the cadence is printed once"       "$(printf '%s\n' "$human" | grep 
 llm="$(run_next --llm 2>/dev/null)"; rc=$?
 t   "llm: rc 0"                                "$rc" "0"
 has "llm: the TOON header is number,ctx,title" "$llm" "{number,ctx,title}"
-t   "llm: two rows, the unblocked set"         "$(printf '%s\n' "$llm" | head -1 | grep -c '^\[2\]')" "1"
+t   "llm: two rows, the unblocked set"         "$(printf '%s\n' "$llm" | sed -n 1p | grep -c '^\[2\]')" "1"
 t   "llm: the p0 row leads"                    "$(printf '%s\n' "$llm" | sed -n 2p)" '6,"M","fix the login crash"'
 t   "llm: header + two rows, nothing else"     "$(printf '%s\n' "$llm" | grep -c .)" "3"
 no  "llm: no cadence line"                     "$llm" "cadence"

@@ -96,7 +96,7 @@ after="$(ports_of "$W" | tr '\n' ' ')"
 slot7="$(wt_port_slot "$P" 7 "$W" 2>/dev/null)"
 stride7="$(wt_port_stride "$P/cckit.config.json")"
 [ "$stride7" = 10 ] && ok || bad "wt_port_stride default: got '$stride7', want 10"
-first7="$(ports_of "$W" | head -1)"
+first7="$(ports_of "$W" | sed -n 1p)"
 [ "$first7" = "$(( 3001 + slot7 * stride7 ))" ] && ok || bad "wt_port_slot disagrees with the assigned port: slot '$slot7' stride '$stride7' port '$first7'"
 [ "$(wt_port_slot "$P" 7 "$W" 2>/dev/null)" = "$slot7" ] && ok || bad "wt_port_slot renumbered a live issue"
 printf '%s' '{"worktree":{"devPortStride":25}}' > "$TMP/stride.json"
@@ -138,7 +138,7 @@ for num in $RACE_NUMS; do
     while [ "$(lines_in "$barrier")" -lt "$RACE_N" ] && [ "$waited" -lt 50 ]; do
       sleep 0.1; waited=$(( waited + 1 ))
     done
-    wt_assign_ports "$W" "$num" "$P" >/dev/null 2>&1
+    wt_assign_ports "$W" "$num" "$P" >/dev/null 2>"$P/.err.$num"
   ) &
   pids="$pids $!"
 done
@@ -153,6 +153,10 @@ race_uniq="$(printf '%s' "$race" | sort -u | grep -c .)"
 [ "$race_total" = 24 ] && ok || bad "parallel: expected 24 ports over 8 concurrent worktrees, got $race_total"
 if [ "$race_total" = "$race_uniq" ]; then ok; else
   bad "parallel port collision: $race_total ports but only $race_uniq distinct ($(printf '%s' "$race" | sort | uniq -d | tr '\n' ' '))"
+  # The evidence, not only the verdict: what the ledger recorded and what the allocator said on
+  # stderr (a lock that timed out warns there). Without these a collision cannot be traced (#449).
+  echo "  ledger:";           sed 's/^/    /' "$P/.git/kit-portslots.tsv" 2>&1
+  echo "  allocator stderr:"; cat "$P"/.err.* 2>/dev/null | grep -v ' PORT=' | sed 's/^/    /'
 fi
 
 # The lock is released on the way out — a leftover lock directory wedges every later start until

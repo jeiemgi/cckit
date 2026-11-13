@@ -42,7 +42,7 @@ if [[ -z "$pj" ]]; then
             "$HOME"/.claude/plugins/*/claude-kit*/.claude-plugin/plugin.json \
             "$HOME"/.claude/plugins/*/*/claude-kit*/.claude-plugin/plugin.json \
             "$HOME"/.claude/plugins/*/*/claude-kit*/*/.claude-plugin/plugin.json \
-            "$HOME"/.claude/plugins/*/*/*/claude-kit*/.claude-plugin/plugin.json 2>/dev/null | head -1 || true)"
+            "$HOME"/.claude/plugins/*/*/*/claude-kit*/.claude-plugin/plugin.json 2>/dev/null | sed -n 1p || true)"
 fi
 [[ -n "$pj" && -f "$pj" ]] || exit 0
 

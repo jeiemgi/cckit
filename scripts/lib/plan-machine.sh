@@ -163,7 +163,7 @@ pm_batches() {
 # _pm_files — pull a "Files:" / "Touches:" hint line from an issue body; emit space-separated paths.
 _pm_files() {
   printf '%s' "$1" | grep -ioE '^[[:space:]]*(Files|Touches):[[:space:]]*.*' 2>/dev/null \
-    | head -1 | sed -E 's/^[[:space:]]*(Files|Touches):[[:space:]]*//I; s/[,]+/ /g' \
+    | sed -n 1p | sed -E 's/^[[:space:]]*(Files|Touches):[[:space:]]*//I; s/[,]+/ /g' \
     | tr -s ' ' | sed 's/^ //; s/ $//'
 }
 
@@ -245,7 +245,7 @@ EOF
   local wavetsv waves
   wavetsv="$(for i in "${!nums[@]}"; do printf '%s\t%s\n' "${nums[$i]}" "${inset[$i]}"; done | pm_waves)"
   # map number -> wave (linear; N small)
-  _wave_of() { printf '%s' "$wavetsv" | awk -F'\t' -v k="$1" '$1==k{print $2; exit}'; }
+  _wave_of() { printf '%s' "$wavetsv" | awk -F'\t' -v k="$1" '$1==k && !hit {print $2; hit=1}'; }
   waves="$(printf '%s' "$wavetsv" | awk -F'\t' '{print $2}' | sort -n | uniq)"
 
   # 5. within each wave: order by priority (stable), then pack into batches (ctx budget + file

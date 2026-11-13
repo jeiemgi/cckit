@@ -36,7 +36,7 @@ IG_REPO_OK=0     # 1 once the project has a GitHub repository to write to
 
 _gs_git() { git -C "$IG_TARGET" "$@"; }
 _gs_last() { printf '%s' "$1" | grep -v '^[[:space:]]*$' | tail -1 | cut -c1-200; }
-_gs_refused_by_plan() { printf '%s' "$1" | grep -qiE 'HTTP 403|Upgrade to GitHub'; }
+_gs_refused_by_plan() { grep -qiE 'HTTP 403|Upgrade to GitHub' <<<"$1"; }
 
 # init_setup_plan -> what will be attempted, from local state alone (no network).
 init_setup_plan() {
@@ -184,7 +184,7 @@ _gs_step_labels() {
   while IFS="$(printf '\t')" read -r name color desc; do
     [ -n "$name" ] || continue
     total=$((total + 1))
-    printf '%s\n' "$have" | grep -qxF "$name" && continue
+    grep -qxF "$name" <<<"$have" && continue
     if out="$(gh label create "$name" --repo "$IG_REPO" --color "$color" --description "$desc" 2>&1)"; then made=$((made + 1)); else bad=$((bad + 1)); fi
   done <<EOF
 $want

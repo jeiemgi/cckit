@@ -33,8 +33,8 @@ CCKIT="$ROOT/bin/cckit"
 PAGE="$ROOT/docs-site/src/content/docs/update.mdx"
 fail=0
 t()     { if [ "$2" = "$3" ]; then echo "ok: $1"; else echo "FAIL: $1 -> got '[$2]' want '[$3]'"; fail=1; fi; }
-has()   { if printf '%s' "$2" | grep -qF -- "$3"; then echo "ok: $1"; else echo "FAIL: $1 -> '$3' not in: $2"; fail=1; fi; }
-hasnt() { if printf '%s' "$2" | grep -qF -- "$3"; then echo "FAIL: $1 -> '$3' found in: $2"; fail=1; else echo "ok: $1"; fi; }
+has()   { if grep -qF -- "$3" <<<"$2"; then echo "ok: $1"; else echo "FAIL: $1 -> '$3' not in: $2"; fail=1; fi; }
+hasnt() { if grep -qF -- "$3" <<<"$2"; then echo "FAIL: $1 -> '$3' found in: $2"; fail=1; else echo "ok: $1"; fi; }
 
 command -v jq   >/dev/null 2>&1 || { echo "update-path-test: jq absent — skipping";   exit 0; }
 command -v git  >/dev/null 2>&1 || { echo "update-path-test: git absent — skipping";  exit 0; }

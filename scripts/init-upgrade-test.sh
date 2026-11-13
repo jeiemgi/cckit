@@ -110,7 +110,7 @@ changed="$(git status --porcelain | awk '{print $2}' | sort | tr '\n' ' ' | sed 
 t "only kit.config.json changed"         "$changed" ".claude/kit.config.json"
 
 diff_body="$(git diff -- .claude/kit.config.json | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)')"
-only_kitver="$(printf '%s\n' "$diff_body" | grep -vqE '"kitVersion"' && echo no || echo yes)"
+only_kitver="$([ -n "$(printf '%s' "$diff_body" | grep -vE '"kitVersion"')" ] && echo no || echo yes)"
 t "diff is only the kitVersion line"     "$only_kitver" "yes"
 t "kitVersion bumped to plugin version"  "$(jq -r '.kitVersion' .claude/kit.config.json)" "$PLUGIN_VERSION"
 t "upgrade block preserved through merge" "$(jq -r '.upgrade.removed | length' .claude/kit.config.json)" "2"

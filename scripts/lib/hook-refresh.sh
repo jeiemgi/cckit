@@ -56,7 +56,7 @@ hook_refresh_state() {
     [ -n "$h" ] && [ "$h" = "$cur" ] && { echo refresh; return 0; }
   fi
   if ! grep -qE '\{\{[A-Za-z_]+\}\}|<!-- IF:' "$tpl" 2>/dev/null; then
-    if _hr_history_hashes "$root" "$tpl" | grep -qx "$cur"; then echo refresh; return 0; fi
+    if grep -qx "$cur" <<<"$(_hr_history_hashes "$root" "$tpl")"; then echo refresh; return 0; fi
   fi
   echo drifted
 }
