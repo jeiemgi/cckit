@@ -110,7 +110,9 @@ run, and the run never merges and never closes an issue.
 
 The state of a run is one JSON file per branch under `.cckit/autopilot/`, written at every stop
 with the reason, the round count, the elapsed seconds, the usage and the resume command. The
-directory is gitignored.
+directory sits at the root of the repo and is shared by every worktree. `cckit init` does not add
+`.cckit/` to `.gitignore`: when `git check-ignore .cckit/` prints nothing, add the line `.cckit/`
+yourself.
 
 Without `--until`, the run ends when the agent exits 0 after a round that changed something. With
 it, the command's exit code is the only thing that ends the run as `done`.
@@ -123,8 +125,8 @@ Two limits behave differently from the others:
 - **There is no cost limit.** Codex prints no cost and cckit applies no price list.
 
 Which limits are enforced, partly enforced or unsupported, with the test behind each:
-[Unattended run limits](/agent-compatibility/#unattended-run-limits). Every flag:
-[CLI reference](/cli-reference/).
+[Unattended run limits](/agent-compatibility/#unattended-run-limits). Every flag is printed by
+`cckit autopilot run --help`; the verb's row is in the [CLI reference](/cli-reference/).
 
 <Aside type="caution" title="Tested with stub agents">
 The limits are tested by stopping a stub agent in `scripts/autopilot-run-test.sh`. The reference
