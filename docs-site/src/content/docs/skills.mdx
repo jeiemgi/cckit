@@ -89,6 +89,25 @@ when you just **describe the task in plain words** — that's the
 
 </div>
 
+## Skills a profile scaffolds
+
+The skills above ship with the plugin. `cckit init` also copies these into the project
+(`.claude/skills/<name>/SKILL.md`), chosen by the profile, so they can be edited there.
+
+<div class="cckit-nowrap-2">
+
+| Skill | Profiles | What it does |
+| ----- | -------- | ------------ |
+| `concrete` | all | Cut padding, hedges and unverifiable claims from durable prose: commits, PR and issue bodies, rules, docs. |
+| `karpathy-guidelines` | all | Guidelines against overcomplicated changes: state assumptions, change only what was asked, define what done means. |
+| `morning-briefing` | software, content, research, automation | What is active, what is blocked, what to focus on today. |
+| `copywriting` | content | Write or rewrite a page meant to persuade: homepage, landing, pricing, feature, headline, call to action. The `editor` agent lists it in `skills:`, so the Editor follows it for marketing copy. |
+| `speckit` | software | Install or identify Spec Kit and drive the spec-driven lifecycle. |
+| `feature-build-refine` | software | Build strategy for a Next.js + RefineDev project; applies only when the stack matches. |
+| `supabase-patterns` | software | Supabase access conventions; applies only when the project uses Supabase. |
+
+</div>
+
 <Aside type="note" title="Running a skill">
 In Claude Code, type `/` and the skill name (for example `/kit-next`). A
 <Tag kind="conversational" text>conversational</Tag> skill also triggers when you describe the task —
