@@ -28,10 +28,9 @@ run a shell can drive every operation.
 ## Why
 
 - **One lifecycle, one source of truth.** Start an issue, get an isolated worktree and branch, open
-  a PR, merge, and clean up — each step is one command, correct by construction. The board is both
-  the plan and the proof.
+  a PR, merge, and clean up — each step is one command. The board is both the plan and the proof.
 - **Sessions that pick up where you left off.** `cckit handoff "<note>"` saves a resume-here note;
-  bare `cckit` prints it at the start of the next session — context survives the context window.
+  bare `cckit` prints it at the start of the next session.
 - **Sessions that talk to each other.** `cckit msg send <branch|project:branch|all> [--steer]
   "<text>"` mails any parallel session on the machine — same project or another; the kit's mail
   hook delivers it to a *live* session between tool calls, and a `--steer` message redirects a
@@ -41,7 +40,7 @@ run a shell can drive every operation.
 - **Scales from one issue to a wave.** The same verbs that take one issue to a merged PR also plan
   and run a whole wave of parallel agents — with a captain that gates and merges behind policy
   floors.
-- **Zero hard dependencies.** Pure bash with graceful fallbacks; it auto-detects optional tools
+- **Zero hard dependencies.** Pure bash with fallbacks; it auto-detects optional tools
   (`gh`, `jq`, `fzf`, `gum`) and degrades instead of failing.
 - **Portable.** No company, framework, or repo is baked in — everything is driven from
   `cckit.config.json`.
@@ -232,7 +231,7 @@ the `kind:` label on the parent and every sub: one of `feat fix task chore secur
 respectively and titles its PR `docs:`. Any other value is refused before anything is created. In `cckit plan` and `cckit effort plan` an issue with no `ctx:` label shows `?` and weighs 2;
 a `ctx:` value outside `S|M|L|XL` also weighs 2 and warns on stderr. The `--flow`
 vocabulary (the `[Flow]` title tags) reads from `effort.flows` in the project config, so `cckit effort new --flow X`
-works out of the box in any configured repo (an explicit `EFFORT_FLOWS` env var still wins per invocation).
+works in any configured repo (an explicit `EFFORT_FLOWS` env var still wins per invocation).
 `cckit effort close` is likewise the **single close implementation** (the `/kit-effort-close` skill is a thin caller
 of the same function): pre-squash work-record snapshot + metrics, squash-merge, close parent + subs, board
 Status=Done, worktree/branch GC, an optional knowledge-ingest hook, and an advisory kit-sync drift check.
@@ -262,7 +261,7 @@ re-target fails, or the list of those PRs cannot be read, the close refuses, nam
 A project gate goes in `effort.preCloseHook`: it runs as `<hook> <effort#> <sub#…>` from the effort worktree
 before the snapshot and the merge, a non-zero exit refuses the close, and `KIT_FORCE=1` skips it with a notice.
 
-The GitHub issue **number** stays the canonical key, but every effort also has a memorable **slug** handle (the one
+The GitHub issue **number** stays the canonical key, but every effort also has a **slug** handle (the one
 already in its `effort/<N>-<slug>` branch). Effort commands take the slug *or* the number interchangeably:
 
 ```bash
@@ -278,7 +277,7 @@ cckit effort close slug-handles
 
 A pure-digits argument is always a number; anything else is resolved to the canonical number by
 matching `effort/*` branches, the `slug:<slug>` label, then open effort titles. An unknown or
-ambiguous slug fails with a clear error rather than guessing. Efforts render as `slug #N`.
+ambiguous slug fails with an error rather than guessing. Efforts render as `slug #N`.
 
 ### Ordering work — `cckit effort chain`
 
@@ -336,7 +335,7 @@ round-trip buys a count that is right either way.
   config per invocation.
 - This gates **efforts only**. `cckit start <issue>` (a plain task worktree) has no WIP limit.
 - **No network, no problem.** `EFFORT_WIP_REMOTE=0` skips the origin query and counts local heads
-  plus your cached `refs/remotes`. If origin is simply unreachable, the count falls back to those
+  plus your cached `refs/remotes`. If origin is unreachable, the count falls back to those
   same cached refs, prints one line saying the count may be stale, and the start proceeds.
 
 ### The weekly cadence
@@ -433,7 +432,7 @@ Guide: [Initialize → The marketing profile](https://cckit.dev/initialize/#the-
 ## Waves — parallel agentic development
 
 `cckit wave` reads your open efforts and proposes the incoming waves of work — parallel agent tasks
-that gate and merge themselves. This is the part that turns one keyboard into a small team:
+that gate and merge themselves:
 
 ```bash
 cckit plan                 # the wave plan: deps-ordered, p0-first inside a wave, file-disjoint
@@ -521,7 +520,7 @@ its current head. Off by default. → [the QA lane](https://cckit.dev/qa-lane/)
 
 cckit is meant to be operated by an agent loop, not only a human. See [`AGENTS.md`](AGENTS.md) for
 the contract. Every verb accepts `--llm` for structured output — uniform payloads come back as
-**TOON** (token-efficient), so the plan, board, and fan-out cost the model far fewer tokens:
+**TOON**, so the plan, board, and fan-out cost the model fewer tokens than the same rows as JSON:
 
 ```bash
 cckit sync --llm           # board state for an agent to reason over
@@ -531,9 +530,10 @@ cckit orchestrate --results --llm # each worker's collected result as JSON
 ```
 
 Human output renders as markdown — rich via `glow` in a terminal, native in the Claude Code
-transcript, pipe-safe everywhere. Every human-facing verb (`sync`, `plan`, `next`, `status`) shares
-one rendering seam, so board tables, wave plans, and the status dashboard read the same in every
-surface and never leak escape codes down a pipe (`cckit render` exposes the seam for any script).
+transcript, verbatim when piped. Every human-facing verb (`sync`, `plan`, `next`, `status`) goes
+through one renderer (`cckit_render`, `scripts/lib/render.sh`), so board tables, wave plans, and the
+status dashboard read the same in all three and print no escape codes into a pipe (`cckit render` exposes
+it for any script).
 
 ### Cloud sessions
 
@@ -551,11 +551,10 @@ Claude Code cloud sessions reach GitHub through a proxy that refuses GraphQL, an
 
 ## cckit builds cckit
 
-None of this is theoretical. cckit is developed *with* cckit — every feature, fix, and tutorial went
+cckit is developed *with* cckit — every feature, fix, and tutorial went
 through its own lifecycle: an issue, an isolated worktree, a pull request, a merge. The receipts are
 public: [every issue closed in the repo →](https://github.com/jeiemgi/cckit/issues?q=is%3Aissue%20state%3Aclosed)
 — including [the effort that produced this README](https://github.com/jeiemgi/cckit/issues/160).
-The board is both the plan and the proof.
 
 cckit also runs on the rules and skills it ships. `templates/` is what `cckit init` writes into a
 project; `.claude/skills/` and `.claude/rules/` here are the subset cckit applies to its own work —
@@ -575,7 +574,7 @@ Full docs live at **[cckit.dev](https://cckit.dev)** — start with
 [the idea](https://cckit.dev/philosophy/) if you want the why. The
 [tutorials](https://cckit.dev/tutorials/) are step-by-step "How to X with Claude Code"
 guides, each labelled **Beginner / Intermediate / Advanced** and carrying a **"Copy as Markdown"
-prompt** you can paste straight into Claude Code — start exactly where you are. The
+prompt** you can paste straight into Claude Code. The
 [cookbook](https://cckit.dev/cookbook/) holds lifecycle recipes, and the
 [CLI reference](https://cckit.dev/cli-reference/) covers every verb.
 

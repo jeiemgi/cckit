@@ -1,6 +1,6 @@
 # Contributing to cckit
 
-Thanks for your interest in cckit. Contributions — issues, ideas, and pull requests — are welcome.
+Contributions — issues, ideas, and pull requests — are welcome.
 
 ## Where it lives
 
@@ -64,8 +64,8 @@ paths:
 effort model) stays unscoped, and a behavioural routing rule must: scoped, it would not load until a
 matching file had already been read. A rule that outgrows 200 lines splits into a short rule plus a
 `knowledge/` doc it points at. `scripts/instruction-budget-lint.sh` is the gate — `--report` lists
-every file's cost; `scripts/instruction-budget-baseline.txt` grandfathers `effort-model.md` (205
-lines) and `naming-and-ids.md` (202), which may shrink but not grow.
+every file's cost; `scripts/instruction-budget-baseline.txt` grandfathers `effort-model.md` (209
+lines) and `naming-and-ids.md` (208), which may shrink but not grow.
 
 ## Durable prose goes through `concrete`
 
@@ -124,7 +124,7 @@ half regresses.
 
 - **bash CLI + lib** → `bin/cckit`, `scripts/lib/*.sh`.
 - **Claude Code plugin** → `skills/`, `commands/`, `.claude-plugin/`.
-- **Docs** → `docs/` (published to [cckit.dev](https://cckit.dev)).
+- **Docs** → `docs-site/` (published to [cckit.dev](https://cckit.dev)).
 - **What cckit installs for itself** → `.claude/skills/`, `.claude/rules/`, and the manifest in
   `scripts/self-install-test.sh`.
 
