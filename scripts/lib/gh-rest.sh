@@ -293,7 +293,7 @@ gh_rest_wave_rows() {
   | while IFS="$tab" read -r sub state; do
       [ -n "$sub" ] || continue
       oid="" title=""
-      pr="$(gh_rest_issue_closing_prs "$repo" "$sub" 2>/dev/null | head -1)"
+      pr="$(gh_rest_issue_closing_prs "$repo" "$sub" 2>/dev/null | sed -n 1p)"
       if [ -n "$pr" ]; then
         IFS="$tab" read -r oid title <<EOF
 $(_ghr_read "repos/$repo/pulls/$pr" --jq '"\(.merge_commit_sha // "")\t\(.title // "")"' 2>/dev/null)

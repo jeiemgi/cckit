@@ -59,7 +59,7 @@ integrations_list() {
 # like `../x` can never resolve to a file outside the registry.
 integration_file() {
   local id="${1:-}" f
-  printf '%s' "$id" | grep -qE '^[a-z][a-z0-9]*(-[a-z0-9]+)*$' || return 1
+  grep -qE '^[a-z][a-z0-9]*(-[a-z0-9]+)*$' <<<"$id" || return 1
   f="$(integrations_dir)/$id.json"
   [ -f "$f" ] || return 1
   printf '%s\n' "$f"

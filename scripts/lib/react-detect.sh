@@ -19,7 +19,7 @@ react_detect() {
 
   # merged dependency name list (deps + devDeps); tolerate malformed JSON
   deps="$(jq -r '((.dependencies // {}) + (.devDependencies // {})) | keys[]?' "$pkg" 2>/dev/null)" || return 0
-  _has() { printf '%s\n' "$deps" | grep -qx "$1"; }
+  _has() { grep -qx "$1" <<<"$deps"; }
 
   _has react || return 0
   REACT_DETECTED="true"

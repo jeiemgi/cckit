@@ -175,7 +175,7 @@ wb_compose() {
   {
     wb_preamble "$num" "$branch"
     printf '\n'
-    printf '%s\n' "$brief" | awk '/^##[[:space:]]/ { exit } { print }'
+    printf '%s\n' "$brief" | awk '/^##[[:space:]]/ { past = 1 } !past { print }'
   } > "$tmp/head"
   { printf '\n'; wb_receipt_contract "$num"; } > "$tmp/tail"
   printf '%s\n' "$brief" | awk 'f || /^##[[:space:]]/ { f = 1; print }' \

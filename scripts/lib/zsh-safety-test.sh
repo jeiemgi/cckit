@@ -153,9 +153,9 @@ rm -rf "$snap_tmp"
 # would be the regression. Comments are stripped first so the explanatory notes don't trip it.
 for f in kit-config.sh kit-gc.sh worktree-start.sh kit-events.sh session-registry.sh; do
   code="$(sed 's/#.*$//' "$LIB/$f")"
-  if printf '%s\n' "$code" | grep -qE '\blocal\b[^=]*\bpath\b'; then
+  if grep -qE '\blocal\b[^=]*\bpath\b' <<<"$code"; then
     bad "$f still declares a bare \`local … path …\`"
-  elif printf '%s\n' "$code" | grep -qE '(^|[^_[:alnum:]])g\(\)'; then
+  elif grep -qE '(^|[^_[:alnum:]])g\(\)' <<<"$code"; then
     bad "$f still defines a bare \`g()\`"
   else
     ok "$f — no bare reserved-name local (static guard)"

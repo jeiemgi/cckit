@@ -53,12 +53,12 @@ _grg_segments() {
 _grg_classify() {
   local s="$1"
   # `--help` / `-h` only prints usage: read-only, never a bypass.
-  printf '%s' "$s" | grep -qE '[[:space:]](--help|-h)([[:space:]]|$)' && return 0
-  if printf '%s' "$s" | grep -qE '^gh([[:space:]]+(-R|--repo)[[:space:]]+[^[:space:]]+|[[:space:]]+--repo=[^[:space:]]+)*[[:space:]]+issue[[:space:]]+create([[:space:]]|$)'; then echo issue-create
-  elif printf '%s' "$s" | grep -qE '^gh([[:space:]]+(-R|--repo)[[:space:]]+[^[:space:]]+|[[:space:]]+--repo=[^[:space:]]+)*[[:space:]]+issue[[:space:]]+close([[:space:]]|$)'; then echo issue-close
-  elif printf '%s' "$s" | grep -qE '^gh([[:space:]]+(-R|--repo)[[:space:]]+[^[:space:]]+|[[:space:]]+--repo=[^[:space:]]+)*[[:space:]]+pr[[:space:]]+create([[:space:]]|$)'; then echo pr-create
-  elif printf '%s' "$s" | grep -qE '^gh([[:space:]]+(-R|--repo)[[:space:]]+[^[:space:]]+|[[:space:]]+--repo=[^[:space:]]+)*[[:space:]]+pr[[:space:]]+merge([[:space:]]|$)'; then echo pr-merge
-  elif printf '%s' "$s" | grep -qE '^git([[:space:]]+-C[[:space:]]+[^[:space:]]+)*[[:space:]]+(checkout[[:space:]]+(.*[[:space:]])?-[bB]|switch[[:space:]]+(.*[[:space:]])?(-c|-C|--create)|worktree[[:space:]]+add)([[:space:]]|$)'; then echo branch
+  grep -qE '[[:space:]](--help|-h)([[:space:]]|$)' <<<"$s" && return 0
+  if grep -qE '^gh([[:space:]]+(-R|--repo)[[:space:]]+[^[:space:]]+|[[:space:]]+--repo=[^[:space:]]+)*[[:space:]]+issue[[:space:]]+create([[:space:]]|$)' <<<"$s"; then echo issue-create
+  elif grep -qE '^gh([[:space:]]+(-R|--repo)[[:space:]]+[^[:space:]]+|[[:space:]]+--repo=[^[:space:]]+)*[[:space:]]+issue[[:space:]]+close([[:space:]]|$)' <<<"$s"; then echo issue-close
+  elif grep -qE '^gh([[:space:]]+(-R|--repo)[[:space:]]+[^[:space:]]+|[[:space:]]+--repo=[^[:space:]]+)*[[:space:]]+pr[[:space:]]+create([[:space:]]|$)' <<<"$s"; then echo pr-create
+  elif grep -qE '^gh([[:space:]]+(-R|--repo)[[:space:]]+[^[:space:]]+|[[:space:]]+--repo=[^[:space:]]+)*[[:space:]]+pr[[:space:]]+merge([[:space:]]|$)' <<<"$s"; then echo pr-merge
+  elif grep -qE '^git([[:space:]]+-C[[:space:]]+[^[:space:]]+)*[[:space:]]+(checkout[[:space:]]+(.*[[:space:]])?-[bB]|switch[[:space:]]+(.*[[:space:]])?(-c|-C|--create)|worktree[[:space:]]+add)([[:space:]]|$)' <<<"$s"; then echo branch
   fi
 }
 
@@ -70,13 +70,13 @@ _grg_hint() {  # <key> [segment] — the segment's flags pick the matching verb 
     issue-close)
       n="$(printf '%s' "$seg" | sed -nE 's/.*--duplicate-of[= ]+#?([0-9]+).*/\1/p')"
       if [ -n "$n" ]; then echo "cckit close <issue> --duplicate-of $n   (state_reason duplicate, board Done)"
-      elif printf '%s' "$seg" | grep -qiE -- '(--reason|-r)[= ]+.?not[ _-]?planned'; then
+      elif grep -qiE -- '(--reason|-r)[= ]+.?not[ _-]?planned' <<<"$seg"; then
         echo 'cckit close <issue> "<why>" --reason not-planned   (superseded: --superseded-by <N>)'
       else echo 'cckit close <issue> "<summary>" [--reason completed|not-planned|duplicate]   (an effort: cckit effort close <N>)'; fi ;;
     pr-create)    echo 'cckit pr <issue> "<summary>"   (an effort: cckit effort pr <N> --summary-file F --for-agents-file F)' ;;
     pr-merge)
-      if printf '%s' "$seg" | grep -qE -- '(--merge|-m)([[:space:]]|$)'; then echo 'cckit merge [<pr>] --merge   (a merge commit; also into an effort/<N> base)'
-      elif printf '%s' "$seg" | grep -qE -- '(--rebase|-r)([[:space:]]|$)'; then echo 'cckit merge [<pr>] --rebase'
+      if grep -qE -- '(--merge|-m)([[:space:]]|$)' <<<"$seg"; then echo 'cckit merge [<pr>] --merge   (a merge commit; also into an effort/<N> base)'
+      elif grep -qE -- '(--rebase|-r)([[:space:]]|$)' <<<"$seg"; then echo 'cckit merge [<pr>] --rebase'
       else echo 'cckit merge [<pr>] [--merge|--rebase]   (an effort: cckit effort close <N>)'; fi ;;
     branch)       echo 'cckit start <issue>   (an effort: cckit effort start <N>)' ;;
   esac
@@ -146,7 +146,7 @@ input="$(cat 2>/dev/null)"
 cmd="$(printf '%s' "$input" | jq -r '.tool_input.command // empty | if type == "array" then (if length > 2 and (.[1] | test("^-[a-z]*c$")) then .[2:] else . end | join(" ")) else . end' 2>/dev/null)"
 [ -z "$cmd" ] && exit 0
 # Cheap prefilter: nothing to inspect unless gh or git appears at all.
-printf '%s' "$cmd" | grep -qE '(^|[^A-Za-z0-9_-])(gh|git)[[:space:]]' || exit 0
+grep -qE '(^|[^A-Za-z0-9_-])(gh|git)[[:space:]]' <<<"$cmd" || exit 0
 
 key=""; hit=""
 while IFS= read -r seg; do
@@ -174,7 +174,7 @@ if [ "$key" = branch ]; then
   case "$cur" in "${base:-develop}"|main|master|develop) : ;; *) exit 0 ;; esac
 fi
 
-if [ "${KIT_ALLOW_RAW:-}" = 1 ] || printf '%s' "$cmd" | grep -qE '(^|[^A-Za-z0-9_])KIT_ALLOW_RAW=1([[:space:]]|$)'; then
+if [ "${KIT_ALLOW_RAW:-}" = 1 ] || grep -qE '(^|[^A-Za-z0-9_])KIT_ALLOW_RAW=1([[:space:]]|$)' <<<"$cmd"; then
   common="$(git -C "$dir" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"
   if [ -n "$common" ]; then
     mkdir -p "$common/cckit" 2>/dev/null

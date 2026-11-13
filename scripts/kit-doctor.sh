@@ -68,7 +68,7 @@ fi
 # ---- color/unicode detection (matches kit-sigil.sh pattern) -----------------
 _loc="${LC_ALL:-${LC_CTYPE:-${LANG:-}}}"
 if [ "${KIT_ASCII:-}" = "1" ]; then KIT_UNICODE=0
-elif printf '%s' "$_loc" | grep -qiE 'utf-?8'; then KIT_UNICODE=1
+elif grep -qiE 'utf-?8' <<<"$_loc"; then KIT_UNICODE=1
 else KIT_UNICODE=0; fi
 
 if [ "${FORCE_COLOR:-}" = "1" ]; then KIT_COLOR=1
@@ -223,7 +223,7 @@ printf '  %s%sTier 0 — bootstrap%s\n' "$C_BOLD" "" "$C_RESET"
 if [[ $IS_MACOS -eq 0 ]]; then
   row "$MARK_SKIP" "Homebrew" "not macOS — skipping"
 elif has_cmd brew; then
-  row "$MARK_OK" "Homebrew" "$(brew --version 2>/dev/null | head -1)"
+  row "$MARK_OK" "Homebrew" "$(brew --version 2>/dev/null | sed -n 1p)"
   CHECKS_OK=$((CHECKS_OK + 1))
 else
   if [[ $MAY_INSTALL -eq 0 ]]; then
@@ -238,7 +238,7 @@ else
       # Add brew to PATH for the rest of this session (Apple Silicon path)
       [[ -f /opt/homebrew/bin/brew ]] && eval "$(/opt/homebrew/bin/brew shellenv)" 2>/dev/null || true
       [[ -f /usr/local/bin/brew   ]] && eval "$(/usr/local/bin/brew shellenv)"   2>/dev/null || true
-      row "$MARK_OK" "Homebrew" "installed $(brew --version 2>/dev/null | head -1)"
+      row "$MARK_OK" "Homebrew" "installed $(brew --version 2>/dev/null | sed -n 1p)"
       CHECKS_OK=$((CHECKS_OK + 1))
       ACTIONS_TAKEN+=("Installed Homebrew")
     else
@@ -273,7 +273,7 @@ fi
 # ---- gh (min version 2.29 for Projects v2) ----------------------------------
 GH_OK=0
 if has_cmd gh; then
-  _ghver="$(gh --version 2>/dev/null | head -1 | awk '{print $3}')"
+  _ghver="$(gh --version 2>/dev/null | sed -n 1p | awk '{print $3}')"
   # Check for Projects v2 support (gh >= 2.29.0)
   _ghmaj="${_ghver%%.*}"
   _ghmin="${_ghver#*.}"; _ghmin="${_ghmin%%.*}"
@@ -291,7 +291,7 @@ if has_cmd gh; then
     [[ $GH_OK -eq 0 ]] && ACTIONS_NEEDED+=("Upgrade gh: brew upgrade gh")
   fi
 elif brew_install gh; then
-  _ghver="$(gh --version 2>/dev/null | head -1 | awk '{print $3}')"
+  _ghver="$(gh --version 2>/dev/null | sed -n 1p | awk '{print $3}')"
   row "$MARK_OK" "gh" "installed $\_ghver"
   CHECKS_OK=$((CHECKS_OK + 1))
   GH_OK=1
@@ -318,7 +318,7 @@ fi
 
 # ---- perl -----------------------------------------------------------------
 if has_cmd perl; then
-  row "$MARK_OK" "perl" "$(perl --version 2>/dev/null | head -2 | tail -1 | tr -d '()' | awk '{print $2}')"
+  row "$MARK_OK" "perl" "$(perl --version 2>/dev/null | sed -n 1,2p | tail -1 | tr -d '()' | awk '{print $2}')"
   CHECKS_OK=$((CHECKS_OK + 1))
 elif brew_install perl; then
   row "$MARK_OK" "perl" "installed"
@@ -420,17 +420,17 @@ _has_vercel_link=0
 
 if [[ $_has_vercel_link -eq 1 ]] || [[ -n "${VERCEL:-}" ]]; then
   if has_cmd vercel; then
-    row "$MARK_OK" "vercel" "$(vercel --version 2>/dev/null | head -1)"
+    row "$MARK_OK" "vercel" "$(vercel --version 2>/dev/null | sed -n 1p)"
     CHECKS_OK=$((CHECKS_OK + 1))
   elif brew_install vercel vercel; then
-    row "$MARK_OK" "vercel" "installed $(vercel --version 2>/dev/null | head -1)"
+    row "$MARK_OK" "vercel" "installed $(vercel --version 2>/dev/null | sed -n 1p)"
     CHECKS_OK=$((CHECKS_OK + 1))
     ACTIONS_TAKEN+=("Installed vercel CLI via brew")
   elif [[ $MAY_INSTALL -eq 1 ]] && has_cmd npm; then
     npm install -g vercel >/dev/null 2>&1 && \
       ACTIONS_TAKEN+=("Installed vercel CLI via npm") || true
     if has_cmd vercel; then
-      row "$MARK_OK" "vercel" "installed $(vercel --version 2>/dev/null | head -1)"
+      row "$MARK_OK" "vercel" "installed $(vercel --version 2>/dev/null | sed -n 1p)"
       CHECKS_OK=$((CHECKS_OK + 1))
     else
       row "$MARK_FAIL" "vercel" "missing — npm install -g vercel"
@@ -745,8 +745,8 @@ fi
 # ---- gh scope: project (Projects v2 silently fails without it) --------------
 GH_SCOPE_PROJECT=0
 if [[ $GH_AUTHED -eq 1 ]] && has_cmd gh; then
-  _token_scopes="$(gh auth status 2>&1 | grep -i 'token scopes\|scopes:' | head -1 || true)"
-  if echo "$_token_scopes" | grep -qi 'project'; then
+  _token_scopes="$(gh auth status 2>&1 | grep -i 'token scopes\|scopes:' | sed -n 1p || true)"
+  if grep -qi 'project' <<<"$_token_scopes"; then
     row "$MARK_OK" "gh scope:project" "present"
     CHECKS_OK=$((CHECKS_OK + 1))
     GH_SCOPE_PROJECT=1
@@ -826,7 +826,7 @@ printf '\n'
 printf '  %s%sSSH (optional — GitHub HTTPS auth already configured by gh)%s\n' "$C_BOLD" "" "$C_RESET"
 
 _ssh_result=0
-ssh -T git@github.com -o ConnectTimeout=5 -o BatchMode=yes 2>&1 | grep -q "successfully authenticated" && _ssh_result=1 || true
+grep -q "successfully authenticated" <<<"$(ssh -T git@github.com -o ConnectTimeout=5 -o BatchMode=yes 2>&1)" && _ssh_result=1 || true
 
 if [[ $_ssh_result -eq 1 ]]; then
   row "$MARK_OK" "SSH to github.com" "key already accepted"

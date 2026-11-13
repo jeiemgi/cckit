@@ -57,7 +57,7 @@ capture
 # --- 3. a real in-scope hit fails -------------------------------------------
 echo 'x=1  TODO' > "$TMP/lib/bad.sh"; track
 capture
-if [ "$run_rc" -ne 0 ] && printf '%s' "$run_out" | grep -q 'T001.*lib/bad.sh'; then
+if [ "$run_rc" -ne 0 ] && grep -q 'T001.*lib/bad.sh' <<<"$run_out"; then
   pass "in-scope hit fails"
 else
   fail "in-scope hit fails (rc=$run_rc: $run_out)"
@@ -105,7 +105,7 @@ capture
 # --- 11. ...but growth in that same file fails ------------------------------
 printf 'a\n```\nx\n```\n\n```\ny\n```\n' > "$TMP/docs/a.md"; track
 capture
-if [ "$run_rc" -ne 0 ] && printf '%s' "$run_out" | grep -q 'grew to'; then
+if [ "$run_rc" -ne 0 ] && grep -q 'grew to' <<<"$run_out"; then
   pass "growth past baseline fails"
 else
   fail "growth past baseline fails (rc=$run_rc: $run_out)"
@@ -115,7 +115,7 @@ fi
 printf 'a\n```\nx\n```\n' > "$TMP/docs/a.md"
 printf 'c\n```\nz\n```\n' > "$TMP/docs/c.md"; track
 capture
-if [ "$run_rc" -ne 0 ] && printf '%s' "$run_out" | grep -q 'docs/c.md'; then
+if [ "$run_rc" -ne 0 ] && grep -q 'docs/c.md' <<<"$run_out"; then
   pass "new offending file fails despite baseline"
 else
   fail "new offending file fails despite baseline (rc=$run_rc: $run_out)"
@@ -143,9 +143,9 @@ source: test
 CONF
 echo 'x=SENTINEL_TOKEN' > "$TMP3/lib/real.sh"
 out3="$( cd "$TMP3" && bash scripts/review-lint.sh 2>&1 )"
-if printf '%s' "$out3" | grep -q 'review-rules.conf'; then
+if grep -q 'review-rules.conf' <<<"$out3"; then
   fail "rule table is not linted against itself (self-matched: $out3)"
-elif printf '%s' "$out3" | grep -q 'lib/real.sh'; then
+elif grep -q 'lib/real.sh' <<<"$out3"; then
   pass "rule table is skipped while real files still match"
 else
   fail "rule table is not linted against itself (real hit missed: $out3)"
@@ -159,7 +159,7 @@ cp "$ENGINE" "$TMP2/scripts/"; cp "$TMP/scripts/review-rules.conf" "$TMP2/script
 ( cd "$TMP2" && git init -q . ) >/dev/null 2>&1
 printf 'a\n```\nx\n```\n' > "$TMP2/docs/a.md"     # never `git add`ed
 out2="$( cd "$TMP2" && bash scripts/review-lint.sh 2>&1 )"; rc2=$?
-if [ "$rc2" -ne 0 ] && printf '%s' "$out2" | grep -q 'docs/a.md'; then
+if [ "$rc2" -ne 0 ] && grep -q 'docs/a.md' <<<"$out2"; then
   pass "scans on-disk files when the index is empty"
 else
   fail "scans on-disk files when the index is empty (rc=$rc2: $out2)"
@@ -218,7 +218,7 @@ out6="$( cd "$TMP5" && bash scripts/review-lint.sh 2>&1 )"; rc6=$?
 printf '~~~\nx\n~~~\n' > "$TMP5/docs/tilde.md"
 ( cd "$TMP5" && git add -A . ) >/dev/null 2>&1
 out7="$( cd "$TMP5" && bash scripts/review-lint.sh 2>&1 )"; rc7=$?
-if [ "$rc7" -ne 0 ] && printf '%s' "$out7" | grep -q 'docs/tilde.md'; then
+if [ "$rc7" -ne 0 ] && grep -q 'docs/tilde.md' <<<"$out7"; then
   pass "a bare ~~~ fence is caught"
 else
   fail "a bare ~~~ fence is caught (rc=$rc7: $out7)"

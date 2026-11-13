@@ -227,7 +227,7 @@ project_find_item_by_issue() {
   fi
   # Pick the card whose project number matches OUR board; empty if the issue isn't on it.
   item_id=$(printf '%s' "$resp" | jq -r --argjson n "$pnum" \
-    '.data.repository.issue.projectItems.nodes[] | select(.project.number==$n) | .id' 2>/dev/null | head -1)
+    '.data.repository.issue.projectItems.nodes[] | select(.project.number==$n) | .id' 2>/dev/null | sed -n 1p)
   echo "$item_id"
 }
 
@@ -245,5 +245,5 @@ project_issue_status() {
     -F o="$owner" -F r="$name" -F n="$issue_num" 2>/dev/null)" || return 1
   printf '%s' "$resp" | jq -r --argjson n "$pnum" \
     '.data.repository.issue.projectItems.nodes[]? | select(.project.number==$n) | .fieldValueByName.name // empty' \
-    2>/dev/null | head -1
+    2>/dev/null | sed -n 1p
 }

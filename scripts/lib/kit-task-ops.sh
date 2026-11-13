@@ -87,17 +87,17 @@ kto_board_enabled() {
 # Parse the issue number from a `<kind>/<N>-<slug>` branch (e.g. feat/173-x -> 173). Empty if none.
 kto_branch_issue_number() {
   local branch="${1:-$(git rev-parse --abbrev-ref HEAD 2>/dev/null)}"
-  printf '%s' "$branch" | grep -oE '/[0-9]+-' | head -1 | tr -d '/-'
+  printf '%s' "$branch" | grep -oE '/[0-9]+-' | sed -n 1p | tr -d '/-'
 }
 
 # Echo the role slug from a comma-separated labels list (role:<slug>). Empty if absent.
 kto_labels_role() {
-  printf '%s' "$1" | tr ',' '\n' | grep '^role:' | head -1 | cut -d: -f2
+  printf '%s' "$1" | tr ',' '\n' | grep '^role:' | sed -n 1p | cut -d: -f2
 }
 
 # Echo the kind slug from a comma-separated labels list (kind:<slug>). Empty if absent.
 kto_labels_kind() {
-  printf '%s' "$1" | tr ',' '\n' | grep '^kind:' | head -1 | cut -d: -f2
+  printf '%s' "$1" | tr ',' '\n' | grep '^kind:' | sed -n 1p | cut -d: -f2
 }
 
 # Compose the PR title as a Conventional Commit subject. Because PRs are squash-merged, this title
@@ -513,7 +513,7 @@ EOF
   common="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"
   main_wt=""
   [[ -n "$common" && "$(basename "$common")" == ".git" ]] && main_wt="$(dirname "$common")"
-  [[ -n "$main_wt" ]] || main_wt=$(git worktree list --porcelain | awk '/^worktree /{print $2; exit}')
+  [[ -n "$main_wt" ]] || main_wt=$(git worktree list --porcelain | awk '/^worktree / && !hit {print $2; hit=1}')
   cd "$main_wt" || { echo "✗ cannot reach the main checkout $main_wt for cleanup" >&2; return 1; }
 
   if [[ -n "$wt" && "$wt" != "$main_wt" ]] && ! _kto_protected "$head"; then
@@ -564,7 +564,7 @@ _kto_existing_labels() {
   fi
   while IFS= read -r l; do
     [[ -n "$l" ]] || continue
-    if printf '%s\n' "$have" | grep -qixF -- "$l"; then
+    if grep -qixF -- "$l" <<<"$have"; then
       keep="${keep:+$keep,}$l"
     else
       echo "⚠ label '$l' not found in $repo — issue created without it (scripts/setup-labels.sh provisions the kit's labels)" >&2

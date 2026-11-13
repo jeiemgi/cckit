@@ -43,7 +43,7 @@ if [ -n "${UPGRADE_REPORT_TEST_INNER:-}" ]; then
   upgrade_changes "$tmp/before" "$tmp/after" > "$tmp/changes"
   t "changes: A / M / D by path, nothing else" "$(tr '\t\n' ' |' < "$tmp/changes")" \
     "M .claude/rules/a.md|A .claude/rules/b.md|A knowledge/INDEX.md|D scripts/run.sh|"
-  t "print: heading carries the counts" "$(upgrade_changes_print "$tmp/changes" "Changed on disk" | head -1)" \
+  t "print: heading carries the counts" "$(upgrade_changes_print "$tmp/changes" "Changed on disk" | sed -n 1p)" \
     "  Changed on disk (2 added, 1 modified, 1 deleted):"
   t "print: one row per change" "$(upgrade_changes_print "$tmp/changes" "Changed on disk" | sed -n 2p)" "    M .claude/rules/a.md"
   : > "$tmp/none"

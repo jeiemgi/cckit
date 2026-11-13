@@ -21,9 +21,9 @@ vb_level() {
   local range="$1" log
   log="$(git -C "$ROOT" log --format='%s%n%b' $range 2>/dev/null || true)"
   [ -n "$log" ] || { echo none; return; }
-  if printf '%s\n' "$log" | grep -qE '(^|[[:space:]])BREAKING CHANGE|^[a-z]+(\([^)]*\))?!:'; then echo major; return; fi
-  if printf '%s\n' "$log" | grep -qE '^feat(\([^)]*\))?:'; then echo minor; return; fi
-  if printf '%s\n' "$log" | grep -qE '^(fix|perf|refactor|revert)(\([^)]*\))?:'; then echo patch; return; fi
+  if grep -qE '(^|[[:space:]])BREAKING CHANGE|^[a-z]+(\([^)]*\))?!:' <<<"$log"; then echo major; return; fi
+  if grep -qE '^feat(\([^)]*\))?:' <<<"$log"; then echo minor; return; fi
+  if grep -qE '^(fix|perf|refactor|revert)(\([^)]*\))?:' <<<"$log"; then echo patch; return; fi
   # Only non-functional commits (docs/chore/style/test/ci/build, or untyped) -> no release.
   echo none
 }

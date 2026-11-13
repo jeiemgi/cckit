@@ -39,7 +39,7 @@ MD
   t "skills: block list, comments and quotes stripped" "$(agent_def_skills "$tmp/tech-lead.md" | tr '\n' ' ')" "kit-task-pr agent-skills:context7 "
   t "skills: inline list"       "$(agent_def_skills "$tmp/editor.md" | tr '\n' ' ')" "one two "
   t "skills: empty inline list" "$(agent_def_skills "$tmp/bare.md")" ""
-  t "body: starts at the first content line" "$(agent_def_body "$tmp/tech-lead.md" | head -1)" "# Tech Lead"
+  t "body: starts at the first content line" "$(agent_def_body "$tmp/tech-lead.md" | sed -n 1p)" "# Tech Lead"
   t "codex name: hyphen becomes underscore" "$(agent_def_codex_name tech-lead)" "tech_lead"
 
   out="$(agent_def_codex "$tmp/tech-lead.md")"; t "codex: rc 0" "$?" "0"

@@ -140,7 +140,7 @@ night_grant_parse() {
   fi
 
   budget="$(printf '%s' "$json" | jq -r 'if (.budget|type) == "string" then .budget else "" end')"
-  if ! printf '%s' "$budget" | grep -Eq '^\+[1-9][0-9]*[kM]?$'; then
+  if ! grep -Eq '^\+[1-9][0-9]*[kM]?$' <<<"$budget"; then
     _ng_err "budget missing or malformed (want +<number>[k|M], e.g. +2000k): '${budget}'"; return 1
   fi
 

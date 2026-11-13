@@ -52,29 +52,36 @@ bo_file() { kit_state_file branch-owners.tsv; }
 _bo_now()  { date +%s 2>/dev/null || echo 0; }
 _bo_host() { hostname 2>/dev/null || echo unknown; }
 
-# _bo_lock / _bo_unlock — the same mkdir primitive the port-slot ledger uses (worktree-start.sh):
-# a stock macOS has no flock(1), and `set -C` redirection is not atomic on every filesystem.
+# _bo_lock / _bo_unlock — the same primitive the port-slot ledger uses (worktree-start.sh): the
+# shell's noclobber redirection, which opens with O_CREAT|O_EXCL. A stock macOS has no flock(1).
+# It was `mkdir` until #449; the `mkdir` of uutils coreutils 0.10.0 (Ubuntu 26.04) exits 0 for the
+# loser of a race, so two claimants held this lock together.
 #
 # Unlike the port lock, a caller that CANNOT lock here must NOT proceed. That lock guards an
 # allocation whose worst case is a duplicate port; this one guards the answer to "is someone else
 # writing this branch?", and answering it without the lock is how both claimants get a yes.
+
+# _bo_lock_try <lockfile> — ONE attempt: 0 when this call created the lock, 1 when it exists.
+_bo_lock_try() { ( set -C; : > "$1" ) 2>/dev/null; }
+
 _bo_lock() {
   local d="$1" tries=0 max
   max=$(( _BO_LOCK_WAIT * 10 ))
   while [ "$tries" -lt "$max" ]; do
-    mkdir "$d" 2>/dev/null && return 0
+    _bo_lock_try "$d" && return 0
     sleep 0.1 2>/dev/null || sleep 1
     tries=$(( tries + 1 ))
   done
-  # A lock directory older than a minute is abandoned: the age floor sits well above _BO_LOCK_WAIT,
-  # so a slow-but-live holder is never stolen from.
+  # A lock older than a minute is abandoned: the age floor sits well above _BO_LOCK_WAIT, so a
+  # slow-but-live holder is never stolen from. `rm -rf` because a cckit from before #449 leaves a
+  # lock DIRECTORY at this path.
   if [ -n "$(find "$d" -maxdepth 0 -mmin +1 2>/dev/null)" ]; then
     rm -rf "$d" 2>/dev/null
-    mkdir "$d" 2>/dev/null && { echo "branch-owner: broke an abandoned ledger lock ($d)" >&2; return 0; }
+    _bo_lock_try "$d" && { echo "branch-owner: broke an abandoned ledger lock ($d)" >&2; return 0; }
   fi
   return 1
 }
-_bo_unlock() { rmdir "$1" 2>/dev/null || rm -rf "$1" 2>/dev/null; }
+_bo_unlock() { rm -rf "$1" 2>/dev/null; }
 
 # _bo_alive <pid> <host> <worktree> — rc 0 when the lease holder may still be running.
 _bo_alive() {
@@ -124,7 +131,7 @@ bo_claim() {
   tmp="$(mktemp 2>/dev/null)" || { _bo_unlock "$lock"; echo "bo_claim: no temp file" >&2; return 1; }
   _bo_rows_live "$f" > "$tmp"
 
-  held_owner="$(awk -F"\t" -v b="$branch" '$1==b {print $2; exit}' "$tmp" 2>/dev/null)"
+  held_owner="$(awk -F"\t" -v b="$branch" '$1==b && !hit {print $2; hit=1}' "$tmp" 2>/dev/null)"
   if [ -n "$held_owner" ] && [ "$held_owner" != "$owner" ]; then
     local held_wt
     held_wt="$(awk -F"\t" -v b="$branch" '$1==b {print $5; exit}' "$tmp" 2>/dev/null)"
@@ -170,7 +177,7 @@ bo_owner() {
   local branch="${1:-}" f
   [ -n "$branch" ] || return 2
   f="$(bo_file)"; [ -f "$f" ] || return 0
-  _bo_rows_live "$f" | awk -F"\t" -v b="$branch" '$1==b {print $2; exit}'
+  _bo_rows_live "$f" | awk -F"\t" -v b="$branch" '$1==b && !hit {print $2; hit=1}'
 }
 
 # bo_list — every live lease, one row per line.

@@ -17,8 +17,8 @@ LIB="$ROOT/scripts/lib"
 fail=0
 t()   { if [ "$2" = "$3" ]; then echo "ok: $1"; else echo "FAIL: $1 -> got '[$2]' want '[$3]'"; fail=1; fi; }
 rc()  { if [ "$2" = "$3" ]; then echo "ok: $1"; else echo "FAIL: $1 -> rc '$2' want '$3'"; fail=1; fi; }
-has() { if printf '%s' "$2" | grep -qF -- "$3"; then echo "ok: $1"; else echo "FAIL: $1 -> '$3' not in: $2"; fail=1; fi; }
-hasnt() { if printf '%s' "$2" | grep -qF -- "$3"; then echo "FAIL: $1 -> '$3' found in: $2"; fail=1; else echo "ok: $1"; fi; }
+has() { if grep -qF -- "$3" <<<"$2"; then echo "ok: $1"; else echo "FAIL: $1 -> '$3' not in: $2"; fail=1; fi; }
+hasnt() { if grep -qF -- "$3" <<<"$2"; then echo "FAIL: $1 -> '$3' found in: $2"; fail=1; else echo "ok: $1"; fi; }
 
 command -v jq >/dev/null 2>&1 || { echo "integration-install-test: jq absent — skipping (dependency-light gate)"; exit 0; }
 
@@ -238,7 +238,7 @@ has "dry-run plan shows the wire command" "$plan" "fixture-tool init --no-status
 out="$(run "$tmp/h8b" "KIT_DRY_RUN=1 integration_install '$desc' '$proj'")"
 t  "dry-run without consent -> still a plan, nothing run" "$out|$(calls)" "dry-run|"
 has "dry-run without consent -> says so" "$(cat "$tmp/err")" "consent: NOT recorded"
-t  "plan on stdout matches" "$(run "$h" "integration_install_plan '$desc' '$proj'" | head -1)" "fixture-tool: not installed. Candidates, tried in this order until one works:"
+t  "plan on stdout matches" "$(run "$h" "integration_install_plan '$desc' '$proj'" | sed -n 1p)" "fixture-tool: not installed. Candidates, tried in this order until one works:"
 
 # ── 9. the wire command: `declined` becomes flags, reasons stay out ────────────────────────────
 t  "declined map is rendered into flags, in descriptor order" "$(run "$h" "integration_wire_command '$desc'")" "fixture-tool init --no-statusline --no-hooks"

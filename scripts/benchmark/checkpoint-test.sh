@@ -172,7 +172,7 @@ case "$out" in *OVERRIDDEN*) rc=1 ;; *) rc=0 ;; esac; t "release: a passing chec
 has "release: a redirected runs dir is printed" "$out" "benchmark runs read from KIT_RELEASE_BENCH_DIR=$P/benchmarks"
 # BENCH_DIR belongs to `cckit bench`; the release reads this repo's own runs whatever it is set to.
 # $P has no 9.9.9 run, so a release that honoured BENCH_DIR would be refused for 9.9.9 from $P.
-own_v="$(basename "$(ls "$ROOT"/benchmarks/runs/*.json | head -1)" .json)"
+own_v="$(basename "$(ls "$ROOT"/benchmarks/runs/*.json | sed -n 1p)" .json)"
 out="$(BENCH_DIR="$FIX/nowhere" bash "$PUBLISH" "$own_v" 2>&1)"
 case "$out" in *"$FIX/nowhere"*) rc=1 ;; *) rc=0 ;; esac; t "release: BENCH_DIR does not move the release check" "$rc" "0"
 has "release: with BENCH_DIR set the check still reads this repo's runs" "$out" "benchmark check: $own_v checkpoint"
@@ -181,7 +181,7 @@ has "release: with BENCH_DIR set the check still reads this repo's runs" "$out" 
 page="$FIX/page.md"
 bash "$CP" page --out "$page" >/dev/null 2>&1;      t "page --out writes" "$?" "0"
 has "page: frontmatter title" "$(head -2 "$page")" "title: Benchmark results"
-has "page: newest version first" "$(grep '^## ' "$page" | head -1)" "## 1.3.0"
+has "page: newest version first" "$(grep '^## ' "$page" | sed -n 1p)" "## 1.3.0"
 has "page: a checkpoint row with its score" "$(cat "$page")" "| 1 | 2026-01-02 | \`develop@abc1234\` | test-model | 1 | **2/3** (66%)"
 has "page: a missed question is listed, table-safe" "$(cat "$page")" 'Branch \| model &lt;x>?'
 bash "$CP" page --out "$page" --check >/dev/null 2>&1; t "page --check: current" "$?" "0"
@@ -207,7 +207,7 @@ bad=0
 for f in "$ROOT"/benchmarks/runs/*.json; do
   [ -e "$f" ] || continue
   v="$(basename "$f" .json)"
-  printf '%s' "$v" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo "  not X.Y.Z: $f"; bad=1; }
+  grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' <<<"$v" || { echo "  not X.Y.Z: $f"; bad=1; }
   jq -e --arg v "$v" '.schema == 1 and .version == $v and (.checkpoints | length) >= 1
     and ([.checkpoints[].n] == [range(1; (.checkpoints | length) + 1)])' "$f" >/dev/null 2>&1 || { echo "  malformed: $f"; bad=1; }
 done

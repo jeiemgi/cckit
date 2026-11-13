@@ -58,7 +58,7 @@ next_issue() {
   # shellcheck source=/dev/null
   . "$here/render.sh"
   local top topnum toptitle
-  top="$(printf '%s\n' "$wave0" | head -1)"
+  top="$(printf '%s\n' "$wave0" | sed -n 1p)"
   topnum="$(printf '%s' "$top" | cut -f3)"
   toptitle="$(printf '%s' "$top" | cut -f6 | sed -E 's/^\[Effort( [0-9]+)?\] [0-9]+ · ?//; s/^\[[A-Za-z]+\] //')"
   {

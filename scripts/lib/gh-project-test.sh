@@ -45,7 +45,7 @@ cat > "$tmp/bin/gh" <<'SH'
 # Record the query, then emit JSON under whichever root the query selected.
 q=""; for a in "$@"; do case "$a" in query=*) q="${a#query=}" ;; esac; done
 printf '%s\n' "$q" >> "$GH_QUERY_LOG"
-if printf '%s' "$q" | grep -q 'organization(login'; then root=organization; else root=user; fi
+if grep -q 'organization(login' <<<"$q"; then root=organization; else root=user; fi
 cat <<JSON
 {"data":{"$root":{"projectV2":{"id":"PVT_org123","fields":{"nodes":[
   {"__typename":"ProjectV2SingleSelectField","id":"F_status","name":"Status","options":[{"id":"O_todo","name":"Todo"}]},

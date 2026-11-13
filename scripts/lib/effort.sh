@@ -221,12 +221,12 @@ effort_pr_title() {
     name="$(printf '%s' "$name" | sed -E 's/^\[[^]]+\] +//')"
     [ -n "$name" ] || name="effort"
   fi
-  scope="$(printf '%s' "$labels" | tr ',' '\n' | sed -n 's/^flow://p' | head -1)"
+  scope="$(printf '%s' "$labels" | tr ',' '\n' | sed -n 's/^flow://p' | sed -n 1p)"
   [ -n "$scope" ] || scope="$tag"
   scope="$(printf '%s' "$scope" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')"
-  printf '%s' "$scope" | grep -qE '^[a-z0-9][a-z0-9._/-]*$' || scope=""
+  grep -qE '^[a-z0-9][a-z0-9._/-]*$' <<<"$scope" || scope=""
   if [ -z "$ctype" ]; then
-    kind="$(printf '%s' "$labels" | tr ',' '\n' | sed -n 's/^kind://p' | head -1)"
+    kind="$(printf '%s' "$labels" | tr ',' '\n' | sed -n 's/^kind://p' | sed -n 1p)"
     if command -v kit_kind_commit_type >/dev/null 2>&1; then
       ctype="$(kit_kind_commit_type "$kind")"     # kinds.sh: a content kind titles as `docs`
     else
@@ -253,7 +253,7 @@ effort_pr_title_check() {
     case "$title" in *"[#$num]"*) return 0 ;; esac
     echo "effort_pr_title_check: PR title lacks the [#$num] effort id: '$title'" >&2; return 1
   fi
-  printf '%s' "$title" | grep -qE '\[#[0-9]+\]' && return 0
+  grep -qE '\[#[0-9]+\]' <<<"$title" && return 0
   echo "effort_pr_title_check: PR title lacks a [#N] effort id: '$title'" >&2; return 1
 }
 
@@ -312,13 +312,13 @@ effort_title_lint() {
   case "$name" in *" — "*|*" · "*|*" / "*) reasons+=("no ' — ' / ' · ' / ' / ' sub-clauses — one clear phrase") ;; esac
   case "$name" in *—*|*▾*|*▸*|*→*|*✓*|*✗*|*…*|*•*) reasons+=("no glyphs (— ▾ ▸ → ✓ ✗ … •) in the title") ;; esac
   # code identifiers: file extensions, snake_case, or a code-dir path.
-  if printf '%s' "$name" | grep -qE '\.(sh|ts|tsx|js|mjs|json|css|md|ya?ml)([^A-Za-z0-9]|$)|[a-z0-9]+_[a-z0-9]+|(^|[^A-Za-z])(scripts|apps|packages|src)/'; then
+  if grep -qE '\.(sh|ts|tsx|js|mjs|json|css|md|ya?ml)([^A-Za-z0-9]|$)|[a-z0-9]+_[a-z0-9]+|(^|[^A-Za-z])(scripts|apps|packages|src)/' <<<"$name"; then
     reasons+=("no code identifiers (file names, paths, snake_case) — name the outcome")
   fi
   # jargon denylist (word-boundary, case-insensitive).
   local w
   for w in $EFFORT_TITLE_JARGON; do
-    printf '%s' "$name" | grep -qiwE "$w" && reasons+=("jargon word '$w' — use plain language")
+    grep -qiwE "$w" <<<"$name" && reasons+=("jargon word '$w' — use plain language")
   done
   # word count ≤ 6.
   local wc; wc=$(printf '%s\n' "$name" | wc -w | tr -d ' ')

@@ -80,7 +80,7 @@ has_paths() {
 baseline_for() {  # <key> → the recorded number, or empty
   [ -f "$BASELINE" ] || { echo ""; return; }
   grep -v '^[[:space:]]*#' "$BASELINE" 2>/dev/null \
-    | awk -v k="$1" '{ n = $NF; sub(/[ \t]+[0-9]+[ \t]*$/, ""); if ($0 == k) { print n; exit } }'
+    | awk -v k="$1" '{ n = $NF; sub(/[ \t]+[0-9]+[ \t]*$/, ""); if ($0 == k && !hit) { print n; hit = 1 } }'
 }
 
 # ---- collect ----------------------------------------------------------------
@@ -115,7 +115,7 @@ pct=0
 
 # largest_three — "a (n), b (n), c (n)" over the resident set, the files a trim would start with.
 largest_three() {
-  printf '%s' "$rows" | awk -F'\t' '$3 == "resident"' | sort -t"$TAB" -k1,1nr | head -3 \
+  printf '%s' "$rows" | awk -F'\t' '$3 == "resident"' | sort -t"$TAB" -k1,1nr | sed -n 1,3p \
     | awk -F'\t' '{ printf "%s%s (%s)", (NR > 1 ? ", " : ""), $4, $1 }'
 }
 

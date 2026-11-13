@@ -53,11 +53,11 @@ dtip=$(git log -1 --format='%h %s' origin/develop 2>/dev/null || echo unknown)
   echo "- develop tip: $dtip"
   if [[ "${ahead:-0}" -gt 0 ]]; then
     echo "- unpushed commits ($ahead):"
-    git log --format='  - %h %s' "${up:-origin/develop}..HEAD" 2>/dev/null | head -20
+    git log --format='  - %h %s' "${up:-origin/develop}..HEAD" 2>/dev/null | sed -n 1,20p
   fi
   if [[ "${dirty:-0}" -gt 0 ]]; then
     echo "- uncommitted changes ($dirty):"
-    git status --porcelain 2>/dev/null | head -40 | sed 's/^/  - /'
+    git status --porcelain 2>/dev/null | sed -n 1,40p | sed 's/^/  - /'
   fi
   st=$(git stash list 2>/dev/null | wc -l | tr -d ' ')
   [[ "${st:-0}" -gt 0 ]] && echo "- stashes present: $st (review: git stash list)"

@@ -193,10 +193,10 @@ plan_next() {
     fi
     printf '## Current capabilities\n\n'
     printf '| area | count | sample |\n| --- | --- | --- |\n'
-    printf '| skills | %s | %s |\n'   "$cs" "$(printf '%s' "$skills" | head -3 | tr '\n' ' ' | sed 's/ $//')"
-    printf '| commands | %s | %s |\n' "$cv" "$(printf '%s' "$verbs"  | head -3 | tr '\n' ' ' | sed 's/ $//')"
-    printf '| rules | %s | %s |\n'    "$cr" "$(printf '%s' "$rules"  | head -3 | tr '\n' ' ' | sed 's/ $//')"
-    printf '| docs | %s | %s |\n'     "$cd" "$(printf '%s' "$docs"   | head -3 | tr '\n' ' ' | sed 's/ $//')"
+    printf '| skills | %s | %s |\n'   "$cs" "$(printf '%s' "$skills" | sed -n 1,3p | tr '\n' ' ' | sed 's/ $//')"
+    printf '| commands | %s | %s |\n' "$cv" "$(printf '%s' "$verbs"  | sed -n 1,3p | tr '\n' ' ' | sed 's/ $//')"
+    printf '| rules | %s | %s |\n'    "$cr" "$(printf '%s' "$rules"  | sed -n 1,3p | tr '\n' ' ' | sed 's/ $//')"
+    printf '| docs | %s | %s |\n'     "$cd" "$(printf '%s' "$docs"   | sed -n 1,3p | tr '\n' ' ' | sed 's/ $//')"
     printf '\n## Proposed next — grounded in the above\n\n'
     printf '| rank | area | proposal |\n| --- | --- | --- |\n'
     printf '%s\n' "$proposals" | awk -F'\t' 'NF>=3 { printf "| %s | %s | %s |\n", $1, $2, $3 }'

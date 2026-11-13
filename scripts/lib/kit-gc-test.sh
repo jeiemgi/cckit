@@ -262,7 +262,7 @@ SH
 chmod +x "$stub/gh"
 
 analysis="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_analyze 2>/dev/null)"
-row() { printf '%s\n' "$analysis" | awk -v b="$1" '$1==b && $2=="->"{sub(/^  [^ ]+ -> /, ""); print; exit}'; }
+row() { printf '%s\n' "$analysis" | awk -v b="$1" '$1==b && $2=="->" && !hit {sub(/^  [^ ]+ -> /, ""); print; hit=1}'; }
 has "squash-landed sub is LANDED by content"       "$(row sub/50a-part)"           "LANDED (content on $init_branch)"
 has "agent worktree branch is LANDED and named"    "$(row worktree-agent-abc123)"  "LANDED (agent worktree; content on $init_branch)"
 has "sub with later base change is LANDED by lineage" "$(row sub/50b-other)"      "LANDED (issue #50 closed, its PR merged)"
@@ -411,7 +411,7 @@ rm -rf ../det-zstaged
 admin="$(git rev-parse --git-common-dir)/worktrees"
 
 analysis="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_analyze 2>/dev/null)"
-drow() { printf '%s\n' "$analysis" | grep -F "$1 [detached@" | head -1; }
+drow() { printf '%s\n' "$analysis" | grep -F "$1 [detached@" | sed -n 1p; }
 has "clean detached worktree on base is LANDED"     "$(drow /det-landed)" "-> LANDED (detached; ancestor of $init_branch)"
 has "detached worktree with its own commit is ORPHAN" "$(drow /det-commit)" "-> ORPHAN"
 has "dirty detached worktree is ORPHAN"             "$(drow /det-dirty)"  "-> ORPHAN"

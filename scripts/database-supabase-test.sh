@@ -23,8 +23,8 @@ E2E="${INIT_E2E_NETWORK:-0}"; E2E_DIR="${INIT_E2E_DIR:-}"
 . "$ROOT/scripts/lib/test-env.sh" && test_env_seal
 fail=0
 t()      { if [ "$2" = "$3" ]; then echo "ok: $1"; else echo "FAIL: $1 -> got '[$2]' want '[$3]'"; fail=1; fi; }
-has()    { if printf '%s' "$2" | grep -qF -- "$3"; then echo "ok: $1"; else echo "FAIL: $1 -> '$3' not in: $2"; fail=1; fi; }
-hasnt()  { if printf '%s' "$2" | grep -qF -- "$3"; then echo "FAIL: $1 -> '$3' found"; fail=1; else echo "ok: $1"; fi; }
+has()    { if grep -qF -- "$3" <<<"$2"; then echo "ok: $1"; else echo "FAIL: $1 -> '$3' not in: $2"; fail=1; fi; }
+hasnt()  { if grep -qF -- "$3" <<<"$2"; then echo "FAIL: $1 -> '$3' found"; fail=1; else echo "ok: $1"; fi; }
 yes_if() { if eval "$2"; then echo "ok: $1"; else echo "FAIL: $1 -> not true: $2"; fail=1; fi; }
 
 command -v jq >/dev/null 2>&1 || { echo "database-supabase-test: jq absent — skipping (dependency-light gate)"; exit 0; }
@@ -76,7 +76,7 @@ yes_if "the env file is ignored" 'grep -qxF "$ENV_FILE" "$p/.gitignore"'
 has "every step is reported" "$out" "[done   ] $ENV_FILE"
 
 # ── idempotent, and a value the user typed is neither changed nor shown ─────────────────────────
-first="$(echo "$NAMES" | head -1)"
+first="$(echo "$NAMES" | sed -n 1p)"
 sed "s#^$first=.*#$first=https://typed-by-the-user.example#" "$p/$ENV_FILE" > "$p/$ENV_FILE.tmp" && mv "$p/$ENV_FILE.tmp" "$p/$ENV_FILE"
 before="$(cd "$p" && find . -type f -print0 | sort -z | xargs -0 cksum)"
 out="$(database_apply "$DB" nextjs "$p" 2>&1)"

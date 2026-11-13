@@ -74,14 +74,14 @@ t "the closed issue's branch is not protected" "$(PATH="$stub:$PATH" wt_protecte
 source "$LIB/kit-gc.sh"
 analysis="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_analyze 2>/dev/null)"
 for b in $branches; do
-  row="$(printf '%s\n' "$analysis" | grep -F "$b" | head -1)"
+  row="$(printf '%s\n' "$analysis" | grep -F "$b" | sed -n 1p)"
   case "$row" in
     *PROTECTED*|*"still OPEN"*) echo "ok: gc reports $b as protected" ;;
     *) echo "FAIL: gc does not protect $b -> '$row'"; fail=1 ;;
   esac
   case "$row" in *SAFE*) echo "FAIL: gc offers $b as SAFE -> '$row'"; fail=1 ;; esac
 done
-row="$(printf '%s\n' "$analysis" | grep -F "task/45-closed-piece" | head -1)"
+row="$(printf '%s\n' "$analysis" | grep -F "task/45-closed-piece" | sed -n 1p)"
 case "$row" in *SAFE*) echo "ok: the control branch (closed issue, merged PR) is SAFE" ;; *) echo "FAIL: control branch not SAFE -> '$row'"; fail=1 ;; esac
 
 [ "$fail" -eq 0 ] && echo "ALL OK (content kinds gc)" || echo "content kinds gc: FAILURES"

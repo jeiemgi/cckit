@@ -82,7 +82,7 @@ status_local_rows() {
 $(git for-each-ref --format='%(refname:short)' "refs/heads/effort/*" 2>/dev/null)
 EOT
         [ -n "$found_in" ] && continue
-        effort="$(git for-each-ref --format='%(refname:short)' "refs/heads/effort/*" 2>/dev/null | head -1)"
+        effort="$(git for-each-ref --format='%(refname:short)' "refs/heads/effort/*" 2>/dev/null | sed -n 1p)"
         [ -n "$effort" ] || continue
         printf 'unmerged\t%s\tin no effort branch\n' "$b"
       done
@@ -122,7 +122,7 @@ status_inprogress_rows() {
   while IFS="$(printf '\t')" read -r wtpath b; do
     [ -n "$wtpath" ] || continue
     case "$b" in
-      detached@*) [ -n "$landed" ] && printf '%s\n' "$landed" | grep -qxF -- "$wtpath" && continue ;;
+      detached@*) [ -n "$landed" ] && grep -qxF -- "$wtpath" <<<"$landed" && continue ;;
       *) : ;;
     esac
     printf '%s\t%s\n' "$wtpath" "$b"
@@ -298,7 +298,7 @@ status_cleanup_counts() {
       [ -n "$r" ] || continue
       b="${r#origin/}"
       case "$b" in "$base"|main|master|develop) continue ;; esac
-      st="$(printf '%s\n' "$idx" | awk -F'\t' -v want="$b" '$1==want{print $2; exit}')"
+      st="$(printf '%s\n' "$idx" | awk -F'\t' -v want="$b" '$1==want && !hit {print $2; hit=1}')"
       case "$st" in *MERGED*) rstale=$((rstale + 1)) ;; *) : ;; esac
     done <<EOT
 $(git branch -r --format='%(refname:short)' 2>/dev/null | grep -v HEAD || true)
