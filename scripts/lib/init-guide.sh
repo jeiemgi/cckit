@@ -226,6 +226,7 @@ recipe_validate() {
     'stack: required text|(.stack | type) == "string" and (.stack | length) > 0' \
     'recommended: must be true or false|(.recommended | type) == "boolean"' \
     'steps: one or more {label, run}|(.steps | type) == "array" and (.steps | length) > 0 and all(.steps[]; (.label | type) == "string" and (.run | type) == "string" and (.run | length) > 0)' \
+    'config: an object of project config keys|((.config // {}) | type) == "object"' \
     'requires: a list of {command, why}|((.requires // []) | type) == "array" and all((.requires // [])[]; (.command | type) == "string")' \
     'lastVerified: a YYYY-MM-DD date|(.lastVerified // "") | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}$")'
 }

@@ -262,6 +262,14 @@ task_file_on_finish() {
   git -C "$wt" add -- "$dir" >/dev/null 2>&1 || return 1
 }
 
+# task_file_body <id> <worktree> — the free-form notes of the task: everything after the header's
+# first blank line in <worktree>'s copy. Nothing when the task has no notes.
+task_file_body() {
+  local f; f="$2/$(task_source_dir)/$1.md"
+  [ -f "$f" ] || return 0
+  awk 'b { print; next } NF == 0 { b = 1 }' "$f"
+}
+
 # task_file_state <id> [<branch>] — what gc asks before it offers a `light/<id>-…` branch for
 # deletion. `closed` only when the base branch's copy says done or dropped. `open` when the base
 # copy says otherwise, or when only the branch (or this checkout) has the file: the work exists

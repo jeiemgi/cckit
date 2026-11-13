@@ -113,6 +113,9 @@ cckit init --profile content --plain-language on --no-github             # + the
 - With neither a terminal nor an answers file, a home folder exits 2 and `--profile` is required.
 
 Recipes and database options are data: one JSON file each in `recipes/` and `databases/` of the kit.
+A recipe may carry a `config` object, which init merges into the project config it writes:
+`nextjs-shadcn` sets [`tasks.check`](/config-and-permissions/#light-tasks) to `pnpm build && pnpm lint`,
+the gate of [`cckit task run`](/light-tasks/#hand-a-task-to-an-agent).
 A database option is offered only when it ships its guide page and its setup test.
 
 ### Profiles

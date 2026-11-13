@@ -16,7 +16,9 @@
 #                               and declare write:true
 #   --agent-arg <arg>           one extra argv entry for the agent CLI (repeatable). cckit adds no
 #                               permission flag: a run that must edit files names its own here
-#   --until "<cmd>"             completion check, run after every round; rc 0 ends the run
+#   --until "<cmd>"             completion check, run before round 1 and after every round; rc 0
+#                               ends the run. One that already passes ends it with no round run
+#                               (exit 0, said on stderr): use --check for a gate on the work
 #   --check "<cmd>"             publication gate, run once the work is complete; a failure stops
 #                               the run and nothing is published
 #   --max-iters <n>             rounds allowed in total (default 5)
@@ -87,7 +89,7 @@ while [ "$#" -gt 0 ]; do
     --dry-run)       DRYRUN=1; shift ;;
     --notify|--notify=*|--plan|--plan=*)
       die "'${1%%=*}' is not supported: no code path delivers a notification or runs a plan from here (see docs: agent-compatibility, unattended limits)" ;;
-    -h|--help) sed -n '2,49p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,51p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     [0-9]*) [ -z "$ISSUE" ] || die "one issue at a time (got '$ISSUE' and '$1')"; ISSUE="$1"; shift ;;
     *) die "unknown arg '$1'" ;;
   esac
@@ -352,6 +354,12 @@ save running ""
 # objective that was done before it started). Asking costs one command, not one agent round.
 if [ -n "$UNTIL" ] && run_cmd until "$UNTIL"; then
   DETAIL="--until already passed before round $((ROUNDS + 1))"
+  # A first run that ends here did nothing (#496): say so, because exit 0 with rounds=0 reads as
+  # "the work is done". --until is a stop condition; the flag for a gate on the work is --check.
+  if [ "$ROUNDS" -eq 0 ]; then
+    echo "autopilot run: --until already passes, so no round ran and nothing was changed." >&2
+    echo "autopilot run: --until is the stop condition. For a gate the work must pass after a round, use --check \"<cmd>\"." >&2
+  fi
   finish
 fi
 
