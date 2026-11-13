@@ -64,12 +64,17 @@ Claude Code only.
 
 ### Design skills: how a page is designed
 
-{/* VERIFY-504 */}
 cckit ships one design skill of its own, `page-design`. It coordinates three design skills made
 by other people: `impeccable` sets the direction and the rules against a generic generated look,
 `emil-design-eng` covers interaction and motion, and `web-design-guidelines` audits the finished
 page. Before building, it writes a short design brief, and the review says which design skills
-were loaded in that run. They are installed with your consent, not by default.
+were loaded in that run.
+
+None of the four is on after setup. The technical person turns them on once: `cckit add
+page-design`, then `cckit add` for each of the three and `cckit doctor --fix`, which asks before
+it installs anything. In the one run on record, the same bakery landing page took about seven
+minutes with the skills and under three without, and used about eight times the tokens. The
+brief named a concept, two typefaces and a palette, and listed eight generic patterns it refused.
 
 ## What you have to do
 

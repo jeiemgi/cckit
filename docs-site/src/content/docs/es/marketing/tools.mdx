@@ -64,13 +64,18 @@ funciona solo en Claude Code.
 
 ### Habilidades de diseño: cómo se diseña una página
 
-{/* VERIFY-504 */}
 cckit incluye una habilidad de diseño propia, `page-design`. Coordina tres habilidades de diseño
 hechas por otras personas: `impeccable` fija la dirección y las reglas contra el aspecto genérico
 de lo generado, `emil-design-eng` cubre la interacción y el movimiento, y `web-design-guidelines`
 audita la página terminada. Antes de construir escribe un resumen de diseño corto, y la revisión
-dice qué habilidades de diseño se cargaron en esa ejecución. Se instalan con tu consentimiento, no
-por defecto.
+dice qué habilidades de diseño se cargaron en esa ejecución.
+
+Ninguna de las cuatro queda activa tras la instalación. La persona técnica las activa una vez:
+`cckit add page-design`, luego `cckit add` para cada una de las tres y `cckit doctor --fix`, que
+pregunta antes de instalar cualquier cosa. En la única ejecución registrada, la misma landing page
+de la panadería tardó unos siete minutos con las habilidades y menos de tres sin ellas, y usó unas
+ocho veces más tokens. El resumen nombró un concepto, dos tipografías y una paleta, y enumeró ocho
+patrones genéricos que rechazó.
 
 ## Qué tienes que hacer tú
 
