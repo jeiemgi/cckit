@@ -1,37 +1,30 @@
 ---
 // ThemeProvider override. Starlight's provider runs first: it reads the stored choice, else the
-// system scheme. Then, on a Marketing page with NO stored choice, the page opens light: the reader is
-// not sitting beside a dark editor. A plain head script is not enough, because the theme picker
-// re-applies "auto" when it mounts, so the page watches `data-theme` until the reader first touches
-// the picker. A stored light or dark choice always wins, and Software pages are untouched.
+// system scheme. Then, on any page with NO stored choice, the page opens dark: dark is the default
+// on both tracks (issue 510). A plain head script is not enough, because the theme picker re-applies
+// "auto" when it mounts, so the page watches `data-theme` until the reader first touches the picker.
+// A stored light or dark choice always wins.
 import Default from '@astrojs/starlight/components/ThemeProvider.astro';
-import { trackOf } from '../lib/tracks';
-
-const marketing = trackOf(Astro.url.pathname) === 'marketing';
 ---
 
 <Default><slot /></Default>
-{
-  marketing && (
-    <script is:inline>
-      (() => {
-        const stored = () => {
-          try { return localStorage.getItem('starlight-theme'); } catch (e) { return null; }
-        };
-        if (stored()) return;
-        const root = document.documentElement;
-        const force = () => {
-          if (!stored() && root.dataset.theme !== 'light') root.dataset.theme = 'light';
-        };
-        force();
-        // The picker mounts later and writes the system scheme; put light back until the reader chooses.
-        const watch = new MutationObserver(force);
-        watch.observe(root, { attributes: true, attributeFilter: ['data-theme'] });
-        const stop = () => watch.disconnect();
-        document.addEventListener('change', (e) => {
-          if (e.target && e.target.closest && e.target.closest('starlight-theme-select')) stop();
-        }, true);
-      })();
-    </script>
-  )
-}
+<script is:inline>
+  (() => {
+    const stored = () => {
+      try { return localStorage.getItem('starlight-theme'); } catch (e) { return null; }
+    };
+    if (stored()) return;
+    const root = document.documentElement;
+    const force = () => {
+      if (!stored() && root.dataset.theme !== 'dark') root.dataset.theme = 'dark';
+    };
+    force();
+    // The picker mounts later and writes the system scheme; put dark back until the reader chooses.
+    const watch = new MutationObserver(force);
+    watch.observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+    const stop = () => watch.disconnect();
+    document.addEventListener('change', (e) => {
+      if (e.target && e.target.closest && e.target.closest('starlight-theme-select')) stop();
+    }, true);
+  })();
+</script>
