@@ -1,139 +1,114 @@
 /* cckit docs theme — DESIGNER-OWNED.
-   This is the single place the visual theme lives. The Designer's spec:
-     - elegant + sober: restrained, high-contrast, calm developer-tool aesthetic
-     - cckit's own identity — NEVER Anthropic/Claude colors (no rust-orange/terracotta/clay)
-   Identity: a sober STEEL-CYAN accent (hue ~195°). Cyan sits opposite Anthropic's warm
-   rust on the color wheel, so "not Anthropic" is structural, not incidental; the steel
-   (desaturated) variant keeps it technical and calm rather than tropical or neon. Accent is
-   a ≤10% spotlight (links + active state only); everything else is cool-tinted neutral.
-   The theme follows the reader's operating system (`prefers-color-scheme`) unless they picked one in
-   the theme menu; Marketing pages open light when nothing is stored (src/components/ThemeProvider.astro).
-   The light theme is the same brand by day.
-   Override Starlight's CSS custom properties below. Color tokens are hex for predictability;
-   fonts use system stacks only (portable — no web-font downloads, no dependencies). */
+   This is the single place the visual theme lives.
+   Palette: the Apple System Colors terminal scheme, chosen by the owner on a review page on
+   2026-11-13 (issue 510). Neutral greys with no tint; ONE action colour, system blue, on both
+   tracks. A track is told apart by its marker colour only (--cckit-track): Software sky blue,
+   Marketing purple. The prompt banner is the scheme's yellow.
+   Dark is the default when the reader has stored no choice (src/components/ThemeProvider.astro).
+   Type: Geist and Geist Mono, self-hosted through @fontsource-variable (imported below).
+   Measured WCAG 2.x contrast (AA needs 4.5:1 for text):
+     dark   body #d1d1d6 on #1e1e1e 10.96 · muted #98989d 5.81 · link #6ab7ff 7.80 (6.52 on inline code)
+            white on action #0071e3 4.70 · Software #76d6ff 10.19 · Marketing #bf5af2 4.73 · prompt #ffd60a 11.81
+     light  body #3a3a3c on #f5f5f7 10.42 · muted #636368 5.49 · link #0060c0 5.62 (5.01 on inline code)
+            white on action #0869cb 5.39 · Software #146b8e 5.47 · Marketing #8a3bb3 5.74 · prompt #7a6200 5.40 */
+@import '@fontsource-variable/geist';
+@import '@fontsource-variable/geist-mono';
 
 /* ── Dark theme (default) ─────────────────────────────────────────────── */
 :root,
 ::backdrop {
-	/* Neutrals — cool-charcoal, tinted toward the accent hue. No pure #000. */
-	--sl-color-white: #f1f6f7; /* highest-contrast text */
-	--sl-color-gray-1: #e3e9eb;
-	--sl-color-gray-2: #c0cace; /* body text */
-	--sl-color-gray-3: #95a0a6; /* muted / secondary */
-	--sl-color-gray-4: #58636a;
-	--sl-color-gray-5: #333d42;
-	--sl-color-gray-6: #1f272c; /* panels, inline-code, hairlines */
-	--sl-color-black: #151b1f; /* page background */
+	--sl-color-white: #ffffff;
+	--sl-color-gray-1: #ebebf0;
+	--sl-color-gray-2: #d1d1d6; /* body text */
+	--sl-color-gray-3: #98989d; /* muted / secondary */
+	--sl-color-gray-4: #636366;
+	--sl-color-gray-5: #3a3a3c;
+	--sl-color-gray-6: #2c2c2e; /* panels, inline code */
+	--sl-color-black: #1e1e1e; /* page background */
 
-	/* Accent — steel cyan (≤10% of the surface: links + active states) */
-	--sl-color-accent-low: #0f3038; /* selection / subtle accent fill */
-	--sl-color-accent: #2c8fa6; /* solid brand accent (active markers, buttons) */
-	--sl-color-accent-high: #8ed3df; /* light accent — headings-on-accent, badge text */
+	--sl-color-accent-low: #10263f;
+	--sl-color-accent: #0071e3; /* the one action colour: buttons, active markers */
+	--sl-color-accent-high: #a8d4ff;
 
-	/* Roles */
 	--sl-color-text: var(--sl-color-gray-2);
-	--sl-color-text-accent: #7ecdda; /* link text — AA on the dark page bg */
-	--sl-color-text-invert: var(--sl-color-black);
+	--sl-color-text-accent: #6ab7ff; /* link text */
+	--sl-color-text-invert: #ffffff; /* text ON the action colour */
 	--sl-color-bg: var(--sl-color-black);
-	--sl-color-bg-nav: #11171a; /* chrome recedes a touch below content */
-	--sl-color-bg-sidebar: #11171a;
+	--sl-color-bg-nav: #1a1a1a;
+	--sl-color-bg-sidebar: #1a1a1a;
 	--sl-color-bg-inline-code: var(--sl-color-gray-6);
 	--sl-color-bg-accent: var(--sl-color-accent);
 
-	/* One colour per docs track, constant on every page (the dots of the top-bar switch, the
-	   two doors on the home page). Each equals that track's link colour. */
-	--cckit-track-software: #7ecdda;
-	--cckit-track-marketing: #f08a9b;
+	/* One marker colour per track, constant on every page; --cckit-track is the current page's. */
+	--cckit-track-software: #76d6ff;
+	--cckit-track-marketing: #bf5af2;
+	--cckit-track: var(--cckit-track-software);
+	--cckit-prompt: #ffd60a;
 
 	/* Hairlines — tighter and quieter than the default black-on-black */
-	--sl-color-hairline-light: #364046;
-	--sl-color-hairline: #2a3338;
-	--sl-color-hairline-shade: #1c2327;
+	--sl-color-hairline-light: #48484a;
+	--sl-color-hairline: #3a3a3c;
+	--sl-color-hairline-shade: #2c2c2e;
 
-	--sl-color-backdrop-overlay: hsla(198, 22%, 6%, 0.72);
+	--sl-color-backdrop-overlay: hsla(0, 0%, 6%, 0.72);
 
 	/* Softer shadows — sober, no heavy drop on dark */
-	--sl-shadow-sm: 0 1px 1px hsla(198, 30%, 3%, 0.4);
-	--sl-shadow-md: 0 2px 2px hsla(198, 30%, 3%, 0.3), 0 4px 6px hsla(198, 30%, 3%, 0.35);
-	--sl-shadow-lg: 0 4px 8px hsla(198, 30%, 3%, 0.3), 0 12px 24px hsla(198, 30%, 3%, 0.45);
+	--sl-shadow-sm: 0 1px 1px hsla(0, 0%, 3%, 0.4);
+	--sl-shadow-md: 0 2px 2px hsla(0, 0%, 3%, 0.3), 0 4px 6px hsla(0, 0%, 3%, 0.35);
+	--sl-shadow-lg: 0 4px 8px hsla(0, 0%, 3%, 0.3), 0 12px 24px hsla(0, 0%, 3%, 0.45);
 
-	/* Typography — refined system stacks (portable, no downloads).
-	   system-ui resolves to SF Pro / Segoe UI; ui-monospace to SF Mono / Cascadia. */
-	--sl-font: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
-		'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
-	--sl-font-mono: ui-monospace, 'SF Mono', 'SFMono-Regular', 'Cascadia Code', 'Cascadia Mono',
-		Menlo, Consolas, 'Liberation Mono', 'Roboto Mono', monospace;
+	--sl-font: 'Geist Variable', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+		Roboto, 'Helvetica Neue', Arial, sans-serif;
+	--sl-font-mono: 'Geist Mono Variable', ui-monospace, 'SF Mono', 'SFMono-Regular', 'Cascadia Code',
+		Menlo, Consolas, monospace;
 }
 
 /* ── Light theme ──────────────────────────────────────────────────────── */
 :root[data-theme='light'],
 [data-theme='light'] ::backdrop {
-	/* Neutrals — faintly cool paper; near-black ink, never pure #fff. */
-	--sl-color-white: #101719; /* highest-contrast text (ink) */
-	--sl-color-gray-1: #1b2327;
-	--sl-color-gray-2: #39444a; /* body text */
-	--sl-color-gray-3: #5b676d; /* muted / secondary */
-	--sl-color-gray-4: #8a969c;
-	--sl-color-gray-5: #c6ced2;
-	--sl-color-gray-6: #eef2f3;
-	--sl-color-gray-7: #f5f8f8;
-	--sl-color-black: #fbfdfd; /* page background */
+	--sl-color-white: #1d1d1f; /* highest-contrast text (ink) */
+	--sl-color-gray-1: #2c2c2e;
+	--sl-color-gray-2: #3a3a3c; /* body text */
+	--sl-color-gray-3: #636368; /* muted / secondary */
+	--sl-color-gray-4: #8e8e93;
+	--sl-color-gray-5: #c7c7cc;
+	--sl-color-gray-6: #e8e8ed;
+	--sl-color-gray-7: #efeff2;
+	--sl-color-black: #f5f5f7; /* page background */
 
-	/* Accent — the same steel cyan, darkened for contrast on light paper */
-	--sl-color-accent-low: #d7eef2; /* subtle accent fill */
-	--sl-color-accent: #157387; /* solid brand accent */
-	--sl-color-accent-high: #0a4250; /* deep accent — headings-on-accent */
+	--sl-color-accent-low: #dcebfb;
+	--sl-color-accent: #0869cb;
+	--sl-color-accent-high: #04386e;
 
-	/* Roles */
 	--sl-color-text: var(--sl-color-gray-2);
-	--sl-color-text-accent: #0a5666; /* link text — AA on the light page bg */
-	/* Text that sits ON the accent (active sidebar link, accent buttons). The light-mode accent is a
-	   deep teal, so this must be LIGHT — not the near-black ink `--sl-color-white` resolves to here. */
-	--sl-color-text-invert: #fbfdfd;
+	--sl-color-text-accent: #0060c0;
+	--sl-color-text-invert: #ffffff;
 	--sl-color-bg: var(--sl-color-black);
-	--sl-color-bg-nav: #f4f8f8;
-	--sl-color-bg-sidebar: #f4f8f8;
+	--sl-color-bg-nav: #ffffff;
+	--sl-color-bg-sidebar: #ffffff;
 	--sl-color-bg-inline-code: var(--sl-color-gray-6);
 	--sl-color-bg-accent: var(--sl-color-accent);
 
-	--cckit-track-software: #0a5666;
-	--cckit-track-marketing: #9a1b36;
+	--cckit-track-software: #146b8e;
+	--cckit-track-marketing: #8a3bb3;
+	--cckit-prompt: #7a6200;
 
-	/* Hairlines */
-	--sl-color-hairline-light: #eef2f3;
-	--sl-color-hairline: #dde5e7;
-	--sl-color-hairline-shade: #e6eced;
+	--sl-color-hairline-light: #ececf0;
+	--sl-color-hairline: #d8d8dc;
+	--sl-color-hairline-shade: #e3e3e8;
 
-	--sl-color-backdrop-overlay: hsla(198, 18%, 30%, 0.33);
+	--sl-color-backdrop-overlay: hsla(0, 0%, 30%, 0.33);
 
-	--sl-shadow-sm: 0 1px 1px hsla(198, 24%, 24%, 0.07), 0 2px 1px hsla(198, 24%, 24%, 0.05);
-	--sl-shadow-md: 0 2px 2px hsla(198, 24%, 24%, 0.06), 0 4px 6px hsla(198, 24%, 24%, 0.08);
-	--sl-shadow-lg: 0 4px 8px hsla(198, 24%, 24%, 0.06), 0 12px 24px hsla(198, 24%, 24%, 0.1);
+	--sl-shadow-sm: 0 1px 1px hsla(0, 0%, 24%, 0.07), 0 2px 1px hsla(0, 0%, 24%, 0.05);
+	--sl-shadow-md: 0 2px 2px hsla(0, 0%, 24%, 0.06), 0 4px 6px hsla(0, 0%, 24%, 0.08);
+	--sl-shadow-lg: 0 4px 8px hsla(0, 0%, 24%, 0.06), 0 12px 24px hsla(0, 0%, 24%, 0.1);
 }
 
-/* ── Marketing track — crimson accent ─────────────────────────────────── */
+/* ── Marketing track — its marker colour ──────────────────────────────── */
 /* Pages under /marketing/ carry <meta name="cckit-track" content="marketing"> (src/routeData.ts).
-   Only the accent changes between the two tracks: neutrals, type and layout are shared. The red is
-   a crimson at hue ~350°, on the blue side of red, so it stays clear of the rust-orange this theme
-   excludes. Measured WCAG 2.x contrast ratios (AA needs 4.5:1 for text):
-     dark   link #f08a9b on page #0e1316 7.85 · on nav #0b1013 8.03 · on inline code #1a2125 6.84
-            page ink #0e1316 on accent #e25a73 5.29 · accent #e25a73 on accent-low #3d101b 4.61
-     light  link #9a1b36 on page #fbfdfd 7.96 · on nav #f4f8f8 7.60 · on inline code #eef2f3 7.21
-            paper #fbfdfd on accent #b3203f 6.44 · accent #b3203f on accent-low #fbe1e6 5.33
-   Two alternates that pass the same checks, should the owner prefer one (low/accent/high/link):
-     signal red, hue 0°   dark #3b1212 #e65c5c #f6b5b5 #f28c8c · light #fbe2e2 #b42424 #5e1010 #9c1c1c
-     ruby, hue 340°       dark #3a1022 #de5a8c #f3b2cb #ee88ae · light #fbe1eb #ac1f57 #590f2d #941a4a */
+   The action colour, neutrals, type and layout are shared; only the marker changes. */
 :root:has(meta[name='cckit-track'][content='marketing']) {
-	--sl-color-accent-low: #3d101b;
-	--sl-color-accent: #e25a73;
-	--sl-color-accent-high: #f5b3bf;
-	--sl-color-text-accent: #f08a9b;
-}
-:root[data-theme='light']:has(meta[name='cckit-track'][content='marketing']) {
-	--sl-color-accent-low: #fbe1e6;
-	--sl-color-accent: #b3203f;
-	--sl-color-accent-high: #5c0f20;
-	--sl-color-text-accent: #9a1b36;
+	--cckit-track: var(--cckit-track-marketing);
 }
 
 /* ── Restrained polish ────────────────────────────────────────────────── */
@@ -152,14 +127,17 @@ body {
 
 /* Tighten heading tracking a hair for a more editorial, composed feel. */
 :where(h1, h2, h3, h4) {
-	letter-spacing: -0.012em;
+	font-weight: 600;
+	letter-spacing: -0.02em;
 }
+:where(h1) { letter-spacing: -0.04em; line-height: 1.1; }
+:where(h2) { letter-spacing: -0.03em; line-height: 1.2; }
 
 /* The site title (cckit) is set in the sans face, bold: a name, not a terminal prompt. */
 .site-title {
 	font-family: var(--sl-font);
 	font-weight: 700;
-	letter-spacing: -0.02em;
+	letter-spacing: -0.04em;
 	font-size: 1.25rem;
 }
 
@@ -185,9 +163,11 @@ body {
 	max-width: 44rem;
 	margin: 1.5rem auto 0;
 	text-align: center;
-	font-size: var(--sl-text-lg);
-	line-height: 1.55;
-	color: var(--sl-color-gray-2);
+	font-size: clamp(2.25rem, 6vw, 4rem);
+	font-weight: 600;
+	letter-spacing: -0.05em;
+	line-height: 1.02;
+	color: var(--sl-color-white);
 	text-wrap: balance;
 }
 .hero-tagline strong { color: var(--sl-color-white); font-weight: 600; }
@@ -440,9 +420,7 @@ h1 .cckit-tag, h2 .cckit-tag, h3 .cckit-tag { font-size: 0.65em; }
 /* The copy-paste prompts you hand an agent. Framed in the conversational accent (these ARE the
    conversational trigger) and given roomy line-height so the blank-line paragraph breaks read as
    real spacing. The code block keeps its native copy button. */
-.cckit-prompt { --cckit-prompt: #e0863c; }
 .sl-markdown-content .cckit-prompt { margin-block: var(--cckit-block-gap); }
-:root[data-theme='light'] .cckit-prompt { --cckit-prompt: #b9701f; }
 /* No custom border or background — the terminal "command window" frame is the whole visual. We only
    tint its title bar with the conversational accent so a prompt reads apart from a plain command block. */
 .cckit-prompt :where(.expressive-code) .ec-line { line-height: 1.7; }
@@ -464,8 +442,8 @@ h1 .cckit-tag, h2 .cckit-tag, h3 .cckit-tag { font-size: 0.65em; }
 	align-items: start; margin: 0; padding: 0.6rem 1rem; font-size: 1rem; line-height: 1.6; }
 .cckit-chat .cckit-chat__row + .cckit-chat__row { margin-top: 0; }
 .cckit-chat__who { font-size: var(--sl-text-sm); font-weight: 600; line-height: 1.83; color: var(--sl-color-gray-3); }
-.cckit-chat__row--you { background: color-mix(in srgb, var(--sl-color-accent-low) 60%, transparent); color: var(--sl-color-white); }
-.cckit-chat__row--you .cckit-chat__who { color: var(--sl-color-text-accent); }
+.cckit-chat__row--you { background: color-mix(in srgb, var(--cckit-track) 10%, transparent); color: var(--sl-color-white); }
+.cckit-chat__row--you .cckit-chat__who { color: var(--cckit-track); }
 .cckit-chat__body { min-width: 0; overflow-wrap: anywhere; }
 .cckit-chat .cckit-chat__body > * { margin: 0; }
 .cckit-chat .cckit-chat__body > * + * { margin-top: 0.5rem; }
@@ -789,14 +767,15 @@ h1 .cckit-tag, h2 .cckit-tag, h3 .cckit-tag { font-size: 0.65em; }
 
 /* ── Reading size, measure and headings (stage 1 of the calmer look) ──── */
 :root {
-	--sl-line-height: 1.7;
+	--sl-text-code: 0.84375rem;
+	--sl-line-height: 1.65;
 	--cckit-measure: 40rem;
 }
 @media (min-width: 50em) {
 	:root {
-		--sl-text-h1: 2.25rem;
-		--sl-text-h2: 1.625rem;
-		--sl-text-h3: 1.3125rem;
+		--sl-text-h1: 2.5rem;
+		--sl-text-h2: 1.75rem;
+		--sl-text-h3: 1.375rem;
 		--sl-text-h4: 1.125rem;
 		--sl-text-h5: 1rem;
 	}
@@ -812,7 +791,7 @@ h1 .cckit-tag, h2 .cckit-tag, h3 .cckit-tag { font-size: 0.65em; }
 }
 @media (max-width: 49.99em) {
 	:root {
-		--sl-text-h1: 1.875rem;
+		--sl-text-h1: 2rem;
 		--sl-text-h2: 1.5rem;
 		--sl-text-h3: 1.25rem;
 		--sl-text-h4: 1.0625rem;

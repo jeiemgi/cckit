@@ -204,7 +204,7 @@ Validation refuses an undeclared profile, a missing `kind`, an unknown stage, or
 ## Editing the docs site
 
 `docs-site/` (Astro + Starlight) has two tracks. A page under `src/content/docs/marketing/` is
-Marketing; every other page is Software. The track sets the sidebar, the accent colour and the
+Marketing; every other page is Software. The track sets the sidebar, the marker colour and the
 current entry of the top-bar switch (`docs-site/src/lib/tracks.ts`, `docs-site/src/routeData.ts`).
 
 - **Software pages live under their area.** The areas, in sidebar order: `getting-started/`,
@@ -215,6 +215,14 @@ current entry of the top-bar switch (`docs-site/src/lib/tracks.ts`, `docs-site/s
   `hooks`, …) stay at the root so links to their anchors keep working. Inside an area the order is:
   why it exists, who does it, which tools plug in, the verbs, the guides. There is no separate
   tutorials section: a step-by-step page is a guide in its area.
+- **The look lives in one file.** `docs-site/src/styles/theme.css` holds the palette (the Apple System
+  Colors terminal scheme, dark and light), the type scale and the measured contrast ratios. Both
+  tracks share one action colour; a track differs by its marker colour, `--cckit-track`. The
+  typeface is Geist and Geist Mono, self-hosted through `@fontsource-variable/geist` and
+  `@fontsource-variable/geist-mono`. A page opens dark when the reader has stored no choice
+  (`docs-site/src/components/ThemeProvider.astro`).
+- **The guide header is two stacked blocks** (`docs-site/src/components/TutorialMeta.astro`): the
+  "Copy the prompt" banner, then "Before you start". Keep each to one line of text per item.
 - **The sidebar is curated.** `sidebar` in `docs-site/astro.config.mjs` lists 43 Software pages:
   one "Start here" link, eight area groups and a Reference group, every group collapsed except the
   one holding the current page. The Marketing list is 15 pages in six groups (How it works, Get set up,
