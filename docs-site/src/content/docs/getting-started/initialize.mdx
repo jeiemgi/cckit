@@ -7,24 +7,8 @@ import { Tabs, TabItem } from '@astrojs/starlight/components';
 import Chat from '../../../components/Chat.astro';
 import Outcomes from '../../../components/Outcomes.astro';
 
-The tool is on your machine, and the project still tells an agent nothing: not which branch the
-team integrates on, not which roles exist, not which rules apply. `cckit init` writes that
-description into the repository, once, and sets up the GitHub side the process depends on.
-
-Each step starts with the sentence you say to your agent in the chat. Below it is the command your
-agent runs for that sentence and what it printed, pasted from a real run on the Bakery site, the
-example project of these guides. You can type the commands yourself.
-
-You do not need to know git or GitHub to answer what it asks. In a terminal, init says what it
-found, asks in plain language, and every question has one answer marked **(Recommended)**: press
-Enter to take it. Your agent has no terminal to answer on, so it previews the run first and then
-passes `--yes`.
-
-**What you will have at the end:** a project with its config and its team of agents written down,
-a GitHub repository with the labels and the base branch the work uses, and one real task taken
-from start to merged.
-
-**Before you start:** [install cckit](/getting-started/install/) and get a clean `cckit doctor`.
+`cckit init` describes the project to your agent and sets up GitHub. Say each sentence in the chat;
+the window shows what your agent runs. The example is the Bakery site.
 
 ## Steps
 
@@ -43,30 +27,24 @@ from start to merged.
     "      2. Save the first version (first commit, the cckit files included)",
     "    On GitHub (<owner>/bakery-site):",
     "      3. Create the PRIVATE repository <owner>/bakery-site (or connect to it when it exists)",
-    "      4. Create the branch 'develop' and push it, the cckit files commit included; make it the default branch of a new repository",
-    "      5. Add the labels and milestones the workflow uses (only the missing ones)",
-    "      6. Turn on \"automatically delete head branches\" after a merge",
-    "      7. Protect 'develop': changes arrive by pull request, up to date, no force-push",
+    "…",
     "    Then: the cckit doctor report.",
-    "    A step whose result is already there is skipped.",
-    "",
     "Re-run without --dry-run to write these files.",
   ]}
   means="A dry run prints the plan and writes nothing, the folder included."
 >
-  This is a preview: nothing was written and the folder does not exist yet. A real run would create
-  the Next.js project, add the cckit files, and then do these seven git and GitHub steps.
+  Nothing was written. A real run would create the Next.js project, add the cckit files, and do
+  seven git and GitHub steps.
 </Chat>
-
-Before it writes anything, init looks at the folder and tells you what it found: a repository, a
-project with no git yet, or an empty folder. A new project can start from a recipe (a ready-made
-web app) and can add a database. In a terminal each of those is a question with a recommended
-answer, and init lists the git and GitHub steps and asks `Go ahead? [Y/n]` once before it runs
-them. From the chat nothing is asked: the flags carry the answers.
-[What init does, in order](/init-reference/#what-init-does-in-order) has every case.
 
 <Outcomes of="cckit init" title="Where it runs, and when your agent runs it">
 
+- Init first says what it found in the folder: a repository, a project with no git yet, or an
+  empty folder. A new project can start from a recipe (a ready-made web app) and can add a
+  database. In a terminal each is a question with one answer marked **(Recommended)**, and init
+  asks `Go ahead? [Y/n]` once before the git and GitHub steps. From the chat nothing is asked: the
+  flags carry the answers. [What init does, in order](/init-reference/#what-init-does-in-order)
+  has every case.
 - In a terminal, from the folder you want to work in: `cckit init`. To create a new project in
   `./my-app`: `cckit init my-app`. `init` only adds cckit's own files; your existing project layout
   is left as it is.
@@ -114,11 +92,8 @@ them. From the chat nothing is asked: the flags carry the answers.
   the first part of the same preview as step 1.
 </Chat>
 
-In a terminal init asks "What kind of work is this project?"; from the chat the answer is
-`--profile`. The answer is a **profile**: the team of agents,
-the rules and the skills the project starts with. For a software product, pick `software`: it
-installs the eight roles described in [The team](/philosophy/the-team/). The other profiles are
-listed under [Profiles](/init-reference/#profiles).
+For a software product, pick `software`: the eight roles of [The team](/philosophy/the-team/).
+All profiles: [Profiles](/init-reference/#profiles).
 
 ### 3 · Run it, with the git and GitHub steps
 
@@ -148,21 +123,22 @@ listed under [Profiles](/init-reference/#profiles).
   private repository.
 </Chat>
 
-`--yes` is the confirmation: without it, a run with no terminal writes the files in the folder
-and does none of these steps, and its last lines name what was left undone. With it, init saves
-the first version, creates the GitHub repository (private unless you
-pass `--public`), creates the base branch `develop`, adds the labels and milestones the process
-uses, and protects the base branch. A step that is already done is skipped.
+<Outcomes of="cckit init --yes" title="What --yes does, and what happens when a step fails">
 
-The run ends with one result line: how many steps were done, skipped and failed. A failed step does
-not stop the later ones. Fix it and run `cckit init` again; finished steps are skipped.
-The full list of steps is under [What init does, in order](/init-reference/#what-init-does-in-order).
+- `--yes` is the confirmation. Without it, a run with no terminal writes the files in the folder
+  and does none of these steps; its last lines name what was left undone.
+- With it, init saves the first version, creates the GitHub repository (private unless you pass
+  `--public`), creates the base branch `develop`, adds the labels and milestones, and protects the
+  base branch. A step that is already done is skipped.
+- The run ends with one result line: how many steps were done, skipped and failed. A failed step
+  does not stop the later ones. Fix it and run `cckit init` again; finished steps are skipped.
+- Every step: [What init does, in order](/init-reference/#what-init-does-in-order).
+
+</Outcomes>
 
 ### 4 · Have your agent find a first real task
 
-A fresh task list is empty. Instead of inventing a task, point your agent at the code and let it
-surface **real** work, then record a task for each finding, so you have something concrete to run.
-Pick an angle:
+A fresh list is empty. Let your agent find real work in the code:
 
 <Tabs syncKey="first-task">
   <TabItem label="Security review">
@@ -189,13 +165,9 @@ Pick an angle:
   </TabItem>
 </Tabs>
 
-Your agent reads the repository and records one task per finding: a file under `tasks/`. The list
-now has real, scoped work to practice on.
-
-The Bakery site was set up with the `marketing` profile, so its list is
-[light tasks](/project-management/light-tasks/). A project set up with `--profile software` tracks
-work in GitHub issues: there the `kit-task-new` skill files one issue per finding with `cckit new`,
-and step 5 is the issue loop, [Take an issue to merged](/development/issue-to-merged-pr/).
+A project set up with `--profile software` tracks work in GitHub issues instead of
+[light tasks](/project-management/light-tasks/): see
+[Take an issue to merged](/development/issue-to-merged-pr/).
 
 ### 5 · Run one, end to end
 
@@ -241,9 +213,7 @@ With GitHub issues the same five steps are `cckit next`, `cckit start <issue>`,
 
 </Outcomes>
 
-The issue loop in full, with what to check at each step:
-[Take an issue to merged](/development/issue-to-merged-pr/). When you have many issues at once,
-[Run work in parallel waves](/development/waves/) sends a whole batch to parallel agents.
+Many tasks at once: [Run work in parallel waves](/development/waves/).
 
 ## Check it worked
 
@@ -270,12 +240,7 @@ The issue loop in full, with what to check at each step:
   Yes. The tools are all there, the project is `configured`, and nothing local is unfinished.
 </Chat>
 
-`doctor` prints a green check for `git`, `gh` (authenticated), `jq` and `perl`. `scan` prints the
-detected language and framework. If both look right, cckit is live in the repository.
-`cckit status` lists local work that is not finished, pull requests waiting on a person, and
-cleanup that is available; after step 5 it should list nothing for the task you ran.
-
-## Troubleshooting
+<Outcomes of="troubleshooting" title="If something looks wrong">
 
 **`doctor` says `gh` isn't authenticated.** Run `gh auth login` once, then re-run the setup prompt.
 cckit uses your existing GitHub CLI session; it never stores a token of its own.
@@ -287,10 +252,9 @@ project config and adjust the project fields; every verb picks up the change. Th
 **`jq` is missing.** cckit runs without the optional tools, but `jq` is required for the
 JSON paths. Install it (`brew install jq` / your package manager) and re-run `doctor`.
 
-## Looking something up
+</Outcomes>
 
-Everything `init` writes resolves from one file, the project config, which every later command
-reads. cckit has no company, framework or repository baked in.
+## Looking something up
 
 [cckit init reference](/init-reference/) has the rest: every folder case, the git and GitHub steps
 one by one, the flags for a run with no terminal, the profiles (the marketing profile included),
