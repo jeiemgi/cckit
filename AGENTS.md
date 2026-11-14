@@ -221,6 +221,11 @@ current entry of the top-bar switch (`docs-site/src/lib/tracks.ts`, `docs-site/s
   typeface is Geist and Geist Mono, self-hosted through `@fontsource-variable/geist` and
   `@fontsource-variable/geist-mono`. A page opens dark when the reader has stored no choice
   (`docs-site/src/components/ThemeProvider.astro`).
+- **The header never moves.** `docs-site/src/components/Header.astro` is a three-column grid: the
+  wordmark, the search centred on the page, then the right group. Items that exist on one track
+  only (version, GitHub icon, language picker) come before the theme picker, and the Software /
+  Marketing switch is last, at the right edge. Search controls take their surface and edge from
+  `--cckit-field-bg` and `--cckit-field-border`, which hold 3:1 against the page in both themes.
 - **The guide header is two stacked blocks** (`docs-site/src/components/TutorialMeta.astro`): the
   "Copy the prompt" banner, then "Before you start". Keep each to one line of text per item.
 - **The sidebar is curated.** `sidebar` in `docs-site/astro.config.mjs` lists 43 Software pages:

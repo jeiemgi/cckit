@@ -44,6 +44,9 @@
 	--cckit-track-marketing: #bf5af2;
 	--cckit-track: var(--cckit-track-software);
 	--cckit-prompt: #ffd60a;
+	/* Search controls: a surface that differs from the page and an edge at 3:1 against it. */
+	--cckit-field-bg: #2c2c2e;
+	--cckit-field-border: #7c7c80;
 
 	/* Hairlines — tighter and quieter than the default black-on-black */
 	--sl-color-hairline-light: #48484a;
@@ -92,6 +95,8 @@
 	--cckit-track-software: #146b8e;
 	--cckit-track-marketing: #8a3bb3;
 	--cckit-prompt: #7a6200;
+	--cckit-field-bg: #ffffff;
+	--cckit-field-border: #86868b;
 
 	--sl-color-hairline-light: #ececf0;
 	--sl-color-hairline: #d8d8dc;
@@ -838,7 +843,7 @@ h1 .cckit-tag, h2 .cckit-tag, h3 .cckit-tag { font-size: 0.65em; }
 }
 
 /* ── Header: search trigger ───────────────────────────────────────────── */
-/* The trigger sits in the middle of the top bar, 34rem at most. Pagefind and DocSearch share the look. */
+/* The trigger is centred on the page by the header grid (Header.astro), 34rem at most. Pagefind and DocSearch share the look. */
 @media (min-width: 50rem) {
 	.header sl-doc-search {
 		width: 100%;
@@ -850,9 +855,9 @@ h1 .cckit-tag, h2 .cckit-tag, h3 .cckit-tag { font-size: 0.65em; }
 		max-width: 34rem;
 		height: 2.75rem;
 		padding-inline: 0.9rem;
-		border: 1px solid var(--sl-color-hairline-light);
+		border: 1px solid var(--cckit-field-border);
 		border-radius: 0.625rem;
-		background: var(--sl-color-black);
+		background: var(--cckit-field-bg);
 		color: var(--sl-color-gray-3);
 		font-size: 1rem;
 	}

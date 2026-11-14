@@ -1,7 +1,9 @@
 ---
-// Header override. Left to right on a desktop: the wordmark, the search (centred, up to 34rem), then
-// the right group: Software / Marketing switch, version text and GitHub icon (Software pages only,
-// see SocialIcons.astro), theme picker, language picker (Marketing pages only, see LanguageSelect.astro).
+// Header override. A three-column grid on a desktop: the wordmark, the search (centred on the page,
+// up to 34rem), then the right group. In the right group the items that exist on one track only come
+// first (version text and GitHub icon on Software, language picker on Marketing), then the theme
+// picker, and the Software / Marketing switch is LAST, so it sits at the right edge and no other
+// item can move it between pages.
 // On a phone: wordmark, spacer, switch, search icon, then Starlight's menu button (which lives outside
 // this component); version, GitHub, theme and language sit in the mobile menu footer.
 import config from 'virtual:starlight/user-config';
@@ -25,14 +27,14 @@ const shouldRenderSearch =
     {shouldRenderSearch && <Search />}
   </div>
   <div class="right-group sl-flex print:hidden">
-    <TrackSwitch />
     <div class="header-extras sl-hidden md:sl-flex">
       <div class="sl-flex social-icons">
         <SocialIcons />
       </div>
-      <ThemeSelect />
       <LanguageSelect />
+      <ThemeSelect />
     </div>
+    <TrackSwitch />
   </div>
 </div>
 
@@ -99,7 +101,7 @@ const shouldRenderSearch =
     @media (min-width: 50rem) {
       .header {
         display: grid;
-        grid-template-columns: auto minmax(0, 1fr) auto;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 34rem) minmax(0, 1fr);
         gap: 1rem;
         align-content: center;
       }
@@ -114,6 +116,8 @@ const shouldRenderSearch =
       .right-group {
         order: 0;
         gap: 1rem;
+        justify-self: end;
+        min-width: 0;
       }
     }
   }
