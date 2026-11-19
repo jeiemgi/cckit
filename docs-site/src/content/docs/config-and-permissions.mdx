@@ -1020,7 +1020,7 @@ path resolves against the main checkout. cckit ships neither.
 | Key | Called as | When | On failure | Env override |
 | --- | --- | --- | --- | --- |
 | `effort.preCloseHook` | `<hook> <effort#> <sub#…>`, cwd = the effort worktree | Before the snapshot and the merge | A non-zero exit refuses the close; the hook's output is printed and nothing is written. A configured hook that is missing or not executable refuses too. | `KIT_EFFORT_PRE_CLOSE_HOOK` |
-| `effort.knowledgeIngestHook` | `<hook> <effort#> <trace-dir>`, cwd = the main checkout | After the merge, the closes and the worktree cleanup | Non-fatal: the close has already landed. A missing or non-executable hook is skipped with a notice. | `KIT_EFFORT_KNOWLEDGE_HOOK` |
+| `effort.knowledgeIngestHook` | `<hook> <effort#> <trace-dir>`, cwd = the main checkout | After the merge, the closes and the worktree cleanup | Non-fatal: the close has already landed. A missing or non-executable hook is skipped with a notice. The hook's output goes to stderr. | `KIT_EFFORT_KNOWLEDGE_HOOK` |
 
 `KIT_FORCE=1` skips the pre-close hook — it is not run — and prints
 `pre-close hook '<path>' skipped (KIT_FORCE=1)` on stderr. The same variable overrides the

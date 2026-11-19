@@ -952,11 +952,24 @@ _EO_KIT_MANAGED_RE='^(scripts/(lib/|kit$|kit-)|\.claude/(skills|hooks|lib|agents
 # the effort number + trace dir, so a project can fold the closed effort's work record into its
 # knowledge base. Config-gated: a NO-OP when unset or the hook file is missing/not executable — the
 # kit ships no default hook. Best-effort — a hook failure never fails the close.
+#
+# The config is read AFTER the close removed the effort worktree, and bin/cckit exports KIT_CONFIG as
+# the copy inside that worktree (#518). So a KIT_CONFIG that no longer exists falls back to the main
+# checkout's config; when that is missing too the close says so — a config that vanished is not the
+# same as a project with no hook. The hook's stdout + stderr go to stderr, like the pre-close hook's.
 _eo_knowledge_ingest() {
   local num="$1" trace="$2" root="$3" hook="" cfg
   hook="${KIT_EFFORT_KNOWLEDGE_HOOK:-}"
   if [ -z "$hook" ]; then
-    cfg="${KIT_CONFIG:-}"; [ -n "$cfg" ] || { [ -f "$root/cckit.config.json" ] && cfg="$root/cckit.config.json" || cfg="$root/.claude/kit.config.json"; }
+    cfg="${KIT_CONFIG:-}"
+    if [ -z "$cfg" ] || [ ! -f "$cfg" ]; then
+      if [ -f "$root/cckit.config.json" ]; then cfg="$root/cckit.config.json"
+      elif [ -f "$root/.claude/kit.config.json" ]; then cfg="$root/.claude/kit.config.json"
+      elif [ -n "$cfg" ]; then
+        echo "effort_close: project config '$cfg' went away with the worktree and the main checkout has none — post-close hook not read" >&2
+        return 0
+      fi
+    fi
     [ -f "$cfg" ] && command -v jq >/dev/null 2>&1 \
       && hook="$(jq -r '.effort.knowledgeIngestHook // empty' "$cfg" 2>/dev/null)"
   fi
@@ -966,7 +979,7 @@ _eo_knowledge_ingest() {
   echo "  → knowledge-ingest hook: $hook $num" >&2
   # Run it from the main checkout (#371): the close has just removed the worktree it was invoked from,
   # so the inherited cwd no longer exists and a hook's relative paths / bare git calls would fail.
-  ( cd "${root:-/}" && "$hook" "$num" "$trace" ) >/dev/null 2>&1 || echo "effort_close: knowledge-ingest hook failed (non-fatal)" >&2
+  ( cd "${root:-/}" && "$hook" "$num" "$trace" ) 1>&2 || echo "effort_close: knowledge-ingest hook failed (non-fatal)" >&2
 }
 
 # _eo_dependent_prs <branch> — pure selector (#358): `gh pr list --json number,baseRefName` on stdin,
