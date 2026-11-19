@@ -1,5 +1,8 @@
 # Delivery 01: how the tools connect
 
+Superseded as the entry page by `revision-01.md`: the owner rejected this sample as verbose and
+hard to understand. The record below describes commit `84b82eb` and is kept as it was written.
+
 Written 2026-11-19 by Claude Code, the implementation delegate. Brief: `brief-01.md`.
 Branch `task/512-docs-guides-less-text-more-visual`, on top of `889e72f`. Nothing was merged or
 deployed, and nothing was pushed (see *Open decisions*).

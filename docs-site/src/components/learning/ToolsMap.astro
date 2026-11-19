@@ -4,7 +4,8 @@
 // cards and each connection is a row "from → action → to" with one sentence under it. Nothing is
 // drawn on a canvas and no text is scaled to fit, so it reads at 320px and with JavaScript off.
 //
-// With JavaScript, each card gains a button that narrows the rows to the connections of that part.
+// With JavaScript, each card gains a button that marks the connections of that part; the other
+// rows stay on the page, dimmed.
 //
 //   import ToolsMap from '../../../components/learning/ToolsMap.astro';
 //   <ToolsMap />
@@ -18,8 +19,8 @@ interface Props {
 const lang = Astro.props.lang ?? langOf(Astro.url.pathname);
 const c = toolsMap[lang];
 const name = (id: ToolId) => c.tools.find((t) => t.id === id)!.name;
-const pick = lang === 'es' ? 'Ver sus conexiones' : 'See its connections';
-const pickFull = (n: string) => (lang === 'es' ? `Ver solo las conexiones de ${n}` : `See only the connections of ${n}`);
+const pick = lang === 'es' ? 'Marcar sus conexiones' : 'Mark its connections';
+const pickFull = (n: string) => (lang === 'es' ? `Marcar las conexiones de ${n}` : `Mark the connections of ${n}`);
 ---
 
 <cckit-tools-map
@@ -87,7 +88,8 @@ const pickFull = (n: string) => (lang === 'es' ? `Ver solo las conexiones de ${n
         let shown = 0;
         for (const row of rows) {
           const on = !id || row.dataset.from === id || row.dataset.to === id;
-          row.hidden = !on;
+          // The rows of other parts stay on the page, dimmed: the whole model remains readable.
+          row.toggleAttribute('data-dim', !on);
           if (on) shown++;
         }
         for (const p of picks) p.setAttribute('aria-pressed', String(p.dataset.pick === id));
@@ -147,7 +149,12 @@ const pickFull = (n: string) => (lang === 'es' ? `Ver solo las conexiones de ${n
     --lm-surface: #ffffff;
     --lm-edge: var(--sl-color-gray-5);
   }
-  .lm p {
+  .lm p,
+  .lm li {
+    margin: 0;
+  }
+  .lm .lm-tool,
+  .lm .lm-relation {
     margin: 0;
   }
   .lm-heading {
@@ -258,6 +265,10 @@ const pickFull = (n: string) => (lang === 'es' ? `Ver solo las conexiones de ${n
     font-size: 0.9375rem;
   }
 
+  .lm-relation[data-dim] {
+    opacity: 0.55;
+    border-style: dashed;
+  }
   .lm-relation {
     padding: 0.875rem 1rem;
     background: var(--lm-surface);

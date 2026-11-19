@@ -15,9 +15,15 @@ The existing PR changes three guide files. It does not implement the scope below
 Its old word-count acceptance criterion is superseded by comprehension, factual completeness,
 and visual explanation. Do not remove facts or hide prerequisites to meet a word count.
 
-Delivery 01 is implemented and committed on this branch, not pushed: read `delivery-01.md` for
-the files, the checks that ran, the risks and three open decisions (push, the PR description, and
-native sub-issues for deliveries 02 to 06). Delivery 02 is next and has no brief yet.
+Delivery 01 was implemented (`84b82eb`, `delivery-01.md`) and the owner rejected it as an entry
+page: `feedback-01-revision.es.md`. The sample was then redone as a three-moment visual scene at
+`/learn/` and `/es/learn/`; the first version's detail moved to `/learn/how-the-tools-connect/`.
+Read `revision-01.md` for what changed, the checks that ran, the captures and the limits.
+Both commits are on this branch and not pushed.
+
+Next action: the owner reviews `/learn/` on the local server. Delivery 02 stays paused under
+`brief-02.md` until that review. Still open from delivery 01: the push, PR 517's description, and
+native sub-issues for deliveries 02 to 06.
 
 `brief-01.md` is the brief delivery 01 was built from. Only one writer may use this worktree at a time.
 Run subsequent deliveries sequentially here, or create native issues/worktrees through cckit
@@ -78,8 +84,8 @@ The wireframes preserve exploratory layout; they are not a completed implementat
 
 | Delivery | Scope | Evidence required | State |
 | --- | --- | --- | --- |
-| 01 | Reusable tools diagram and staged scene, one EN/ES sample | Keyboard controls, reduced motion, correct lifecycle, build | Implemented, awaiting review: `delivery-01.md` |
-| 02 | Unified navigation, home, language routing and redirects | Route inventory; no broken links or false translations | Pending |
+| 01 | Reusable tools diagram and staged scene, one EN/ES sample | Keyboard controls, reduced motion, correct lifecycle, build | Rejected as entry, then redone: `revision-01.md`. Awaiting owner review |
+| 02 | Unified navigation, home, language routing and redirects | Route inventory; no broken links or false translations | Paused: `brief-02.md` |
 | 03 | Five-chapter EN/ES onboarding and appointment demo story | Run prompts; preserve setup preconditions and error recovery | Pending |
 | 04 | Light/dark tokens, typography, layout and mascot placement | Mobile/desktop review; contrast and UI-state samples | Pending |
 | 05 | Reference inventory, translations, glossary and remaining guides | Page-by-page fact/translation map | Pending |
@@ -145,6 +151,17 @@ must be reported for the director to run. The command does not publish, merge or
 Before stopping, update this file with actual results and run `./bin/cckit handoff` with the
 remaining delivery, next command, branch and references. If that write fails, preserve the same
 information in this tracked directory and state the failure explicitly.
+
+## Results of revision 01
+
+Run on 2026-11-19 in this worktree; details and limits are in `revision-01.md`.
+
+- `pnpm --dir docs-site build`: exit 0, 217 pages.
+- `bash scripts/update-path-test.sh` and `bash scripts/docs-marketing-words-test.sh`: pass.
+- `bash scripts/check.sh`: `117 passed, 0 failed`.
+- Browser review in Chrome: keyboard, reduced motion, 320 px, 360 px and 1280 px, both themes,
+  contrast measured. Nine captures in `evidence/revision-01/`.
+- Not run: a screen reader, Safari, Firefox, and any reader outside the project.
 
 ## Results of delivery 01
 

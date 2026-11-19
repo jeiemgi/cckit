@@ -1,6 +1,6 @@
 // Content for the learning components (ToolsMap.astro, StagedScene.astro), in English and Spanish.
 // The components render this as plain HTML at build time; no text lives in an image or a canvas.
-// Reference project of the examples: a small appointment-booking app. Nothing here is output from
+// Reference project of the examples: a small app for booking services. Nothing here is output from
 // a run: the state rows are an illustration and the components label them as one.
 
 export type Lang = 'en' | 'es';
@@ -50,8 +50,8 @@ export const toolsMap: Record<Lang, ToolsMapContent> = {
 		label: 'How the tools connect',
 		toolsHeading: 'The five parts',
 		relationsHeading: 'What each one does to the next',
-		filterHint: 'Select a part to see only its connections.',
-		showAll: 'Show all connections',
+		filterHint: 'Select a part to mark its connections.',
+		showAll: 'Clear the selection',
 		filterStatus: '{n} of {total} connections involve {name}.',
 		allStatus: 'All {total} connections.',
 		tools: [
@@ -60,7 +60,7 @@ export const toolsMap: Record<Lang, ToolsMapContent> = {
 				id: 'agent',
 				name: 'Your agent',
 				kind: 'Claude Code or Codex',
-				role: 'It reads the project, edits files and runs commands. It is the only part that writes code.',
+				role: 'It reads the project. It can edit files and run commands in your project.',
 			},
 			{
 				id: 'cckit',
@@ -114,8 +114,8 @@ export const toolsMap: Record<Lang, ToolsMapContent> = {
 		label: 'Cómo se conectan las herramientas',
 		toolsHeading: 'Las cinco partes',
 		relationsHeading: 'Qué le hace cada una a la siguiente',
-		filterHint: 'Selecciona una parte para ver solo sus conexiones.',
-		showAll: 'Mostrar todas las conexiones',
+		filterHint: 'Selecciona una parte para marcar sus conexiones.',
+		showAll: 'Quitar la selección',
 		filterStatus: '{n} de {total} conexiones incluyen a {name}.',
 		allStatus: 'Las {total} conexiones.',
 		tools: [
@@ -124,7 +124,7 @@ export const toolsMap: Record<Lang, ToolsMapContent> = {
 				id: 'agent',
 				name: 'Tu agente',
 				kind: 'Claude Code o Codex',
-				role: 'Lee el proyecto, edita archivos y ejecuta comandos. Es la única parte que escribe código.',
+				role: 'Lee el proyecto. Puede editar archivos y ejecutar comandos en tu proyecto.',
 			},
 			{
 				id: 'cckit',
@@ -313,7 +313,7 @@ export const smallChange: Record<Lang, SceneContent> = {
 					word: 'Commit',
 					definition: 'A saved point in the history of the project, with a short message saying what changed.',
 				},
-				note: 'Which checks run depends on your project. cckit runs the ones you configured and adds none of its own; a project with no check has nothing to pass here.',
+				note: 'In this example the checks are the ones the project configured. Which checks exist differs from project to project.',
 				state: [
 					{ value: 'Issue open', state: 'kept' },
 					{ value: 'Branch and worktree in use', state: 'kept' },
@@ -351,10 +351,10 @@ export const smallChange: Record<Lang, SceneContent> = {
 	},
 	es: {
 		label: 'Un cambio pequeño, desde el pedido hasta un pull request revisado',
-		example: 'El cambio: cada servicio de la app de citas muestra cuánto dura.',
+		example: 'El cambio: cada servicio de la app de reservas muestra cuánto dura.',
 		tracks: ['Registro del trabajo', 'Copia separada', 'El cambio', 'Revisión'],
 		stateHeading: 'Cómo queda todo después de este paso',
-		illustration: 'Ilustración del ejemplo de la app de citas. No es la salida de una ejecución.',
+		illustration: 'Ilustración del ejemplo de la app de reservas. No es la salida de una ejecución.',
 		steps: [
 			{
 				title: 'Pides el cambio',
@@ -404,7 +404,7 @@ export const smallChange: Record<Lang, SceneContent> = {
 					word: 'Commit',
 					definition: 'Un punto guardado en el historial del proyecto, con un mensaje corto que dice qué cambió.',
 				},
-				note: 'Qué comprobaciones se ejecutan depende de tu proyecto. cckit ejecuta las que configuraste y no añade ninguna propia; un proyecto sin comprobaciones no tiene nada que pasar aquí.',
+				note: 'En este ejemplo las comprobaciones son las que el proyecto configuró. Cuáles existen cambia de un proyecto a otro.',
 				state: [
 					{ value: 'Issue abierto', state: 'kept' },
 					{ value: 'Rama y worktree en uso', state: 'kept' },
@@ -439,5 +439,151 @@ export const smallChange: Record<Lang, SceneContent> = {
 				],
 			},
 		],
+	},
+};
+
+// ── Change story (the entry scene) ──────────────────────────────────────────────────────────────
+// One improvement to a service-booking app, in three moments. Everything shown is drawn for the
+// page: the component says so once. No screen here is a capture, a test result or CLI output.
+
+export interface StoryContent {
+	label: string;
+	tabsLabel: string;
+	next: string;
+	illustration: string;
+	/** The request, shown as the chat message and as the title of the record. */
+	request: string;
+	requestShort: string;
+	app: { title: string; services: { name: string; duration: string }[]; book: string; added: string };
+	moments: {
+		ask: { title: string; line: string; who: string; appCaption: string };
+		prepare: {
+			title: string;
+			line: string;
+			fromCckit: string;
+			fromAgent: string;
+			instructions: { name: string; sub: string };
+			record: { name: string; check: string };
+			copy: { shared: string; sharedSub: string; own: string; ownSub: string };
+			agentWork: string;
+			appCaption: string;
+		};
+		review: {
+			title: string;
+			line: string;
+			card: string;
+			before: string;
+			after: string;
+			ready: string;
+			notPublished: string;
+			appCaption: string;
+		};
+	};
+}
+
+export const changeStory: Record<Lang, StoryContent> = {
+	en: {
+		label: 'One improvement, from the request to the result you review',
+		tabsLabel: 'The three moments',
+		next: 'Next',
+		illustration: 'Illustrative example. The booking app and these screens are drawn for this page.',
+		request: 'Show how long each service lasts before booking.',
+		requestShort: 'Show service duration',
+		app: {
+			title: 'Pick a service',
+			services: [
+				{ name: 'Haircut', duration: '30 min' },
+				{ name: 'Color', duration: '90 min' },
+				{ name: 'Beard trim', duration: '15 min' },
+			],
+			book: 'Book',
+			added: 'added',
+		},
+		moments: {
+			ask: {
+				title: 'You ask for a change',
+				line: 'You say what you want in the chat with your agent.',
+				who: 'You',
+				appCaption: 'The booking app today',
+			},
+			prepare: {
+				title: 'Your agent prepares it with cckit',
+				line: 'cckit gives your agent your project\'s instructions, writes the request down and keeps the work apart.',
+				fromCckit: 'cckit sets up',
+				fromAgent: 'Your agent does the work',
+				instructions: { name: 'Project instructions', sub: 'How work is done here' },
+				record: { name: 'Request written down', check: 'Each service shows how long it lasts' },
+				copy: {
+					shared: 'Shared project',
+					sharedSub: 'untouched',
+					own: 'Separate copy',
+					ownSub: 'for this change',
+				},
+				agentWork: 'Edits the files in the separate copy',
+				appCaption: 'The shared project: no change yet',
+			},
+			review: {
+				title: 'You review the result',
+				line: 'The change is ready for you to look at. Nothing is published yet.',
+				card: 'Proposed change',
+				before: 'Before',
+				after: 'After',
+				ready: 'Ready for your review',
+				notPublished: 'Not published',
+				appCaption: 'The app with the proposed change',
+			},
+		},
+	},
+	es: {
+		label: 'Una mejora, desde el pedido hasta el resultado que revisas',
+		tabsLabel: 'Los tres momentos',
+		next: 'Siguiente',
+		illustration: 'Ejemplo ilustrativo. La app de reservas y estas pantallas están dibujadas para esta página.',
+		request: 'Muestra cuánto dura cada servicio antes de reservar.',
+		requestShort: 'Mostrar la duración de los servicios',
+		app: {
+			title: 'Elige un servicio',
+			services: [
+				{ name: 'Corte de pelo', duration: '30 min' },
+				{ name: 'Color', duration: '90 min' },
+				{ name: 'Arreglo de barba', duration: '15 min' },
+			],
+			book: 'Reservar',
+			added: 'añadido',
+		},
+		moments: {
+			ask: {
+				title: 'Pides un cambio',
+				line: 'Dices lo que quieres en el chat con tu agente.',
+				who: 'Tú',
+				appCaption: 'La app de reservas hoy',
+			},
+			prepare: {
+				title: 'Tu agente lo prepara con cckit',
+				line: 'cckit le da a tu agente las instrucciones de tu proyecto, anota el pedido y mantiene el trabajo aparte.',
+				fromCckit: 'cckit prepara',
+				fromAgent: 'Tu agente hace el trabajo',
+				instructions: { name: 'Instrucciones del proyecto', sub: 'Cómo se trabaja aquí' },
+				record: { name: 'Pedido anotado', check: 'Cada servicio muestra cuánto dura' },
+				copy: {
+					shared: 'Proyecto compartido',
+					sharedSub: 'intacto',
+					own: 'Copia separada',
+					ownSub: 'para este cambio',
+				},
+				agentWork: 'Edita los archivos en la copia separada',
+				appCaption: 'El proyecto compartido: sin cambios todavía',
+			},
+			review: {
+				title: 'Revisas el resultado',
+				line: 'El cambio está listo para que lo veas. Todavía no se ha publicado nada.',
+				card: 'Cambio propuesto',
+				before: 'Antes',
+				after: 'Después',
+				ready: 'Listo para tu revisión',
+				notPublished: 'Sin publicar',
+				appCaption: 'La app con el cambio propuesto',
+			},
+		},
 	},
 };

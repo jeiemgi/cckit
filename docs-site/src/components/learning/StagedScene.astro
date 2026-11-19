@@ -240,6 +240,7 @@ const of = lang === 'es' ? 'de' : 'of';
     --ls-changed: #8a6a12;
   }
   .ls p,
+  .ls li,
   .ls h3,
   .ls dl,
   .ls dd {
@@ -247,6 +248,9 @@ const of = lang === 'es' ? 'de' : 'of';
   }
   .ls [hidden] {
     display: none !important;
+  }
+  .ls .ls-step {
+    margin: 0;
   }
   .ls-example {
     color: var(--sl-color-white);
@@ -279,6 +283,21 @@ const of = lang === 'es' ? 'de' : 'of';
   .ls button:focus-visible {
     outline: 3px solid var(--sl-color-text-accent);
     outline-offset: 2px;
+  }
+  /* Previous and Next are the controls; the other three are secondary and read as plain links. */
+  .ls .ls-replay {
+    margin-inline-start: auto;
+  }
+  .ls .ls-replay,
+  .ls .ls-play,
+  .ls .ls-mode {
+    min-height: 2.75rem;
+    padding-inline: 0.5rem;
+    font-size: 0.875rem;
+    background: transparent;
+    border-color: transparent;
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
   }
   .ls .ls-next {
     color: var(--sl-color-text-invert);

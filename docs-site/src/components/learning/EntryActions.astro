@@ -1,0 +1,76 @@
+---
+// EntryActions — the two links under an entry scene: one main action and one secondary link.
+//   <EntryActions primary={{ label, href }} secondary={{ label, href }} note="…" other={{ label, href }} />
+// `other` is the same page in the other language.
+interface Link {
+  label: string;
+  href: string;
+}
+interface Props {
+  primary: Link;
+  secondary?: Link;
+  note?: string;
+  other?: Link;
+}
+const { primary, secondary, note, other } = Astro.props;
+---
+
+<div class="ea not-content">
+  <p class="ea-links">
+    <a class="ea-primary" href={primary.href}>{primary.label} <span aria-hidden="true">→</span></a>
+    {secondary && <a class="ea-secondary" href={secondary.href}>{secondary.label}</a>}
+  </p>
+  {(note || other) && (
+    <p class="ea-note">
+      {note} {other && <a href={other.href}>{other.label}</a>}
+    </p>
+  )}
+</div>
+
+<style>
+  .ea {
+    margin-block: 1.5rem;
+  }
+  .ea p {
+    margin: 0;
+  }
+  .ea-links {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1.25rem;
+  }
+  .ea-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 3rem;
+    padding: 0.625rem 1.25rem;
+    color: var(--sl-color-text-invert);
+    font-size: 1.0625rem;
+    font-weight: 600;
+    text-decoration: none;
+    background: var(--sl-color-accent);
+    border-radius: 0.5rem;
+  }
+  .ea-primary:hover {
+    filter: brightness(1.1);
+  }
+  .ea-secondary {
+    color: var(--sl-color-text-accent);
+    font-size: 1.0625rem;
+    font-weight: 600;
+  }
+  .ea a:focus-visible {
+    outline: 3px solid var(--sl-color-text-accent);
+    outline-offset: 3px;
+  }
+  .ea-note a {
+    color: var(--sl-color-text-accent);
+  }
+  .ea-note {
+    margin-top: 0.75rem !important;
+    color: var(--sl-color-gray-3);
+    font-size: 0.9375rem;
+  }
+</style>
