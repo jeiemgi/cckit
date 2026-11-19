@@ -687,13 +687,16 @@ prompt** you can paste straight into Claude Code. The
 [cookbook](https://cckit.dev/cookbook/) holds lifecycle recipes, and the
 [CLI reference](https://cckit.dev/cli-reference/) covers every verb.
 
-The site has two tracks, switched from the top bar. **Software** is for developers: its sidebar
-lists 43 pages in the order a team works in (Start here, Philosophy, Getting started, Project
-management, Design, Development, Review, Ship, then the optional Memory area and Reference), with
-only the current group open. Every other page is linked from its area's "More guides" page or from
-[All reference pages](https://cckit.dev/reference/). **[Marketing](https://cckit.dev/marketing/)** is
-ten pages for a marketing team that works by talking to Claude and never opens a terminal; the
-same ten pages are in Spanish at [cckit.dev/es/marketing](https://cckit.dev/es/marketing/).
+The site has one navigation. The home page shows one improvement to a small booking app going from
+a request in the chat to a result you review, before any term or command. The sidebar then lists
+60 pages: Start here, How it works, the guides by area in the order a team works in (Getting
+started, Project management, Design, Development, Review, Ship, then the optional Memory area),
+**[For marketing teams](https://cckit.dev/marketing/)** (15 pages for a team that works by talking
+to its assistant and never opens a terminal), Concepts and Reference, with only the current group
+open. Every other page is linked from its area's "More guides" page or from
+[All reference pages](https://cckit.dev/reference/). The home page, "How it works" and the
+Marketing pages are also in Spanish under [cckit.dev/es](https://cckit.dev/es/); the other pages
+are in English only.
 `pnpm build` in `docs-site/` fails when a Marketing page says "worktree", "branch" or "PR" outside
 its glossary page.
 

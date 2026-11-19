@@ -1,16 +1,19 @@
 ---
-// Starlight Footer override — renders the default footer plus a standing legal/trademark disclaimer
+// Starlight Footer override — renders the default footer, the Kito banner and a standing legal/trademark disclaimer
 // on every page (production included). This override carries NO client islands, so it is always
 // registered; the dev-only Agentation toolbar lives in DevAnnotate.astro instead.
 import Default from '@astrojs/starlight/components/Footer.astro';
 import SpeedInsights from '@vercel/speed-insights/astro';
 import ConsentBanner from './ConsentBanner.astro';
+import KitoFooter from './brand/KitoFooter.astro';
 
 // PUBLIC_ var is exposed to components via import.meta.env — gate the "Cookie settings" re-open
 // trigger on the same signal as the banner so it only appears when GA (and thus consent) is live.
 const GA_ENABLED = Boolean(import.meta.env.PUBLIC_GA_MEASUREMENT_ID);
 ---
 <Default />
+{/* The closing banner of the theme: Kito, one invitation and three links (brand/KitoFooter.astro). */}
+<KitoFooter id="site" />
 {/* Core Web Vitals sampling — zero-config on Vercel, free on Hobby; a ranking-relevant signal
     Google's tools otherwise give no visibility into. */}
 <SpeedInsights />
@@ -53,11 +56,11 @@ const GA_ENABLED = Boolean(import.meta.env.PUBLIC_GA_MEASUREMENT_ID);
     margin-top: 0.4rem;
     text-align: center;
     font-size: var(--sl-text-xs);
-    color: var(--sl-color-gray-4);
+    color: var(--sl-color-gray-3);
   }
   .cckit-heart {
     vertical-align: -2px;
-    color: var(--sl-color-gray-4); /* muted, deliberately not red */
+    color: var(--sl-color-gray-3); /* muted, deliberately not red */
   }
   .cckit-madeby .sr-only {
     position: absolute;

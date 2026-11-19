@@ -1,14 +1,13 @@
-// The docs site has two tracks. A page belongs to Marketing when it lives under /marketing/ (or its
-// Spanish copy under /es/marketing/); every other page is Software. The Software track's entry page is
-// /software/; the home page (/) is the door to both tracks. The track decides three things:
-// which sidebar the page shows (src/routeData.ts), which accent colour it takes (the `cckit-track`
-// meta tag read by src/styles/theme.css) and which entry of the top-bar switch is current
-// (src/components/TrackSwitch.astro).
+// A page under /marketing/ (or its Spanish copy under /es/marketing/) is written for a reader who
+// never opens a terminal; every other page is written for a developer. The site has one navigation
+// for both (astro.config.mjs). This helper only tells the two kinds of page apart where the wording
+// differs: "your assistant" against "your agent" in Chat.astro and TutorialMeta.astro, and the
+// plain-words check in src/integrations/marketing-words.mjs.
 export type Track = 'software' | 'marketing';
 
 const MARKETING = /^\/?(?:[a-z]{2}\/)?marketing(?:\/|$)/;
 
-/** Track of a page, from its route id (`marketing/get-set-up`) or its path (`/es/marketing/`). */
+/** Kind of a page, from its route id (`marketing/get-set-up`) or its path (`/es/marketing/`). */
 export function trackOf(idOrPath: string): Track {
 	return MARKETING.test(idOrPath) ? 'marketing' : 'software';
 }

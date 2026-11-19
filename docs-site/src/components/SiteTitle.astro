@@ -1,0 +1,11 @@
+---
+// SiteTitle override — the approved illustrated logo, linking to the home page of the page's
+// language. The accessible name is the site title.
+import StickerLogo from './brand/StickerLogo.astro';
+
+const es = /^\/es(\/|$)/.test(Astro.url.pathname);
+---
+
+<a class="site-title cckit-brand" href={es ? '/es/' : '/'} aria-label={es ? 'cckit, inicio' : 'cckit, home'}>
+  <StickerLogo id="site-logo-clip" />
+</a>

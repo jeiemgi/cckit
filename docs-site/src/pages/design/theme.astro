@@ -1,0 +1,373 @@
+---
+import { Image } from "astro:assets";
+import StickerLogo from "../../components/brand/StickerLogo.astro";
+import KitoFooter from "../../components/brand/KitoFooter.astro";
+import Ornament from "../../components/brand/Ornament.astro";
+import trio from "../../../../docs/design/512/references/trio-approved.png";
+import "@fontsource-variable/geist";
+import "@fontsource-variable/geist-mono";
+
+const themes = ["light", "dark"] as const;
+const colors = [
+  { name: "Papel", hex: "#F2F4EB", color: "#f2f4eb" },
+  { name: "Tinta", hex: "#202521", color: "#202521" },
+  { name: "Cobalto", hex: "#2457D6", color: "#2457d6" },
+  { name: "Salvia", hex: "#8FA878", color: "#8fa878" },
+  { name: "Ocre", hex: "#D4AF59", color: "#d4af59" },
+];
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="color-scheme" content="light dark" />
+    <title>cckit — estudio de tema</title>
+    <meta name="description" content="Exploración del tema editorial de cckit: componentes, tipografía y color en claro y oscuro." />
+  </head>
+  <body>
+    <a class="skip" href="#themes">Saltar a la muestra</a>
+    <header class="studio-header">
+      <a class="studio-brand" href="/" aria-label="cckit, inicio"><StickerLogo id="studio-logo-clip" /></a>
+      <span class="studio-caption">ESTUDIO DE TEMA <span class="edition">/ 01</span></span>
+      <div class="view-picker" role="group" aria-label="Vista de la muestra">
+        <button type="button" data-view="both" aria-pressed="true">Comparar</button>
+        <button type="button" data-view="light" aria-pressed="false">Claro</button>
+        <button type="button" data-view="dark" aria-pressed="false">Oscuro</button>
+      </div>
+    </header>
+
+    <main>
+      <div class="studio-intro">
+        <div><p class="eyebrow">UNA IDENTIDAD PARA CONSTRUIR</p><h1>Un poco de carácter.<br />Mucho espacio para pensar.</h1></div>
+        <p>El escritorio de Kito.<br />Tipografía precisa, papel cálido<br />y pequeños detalles de tinta.</p>
+      </div>
+
+      <div class="theme-grid" id="themes" data-view="both">
+        {themes.map((theme) => (
+          <article class="theme-board" data-theme={theme} aria-label={`Muestra en tema ${theme === "light" ? "claro" : "oscuro"}`}>
+            <header class="board-header">
+              <a class="wordmark" href="/" aria-label="cckit, inicio"><StickerLogo id={`${theme}-logo-clip`} /></a>
+              <nav aria-label={`Navegación de ejemplo, ${theme}`}><a href={`#components-${theme}`}>Explorar</a><a href="/cli-reference/">Docs <span aria-hidden="true">↗</span></a></nav>
+              <span class="theme-name">{theme === "light" ? "01 / Claro" : "02 / Oscuro"}</span>
+            </header>
+
+            <section class="editorial" aria-label="Composición editorial">
+              <div class="hero-copy">
+                <p class="eyebrow"><span class="tiny-cross" aria-hidden="true">+</span> TU PROYECTO, CON UN PLAN</p>
+                <h2>Una idea.<br />Un siguiente<br /><span class="underlined">paso claro.<Ornament kind="underline" class="heading-ink" /></span></h2>
+                <p class="hero-description">Dale a tu agente instrucciones y un proceso para trabajar contigo.</p>
+                <a class="button primary has-flourish" href="/">Conoce cckit <span aria-hidden="true">↗</span><Ornament kind="spark" class="button-ink" /></a>
+              </div>
+              <div class="hero-art">
+                <span class="registration" aria-hidden="true">+</span>
+                <div class="dot-field" aria-hidden="true"></div>
+                <figure class="character-figure">
+                  <Image src={trio} alt="Un Post-it amarillo, una terminal azul y una memoria USB verde, de izquierda a derecha." width={520} />
+                  <figcaption class="character-names"><span>Nota</span><span>Kito</span><span>Memo</span></figcaption>
+                </figure>
+              </div>
+            </section>
+
+            <div class="board-content">
+              <section class="specimen" id={`components-${theme}`}>
+                <header class="section-label"><span>01 / ACCIONES</span><span class="section-rule"></span><span aria-hidden="true">↙</span></header>
+                <div class="button-row">
+                  <button class="button primary" type="button" data-demo-action>Empezar <span aria-hidden="true">↗</span></button>
+                  <button class="button secondary" type="button" data-demo-reset>Reiniciar</button>
+                  <button class="button quiet" type="button" disabled>No disponible</button>
+                </div>
+                <p class="action-status" role="status">Prueba el hover, el clic y el foco con Tab.</p>
+                <a class="text-link" href="/getting-started/install/">Ver cómo instalarlo <Ornament kind="arrow" class="link-ink" /></a>
+              </section>
+
+              <section class="specimen workspace">
+                <header class="section-label"><span>02 / ESPACIO DE TRABAJO</span><span class="section-rule"></span><span aria-hidden="true">+</span></header>
+                <div class="tabs" role="tablist" aria-label={`Contenido de ejemplo, ${theme}`}>
+                  <button type="button" role="tab" id={`${theme}-tab-command`} aria-controls={`${theme}-panel-command`} aria-selected="true" data-tab="command">Terminal<Ornament kind="underline" class="tab-ink" /></button>
+                  <button type="button" role="tab" id={`${theme}-tab-plan`} aria-controls={`${theme}-panel-plan`} aria-selected="false" tabindex="-1" data-tab="plan">El plan<Ornament kind="underline" class="tab-ink" /></button>
+                </div>
+                <div class="code-panel" id={`${theme}-panel-command`} role="tabpanel" aria-labelledby={`${theme}-tab-command`} tabindex="0">
+                  <div class="terminal-top"><span class="terminal-dots" aria-hidden="true">● ● ●</span><span>~/mi-proyecto</span><button type="button" class="copy" data-copy="cckit init" aria-label="Copiar cckit init">Copiar</button></div>
+                  <pre><code><span class="code-comment"># Un lugar para empezar</span>{"\n"}<span class="prompt">❯</span> cckit init</code></pre>
+                  <div class="terminal-foot"><span class="terminal-check" aria-hidden="true">↳</span> Tu agente trabaja con las reglas del proyecto.</div>
+                </div>
+                <div class="plan-panel" id={`${theme}-panel-plan`} role="tabpanel" aria-labelledby={`${theme}-tab-plan`} tabindex="0" hidden>
+                  <p class="plan-title">Una mejora pequeña, bien definida.</p>
+                  <ol><li>Describe lo que quieres cambiar.</li><li>Prepara el trabajo con tu agente.</li><li>Revisa el resultado.</li></ol>
+                  <p class="plan-note">Ejemplo del recorrido. Los comandos están en las guías.</p>
+                </div>
+                <p class="copy-status sr-only" role="status"></p>
+              </section>
+
+              <section class="specimen">
+                <header class="section-label"><span>03 / PIEZAS CON CARÁCTER</span><span class="section-rule"></span><span aria-hidden="true">◇</span></header>
+                <div class="card-pair">
+                  <a class="guide-card" href="/">
+                    <Ornament kind="dots" class="card-ink" />
+                    <span class="guide-index">GUÍA 01 <span aria-hidden="true">↗</span></span>
+                    <h3>Empieza con<br />algo pequeño.</h3>
+                    <p>Una mejora que puedas ver y revisar.</p>
+                    <span class="card-footer">Abrir la guía <span aria-hidden="true">→</span></span>
+                  </a>
+                  <aside class="sticky-note" aria-label="Nota de trabajo de ejemplo">
+                    <Ornament kind="tape" class="note-tape" />
+                    <span class="note-label">PARA EL PRÓXIMO PASO</span>
+                    <p>Mostrar cuánto<br />dura cada servicio.</p>
+                    <span class="note-checkbox"><span aria-hidden="true">□</span> Listo para revisar</span>
+                  </aside>
+                </div>
+              </section>
+
+              <section class="specimen form-specimen">
+                <header class="section-label"><span>04 / ESTADOS QUE AYUDAN</span><span class="section-rule"></span><span aria-hidden="true">↗</span></header>
+                <form novalidate data-demo-form>
+                  <label for={`${theme}-project`}>Nombre del proyecto <span class="field-optional">/ ejemplo</span><Ornament kind="corner" class="field-ink" /></label>
+                  <div class="input-row"><input id={`${theme}-project`} name="project" autocomplete="off" placeholder="Mi próximo proyecto" aria-describedby={`${theme}-hint ${theme}-error`} required /><button class="button secondary" type="submit">Probar</button></div>
+                  <p class="field-hint" id={`${theme}-hint`}>Una prueba de interfaz. No se guarda ni se envía.</p>
+                  <p class="field-error" id={`${theme}-error`} role="alert" hidden>Escribe un nombre para continuar.</p>
+                  <p class="form-status" role="status"></p>
+                </form>
+                <div class="state-row"><span class="badge success"><span aria-hidden="true">✓</span> Revisado</span><span class="badge pending"><span aria-hidden="true">◷</span> En progreso</span><span class="badge neutral"><span aria-hidden="true">○</span> Por empezar</span></div>
+              </section>
+
+              <section class="specimen palette-specimen">
+                <header class="section-label"><span>05 / TINTAS Y TIPOGRAFÍA</span><span class="section-rule"></span><span aria-hidden="true">Aa</span></header>
+                <div class="palette">{colors.map((c) => (<div class="swatch"><span class="swatch-color" style={`--swatch:${c.color}`}></span><span>{c.name}</span><code>{c.hex}</code></div>))}</div>
+                <div class="type-pair"><div><p class="type-name">GEIST / TEXTO</p><span class="type-large">Aa, qué buena idea.</span></div><div><p class="type-name">GEIST MONO / DETALLE</p><span class="mono-sample">&gt;_ next step</span></div></div>
+              </section>
+
+              <KitoFooter id={theme} lang="es" />
+            </div>
+          </article>
+        ))}
+      </div>
+
+      <footer class="studio-footer"><p>Dirección exploratoria · No cambia el tema del sitio actual.</p><a href="/">Volver a la muestra de contenido <span aria-hidden="true">↗</span></a></footer>
+    </main>
+  </body>
+</html>
+
+<script>
+  const grid = document.querySelector<HTMLElement>(".theme-grid");
+  document.querySelectorAll<HTMLButtonElement>("[data-view]").forEach((button) => {
+    if (button.tagName !== "BUTTON") return;
+    button.addEventListener("click", () => {
+      if (!grid) return;
+      grid.dataset.view = button.dataset.view;
+      document.querySelectorAll<HTMLButtonElement>("button[data-view]").forEach((b) => b.setAttribute("aria-pressed", String(b === button)));
+    });
+  });
+  document.querySelectorAll<HTMLElement>(".theme-board").forEach((board) => {
+    const tabs = [...board.querySelectorAll<HTMLButtonElement>("[role=tab]")];
+    const activate = (tab: HTMLButtonElement) => {
+      for (const t of tabs) {
+        const active = t === tab;
+        t.setAttribute("aria-selected", String(active));
+        t.tabIndex = active ? 0 : -1;
+        const panel = board.querySelector<HTMLElement>(`#${t.getAttribute("aria-controls")}`);
+        if (panel) panel.hidden = !active;
+      }
+    };
+    tabs.forEach((tab, i) => {
+      tab.addEventListener("click", () => activate(tab));
+      tab.addEventListener("keydown", (event) => {
+        let index = i;
+        if (event.key === "ArrowRight") index = (i + 1) % tabs.length;
+        else if (event.key === "ArrowLeft") index = (i - 1 + tabs.length) % tabs.length;
+        else if (event.key === "Home") index = 0;
+        else if (event.key === "End") index = tabs.length - 1;
+        else return;
+        event.preventDefault(); activate(tabs[index]); tabs[index].focus();
+      });
+    });
+    const action = board.querySelector<HTMLButtonElement>("[data-demo-action]");
+    const status = board.querySelector<HTMLElement>(".action-status");
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const reset = () => {
+      clearTimeout(timer);
+      if (action) { action.disabled = false; action.removeAttribute("aria-busy"); action.innerHTML = 'Empezar <span aria-hidden="true">↗</span>'; }
+      if (status) status.textContent = "Prueba el hover, el clic y el foco con Tab.";
+    };
+    action?.addEventListener("click", () => {
+      action.disabled = true; action.setAttribute("aria-busy", "true"); action.textContent = "Preparando…";
+      if (status) status.textContent = "Estado de carga de ejemplo.";
+      timer = setTimeout(() => { action.disabled = false; action.removeAttribute("aria-busy"); action.textContent = "Listo ✓"; if (status) status.textContent = "Así se ve una acción completada. No se ha creado ningún proyecto."; }, 1000);
+    });
+    board.querySelector("[data-demo-reset]")?.addEventListener("click", reset);
+    board.querySelector<HTMLButtonElement>("[data-copy]")?.addEventListener("click", async (event) => {
+      const button = event.currentTarget as HTMLButtonElement;
+      const message = board.querySelector<HTMLElement>(".copy-status");
+      try { await navigator.clipboard.writeText(button.dataset.copy ?? ""); button.textContent = "Copiado ✓"; if (message) message.textContent = "Comando copiado."; }
+      catch { if (message) message.textContent = "No se pudo copiar. Selecciona cckit init y cópialo manualmente."; }
+    });
+    const form = board.querySelector<HTMLFormElement>("[data-demo-form]");
+    const input = form?.querySelector<HTMLInputElement>("input");
+    const error = form?.querySelector<HTMLElement>(".field-error");
+    const formStatus = form?.querySelector<HTMLElement>(".form-status");
+    form?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const valid = !!input?.value.trim();
+      input?.setAttribute("aria-invalid", String(!valid));
+      if (error) error.hidden = valid;
+      if (formStatus) formStatus.textContent = valid ? "✓ Nombre válido. Esta muestra no guarda datos." : "";
+      if (!valid) input?.focus();
+    });
+    input?.addEventListener("input", () => { input.removeAttribute("aria-invalid"); if (error) error.hidden = true; if (formStatus) formStatus.textContent = ""; });
+  });
+</script>
+
+<style is:global>
+  * { box-sizing: border-box; }
+  :root { font-family: "Geist Variable", sans-serif; font-synthesis: none; color: #202521; background: #e8ebe2; color-scheme: light; }
+  body { margin: 0; }
+  button, input { font: inherit; }
+  button, a, input { -webkit-tap-highlight-color: transparent; }
+  button { cursor: pointer; }
+  a { color: inherit; }
+  [hidden] { display: none !important; }
+  :focus-visible { outline: 3px solid var(--focus, #2457d6); outline-offset: 4px; }
+  .sr-only, .skip:not(:focus) { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .skip:focus { position: fixed; inset: 12px auto auto 12px; padding: 16px; background: #f2f4eb; z-index: 10; }
+  .studio-header { min-height: 84px; display: flex; align-items: center; gap: 28px; padding: 16px 40px; border-bottom: 1px solid #c3c9bd; }
+  .studio-brand { text-decoration: none; font-size: 31px; font-weight: 760; letter-spacing: -2px; }
+  .logo-art { display: block; width: 112px; height: 49px; overflow: visible; }
+  .studio-caption, .eyebrow, .section-label, .theme-name, .type-name, .note-label, .guide-index { font-family: "Geist Mono Variable", monospace; font-size: 11px; line-height: 1.5; letter-spacing: .065em; }
+  .studio-caption { border-left: 1px solid #b9c0b1; padding-left: 28px; }
+  .edition { color: #52604e; }
+  .view-picker { margin-left: auto; display: flex; gap: 4px; padding: 4px; border: 1px solid #b7bfb0; border-radius: 6px; }
+  .view-picker button { min-height: 44px; padding: 0 15px; border: 0; background: transparent; color: #354131; border-radius: 3px; font-size: 13px; }
+  .view-picker button[aria-pressed="true"] { background: #202521; color: #f2f4eb; }
+  .view-picker button:hover { text-decoration: underline; text-underline-offset: 4px; }
+  main { max-width: 1640px; margin: auto; padding: 0 40px; }
+  .studio-intro { display: flex; justify-content: space-between; align-items: end; padding: 54px 0 40px; gap: 24px; }
+  .studio-intro .eyebrow { color: #52604e; margin: 0 0 14px; }
+  .studio-intro h1 { font-size: clamp(30px, 3vw, 43px); letter-spacing: -.05em; line-height: 1.12; font-weight: 560; margin: 0; }
+  .studio-intro > p { color: #52604e; font-size: 14px; line-height: 1.65; margin: 0 0 2px; }
+  .theme-grid { display: grid; grid-template-columns: 1fr 1fr; align-items: start; gap: 24px; }
+  .theme-grid[data-view="light"], .theme-grid[data-view="dark"] { grid-template-columns: minmax(0, 1040px); justify-content: center; }
+  .theme-grid[data-view="light"] [data-theme="dark"], .theme-grid[data-view="dark"] [data-theme="light"] { display: none; }
+  .theme-board { --paper: #f2f4eb; --surface: #fbfcf7; --ink: #202521; --muted: #596252; --line: #89917f; --subtle-line: #d3d9c9; --accent: #2457d6; --accent-hover: #1946b9; --on-accent: #fff; --focus: #2457d6; --sage: #526a3d; --sage-bg: #e4ebdc; --ochre: #806117; --ochre-bg: #f2e9c9; --error: #a52d31; --shadow: #202521; --terminal: #202521; --terminal-ink: #f2f4eb; --terminal-muted: #a8b5a0; background: var(--paper); color: var(--ink); border: 1px solid #a2ab98; border-radius: 8px; overflow: clip; container-type: inline-size; }
+  .theme-board[data-theme="dark"] { --paper: #1b211d; --surface: #252e27; --ink: #f2f4eb; --muted: #b1bcaa; --line: #7b8b75; --subtle-line: #3c483e; --accent: #91b1ff; --accent-hover: #b1c7ff; --on-accent: #142348; --focus: #acc4ff; --sage: #b4cea0; --sage-bg: #303e2a; --ochre: #e6c777; --ochre-bg: #3f3823; --error: #ffa9a6; --shadow: #91b1ff; --terminal: #131915; --terminal-ink: #f2f4eb; --terminal-muted: #a8b5a0; border-color: #66735f; color-scheme: dark; }
+  .board-header { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 22px 30px; border-bottom: 1px solid var(--subtle-line); }
+  .wordmark { font-size: 29px; line-height: 1; font-weight: 730; letter-spacing: -1.8px; }
+  .wordmark { display: inline-flex; min-height: 44px; align-items: center; } .wordmark .logo-art { width: 105px; height: 46px; }
+  .board-header nav { display: flex; gap: 20px; margin-left: auto; font-size: 12px; }
+  .board-header nav a { display: inline-flex; align-items: center; min-height: 44px; text-decoration: none; }
+  .board-header nav a:hover { text-decoration: underline; text-underline-offset: 5px; }
+  .theme-name { color: var(--muted); margin-left: 8px; font-size: 10px; }
+  .editorial { padding: 42px 30px 35px; display: grid; grid-template-columns: 1.05fr 1fr; gap: 8px; border-bottom: 1px solid var(--subtle-line); }
+  .eyebrow { margin: 0 0 20px; color: var(--muted); font-size: 10px; }
+  .tiny-cross { margin-right: 4px; color: var(--accent); font-size: 17px; }
+  .hero-copy h2 { font-size: clamp(34px, 6.7cqw, 62px); line-height: 1.045; letter-spacing: -.065em; font-weight: 590; margin: 0 0 22px; position: relative; z-index: 1; }
+  .underlined { position: relative; white-space: nowrap; }
+  .heading-ink { position: absolute; left: -3px; bottom: -13px; width: calc(100% + 8px); height: 18px; }
+  .has-flourish { position: relative; }
+  .button-ink { position: absolute; width: 31px; height: 27px; right: -23px; top: -19px; opacity: .85; transform: rotate(-12deg); transition: transform 160ms ease; }
+  .has-flourish:hover .button-ink, .has-flourish:focus-visible .button-ink { transform: translate(2px, -2px) rotate(0); }
+  .link-ink { width: 27px; height: 24px; transform: rotate(20deg); transition: transform 160ms ease; }
+  .text-link:hover .link-ink { transform: translate(3px, -2px) rotate(20deg); }
+  .tabs button { position: relative; }
+  .tab-ink { position: absolute; left: 0; bottom: -4px; width: 100%; height: 11px; display: none; }
+  .tabs button[aria-selected="true"] .tab-ink { display: block; }
+  .guide-card { position: relative; isolation: isolate; }
+  .guide-card > :not(.card-ink) { position: relative; z-index: 1; }
+  .card-ink { position: absolute; width: 105px; height: 61px; right: -3px; bottom: 11px; opacity: .2; z-index: 0; }
+  .note-tape { position: absolute; width: 83px; height: 36px; left: 50%; top: -19px; transform: translateX(-50%) rotate(-7deg); opacity: .95; }
+  .form-specimen label { position: relative; }
+  .field-ink { position: absolute; width: 25px; height: 25px; right: 0; top: -10px; opacity: .7; }
+  .hero-description { font-size: 14px; line-height: 1.6; color: var(--muted); max-width: 260px; margin: 0 0 24px; }
+  .button { min-height: 44px; padding: 10px 16px; border: 1px solid transparent; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; gap: 16px; font-size: 13px; line-height: 1.4; font-weight: 540; text-decoration: none; transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease; }
+  .button.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); box-shadow: 3px 3px 0 var(--paper), 4px 4px 0 var(--shadow); }
+  .button.primary:hover:not(:disabled) { background: var(--accent-hover); transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--paper), 5px 5px 0 var(--shadow); }
+  .button.primary:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: none; }
+  .button.secondary { background: transparent; border-color: var(--line); color: var(--ink); }
+  .button.secondary:hover:not(:disabled) { background: var(--surface); border-color: var(--ink); }
+  .button.secondary:active:not(:disabled) { transform: translateY(1px); }
+  .button:disabled { cursor: not-allowed; box-shadow: none; background: var(--subtle-line); border-color: var(--subtle-line); color: var(--muted); }
+  .hero-art { position: relative; align-self: stretch; min-width: 0; display: flex; flex-direction: column; justify-content: end; padding-bottom: 26px; }
+  .character-figure { width: 100%; margin: 0; position: relative; z-index: 1; }
+  .hero-art .character-figure img { width: 100%; height: auto; max-width: none; margin: 0; display: block; }
+  .character-names { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); text-align: center; padding-top: 9px; color: var(--ink); font: 10px "Geist Mono Variable", monospace; letter-spacing: .025em; }
+  .registration { color: var(--accent); position: absolute; top: 0; right: 0; font: 21px "Geist Mono Variable", monospace; }
+  .dot-field { width: 85%; height: 140px; position: absolute; bottom: 15px; right: -6px; opacity: .28; background-image: radial-gradient(var(--ink) .8px, transparent 1px); background-size: 7px 7px; mask-image: linear-gradient(120deg, transparent, #000); }
+  .board-content { padding: 0 30px; }
+  .specimen { padding: 27px 0 28px; border-bottom: 1px solid var(--subtle-line); }
+  .section-label { display: flex; align-items: center; gap: 12px; font-size: 10px; color: var(--muted); margin-bottom: 23px; }
+  .section-rule { height: 1px; background: var(--subtle-line); flex: 1; }
+  .button-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .action-status { color: var(--muted); font-size: 12px; line-height: 1.5; margin: 16px 0 12px; min-height: 18px; }
+  .text-link { color: var(--accent); font-size: 13px; display: inline-flex; align-items: center; gap: 18px; min-height: 44px; text-decoration-thickness: 1px; text-underline-offset: 5px; }
+  .text-link:hover { text-decoration-thickness: 2px; }
+  .tabs { display: flex; gap: 22px; border-bottom: 1px solid var(--subtle-line); margin-bottom: 15px; }
+  .tabs button { background: none; color: var(--muted); border: 0; border-bottom: 2px solid transparent; min-height: 44px; padding: 0 3px 10px; font-size: 13px; }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+  .tabs button:hover { color: var(--ink); }
+  .code-panel { background: var(--terminal); color: var(--terminal-ink); border: 1px solid var(--line); border-radius: 5px; overflow: hidden; min-height: 180px; }
+  .terminal-top { padding: 9px 16px 9px 14px; display: flex; align-items: center; gap: 16px; color: var(--terminal-muted); font: 11px "Geist Mono Variable", monospace; border-bottom: 1px solid #3c483e; }
+  .terminal-dots { letter-spacing: 3px; color: #8fa878; font-size: 9px; }
+  .copy { color: #f2f4eb; border: 1px solid #7b8b75; background: none; min-height: 44px; padding: 5px 9px; border-radius: 3px; font: 10px "Geist Mono Variable", monospace; margin-left: auto; }
+  .copy:hover { background: #303e2a; }
+  pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 13px/1.9 "Geist Mono Variable", monospace; padding: 17px 20px; margin: 0; }
+  pre code { font: inherit; }
+  .code-comment { color: #a8b5a0; }
+  .prompt { color: #91b1ff; }
+  .terminal-foot { padding: 0 20px 18px; color: #a8b5a0; font-size: 11px; line-height: 1.6; }
+  .terminal-check { color: #91b1ff; padding-right: 5px; }
+  .plan-panel { min-height: 180px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 5px; background: var(--surface); font-size: 13px; }
+  .plan-title { margin: 0 0 12px; font-weight: 600; }
+  .plan-panel ol { margin: 0; padding-left: 20px; line-height: 1.9; }
+  .plan-note { font-size: 11px; color: var(--muted); }
+  .card-pair { display: grid; grid-template-columns: 1.15fr 1fr; gap: 24px; align-items: center; }
+  .guide-card { display: flex; flex-direction: column; min-height: 218px; padding: 20px; background: var(--surface); border: 1px solid var(--line); border-radius: 5px; text-decoration: none; transition: transform 160ms ease, box-shadow 160ms ease; }
+  .guide-card:hover { transform: translate(-2px, -2px); box-shadow: 4px 4px 0 var(--subtle-line); }
+  .guide-index { display: flex; justify-content: space-between; font-size: 9px; color: var(--muted); }
+  .guide-index > span { color: var(--accent); font: 18px "Geist Variable", sans-serif; }
+  .guide-card h3 { font-size: clamp(20px, 3.7cqw, 29px); line-height: 1.14; letter-spacing: -.04em; font-weight: 560; margin: 16px 0 10px; }
+  .guide-card p { color: var(--muted); font-size: 12px; line-height: 1.5; margin: 0 0 20px; }
+  .card-footer { margin-top: auto; display: flex; justify-content: space-between; gap: 8px; color: var(--accent); font-size: 12px; }
+  .sticky-note { background: #edda98; color: #3c341a; padding: 26px 18px 20px; position: relative; transform: rotate(2deg); min-height: 183px; box-shadow: 3px 4px 0 #00000018; }
+  .sticky-note::after { content: ""; position: absolute; bottom: 0; right: 0; border-style: solid; border-width: 0 0 17px 17px; border-color: transparent transparent var(--paper) #c6ae63; }
+  .note-pin { position: absolute; top: 5px; right: 10px; font: 18px "Geist Mono Variable", monospace; }
+  .note-label { font-size: 8px; color: #665422; }
+  .sticky-note p { font-size: 19px; font-weight: 520; line-height: 1.3; letter-spacing: -.03em; margin: 16px 0 22px; }
+  .note-checkbox { font-size: 10px; display: flex; align-items: center; gap: 8px; }
+  .note-checkbox > span { font-size: 17px; }
+  form label { display: block; font-size: 13px; font-weight: 530; margin-bottom: 10px; }
+  .field-optional { color: var(--muted); font-size: 11px; font-weight: 400; }
+  .input-row { display: flex; gap: 10px; }
+  .input-row input { min-width: 0; flex: 1; min-height: 44px; padding: 10px 12px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 4px; font-size: 16px; }
+  input::placeholder { color: var(--muted); }
+  input:hover { border-color: var(--ink); }
+  input[aria-invalid="true"] { border-color: var(--error); box-shadow: inset 0 0 0 1px var(--error); }
+  .field-hint, .field-error, .form-status { font-size: 11px; line-height: 1.6; margin: 8px 0 0; }
+  .field-hint { color: var(--muted); }
+  .field-error { color: var(--error); }
+  .form-status { color: var(--sage); }
+  .form-status:empty { display: none; }
+  .state-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+  .badge { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; line-height: 1.4; padding: 6px 9px; border-radius: 3px; border: 1px solid currentColor; }
+  .badge.success { color: var(--sage); background: var(--sage-bg); }
+  .badge.pending { color: var(--ochre); background: var(--ochre-bg); }
+  .badge.neutral { color: var(--muted); }
+  .palette { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+  .swatch { min-width: 0; display: flex; flex-direction: column; gap: 5px; font-size: 10px; }
+  .swatch-color { display: block; height: 38px; background: var(--swatch); border: 1px solid var(--line); border-radius: 3px; margin-bottom: 3px; }
+  .swatch code { color: var(--muted); font: 8px "Geist Mono Variable", monospace; }
+  .type-pair { display: grid; grid-template-columns: 1.25fr 1fr; gap: 16px; border-top: 1px solid var(--subtle-line); padding-top: 23px; margin-top: 27px; }
+  .type-name { color: var(--muted); font-size: 8px; margin: 0 0 12px; }
+  .type-large { font-size: 20px; letter-spacing: -.045em; font-weight: 500; }
+  .mono-sample { font: 14px "Geist Mono Variable", monospace; }
+  .board-footer { display: flex; justify-content: space-between; align-items: center; padding: 23px 0; font-size: 11px; color: var(--muted); }
+  .footer-star { color: var(--accent); font-size: 26px; }
+  .studio-footer { padding: 24px 0 40px; display: flex; justify-content: space-between; gap: 20px; font-size: 12px; color: #52604e; }
+  .studio-footer p { margin: 0; }
+  .studio-footer a { text-underline-offset: 4px; }
+  @media (min-width: 1600px) { .editorial { padding: 48px 38px 38px; } .board-content { padding: 0 38px; } .board-header { padding-inline: 38px; } }
+  @media (max-width: 1020px) { main { padding: 0 20px; } .studio-header { padding-inline: 20px; } .studio-caption { display: none; } .theme-grid { gap: 16px; } .editorial { padding: 30px 22px; grid-template-columns: 1fr; } .hero-copy h2 { font-size: 45px; } .hero-copy h2 br:nth-child(2) { display: none; } .hero-description { max-width: 310px; } .hero-art { min-height: 150px; width: 85%; justify-self: center; padding: 0 0 25px; margin-top: 20px; } .character-figure { width: 100%; margin: 0; } .registration { top: 10px; } .board-content { padding: 0 22px; } .board-header { padding: 16px 22px; } .board-header nav { display: none; } .card-pair { gap: 15px; } .sticky-note { padding: 23px 13px 16px; } .sticky-note p { font-size: 17px; } .guide-card { padding: 15px; } .type-pair { grid-template-columns: 1fr; } }
+  @media (max-width: 720px) { .theme-grid { grid-template-columns: minmax(0, 1fr); gap: 24px; } main { padding-inline: 16px; } .studio-header { padding: 12px 16px; gap: 12px; min-height: 74px; } .view-picker { gap: 0; padding: 3px; } .view-picker button { min-height: 44px; padding: 0 10px; font-size: 12px; } .studio-intro { padding: 35px 0 28px; } .studio-intro > p { display: none; } .studio-intro h1 { font-size: 32px; } .studio-intro .eyebrow { font-size: 10px; } .editorial { grid-template-columns: 1.05fr 1fr; padding: 32px 23px; } .hero-copy h2 { font-size: clamp(34px, 7.2cqw, 47px); } .hero-copy h2 br:nth-child(2) { display: initial; } .hero-art { width: 100%; min-height: 0; margin: 0; padding-bottom: 35px; } .character-figure { width: 100%; margin: 0; } .hero-description { font-size: 13px; } .character-names { font-size: 9px; } .type-pair { grid-template-columns: 1fr 1fr; } .type-large { font-size: 18px; } .mono-sample { font-size: 12px; } .studio-footer { flex-direction: column; font-size: 11px; } }
+  @media (max-width: 380px) { .editorial { grid-template-columns: 1fr; } .hero-copy h2 { font-size: 44px; } .hero-art { width: 75%; margin: 20px auto 0; padding-bottom: 25px; } .character-figure { width: 100%; margin: 0; } .hero-copy h2 br:nth-child(2) { display: none; } .board-content { padding-inline: 18px; } .board-header { padding-inline: 18px; } .card-pair { grid-template-columns: 1fr; } .sticky-note { margin: 0 8px; min-height: 150px; } .guide-card { min-height: 190px; } .type-pair { grid-template-columns: 1fr; } .palette { gap: 7px; } .swatch { font-size: 9px; } .swatch code { font-size: 7px; } .theme-name { margin-left: auto; } .button-row { gap: 10px; } }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; } }
+</style>

@@ -1,6 +1,5 @@
 import { getCollection } from 'astro:content';
 import { OGImageRoute } from 'astro-og-canvas';
-import { trackOf } from '../../lib/tracks';
 
 // One generated 1200×630 social card per docs page. The Head override points each page's og:image /
 // twitter:image at /og/<id>.png. Guides fold their eyebrow (Guide · <tag> · <difficulty> ·
@@ -20,16 +19,16 @@ export const { getStaticPaths, GET } = await OGImageRoute({
     return {
       title: entry.data.title,
       description: t ? eyebrow : entry.data.description ?? '',
+      // The theme's dark page and surface, with a cobalt edge (src/styles/theme.css).
       bgGradient: [
-        [11, 14, 18],
-        [14, 22, 28],
+        [27, 33, 29],
+        [37, 46, 39],
       ],
-      // The card's edge takes the page's track colour: crimson for Marketing, cyan for Software.
-      border: { color: trackOf(_id) === 'marketing' ? [226, 90, 115] : [42, 179, 166], width: 10, side: 'inline-start' },
+      border: { color: [145, 177, 255], width: 10, side: 'inline-start' },
       padding: 60,
       font: {
-        title: { color: [240, 246, 246], size: 62, weight: 'Bold', lineHeight: 1.1 },
-        description: { color: [143, 166, 173], size: 30, weight: 'Normal' },
+        title: { color: [242, 244, 235], size: 62, weight: 'Bold', lineHeight: 1.1 },
+        description: { color: [177, 188, 170], size: 30, weight: 'Normal' },
       },
     };
   },

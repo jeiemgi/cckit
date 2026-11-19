@@ -1,0 +1,283 @@
+---
+// KitoFooter — the closing banner of every page: a short invitation, Kito, a floating note and
+// three real links. The motion is CSS only (transforms and one dashed stroke). It runs when the
+// reader has not asked for reduced motion, and the Pause button stops all of it. With JavaScript
+// off or with reduced motion the composition is still and the button is not shown.
+//   <KitoFooter id="site" />            language follows the page path
+//   <KitoFooter id="light" lang="es" />
+import { Image } from 'astro:assets';
+import StickerLogo from './StickerLogo.astro';
+import Ornament from './Ornament.astro';
+import kito from '../learning/assets/kito-pointing.webp';
+
+interface Props {
+  id: string;
+  lang?: 'en' | 'es';
+}
+const { id } = Astro.props;
+const lang = Astro.props.lang ?? (/^\/es(\/|$)/.test(Astro.url.pathname) ? 'es' : 'en');
+
+const T = {
+  en: {
+    label: 'Keep building with cckit',
+    eyebrow: 'What comes next starts with you',
+    title: ['What if we make', 'that idea?'],
+    text: ['One project. One first step.', 'And good company along the way.'],
+    cta: { text: 'Set it up in your project', href: '/getting-started/install/' },
+    note: ['your next', 'good idea'],
+    caption: 'Kito, ready to start.',
+    home: { label: 'cckit, home', href: '/' },
+    nav: 'Footer links',
+    links: [
+      { text: 'Start here', href: '/' },
+      { text: 'Commands', href: '/cli-reference/' },
+      { text: 'GitHub', href: 'https://github.com/jeiemgi/cckit' },
+    ],
+    line: 'Open source. Make it yours.',
+    pause: 'Pause motion',
+    resume: 'Resume motion',
+  },
+  es: {
+    label: 'Sigue construyendo con cckit',
+    eyebrow: 'Lo siguiente empieza contigo',
+    title: ['¿Y si hacemos', 'esa idea?'],
+    text: ['Un proyecto. Un primer paso.', 'Y buena compañía para seguir.'],
+    cta: { text: 'Mira cómo funciona', href: '/es/learn/how-the-tools-connect/' },
+    note: ['tu próxima', 'buena idea'],
+    caption: 'Kito, listo para empezar.',
+    home: { label: 'cckit, inicio', href: '/es/' },
+    nav: 'Enlaces del pie',
+    links: [
+      { text: 'Empieza aquí', href: '/es/' },
+      { text: 'Comandos (en inglés)', href: '/cli-reference/', hreflang: 'en' },
+      { text: 'GitHub', href: 'https://github.com/jeiemgi/cckit' },
+    ],
+    line: 'Open source. Para hacerlo tuyo.',
+    pause: 'Pausar movimiento',
+    resume: 'Reanudar movimiento',
+  },
+} as const;
+const t = T[lang];
+---
+
+<cckit-footer class="kf not-content" data-pause={t.pause} data-resume={t.resume}>
+  <section aria-label={t.label}>
+    <div class="kf-banner">
+      <Ornament kind="dots" class="kf-dots" />
+      <div class="kf-copy">
+        <p class="kf-eyebrow"><span aria-hidden="true">+</span> {t.eyebrow}</p>
+        <p class="kf-title">{t.title[0]}<br /><span>{t.title[1]}</span></p>
+        <Ornament kind="underline" class="kf-underline" />
+        <p class="kf-description">{t.text[0]}<br />{t.text[1]}</p>
+        <a class="kf-cta" href={t.cta.href}>{t.cta.text} <span aria-hidden="true">↗</span></a>
+      </div>
+      <div class="kf-stage" aria-hidden="true">
+        <svg class="kf-route" viewBox="0 0 280 230"><path class="kf-trail" d="M15 189 C-8 102 133 97 103 42 S208 5 243 60" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 8"></path></svg>
+        <span class="kf-note">{t.note[0]}<br />{t.note[1]} <span>↗</span></span>
+        <Ornament kind="arrow" class="kf-arrow" />
+        <Image class="kf-kito" src={kito} alt="" width={260} densities={[1, 2]} loading="lazy" />
+        <Ornament kind="spark-ochre" class="kf-spark" />
+        <span class="kf-caption">{t.caption}</span>
+      </div>
+    </div>
+    <div class="kf-links">
+      <a class="kf-logo" href={t.home.href} aria-label={t.home.label}><StickerLogo id={`${id}-footer-logo`} /></a>
+      <nav aria-label={t.nav}>
+        {t.links.map((l) => (
+          <a href={l.href} hreflang={'hreflang' in l ? l.hreflang : undefined}>{l.text} <span aria-hidden="true">↗</span></a>
+        ))}
+      </nav>
+    </div>
+    <div class="kf-bottom">
+      <span>{t.line}</span>
+      <button class="kf-motion" type="button" aria-pressed="false" hidden>{t.pause}</button>
+    </div>
+  </section>
+</cckit-footer>
+
+<script>
+  class CckitFooter extends HTMLElement {
+    connectedCallback() {
+      const button = this.querySelector<HTMLButtonElement>('.kf-motion');
+      if (!button) return;
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
+      const update = () => {
+        this.dataset.motion = reduce.matches ? 'off' : 'on';
+        button.hidden = reduce.matches;
+      };
+      update();
+      reduce.addEventListener('change', update);
+      button.addEventListener('click', () => {
+        const paused = this.toggleAttribute('data-paused');
+        button.setAttribute('aria-pressed', String(paused));
+        button.textContent = (paused ? this.dataset.resume : this.dataset.pause) ?? '';
+      });
+    }
+  }
+  if (!customElements.get('cckit-footer')) customElements.define('cckit-footer', CckitFooter);
+</script>
+
+<style>
+  .kf {
+    --kf-bg: #e5ebdc;
+    --kf-ink: #202521;
+    --kf-muted: #4d5c45;
+    --kf-line: #a7b29b;
+    --kf-blue: #2457d6;
+    --kf-on-blue: #fff;
+    display: block;
+    position: relative;
+    margin: 3rem 0 0;
+    background: var(--kf-bg);
+    color: var(--kf-ink);
+    border: 1px solid var(--kf-line);
+    border-radius: 6px;
+    overflow: clip;
+    container-type: inline-size;
+    font-family: var(--sl-font, 'Geist Variable', sans-serif);
+  }
+  :global([data-theme='dark']) .kf {
+    --kf-bg: #29372c;
+    --kf-ink: #f2f4eb;
+    --kf-muted: #c1cdb6;
+    --kf-line: #61755b;
+    --kf-blue: #b4caff;
+    --kf-on-blue: #142348;
+  }
+  .kf p { margin: 0; }
+  .kf-banner {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    gap: 0.5rem;
+    min-height: 20rem;
+    padding: 2.25rem 1.875rem 1.875rem;
+  }
+  .kf-copy { position: relative; z-index: 2; }
+  .kf .kf-eyebrow {
+    display: flex;
+    gap: 0.45rem;
+    align-items: center;
+    margin-bottom: 1.1rem;
+    font: 0.75rem/1.5 var(--sl-font-mono, 'Geist Mono Variable', monospace);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--kf-muted);
+  }
+  .kf-eyebrow > span { color: var(--kf-blue); font-size: 1rem; }
+  .kf .kf-title {
+    position: relative;
+    font-size: clamp(2rem, 6.6cqw, 3.5rem);
+    line-height: 1.03;
+    font-weight: 570;
+    letter-spacing: -0.055em;
+    color: var(--kf-ink);
+  }
+  .kf-title > span { white-space: nowrap; }
+  .kf :global(.kf-underline) { width: 11rem; max-width: 90%; height: 1.45rem; margin: 0.2rem 0 0.4rem; }
+  .kf .kf-description { margin-bottom: 1.4rem; font-size: 1rem; line-height: 1.55; color: var(--kf-muted); }
+  .kf-cta {
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    min-height: 2.875rem;
+    padding: 0.7rem 1rem;
+    background: var(--kf-blue);
+    border: 1px solid var(--kf-blue);
+    border-radius: 4px;
+    color: var(--kf-on-blue);
+    font-size: 1rem;
+    font-weight: 570;
+    text-decoration: none;
+    box-shadow: 3px 3px 0 var(--kf-bg), 4px 4px 0 var(--kf-ink);
+  }
+  .kf-cta:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--kf-bg), 5px 5px 0 var(--kf-ink); }
+  .kf-cta:active { transform: translate(2px, 2px); box-shadow: none; }
+  .kf-stage { position: relative; justify-self: end; width: 100%; max-width: 19rem; min-width: 0; min-height: 16.25rem; }
+  .kf :global(.kf-kito) {
+    position: absolute;
+    right: -4px;
+    bottom: 1.6rem;
+    z-index: 2;
+    width: 100%;
+    max-width: 16.25rem;
+    height: auto;
+    transform: rotate(-5deg);
+    transform-origin: 50% 90%;
+  }
+  .kf-note {
+    position: absolute;
+    z-index: 3;
+    top: 0.45rem;
+    right: 1.3rem;
+    padding: 0.85rem 1.4rem 0.8rem 0.85rem;
+    font: 0.8125rem/1.4 var(--sl-font-mono, 'Geist Mono Variable', monospace);
+    color: #493c17;
+    background: #edda98;
+    transform: rotate(9deg);
+    box-shadow: 3px 4px 0 #00000016;
+  }
+  .kf-note > span { position: absolute; top: 0.3rem; right: 0.45rem; }
+  .kf :global(.kf-arrow) { position: absolute; z-index: 3; top: 2.8rem; left: -1rem; width: 3.75rem; height: 3.75rem; transform: rotate(-25deg); }
+  .kf :global(.kf-spark) { position: absolute; z-index: 3; right: -0.4rem; bottom: 5.1rem; width: 3rem; height: 3rem; }
+  .kf :global(.kf-dots) { position: absolute; top: -1rem; right: -1rem; width: 11.9rem; height: 6.9rem; opacity: 0.38; }
+  .kf-route { position: absolute; top: 0; left: -10px; width: 110%; height: 90%; color: var(--kf-line); overflow: visible; }
+  .kf-caption { position: absolute; right: 0; bottom: -0.2rem; color: var(--kf-muted); font: 0.75rem/1.5 var(--sl-font-mono, 'Geist Mono Variable', monospace); }
+  .kf-links { display: flex; align-items: center; gap: 1rem; margin: 0 1.875rem; padding: 1rem 0; border-top: 1px solid var(--kf-line); }
+  .kf-logo { display: inline-flex; align-items: center; min-height: 2.75rem; }
+  .kf-logo :global(.logo-art) { display: block; width: 5.5rem; height: 2.4rem; }
+  .kf nav { display: flex; flex-wrap: wrap; align-items: center; gap: 0 1.1rem; margin-left: auto; }
+  .kf nav a { display: inline-flex; align-items: center; gap: 0.3rem; min-height: 2.75rem; color: var(--kf-ink); font-size: 0.9375rem; text-decoration: none; }
+  .kf nav a:hover { text-decoration: underline; text-underline-offset: 5px; }
+  .kf a:focus-visible, .kf button:focus-visible { outline: 3px solid var(--kf-blue); outline-offset: 4px; }
+  .kf-bottom {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0 0.75rem;
+    margin: 0 1.875rem;
+    padding: 0 0 0.9rem;
+    color: var(--kf-muted);
+    font: 0.8125rem/1.5 var(--sl-font-mono, 'Geist Mono Variable', monospace);
+  }
+  .kf-motion {
+    min-height: 2.75rem;
+    padding: 0 0.15rem;
+    border: 0;
+    background: transparent;
+    color: var(--kf-muted);
+    font: inherit;
+    text-decoration: underline;
+    text-underline-offset: 4px;
+    cursor: pointer;
+  }
+  .kf [hidden] { display: none; }
+  @media (prefers-reduced-motion: no-preference) {
+    .kf-cta { transition: transform 160ms ease, box-shadow 160ms ease; }
+    .kf[data-motion='on'] :global(.kf-kito) { animation: kito-rock 6s ease-in-out infinite; }
+    .kf[data-motion='on'] .kf-note { animation: note-float 7s ease-in-out infinite; }
+    .kf[data-motion='on'] :global(.kf-spark) { animation: spark-turn 8s ease-in-out infinite; }
+    .kf[data-motion='on'] .kf-trail { animation: trail-move 16s linear infinite; }
+    .kf[data-motion='on'][data-paused] :global(.kf-kito),
+    .kf[data-motion='on'][data-paused] .kf-note,
+    .kf[data-motion='on'][data-paused] :global(.kf-spark),
+    .kf[data-motion='on'][data-paused] .kf-trail { animation-play-state: paused; }
+  }
+  @keyframes kito-rock { 0%, 100% { transform: translateY(0) rotate(-5deg); } 50% { transform: translateY(-6px) rotate(-2deg); } }
+  @keyframes note-float { 0%, 100% { transform: translateY(0) rotate(9deg); } 50% { transform: translateY(-7px) rotate(5deg); } }
+  @keyframes spark-turn { 0%, 100% { transform: rotate(-8deg) scale(0.94); } 50% { transform: rotate(12deg) scale(1.05); } }
+  @keyframes trail-move { to { stroke-dashoffset: -110; } }
+  /* Narrow: the copy first, then a smaller stage on the right; the links stack under the logo. */
+  @container (max-width: 34rem) {
+    .kf-banner { grid-template-columns: 1fr; gap: 0.8rem; min-height: 0; padding: 1.75rem 1.25rem 1.25rem; }
+    .kf-stage { width: 13.75rem; min-height: 16.5rem; justify-self: end; }
+    .kf-note { right: 0.9rem; }
+    .kf :global(.kf-kito) { right: 5px; bottom: 1.4rem; width: 11.9rem; }
+    .kf :global(.kf-arrow) { left: 0; }
+    .kf-links { flex-direction: column; align-items: flex-start; gap: 0; margin-inline: 1.25rem; }
+    .kf nav { margin-left: 0; }
+    .kf-bottom { margin-inline: 1.25rem; }
+  }
+</style>
