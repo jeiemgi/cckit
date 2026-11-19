@@ -292,6 +292,7 @@ cat > "$stub/khook" <<'SH'
 #!/usr/bin/env bash
 printf 'ingested %s\n' "$1" > "$KHOOK_MARKER"
 pwd -P > "$KHOOK_MARKER.cwd" 2>/dev/null || echo "NO-CWD" > "$KHOOK_MARKER.cwd"
+[ -z "${KHOOK_SAY:-}" ] || echo "$KHOOK_SAY"
 SH
 chmod +x "$stub/khook"
 start_out="$(effort_start 88 forced 2>/dev/null)"
@@ -310,6 +311,28 @@ t  "knowledge-ingest hook ran with the effort number" "$(cat "$tmp/khook.out" 2>
 t  "knowledge-ingest hook runs in the main checkout" "$(cat "$tmp/khook.out.cwd" 2>/dev/null)" "$(cd "$tmp/work" && pwd -P)"
 # #148: no kit-managed file touched → the drift check stays silent
 case "$forced_out" in *"kit-sync"*) echo "FAIL: kit-sync warning fired with no kit-managed change"; fail=1 ;; *) echo "ok: drift check silent when no kit-managed file changed" ;; esac
+
+# #518: bin/cckit exports KIT_CONFIG as the config found from $PWD — the effort worktree's copy —
+# and the close removes that worktree before the post-close hook is looked up. The hook named in
+# the config must still run, read from the main checkout's copy.
+mkdir -p "$tmp/work/.claude"
+printf '{"effort":{"knowledgeIngestHook":"%s"}}\n' "$stub/khook" > "$tmp/work/.claude/kit.config.json"
+effort_start 87 from-config-hook >/dev/null 2>&1
+cd "$tmp/work/.claude/worktrees/effort+87-from-config-hook"
+mkdir -p .claude && cp "$tmp/work/.claude/kit.config.json" .claude/kit.config.json
+rm -f "$tmp/khook.out" "$tmp/khook.out.cwd"
+cfg_out="$(KIT_CONFIG="$PWD/.claude/kit.config.json" KHOOK_MARKER="$tmp/khook.out" KHOOK_SAY="hook says hello" KIT_FORCE=1 effort_close 87 2>&1)"
+cd "$tmp/work"
+t  "post-close hook from the config runs after its worktree is gone" "$(cat "$tmp/khook.out" 2>/dev/null)" "ingested 87"
+case "$cfg_out" in *"hook says hello"*) echo "ok: post-close hook output reaches the close output" ;; *) echo "FAIL: post-close hook output was discarded: $cfg_out"; fail=1 ;; esac
+rm -f "$tmp/work/.claude/kit.config.json"
+# With no config left anywhere, the close says the hook could not be read; it does not stay silent.
+effort_start 86 config-gone >/dev/null 2>&1
+cd "$tmp/work/.claude/worktrees/effort+86-config-gone"
+mkdir -p .claude && printf '{"effort":{"knowledgeIngestHook":"%s"}}\n' "$stub/khook" > .claude/kit.config.json
+gone_out="$(KIT_CONFIG="$PWD/.claude/kit.config.json" KHOOK_MARKER="$tmp/khook.out" KIT_FORCE=1 effort_close 86 2>&1)"
+cd "$tmp/work"
+case "$gone_out" in *"post-close hook not read"*) echo "ok: a config that vanished with the worktree is reported" ;; *) echo "FAIL: vanished config stayed silent: $gone_out"; fail=1 ;; esac
 
 # ── effort_close #164: WAVE-style close — subs merged as individual task PRs, no effort branch ──
 # Run from the main checkout on a non-effort branch with NO effort/<N>-* branch anywhere: the close
