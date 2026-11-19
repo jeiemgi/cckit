@@ -1,0 +1,27 @@
+[
+  {
+    "file": "trio-approved.png",
+    "source": "exec-6cf25061-db01-4ef0-8d6e-a027939f7daa.png",
+    "sha256": "dc1ab0bb174ac45b3e6fe4c47e39f2e02b27818c569db83c4564ace63658a78d"
+  },
+  {
+    "file": "kito-poses.png",
+    "source": "exec-3879bc71-8811-47f9-adb7-6f174756c731.png",
+    "sha256": "0ec8efee5eb54eb80475a6a8e5b28435f39f1ec130e5d58056e9a7170dbfd5e7"
+  },
+  {
+    "file": "ticket-poses.png",
+    "source": "exec-29677d59-233a-43bc-a6d0-591b1e79efa4.png",
+    "sha256": "4121474698442401607ebb93b9c80b07db88adeb7262275fc5a1985b81253c65"
+  },
+  {
+    "file": "usb-poses.png",
+    "source": "exec-e121fca3-c46f-4052-bf74-566e0889b59f.png",
+    "sha256": "246bea3616ec32bc4fcaf8653a42a848af7601f5beec775314b48c186ee0d141"
+  },
+  {
+    "file": "cckit-logo-approved.png",
+    "source": "exec-82c8588d-e03d-42ad-a695-7d0510b3ea13.png",
+    "sha256": "ea5c45b9b723e3da917c836d56ccb934b85eba0b0399e99ece944879b4858dd5"
+  }
+]

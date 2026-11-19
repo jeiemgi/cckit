@@ -1,0 +1,50 @@
+---
+title: Cómo se conectan las herramientas
+description: Qué hace cada parte (tu agente de código, cckit, tu proyecto y GitHub) y cómo viaja un cambio pequeño entre ellas, desde tu pedido hasta un pull request revisado.
+---
+
+import { Image } from 'astro:assets';
+import ToolsMap from '../../../../components/learning/ToolsMap.astro';
+import StagedScene from '../../../../components/learning/StagedScene.astro';
+import { smallChange } from '../../../../components/learning/content';
+import trio from '../../../../components/learning/assets/trio-approved.png';
+
+Ya conversas con un agente de código. cckit añade a esa conversación una secuencia fija de pasos: cada cambio queda anotado, se hace aparte de tus archivos principales y se revisa antes de entrar al proyecto. Esta página muestra las partes que intervienen y sigue un cambio a través de ellas.
+
+<Image src={trio} alt="" width={640} />
+
+Leer esta página no requiere instalar nada. Para hacer lo mismo en tu proyecto necesitas un agente de código (Claude Code o Codex), [cckit instalado](/getting-started/install/), una cuenta de GitHub con la sesión iniciada y un proyecto en el que ya se ejecutó [`cckit init`](/getting-started/initialize/). Esas dos páginas están en inglés.
+
+[Read this page in English](/learn/how-the-tools-connect/)
+
+## Las partes y qué las conecta
+
+<ToolsMap />
+
+## Un cambio pequeño, paso a paso
+
+El ejemplo es una app pequeña de citas: un visitante elige un servicio, ve los horarios libres y reserva uno. No tienes que construirla. En tu proyecto, elige una mejora pequeña que puedas comprobar y dísela a tu agente con tus palabras, por ejemplo:
+
+```text
+Quiero que cada servicio muestre cuánto dura antes de que el visitante elija un horario.
+Regístralo como trabajo de este proyecto con cckit y empieza a hacerlo.
+```
+
+<StagedScene scene={smallChange} />
+
+## Después de la revisión: dos acciones separadas
+
+La escena termina en un pull request revisado porque las dos acciones siguientes son decisiones, y ninguna ocurre por sí sola.
+
+- **Merge.** Hacer merge es incorporar el cambio propuesto a la versión del proyecto que todos comparten. Lo decide una persona. Cuando lo indicas, tu agente ejecuta `cckit merge`: fusiona el pull request, cierra el issue enlazado y elimina la rama y el worktree de ese cambio.
+- **Despliegue.** Poner el cambio en línea no es parte de cckit. Que un merge publique algo depende de cómo esté configurado el alojamiento de tu proyecto, y eso se configura aparte de cckit.
+
+## Si tu proyecto lleva su lista de trabajo en archivos
+
+No todos los proyectos registran el trabajo como issues de GitHub. Con las tareas ligeras (light tasks) la lista es un archivo por tarea dentro del proyecto, y los comandos son `cckit task new`, `cckit task start` y `cckit task finish`. La lista no necesita una cuenta de GitHub. La revisión sí: terminar una tarea abre un pull request en GitHub. [Tasks without GitHub issues](/project-management/light-tasks/) tiene los detalles, en inglés.
+
+## Siguiente
+
+- [Instalar cckit](/getting-started/install/) (en inglés)
+- [Preparar un proyecto](/getting-started/initialize/) (en inglés)
+- [Take an issue to merged](/development/issue-to-merged-pr/): los mismos pasos con cada comando y su salida (en inglés)
