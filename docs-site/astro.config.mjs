@@ -8,6 +8,7 @@ import sitemap from '@astrojs/sitemap';
 import rehypeExternalLinks from 'rehype-external-links';
 import marketingWords from './src/integrations/marketing-words.mjs';
 import rehypeRecordTables from './src/lib/rehype-record-tables.mjs';
+import { isTranslated } from './src/lib/translated.mjs';
 
 // .env files are NOT injected into process.env inside astro.config.mjs. Vercel DOES populate
 // process.env from the project's env vars at build, so prefer that; locally, fall back to parsing
@@ -128,11 +129,11 @@ export default defineConfig({
     react(),
     starlight({
       title: 'cckit',
-      // Two languages, one translated section. English is served at the root; Spanish under /es/.
-      // Only the Marketing pages exist in Spanish (src/content/docs/es/marketing/). Starlight
-      // still builds an English fallback copy of every other page under /es/; those copies are
-      // kept out of the sitemap below and marked noindex by the route middleware, and the language
-      // picker is rendered on Marketing pages only (src/components/LanguageSelect.astro).
+      // Two languages. English is served at the root; Spanish under /es/. A page is Spanish when
+      // its file exists under src/content/docs/es/ (src/lib/translated.mjs). Starlight still builds
+      // an English fallback copy of every other page under /es/; those copies are kept out of the
+      // sitemap below and marked noindex by the route middleware, and the language picker is
+      // rendered only on a page that exists in both languages (src/components/LanguageSelect.astro).
       defaultLocale: 'root',
       locales: {
         root: { label: 'English', lang: 'en' },
@@ -151,7 +152,9 @@ export default defineConfig({
           ]
         : [],
       // Wrap long code lines instead of a horizontal scrollbar (the long copilot prompts especially).
-      expressiveCode: { defaultProps: { wrap: true } },
+      // One dark syntax theme: a code block is the terminal in both site themes, and its frame
+      // colours come from src/styles/theme.css.
+      expressiveCode: { themes: ['github-dark'], defaultProps: { wrap: true } },
       // Header version badge — prepended to the social icons (see src/components/SocialIcons.astro).
       // Footer override mounts the dev-only annotation toolbar (stripped from production).
       components: {
@@ -163,12 +166,11 @@ export default defineConfig({
         // Head override swaps the single global og.png for a per-page generated card
         // (/og/<id>.png). Its per-page og:image/twitter:image replace the global ones below.
         Head: './src/components/Head.astro',
-        // Header override lays out the top bar: wordmark, centred search, Software / Marketing switch,
-        // version, GitHub, theme and language (src/components/Header.astro).
+        // Header override lays out the top bar: logo, centred search, version, GitHub, language
+        // and theme (src/components/Header.astro). SiteTitle is the approved illustrated logo.
         Header: './src/components/Header.astro',
-        // ThemeProvider override: Marketing opens light when the reader has not chosen a theme.
-        ThemeProvider: './src/components/ThemeProvider.astro',
-        // LanguageSelect override shows the picker on Marketing pages only.
+        SiteTitle: './src/components/SiteTitle.astro',
+        // LanguageSelect override shows the picker only on a page that exists in both languages.
         LanguageSelect: './src/components/LanguageSelect.astro',
         ...(DEV ? { PageSidebar: './src/components/DevAnnotate.astro' } : {}),
       },
@@ -207,22 +209,18 @@ export default defineConfig({
             ]
           : []),
       ],
-      // The Designer owns the visual theme — this file is the single hook (elegant + sober,
-      // never Claude/Anthropic colors). Placeholder until the Designer's spec lands.
+      // The visual theme lives in one file.
       customCss: ['./src/styles/theme.css'],
-      // Per-track sidebars: this one array holds the entries of both tracks, and the route
-      // middleware keeps only the entries of the track a page belongs to (src/routeData.ts).
+      // Opens the group of an unlisted page, and settles hreflang and noindex per page.
       routeMiddleware: './src/routeData.ts',
-      // Software: 43 entries. One link to the track's entry page, then the six areas in the order a
-      // team works in, the optional Memory area, then Reference. Every group is collapsed; Starlight opens the group that holds the
-      // current page. A Software page that is not listed here is linked from its area's "More
-      // guides" page or from /reference/, and search covers all of them.
+      // ONE sidebar for every page. Two links to begin with (the visual entry and how the parts
+      // connect), the guides by area in the order a team works in, the optional Memory area, the
+      // Marketing use case, Concepts, then Reference. Every group is collapsed; Starlight opens
+      // the group that holds the current page. A page that is not listed here is linked from its
+      // area's "More guides" page or from /reference/, and search covers all of them.
       sidebar: [
-        { label: 'Start here', slug: 'software' },
-        { label: 'Philosophy', collapsed: true, items: [
-          { label: 'The idea', slug: 'philosophy' },
-          { label: 'The team: you and the agents', slug: 'philosophy/the-team' },
-        ]},
+        { label: 'Start here', translations: { es: 'Empieza aquí' }, slug: 'index' },
+        { label: 'How it works, part by part', translations: { es: 'Cómo funciona, parte por parte' }, slug: 'learn/how-the-tools-connect' },
         { label: 'Getting started', collapsed: true, items: [
           { label: 'What you set up, and why', slug: 'getting-started' },
           { label: 'Install and check', slug: 'getting-started/install' },
@@ -271,19 +269,10 @@ export default defineConfig({
           { label: 'Install MemPalace', slug: 'memory/install-mempalace' },
           { label: 'How cckit uses memory', slug: 'memory/how-cckit-uses-it' },
         ]},
-        { label: 'Reference', collapsed: true, items: [
-          { label: 'CLI reference', slug: 'cli-reference' },
-          { label: 'Config and permissions', slug: 'config-and-permissions' },
-          { label: 'Integrations', slug: 'integrations' },
-          { label: 'Skills cckit ships', slug: 'skills' },
-          { label: 'Rules cckit ships', slug: 'rules' },
-          { label: 'All reference pages', slug: 'reference' },
-        ]},
-        // Marketing: 15 pages in six groups, in the order a reader goes through them (each page's
-        // "Next:" link is the following entry), for a reader who never opens
-        // a terminal. The middleware drops the outer group heading, shows the inner groups at the top
-        // level and opens them all, on every page under /marketing/.
-        { label: 'Marketing', translations: { es: 'Marketing' }, items: [
+        // The Marketing use case: 15 pages in six groups, in the order a reader goes through them
+        // (each page's "Next:" link is the following entry), for a reader who never opens a
+        // terminal. These are the pages that exist in Spanish.
+        { label: 'For marketing teams', translations: { es: 'Para equipos de marketing' }, collapsed: true, items: [
           { label: 'Start here: what you can hand over', translations: { es: 'Empieza aquí: qué puedes delegar' }, slug: 'marketing' },
           { label: 'How it works', translations: { es: 'Cómo funciona' }, items: [
             { label: 'What happens after you hand it over', translations: { es: 'Qué pasa una vez que lo delegas' }, slug: 'marketing/how-we-work' },
@@ -312,17 +301,29 @@ export default defineConfig({
             { label: 'Words you will hear', translations: { es: 'Palabras que vas a escuchar' }, slug: 'marketing/words-you-will-hear' },
           ]},
         ]},
+        { label: 'Concepts', translations: { es: 'Conceptos' }, collapsed: true, items: [
+          { label: 'How an agency builds software', slug: 'software' },
+          { label: 'The idea', slug: 'philosophy' },
+          { label: 'The team: you and the agents', slug: 'philosophy/the-team' },
+        ]},
+        { label: 'Reference', translations: { es: 'Referencia' }, collapsed: true, items: [
+          { label: 'CLI reference', slug: 'cli-reference' },
+          { label: 'Config and permissions', slug: 'config-and-permissions' },
+          { label: 'Integrations', slug: 'integrations' },
+          { label: 'Skills cckit ships', slug: 'skills' },
+          { label: 'Rules cckit ships', slug: 'rules' },
+          { label: 'All reference pages', slug: 'reference' },
+        ]},
       ],
     }),
     // Starlight uses this sitemap integration instead of its default when one is present. Keep the
-    // /social/ export templates (IG feed + story cards) out of the sitemap — they're internal
-    // manual-post assets, not pages we want crawled or indexed. Under /es/ only the Marketing pages
-    // are Spanish; every other /es/ URL is an English fallback copy and stays out too.
+    // /social/ export templates and the /design/ study out of the sitemap: they are internal, not
+    // pages to crawl. Under /es/ only a real translation is listed; an English fallback copy is not.
     sitemap({
       filter: (page) => {
         const path = new URL(page).pathname;
-        if (path.includes('/social/')) return false;
-        return !path.startsWith('/es/') || path.startsWith('/es/marketing/');
+        if (path.includes('/social/') || path.startsWith('/design/')) return false;
+        return !path.startsWith('/es/') || isTranslated(path);
       },
     }),
   ],

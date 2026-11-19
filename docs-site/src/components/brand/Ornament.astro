@@ -1,0 +1,35 @@
+---
+// Ornament — one ink accent cut from the approved ornament sheet (docs/design/512). Decorative:
+// it is hidden from assistive technology and takes no pointer events. The caller sizes it with a
+// class; the drawing keeps its proportions inside that box.
+//
+//   <Ornament kind="underline" class="my-ink" />
+import { Image } from 'astro:assets';
+import arrow from './assets/ornament-arrow.webp';
+import corner from './assets/ornament-corner.webp';
+import dots from './assets/ornament-dots.webp';
+import spark from './assets/ornament-spark.webp';
+import sparkOchre from './assets/ornament-spark-ochre.webp';
+import tape from './assets/ornament-tape.webp';
+import underline from './assets/ornament-underline.webp';
+
+const files = { arrow, corner, dots, spark, 'spark-ochre': sparkOchre, tape, underline } as const;
+
+interface Props {
+  kind: keyof typeof files;
+  class?: string;
+}
+const { kind, class: className } = Astro.props;
+const file = files[kind];
+---
+
+<Image
+  src={file}
+  alt=""
+  aria-hidden="true"
+  class:list={['brand-ornament', className]}
+  width={file.width}
+  height={file.height}
+  loading="lazy"
+  style="display:block;object-fit:contain;pointer-events:none;user-select:none;max-width:none;margin:0"
+/>

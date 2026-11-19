@@ -1,0 +1,329 @@
+---
+// ToolsMap — the parts a change passes through (you, your agent, cckit, your project, GitHub) and
+// what each one does to the next. Everything is HTML rendered at build time: the parts are a list of
+// cards and each connection is a row "from → action → to" with one sentence under it. Nothing is
+// drawn on a canvas and no text is scaled to fit, so it reads at 320px and with JavaScript off.
+//
+// With JavaScript, each card gains a button that marks the connections of that part; the other
+// rows stay on the page, dimmed.
+//
+//   import ToolsMap from '../../../components/learning/ToolsMap.astro';
+//   <ToolsMap />
+//
+// Text comes from ./content.ts (English and Spanish); the language follows the page path.
+import { langOf, toolsMap, type ToolId } from './content';
+
+interface Props {
+  lang?: 'en' | 'es';
+}
+const lang = Astro.props.lang ?? langOf(Astro.url.pathname);
+const c = toolsMap[lang];
+const name = (id: ToolId) => c.tools.find((t) => t.id === id)!.name;
+const pick = lang === 'es' ? 'Marcar sus conexiones' : 'Mark its connections';
+const pickFull = (n: string) => (lang === 'es' ? `Marcar las conexiones de ${n}` : `Mark the connections of ${n}`);
+---
+
+<cckit-tools-map
+  class="lm not-content"
+  data-filter-status={c.filterStatus}
+  data-all-status={c.allStatus}
+>
+  <section aria-label={c.label}>
+    <p class="lm-heading">{c.toolsHeading}</p>
+    <ul class="lm-tools">
+      {
+        c.tools.map((t) => (
+          <li class="lm-tool" data-tool={t.id}>
+            <p class="lm-name">{t.name}</p>
+            <p class="lm-kind">{t.kind}</p>
+            <p class="lm-role">{t.role}</p>
+            <button type="button" class="lm-pick" data-pick={t.id} data-name={t.name} aria-pressed="false" aria-label={pickFull(t.name)} hidden>
+              {pick}
+            </button>
+          </li>
+        ))
+      }
+    </ul>
+
+    <p class="lm-heading">{c.relationsHeading}</p>
+    <div class="lm-bar" hidden>
+      <p class="lm-status" role="status">{c.filterHint}</p>
+      <button type="button" class="lm-all" hidden>{c.showAll}</button>
+    </div>
+    <ol class="lm-relations">
+      {
+        c.relations.map((r) => (
+          <li class="lm-relation" data-from={r.from} data-to={r.to}>
+            <p class="lm-edge">
+              <span class="lm-chip" data-tool={r.from}>{name(r.from)}</span>
+              <span class="lm-action">
+                <span class="lm-arrow" aria-hidden="true">→</span>
+                {r.action}
+                <span class="lm-arrow" aria-hidden="true">→</span>
+              </span>
+              <span class="lm-chip" data-tool={r.to}>{name(r.to)}</span>
+            </p>
+            <p class="lm-detail" set:html={r.detail} />
+          </li>
+        ))
+      }
+    </ol>
+  </section>
+</cckit-tools-map>
+
+<script>
+  class CckitToolsMap extends HTMLElement {
+    connectedCallback() {
+      const picks = [...this.querySelectorAll<HTMLButtonElement>('.lm-pick')];
+      const rows = [...this.querySelectorAll<HTMLElement>('.lm-relation')];
+      const bar = this.querySelector<HTMLElement>('.lm-bar');
+      const status = this.querySelector<HTMLElement>('.lm-status');
+      const all = this.querySelector<HTMLButtonElement>('.lm-all');
+      if (!bar || !status || !all) return;
+      const hint = status.textContent ?? '';
+      const fill = (text: string, values: Record<string, string | number>) =>
+        text.replace(/\{(\w+)\}/g, (_, key) => String(values[key] ?? ''));
+
+      const show = (id: string | null, name = '') => {
+        let shown = 0;
+        for (const row of rows) {
+          const on = !id || row.dataset.from === id || row.dataset.to === id;
+          // The rows of other parts stay on the page, dimmed: the whole model remains readable.
+          row.toggleAttribute('data-dim', !on);
+          if (on) shown++;
+        }
+        for (const p of picks) p.setAttribute('aria-pressed', String(p.dataset.pick === id));
+        for (const card of this.querySelectorAll<HTMLElement>('.lm-tool')) {
+          card.toggleAttribute('data-current', card.dataset.tool === id);
+        }
+        all.hidden = !id;
+        status.textContent = id
+          ? fill(this.dataset.filterStatus ?? '', { n: shown, total: rows.length, name })
+          : hint;
+      };
+
+      for (const p of picks) {
+        p.hidden = false;
+        p.addEventListener('click', () => {
+          const pressed = p.getAttribute('aria-pressed') === 'true';
+          show(pressed ? null : (p.dataset.pick ?? null), p.dataset.name);
+        });
+      }
+      all.addEventListener('click', () => {
+        const current = picks.find((p) => p.getAttribute('aria-pressed') === 'true');
+        show(null);
+        // The button that was just used disappears: hand focus back to the card that was selected.
+        current?.focus();
+      });
+      bar.hidden = false;
+    }
+  }
+  if (!customElements.get('cckit-tools-map')) customElements.define('cckit-tools-map', CckitToolsMap);
+</script>
+
+<style>
+  /* Colours: text, surfaces and the action colour come from the site theme (src/styles/theme.css).
+     The five part colours below are the brand colours of docs/design/512/README.md, adjusted per
+     theme so the 4px card edge and the chip outline reach 3:1 against the surface they sit on.
+     They mark which part a row names; the name is always written next to them. */
+  .lm {
+    --lm-you: #a3a3a8;
+    --lm-agent: #f2f4eb;
+    --lm-cckit: #6f93ee;
+    --lm-project: #8fa878;
+    --lm-github: #d4af59;
+    --lm-surface: var(--sl-color-gray-6);
+    --lm-edge: var(--sl-color-gray-5);
+    display: block;
+    margin-block: 1.5rem;
+    color: var(--sl-color-text);
+    font-size: 1rem;
+    line-height: 1.55;
+  }
+  :global([data-theme='light']) .lm {
+    --lm-you: #636368;
+    --lm-agent: #202521;
+    --lm-cckit: #2457d6;
+    --lm-project: #58733f;
+    --lm-github: #8a6a12;
+    --lm-surface: #ffffff;
+    --lm-edge: var(--sl-color-gray-5);
+  }
+  .lm p,
+  .lm li {
+    margin: 0;
+  }
+  .lm .lm-tool,
+  .lm .lm-relation {
+    margin: 0;
+  }
+  .lm-heading {
+    margin: 1.75rem 0 0.75rem !important;
+    color: var(--sl-color-white);
+    font-size: 1.125rem;
+    font-weight: 600;
+  }
+  .lm-heading:first-child {
+    margin-top: 0 !important;
+  }
+
+  .lm-tools,
+  .lm-relations {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.75rem;
+  }
+  .lm-tools {
+    grid-template-columns: repeat(auto-fit, minmax(13.5rem, 1fr));
+  }
+  .lm-tool {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.875rem 1rem;
+    background: var(--lm-surface);
+    border: 1px solid var(--lm-edge);
+    border-inline-start: 4px solid var(--lm-part);
+    border-radius: 0.5rem;
+  }
+  .lm-tool[data-current] {
+    border-color: var(--lm-part);
+  }
+  [data-tool='you'] {
+    --lm-part: var(--lm-you);
+  }
+  [data-tool='agent'] {
+    --lm-part: var(--lm-agent);
+  }
+  [data-tool='cckit'] {
+    --lm-part: var(--lm-cckit);
+  }
+  [data-tool='project'] {
+    --lm-part: var(--lm-project);
+  }
+  [data-tool='github'] {
+    --lm-part: var(--lm-github);
+  }
+  .lm-name {
+    color: var(--sl-color-white);
+    font-weight: 600;
+    font-size: 1.0625rem;
+  }
+  .lm-kind {
+    color: var(--sl-color-gray-3);
+    font-size: 0.875rem;
+  }
+  .lm-role {
+    flex: 1;
+    margin-top: 0.25rem !important;
+  }
+
+  .lm button {
+    font: inherit;
+    font-size: 0.9375rem;
+    min-height: 2.5rem;
+    padding: 0.375rem 0.75rem;
+    color: var(--sl-color-white);
+    background: var(--cckit-field-bg, transparent);
+    border: 1px solid var(--cckit-field-border, currentColor);
+    border-radius: 0.375rem;
+    cursor: pointer;
+  }
+  .lm button:hover {
+    border-color: var(--sl-color-white);
+  }
+  .lm button:focus-visible {
+    outline: 3px solid var(--sl-color-text-accent);
+    outline-offset: 2px;
+  }
+  .lm-pick {
+    align-self: flex-start;
+    margin-top: 0.5rem;
+  }
+  .lm-pick[aria-pressed='true'] {
+    color: var(--sl-color-text-invert);
+    background: var(--sl-color-accent);
+    border-color: var(--sl-color-accent);
+  }
+
+  .lm-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 1rem;
+    margin-bottom: 0.75rem;
+  }
+  .lm-bar[hidden],
+  .lm [hidden] {
+    display: none;
+  }
+  .lm-status {
+    color: var(--sl-color-gray-3);
+    font-size: 0.9375rem;
+  }
+
+  .lm-relation[data-dim] {
+    opacity: 0.55;
+    border-style: dashed;
+  }
+  .lm-relation {
+    padding: 0.875rem 1rem;
+    background: var(--lm-surface);
+    border: 1px solid var(--lm-edge);
+    border-radius: 0.5rem;
+  }
+  /* One connection reads on one line when there is room and stacks, top to bottom, when not. */
+  .lm-edge {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.375rem 0.625rem;
+  }
+  .lm-chip {
+    padding: 0.125rem 0.625rem;
+    color: var(--sl-color-white);
+    font-weight: 600;
+    border: 2px solid var(--lm-part);
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .lm-action {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 0.375rem;
+    color: var(--sl-color-white);
+  }
+  .lm-arrow {
+    color: var(--sl-color-gray-3);
+  }
+  .lm-detail {
+    margin-top: 0.5rem !important;
+  }
+  .lm :global(code) {
+    padding: 0.0625rem 0.3125rem;
+    font-family: var(--__sl-font-mono, ui-monospace, monospace);
+    font-size: 0.9em;
+    color: var(--sl-color-white);
+    background: var(--sl-color-bg);
+    border: 1px solid var(--lm-edge);
+    border-radius: 0.25rem;
+    overflow-wrap: anywhere;
+  }
+  @media (max-width: 30rem) {
+    .lm-edge {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    .lm-action .lm-arrow:first-child {
+      display: none;
+    }
+    .lm-action .lm-arrow:last-child {
+      display: inline-block;
+      transform: rotate(90deg);
+    }
+  }
+</style>

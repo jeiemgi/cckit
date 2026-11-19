@@ -1,0 +1,589 @@
+---
+// ChangeStory — the entry scene: one improvement to the example booking app in three moments.
+//   1. You ask for a change        a chat message, beside the app without durations
+//   2. Your agent prepares it      what cckit sets up (instructions, the request written down, a
+//      with cckit                  separate copy) and what the agent does there
+//   3. You review the result       the proposed change, beside the app with durations
+// Each moment has one sentence and objects that change; the app sits in the same place in all
+// three, so moving between moments shows it changing.
+//
+// Without JavaScript the three moments are on the page in order, each complete. With JavaScript
+// they become three numbered tabs (arrow keys move between them) and a Next button. There is no
+// automatic play. The scene is labelled once as an illustration.
+//
+//   import ChangeStory from '../../../components/learning/ChangeStory.astro';
+//   <ChangeStory />
+import { Image } from 'astro:assets';
+import BookingApp from './BookingApp.astro';
+import { langOf, changeStory, type Lang } from './content';
+import kito from './assets/kito-pointing.webp';
+
+interface Props {
+  lang?: Lang;
+}
+const lang = Astro.props.lang ?? langOf(Astro.url.pathname);
+const c = changeStory[lang];
+const m = c.moments;
+const order = [
+  { id: 'ask', title: m.ask.title },
+  { id: 'prepare', title: m.prepare.title },
+  { id: 'review', title: m.review.title },
+];
+const first = c.app.services[0];
+---
+
+<cckit-change-story class="cs not-content">
+  <section aria-label={c.label}>
+    <div class="cs-tabs" role="tablist" aria-label={c.tabsLabel} hidden>
+      {
+        order.map((o, i) => (
+          <button type="button" role="tab" class="cs-tab" id={`cs-tab-${o.id}`} aria-controls={`cs-${o.id}`} aria-selected={i === 0 ? 'true' : 'false'} tabindex={i === 0 ? 0 : -1}>
+            <span class="cs-n" aria-hidden="true">{i + 1}</span>
+            <span class="cs-tab-name">{o.title}</span>
+          </button>
+        ))
+      }
+    </div>
+
+    <ol class="cs-moments">
+      <li class="cs-moment" id="cs-ask" data-tab="cs-tab-ask">
+        <p class="cs-head"><span class="cs-n" aria-hidden="true">1</span><strong class="cs-title">{m.ask.title}</strong></p>
+        <p class="cs-line">{m.ask.line}</p>
+        <div class="cs-stage">
+          <div class="cs-side">
+            <div class="cs-chat">
+              <p class="cs-who">{m.ask.who}</p>
+              <p class="cs-bubble">{c.request}</p>
+            </div>
+          </div>
+          <BookingApp lang={lang} caption={m.ask.appCaption} />
+          <button type="button" class="cs-next" data-to="cs-tab-prepare" hidden>{c.next}: {m.prepare.title} <span aria-hidden="true">→</span></button>
+        </div>
+      </li>
+
+      <li class="cs-moment" id="cs-prepare" data-tab="cs-tab-prepare">
+        <p class="cs-head"><span class="cs-n" aria-hidden="true">2</span><strong class="cs-title">{m.prepare.title}</strong></p>
+        <p class="cs-line">{m.prepare.line}</p>
+        <div class="cs-stage">
+          <div class="cs-side">
+            <div class="cs-group">
+              <p class="cs-group-name">{m.prepare.fromCckit}</p>
+              <ul class="cs-objects">
+                <li class="cs-doc">
+                  <span class="cs-doc-lines" aria-hidden="true"></span>
+                  <strong>{m.prepare.instructions.name}</strong>
+                  <span>{m.prepare.instructions.sub}</span>
+                </li>
+                <li class="cs-note">
+                  <strong>{m.prepare.record.name}</strong>
+                  <span class="cs-check"><span class="cs-box" aria-hidden="true"></span>{m.prepare.record.check}</span>
+                </li>
+                <li class="cs-copies">
+                  <span class="cs-copy cs-copy-shared"><strong>{m.prepare.copy.shared}</strong><span>{m.prepare.copy.sharedSub}</span></span>
+                  <span class="cs-copy cs-copy-own"><strong>{m.prepare.copy.own}</strong><span>{m.prepare.copy.ownSub}</span></span>
+                </li>
+              </ul>
+            </div>
+            <p class="cs-link" aria-hidden="true">↓</p>
+            <div class="cs-group cs-agent">
+              <Image src={kito} alt="" width={176} class="cs-kito" />
+              <div>
+                <p class="cs-group-name">{m.prepare.fromAgent}</p>
+                <p class="cs-agent-work">{m.prepare.agentWork}</p>
+              </div>
+            </div>
+          </div>
+          <BookingApp lang={lang} caption={m.prepare.appCaption} />
+          <button type="button" class="cs-next" data-to="cs-tab-review" hidden>{c.next}: {m.review.title} <span aria-hidden="true">→</span></button>
+        </div>
+      </li>
+
+      <li class="cs-moment" id="cs-review" data-tab="cs-tab-review">
+        <p class="cs-head"><span class="cs-n" aria-hidden="true">3</span><strong class="cs-title">{m.review.title}</strong></p>
+        <p class="cs-line">{m.review.line}</p>
+        <div class="cs-stage cs-stage-result">
+          <div class="cs-side">
+            <div class="cs-review">
+              <p class="cs-review-kind">{m.review.card}</p>
+              <p class="cs-review-title">{c.requestShort}</p>
+              <dl class="cs-diff">
+                <div><dt>{m.review.before}</dt><dd><span class="cs-pill">{first.name}</span></dd></div>
+                <div><dt>{m.review.after}</dt><dd><span class="cs-pill">{first.name}</span><span class="cs-pill cs-pill-new">{first.duration}</span></dd></div>
+              </dl>
+              <p class="cs-states">
+                <span class="cs-state cs-state-ready">{m.review.ready}</span>
+                <span class="cs-state cs-state-held">{m.review.notPublished}</span>
+              </p>
+            </div>
+          </div>
+          <BookingApp lang={lang} durations caption={m.review.appCaption} />
+        </div>
+      </li>
+    </ol>
+    <p class="cs-illustration">{c.illustration}</p>
+  </section>
+</cckit-change-story>
+
+<script>
+  class CckitChangeStory extends HTMLElement {
+    connectedCallback() {
+      const tablist = this.querySelector<HTMLElement>('.cs-tabs');
+      const tabs = [...this.querySelectorAll<HTMLButtonElement>('.cs-tab')];
+      const panels = [...this.querySelectorAll<HTMLElement>('.cs-moment')];
+      if (!tablist || tabs.length === 0 || tabs.length !== panels.length) return;
+
+      const select = (index: number, focus: boolean) => {
+        tabs.forEach((tab, i) => {
+          const on = i === index;
+          tab.setAttribute('aria-selected', String(on));
+          tab.tabIndex = on ? 0 : -1;
+          panels[i].hidden = !on;
+        });
+        if (focus) tabs[index].focus();
+      };
+
+      tabs.forEach((tab, i) => {
+        tab.addEventListener('click', () => select(i, false));
+        tab.addEventListener('keydown', (event) => {
+          const to =
+            event.key === 'ArrowRight' || event.key === 'ArrowDown' ? (i + 1) % tabs.length
+            : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? (i - 1 + tabs.length) % tabs.length
+            : event.key === 'Home' ? 0
+            : event.key === 'End' ? tabs.length - 1
+            : -1;
+          if (to < 0) return;
+          event.preventDefault();
+          select(to, true);
+        });
+      });
+      panels.forEach((panel) => {
+        panel.setAttribute('role', 'tabpanel');
+        panel.setAttribute('aria-labelledby', panel.dataset.tab ?? '');
+        const next = panel.querySelector<HTMLButtonElement>('.cs-next');
+        if (!next) return;
+        next.hidden = false;
+        // The Next button leaves with its panel: focus goes to the tab of the moment now shown.
+        next.addEventListener('click', () => select(tabs.findIndex((t) => t.id === next.dataset.to), true));
+      });
+
+      this.setAttribute('data-enhanced', '');
+      tablist.hidden = false;
+      select(0, false);
+    }
+  }
+  if (!customElements.get('cckit-change-story')) customElements.define('cckit-change-story', CckitChangeStory);
+</script>
+
+<style>
+  /* Page text, surfaces and the action colour come from the site theme. The drawn objects use the
+     brand colours of docs/design/512/README.md: ivory paper, charcoal ink, cobalt for what is new,
+     ochre for the written request. Text on them is charcoal or white, measured in delivery-01.md. */
+  .cs {
+    --cs-ink: #202521;
+    --cs-paper: #f2f4eb;
+    --cs-cobalt: #2457d6;
+    --cs-ochre: #d4af59;
+    --cs-sage: #8fa878;
+    --cs-surface: var(--sl-color-gray-6);
+    --cs-edge: var(--sl-color-gray-5);
+    --cs-shadow: rgba(0, 0, 0, 0.45);
+    display: block;
+    container-type: inline-size;
+    margin-block: 1rem;
+    color: var(--sl-color-text);
+    font-size: 1rem;
+    line-height: 1.5;
+  }
+  :global([data-theme='light']) .cs {
+    --cs-surface: #ffffff;
+    --cs-shadow: rgba(32, 37, 33, 0.22);
+  }
+  .cs p,
+  .cs ul,
+  .cs ol,
+  .cs dl,
+  .cs dd {
+    margin: 0;
+    padding: 0;
+  }
+  .cs ul,
+  .cs ol {
+    list-style: none;
+  }
+  /* The site theme spaces list items (`.sl-markdown-content li + li`); these lists use grid gaps. */
+  .cs .cs-moment,
+  .cs .cs-objects > li {
+    margin: 0;
+  }
+  .cs [hidden] {
+    display: none !important;
+  }
+
+  /* Tabs */
+  /* Narrow: one row; the selected tab shows its name, the other two show their number (their
+     name stays in the accessibility tree). Wide: three equal tabs, all named. */
+  .cs-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+  .cs-tab[aria-selected='true'] {
+    flex: 1;
+  }
+  @container (max-width: 43.99rem) {
+    .cs-tab[aria-selected='false'] .cs-tab-name {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+    .cs-tab[aria-selected='false'] {
+      position: relative;
+      min-width: 3rem;
+      justify-content: center;
+      padding-inline: 0.625rem;
+    }
+  }
+  @container (min-width: 44rem) {
+    .cs-tabs {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+  .cs button {
+    font: inherit;
+    cursor: pointer;
+  }
+  .cs-tab {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    min-height: 3rem;
+    padding: 0.5rem 0.875rem;
+    color: var(--sl-color-white);
+    text-align: start;
+    font-weight: 600;
+    background: var(--cs-surface);
+    border: 1px solid var(--cs-edge);
+    border-radius: 0.5rem;
+  }
+  .cs-tab:hover {
+    border-color: var(--sl-color-white);
+  }
+  .cs-tab[aria-selected='true'] {
+    color: var(--sl-color-text-invert);
+    background: var(--sl-color-accent);
+    border-color: var(--sl-color-accent);
+  }
+  .cs button:focus-visible {
+    outline: 3px solid var(--sl-color-text-accent);
+    outline-offset: 3px;
+  }
+  .cs-n {
+    flex: none;
+    display: inline-grid;
+    place-items: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    font-weight: 700;
+    border: 2px solid currentColor;
+    border-radius: 50%;
+  }
+
+  /* Moments */
+  .cs-moments {
+    display: grid;
+    gap: 1rem;
+  }
+  .cs-moment {
+    display: grid;
+    gap: 0.75rem;
+    padding: 1rem 1.125rem;
+    background: var(--cs-surface);
+    border: 1px solid var(--cs-edge);
+    border-radius: 0.75rem;
+  }
+  .cs-head {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    color: var(--sl-color-white);
+    font-size: 1.25rem;
+  }
+  /* With tabs, the tab already names the moment. */
+  .cs[data-enhanced] .cs-head {
+    display: none;
+  }
+  .cs-line {
+    color: var(--sl-color-white);
+    font-size: 1.125rem;
+  }
+  /* Narrow: what happens, then the app, then Next. Wide: the app keeps the right column for the
+     whole height and Next sits under what happens, so all three moments are the same height. */
+  .cs-stage {
+    display: grid;
+    gap: 1.25rem;
+    align-items: start;
+    grid-template-areas: 'side' 'app' 'next';
+  }
+  /* The last moment is about the app: on a narrow screen it comes before the review card. */
+  .cs-stage-result {
+    grid-template-areas: 'app' 'side';
+  }
+  .cs-stage > :global(.ba) {
+    grid-area: app;
+  }
+  @container (min-width: 44rem) {
+    .cs-stage {
+      grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+      grid-template-rows: 1fr auto;
+      grid-template-areas: 'side app' 'next app';
+      min-height: 24.5rem;
+    }
+    .cs-stage-result {
+      grid-template-areas: 'side app' 'side app';
+    }
+    .cs-stage .cs-next {
+      justify-self: start;
+      align-self: end;
+    }
+  }
+  .cs-side {
+    grid-area: side;
+    display: grid;
+    gap: 0.5rem;
+    align-content: start;
+  }
+
+  /* 1 · the request as a chat message */
+  .cs-chat {
+    display: grid;
+    gap: 0.375rem;
+    justify-items: start;
+    max-width: 26rem;
+  }
+  .cs-who,
+  .cs-group-name,
+  .cs-review-kind {
+    color: var(--sl-color-gray-3);
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+  .cs-bubble {
+    padding: 0.875rem 1.125rem !important;
+    color: #ffffff;
+    font-size: 1.25rem;
+    font-weight: 600;
+    line-height: 1.35;
+    background: var(--cs-cobalt);
+    border-radius: 1.125rem 1.125rem 1.125rem 0.25rem;
+    box-shadow: 4px 4px 0 var(--cs-shadow);
+  }
+
+  /* 2 · what cckit sets up, then what the agent does */
+  .cs-group {
+    display: grid;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    border: 1.5px dashed var(--sl-color-gray-4);
+    border-radius: 0.625rem;
+  }
+  .cs-objects {
+    display: grid;
+    gap: 0.625rem;
+    grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+    align-items: stretch;
+  }
+  .cs-objects > li {
+    display: grid;
+    gap: 0.25rem;
+    align-content: start;
+    padding: 0.625rem 0.75rem;
+    color: var(--cs-ink);
+    font-size: 0.9375rem;
+    border: 2px solid var(--cs-ink);
+    border-radius: 0.5rem;
+  }
+  .cs-doc {
+    background: var(--cs-paper);
+  }
+  .cs-doc-lines {
+    height: 1.125rem;
+    background: repeating-linear-gradient(to bottom, var(--cs-ink) 0 2px, transparent 2px 7px);
+    width: 60%;
+    opacity: 0.55;
+  }
+  .cs-note {
+    background: var(--cs-ochre);
+    border-radius: 0.25rem 0.25rem 1.25rem 0.25rem !important;
+  }
+  .cs-check {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0.375rem;
+    align-items: start;
+  }
+  .cs-box {
+    width: 0.8125rem;
+    height: 0.8125rem;
+    margin-top: 0.25em;
+    border: 2px solid var(--cs-ink);
+    border-radius: 2px;
+  }
+  .cs-copies {
+    padding: 0 !important;
+    border: 0 !important;
+    gap: 0.375rem !important;
+  }
+  .cs-copy {
+    display: grid;
+    padding: 0.4375rem 0.625rem;
+    color: var(--cs-ink);
+    background: var(--cs-paper);
+    border: 2px solid var(--cs-ink);
+    border-radius: 0.5rem;
+  }
+  .cs-copy-own {
+    margin-inline-start: 0.875rem;
+    color: #ffffff;
+    background: var(--cs-cobalt);
+    border-style: dashed;
+    border-color: #ffffff;
+    outline: 2px solid var(--cs-cobalt);
+  }
+  .cs-link {
+    justify-self: center;
+    color: var(--sl-color-gray-3);
+    font-size: 1.25rem;
+    line-height: 1;
+  }
+  .cs-agent {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .cs-kito {
+    width: 5.5rem;
+    height: auto;
+  }
+  .cs-agent-work {
+    color: var(--sl-color-white);
+    font-size: 1.0625rem;
+    font-weight: 600;
+  }
+
+  /* 3 · the proposed change */
+  .cs-review {
+    display: grid;
+    gap: 0.625rem;
+    max-width: 26rem;
+    padding: 1rem;
+    color: var(--cs-ink);
+    background: var(--cs-paper);
+    border: 2px solid var(--cs-ink);
+    border-radius: 0.75rem;
+    box-shadow: 4px 4px 0 var(--cs-shadow);
+  }
+  .cs-review .cs-review-kind {
+    color: #4b5249;
+  }
+  .cs-review-title {
+    font-size: 1.1875rem;
+    font-weight: 700;
+    line-height: 1.3;
+  }
+  .cs-diff {
+    display: grid;
+    gap: 0.375rem;
+  }
+  .cs-diff > div {
+    display: grid;
+    grid-template-columns: 4.75rem minmax(0, 1fr);
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .cs-diff dt {
+    color: #4b5249;
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+  .cs-diff dd {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+  }
+  .cs-pill {
+    padding: 0.125rem 0.5rem;
+    font-weight: 600;
+    background: #ffffff;
+    border: 1.5px solid var(--cs-ink);
+    border-radius: 0.375rem;
+  }
+  .cs-pill-new {
+    color: #ffffff;
+    background: var(--cs-cobalt);
+    border-color: var(--cs-cobalt);
+  }
+  .cs-states {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.25rem !important;
+  }
+  .cs-state {
+    padding: 0.25rem 0.625rem;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    border: 2px solid var(--cs-ink);
+    border-radius: 999px;
+  }
+  .cs-state-ready {
+    color: #ffffff;
+    background: var(--cs-ink);
+  }
+  .cs-state-held {
+    border-style: dashed;
+  }
+
+  .cs-next {
+    grid-area: next;
+    justify-self: end;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    min-height: 2.75rem;
+    padding: 0.5rem 0.875rem;
+    color: var(--sl-color-white);
+    font-weight: 600;
+    background: transparent;
+    border: 1px solid var(--cckit-field-border, currentColor);
+    border-radius: 0.375rem;
+  }
+  .cs-next:hover {
+    border-color: var(--sl-color-white);
+  }
+  .cs-illustration {
+    margin-top: 0.625rem !important;
+    color: var(--sl-color-gray-3);
+    font-size: 0.875rem;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .cs[data-enhanced] .cs-moment:not([hidden]) .cs-side,
+    .cs[data-enhanced] .cs-moment:not([hidden]) :global(.ba-duration) {
+      animation: cs-in 0.28s ease-out;
+    }
+  }
+  @keyframes cs-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+</style>

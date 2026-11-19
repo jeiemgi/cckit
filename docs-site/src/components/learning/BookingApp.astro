@@ -1,0 +1,132 @@
+---
+// BookingApp — a drawn screen of the example project, a small app for booking services. It is an
+// illustration built from HTML, never a capture: ChangeStory.astro labels the whole scene as one.
+// `durations` switches between the app before the change and the app with the change.
+import { langOf, changeStory, type Lang } from './content';
+
+interface Props {
+  lang?: Lang;
+  durations?: boolean;
+  caption: string;
+}
+const lang = Astro.props.lang ?? langOf(Astro.url.pathname);
+const { durations = false, caption } = Astro.props;
+const app = changeStory[lang].app;
+---
+
+<figure class="ba" data-durations={durations ? '' : undefined}>
+  <figcaption class="ba-caption">{caption}</figcaption>
+  <div class="ba-window">
+    <div class="ba-bar" aria-hidden="true"><span></span><span></span><span></span></div>
+    <p class="ba-title">{app.title}</p>
+    <ul class="ba-list">
+      {
+        app.services.map((s) => (
+          <li class="ba-row">
+            <span class="ba-name">{s.name}</span>
+            {durations && (
+              <span class="ba-duration">
+                {s.duration}
+                <span class="ba-added">{app.added}</span>
+              </span>
+            )}
+            <span class="ba-book" aria-hidden="true">{app.book}</span>
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+</figure>
+
+<style>
+  .ba {
+    margin: 0;
+    display: grid;
+    gap: 0.5rem;
+    align-content: start;
+  }
+  .ba-caption {
+    color: var(--sl-color-gray-3);
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+  /* The drawn app keeps its own light surface in both themes, so it reads as "the product" and
+     not as part of the docs page. Text on it is charcoal on ivory (README brand colours): 13.9:1. */
+  .ba-window {
+    --ba-ink: #202521;
+    --ba-paper: #f2f4eb;
+    --ba-line: #c9cdbd;
+    --ba-new: #2457d6;
+    padding: 0 0.875rem 0.875rem;
+    color: var(--ba-ink);
+    background: var(--ba-paper);
+    border: 2px solid var(--ba-ink);
+    border-radius: 0.75rem;
+    box-shadow: 4px 4px 0 var(--cs-shadow, rgba(0, 0, 0, 0.35));
+  }
+  .ba-bar {
+    display: flex;
+    gap: 0.3125rem;
+    padding: 0.625rem 0;
+  }
+  .ba-bar span {
+    width: 0.5rem;
+    height: 0.5rem;
+    border: 1.5px solid var(--ba-ink);
+    border-radius: 50%;
+  }
+  .ba-title {
+    margin: 0 0 0.625rem;
+    font-size: 1.0625rem;
+    font-weight: 700;
+  }
+  .ba-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.5rem;
+  }
+  .ba-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.25rem 0.625rem;
+    padding: 0.625rem 0.75rem;
+    background: #ffffff;
+    border: 1.5px solid var(--ba-line);
+    border-radius: 0.5rem;
+  }
+  .ba-name {
+    font-weight: 600;
+  }
+  .ba-book {
+    grid-column: 2;
+    grid-row: 1;
+    padding: 0.1875rem 0.625rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    border: 1.5px solid var(--ba-ink);
+    border-radius: 999px;
+  }
+  /* The added duration: its own line under the name, outlined in cobalt and tagged in words. */
+  .ba-duration {
+    grid-column: 1 / -1;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    justify-self: start;
+    padding: 0.125rem 0.5rem;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    border: 2px solid var(--ba-new);
+    border-radius: 0.375rem;
+  }
+  .ba-added {
+    padding: 0 0.375rem;
+    color: #ffffff;
+    font-size: 0.875rem;
+    background: var(--ba-new);
+    border-radius: 0.25rem;
+  }
+</style>

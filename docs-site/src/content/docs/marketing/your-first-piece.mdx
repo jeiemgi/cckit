@@ -18,29 +18,16 @@ import TutorialMeta from '../../../components/TutorialMeta.astro';
 
 <TutorialMeta />
 
-The first time, hand over something small and complete: one landing page, one post, one section
-of a site. You describe it, your assistant builds it in the background and returns a review link,
-and a person approves it. Pilot Light Bakery's project is set up and empty, and the first thing the
-shop needs is a landing page.
-
-**Who does it:** you describe the piece and read the result. Your assistant and its helpers build.
-Your colleague approves; if you work alone, you finish it yourself (step 3 says how).
-
-**What you will have at the end:** the piece as part of the shared version of the project, and the
-task marked done.
-
-**Before you start:** the [keys are given](/marketing/get-set-up/) and the project is open in the
-chat with your assistant.
+Describe a piece, get a link, approve it. The example is the landing page of Pilot Light Bakery.
 
 <Steps>
 
-1. **Describe the piece in one paragraph.** Say what it is and what goes on it. Your assistant
-   writes it down as a task and starts building:
+1. **Describe the piece.**
 
    <Chat
      title="handing over the Pilot Light Bakery landing page"
      say="I need a landing page for my bakery, Pilot Light. At the top the name and a short line about us, then three breads with prices, our opening hours and a contact form. Can you build it?"
-     means="Nothing is public yet. You will get a link, read the page and approve it or ask for changes."
+     means="Nothing is public yet."
    >
      I wrote it down as a task and started building. I will tell you when there is a link.
    </Chat>
@@ -57,70 +44,59 @@ chat with your assistant.
 
    </Outcomes>
 
-2. **Wait for the link.** Your assistant tells you when the page is ready and gives you one link.
-   Before it does, it checks that the site still works; when that check fails, or when nothing
-   changed, no review is opened and your assistant says why.
+2. **Wait for the link.** It arrives once the site passes its check.
 
-   One round of a landing page like this one took under three minutes in a real run with nobody
-   stepping in; a second page, a menu, took about one minute.
+   <Outcomes title="How long it takes, and when no link comes">
 
-3. **Look at the result.** Open the review link. [Review and approval](/marketing/review-and-approval/)
-   says what the page shows. If you want something changed, say it:
+   - One round of a landing page like this one took under three minutes in a real run with nobody
+     stepping in; a second page, a menu, took about one minute.
+   - With the design skills on [The tools we plug in](/marketing/tools/#design-skills-how-a-page-is-designed),
+     your assistant writes a short design brief first and the review names the skills it loaded. In
+     the one run on record that took about seven minutes.
+   - When the check fails, or when nothing changed, no review is opened and your assistant says why.
+
+   </Outcomes>
+
+3. **Read it. Ask for changes in plain words.**
 
    <Chat
      title="asking for changes on the Pilot Light Bakery landing page"
      say="The line at the top is too long. Use 'Bread baked this morning'. And add a photo of the shop."
-     means="You only describe what to change. The review link stays the same, and nothing is approved by itself."
+     means="The review link stays the same."
    >
      The line at the top is changed and the review is updated. I could not add a photo: there is
      none in the project. Send me one and I will add it.
    </Chat>
 
-   **Who approves.** Send the link to your colleague. GitHub does not let the person who asked for
-   a review approve it, so a second person reads the page and clicks **Approve**. If you work
-   alone there is no second reader: you read the review yourself and finish it, either by telling
-   your assistant the page is fine or with the green **Merge pull request** button on the review
-   page.
+4. **Approve.** A colleague opens the link and clicks **Approve**. Then tell your assistant, and it marks the piece done.
 
-4. **Approved.** Once it is approved, tell your assistant so, and it finishes the piece: the page
-   becomes part of the shared version and the task is marked done. See
-   [After approval](/marketing/review-and-approval/#after-approval).
+   <Outcomes title="If you work alone, and what approving does">
+
+   - GitHub does not let the person who asked for a review approve it. If you work alone, read the
+     review yourself and finish it: tell your assistant the page is fine, or use the green
+     **Merge pull request** button on the review page.
+   - Once approved, the page becomes part of the shared version and the task is marked done. See
+     [After approval](/marketing/review-and-approval/#after-approval) and
+     [Review and approval](/marketing/review-and-approval/).
+   - You never edit code, and nothing is approved by itself.
+
+   </Outcomes>
 
 </Steps>
 
-For a page, your assistant loads the design skills described on
-[The tools we plug in](/marketing/tools/#design-skills-how-a-page-is-designed) and writes a short
-design brief before it builds. The review says which design skills were loaded in that run. A
-page built this way takes longer: in the one run on record, about seven minutes where the plain
-run took under three.
-
-You never edit code. Nothing is approved by itself, and cckit does not publish: the result is an
-approved site that works, and putting it on a public address is a separate step.
-
-## Check that it worked
-
-Ask "Where are we?". The landing page is no longer listed as in progress or waiting for a review,
-and it counts as done.
+<Aside type="note" title="Approved is not published">
+cckit stops at approved. [Put an approved piece online](/marketing/go-live/) says what to hand the person who publishes.
+</Aside>
 
 ## Coming back to a piece
-
-Pieces you have started are still there after you close the app. Open the project again and say:
 
 <Chat
   title="coming back to the Bakery site the next day"
   say="Where are we? Show me what I have started and anything waiting for a review."
-  means="Then say which one to continue. To pick new work instead, say: “Show me what is ready and I will pick.”"
+  means="Then say which one to continue. A finished piece is no longer listed as in progress or waiting for a review."
 >
   The landing page is done. You have one piece in progress, the post about the new rye loaf.
   Nothing is waiting for a review. Do you want to continue the post?
 </Chat>
-
-<Aside type="note" title="Approved is not published">
-cckit stops at approved. See [after approval](/marketing/review-and-approval/#after-approval), and
-[Put an approved piece online](/marketing/go-live/) for what to hand the person who publishes.
-</Aside>
-
-Want to shape a post sentence by sentence instead of handing it over? See
-[Write a piece together](/marketing/write-together/).
 
 Next: [Write a piece together](/marketing/write-together/)

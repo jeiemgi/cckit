@@ -1,64 +1,83 @@
 /* cckit docs theme — DESIGNER-OWNED.
    This is the single place the visual theme lives.
-   Palette: the Apple System Colors terminal scheme, chosen by the owner on a review page on
-   2026-11-13 (issue 510). Neutral greys with no tint; ONE action colour, system blue, on both
-   tracks. A track is told apart by its marker colour only (--cckit-track): Software sky blue,
-   Marketing purple. The prompt banner is the scheme's yellow.
-   Dark is the default when the reader has stored no choice (src/components/ThemeProvider.astro).
+   Direction: the Kito desk, approved by the owner on 2026-11-19 from the study at
+   src/pages/design/theme.astro (docs/design/512/theme-study.md). Ivory paper, forest-charcoal ink,
+   cobalt for actions, sage and ochre for states; thin ink lines, a small offset shadow on the main
+   action, and a few ink ornaments cut from the approved sheet (src/components/brand/).
+   The theme follows the reader's stored choice, else the system scheme
+   (src/components/ThemeProvider.astro).
    Type: Geist and Geist Mono, self-hosted through @fontsource-variable (imported below).
-   Measured WCAG 2.x contrast (AA needs 4.5:1 for text):
-     dark   body #d1d1d6 on #1e1e1e 10.96 · muted #98989d 5.81 · link #6ab7ff 7.80 (6.52 on inline code)
-            white on action #0071e3 4.70 · Software #76d6ff 10.19 · Marketing #bf5af2 4.73 · prompt #ffd60a 11.81
-     light  body #3a3a3c on #f5f5f7 10.42 · muted #636368 5.49 · link #0060c0 5.62 (5.01 on inline code)
-            white on action #0869cb 5.39 · Software #146b8e 5.47 · Marketing #8a3bb3 5.74 · prompt #7a6200 5.40 */
+   Contrast is measured in the browser per delivery; the figures are in docs/design/512/. */
 @import '@fontsource-variable/geist';
 @import '@fontsource-variable/geist-mono';
 
-/* ── Dark theme (default) ─────────────────────────────────────────────── */
+/* ── Dark theme ───────────────────────────────────────────────────────── */
 :root,
 ::backdrop {
-	--sl-color-white: #ffffff;
-	--sl-color-gray-1: #ebebf0;
-	--sl-color-gray-2: #d1d1d6; /* body text */
-	--sl-color-gray-3: #98989d; /* muted / secondary */
-	--sl-color-gray-4: #636366;
-	--sl-color-gray-5: #3a3a3c;
-	--sl-color-gray-6: #2c2c2e; /* panels, inline code */
-	--sl-color-black: #1e1e1e; /* page background */
+	--sl-color-white: #f2f4eb; /* headings, strongest text */
+	--sl-color-gray-1: #e6eadf;
+	--sl-color-gray-2: #dbe1d3; /* body text */
+	--sl-color-gray-3: #b1bcaa; /* muted / secondary */
+	--sl-color-gray-4: #7b8b75; /* control borders */
+	--sl-color-gray-5: #3c483e; /* quiet lines */
+	--sl-color-gray-6: #252e27; /* surfaces, inline code */
+	--sl-color-black: #1b211d; /* page */
 
-	--sl-color-accent-low: #10263f;
-	--sl-color-accent: #0071e3; /* the one action colour: buttons, active markers */
-	--sl-color-accent-high: #a8d4ff;
+	--sl-color-accent-low: #232f4d;
+	--sl-color-accent: #91b1ff; /* the action colour */
+	--sl-color-accent-high: #c9d8ff;
 
 	--sl-color-text: var(--sl-color-gray-2);
-	--sl-color-text-accent: #6ab7ff; /* link text */
-	--sl-color-text-invert: #ffffff; /* text ON the action colour */
+	--sl-color-text-accent: #91b1ff; /* link text */
+	--sl-color-text-invert: #142348; /* text ON the action colour */
 	--sl-color-bg: var(--sl-color-black);
-	--sl-color-bg-nav: #1a1a1a;
-	--sl-color-bg-sidebar: #1a1a1a;
+	--sl-color-bg-nav: #1b211d;
+	--sl-color-bg-sidebar: #1b211d;
 	--sl-color-bg-inline-code: var(--sl-color-gray-6);
 	--sl-color-bg-accent: var(--sl-color-accent);
 
-	/* One marker colour per track, constant on every page; --cckit-track is the current page's. */
-	--cckit-track-software: #76d6ff;
-	--cckit-track-marketing: #bf5af2;
-	--cckit-track: var(--cckit-track-software);
-	--cckit-prompt: #ffd60a;
-	/* Search controls: a surface that differs from the page and an edge at 3:1 against it. */
-	--cckit-field-bg: #2c2c2e;
-	--cckit-field-border: #7c7c80;
+	/* State colours: sage = done / tip, ochre = in progress / caution, red = error. */
+	--sl-color-green-low: #303e2a;
+	--sl-color-green: #8fa878;
+	--sl-color-green-high: #b4cea0;
+	--sl-color-orange-low: #3f3823;
+	--sl-color-orange: #d4af59;
+	--sl-color-orange-high: #e6c777;
+	--sl-color-red-low: #45282a;
+	--sl-color-red: #e0706c;
+	--sl-color-red-high: #ffa9a6;
+	--sl-color-blue-low: #232f4d;
+	--sl-color-blue: #91b1ff;
+	--sl-color-blue-high: #c9d8ff;
+	--sl-color-purple-low: #232f4d;
+	--sl-color-purple: #91b1ff;
+	--sl-color-purple-high: #c9d8ff;
 
-	/* Hairlines — tighter and quieter than the default black-on-black */
-	--sl-color-hairline-light: #48484a;
-	--sl-color-hairline: #3a3a3c;
-	--sl-color-hairline-shade: #2c2c2e;
+	--cckit-surface: #252e27; /* cards, fields, panels */
+	--cckit-line: #7b8b75; /* the edge of a control: 3:1 against the surface */
+	--cckit-focus: #acc4ff;
+	--cckit-shadow: #91b1ff; /* the offset under the main action */
+	--cckit-terminal: #131915; /* code blocks, in both themes */
+	--cckit-terminal-ink: #f2f4eb;
+	--cckit-terminal-muted: #a8b5a0;
+	--cckit-terminal-line: #3c483e;
+	--cckit-note: #edda98; /* the Post-it; its ink is fixed, it is paper in both themes */
+	--cckit-note-ink: #3c341a;
+	/* Kept for the components that still name them: one marker colour, the link colour. */
+	--cckit-track: var(--sl-color-text-accent);
+	--cckit-prompt: #e6c777;
+	--cckit-field-bg: var(--cckit-surface);
+	--cckit-field-border: var(--cckit-line);
 
-	--sl-color-backdrop-overlay: hsla(0, 0%, 6%, 0.72);
+	--sl-color-hairline-light: #4a584b;
+	--sl-color-hairline: #3c483e;
+	--sl-color-hairline-shade: #2c362e;
 
-	/* Softer shadows — sober, no heavy drop on dark */
-	--sl-shadow-sm: 0 1px 1px hsla(0, 0%, 3%, 0.4);
-	--sl-shadow-md: 0 2px 2px hsla(0, 0%, 3%, 0.3), 0 4px 6px hsla(0, 0%, 3%, 0.35);
-	--sl-shadow-lg: 0 4px 8px hsla(0, 0%, 3%, 0.3), 0 12px 24px hsla(0, 0%, 3%, 0.45);
+	--sl-color-backdrop-overlay: hsla(140, 10%, 6%, 0.72);
+
+	--sl-shadow-sm: 0 1px 1px hsla(140, 10%, 3%, 0.4);
+	--sl-shadow-md: 0 2px 2px hsla(140, 10%, 3%, 0.3), 0 4px 6px hsla(140, 10%, 3%, 0.35);
+	--sl-shadow-lg: 0 4px 8px hsla(140, 10%, 3%, 0.3), 0 12px 24px hsla(140, 10%, 3%, 0.45);
 
 	--sl-font: 'Geist Variable', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
 		Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -69,51 +88,61 @@
 /* ── Light theme ──────────────────────────────────────────────────────── */
 :root[data-theme='light'],
 [data-theme='light'] ::backdrop {
-	--sl-color-white: #1d1d1f; /* highest-contrast text (ink) */
-	--sl-color-gray-1: #2c2c2e;
-	--sl-color-gray-2: #3a3a3c; /* body text */
-	--sl-color-gray-3: #636368; /* muted / secondary */
-	--sl-color-gray-4: #8e8e93;
-	--sl-color-gray-5: #c7c7cc;
-	--sl-color-gray-6: #e8e8ed;
-	--sl-color-gray-7: #efeff2;
-	--sl-color-black: #f5f5f7; /* page background */
+	--sl-color-white: #202521; /* ink */
+	--sl-color-gray-1: #262c27;
+	--sl-color-gray-2: #2d342e; /* body text */
+	--sl-color-gray-3: #596252; /* muted / secondary */
+	--sl-color-gray-4: #89917f; /* control borders */
+	--sl-color-gray-5: #c9d0be;
+	--sl-color-gray-6: #e6eadd; /* inline code, quiet fills */
+	--sl-color-gray-7: #ecefe4;
+	--sl-color-black: #f2f4eb; /* page: ivory */
 
-	--sl-color-accent-low: #dcebfb;
-	--sl-color-accent: #0869cb;
-	--sl-color-accent-high: #04386e;
+	--sl-color-accent-low: #dfe6f8;
+	--sl-color-accent: #2457d6;
+	--sl-color-accent-high: #16357f;
 
 	--sl-color-text: var(--sl-color-gray-2);
-	--sl-color-text-accent: #0060c0;
+	--sl-color-text-accent: #2457d6;
 	--sl-color-text-invert: #ffffff;
 	--sl-color-bg: var(--sl-color-black);
-	--sl-color-bg-nav: #ffffff;
-	--sl-color-bg-sidebar: #ffffff;
+	--sl-color-bg-nav: #f2f4eb;
+	--sl-color-bg-sidebar: #f2f4eb;
 	--sl-color-bg-inline-code: var(--sl-color-gray-6);
 	--sl-color-bg-accent: var(--sl-color-accent);
 
-	--cckit-track-software: #146b8e;
-	--cckit-track-marketing: #8a3bb3;
-	--cckit-prompt: #7a6200;
-	--cckit-field-bg: #ffffff;
-	--cckit-field-border: #86868b;
+	--sl-color-green-low: #e4ebdc;
+	--sl-color-green: #526a3d;
+	--sl-color-green-high: #3f5530;
+	--sl-color-orange-low: #f2e9c9;
+	--sl-color-orange: #806117;
+	--sl-color-orange-high: #6b5010;
+	--sl-color-red-low: #f6dfdc;
+	--sl-color-red: #a52d31;
+	--sl-color-red-high: #7f1f23;
+	--sl-color-blue-low: #dfe6f8;
+	--sl-color-blue: #2457d6;
+	--sl-color-blue-high: #16357f;
+	--sl-color-purple-low: #dfe6f8;
+	--sl-color-purple: #2457d6;
+	--sl-color-purple-high: #16357f;
 
-	--sl-color-hairline-light: #ececf0;
-	--sl-color-hairline: #d8d8dc;
-	--sl-color-hairline-shade: #e3e3e8;
+	--cckit-surface: #fbfcf7;
+	--cckit-line: #89917f;
+	--cckit-focus: #2457d6;
+	--cckit-shadow: #202521;
+	--cckit-terminal: #202521;
+	--cckit-prompt: #806117;
 
-	--sl-color-backdrop-overlay: hsla(0, 0%, 30%, 0.33);
+	--sl-color-hairline-light: #e0e5d6;
+	--sl-color-hairline: #d3d9c9;
+	--sl-color-hairline-shade: #dde2d3;
 
-	--sl-shadow-sm: 0 1px 1px hsla(0, 0%, 24%, 0.07), 0 2px 1px hsla(0, 0%, 24%, 0.05);
-	--sl-shadow-md: 0 2px 2px hsla(0, 0%, 24%, 0.06), 0 4px 6px hsla(0, 0%, 24%, 0.08);
-	--sl-shadow-lg: 0 4px 8px hsla(0, 0%, 24%, 0.06), 0 12px 24px hsla(0, 0%, 24%, 0.1);
-}
+	--sl-color-backdrop-overlay: hsla(100, 8%, 30%, 0.33);
 
-/* ── Marketing track — its marker colour ──────────────────────────────── */
-/* Pages under /marketing/ carry <meta name="cckit-track" content="marketing"> (src/routeData.ts).
-   The action colour, neutrals, type and layout are shared; only the marker changes. */
-:root:has(meta[name='cckit-track'][content='marketing']) {
-	--cckit-track: var(--cckit-track-marketing);
+	--sl-shadow-sm: 0 1px 1px hsla(100, 8%, 24%, 0.07), 0 2px 1px hsla(100, 8%, 24%, 0.05);
+	--sl-shadow-md: 0 2px 2px hsla(100, 8%, 24%, 0.06), 0 4px 6px hsla(100, 8%, 24%, 0.08);
+	--sl-shadow-lg: 0 4px 8px hsla(100, 8%, 24%, 0.06), 0 12px 24px hsla(100, 8%, 24%, 0.1);
 }
 
 /* ── Restrained polish ────────────────────────────────────────────────── */
@@ -138,13 +167,6 @@ body {
 :where(h1) { letter-spacing: -0.04em; line-height: 1.1; }
 :where(h2) { letter-spacing: -0.03em; line-height: 1.2; }
 
-/* The site title (cckit) is set in the sans face, bold: a name, not a terminal prompt. */
-.site-title {
-	font-family: var(--sl-font);
-	font-weight: 700;
-	letter-spacing: -0.04em;
-	font-size: 1.25rem;
-}
 
 /* ── Homepage hero ────────────────────────────────────────────────────── */
 
@@ -191,80 +213,8 @@ body {
 	border-radius: 999px;
 }
 
-/* Secondary links below the two doors: one centered row. */
-.hero-actions {
-	display: flex;
-	flex-wrap: wrap;
-	justify-content: center;
-	align-items: center;
-	gap: 0.75rem;
-	margin-top: 1.75rem;
-}
-
-/* The two doors on the home page: one entry per docs track. Each door is one link; its top edge
-   and its label take that track's colour (blue for Software, red for Marketing) on every theme. */
-.doors {
-	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
-	gap: 1rem;
-	margin-top: 2rem;
-}
-.sl-markdown-content .door {
-	display: flex;
-	flex-direction: column;
-	gap: 0.5rem;
-	padding: 1.25rem 1.4rem 1.4rem;
-	color: var(--sl-color-text);
-	text-decoration: none;
-	background: var(--sl-color-bg-sidebar);
-	border: 1px solid var(--sl-color-hairline-light);
-	border-top: 3px solid var(--door);
-	border-radius: 0.75rem;
-	box-shadow: var(--sl-shadow-sm);
-	transition: border-color 0.15s ease, box-shadow 0.15s ease;
-}
-.door[data-track='software'] { --door: var(--cckit-track-software); }
-.door[data-track='marketing'] { --door: var(--cckit-track-marketing); }
-.sl-markdown-content .door:hover {
-	border-color: var(--door);
-	box-shadow: var(--sl-shadow-md);
-}
-.door:focus-visible {
-	outline: 2px solid var(--door);
-	outline-offset: 3px;
-}
-.door-kicker {
-	font-size: var(--sl-text-sm);
-	font-weight: 600;
-	letter-spacing: 0;
-	text-transform: none;
-	color: var(--door);
-}
-.door-title {
-	font-size: var(--sl-text-h4);
-	font-weight: 600;
-	line-height: 1.25;
-	color: var(--sl-color-white);
-}
-.door-text { line-height: 1.6; }
-.door-go {
-	margin-top: auto;
-	padding-top: 0.5rem;
-	font-weight: 600;
-	color: var(--door);
-}
-.door-go::after { content: ' \2192'; }
-/* The line under the doors that points Spanish readers at /es/marketing/. */
-.sl-markdown-content .doors-note {
-	margin-top: 0.75rem;
-	text-align: end;
-	font-size: var(--sl-text-sm);
-	color: var(--sl-color-gray-3);
-}
-
-
 /* Header version — quiet text, not a pill. Tells readers which cckit version these docs describe;
-   links to the releases list for older versions. Hidden on Marketing (see below). */
+   links to the releases list for older versions. */
 .site-version {
 	display: inline-flex;
 	align-items: center;
@@ -283,9 +233,6 @@ body {
 	color: var(--sl-color-white);
 	background: none;
 	text-decoration: underline;
-}
-:root:has(meta[name='cckit-track'][content='marketing']) .site-version {
-	display: none;
 }
 
 /* ── Card icons — unify to the steel-cyan identity ────────────────────── */
@@ -436,7 +383,7 @@ h1 .cckit-tag, h2 .cckit-tag, h3 .cckit-tag { font-size: 0.65em; }
 }
 
 /* ── Conversation window (src/components/Chat.astro, Outcomes.astro) ──── */
-/* Rows with a speaker column, not bubbles. Tokens only, so light, dark and the Marketing accent follow. */
+/* Rows with a speaker column, not bubbles. Tokens only, so light and dark follow. */
 .sl-markdown-content .cckit-chat { margin: 1.25rem 0 0.75rem; border: 1px solid var(--sl-color-hairline); border-radius: 0.75rem;
 	background: var(--sl-color-bg-sidebar); overflow: hidden; }
 .cckit-chat__head { padding: 0.55rem 1rem; font-size: var(--sl-text-sm); line-height: 1.5; color: var(--sl-color-gray-3);
@@ -667,17 +614,15 @@ h1 .cckit-tag, h2 .cckit-tag, h3 .cckit-tag { font-size: 0.65em; }
 }
 
 /* ── "Next" suggestion cards ──────────────────────────────────────────── */
-/* The cards at the foot of a page that point onward. Set apart from the body with the propose-violet
-   accent (not the steel-cyan brand) and made fully clickable: the lone link inside each card stretches
+/* The cards at the foot of a page that point onward. Made fully clickable: the lone link inside each card stretches
    to cover it, so the whole card is the target while the icon + title stay visible. */
 .next-cards :where(.card) {
 	position: relative;
 	border-color: color-mix(in srgb, var(--cckit-next) 45%, var(--sl-color-hairline));
 	background: color-mix(in srgb, var(--cckit-next) 6%, transparent);
 	transition: border-color 0.15s ease, background-color 0.15s ease;
-	--cckit-next: #8b7cf6;
+	--cckit-next: var(--sl-color-text-accent);
 }
-:root[data-theme='light'] .next-cards :where(.card) { --cckit-next: #6d5bd6; }
 .next-cards :where(.card):hover {
 	border-color: var(--cckit-next);
 	background: color-mix(in srgb, var(--cckit-next) 11%, transparent);
@@ -713,61 +658,6 @@ h1 .cckit-tag, h2 .cckit-tag, h3 .cckit-tag { font-size: 0.65em; }
 	opacity: 0.7;
 	-webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 7h10v10'/%3E%3Cpath d='M7 17 17 7'/%3E%3C/svg%3E") center / contain no-repeat;
 	mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 7h10v10'/%3E%3Cpath d='M7 17 17 7'/%3E%3C/svg%3E") center / contain no-repeat;
-}
-
-/* ── Sidebar group icons ──────────────────────────────────────────────── */
-/* Starlight sidebar entries don't take an icon, so we paint one before each top-level GROUP label
-   (Philosophy … Reference) via a CSS mask — a line icon tinted with
-   the accent. Matched by group order (the sidebar config order is stable); keep these in sync when a
-   group is added or reordered, or the last group renders as an empty square. Software only: the
-   Marketing groups carry no icon (the base rules below are scoped off that track). */
-:root:not(:has(meta[name='cckit-track'][content='marketing'])) .top-level > li > details > summary .group-label { display: flex; align-items: center; }
-:root:not(:has(meta[name='cckit-track'][content='marketing'])) .top-level > li > details > summary .group-label::before {
-	content: '';
-	width: 1.1em;
-	height: 1.1em;
-	flex: none;
-	margin-inline-end: 0.5rem;
-	background-color: var(--sl-color-text-accent);
-	-webkit-mask: var(--cckit-nav-icon) center / contain no-repeat;
-	mask: var(--cckit-nav-icon) center / contain no-repeat;
-}
-/* The first entry (Start here) is a link, not a group, so groups start at the second item. */
-/* 2 · Philosophy — lightbulb */
-.top-level > li:nth-child(2) > details > summary .group-label {
-	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5'/%3E%3Cpath d='M9 18h6'/%3E%3Cpath d='M10 22h4'/%3E%3C/svg%3E");
-}
-/* 3 · Getting started — rocket */
-.top-level > li:nth-child(3) > details > summary .group-label {
-	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z'/%3E%3Cpath d='M12 15l-3-3a22 22 0 0 1 8-10c3 0 5 2 5 5a22 22 0 0 1-10 8z'/%3E%3Cpath d='M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0'/%3E%3Cpath d='M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5'/%3E%3C/svg%3E");
-}
-/* 4 · Project management — layers */
-.top-level > li:nth-child(4) > details > summary .group-label {
-	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 2 2 7l10 5 10-5-10-5z'/%3E%3Cpath d='M2 17l10 5 10-5'/%3E%3Cpath d='M2 12l10 5 10-5'/%3E%3C/svg%3E");
-}
-/* 5 · Design — pen */
-.top-level > li:nth-child(5) > details > summary .group-label {
-	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 20h9'/%3E%3Cpath d='M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z'/%3E%3C/svg%3E");
-}
-/* 6 · Development — code */
-.top-level > li:nth-child(6) > details > summary .group-label {
-	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m16 18 6-6-6-6'/%3E%3Cpath d='m8 6-6 6 6 6'/%3E%3C/svg%3E");
-}
-/* 7 · Review — check */
-.top-level > li:nth-child(7) > details > summary .group-label {
-	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='m9 12 2 2 4-4'/%3E%3C/svg%3E");
-}
-/* 8 · Ship — paper plane */
-.top-level > li:nth-child(8) > details > summary .group-label {
-	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m22 2-7 20-4-9-9-4Z'/%3E%3Cpath d='M22 2 11 13'/%3E%3C/svg%3E");
-}
-/* 9 · Memory — database */
-.top-level > li:nth-child(9) > details > summary .group-label {
-	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cellipse cx='12' cy='5' rx='9' ry='3'/%3E%3Cpath d='M3 5v14a9 3 0 0 0 18 0V5'/%3E%3Cpath d='M3 12a9 3 0 0 0 18 0'/%3E%3C/svg%3E");
-}
-/* 10 · Reference — list */
-.top-level > li:nth-child(10) > details > summary .group-label {
-	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 6h13'/%3E%3Cpath d='M8 12h13'/%3E%3Cpath d='M8 18h13'/%3E%3Cpath d='M3 6h.01'/%3E%3Cpath d='M3 12h.01'/%3E%3Cpath d='M3 18h.01'/%3E%3C/svg%3E");
 }
 
 /* ── Reading size, measure and headings (stage 1 of the calmer look) ──── */
@@ -881,30 +771,366 @@ h1 .cckit-tag, h2 .cckit-tag, h3 .cckit-tag { font-size: 0.65em; }
 	}
 }
 
-/* ── Home hero (Starlight `hero:` frontmatter): centred, a heading rather than a billboard ── */
-.hero {
-	grid-template-columns: minmax(0, 1fr);
-	padding-block: 2rem 0.5rem;
-}
-.hero .stack {
-	text-align: center;
-}
-.hero .copy {
-	align-items: center;
-}
-.hero h1 {
-	font-size: clamp(2rem, 1.2rem + 2.6vw, 3rem);
-	text-wrap: balance;
-}
-.hero .copy > * {
-	max-width: 40rem;
-}
-.hero .tagline {
-	font-size: 1.125rem;
-	line-height: 1.6;
-}
-
 /* Search chips: list items are not prose. */
 .sl-markdown-content .sstart-chips > li {
 	margin: 0;
+}
+
+/* ══ The Kito desk: components ════════════════════════════════════════════
+   Taken from the approved study (src/pages/design/theme.astro). The study page is not imported
+   by any page of the site; these rules are the site's own copy. */
+
+/* Focus: one ring, everywhere, in the theme's focus colour. */
+:focus-visible {
+	outline: 3px solid var(--cckit-focus);
+	outline-offset: 3px;
+}
+
+/* ── Headings and the small mono label ────────────────────────────────── */
+:where(h1, h2, h3, h4) { font-weight: 580; }
+:where(h1) { letter-spacing: -0.05em; }
+:where(h2) { letter-spacing: -0.035em; }
+.sl-markdown-content :where(h2):not(:where(.not-content *)) {
+	padding-top: 1.5rem;
+	border-top: 1px solid var(--sl-color-hairline);
+}
+.cckit-eyebrow {
+	font-family: var(--sl-font-mono);
+	font-size: 0.8125rem;
+	line-height: 1.5;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--sl-color-gray-3);
+}
+
+/* ── Header and logo ──────────────────────────────────────────────────── */
+header.header {
+	border-bottom: 1px solid var(--sl-color-hairline);
+}
+.cckit-brand {
+	display: inline-flex;
+	align-items: center;
+	min-height: 2.75rem;
+}
+.cckit-brand .logo-art {
+	display: block;
+	width: 5.75rem;
+	height: 2.5rem;
+	overflow: visible;
+}
+
+/* ── Sidebar and "On this page" ───────────────────────────────────────── */
+.sidebar-pane { border-inline-end: 1px solid var(--sl-color-hairline); }
+.sidebar-content .top-level > li > details > summary .group-label .large,
+.sidebar-content .top-level > li > details > summary .group-label {
+	font-family: var(--sl-font-mono);
+	font-size: 0.8125rem;
+	font-weight: 500;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--sl-color-gray-3);
+}
+.sidebar-content .top-level > li > a.large {
+	font-size: 1rem;
+	font-weight: 580;
+	color: var(--sl-color-white);
+}
+.sidebar-content a { border-radius: 4px; }
+.sidebar-content a[aria-current='page'],
+.sidebar-content a[aria-current='page']:hover,
+.sidebar-content a[aria-current='page']:focus {
+	box-shadow: inset 2px 0 0 var(--sl-color-text-accent);
+	font-weight: 580;
+}
+starlight-toc a[aria-current='true'],
+mobile-starlight-toc a[aria-current='true'] { color: var(--sl-color-text-accent); }
+
+/* ── Links ────────────────────────────────────────────────────────────── */
+.sl-markdown-content a:not(:where(.not-content *)) {
+	text-decoration-thickness: 1px;
+	text-underline-offset: 0.22em;
+}
+.sl-markdown-content a:hover:not(:where(.not-content *)) { text-decoration-thickness: 2px; }
+
+/* ── Buttons (Starlight LinkButton and the site's own) ────────────────── */
+.sl-link-button.sl-link-button,
+.cckit-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.75rem;
+	min-height: 2.75rem;
+	padding: 0.625rem 1rem;
+	border: 1px solid transparent;
+	border-radius: 4px;
+	font-size: 1rem;
+	font-weight: 550;
+	line-height: 1.4;
+	text-decoration: none;
+	cursor: pointer;
+}
+.sl-link-button.primary,
+.cckit-button.primary {
+	background: var(--sl-color-accent);
+	border-color: var(--sl-color-accent);
+	color: var(--sl-color-text-invert);
+	box-shadow: 3px 3px 0 var(--sl-color-bg), 4px 4px 0 var(--cckit-shadow);
+}
+.sl-link-button.primary:hover,
+.cckit-button.primary:hover {
+	color: var(--sl-color-text-invert);
+	transform: translate(-1px, -1px);
+	box-shadow: 4px 4px 0 var(--sl-color-bg), 5px 5px 0 var(--cckit-shadow);
+}
+.sl-link-button.primary:active,
+.cckit-button.primary:active {
+	transform: translate(2px, 2px);
+	box-shadow: none;
+}
+.sl-link-button.secondary,
+.cckit-button.secondary {
+	background: transparent;
+	border-color: var(--cckit-line);
+	color: var(--sl-color-white);
+}
+.sl-link-button.secondary:hover,
+.cckit-button.secondary:hover {
+	background: var(--cckit-surface);
+	border-color: var(--sl-color-white);
+	color: var(--sl-color-white);
+}
+.sl-link-button.minimal { color: var(--sl-color-text-accent); }
+.cckit-button[aria-disabled='true'],
+.cckit-button:disabled {
+	cursor: not-allowed;
+	box-shadow: none;
+	background: var(--sl-color-gray-5);
+	border-color: var(--sl-color-gray-5);
+	color: var(--sl-color-gray-3);
+}
+@media (prefers-reduced-motion: no-preference) {
+	.sl-link-button.sl-link-button,
+	.cckit-button,
+	.sl-link-card,
+	.pagination-links a {
+		transition: transform 150ms ease, box-shadow 150ms ease, background-color 150ms ease, border-color 150ms ease;
+	}
+}
+
+/* ── Tabs (Starlight <Tabs>) ──────────────────────────────────────────── */
+starlight-tabs [role='tablist'] { border-bottom: 1px solid var(--sl-color-hairline); gap: 1.25rem; }
+starlight-tabs [role='tab'] {
+	position: relative;
+	min-height: 2.75rem;
+	padding: 0 0.2rem 0.75rem;
+	color: var(--sl-color-gray-3);
+	border-bottom: 2px solid transparent;
+}
+starlight-tabs [role='tab']:hover { color: var(--sl-color-white); }
+starlight-tabs [role='tab'][aria-selected='true'] {
+	color: var(--sl-color-white);
+	font-weight: 580;
+	border-bottom-color: transparent;
+}
+/* The selected tab is marked with a stroke of ink and a heavier weight, so the state does not
+   rest on colour. The stroke sits inside the tab: the tab list clips what hangs below it. */
+starlight-tabs [role='tab'][aria-selected='true']::after {
+	content: '';
+	position: absolute;
+	inset-inline: 0;
+	bottom: 0.05rem;
+	height: 0.6rem;
+	background: url('../components/brand/assets/ornament-underline.webp') center / 100% 100% no-repeat;
+	pointer-events: none;
+}
+
+/* ── Cards ────────────────────────────────────────────────────────────── */
+.sl-markdown-content .card,
+.sl-link-card {
+	background: var(--cckit-surface);
+	border: 1px solid var(--cckit-line);
+	border-radius: 5px;
+	box-shadow: none;
+}
+.sl-link-card:hover {
+	background: var(--cckit-surface);
+	border-color: var(--sl-color-white);
+	transform: translate(-2px, -2px);
+	box-shadow: 4px 4px 0 var(--sl-color-hairline);
+}
+.sl-link-card .title { font-weight: 580; letter-spacing: -0.02em; }
+.sl-link-card svg { color: var(--sl-color-text-accent); }
+.card .icon { border-radius: 4px; }
+.sl-markdown-content .cckit-record,
+.sl-markdown-content .cckit-chat {
+	background: var(--cckit-surface);
+	border-color: var(--sl-color-hairline);
+	border-radius: 5px;
+}
+.pagination-links a {
+	background: var(--cckit-surface);
+	border: 1px solid var(--cckit-line);
+	border-radius: 5px;
+	box-shadow: none;
+}
+.pagination-links a:hover {
+	border-color: var(--sl-color-white);
+	transform: translate(-2px, -2px);
+	box-shadow: 4px 4px 0 var(--sl-color-hairline);
+}
+
+/* ── Code ─────────────────────────────────────────────────────────────── */
+/* A code block is the terminal: dark ink in both themes (astro.config.mjs gives Expressive Code
+   one dark syntax theme). */
+.expressive-code {
+	--ec-brdRad: 5px;
+	--ec-brdCol: var(--cckit-line);
+	--ec-codeBg: var(--cckit-terminal);
+	--ec-codeFg: var(--cckit-terminal-ink);
+	--ec-frm-edBg: var(--cckit-terminal);
+	--ec-frm-trmBg: var(--cckit-terminal);
+	--ec-frm-edTabBarBg: var(--cckit-terminal);
+	--ec-frm-edActTabBg: var(--cckit-terminal);
+	--ec-frm-edActTabFg: var(--cckit-terminal-ink);
+	--ec-frm-edTabBarBrdBtmCol: var(--cckit-terminal-line);
+	--ec-frm-edActTabBrdCol: transparent;
+	--ec-frm-edActTabIndTopCol: transparent;
+	--ec-frm-edActTabIndBtmCol: transparent;
+	--ec-frm-trmTtbBg: var(--cckit-terminal);
+	--ec-frm-trmTtbFg: var(--cckit-terminal-muted);
+	--ec-frm-trmTtbDotsFg: #8fa878;
+	--ec-frm-trmTtbDotsOpa: 1;
+	--ec-frm-trmTtbBrdBtmCol: var(--cckit-terminal-line);
+	--ec-frm-frameBoxShdCssVal: none;
+	--ec-frm-inlBtnFg: var(--cckit-terminal-ink);
+	--ec-frm-inlBtnBrd: var(--cckit-line);
+	--ec-frm-tooltipSuccessBg: #8fa878;
+	--ec-frm-tooltipSuccessFg: #131915;
+	--ec-uiFontFml: var(--sl-font-mono);
+}
+.sl-markdown-content :not(pre) > code:not(:where(.not-content *)) {
+	border: 1px solid var(--sl-color-hairline);
+	border-radius: 3px;
+}
+.cckit-chat .cckit-chat__cmd { border: 0; }
+
+/* ── Asides ───────────────────────────────────────────────────────────── */
+.starlight-aside {
+	position: relative;
+	border: 1px solid var(--sl-color-hairline);
+	border-inline-start: 3px solid var(--sl-color-asides-border);
+	border-radius: 5px;
+}
+.starlight-aside--note { background: var(--cckit-surface); }
+/* A tip is the Post-it: paper in both themes, with a strip of tape. */
+.starlight-aside--tip {
+	--sl-color-asides-text-accent: #665422;
+	--sl-color-asides-border: #c6ae63;
+	margin-top: 2.25rem !important;
+	background: var(--cckit-note);
+	border-color: #c6ae63;
+	color: var(--cckit-note-ink);
+}
+.starlight-aside--tip :where(a, code, strong) { color: var(--cckit-note-ink); }
+.starlight-aside--tip :not(pre) > code { background: #e3cd84; border-color: #c6ae63; }
+.starlight-aside--tip::before {
+	content: '';
+	position: absolute;
+	top: -1.15rem;
+	left: 50%;
+	width: 5rem;
+	height: 2.25rem;
+	transform: translateX(-50%) rotate(-5deg);
+	background: url('../components/brand/assets/ornament-tape.webp') center / contain no-repeat;
+	pointer-events: none;
+}
+
+/* ── Fields ───────────────────────────────────────────────────────────── */
+.header .DocSearch-Button,
+.header site-search button[data-open-modal] { border-radius: 4px; }
+starlight-theme-select select,
+starlight-lang-select select { border-radius: 4px; }
+starlight-theme-select label:focus-within,
+starlight-lang-select label:focus-within {
+	outline: 3px solid var(--cckit-focus);
+	outline-offset: 3px;
+	border-radius: 4px;
+}
+.sl-markdown-content table { border-collapse: collapse; }
+.sl-markdown-content :where(th) {
+	font-family: var(--sl-font-mono);
+	font-size: 0.8125rem;
+	font-weight: 500;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--sl-color-gray-3);
+}
+
+/* ── Splash pages (the home): an editorial hero ───────────────────────── */
+/* Title and one sentence on the left, the three characters with their names on the right, small:
+   the story under the hero is the subject of the first screen. */
+.hero {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	align-items: center;
+	gap: 1rem 2rem;
+	padding-block: 1.25rem 0;
+}
+.hero .stack { text-align: start; gap: 0.5rem; }
+.hero .copy { align-items: flex-start; gap: 0.5rem; }
+.hero h1 {
+	font-size: clamp(2rem, 1.1rem + 2.6vw, 2.875rem);
+	letter-spacing: -0.055em;
+	line-height: 1.06;
+	text-wrap: balance;
+}
+/* One stroke of ink under the title. */
+.hero h1::after {
+	content: '';
+	display: block;
+	width: 9.5rem;
+	height: 0.95rem;
+	margin-top: 0.15rem;
+	background: url('../components/brand/assets/ornament-underline.webp') left center / contain no-repeat;
+}
+.hero .tagline {
+	max-width: 40rem;
+	font-size: 1.125rem;
+	line-height: 1.5;
+	color: var(--sl-color-gray-3);
+}
+.hero > .hero-html { order: 2; width: auto; height: auto; margin: 0; }
+.cckit-trio { margin: 0; width: 13.5rem; }
+.cckit-trio img { display: block; width: 100%; height: auto; }
+.cckit-trio figcaption {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	padding-top: 0.25rem;
+	text-align: center;
+	font-family: var(--sl-font-mono);
+	font-size: 0.75rem;
+	letter-spacing: 0.03em;
+	color: var(--sl-color-gray-3);
+}
+@media (min-width: 50rem) {
+	.hero { grid-template-columns: minmax(0, 1fr) auto; }
+}
+@media (max-width: 49.99rem) {
+	/* Narrow: the title and the story come first; the characters are left out of the hero. */
+	.hero > .hero-html { display: none; }
+}
+
+/* Activation tags carry one hue per kind (src/components/Tag.astro). On ivory those hues are too
+   light to read as text, so the light theme mixes each toward the ink; dark lifts them slightly. */
+:root[data-theme='light'] .cckit-tag.cckit-tag,
+:root[data-theme='light'] .sl-markdown-content a.cckit-tag,
+:root[data-theme='light'] .cckit-tag-ref.cckit-tag-ref,
+:root[data-theme='light'] .sl-markdown-content a.cckit-tag-ref {
+	color: color-mix(in srgb, var(--tag, #2457d6) 48%, #202521);
+}
+:root:not([data-theme='light']) .cckit-tag.cckit-tag,
+:root:not([data-theme='light']) .sl-markdown-content a.cckit-tag,
+:root:not([data-theme='light']) .cckit-tag-ref.cckit-tag-ref,
+:root:not([data-theme='light']) .sl-markdown-content a.cckit-tag-ref {
+	color: color-mix(in srgb, var(--tag, #91b1ff) 78%, #f2f4eb);
 }

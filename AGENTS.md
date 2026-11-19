@@ -203,41 +203,63 @@ Validation refuses an undeclared profile, a missing `kind`, an unknown stage, or
 
 ## Editing the docs site
 
-`docs-site/` (Astro + Starlight) has two tracks. A page under `src/content/docs/marketing/` is
-Marketing; every other page is Software. The track sets the sidebar, the marker colour and the
-current entry of the top-bar switch (`docs-site/src/lib/tracks.ts`, `docs-site/src/routeData.ts`).
+`docs-site/` (Astro + Starlight) is one site with one navigation. The home page (`index.mdx`, and
+`es/index.mdx` in Spanish) is the visual entry: one improvement to a service-booking app in three
+moments (`docs-site/src/components/learning/ChangeStory.astro`), shown before any term or command.
+A page under `src/content/docs/marketing/` is written for a reader who never opens a terminal;
+`docs-site/src/lib/tracks.ts` tells those pages apart only for wording ("your assistant" against
+"your agent") and for the plain-words check.
 
 - **Software pages live under their area.** The areas, in sidebar order: `getting-started/`,
   `project-management/`, `design/`, `development/`, `review/`, `ship/`, then the optional
   `memory/`. `software.mdx`
-  is the track's entry page and `philosophy/` holds the team page beside `philosophy.mdx`.
+  is the overview of the six steps and `philosophy/` holds the team page beside `philosophy.mdx`;
+  both are listed under Concepts.
   Reference pages (`cli-reference`, `config-and-permissions`, `integrations`, `skills`, `rules`,
   `hooks`, …) stay at the root so links to their anchors keep working. Inside an area the order is:
   why it exists, who does it, which tools plug in, the verbs, the guides. There is no separate
   tutorials section: a step-by-step page is a guide in its area.
-- **The look lives in one file.** `docs-site/src/styles/theme.css` holds the palette (the Apple System
-  Colors terminal scheme, dark and light), the type scale and the measured contrast ratios. Both
-  tracks share one action colour; a track differs by its marker colour, `--cckit-track`. The
-  typeface is Geist and Geist Mono, self-hosted through `@fontsource-variable/geist` and
-  `@fontsource-variable/geist-mono`. A page opens dark when the reader has stored no choice
-  (`docs-site/src/components/ThemeProvider.astro`).
+- **The look lives in one file.** `docs-site/src/styles/theme.css` holds the palette (ivory paper,
+  forest-charcoal ink, cobalt for actions, sage and ochre for states; dark and light), the type
+  scale and the component rules: buttons with a small offset shadow, tabs, cards, asides, fields
+  and the terminal look of code blocks, which are dark in both themes (`expressiveCode.themes` in
+  `astro.config.mjs` is one dark theme). The direction was approved from the study page
+  `docs-site/src/pages/design/theme.astro` (`/design/theme/`, noindex, out of the sitemap); no page
+  imports the study. The typeface is Geist and Geist Mono, self-hosted through
+  `@fontsource-variable/geist` and `@fontsource-variable/geist-mono`. The theme follows the
+  reader's stored choice, else the system scheme; there is no ThemeProvider override.
+- **Brand pieces live in `docs-site/src/components/brand/`.** `StickerLogo.astro` is the approved
+  illustrated logo (the header's `SiteTitle.astro` and the footer use it), `Ornament.astro` is one
+  ink accent (`underline`, `spark`, `arrow`, `dots`, `tape`, `corner`), and `KitoFooter.astro` is
+  the closing banner on every page, in English and Spanish. Its motion is CSS only, the Pause
+  button stops it, and with reduced motion or no JavaScript it is still. The images are WebP crops
+  of the approved sheets in `docs/design/512/references/`; the sheets themselves are not served.
+  The characters are Nota (the Post-it), Kito (the terminal) and Memo (the USB stick); their names
+  stay small under the trio on the home page. Use an ornament where it marks hierarchy (a title, the
+  main action, the selected tab, a tip) and keep reading surfaces plain.
 - **The header never moves.** `docs-site/src/components/Header.astro` is a three-column grid: the
-  wordmark, the search centred on the page, then the right group. Items that exist on one track
-  only (version, GitHub icon, language picker) come before the theme picker, and the Software /
-  Marketing switch is last, at the right edge. Search controls take their surface and edge from
-  `--cckit-field-bg` and `--cckit-field-border`, which hold 3:1 against the page in both themes.
+  logo, the search centred on the page, then the right group: version text, GitHub icon, language
+  picker and theme picker. Search controls take their surface and edge from `--cckit-field-bg` and
+  `--cckit-field-border`, which hold 3:1 against the page in both themes. The search says Search
+  (Buscar): the site has no service that answers questions, so no control says "ask".
 - **The guide header is two stacked blocks** (`docs-site/src/components/TutorialMeta.astro`): the
   "Copy the prompt" banner, then "Before you start". Keep each to one line of text per item.
-- **The sidebar is curated.** `sidebar` in `docs-site/astro.config.mjs` lists 43 Software pages:
-  one "Start here" link, eight area groups and a Reference group, every group collapsed except the
-  one holding the current page. The Marketing list is 15 pages in six groups (How it works, Get set up,
-  Make a piece, Review and approve, Plan, Look things up) after a "Start here" link, nested in the
-  `Marketing` entry; `src/routeData.ts` unwraps it and opens every group. Each Marketing page ends
-  with a `Next:` link to the following sidebar entry; move a page and its neighbours' links move
-  with it, in both languages. The sidebar group icons in
-  `theme.css` apply to Software only. The site has 87 English pages (72 Software, 15 Marketing). A new
-  Software page is not added to the sidebar by default: link a guide from its area's
-  `more-guides.mdx` (`development/`, `review/`) and a reference page from `reference.mdx`.
+- **The sidebar is curated, and there is one.** `sidebar` in `docs-site/astro.config.mjs` lists 60
+  pages for every reader: two links (Start here, How it works, part by part), seven area groups
+  (Getting started to Memory), the group For marketing teams (15 pages in six sub-groups: How it
+  works, Get set up, Make a piece, Review and approve, Plan, Look things up), Concepts and
+  Reference. Every group is collapsed except the one holding the current page;
+  `src/routeData.ts` opens the group of a page that is not listed. Each Marketing page ends with a
+  `Next:` link to the following sidebar entry; move a page and its neighbours' links move with it,
+  in both languages. A new page is not added to the sidebar by default: link a guide from its
+  area's `more-guides.mdx` (`development/`, `review/`) and a reference page from `reference.mdx`.
+- **Spanish is per page.** A page is Spanish when its file exists under `src/content/docs/es/`
+  with the same name as the English one (`docs-site/src/lib/translated.mjs`): today the home page,
+  `learn/how-the-tools-connect` and the 15 Marketing pages. Only those pages show the language
+  picker, carry the `hreflang` pair and are listed in the sitemap under `/es/`. Every other `/es/`
+  URL is an English fallback copy that Starlight builds: `noindex`, canonical to the English page.
+  Do not link to a fallback as if it were Spanish; a link from a Spanish page to an English one
+  says "(en inglés)".
 - **A guide step leads with a conversation window.** `<Chat>` (`docs-site/src/components/Chat.astro`)
   shows what a person says in the agent's chat, the command it runs (`ran`, Software only), the
   real output and the agent's reply, on one running example, the "Bakery site". `<Outcomes>`
@@ -250,9 +272,8 @@ current entry of the top-bar switch (`docs-site/src/lib/tracks.ts`, `docs-site/s
   omitted when none of those exists; the reply claims nothing the command did not do. A Marketing
   window carries no `ran` and no `output` (the build fails if it does). Reference pages stay
   command-first. Authoring notes: `docs-site/src/components/README-chat.md`.
-- **A Marketing page has a Spanish twin** with the same file name under
-  `src/content/docs/es/marketing/`. Change both in one commit. Links from a Spanish page into a
-  Software page say the target is in English.
+- **A translated page has a Spanish twin** with the same file name under
+  `src/content/docs/es/`. Change both in one commit.
 - **Marketing pages use plain words.** `astro build` fails when a page under `marketing/` or
   `es/marketing/` says "worktree", "branch" or "PR"; `words-you-will-hear.mdx` is the one
   exemption (`docs-site/src/integrations/marketing-words.mjs`, tested by
@@ -263,15 +284,10 @@ current entry of the top-bar switch (`docs-site/src/lib/tracks.ts`, `docs-site/s
   heading). Smaller tables stay tables. To keep a grid, wrap the table in
   `<div data-table="grid">` (`docs-site/src/lib/rehype-record-tables.mjs`, tested by
   `scripts/docs-record-tables-test.sh`).
-- **The header is one component.** `docs-site/src/components/Header.astro` lays out the top bar:
-  wordmark, centred search, then the Software / Marketing switch (`TrackSwitch.astro`), version text
-  and GitHub icon (Software only, `SocialIcons.astro`), theme picker, language picker (Marketing
-  only). The switch lives there, not in `SiteTitle` (no override of that remains). On a phone the
-  switch, the search icon and the menu button share one row.
-- **`SearchStart.astro` is the search entry** on the home page and on `software.mdx`,
-  `marketing/index.mdx` and `es/marketing/index.mdx`. Its chips are defined in that file, one list
-  per track and language; every chip is a real link, and a script upgrades the click to open search
-  with the chip's text. Check each chip's target exists when you edit the lists.
+- **`SearchStart.astro` is the search entry** on `software.mdx`, `marketing/index.mdx` and
+  `es/marketing/index.mdx`. Its chips are defined in that file, one list per kind and language;
+  every chip is a real link, and a script upgrades the click to open search with the chip's text.
+  Check each chip's target exists when you edit the lists.
 - **`tutorial.prerequisites` are full sentences.** An item is a string or `{ text, link, href }`
   (`link` is the words inside `text` that become the link; backticks make inline code), rendered as
   the checklist in `TutorialMeta.astro`.

@@ -1,0 +1,46 @@
+---
+title: How the tools connect
+description: What your coding agent, cckit, your project and GitHub each do, and how one small change travels between them from your request to a reviewed pull request.
+---
+
+import ToolsMap from '../../../components/learning/ToolsMap.astro';
+import StagedScene from '../../../components/learning/StagedScene.astro';
+import { smallChange } from '../../../components/learning/content';
+
+This page shows the parts involved when you work with a coding agent and cckit, and follows one change through them. It is one example of a workflow: cckit also supports task lists kept in files, larger pieces of work split into parts, and more or less automation. For the short version, see [From an idea to a change you can review](/).
+
+Reading this page needs nothing installed. To do the same in your own project you need a coding agent (Claude Code or Codex), [cckit installed](/getting-started/install/), a GitHub account you are signed in to, and a project that has run [`cckit init`](/getting-started/initialize/).
+
+[Leer esta página en español](/es/learn/how-the-tools-connect/)
+
+## The parts and what connects them
+
+<ToolsMap />
+
+## One small change, step by step
+
+The example is a small app for booking services: a visitor picks a service, sees the free times and books one. You do not have to build it. In your own project, pick a small improvement you can check, and say it to your agent in your own words, for example:
+
+```text
+I want each service to show how long it lasts before the visitor picks a time.
+Record it as work for this project with cckit, then start on it.
+```
+
+<StagedScene scene={smallChange} />
+
+## After the review: two separate actions
+
+The scene stops at a reviewed pull request because the next two actions are decisions, and neither happens by itself.
+
+- **Merge.** To merge is to add the proposed change to the version of the project everyone shares. A person decides it. When you say so, your agent runs `cckit merge`: it merges the pull request, closes the issue linked to it and removes the branch and the worktree of that change.
+- **Deployment.** Putting the change online is not part of cckit. Whether a merge publishes anything depends on how your project's hosting is configured, apart from cckit. Some hosting services also build a preview when a branch reaches GitHub, before any merge; that is configured there too.
+
+## If your project keeps its work list in files
+
+Not every project records work as GitHub issues. With light tasks the list is one file per task inside the project, and the commands are `cckit task new`, `cckit task start` and `cckit task finish`. The list needs no GitHub account. Review does: finishing a task opens a pull request on GitHub. [Tasks without GitHub issues](/project-management/light-tasks/) has the details.
+
+## Next
+
+- [Install cckit](/getting-started/install/)
+- [Set up a project](/getting-started/initialize/)
+- [Take an issue to merged](/development/issue-to-merged-pr/), the same steps with every command and its output

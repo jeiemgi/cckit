@@ -1,0 +1,73 @@
+---
+// EntryActions — the two links under an entry scene: one main action and one secondary link.
+//   <EntryActions primary={{ label, href }} secondary={{ label, href }} note="…" />
+// The main action carries the theme's offset shadow and one ink spark (src/styles/theme.css,
+// src/components/brand/Ornament.astro).
+import Ornament from '../brand/Ornament.astro';
+
+interface Link {
+  label: string;
+  href: string;
+}
+interface Props {
+  primary: Link;
+  secondary?: Link;
+  note?: string;
+}
+const { primary, secondary, note } = Astro.props;
+---
+
+<div class="ea not-content">
+  <p class="ea-links">
+    <a class="cckit-button primary ea-primary" href={primary.href}>
+      {primary.label} <span aria-hidden="true">↗</span>
+      <Ornament kind="spark" class="ea-spark" />
+    </a>
+    {secondary && <a class="ea-secondary" href={secondary.href}>{secondary.label}</a>}
+  </p>
+  {note && <p class="ea-note">{note}</p>}
+</div>
+
+<style>
+  .ea {
+    margin-block: 1.5rem;
+  }
+  .ea p {
+    margin: 0;
+  }
+  .ea-links {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem 1.75rem;
+  }
+  .ea-primary {
+    position: relative;
+  }
+  .ea :global(.ea-spark) {
+    position: absolute;
+    top: -1.1rem;
+    right: -1.35rem;
+    width: 1.9rem;
+    height: 1.7rem;
+    transform: rotate(-12deg);
+  }
+  .ea-secondary {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+    color: var(--sl-color-text-accent);
+    font-size: 1rem;
+    font-weight: 550;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.3em;
+  }
+  .ea-secondary:hover {
+    text-decoration-thickness: 2px;
+  }
+  .ea-note {
+    margin-top: 0.9rem !important;
+    color: var(--sl-color-gray-3);
+    font-size: 0.9375rem;
+  }
+</style>

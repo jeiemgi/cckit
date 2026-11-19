@@ -1,0 +1,24 @@
+---
+// StickerLogo — the approved illustrated cckit logo (docs/design/512/references/
+// cckit-logo-approved.png). The artwork is the original raster, cropped to the logo's cell and
+// shown through a clip path that follows its sticker outline; it is not a vector redraw.
+// `id` must be unique on the page: it names the clip path.
+import { getImage } from 'astro:assets';
+import sheet from './assets/logo-sheet.webp';
+
+interface Props {
+  id: string;
+  label?: string;
+}
+const { id, label = 'cckit' } = Astro.props;
+const art = await getImage({ src: sheet, format: 'webp', width: 550 });
+---
+
+<svg class="logo-art" viewBox="60 140 550 240" role="img" aria-label={label} xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <clipPath id={id}>
+      <path d="M127 160 C103 153 77 169 69 194 C61 217 71 234 79 243 C66 270 74 307 91 328 C110 351 142 359 171 356 C196 355 211 349 224 346 C248 360 277 359 305 352 C318 359 339 359 358 354 L415 355 C431 361 453 360 474 354 C487 365 502 374 525 374 L557 374 C583 374 601 358 602 334 L602 253 C611 231 601 203 582 196 L570 193 L570 180 C569 162 556 153 538 153 L493 153 C481 142 466 140 451 141 C434 142 421 149 416 160 L395 161 C390 149 378 146 363 146 L339 146 C320 146 311 156 311 175 L312 198 C292 191 271 187 249 191 C229 192 214 200 202 206 C189 190 171 182 153 183 C149 170 141 163 127 160 Z" />
+    </clipPath>
+  </defs>
+  <image href={art.src} x="60" y="140" width="550" height="240" clip-path={`url(#${id})`} />
+</svg>
