@@ -1,6 +1,6 @@
 # Docs experience: execution checkpoint
 
-Updated 2026-11-19, after delivery 01. Owner: José. Director/reviewer: Codex. Implementation delegate: Claude Code.
+Updated 2026-11-19, after the theme delivery. Owner: José. Director/reviewer: Codex. Implementation delegate: Claude Code.
 
 ## Resume here
 
@@ -15,15 +15,14 @@ The existing PR changes three guide files. It does not implement the scope below
 Its old word-count acceptance criterion is superseded by comprehension, factual completeness,
 and visual explanation. Do not remove facts or hide prerequisites to meet a word count.
 
-Delivery 01 was implemented (`84b82eb`, `delivery-01.md`) and the owner rejected it as an entry
-page: `feedback-01-revision.es.md`. The sample was then redone as a three-moment visual scene at
-`/learn/` and `/es/learn/`; the first version's detail moved to `/learn/how-the-tools-connect/`.
-Read `revision-01.md` for what changed, the checks that ran, the captures and the limits.
-Both commits are on this branch and not pushed.
+Delivery 01 was implemented (`84b82eb`, `delivery-01.md`), rejected as an entry page, and redone
+as a three-moment scene (`0d17804`, `revision-01.md`). The approved theme and one navigation are
+applied to the whole site in `1582c3d` (`delivery-02-theme-and-navigation.md`). None of it is pushed.
 
-Next action: the owner reviews `/learn/` on the local server. Delivery 02 stays paused under
-`brief-02.md` until that review. Still open from delivery 01: the push, PR 517's description, and
-native sub-issues for deliveries 02 to 06.
+Codex owns the home page and is building it uncommitted in this worktree: `index.mdx`,
+`es/index.mdx`, `components/home/`, `HomeHeroOverride.astro` and the `Hero:` line in
+`astro.config.mjs`. Deliveries 03, 05 and 06 are native sub-issues of #512: #520, #521, #522.
+Still waiting on the owner: the push, PR 517's description and the 0.10 release promotion.
 
 `brief-01.md` is the brief delivery 01 was built from. Only one writer may use this worktree at a time.
 Run subsequent deliveries sequentially here, or create native issues/worktrees through cckit
@@ -85,11 +84,11 @@ The wireframes preserve exploratory layout; they are not a completed implementat
 | Delivery | Scope | Evidence required | State |
 | --- | --- | --- | --- |
 | 01 | Reusable tools diagram and staged scene, one EN/ES sample | Keyboard controls, reduced motion, correct lifecycle, build | Rejected as entry, then redone: `revision-01.md`. Awaiting owner review |
-| 02 | Unified navigation, home, language routing and redirects | Route inventory; no broken links or false translations | Paused: `brief-02.md` |
-| 03 | Five-chapter EN/ES onboarding and appointment demo story | Run prompts; preserve setup preconditions and error recovery | Pending |
-| 04 | Light/dark tokens, typography, layout and mascot placement | Mobile/desktop review; contrast and UI-state samples | Pending |
-| 05 | Reference inventory, translations, glossary and remaining guides | Page-by-page fact/translation map | Pending |
-| 06 | Real search/Ask AI integration when account config is available | Answers cite docs; search fallback; no simulated chat | Pending |
+| 02 | Unified navigation, home, language routing and redirects | Route inventory; no broken links or false translations | Navigation and language routing done in `1582c3d`; home page in progress by Codex |
+| 03 | Five-chapter EN/ES onboarding and appointment demo story | Run prompts; preserve setup preconditions and error recovery | Pending: #520 |
+| 04 | Light/dark tokens, typography, layout and mascot placement | Mobile/desktop review; contrast and UI-state samples | Done in `1582c3d`: `delivery-02-theme-and-navigation.md` |
+| 05 | Reference inventory, translations, glossary and remaining guides | Page-by-page fact/translation map | Pending: #521 |
+| 06 | Real search/Ask AI integration when account config is available | Answers cite docs; search fallback; no simulated chat | Pending: #522 |
 
 Do not claim the complete release is ready when only delivery 01 passes.
 Screenshots/GIFs must come from a real, named demo state, not an invented interface.
