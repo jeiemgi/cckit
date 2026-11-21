@@ -70,6 +70,18 @@ out="$( cd "$repo" && CCKIT_LEAK_WORDS='frobnic' bash -c '. scripts/lib/leak-fen
 t "CCKIT_LEAK_WORDS without the word: passes" "$rc" "0"
 untrack "docs/ci.md"
 
+# 5b. a secret set from the list file carries its comment lines, one with `|`: comments are dropped
+# before the split, so the scan still runs and still catches the word
+track "docs/ci.md" "mentions quuxcorp here"
+out="$( cd "$repo" && CCKIT_LEAK_WORDS=$'# words (a|b), see docs\nfrobnic|quuxcorp' bash -c '. scripts/lib/leak-fence.sh; leak_fence_check' 2>&1 )"; rc=$?
+t "CCKIT_LEAK_WORDS with a comment line containing |: comment skipped, word caught" "$rc" "1"
+case "$out" in *"docs/ci.md:1"*) echo "ok: hit reported with the comment present" ;; *) echo "FAIL: scan did not run: $out"; fail=1 ;; esac
+# 5c. a pattern that does not compile fails the gate instead of passing on an empty scan
+out="$( cd "$repo" && CCKIT_LEAK_WORDS='(unbalanced' bash -c '. scripts/lib/leak-fence.sh; leak_fence_check' 2>&1 )"; rc=$?
+t "invalid pattern: the gate fails, it does not pass silently" "$rc" "1"
+case "$out" in *"did not compile"*) echo "ok: names the cause" ;; *) echo "FAIL: cause not named: $out"; fail=1 ;; esac
+untrack "docs/ci.md"
+
 # 6. the fence file itself names the built-in word and is excluded from its own scan
 out="$(fence)"; rc=$?
 t "the fence source is not a hit" "$rc" "0"
