@@ -26,7 +26,14 @@ cckit pr <issue> "<summary>" # open the PR
   to set the type yourself. CI (`commitlint`) fails the PR until the title is valid; check one locally
   with `scripts/lib/commitlint.sh "feat: your summary"`.
 - Run the local gate before opening a PR: `bash scripts/check.sh` (shell syntax, valid manifests,
-  no stray branding, the commitlint rules, the skill-listing and instruction-file budgets). A green gate is the bar.
+  the leak fence, the commitlint rules, the skill-listing and instruction-file budgets). A green gate is the bar.
+- **The leak fence.** cckit is public and is developed next to private repositories, so gate step 3
+  fails on any tracked line that contains a private word: a product or client name, a person's name,
+  a private path. The built-in word is always on; your own patterns live in `.cckit/leak-words`
+  (local, gitignored, one extended regex per line) or in the `CCKIT_LEAK_WORDS` repository secret
+  (CI, `|`-separated). Never commit the list: a public denylist publishes the words it hides. A hit
+  prints `file:line` only. `bash scripts/leak-fence-test.sh` is its selftest. Write a word end as
+  `([^[:alnum:]]|$)`, not `\b`: `\b` matches nothing in `git grep -E` on macOS.
 - The gate ends with `bash scripts/test.sh`, which runs every `*-test.sh` under `bin/` and
   `scripts/`, several files at a time (the CPU count, capped at 8). `bash scripts/test.sh <pattern>`
   runs the files whose path matches; `-j <N>` or `TEST_JOBS=<N>` sets how many run at once,

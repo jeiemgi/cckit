@@ -14,7 +14,7 @@ if [ -n "${KIT_PROFILE_TEST_INNER:-}" ]; then
   export KIT_PROFILE_HOME="$(mktemp -d)"; trap 'rm -rf "$KIT_PROFILE_HOME"' EXIT
 
   # slug normalization (O8)
-  t "slug spaces+case"  "$(KIT_PROFILE_USER='Jose Gutierrez' kit_profile_user_slug)" "jose-gutierrez"
+  t "slug spaces+case"  "$(KIT_PROFILE_USER='Ada Example' kit_profile_user_slug)"    "ada-example"
   t "slug explicit arg" "$(kit_profile_user_slug 'Ada Lovelace')"                    "ada-lovelace"
   t "slug all-symbols -> user" "$(kit_profile_user_slug '!!!')" "user"
 
@@ -32,8 +32,8 @@ if [ -n "${KIT_PROFILE_TEST_INNER:-}" ]; then
   t "init idempotent" "$h1" "$h2"
 
   # set / get scalar + nested
-  kit_profile_set name "Jose" string tester
-  t "get name"        "$(kit_profile_get .name tester)"          "Jose"
+  kit_profile_set name "Ada" string tester
+  t "get name"        "$(kit_profile_get .name tester)"          "Ada"
   kit_profile_set defaults.mode guided string tester
   t "get nested mode" "$(kit_profile_get .defaults.mode tester)" "guided"
   kit_profile_set defaults.memory_on true bool tester
