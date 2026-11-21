@@ -30,7 +30,7 @@ Authority:
 
 ## Stack
 
-Read the project's actual backend stack from `CLAUDE.md` and `.claude/kit.config.json` before acting — framework, ORM, database, queue. Don't assume.
+Read the project's actual backend stack from `{{ADAPTER_INSTRUCTIONS}}` and `{{CONFIG_REL}}` before acting — framework, ORM, database, queue. Don't assume.
 
 ## Workflow
 

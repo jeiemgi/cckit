@@ -41,6 +41,14 @@ for agent in claude codex; do
  has "$out" 'would launch 2 flow(s): 3 4'
  has "$out" "agent '$agent'"
 done
+# #352: a KIT_BASE_BRANCH from the environment reaches orchestrate, and the banner says so. Without
+# one the banner names the config's base and carries no override line.
+out="$(KIT_BASE_BRANCH=effort/9-x run 3)"
+has "$out" '(base effort/9-x)'
+has "$out" "base 'effort/9-x' comes from KIT_BASE_BRANCH in the environment (the config says 'develop')"
+out="$(env -u KIT_BASE_BRANCH bash "$TMP/install/scripts/autopilot.sh" --dry-run 3)"
+has "$out" '(base develop)'
+case "$out" in *'comes from KIT_BASE_BRANCH'*) echo 'FAIL override line printed with no override'; exit 1 ;; esac
 out="$(run --cap 1)"; has "$out" 'would launch 1 flow(s): 3'; has "$out" 'queued past cap (run a later wave): 4'
 out="$(BLOCKER_STATE=CLOSED run 3)"; has "$out" 'would launch 1 flow(s): 3'
 export BLOCKER_STATE=OPEN

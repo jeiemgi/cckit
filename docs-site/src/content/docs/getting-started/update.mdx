@@ -1,0 +1,285 @@
+---
+title: Update a project
+description: "Bring a project set up by an older cckit to the installed version: check the version, preview the change, apply it and confirm. With what the update changes and what it never touches."
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
+
+cckit moves forward: new rules, new guards, fixed hooks. A project set up months ago still has the
+files it was given that day, and it also has your edits to them. An update has to bring the new
+files in without undoing your edits, and you should be able to see what it will change before it
+changes anything.
+
+A project records the cckit version that set it up as `kitVersion` in its config. Updating the
+cckit install does not change the project; the four steps below do.
+
+Each step starts with the sentence you say to your agent in the chat. Below it is the command your
+agent runs for that sentence and what the command printed, pasted from a real run on the Bakery
+site, the example project of these guides. You can type the commands yourself, from the project root.
+
+**What you will have at the end:** the project on the installed version, the files it was missing
+added, every file you edited kept, and one diff to review and commit.
+
+**Who does it:** one person, from the project root, on a clean working tree. Every command on this
+page is run, in this order, by `scripts/update-path-test.sh` against a project built the way an
+older cckit left it.
+
+This page is about the project. Moving the install itself forward is in the
+[install and update matrix](/install-matrix/).
+
+## 1. Check which version the project is on
+
+<Chat
+  title="checking which cckit version the Bakery site is on"
+  say="Is the Bakery site on the current cckit version?"
+  ran="cckit update"
+  output="⡶ / claude-kit · update available  0.8.2 -> 0.9.0 · run: cckit init --upgrade (in Claude Code: /kit-update) · preview with --dry-run · your edits are kept"
+  means="The project is behind. Checking is safe, it reads and prints one line and changes nothing. Step 3 previews the upgrade before applying it."
+>
+  The Bakery site was set up with cckit 0.8.2, and this computer has 0.9.0. Nothing has changed.
+  Do you want me to show what the upgrade would change?
+</Chat>
+
+The same line is printed at the start of every Claude Code session by the `kit_version_check.sh`
+hook.
+
+<Outcomes of="cckit update">
+
+| Output | Meaning | Exit |
+| --- | --- | --- |
+| `update available · <have> -> <latest> · run: cckit init --upgrade (in Claude Code: /kit-update)` | the project is behind the install | 10 |
+| `up to date` | `kitVersion` equals the installed version | 0 |
+| `ahead of plugin <latest>` | the project records a newer version than the install it is compared with. Do not downgrade — see [the matrix](/install-matrix/#a-kitversion-that-is-not-a-released-tag) | 0 |
+
+</Outcomes>
+
+## 2. Move an old layout to the current one
+
+<Chat
+  title="checking whether the Bakery site has an old skill layout"
+  say="Does the Bakery site still have the old task skill folders? Show me what moving them would do."
+  ran="cckit migrate --dry-run"
+  output={[
+    "kit-migrate: layout already on v2 (no old task-* paths to move).",
+    "  [dry-run] would register upgrade.renamed[.claude/skills/task-new]=.claude/skills/kit-task-new in .claude/kit.config.json",
+    "  [dry-run] would register upgrade.renamed[.claude/skills/task-start]=.claude/skills/kit-task-start in .claude/kit.config.json",
+    "…",
+    "  (docs reference current skill names — no rewrite needed)",
+  ]}
+  means="Only a project scaffolded before the kit- skill prefix has old folders to move. A dry run writes nothing."
+>
+  No. The layout is already current, so there is nothing to move. The preview would only record
+  eight old skill names in the config, so a later upgrade never adds those names back. I changed
+  nothing.
+</Chat>
+
+<Outcomes of="cckit migrate" title="What cckit migrate does on a project with an old layout">
+
+Projects scaffolded before the `kit-` skill prefix have `.claude/skills/task-*` directories. Preview
+the move, then apply it:
+
+- `--dry-run` prints each move it would make and writes nothing.
+- The real run copies `.claude/` to `.claude.bak.<timestamp>` first, moves each old directory to
+  its new name without overwriting one that exists, records the rename under `upgrade.renamed` in
+  the config, and rewrites `/task-<verb>` to `/kit-task-<verb>` in `CLAUDE.md` and the rules.
+- `upgrade.renamed` is what stops the next step from re-adding the old directory.
+- On a project with no old paths it prints `layout already on v2` and exits 0.
+- It asks before writing. `cckit migrate --yes` (or `KIT_ASSUME_YES=1`) answers for a script.
+
+Commit the result, and delete the `.claude.bak.<timestamp>` directory once you have looked at it.
+Registering a rename re-serialises the config file, so expect a formatting diff in that commit.
+
+</Outcomes>
+
+## 3. Preview, then apply
+
+The upgrade refuses a dirty working tree (exit 1), so the diff it produces is only its own. Check,
+preview, apply. First the preview:
+
+<Chat
+  title="previewing the upgrade of the Bakery site"
+  say="Show me what the upgrade would change, before you change anything."
+  ran={[
+    { cmd: "git status --short" },
+    {
+      cmd: "cckit init --upgrade --dry-run",
+      output: [
+        "-> DRY RUN — nothing will be written. Plan for <project>:",
+        "  (UPGRADE: existing files are PRESERVED; only genuinely-missing files are added; config keys merged.)",
+        "…",
+        "  Would change (0 added, 3 modified):",
+        "    M .claude/kit.config.json",
+        "    M .claude/kit.manifest.json",
+        "    M .claude/settings.local.json",
+        "",
+        "  A = added · M = modified. Measured by running the upgrade on a temporary copy; <project> was not written.",
+        "Re-run without --dry-run to apply.",
+      ],
+    },
+  ]}
+  means="The working tree has to print nothing for git status before you start. The dry run runs the upgrade on a temporary copy, so the project is not written."
+>
+  The working tree is clean, so the diff will be the upgrade's alone. The upgrade would add no file
+  and change three: the project config, its manifest and a local settings file. Nothing was
+  written.
+</Chat>
+
+Then apply it:
+
+<Chat
+  title="applying the upgrade to the Bakery site"
+  say="That looks right. Apply the upgrade."
+  ran="cckit init --upgrade"
+  output={[
+    "-> Upgrading marketing profile in <project>",
+    "  + .claude/kit.config.json (merged · kitVersion -> 0.9.0 · in-place)",
+    "…",
+    "  Upgrade -> kitVersion 0.9.0",
+    "  Changed on disk (0 added, 3 modified):",
+    "    M .claude/kit.config.json",
+    "    M .claude/kit.manifest.json",
+    "    M .claude/settings.local.json",
+    "  Preserved (your edits, untouched):",
+    "    = .claude/agents/pm/AGENT.md",
+    "    = .claude/agents/editor/AGENT.md",
+    "…",
+  ]}
+  means="The Changed on disk list is measured after the run and equals the preview's list. Nothing is committed yet: step 4 reads the diff."
+>
+  Done. The Bakery site is on 0.9.0. Three files changed, the same three the preview listed, and
+  every file you had edited was kept as it was.
+</Chat>
+
+<Outcomes of="cckit init --upgrade" title="What the dry run prints, and what the upgrade changes and never touches">
+
+#### What the dry run prints
+
+`cckit init --upgrade --dry-run` copies the kit-managed paths of the project to a temporary
+directory, runs the upgrade there, and prints what differs afterwards. The project is not written.
+
+```text
+  Would change (27 added, 2 modified):
+    A .claude/hooks/kit-mail-check.sh
+    M .claude/kit.config.json
+    A .claude/rules/merge-safety.md
+    M .claude/settings.json
+    …
+```
+
+`A` is a file that would be added, `M` one whose content would change. The real run prints the same
+rows under `Changed on disk`, measured the same way: a checksum of each file before the first write
+and after the last. The test asserts the two lists are equal to each other and to an independent
+before/after checksum of the whole project.
+
+The paths that are copied and measured: `.claude/` (without `.claude/worktrees/`), `.codex/`,
+`.agents/`, `.cckit/`, `scripts/`, `knowledge/`, `benchmarks/`, `CLAUDE.md`, `AGENTS.md`,
+`.gitignore` and `cckit.config.json`. `node_modules` directories are skipped. The upgrade writes
+nowhere else.
+
+<Aside type="note" title="Gitignored files are in the list">
+`.claude/settings.local.json` and `.claude/kit.manifest.json` are listed when they change, and
+`git status` does not show them. The list is what changed on disk, not what git tracks.
+</Aside>
+
+#### What the upgrade changes
+
+| What | How |
+| --- | --- |
+| Files the project does not have | added from the current templates: rules, skills and agents of the project's profile, hooks, `scripts/` helpers, `benchmarks/`, `knowledge/INDEX.md` |
+| `kitVersion` in the config | set to the installed version. When that is the only difference, the one line is edited in place and the rest of the file keeps its formatting and key order |
+| Config keys the current version requires and the project lacks | added after the keys already there. Adding a key re-serialises the file, so inline arrays are expanded in that diff |
+| A hook the project never edited | replaced by the current template, listed as `Refreshed` |
+| `.claude/settings.json` | a hook registration cckit needs and the file lacks is added (the raw-git guard, the session-mail hook on four events). The file is then listed as `M`. Adding one re-serialises the file |
+| `.claude/settings.local.json`, `.claude/kit.manifest.json`, `.claude/statusline.sh`, `.gitignore` | cckit's own entries are added or re-stamped |
+
+#### What it never touches
+
+| What | Reported as |
+| --- | --- |
+| A rule, skill, agent, script or instruction file (`CLAUDE.md`, `AGENTS.md`) that already exists, edited or not | `Preserved` |
+| A hook the project customized | `Drifted` — kept; compare it with `templates/hooks/` yourself |
+| A path listed under `upgrade.removed`, or a key of `upgrade.renamed`, in the config | `Skipped` — never re-added |
+| A config value the project set | kept; the project's value wins over the template's |
+| A feature block the config does not have (`plans`, `specKit`, `prePush`, `local`, `memory`, `adapters`) | not added |
+| A hook registration already in `.claude/settings.json` | left in the block and position it is in |
+| A `.claude/settings.json` that already has every registration | not rewritten, listed as `Preserved` |
+| A customized `.claude/statusline.sh` | `Preserved` |
+
+To stop the upgrade from re-adding something you deleted on purpose, list its path under
+`upgrade.removed` in the config before you run it. A directory entry covers the files under it.
+
+</Outcomes>
+
+To stop the upgrade from re-adding something you deleted on purpose, list its path under
+`upgrade.removed` in the config before you run it. A directory entry covers the files under it.
+
+## 4. Confirm it worked
+
+<Chat
+  title="confirming the Bakery site is up to date"
+  say="Check that it worked, and show me what changed in git."
+  ran={[
+    { cmd: "cckit update", output: "⡶ / claude-kit · v0.9.0  al día · up to date" },
+    { cmd: "git status --short", output: " M .claude/kit.config.json" },
+    { cmd: "git diff --stat", output: [
+        " .claude/kit.config.json | 2 +-",
+        " 1 file changed, 1 insertion(+), 1 deletion(-)",
+      ] },
+    {
+      cmd: "cckit init --upgrade",
+      output: "x already at 0.9.0 -- nothing to upgrade. (To pull a newer release, refresh the plugin cache: claude plugin update.)",
+    },
+  ]}
+  means="Review the diff and commit it. Git lists one file, not three, because the other two are gitignored."
+>
+  The Bakery site is up to date. Git shows one changed file, the config, with one line in and one
+  line out. Running the upgrade a second time found nothing to do and wrote no file.
+</Chat>
+
+<Outcomes of="the four checks" title="What you should see, command by command">
+
+| Command | What you should see |
+| --- | --- |
+| `cckit update` | `up to date`, exit 0 |
+| `git status --short` | the files in the `Changed on disk` list, minus the gitignored ones |
+| `git diff --stat` | `.claude/kit.config.json` with 1 insertion and 1 deletion when no config key was added |
+| `cckit init --upgrade`, a second time | `already at <version> -- nothing to upgrade`, exit 0, no file written |
+
+</Outcomes>
+
+Rules, skills, hooks and settings under `.claude/` are read at session start: an agent session that
+was open during the upgrade keeps the old ones until it is restarted.
+
+<Outcomes of="the four steps" title="The four steps as plain commands">
+
+```bash
+cckit update
+cckit migrate --dry-run
+cckit migrate
+git status --short
+cckit init --upgrade --dry-run
+cckit init --upgrade
+git diff --stat
+```
+
+</Outcomes>
+
+## Limits
+
+- **The comparison is a version string.** `cckit init --upgrade` answers `nothing to upgrade` when
+  `kitVersion` equals the installed version, even if the install has newer templates than the
+  release that string names. See
+  [Updates are skipped when the version string did not change](/install-matrix/#updates-are-skipped-when-the-version-string-did-not-change).
+- **An existing file is never updated to a newer template**, hooks excepted. A file that is
+  missing when the upgrade runs is added from the current template, so to take the current version
+  of a rule or script, delete it and commit before step 3.
+- **`cckit doctor` is not part of this path.** It checks the machine, not the project's files. Run
+  with no terminal and no `--fix` it installs nothing and writes no file; `cckit doctor --fix`
+  installs. See [Install and check](/getting-started/install/).
+
+## In the chat
+
+In Claude Code, `/kit-update` runs the same two commands: the dry run, then the upgrade after you
+confirm. It summarizes the changelog between the two versions first.

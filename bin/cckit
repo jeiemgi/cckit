@@ -7,22 +7,46 @@
 #   cckit                           resume: print the last session's resume-here handoff
 #   cckit handoff "<note>"          save a resume-here note for the next session
 #   cckit install [bin-dir]         symlink cckit onto your PATH (global install)
-#   cckit init --profile <p>        scaffold cckit.config.json + .claude/ (--profile required)
+#   cckit init [<folder>]           guided setup: detect the folder, ask, scaffold, then git + GitHub after
+#                                   one confirmation (--yes with no terminal; --no-github = scaffold only;
+#                                   --answers FILE, --recipe <id>, --database <id>, --public, --dry-run)
+#                                   --adapter <claude|codex|both> selects the agent (default claude)
 #   cckit start <issue> [slug]      isolated worktree + branch for an issue
-#   cckit pr <issue> <summary>      commit + push + open the PR
+#   cckit pr <issue> <summary> [--base <branch>]   commit + push + open the PR (--base: target <branch>, not the
+#                                   integration branch; the push exports it as KIT_PR_BASE)
+#   cckit hotfix <pr|sha> [--base B]   cherry-pick a merged PR or commit onto B (default main):
+#                                   worktree from origin/B, cherry-pick -x, push, PR `Cherry-pick of #N`
 #   cckit close <issue> <summary> [--reason completed|not-planned|duplicate] [--duplicate-of N]
 #               [--superseded-by N]  close the issue with a reason + summary comment; board Done
 #   cckit new [--role R --kind K --priority P --milestone M --blocked-by "#1" --body B|--body-file F] "<title>"
 #                                   file ONE issue: labels + board (Todo) in one step (never raw gh issue create)
+#   cckit task <new|list|next|start|finish|run|share|default>   light tasks: work tracked in the project, no GitHub issue
+#     task new [--priority pN --kind K --body B|--body-file F] "<title>"   record a task (one file
+#         under tasks/; a draft in this checkout until it is started or shared)
+#     task list [--all] · task next   every open task and its state · the one to take next
+#     task start [--force] [--no-push] <id>   worktree + branch light/<id>-<slug> from the base (alias: take)
+#     task finish [<id>] "<summary>" [--all]  mark it done on its branch, push, open the pull request;
+#         the task is done when that PR merges (alias: done). --all also commits new files
+#     task run <id> [--check "<cmd>"] [--max-iters N] [--max-seconds N] [--agent <cmd>] [--no-finish]
+#         start the task, run ONE headless objective built from its title and notes, finish it and
+#         print the review link. Gate: --check, else tasks.check in the config. Never merges
+#     task share ["<summary>"]        one pull request that adds this checkout's drafts to the base;
+#         they list as shared until it merges. Re-run to retry a share whose push or PR failed
+#     task default                    print light | issues: the project's default list (tasks.default).
+#         With light, a bare `cckit next` prints what `cckit task next` prints
 #   cckit merge [<pr>] [--merge|--rebase]   merge the PR (squash by default; rebases on conflict), close
-#                                   its issues, GC the branch, update the PR's base (develop or effort/<N>)
+#                                   its issues, GC the branch, update the PR's base (develop or effort/<N>);
+#                                   refuses an effort/* head: that PR merges with cckit effort close <N>
 #   cckit contribute "<summary>"    open a contribution PR to cckit, gated on scripts/check.sh
 #                                   (from the cckit checkout or worktree you are in; else the installed one)
 #   cckit sync [--llm]              board state / what's unblocked
+#     sync --json | --write | --cached [TTL] | --watch [SECS] | --plan
+#                                   the dashboard layer: one JSON summary, cached atomically in
+#                                   <git-common-dir>/kit-sync-cache.json (--llm stays TOON)
 #   cckit plan [--llm] [--effort N] wave plan: deps-ordered, p0-first in a wave, file-disjoint (TOON --llm)
 #   cckit plan-next [--llm]         forward plan: current skills/verbs/rules/docs -> what to build next
 #   cckit effort <new|chain|start|pr|close|plan>   the effort lifecycle
-#     effort new [--flow F --role R --priority p1 --goal G --scope S --for-agents A
+#     effort new [--flow F --role R --kind K --priority p1 --goal G --scope S --for-agents A
 #       --verification V --depends-on "#1,#2" --milestone M] "<name>" ["sub :: desc" …]
 #         parent (4-section body + ctx/kind/priority/role/flow labels) + linted native sub-issues
 #     effort chain <a> <b> [<c> …]  linear order: b blocked_by a, c blocked_by b, + a
@@ -33,33 +57,61 @@
 #         EFFORT_WIP_REMOTE=0 or an unreachable origin uses the cache and still starts). Refuses
 #         before writing anything; --force (or KIT_FORCE=1) starts anyway, at limit 0 too.
 #         `cckit start <issue>` is not affected.
-#     effort pr [<N>] [--summary S|--summary-file F] [--for-agents A|--for-agents-file F] [--title T]
-#         the ONE effort PR: inherits labels + milestone, rich body, board In Review
+#     effort pr [<N>] [--summary S|--summary-file F] [--for-agents A|--for-agents-file F] [--title T] [--type T]
+#         the ONE effort PR: inherits labels + milestone, rich body, board In Review. Title is a
+#         Conventional Commit subject carrying the id — `type(scope): name [#N]` (scope = flow:
+#         label, type = --type or the kind: label, default feat); refused before gh when it fails
+#         commitlint. pr.titleStyle = issue-title keeps `[Role] [#N] name`, unchecked.
 #   cckit orchestrate <a> <b> …     run N flows in parallel worktrees (--runtime tmux|herdr)
+#   cckit orchestrate --results     how each worker ended: success | failure | interrupted
 #   cckit autopilot [<a> …]         unattended multi-flow: drive (or auto-pick) issues under a cap
+#   cckit autopilot run [<issue>] --objective "<text>"   ONE bounded headless objective on this branch
 #   cckit watch [--merge] [--loop]  captain: gate open PRs, squash-merge CLEAN, advance the wave
 #   cckit next [--effort N]         everyday helper: the unblocked set + how to start the top issue
+#                                   + the weekly cadence (plan Monday, next daily, gc Friday)
 #   cckit wave [--effort N]         read open efforts, propose incoming waves: fan-out + captain drive
 #   cckit msg <send|read|list>      session mail across projects: steer a live session (--steer)
+#   cckit claims                    live session claims: which session is working which issue (read-only)
 #   cckit gc [--prune [--yes]]      report (default) or prune merged + landed branches and worktrees
 #   cckit cleanup [--yes]           guided destructive sweep over the gc report (plan first)
-#   cckit status                    thin dashboard: board + worktrees + resume handoff
+#   cckit status                    where are we: board, next effort per flow, local undone work,
+#                                   PRs waiting on a human, cleanup available, resume handoff
 #   cckit scan [--llm]              detect this repo's stack + kit state (JSON)
 #   cckit debug [--check] <args>    optional browser-debug via chrome-devtools-axi (auto-detected)
 #   cckit encode-context            stdin JSON -> compact TOON (uniform arrays; JSON fallback)
 #   cckit render                    stdin markdown -> rich (glow on a TTY; verbatim when piped)
-#   cckit doctor                    onboarding preflight (deps, gh auth)
+#   cckit doctor                    onboarding preflight (deps, gh auth, selected agent CLIs)
+#   cckit add [<name>] [--set k=v]  list integrations + modules; with a name, switch one on in the config
+#   cckit page <mode|open|poll|reply|end|answer>
+#                                   review pages: open a plan/decision/grill as a page (terminal
+#                                   output where there is no browser), and record the answer
 #   cckit update                    check whether this project is behind the installed cckit
 #   cckit migrate                   reshuffle an old kit layout to the current one
 #   cckit adopt                     record kit-shaped files a repo already has into the manifest
 #   cckit digest <path|url>         summarize a file or URL (local model)
 #   cckit bench [run|report|…]      doc-retrieval benchmark: score how well docs are found + used
-#   cckit release <ver> [--publish] cut a release (dry-run by default)
+#   cckit bench checkpoint <ver>    record a benchmark run as a checkpoint of release <ver>
+#                                   (checkpoints: list them · check <ver>: the release gate · page)
+#   cckit bench verbs [--json]      wall time + gh call count of the read-only verbs
+#                                   (attach to a checkpoint: bench checkpoint <ver> --verbs <file>)
+#   cckit release <ver> [--publish] cut a release (dry-run by default); refuses when <ver> has no
+#                                   benchmark checkpoint or scores lower (--skip-bench-check overrides)
 #   cckit version [--llm]           the installed cckit version
 #   cckit commands [--llm]          list every verb (the command catalog)
 #   cckit lib [--llm] [--all]       list every scripts/lib helper: functions, purpose, error contract
 #   cckit brief <issue>             the delegation brief for an issue, from real state
 #   cckit receipt <issue> …        record/read one stage receipt (a worker's durable report)
+#   cckit qa <up|ready> [--lane N] [--timeout S]   launch the declared review stack on this lane's
+#                                   ports; exit 0 only once every readiness probe answers
+#   cckit qa open [--lane N] [--pr N] [--route /p] [--print]   open the screen the change touched
+#                                   (the PR body's `QA route:` line, else qa.route) on a usable lane
+#   cckit qa stop [--lane N] [--force]   stop the lane's stack — supervisors before listeners — and
+#                                   exit 0 only when nothing listens on the lane's ports
+#   cckit qa verdict [pass|fail] [--lane N] [--note T] [--shot F]   record the verdict against the
+#                                   reviewed commit (PR comment upserted, a fail mailed to the builder);
+#                                   with no pass|fail, read it back: pass · fail · stale · none
+#   cckit qa lanes [--llm]          read-only table of every lane: branch, ports, up (listeners on
+#                                   its ports), verdict (pass · fail · stale · none), worktree
 #   cckit completions [bash|zsh]    print a shell-completion script to source
 #   cckit help
 set -eu
@@ -84,6 +136,7 @@ LIB="$ROOT/scripts/lib"
 # (config-path.sh, #69) that every kit entrypoint uses.
 # shellcheck source=/dev/null
 source "$LIB/config-path.sh"
+_KIT_CONFIG_GIVEN="${KIT_CONFIG:+1}"   # 1 = the caller named a config; init keeps only that one (#487)
 if [ -z "${KIT_CONFIG:-}" ]; then
   KIT_CONFIG="$(kit_config_find "$PWD" || true)"
   [ -n "$KIT_CONFIG" ] || KIT_CONFIG="$ROOT/cckit.config.json"
@@ -169,14 +222,19 @@ case "$cmd" in
     # shellcheck source=/dev/null
     source "$LIB/role-identity.sh"; source "$LIB/worktree-start.sh"
     if cckit_is_json; then
-      out="$(wt_start "$@" 2>&1)"; rc=$?
-      cckit_json verb start issue "${1:-}" ok "$([ "$rc" -eq 0 ] && echo true || echo false)" \
+      # `&& … ||` keeps `set -e` from exiting on a refused start before the JSON result is printed.
+      out="$(wt_start "$@" 2>&1)" && rc=0 || rc=$?
+      # The issue is the first non-flag argument: `start --force 42` reports 42, not `--force`.
+      start_issue=""; for a in "$@"; do case "$a" in -*) ;; *) start_issue="$a"; break ;; esac; done
+      cckit_json verb start issue "$start_issue" ok "$([ "$rc" -eq 0 ] && echo true || echo false)" \
         detail "$(printf '%s' "$out" | tail -1)"
       exit "$rc"
     fi
     wt_start "$@"
     ;;
   pr|close)
+    if [ "$cmd" = pr ]; then case "${1:-}" in -h|--help)
+      echo 'cckit pr <issue> "<summary>" ["<commit-msg>"] [--base <branch>]'; exit 0 ;; esac; fi
     # shellcheck source=/dev/null
     source "$LIB/kit-config.sh" && load_kit_config
     # shellcheck source=/dev/null
@@ -189,6 +247,12 @@ case "$cmd" in
         close) out="$(kto_task_close "$@" 2>&1)"; rc=$? ;;
       esac
       url="$(printf '%s' "$out" | grep -oE 'https://[^ ]+/pull/[0-9]+' | tail -1)"
+      # pr: --base may come before the issue number, so skip it when reporting the issue (#391).
+      if [ "$cmd" = pr ]; then
+        while [ "$#" -gt 0 ]; do
+          case "$1" in --base) shift; [ "$#" -gt 0 ] && shift ;; --base=*) shift ;; *) break ;; esac
+        done
+      fi
       cckit_json verb "$cmd" issue "${1:-}" ok "$([ "$rc" -eq 0 ] && echo true || echo false)" \
         url "$url" detail "$(printf '%s' "$out" | tail -1)"
       exit "$rc"
@@ -197,6 +261,23 @@ case "$cmd" in
       pr)    kto_task_pr    "$@" ;;
       close) kto_task_close "$@" ;;
     esac
+    ;;
+  hotfix)
+    # Carry ONE merged change to the release branch (#360): its own PR path, because a cherry-pick
+    # has no issue for `cckit pr` to read or close.
+    # shellcheck source=/dev/null
+    source "$LIB/kit-config.sh" && load_kit_config
+    # shellcheck source=/dev/null
+    source "$LIB/worktree-start.sh"; source "$LIB/kit-hotfix.sh"
+    if cckit_is_json; then
+      out="$(kto_hotfix "$@" 2>&1)" && rc=0 || rc=$?
+      url="$(printf '%s' "$out" | grep -oE 'https://[^ ]+/pull/[0-9]+' | tail -1)"
+      cckit_json verb hotfix source "${1:-}" ok "$([ "$rc" -eq 0 ] && echo true || echo false)" \
+        url "$url" worktree "$(printf '%s\n' "$out" | sed -n 's/^worktree: //p' | tail -1)" \
+        detail "$(printf '%s' "$out" | tail -1)"
+      exit "$rc"
+    fi
+    kto_hotfix "$@"
     ;;
   new)
     # File ONE issue through kto_task_new (labels + board add + Role/Status fields). This verb is why
@@ -234,10 +315,26 @@ case "$cmd" in
     fi
     kto_task_new "$n_title" "$n_role" "$n_kind" "$n_prio" "$n_ms" "$n_plan" "$n_blocked" "$n_body"; echo
     ;;
+  task)
+    # Light tasks (#450): work tracked through a task source (the `file` source: one tracked file
+    # per task) and not through GitHub issues. One dispatcher in the lib, as `qa` and `receipt` do.
+    # kit-task-ops.sh is loaded for kto_pr_title only, so the PR title is built by the same code
+    # `cckit pr` uses.
+    # shellcheck source=/dev/null
+    source "$LIB/kit-config.sh" && load_kit_config
+    # shellcheck source=/dev/null
+    source "$LIB/worktree-issue.sh"; source "$LIB/worktree-start.sh"
+    # shellcheck source=/dev/null
+    source "$LIB/commitlint.sh"; source "$LIB/kit-task-ops.sh"
+    # shellcheck source=/dev/null
+    source "$LIB/light-task.sh"
+    lt_cli "$@"
+    ;;
   merge)
     # Merge (squash by default, --merge / --rebase, #376) through kto_task_pr_merge: rebase on conflict, close the PR's linked issues (native
     # auto-close only fires on the default branch), then clean the branch + worktree. The verb behind
-    # every raw `gh pr merge` (#361). An effort's PR merges with `cckit effort close <N>`.
+    # every raw `gh pr merge` (#361). An effort's PR merges with `cckit effort close <N>`: an
+    # effort/* head is refused here (#379; KIT_FORCE=1 overrides).
     # shellcheck source=/dev/null
     source "$LIB/kit-config.sh" && load_kit_config
     # shellcheck source=/dev/null
@@ -283,6 +380,7 @@ case "$cmd" in
       landed="$(printf '%s\n' "$out" | awk '/^  LANDED branches/{print $3}')"
       orphan="$(printf '%s\n' "$out" | awk '/^  ORPHAN kept/{print $3}')"
       protected="$(printf '%s\n' "$out" | awk '/^  PROTECTED kept/{print $3}')"
+      unknown="$(printf '%s\n' "$out" | awk '/^  UNKNOWN kept/{print $3}')"
       stash="$(printf '%s\n' "$out" | awk '/^  stashes kept/{print $3}')"
       zombie="$(printf '%s\n' "$out" | awk '/^  ZOMBIE worktrees/{print $3}')"
       rfail="$(printf '%s\n' "$out" | awk '/^  remote deletes failed/{print $4}')"
@@ -290,7 +388,7 @@ case "$cmd" in
       if [ "$cleanup_rc" -eq 0 ]; then case " $* " in *" --yes "*|*" -y "*) applied=yes ;; esac; fi
       err="$(tr '\n' ' ' < "$cleanup_err" | sed 's/[[:space:]]*$//')"; rm -f "$cleanup_err"
       cckit_json verb cleanup safe "${safe:-0}" landed "${landed:-0}" worktrees "${wt:-0}" orphan "${orphan:-0}" \
-        protected "${protected:-0}" stash "${stash:-0}" zombie "${zombie:-0}" applied "$applied" \
+        protected "${protected:-0}" unknown "${unknown:-0}" stash "${stash:-0}" zombie "${zombie:-0}" applied "$applied" \
         remote_failed "${rfail:-0}" rc "$cleanup_rc" error "$err"
       [ "$cleanup_rc" -eq 0 ] || exit "$cleanup_rc"
     else
@@ -315,7 +413,8 @@ case "$cmd" in
           landed="$(printf '%s\n' "$out" | grep -c '> LANDED ' || true)"
           protected="$(printf '%s\n' "$out" | grep -c 'PROTECTED:' || true)"
           orphan="$(printf '%s\n' "$out" | grep -c 'ORPHAN' || true)"
-          cckit_json verb gc safe "$safe" landed "$landed" protected "$protected" orphan "$orphan"
+          unknown="$(printf '%s\n' "$out" | grep -c '> UNKNOWN ' || true)"
+          cckit_json verb gc safe "$safe" landed "$landed" protected "$protected" orphan "$orphan" unknown "$unknown"
         else
           kit_gc_analyze "$@"
         fi
@@ -328,6 +427,19 @@ case "$cmd" in
     # Everyday-dev helper: surface the unblocked set + the one command to start the top issue.
     # shellcheck source=/dev/null
     source "$LIB/kit-config.sh" && load_kit_config
+    # tasks.default = light (the marketing profile): a bare `cckit next` answers from the light
+    # task list — the same output as `cckit task next`. Any argument (`--effort <N>`, a filter)
+    # asks about issues and takes the issue path, as does every project whose default is issues.
+    if [ "$#" -eq 0 ]; then
+      # shellcheck source=/dev/null
+      source "$LIB/task-source.sh"
+      if [ "$(task_default_name)" = "light" ]; then
+        # shellcheck source=/dev/null
+        source "$LIB/worktree-issue.sh"; source "$LIB/light-task.sh"
+        lt_cli next
+        exit $?
+      fi
+    fi
     # shellcheck source=/dev/null
     source "$LIB/next.sh"; next_issue "$@"
     ;;
@@ -369,6 +481,7 @@ case "$cmd" in
   migrate)     exec "$ROOT/scripts/kit-migrate.sh" "$@" ;;
   adopt)       exec "$ROOT/scripts/kit-adopt.sh" "$@" ;;
   doctor)      exec "$ROOT/scripts/kit-doctor.sh" "$@" ;;
+  add)         exec "$ROOT/scripts/kit-add.sh" "$@" ;;
   digest)      exec "$ROOT/scripts/kit-digest.sh" "$@" ;;
   bench)
     # Documentation benchmark (#200) — score how well this project finds + uses its OWN canonical
@@ -377,14 +490,31 @@ case "$cmd" in
     BENCH_ROOT="$PWD/scripts/benchmark"; [ -d "$BENCH_ROOT" ] || BENCH_ROOT="$ROOT/scripts/benchmark"
     export BENCH_KIT_ROOT="$ROOT"
     sub="${1:-report}"; shift || true
+    BENCH_USAGE='cckit bench <run|quality|report|gate|stop-check> [--dry] [--json]
+cckit bench checkpoint <X.Y.Z> [--passes N] [--from <run.json>] [--model <name>] [--note <text>] [--verbs <timings.json>]
+cckit bench checkpoints [--json] | check <X.Y.Z> | page [--out <file>] [--check]
+cckit bench verbs [--runs N] [--checkout <dir>] [--verb "<verb>"] [--json]   (attach: checkpoint <X.Y.Z> --verbs <file>)'
     case "$sub" in
       run)        exec bash "$BENCH_ROOT/run.sh" "$@" ;;
       quality)    exec bash "$BENCH_ROOT/run-quality.sh" "$@" ;;
       report)     exec bash "$BENCH_ROOT/report.sh" "$@" ;;
       gate)       exec bash "$BENCH_ROOT/gate.sh" "$@" ;;
       stop-check) exec bash "$BENCH_ROOT/stop-check.sh" "$@" ;;
-      -h|--help)  echo 'cckit bench <run|quality|report|gate|stop-check> [--dry] [--json]'; exit 0 ;;
-      *) echo 'cckit bench <run|quality|report|gate|stop-check> [--dry] [--json]' >&2; exit 2 ;;
+      # Recorded checkpoints per release version (#452). A project scaffolded before checkpoint.sh
+      # existed has no copy of it, so these fall back to cckit's own.
+      checkpoint|checkpoints|check|page)
+        CP="$BENCH_ROOT/checkpoint.sh"; [ -f "$CP" ] || CP="$ROOT/scripts/benchmark/checkpoint.sh"
+        case "$sub" in
+          checkpoint)  exec bash "$CP" record "$@" ;;
+          checkpoints) exec bash "$CP" list "$@" ;;
+          *)           exec bash "$CP" "$sub" "$@" ;;
+        esac ;;
+      # Wall time + gh call count of the read-only verbs (#452). Same fallback as the checkpoint verbs.
+      verbs)
+        VT="$BENCH_ROOT/verb-timings.sh"; [ -f "$VT" ] || VT="$ROOT/scripts/benchmark/verb-timings.sh"
+        exec bash "$VT" "$@" ;;
+      -h|--help)  echo "$BENCH_USAGE"; exit 0 ;;
+      *) echo "$BENCH_USAGE" >&2; exit 2 ;;
     esac
     ;;
   scan)        source "$LIB/project-scan.sh"; project_scan "$@" ;;
@@ -400,6 +530,20 @@ case "$cmd" in
     [ "$croot" = "$ROOT" ] || echo "contribute: using the checkout at $croot" >&2
     cd "$croot"; exec "$croot/scripts/contribute.sh" "$@" ;;
   status|ui)   exec "$ROOT/scripts/status.sh" "$@" ;;
+  claims)
+    # Live session claims (#384) — which session is working which issue. Read-only: a dead claim is
+    # skipped here and reaped by the next `cckit start` on that issue, never by this verb.
+    # shellcheck source=/dev/null
+    source "$LIB/session-registry.sh"
+    if cckit_is_json; then sreg_list "$PWD" --json; exit 0; fi
+    rows="$(sreg_list "$PWD")"
+    if [ -z "$rows" ]; then echo "(no live claims)"; exit 0; fi
+    printf '%-7s %-8s %-17s %-42s %s\n' "ISSUE" "PID" "SINCE" "BRANCH" "WORKTREE"
+    printf '%s\n' "$rows" | while IFS=$'\t' read -r c_issue c_branch c_wt c_pid c_host c_started; do
+      c_since="$(date -r "$c_started" '+%Y-%m-%d %H:%M' 2>/dev/null || date -d "@$c_started" '+%Y-%m-%d %H:%M' 2>/dev/null || echo "$c_started")"
+      printf '%-7s %-8s %-17s %-42s %s\n' "#$c_issue" "$c_pid" "$c_since" "$c_branch" "$c_wt"
+    done
+    ;;
   resume)      source "$LIB/handoff.sh"; handoff_read ;;
   handoff)     source "$LIB/handoff.sh"; handoff_write "$@" ;;
   msg)
@@ -415,7 +559,13 @@ case "$cmd" in
     esac
     ;;
   install)     exec "$ROOT/scripts/install.sh" "$@" ;;
-  init)        exec "$ROOT/scripts/init.sh" "$@" ;;
+  init)
+    # init resolves the config from the folder it sets up. The KIT_CONFIG this dispatcher worked out
+    # is the invoking directory's project or, outside any project, cckit's OWN config: read as the
+    # new project's, that one gave every fresh project cckit's base branch and label set (#487).
+    # A KIT_CONFIG the caller exported is kept.
+    [ -n "$_KIT_CONFIG_GIVEN" ] || unset KIT_CONFIG
+    exec "$ROOT/scripts/init.sh" "$@" ;;
   commands)
     # The command catalog - verbs parsed from this dispatcher's own case labels (single source).
     verbs="$(grep -oE '^  [a-z][a-z|-]*\)' "$BIN/cckit" | sed 's/[) ]//g' | tr '|' '\n' | grep -vE '^(-|$)' | sort -u)"
@@ -455,6 +605,21 @@ case "$cmd" in
     # shellcheck source=/dev/null
     source "$LIB/stage-receipt.sh"
     sr_cli "$@"
+    ;;
+  qa)
+    # The QA lane (#295): launch the stack command the project declared under `qa`, on this lane's
+    # port block, and report USABLE only when every readiness probe answers. One dispatcher in the
+    # lib, as `receipt` does with sr_cli, so later subcommands land there and not here.
+    # shellcheck source=/dev/null
+    source "$LIB/qa-lane.sh"
+    qa_cli "$@"
+    ;;
+  page)
+    # Review pages (#451): a plan, a decision or a grilling round opens as a page when this session
+    # has a browser, and prints to the terminal when it does not. One dispatcher in the lib.
+    # shellcheck source=/dev/null
+    source "$LIB/review-page.sh"
+    rp_cli "$@"
     ;;
   completions)
     case "${1:-bash}" in

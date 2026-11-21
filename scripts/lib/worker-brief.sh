@@ -54,7 +54,7 @@ Then RECORD your receipt — this is the only durable record of the run, and you
     url:        <PR or issue URL>
     gate:       pass | fail — <the failing check, if any>
     blocker:    <what stopped you, or: none>
-    next stage: build | review | design | docs | none
+    next stage: build | review | design | docs | qa | none
     RECEIPT
 
 Re-running that with the same five values is safe — it rewrites its own attempt rather than
@@ -175,7 +175,7 @@ wb_compose() {
   {
     wb_preamble "$num" "$branch"
     printf '\n'
-    printf '%s\n' "$brief" | awk '/^##[[:space:]]/ { exit } { print }'
+    printf '%s\n' "$brief" | awk '/^##[[:space:]]/ { past = 1 } !past { print }'
   } > "$tmp/head"
   { printf '\n'; wb_receipt_contract "$num"; } > "$tmp/tail"
   printf '%s\n' "$brief" | awk 'f || /^##[[:space:]]/ { f = 1; print }' \

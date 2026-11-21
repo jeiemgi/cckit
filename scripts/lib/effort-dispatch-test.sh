@@ -17,14 +17,14 @@ t() { if [ "$2" = "$3" ]; then echo "ok: $1"; else echo "FAIL: $1 -> got '[$2]' 
 blk="$(awk '/^  effort\)/{f=1} f{print} f && /^    ;;$/{exit}' "$BIN")"
 t "effort) branch found" "$([ -n "$blk" ] && echo yes)" "yes"
 
-cfg_ln="$(printf '%s\n' "$blk" | grep -n 'load_kit_config' | head -1 | cut -d: -f1)"
-lib_ln="$(printf '%s\n' "$blk" | grep -n 'source "\$LIB/effort\.sh"' | head -1 | cut -d: -f1)"
+cfg_ln="$(printf '%s\n' "$blk" | grep -n 'load_kit_config' | sed -n 1p | cut -d: -f1)"
+lib_ln="$(printf '%s\n' "$blk" | grep -n 'source "\$LIB/effort\.sh"' | sed -n 1p | cut -d: -f1)"
 t "effort) loads the project config"          "$([ -n "$cfg_ln" ] && echo yes)" "yes"
 t "config load precedes the effort libs"      "$([ -n "$cfg_ln" ] && [ -n "$lib_ln" ] && [ "$cfg_ln" -lt "$lib_ln" ] && echo yes)" "yes"
 
 # #243: every effort subcommand the usage header advertises must actually dispatch, `chain` included
 # — a docs/code drift guard (a subcommand documented but not wired falls through to the usage line).
-usage_subs="$(grep -oE '^#   cckit effort <[a-z|]+>' "$BIN" | head -1 | sed -E 's/.*<//; s/>//; s/\|/ /g')"
+usage_subs="$(grep -oE '^#   cckit effort <[a-z|]+>' "$BIN" | sed -n 1p | sed -E 's/.*<//; s/>//; s/\|/ /g')"
 t "usage header lists the effort subcommands" "$usage_subs" "new chain start pr close plan"
 for s in $usage_subs; do
   t "effort) dispatches '$s'" \

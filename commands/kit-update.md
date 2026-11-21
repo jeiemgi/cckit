@@ -53,7 +53,7 @@ _behind="$(git -C "${CLAUDE_PLUGIN_ROOT}" rev-list --count HEAD.."origin/$_branc
 
 If `_behind` > 0:
 
-- Print a prominent warning (ASCII only, no emoji):
+- Print a warning (ASCII only, no emoji):
   > "[warn] plugin source is $_behind commit(s) behind origin/$_branch -- you may be installing an older version of claude-kit"
   > "Update the source first:  git -C ${CLAUDE_PLUGIN_ROOT} pull  then re-run /kit-update."
 - Use `AskUserQuestion` to ask:
@@ -76,7 +76,7 @@ in-tree) nor **downgrade**:
 [ -f "$PWD/packages/claude-kit-plugin/.claude-plugin/plugin.json" ] && echo "home-repo"
 # Same version? (nothing to add)
 _have="$(jq -r '.kitVersion // "0.0.0"' "$PWD/.claude/kit.config.json" 2>/dev/null)"
-_plug="$(jq -r '.version // "0.0.0"' "/Users/josegutierrezdelgado/.claude/plugins/cache/claude-kit-marketplace/claude-kit/0.7.0-beta.6/.claude-plugin/plugin.json" 2>/dev/null)"
+_plug="$(jq -r '.version // "0.0.0"' "${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json" 2>/dev/null)"
 [ "$_have" = "$_plug" ] && echo "same-version"
 ```
 
@@ -104,11 +104,15 @@ _plug="$(jq -r '.version // "0.0.0"' "/Users/josegutierrezdelgado/.claude/plugin
    ```bash
    "${CLAUDE_PLUGIN_ROOT}/scripts/init.sh" --upgrade --target "$PWD" --dry-run
    ```
-   Then run it for real to see the precise added/preserved report (step 4). Make clear: upgrade only
+   It runs the upgrade on a temporary copy and prints `Would change (N added, M modified)` with one
+   `A`/`M` row per file — the same rows the real run prints as `Changed on disk` (step 4). Show the
+   user that list. Make clear: upgrade only
    **adds** missing files and **merges** new required config keys — your existing `.claude/` files
    (including a customized `.claude/statusline.sh` shim) and `kit.config.json` values are never
    overwritten, and feature blocks your config deliberately lacks (`plans`, `specKit`, `prePush`,
-   `local`, `memory`) are never injected from profile defaults.
+   `local`, `memory`) are never injected from profile defaults. The stored adapter selection
+   (`adapters`) is kept; pass `--adapter codex` (or `claude`) to ADD the other adapter — the files of
+   the one already installed are not rewritten.
 
 4. **Confirm, then apply.** Ask with `AskUserQuestion`: **Apply update** · **Preview only** · **Skip**.
    Per the CLI-style preference, when the delta is purely additive (only new files, nothing preserved
@@ -117,10 +121,11 @@ _plug="$(jq -r '.version // "0.0.0"' "/Users/josegutierrezdelgado/.claude/plugin
    "${CLAUDE_PLUGIN_ROOT}/scripts/init.sh" --upgrade --target "$PWD"
    ```
 
-5. **Report + onboard.** Echo what was **added** vs **preserved** and the new `.kitVersion`. Then warmly
+5. **Report + onboard.** Echo the `Changed on disk` list (added and modified files), what was
+   **preserved**, and the new `.kitVersion`. Then warmly
    walk the user through the headline new features and offer to run any that fit this project (e.g.
    "this release adds `/kit-annotate` — want me to set it up?"). The goal is comfort with the new
-   surface, not a changelog dump.
+   features, not a changelog dump.
 
 ## Rules
 

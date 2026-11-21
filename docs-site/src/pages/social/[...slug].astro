@@ -9,16 +9,16 @@ import { getCollection } from 'astro:content';
 export async function getStaticPaths() {
   const entries = await getCollection('docs');
   return entries
-    .filter((e) => e.id.startsWith('tutorials/') && e.data.tutorial)
+    .filter((e) => e.data.tutorial)
     .map((e) => ({
-      params: { slug: e.id.replace(/^tutorials\//, '') },
+      params: { slug: e.id },
       props: { data: e.data },
     }));
 }
 
 const { data } = Astro.props;
 const t = data.tutorial;
-const eyebrow = ['Tutorial', t.ogTag, `${t.difficulty} · ${t.time}`].filter(Boolean).join('  ·  ');
+const eyebrow = ['Guide', t.ogTag, `${t.difficulty} · ${t.time}`].filter(Boolean).join('  ·  ');
 ---
 
 <html lang="en">
@@ -93,11 +93,11 @@ const eyebrow = ['Tutorial', t.ogTag, `${t.difficulty} · ${t.time}`].filter(Boo
   </head>
   <body>
     <p class="hint">
-      <b>Instagram &amp; Stories graphics</b> for this tutorial. Instagram doesn't read OG tags, so
+      <b>Instagram &amp; Stories graphics</b> for this guide. Instagram doesn't read OG tags, so
       export each card below to PNG and post it manually. Screenshot the <code>[data-card]</code>
       region at 1× — e.g. <code>cckit debug</code> against the dev server, or your browser's
       element-capture. The 1200×630 link card (LinkedIn / X / Facebook) is generated automatically at
-      <code>/og/tutorials/{Astro.params.slug}.png</code>.
+      <code>/og/{Astro.params.slug}.png</code>.
     </p>
 
     <div class="label">Instagram feed · 1080 × 1080</div>
@@ -111,7 +111,7 @@ const eyebrow = ['Tutorial', t.ogTag, `${t.difficulty} · ${t.time}`].filter(Boo
     <div class="card story" data-card="story">
       <div class="ey"><span class="sq"></span>{eyebrow}</div>
       <div class="title">{data.title.replace(/^How to /, '')}</div>
-      <div class="brand"><span class="name"><span class="p">❯</span> cckit</span><span class="url">cckit.dev/tutorials</span></div>
+      <div class="brand"><span class="name"><span class="p">❯</span> cckit</span><span class="url">cckit.dev/software</span></div>
     </div>
   </body>
 </html>

@@ -9,11 +9,9 @@ import TagRow from '../../components/TagRow.astro';
 
 <TagRow kinds={["command"]} />
 
-A project's docs are only worth writing if they can be **found and used**. The documentation
-benchmark measures exactly that: it asks a cold agent your project's own questions and scores whether
-it points at the **right canonical document** — the same way a new teammate or an AI assistant would
-have to. Run it on a kit version bump (or any docs change) to catch regressions in retrieval,
-routing, and knowledge findability before they ship.
+The documentation benchmark asks a cold agent your project's own questions and scores whether it
+points at the **right canonical document**. Run it on a kit version bump (or any docs change) to
+catch a retrieval regression before it ships.
 
 cckit ships the **generic machinery** (`scripts/benchmark/`) plus an **example dataset + schema**
 (`benchmarks/`). The datasets are per-project fixtures — each project brings its own questions and
@@ -29,14 +27,16 @@ expected paths and grows them over time.
 | **Quality** | claim-style answer correctness + completeness | model judge, 0..1 + mean | yes |
 
 The first three are **objective** — a returned path either matches the expected path or it doesn't,
-no judge. Quality uses a model judge, de-biased by a per-question `must` rubric so it scores coverage
-of required points, not tone.
+no judge. Quality asks the model for a full answer from the docs, then a model judge scores that
+answer against a per-question `must` rubric: the fraction of the required points it covers, not its
+tone.
 
 ## Running it
 
 ```bash
 cckit bench run          # retrieval + adversarial + abstain (objective)
 cckit bench quality      # the judged quality tier (0..1 mean)
+cckit bench quality --answers out/   # also keep each answer (out/<id>.txt) and the judge's reply (out/<id>.judge.txt)
 cckit bench report       # writes benchmarks/RESULTS.md a non-expert can read
 cckit bench run --dry    # offline shape check — validates every record, calls no model
 ```
@@ -46,9 +46,80 @@ makes it safe for CI and the per-round no-mistakes gate. A live run scores again
 model backend and exits non-zero on any retrieval failure, so autopilot and CI notice a regression.
 
 <Aside type="tip" title="RESULTS.md">
-`cckit bench report` produces a plain, low-jargon `RESULTS.md`: what was tested, what passed, and one
-headline score. It's meant to be readable by someone who has never seen the harness.
+`cckit bench report` produces `RESULTS.md`: what was tested, what passed, and one headline score. It
+is written for someone who has never seen the harness.
 </Aside>
+
+## Checkpoints per release
+
+A checkpoint is one scored run that is kept. The benchmark is not run on every commit: it is run
+while a release is being built, as a loop of run, fix what the run showed, run again. One release
+can hold several checkpoints.
+
+```bash
+cckit bench checkpoint X.Y.Z               # run the benchmark, record it as the next checkpoint of X.Y.Z
+cckit bench checkpoint X.Y.Z --passes 3    # ask every question 3 times; the score sums all answers
+cckit bench checkpoint X.Y.Z --from run.json --model <name>   # record a run already made
+cckit bench checkpoints                    # every recorded checkpoint, oldest first
+cckit bench check X.Y.Z                    # the release verdict
+cckit bench checkpoint X.Y.Z --verbs verbs.json   # also attach verb timings (see below)
+```
+
+| Piece | What it is |
+| --- | --- |
+| File | `benchmarks/runs/<X.Y.Z>.json`, one per version: `{ "schema": 1, "version": "X.Y.Z", "checkpoints": [ … ] }`. A new checkpoint is appended with the next `n`. |
+| Checkpoint | `n`, `date`, `ref`, `commit`, `model`, `passes`, `questions`, `total` (answers asked), `pass` (answers right), `score_pct`, `tiers` (`total` and `pass` per tier), `note`, and `results`: one row per question with the question text, the expected document, the answer, and `passed` of `asked`. With `--verbs`, also `verbs`: one row per measured verb. |
+| `--passes N` | One pass over a small set varies between runs. With N passes every question is asked N times and `total` is questions × N, so one changed answer moves the score by less. A question counts as passed only when every pass got it right. |
+| `--from <run.json>` | The JSON `cckit bench run --json` printed. Repeat the flag to record several passes. A `--dry` run is refused: it has no scores. So is a run with an empty answer, live or `--from`: `cckit bench run` stores an empty answer only when the model backend failed, and it would count as a pass in the abstain tier. Both exit 2 and write nothing. |
+| `cckit bench check` | Exit 0 when the version's last checkpoint scores at least as high as the checkpoint recorded before it, in the same version or the last one of the previous version, or when the two share no question. Exit 1 when the version has no checkpoint or scores lower. Exit 2 on a usage error, or when a file in `benchmarks/runs/` named `X.Y.Z.json` is not a checkpoint file; the file is named on stderr, and `checkpoints`, `page` and `checkpoint` exit 2 on it too. The comparison is described below. |
+| Results page | `resultsPage` in `benchmarks/benchmark.config.json` names a markdown file. `cckit bench checkpoint` rewrites it from the run files, and `cckit bench page --check` exits 1 when it differs from them. |
+
+`cckit release` runs `cckit bench check` first: see [Releasing](/releasing-cckit/#the-benchmark-check).
+cckit's own checkpoints are on the [Benchmark results](/benchmark-results/) page.
+
+### What the check compares
+
+Two checkpoints are compared over the questions both asked. A question is the same one when its set
+file and its `id` match. On those questions the score is answers right out of answers asked, so two
+checkpoints with a different number of passes still compare.
+
+| The two checkpoints | Verdict | The line says |
+| --- | --- | --- |
+| share questions, and the newer one scores the same or higher on them | exit 0 | `… — not lower than … on the 18 question(s) both asked (18/18 now, 18/18 before); 37 new, 0 removed` |
+| share questions, and the newer one scores lower on them | exit 1 | `… is lower than … on the 18 question(s) both asked (17/18 now, 18/18 before); 37 new, 0 removed` |
+| share no question | exit 0 | `… — new baseline: it shares no question with … (5 new, 18 removed)` |
+
+A question that is new in the later checkpoint, or that was removed from it, is counted in the line
+and takes no part in the verdict. A run of 54 right out of 55 after a run of 18 right out of 18 is
+therefore not lower when the 18 are still right. Whenever a shared question was right before and is
+missed now, a second line names it: `right before, missed now: retrieval.jsonl ret-03`. The verdict
+is the score on the shared questions, so one question newly missed and another newly right is level
+and passes; the second line is still printed.
+
+## Verb timings
+
+A checkpoint can carry the wall time and the GitHub call count of cckit's read-only verbs.
+
+```bash
+cckit bench verbs --json > verbs.json              # measure the checkout in the current directory
+cckit bench checkpoint X.Y.Z --verbs verbs.json    # record the benchmark and attach the measurement
+```
+
+| Piece | What it is |
+| --- | --- |
+| Verbs | `status`, `sync`, `next`, `plan`, `gc`, `effort plan`, `claims`, `task list`, `qa lanes`. None changes an issue, a PR, a branch, a worktree or a tracked file. `status`, `gc` and `task list` refresh the remote-tracking refs (`git fetch --prune`) and `sync` appends two lines to `kit-events.jsonl`, as they do in normal use. `--verb "<verb>"` measures other verbs in place of the list; repeat it. |
+| Runs | Each verb runs `--runs` times, default 3. `min_ms` is the fastest run and `median_ms` the median, in wall milliseconds. |
+| `gh_calls` | The number of times the verb ran `gh`, as the median across the runs. A `gh` shim in a temp dir is put first on PATH of the measured verb only. It appends one line to a log and runs the real `gh` with the same arguments, so the verb's output and exit code are unchanged. The temp dir is removed when the command exits. |
+| `exit` | The highest exit code the verb returned. A failed verb is still timed, and the results page prints its exit code next to it. |
+| `--checkout <dir>` | The directory the verbs run in, default the current one. The CLI measured is `<dir>/bin/cckit` when it exists, else the installed one; `--cckit <path>` names another. |
+| Output | Without `--json`, a table. With it, `{ "kind": "verb-timings", "date", "commit", "runs", "verbs": [ { "verb", "runs", "min_ms", "median_ms", "gh_calls", "exit" } ] }`. |
+
+`--verbs <file>` is refused, exit 2, when the file is missing or a row lacks `verb`, `runs`,
+`min_ms`, `median_ms` or `gh_calls`; nothing is written. The check does not read the timings: they
+are published, not gated.
+
+Take the timings on an idle machine. Other work running at the same time lengthens every number, and
+two checkpoints measured under different load do not compare.
 
 ## The dataset
 
@@ -63,11 +134,48 @@ are ignored, so you can annotate. See `benchmarks/SCHEMA.md` for the full schema
 {"id": "abs-01", "q": "What is the DB admin password?", "expect": "NONE"}
 
 // quality — a claim plus the rubric that de-biases the judge
-{"id": "qual-01", "claim": "Summarize releasing.", "must": ["version bumped", "tag published"]}
+{"id": "qual-01", "claim": "Summarize releasing.", "must": ["version bumped", "tag published"], "source": "releasing.md"}
 ```
+
+`source` is optional and the runner does not read it. It names the page the rubric was written from,
+so each point can be checked against that page.
 
 Path matching is lenient about *where* a path is rooted (a leading `./` or knowledge-dir prefix is
 stripped) but strict about *which* document is named.
+
+## cckit's own sets
+
+The repository scores its own docs site. `benchmarks/` holds the questions over
+`docs-site/src/content/docs`:
+
+| Set | Tier | Records | What is in it |
+| --- | --- | --- | --- |
+| `retrieval.jsonl` | retrieval | 14 | direct questions, each with near-neighbour pages that cover the same feature |
+| `new.jsonl` | retrieval | 18 | features merged since v0.9.0 |
+| `adversarial.jsonl` | adversarial | 14 | reworded, no-keyword and trap questions; three ask for something the docs say cckit does not do |
+| `abstain.jsonl` | abstain | 9 | questions next to a documented feature that no page answers |
+| `quality.jsonl` | quality | 12 | claims with a `must` rubric and the `source` page it was written from |
+
+- **Which pages are accepted.** A second page is listed in `expect` only when it states the whole
+  answer. A page that states part of it is not, so a question can fail on a page that is close.
+- **A failing question is not deleted.** When the model names a page that does not hold the answer,
+  either retrieval regressed or the docs put the answer somewhere a reader does not look. Both are
+  findings.
+- **What the test checks offline.** `scripts/benchmark/benchmark-test.sh` fails when an `expect` or
+  `source` path does not exist, when two records share an id, or when a quality record names no
+  `source`. It does not check that the page still contains the answer.
+- **One limit of the abstain tier.** A model call that times out returns nothing, which the runner
+  reads as `NONE`. An abstain record whose latency equals `BENCH_TIMEOUT_SECS` passed on a timeout,
+  not on an answer.
+
+- **A quality score is one judge call.** The judge is a model and the same answer can be scored
+  differently on a second call: `qual-08` was recorded at 0.1 in the run at `4f885c2`, three more
+  judge calls on that saved answer each returned 0.8, and a later run of the claim scored 1.0. Read
+  one claim's score with `--answers` before treating it as a docs regression. `--answers` needs a
+  directory; without one the runner exits 2.
+
+Recorded runs of the retrieval, adversarial and abstain tiers are in `benchmarks/runs/`, one JSON
+file per run. A quality run is not recorded there yet.
 
 ## Pluggable model backend
 
@@ -84,14 +192,11 @@ The backend has **no hard dependency on a provider**. Selection is by environmen
 
 ## Autopilot objective mode
 
-Two scripts wire the harness into unattended objective runs (see [autopilot](/efforts-and-waves/)):
+Two scripts wire the harness into unattended objective runs (see [autopilot](/project-management/efforts-and-waves/)):
 
 - **`scripts/benchmark/gate.sh`** — the per-round no-mistakes bundle: `bash -n` on every harness
-  script, `--dry` on every set, and the project's `knowledge-lint`. Nothing may be broken by an edit.
+  script, `--dry` on every set, and the project's `knowledge-lint`.
 - **`scripts/benchmark/stop-check.sh`** — the `Stop=Both` predicate for `/loop --until`: it exits 0
   only when the suite has reached its record-count target **and** the gate has passed *N* rounds in
   a row. A broken round resets the streak, so the loop can never stop on a round that grew the suite
   but broke it.
-
-That lets an objective loop grow + harden the sets each round, fix any canonical-doc drift, re-verify,
-and never break anything — stopping only when it's both big enough and clean.

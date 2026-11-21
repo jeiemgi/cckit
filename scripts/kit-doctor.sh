@@ -2,18 +2,27 @@
 # kit-doctor — onboarding preflight: deps + brew bootstrap + gh auth/scopes + SSH guided
 #
 # Usage:
-#   scripts/kit-doctor.sh                 # detect + report; in a terminal, ASK before installing
+#   scripts/kit-doctor.sh                 # detect + report; in a terminal, ASK before installing.
+#                                         # With no terminal and no --fix: report only, nothing is
+#                                         # installed and no file is written
 #   scripts/kit-doctor.sh --fix           # install missing deps without asking (alias: --yes, -y)
 #   scripts/kit-doctor.sh --dry-run       # report only — no installs, no auth changes
 #   scripts/kit-doctor.sh --no-install    # check and auth only — skip package installs
 #   scripts/kit-doctor.sh --dismiss-local # silence the "local layer down" session notice
 #                                         # until the next x.y kit update
+#   scripts/kit-doctor.sh --agents        # only the selected agent runtimes (claude / codex):
+#                                         # present or absent; exit 1 if one is absent. No network.
 #
 # Tiers:
 #   Tier 0  Homebrew (macOS bootstrap — requires sudo password)
 #   Tier 1  git, gh, jq, perl           — hard deps, auto-install via brew
 #   Tier 2  node + pnpm, vercel, turbo  — project-specific, auto-install if applicable
-#   Local   mlx-lm via uv tool install + mlx_lm.server auto-start (when .local.enabled)
+#   Agents  the runtime binary of each adapter the project selected (`adapters` in the config),
+#           plus whether the Codex hooks are registered in .codex/hooks.json when codex is selected
+#   Integr. one row per descriptor in integrations/ that is on (its config key, or on by default
+#           with the key absent — a missing default-on tool is reported, not failed) — installed by the
+#           shared runner (scripts/lib/integration-install.sh), only with recorded consent
+#   Local   mlx_lm.server auto-start (when .local.enabled)
 #   Auth    gh auth status + scope:project, git config name/email
 #   SSH     optional guided flow (ed25519, pbcopy, link to github settings)
 set -euo pipefail
@@ -22,15 +31,17 @@ set -euo pipefail
 _export_dir_doctor="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
 
 # ---- flags ------------------------------------------------------------------
-DRY_RUN=0; NO_INSTALL=0; DISMISS_LOCAL=0; ASSUME_YES=0
+DRY_RUN=0; NO_INSTALL=0; DISMISS_LOCAL=0; ASSUME_YES=0; AGENTS_ONLY=0
+INSTALL_APPROVED=0   # 1 = the operator said yes to installs in THIS run (--fix/--yes, or the prompt)
 for _a in "$@"; do
   case "$_a" in
     --dry-run)       DRY_RUN=1 ;;
     --no-install)    NO_INSTALL=1 ;;
-    --fix|--yes|-y)  ASSUME_YES=1 ;;
+    --fix|--yes|-y)  ASSUME_YES=1; INSTALL_APPROVED=1 ;;
     --dismiss-local) DISMISS_LOCAL=1 ;;
+    --agents)        AGENTS_ONLY=1 ;;
     -h|--help)
-      sed -n '2,13p' "$0" | grep '^#' | sed 's/^# \?//'
+      sed -n '2,15p' "$0" | grep '^#' | sed 's/^# \?//'
       exit 0 ;;
   esac
 done
@@ -57,7 +68,7 @@ fi
 # ---- color/unicode detection (matches kit-sigil.sh pattern) -----------------
 _loc="${LC_ALL:-${LC_CTYPE:-${LANG:-}}}"
 if [ "${KIT_ASCII:-}" = "1" ]; then KIT_UNICODE=0
-elif printf '%s' "$_loc" | grep -qiE 'utf-?8'; then KIT_UNICODE=1
+elif grep -qiE 'utf-?8' <<<"$_loc"; then KIT_UNICODE=1
 else KIT_UNICODE=0; fi
 
 if [ "${FORCE_COLOR:-}" = "1" ]; then KIT_COLOR=1
@@ -88,10 +99,13 @@ fi
 
 # ---- install consent --------------------------------------------------------
 # The doctor can install missing dependencies for you (Homebrew, gh, jq, node, …). When a HUMAN runs
-# it in a terminal, ASK first — install only if approved. Non-interactive callers (init.sh preflight,
-# hooks) pass --fix/--yes or simply have no TTY, so automation keeps its current auto-install behavior
-# and never blocks on a prompt. --dry-run / --no-install already skip installs entirely.
-if [[ $DRY_RUN -eq 0 && $NO_INSTALL -eq 0 && $ASSUME_YES -eq 0 && -t 0 ]]; then
+# it in a terminal, ASK first — install only if approved. A non-interactive caller that wants
+# installs passes --fix/--yes (init.sh's preflight does). A run with no terminal and no --fix has
+# nobody to ask, so it is report-only: no package install, no `pnpm install`, no seeded or refreshed
+# file, no server start (#448 — it used to run `pnpm install` in whatever directory it was called
+# from). --dry-run / --no-install already skip installs entirely. MAY_INSTALL is the one gate every
+# install or write below reads.
+if [[ $DRY_RUN -eq 0 && $NO_INSTALL -eq 0 && $ASSUME_YES -eq 0 && $AGENTS_ONLY -eq 0 && -t 0 ]]; then
   printf '\n  %s%scckit doctor can install anything missing for you%s (via Homebrew, corepack, etc.).\n' "$C_BOLD" "" "$C_RESET"
   printf '  It will show each thing as it goes. Nothing is installed if you decline.\n\n'
   printf '  Install missing dependencies? [Y/n] '
@@ -100,8 +114,12 @@ if [[ $DRY_RUN -eq 0 && $NO_INSTALL -eq 0 && $ASSUME_YES -eq 0 && -t 0 ]]; then
     [nN]|[nN][oO])
       NO_INSTALL=1
       printf '\n  %s report-only — listing what is missing and how to install it (no changes made).\n' "$MARK_SKIP" ;;
-    *) : ;;  # default (Enter / y) → proceed with installs
+    *) INSTALL_APPROVED=1 ;;  # default (Enter / y) → proceed with installs
   esac
+fi
+MAY_INSTALL=0; UNAPPROVED=0
+if [[ $DRY_RUN -eq 0 && $NO_INSTALL -eq 0 ]]; then
+  if [[ $INSTALL_APPROVED -eq 1 ]]; then MAY_INSTALL=1; else UNAPPROVED=1; fi
 fi
 
 # ---- report accumulators ----------------------------------------------------
@@ -124,12 +142,69 @@ has_cmd() { command -v "$1" >/dev/null 2>&1; }
 # Returns 0 if the command is now available, 1 if not.
 brew_install() {
   local pkg="$1" cmd="${2:-$1}"
-  if [[ $DRY_RUN -eq 1 || $NO_INSTALL -eq 1 ]]; then
+  if [[ $MAY_INSTALL -eq 0 ]]; then
     return 1
   fi
   if ! has_cmd brew; then return 1; fi
   brew install "$pkg" >/dev/null 2>&1 && has_cmd "$cmd"
 }
+
+# ---- agent runtimes (E257.3) ------------------------------------------------
+# One row per adapter the project SELECTED (`adapters` in its config; a config without the key means
+# claude). An adapter whose CLI is not on PATH is installed but cannot run, so it is a warning and a
+# manual action — the doctor never installs an agent CLI. Sets AGENTS_ABSENT to the count.
+AGENTS_ABSENT=0
+doctor_agents() {
+  local _d _sel _name _state _ver _tab
+  _d="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+  command -v kit_config_path >/dev/null 2>&1 || . "$_d/lib/config-path.sh"
+  command -v adapter_runtime_report >/dev/null 2>&1 || . "$_d/lib/adapter-select.sh"
+  _tab="$(printf '\t')"
+  if ! _sel="$(adapter_project_list "${TARGET:-$PWD}" 2>/dev/null)"; then
+    row "$MARK_FAIL" "adapters" "the config's 'adapters' value is invalid (expected claude and/or codex)"
+    CHECKS_FAIL=$((CHECKS_FAIL + 1)); AGENTS_ABSENT=$((AGENTS_ABSENT + 1))
+    return 0
+  fi
+  while IFS="$_tab" read -r _name _state _ver; do
+    [[ -n "$_name" ]] || continue
+    if [[ "$_state" == "present" ]]; then
+      row "$MARK_OK" "$_name" "$_ver"
+      CHECKS_OK=$((CHECKS_OK + 1))
+    else
+      row "$MARK_WARN" "$_name" "absent — the $_name adapter is selected but its CLI is not on PATH"
+      CHECKS_WARN=$((CHECKS_WARN + 1)); AGENTS_ABSENT=$((AGENTS_ABSENT + 1))
+      ACTIONS_NEEDED+=("Install the $_name CLI (the project selects the $_name adapter)")
+    fi
+  done <<EOF_AGENTS
+$(adapter_runtime_report "$_sel")
+EOF_AGENTS
+  # Codex runs a project's hooks from .codex/hooks.json, and only after the user trusted them. The
+  # registration is checkable; the trust is Codex's own per-machine state and is not readable here,
+  # so a registered row says so instead of claiming the hooks run (E257.5).
+  if adapter_has "$_sel" codex; then
+    local _root
+    command -v codex_hooks_registered >/dev/null 2>&1 || . "$_d/lib/codex-hooks.sh"
+    _root="$(git -C "${TARGET:-$PWD}" rev-parse --show-toplevel 2>/dev/null)"
+    [[ -n "$_root" ]] || _root="${TARGET:-$PWD}"
+    if codex_hooks_registered "$_root/.codex/hooks.json" guard-base-branch-commit.sh \
+       && codex_hooks_registered "$_root/.codex/hooks.json" kit-mail-check.sh; then
+      row "$MARK_OK" "codex hooks" "registered in .codex/hooks.json — Codex runs them once trusted (/hooks in Codex; trust is not readable from here)"
+      CHECKS_OK=$((CHECKS_OK + 1))
+    else
+      row "$MARK_WARN" "codex hooks" "not registered in .codex/hooks.json — the commit guard and session mail do not run in Codex"
+      CHECKS_WARN=$((CHECKS_WARN + 1))
+      ACTIONS_NEEDED+=("Run cckit init --upgrade to register the Codex hooks in .codex/hooks.json")
+    fi
+  fi
+}
+
+# ---- --agents: only the runtime rows, then exit (no installs, no network) ----
+if [[ $AGENTS_ONLY -eq 1 ]]; then
+  printf '  %s%sAgent runtimes%s\n' "$C_BOLD" "" "$C_RESET"
+  doctor_agents
+  [[ $AGENTS_ABSENT -eq 0 ]] || exit 1
+  exit 0
+fi
 
 # ============================================================================
 # BANNER
@@ -137,6 +212,7 @@ brew_install() {
 printf '\n'
 printf '  %s%s%s  kit-doctor\n' "$MARK_SEED" "$C_BOLD" " / claude-kit${C_RESET}"
 printf '  %s\n' "${C_DIM}onboarding preflight${C_RESET}${DRY_RUN:+${C_WARN} [dry-run]${C_RESET}}${NO_INSTALL:+${C_DIM} [no-install]${C_RESET}}"
+[[ $UNAPPROVED -eq 1 && $AGENTS_ONLY -eq 0 ]] && printf '  %s report-only — no terminal and no --fix, so nothing is installed and no file is written. To install: cckit doctor --fix\n' "$MARK_SKIP"
 printf '\n'
 
 # ============================================================================
@@ -147,10 +223,10 @@ printf '  %s%sTier 0 — bootstrap%s\n' "$C_BOLD" "" "$C_RESET"
 if [[ $IS_MACOS -eq 0 ]]; then
   row "$MARK_SKIP" "Homebrew" "not macOS — skipping"
 elif has_cmd brew; then
-  row "$MARK_OK" "Homebrew" "$(brew --version 2>/dev/null | head -1)"
+  row "$MARK_OK" "Homebrew" "$(brew --version 2>/dev/null | sed -n 1p)"
   CHECKS_OK=$((CHECKS_OK + 1))
 else
-  if [[ $DRY_RUN -eq 1 || $NO_INSTALL -eq 1 ]]; then
+  if [[ $MAY_INSTALL -eq 0 ]]; then
     row "$MARK_FAIL" "Homebrew" "missing — install: https://brew.sh"
     CHECKS_FAIL=$((CHECKS_FAIL + 1))
     ACTIONS_NEEDED+=("Install Homebrew: https://brew.sh")
@@ -162,7 +238,7 @@ else
       # Add brew to PATH for the rest of this session (Apple Silicon path)
       [[ -f /opt/homebrew/bin/brew ]] && eval "$(/opt/homebrew/bin/brew shellenv)" 2>/dev/null || true
       [[ -f /usr/local/bin/brew   ]] && eval "$(/usr/local/bin/brew shellenv)"   2>/dev/null || true
-      row "$MARK_OK" "Homebrew" "installed $(brew --version 2>/dev/null | head -1)"
+      row "$MARK_OK" "Homebrew" "installed $(brew --version 2>/dev/null | sed -n 1p)"
       CHECKS_OK=$((CHECKS_OK + 1))
       ACTIONS_TAKEN+=("Installed Homebrew")
     else
@@ -197,7 +273,7 @@ fi
 # ---- gh (min version 2.29 for Projects v2) ----------------------------------
 GH_OK=0
 if has_cmd gh; then
-  _ghver="$(gh --version 2>/dev/null | head -1 | awk '{print $3}')"
+  _ghver="$(gh --version 2>/dev/null | sed -n 1p | awk '{print $3}')"
   # Check for Projects v2 support (gh >= 2.29.0)
   _ghmaj="${_ghver%%.*}"
   _ghmin="${_ghver#*.}"; _ghmin="${_ghmin%%.*}"
@@ -209,13 +285,13 @@ if has_cmd gh; then
   else
     row "$MARK_WARN" "gh" "$_ghver — upgrade needed (>=2.29 for Projects v2)"
     CHECKS_WARN=$((CHECKS_WARN + 1))
-    if [[ $DRY_RUN -eq 0 && $NO_INSTALL -eq 0 ]] && has_cmd brew; then
+    if [[ $MAY_INSTALL -eq 1 ]] && has_cmd brew; then
       brew upgrade gh >/dev/null 2>&1 && GH_OK=1 && ACTIONS_TAKEN+=("Upgraded gh")
     fi
     [[ $GH_OK -eq 0 ]] && ACTIONS_NEEDED+=("Upgrade gh: brew upgrade gh")
   fi
 elif brew_install gh; then
-  _ghver="$(gh --version 2>/dev/null | head -1 | awk '{print $3}')"
+  _ghver="$(gh --version 2>/dev/null | sed -n 1p | awk '{print $3}')"
   row "$MARK_OK" "gh" "installed $\_ghver"
   CHECKS_OK=$((CHECKS_OK + 1))
   GH_OK=1
@@ -242,7 +318,7 @@ fi
 
 # ---- perl -----------------------------------------------------------------
 if has_cmd perl; then
-  row "$MARK_OK" "perl" "$(perl --version 2>/dev/null | head -2 | tail -1 | tr -d '()' | awk '{print $2}')"
+  row "$MARK_OK" "perl" "$(perl --version 2>/dev/null | sed -n 1,2p | tail -1 | tr -d '()' | awk '{print $2}')"
   CHECKS_OK=$((CHECKS_OK + 1))
 elif brew_install perl; then
   row "$MARK_OK" "perl" "installed"
@@ -284,7 +360,7 @@ if has_cmd pnpm; then
 elif [[ -n "$_pkg_mgr" && "$_pkg_mgr" == pnpm* ]]; then
   # Pinned in package.json — enable via corepack
   if has_cmd corepack || has_cmd node; then
-    if [[ $DRY_RUN -eq 0 && $NO_INSTALL -eq 0 ]]; then
+    if [[ $MAY_INSTALL -eq 1 ]]; then
       corepack enable pnpm 2>/dev/null && \
         corepack prepare "$_pkg_mgr" --activate 2>/dev/null && \
         ACTIONS_TAKEN+=("Enabled pnpm via corepack ($_pkg_mgr)") || true
@@ -318,7 +394,7 @@ if [[ -d "$_nm" ]]; then
   row "$MARK_OK" "node_modules" "present"
   CHECKS_OK=$((CHECKS_OK + 1))
 elif [[ -f "$_pkg_json" ]]; then
-  if [[ $DRY_RUN -eq 0 && $NO_INSTALL -eq 0 ]] && has_cmd pnpm; then
+  if [[ $MAY_INSTALL -eq 1 ]] && has_cmd pnpm; then
     printf '\n  %s node_modules missing — running pnpm install...\n' "$MARK_WARN"
     if pnpm install --frozen-lockfile 2>/dev/null || pnpm install; then
       row "$MARK_OK" "node_modules" "installed via pnpm install"
@@ -344,17 +420,17 @@ _has_vercel_link=0
 
 if [[ $_has_vercel_link -eq 1 ]] || [[ -n "${VERCEL:-}" ]]; then
   if has_cmd vercel; then
-    row "$MARK_OK" "vercel" "$(vercel --version 2>/dev/null | head -1)"
+    row "$MARK_OK" "vercel" "$(vercel --version 2>/dev/null | sed -n 1p)"
     CHECKS_OK=$((CHECKS_OK + 1))
   elif brew_install vercel vercel; then
-    row "$MARK_OK" "vercel" "installed $(vercel --version 2>/dev/null | head -1)"
+    row "$MARK_OK" "vercel" "installed $(vercel --version 2>/dev/null | sed -n 1p)"
     CHECKS_OK=$((CHECKS_OK + 1))
     ACTIONS_TAKEN+=("Installed vercel CLI via brew")
-  elif [[ $DRY_RUN -eq 0 && $NO_INSTALL -eq 0 ]] && has_cmd npm; then
+  elif [[ $MAY_INSTALL -eq 1 ]] && has_cmd npm; then
     npm install -g vercel >/dev/null 2>&1 && \
       ACTIONS_TAKEN+=("Installed vercel CLI via npm") || true
     if has_cmd vercel; then
-      row "$MARK_OK" "vercel" "installed $(vercel --version 2>/dev/null | head -1)"
+      row "$MARK_OK" "vercel" "installed $(vercel --version 2>/dev/null | sed -n 1p)"
       CHECKS_OK=$((CHECKS_OK + 1))
     else
       row "$MARK_FAIL" "vercel" "missing — npm install -g vercel"
@@ -388,17 +464,136 @@ fi
 printf '\n'
 
 # ============================================================================
-# LOCAL MODEL LAYER (opt-in — only checked when .local.enabled is true)
+# AGENT RUNTIMES — the CLI of each selected adapter
 # ============================================================================
-# Same gating principle as vercel: silence when the project didn't opt in.
-# Install path (#313): `uv tool install mlx-lm` — isolated tool venv, PEP 668-safe
-# (Homebrew python is externally-managed; plain pip/pip3 fails there). Fallback
-# pipx; NEVER suggest plain pip. When mlx-lm is present but the server is down,
-# the doctor starts it in background + health-checks the port. --dry-run stays
-# 100% read-only: it reports what it would do, installs and starts nothing.
+printf '  %s%sAgent runtimes%s\n' "$C_BOLD" "" "$C_RESET"
+doctor_agents
+printf '\n'
+
+# ============================================================================
+# INTEGRATIONS (opt-in — one row per descriptor in integrations/ the project switched on)
+# ============================================================================
+# An optional third-party tool is DATA: integrations/<id>.json names its config key, its detect
+# command and its install candidates in order. This loop holds no tool's recipe. For every
+# descriptor whose config key is on it asks the shared runner (lib/integration-install.sh) and
+# turns the runner's one status line into a row. Silent when the project switched nothing on.
+#
+# The runner installs only with consent recorded in .cckit/consent (`install:<id>`). The operator
+# saying yes to installs in THIS run — --fix/--yes, or the terminal prompt above — is that consent,
+# and is recorded here, so init's `--yes` preflight keeps installing. A run nobody approved (no
+# TTY, no --fix) reports the tool missing and installs nothing. --dry-run / --no-install run the
+# runner under KIT_DRY_RUN: it plans, and neither installs nor records anything.
 command -v kit_config_path >/dev/null 2>&1 || . "$(dirname "$0")/lib/config-path.sh"
 _kitcfg="$(kit_config_path "${TARGET:-$PWD}" 2>/dev/null || true)"
 [[ -n "$_kitcfg" ]] || _kitcfg="${TARGET:-$PWD}/.claude/kit.config.json"
+
+# doctor_integration <descriptor> — one row for one enabled integration.
+doctor_integration() {
+  local f="$1" id label recipe st bin after also
+  id="$(jq -r '.id' "$f")"; label="$(jq -r '.label' "$f")"
+  recipe="$(jq -r '.install[0].run' "$f")"
+  if integration_detect "$f" "$_ig_target"; then
+    bin="$(integration_bin "$f" || true)"
+    row "$MARK_OK" "$label" "installed${bin:+ ($bin)}"
+    CHECKS_OK=$((CHECKS_OK + 1))
+    return 0
+  fi
+  if ! integration_applies "$f" "$_ig_target"; then
+    row "$MARK_SKIP" "$label" "needs $(integration_applies_needs "$f") — skipping install"
+    return 0
+  fi
+  # On by default and never chosen by this project: its callers fall back without the tool, so a
+  # missing one is reported, does not fail the run, and is NOT installed — a yes to installs covers
+  # what the project switched on. `cckit add <id>` writes the key, and then the rows below apply.
+  if integration_default_on "$f" && ! integration_explicit "$f" "$_kitcfg"; then
+    row "$MARK_SKIP" "$label" "not installed — on by default, falls back without it. By hand: $recipe  (or 'cckit add $id', then 'cckit doctor --fix')"
+    return 0
+  fi
+  if [[ $DRY_RUN -eq 1 || $NO_INSTALL -eq 1 ]]; then
+    st="$(KIT_DRY_RUN=1 integration_install "$f" "$_ig_target" 2>/dev/null || true)"
+  else
+    if [[ $INSTALL_APPROVED -eq 1 ]]; then integration_consent_record "$id" "$_ig_target" || true; fi
+    st="$(integration_install "$f" "$_ig_target" || true)"
+  fi
+  case "$st" in
+    present|installed\ *)
+      bin="$(integration_bin "$f" || true)"
+      if [[ "$st" == present ]]; then
+        row "$MARK_OK" "$label" "installed${bin:+ ($bin)}"
+      else
+        after="$(jq -r '.afterInstall // ""' "$f")"
+        # What the installer writes besides the file `detect` checks (descriptor: alsoWrites).
+        also="$(jq -r '(.alsoWrites // []) | join(", ")' "$f")"
+        row "$MARK_OK" "$label" "installed via ${st#installed }${bin:+ ($bin)}${also:+ — it also wrote: $also}"
+        ACTIONS_TAKEN+=("Installed $label via ${st#installed }${also:+ — it also wrote: $also}${after:+ — $after}")
+      fi
+      CHECKS_OK=$((CHECKS_OK + 1)) ;;
+    dry-run)
+      row "$MARK_FAIL" "$label" "missing — $recipe"
+      CHECKS_FAIL=$((CHECKS_FAIL + 1))
+      ACTIONS_NEEDED+=("Install $label: $recipe") ;;
+    no-consent)
+      row "$MARK_FAIL" "$label" "missing — nothing installs without your yes: cckit doctor --fix"
+      CHECKS_FAIL=$((CHECKS_FAIL + 1))
+      ACTIONS_NEEDED+=("Install $label: cckit doctor --fix  (or by hand: $recipe)") ;;
+    *)
+      row "$MARK_FAIL" "$label" "install failed — $recipe"
+      CHECKS_FAIL=$((CHECKS_FAIL + 1))
+      ACTIONS_NEEDED+=("Install $label: $recipe") ;;
+  esac
+}
+
+_ig_target="${TARGET:-$PWD}"
+if has_cmd jq && [[ -f "$_kitcfg" ]]; then
+  # shellcheck source=/dev/null
+  . "$_export_dir_doctor/lib/integration-install.sh"
+  _ig_shown=0
+  for _ig_id in $(integrations_list); do
+    _ig_f="$(integration_file "$_ig_id")" || continue
+    integration_enabled "$_ig_f" "$_kitcfg" || continue
+    if [[ $_ig_shown -eq 0 ]]; then
+      printf '  %s%sIntegrations (optional tools that are on in this project)%s\n' "$C_BOLD" "" "$C_RESET"
+      _ig_shown=1
+    fi
+    doctor_integration "$_ig_f"
+  done
+  if [[ $_ig_shown -eq 1 ]]; then printf '\n'; fi
+fi
+
+# ============================================================================
+# PAGE-DESIGN SKILL (only checked when tasks.design is true)
+# ============================================================================
+# `tasks.design: true` makes every task of the project a page task, and a page task tells the agent
+# to load cckit's `page-design` skill. The key alone installs nothing: a project already at the
+# installed version gets no file from `cckit init --upgrade`. One row per selected adapter says
+# whether the skill is in its skills folder, and a missing one names the command that copies it.
+if has_cmd jq && [[ -f "$_kitcfg" ]] && [[ "$(jq -r '.tasks.design // false' "$_kitcfg" 2>/dev/null)" == "true" ]]; then
+  command -v adapter_list_from_config >/dev/null 2>&1 || . "$_export_dir_doctor/lib/adapter-select.sh"
+  printf '  %s%sPage tasks (tasks.design is on)%s\n' "$C_BOLD" "" "$C_RESET"
+  _pd_root="$(dirname "$_kitcfg")"
+  [[ "$(basename "$_pd_root")" == ".claude" ]] && _pd_root="$(dirname "$_pd_root")"
+  for _pd_a in $(adapter_list_from_config "$_kitcfg" 2>/dev/null || echo claude); do
+    _pd_dir="$(adapter_dir "$_pd_a")/skills/page-design"
+    if [[ -f "$_pd_root/$_pd_dir/SKILL.md" ]]; then
+      row "$MARK_OK" "page-design skill" "$_pd_dir"
+      CHECKS_OK=$((CHECKS_OK + 1))
+    else
+      row "$MARK_FAIL" "page-design skill" "missing from $_pd_dir — run: cckit add page-design"
+      CHECKS_FAIL=$((CHECKS_FAIL + 1))
+      ACTIONS_NEEDED+=("Add the page-design skill ($_pd_dir): cckit add page-design")
+    fi
+  done
+  printf '\n'
+fi
+
+# ============================================================================
+# LOCAL MODEL LAYER (opt-in — only checked when .local.enabled is true)
+# ============================================================================
+# Same gating principle as vercel: silence when the project didn't opt in. The runtime itself is
+# an integration (integrations/mlx-lm.json) and was handled by the loop above; this section is the
+# part that is not an install — the server. When the runtime is present but the server is down,
+# the doctor starts it in background + health-checks the port. --dry-run stays 100% read-only: it
+# reports what it would do and starts nothing.
 _local_on="false"
 [[ -f "$_kitcfg" ]] && _local_on="$(jq -r '.local.enabled // false' "$_kitcfg" 2>/dev/null || echo false)"
 if [[ "$_local_on" == "true" ]]; then
@@ -406,60 +601,17 @@ if [[ "$_local_on" == "true" ]]; then
   _lport="$(jq -r '.local.port // 8080' "$_kitcfg" 2>/dev/null || echo 8080)"
   _lmodel="$(jq -r '.local.model // "mlx-community/Qwen3-8B-4bit"' "$_kitcfg" 2>/dev/null || echo "mlx-community/Qwen3-8B-4bit")"
 
-  # Apple silicon — MLX requirement; gate install/start on it
-  _mlx_capable=0
+  # Apple silicon — MLX requirement (the descriptor's appliesWhen.platform gates the install)
   if [[ $IS_MACOS -eq 1 && "$(uname -m 2>/dev/null)" == "arm64" ]]; then
     row "$MARK_OK" "apple silicon" "$(sysctl -n machdep.cpu.brand_string 2>/dev/null || echo arm64)"
     CHECKS_OK=$((CHECKS_OK + 1))
-    _mlx_capable=1
   else
     row "$MARK_WARN" "apple silicon" "MLX needs an Apple silicon Mac — local layer will stay dormant here"
     CHECKS_WARN=$((CHECKS_WARN + 1))
   fi
 
-  # mlx-lm binary — uv/pipx install to ~/.local/bin, which may not be on PATH yet
-  _mlx_find() {
-    if has_cmd mlx_lm.server; then command -v mlx_lm.server
-    elif [[ -x "$HOME/.local/bin/mlx_lm.server" ]]; then echo "$HOME/.local/bin/mlx_lm.server"
-    fi
-    return 0  # never trip set -e via the $(...) assignment
-  }
-  _mlx_bin="$(_mlx_find)"
-
-  if [[ -n "$_mlx_bin" ]]; then
-    row "$MARK_OK" "mlx-lm" "installed ($_mlx_bin)"
-    CHECKS_OK=$((CHECKS_OK + 1))
-  elif [[ $_mlx_capable -eq 0 ]]; then
-    row "$MARK_SKIP" "mlx-lm" "not Apple silicon — skipping install"
-  elif [[ $DRY_RUN -eq 1 || $NO_INSTALL -eq 1 ]]; then
-    row "$MARK_FAIL" "mlx-lm" "missing — uv tool install mlx-lm"
-    CHECKS_FAIL=$((CHECKS_FAIL + 1))
-    ACTIONS_NEEDED+=("Install the local model runtime: uv tool install mlx-lm")
-  else
-    # ensure an installer: uv preferred (brew-installable), pipx as fallback
-    if ! has_cmd uv && ! has_cmd pipx; then
-      brew_install uv uv && ACTIONS_TAKEN+=("Installed uv via brew") || true
-    fi
-    if has_cmd uv; then
-      printf '  %s mlx-lm missing — installing via uv tool install (isolated venv)...\n' "$MARK_WARN"
-      uv tool install mlx-lm >/dev/null 2>&1 || true
-      _mlx_installer="uv tool install"
-    elif has_cmd pipx; then
-      printf '  %s mlx-lm missing — installing via pipx (isolated venv)...\n' "$MARK_WARN"
-      pipx install mlx-lm >/dev/null 2>&1 || true
-      _mlx_installer="pipx"
-    fi
-    _mlx_bin="$(_mlx_find)"
-    if [[ -n "$_mlx_bin" ]]; then
-      row "$MARK_OK" "mlx-lm" "installed via ${_mlx_installer:-uv} ($_mlx_bin)"
-      CHECKS_OK=$((CHECKS_OK + 1))
-      ACTIONS_TAKEN+=("Installed mlx-lm via ${_mlx_installer:-uv}")
-    else
-      row "$MARK_FAIL" "mlx-lm" "install failed — uv tool install mlx-lm"
-      CHECKS_FAIL=$((CHECKS_FAIL + 1))
-      ACTIONS_NEEDED+=("Install the local model runtime: uv tool install mlx-lm")
-    fi
-  fi
+  # the server binary — resolved through the descriptor, so ~/.local/bin is searched too
+  _mlx_bin="$(integration_bin "$(integration_file mlx-lm 2>/dev/null || true)" 2>/dev/null || true)"
 
   # server alive on the configured port — auto-start when down + installed
   _lurl="http://127.0.0.1:${_lport}/v1/models"
@@ -470,7 +622,7 @@ if [[ "$_local_on" == "true" ]]; then
     row "$MARK_WARN" "server" "not running — install mlx-lm first, then re-run kit-doctor"
     CHECKS_WARN=$((CHECKS_WARN + 1))
     ACTIONS_NEEDED+=("Start the local model server: mlx_lm.server --model ${_lmodel} --port ${_lport}")
-  elif [[ $DRY_RUN -eq 1 ]]; then
+  elif [[ $DRY_RUN -eq 1 || $UNAPPROVED -eq 1 ]]; then
     row "$MARK_WARN" "server" "not running — would start mlx_lm.server in background (first run downloads ~4.5 GB)"
     CHECKS_WARN=$((CHECKS_WARN + 1))
     ACTIONS_NEEDED+=("Start the local model server: mlx_lm.server --model ${_lmodel} --port ${_lport}")
@@ -510,14 +662,14 @@ fi
 # MEMORY LAYER (MemPalace) — opt-in — only checked when .memory.enabled is true
 # ============================================================================
 # Same gating principle as the local model layer: silent unless the project opted
-# into memory at init. Three things to verify:
-#   1. the `mempalace` CLI is installed — the SessionStart/Stop/… hooks no-op without it.
-#   2. a per-wing identity header exists. `mempalace wake-up` scopes the L1 *body* to the
+# into memory at init. Two things to verify:
+#   1. a per-wing identity header exists. `mempalace wake-up` scopes the L1 *body* to the
 #      wing, but reads its L0 identity *header* from the single global ~/.mempalace/identity.txt
 #      (mempalace layers.py Layer0), so every wing shows the same — usually wrong — header
 #      unless .claude/mempal-identity.<wing>.txt is present. --fix seeds a starter from kit.config.
-#   3. the session-start hook is current — older hooks just ran `wake-up --wing` and could not
-#      apply the per-wing header from (2). --fix re-emits the hook from the kit template.
+#   2. the session-start hook is current — older hooks just ran `wake-up --wing` and could not
+#      apply the per-wing header from (1). --fix re-emits the hook from the kit template.
+# The CLI itself is an integration (integrations/mempalace.json), handled by the loop above.
 _mem_on="false"
 [[ -f "$_kitcfg" ]] && _mem_on="$(jq -r '.memory.enabled // false' "$_kitcfg" 2>/dev/null || echo false)"
 if [[ "$_mem_on" == "true" ]]; then
@@ -525,61 +677,14 @@ if [[ "$_mem_on" == "true" ]]; then
   _mwing="$(jq -r '.memory.wing // .project.slug // ""' "$_kitcfg" 2>/dev/null || echo "")"
   [[ -z "$_mwing" || "$_mwing" == "null" ]] && _mwing="$(basename "${TARGET:-$PWD}")"
 
-  # 1. mempalace CLI — install it (guarded) when memory is on but the CLI is missing; the
-  #    SessionStart/Stop/… hooks are silent no-ops without it. MemPalace is a Python CLI
-  #    (github.com/MemPalace/mempalace); install into an isolated tool venv via pipx (fallback uv).
-  #    Installs obey the same consent guard as every other dep: skipped under --dry-run/--no-install
-  #    or when the operator declined the install prompt.
-  _mp_find() {  # pipx/uv drop the bin in ~/.local/bin, which may not be on PATH yet this session
-    if has_cmd mempalace; then command -v mempalace
-    elif [[ -x "$HOME/.local/bin/mempalace" ]]; then echo "$HOME/.local/bin/mempalace"
-    fi
-    return 0
-  }
-  _mp_bin="$(_mp_find)"
-  if [[ -n "$_mp_bin" ]]; then
-    _mv="$("$_mp_bin" --version 2>/dev/null | head -1)"; [[ -n "$_mv" ]] || _mv="installed"
-    row "$MARK_OK" "mempalace CLI" "$_mv"
-    CHECKS_OK=$((CHECKS_OK + 1))
-  elif [[ $DRY_RUN -eq 1 || $NO_INSTALL -eq 1 ]]; then
-    row "$MARK_FAIL" "mempalace CLI" "missing — pipx install mempalace"
-    CHECKS_FAIL=$((CHECKS_FAIL + 1))
-    ACTIONS_NEEDED+=("Install MemPalace: pipx install mempalace  (then: mempalace mcp)")
-  else
-    # ensure an installer: pipx preferred (brew-installable), uv as fallback. NEVER plain pip.
-    if ! has_cmd pipx && ! has_cmd uv; then
-      brew_install pipx pipx && ACTIONS_TAKEN+=("Installed pipx via brew") || true
-    fi
-    if has_cmd pipx; then
-      printf '  %s mempalace missing — installing via pipx (isolated venv)...\n' "$MARK_WARN"
-      pipx install mempalace >/dev/null 2>&1 || true
-      _mp_installer="pipx"
-    elif has_cmd uv; then
-      printf '  %s mempalace missing — installing via uv tool install (isolated venv)...\n' "$MARK_WARN"
-      uv tool install mempalace >/dev/null 2>&1 || true
-      _mp_installer="uv tool install"
-    fi
-    _mp_bin="$(_mp_find)"
-    if [[ -n "$_mp_bin" ]]; then
-      _mv="$("$_mp_bin" --version 2>/dev/null | head -1)"; [[ -n "$_mv" ]] || _mv="installed"
-      row "$MARK_OK" "mempalace CLI" "$_mv (via ${_mp_installer:-pipx})"
-      CHECKS_OK=$((CHECKS_OK + 1))
-      ACTIONS_TAKEN+=("Installed MemPalace via ${_mp_installer:-pipx} — run 'mempalace mcp' to wire the MCP server")
-    else
-      row "$MARK_FAIL" "mempalace CLI" "install failed — install pipx, then: pipx install mempalace"
-      CHECKS_FAIL=$((CHECKS_FAIL + 1))
-      ACTIONS_NEEDED+=("Install MemPalace: pipx install mempalace  (then: mempalace mcp)")
-    fi
-  fi
-
-  # 2. per-wing identity header — the fix for the global-header bug
+  # 1. per-wing identity header — the fix for the global-header bug
   _idfile="${TARGET:-$PWD}/.claude/mempal-identity.${_mwing}.txt"
   _idfile_generic="${TARGET:-$PWD}/.claude/mempal-identity.txt"
   if [[ -s "$_idfile" ]] || [[ -s "$_idfile_generic" ]]; then
     _present="$_idfile"; [[ -s "$_idfile" ]] || _present="$_idfile_generic"
     row "$MARK_OK" "identity header" "wing-scoped (${_present#${TARGET:-$PWD}/})"
     CHECKS_OK=$((CHECKS_OK + 1))
-  elif [[ $DRY_RUN -eq 0 && $NO_INSTALL -eq 0 ]]; then
+  elif [[ $MAY_INSTALL -eq 1 ]]; then
     # Seed a starter header from kit.config so this wing stops inheriting the global identity.
     _owner="$(jq -r '.project.owner // ""' "$_kitcfg" 2>/dev/null || echo "")"
     _pname="$(jq -r '.project.name // ""' "$_kitcfg" 2>/dev/null || echo "")"
@@ -598,17 +703,17 @@ if [[ "$_mem_on" == "true" ]]; then
     ACTIONS_NEEDED+=("Create .claude/mempal-identity.${_mwing}.txt so this wing has its own wake-up header (or run: cckit doctor --fix)")
   fi
 
-  # 3. session-start hook freshness — the `mempal-identity` marker means the hook
-  #    knows how to swap in the per-wing header (2). Older hooks lack it.
+  # 2. session-start hook freshness — the `mempal-identity` marker means the hook
+  #    knows how to swap in the per-wing header (1). Older hooks lack it.
   _hook="${TARGET:-$PWD}/.claude/hooks/mempal_session_start.sh"
   _kit_root="$(dirname "$_export_dir_doctor")"
   _hook_tmpl="$_kit_root/templates/hooks/mempal_session_start.sh.tmpl"
   if [[ ! -f "$_hook" ]]; then
-    : # no hook installed — the CLI row already covers a non-functioning memory layer
+    : # no hook installed — the integration row already covers a non-functioning memory layer
   elif grep -q 'mempal-identity' "$_hook" 2>/dev/null; then
     row "$MARK_OK" "session-start hook" "current — applies the per-wing header"
     CHECKS_OK=$((CHECKS_OK + 1))
-  elif [[ $DRY_RUN -eq 0 && $NO_INSTALL -eq 0 && -f "$_hook_tmpl" ]]; then
+  elif [[ $MAY_INSTALL -eq 1 && -f "$_hook_tmpl" ]]; then
     # Re-emit from the template (only {{WING}} to substitute; no IF blocks in this hook).
     if sed "s|{{WING}}|${_mwing}|g" "$_hook_tmpl" > "$_hook"; then
       chmod +x "$_hook"
@@ -668,8 +773,8 @@ fi
 # ---- gh scope: project (Projects v2 silently fails without it) --------------
 GH_SCOPE_PROJECT=0
 if [[ $GH_AUTHED -eq 1 ]] && has_cmd gh; then
-  _token_scopes="$(gh auth status 2>&1 | grep -i 'token scopes\|scopes:' | head -1 || true)"
-  if echo "$_token_scopes" | grep -qi 'project'; then
+  _token_scopes="$(gh auth status 2>&1 | grep -i 'token scopes\|scopes:' | sed -n 1p || true)"
+  if grep -qi 'project' <<<"$_token_scopes"; then
     row "$MARK_OK" "gh scope:project" "present"
     CHECKS_OK=$((CHECKS_OK + 1))
     GH_SCOPE_PROJECT=1
@@ -749,7 +854,7 @@ printf '\n'
 printf '  %s%sSSH (optional — GitHub HTTPS auth already configured by gh)%s\n' "$C_BOLD" "" "$C_RESET"
 
 _ssh_result=0
-ssh -T git@github.com -o ConnectTimeout=5 -o BatchMode=yes 2>&1 | grep -q "successfully authenticated" && _ssh_result=1 || true
+grep -q "successfully authenticated" <<<"$(ssh -T git@github.com -o ConnectTimeout=5 -o BatchMode=yes 2>&1)" && _ssh_result=1 || true
 
 if [[ $_ssh_result -eq 1 ]]; then
   row "$MARK_OK" "SSH to github.com" "key already accepted"
@@ -800,6 +905,33 @@ if [[ -f "$_kit_target/CLAUDE.md" && -f "$_export_script" ]]; then
     ACTIONS_NEEDED+=("Inspect portability: scripts/kit-export-project.sh --verify (then export for claude.ai with no args)")
   fi
   printf '\n'
+fi
+
+# ============================================================================
+# INSTRUCTION FILES (resident context budget, #357)
+# ============================================================================
+# CLAUDE.md and every .claude/rules/*.md without a `paths:` frontmatter load into every session;
+# Claude Code warns at startup once they pass 150k characters combined. Show the number and the
+# three largest files here so it is seen before that warning is. Read-only, and the same
+# measurement the gate uses (instruction-budget-lint.sh --summary). Absent when the project has no
+# instruction files.
+_budget_lint="$_export_dir_doctor/instruction-budget-lint.sh"
+if [[ -f "$_budget_lint" ]]; then
+  _budget_line="$(INSTRUCTION_BUDGET_ROOT="$_kit_target" bash "$_budget_lint" --summary 2>/dev/null || true)"
+  if [[ -n "$_budget_line" ]]; then
+    printf '  %s%sInstruction files (loaded into every session)%s\n' "$C_BOLD" "" "$C_RESET"
+    _budget_resident="$(printf '%s' "$_budget_line" | awk '{print $3}')"
+    _budget_limit="$(printf '%s' "$_budget_line" | awk '{print $5}')"
+    if [[ "$_budget_resident" =~ ^[0-9]+$ && "$_budget_limit" =~ ^[0-9]+$ && "$_budget_resident" -gt "$_budget_limit" ]]; then
+      row "$MARK_WARN" "resident budget" "$_budget_line"
+      CHECKS_WARN=$((CHECKS_WARN + 1))
+      ACTIONS_NEEDED+=("Trim resident instruction files: scripts/instruction-budget-lint.sh --report (scope a rule with paths:, or split it into a short rule + a knowledge doc)")
+    else
+      row "$MARK_OK" "resident budget" "$_budget_line"
+      CHECKS_OK=$((CHECKS_OK + 1))
+    fi
+    printf '\n'
+  fi
 fi
 
 # ============================================================================

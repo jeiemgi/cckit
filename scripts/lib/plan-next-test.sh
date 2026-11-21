@@ -39,7 +39,7 @@ if [ -n "${PN_TEST_INNER:-}" ]; then
 
   # --- proposals shape (bash + zsh) ---
   props="$(_pn_proposals "$fix")"
-  first="$(printf '%s\n' "$props" | head -1)"
+  first="$(printf '%s\n' "$props" | sed -n 1p)"
   has "rank 1 is docs"            "$first" "1	docs"
   has "mandatory docs+README"     "$first" "README"
   has "undocumented skill gap"    "$props" "beta-skill"

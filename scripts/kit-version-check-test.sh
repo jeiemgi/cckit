@@ -21,6 +21,10 @@ printf '{"kitVersion":"0.0.1"}' > "$tmp/cckit.config.json"
 out="$(env -u CLAUDE_PLUGIN_ROOT bash "$SCRIPT" --target "$tmp" 2>&1)"; rc=$?
 t "behind project → exit 10 (self-resolved, not a silent no-op)" "$rc" "10"
 case "$out" in *"$INSTALLED"*) echo "ok: notice names the resolved install version ($INSTALLED)" ;; *) echo "FAIL: notice lacks install version: $out"; fail=1 ;; esac
+# #448: the notice names the command a terminal user or a non-Claude agent runs, beside the slash
+# command — `/kit-update` alone exists only inside Claude Code.
+case "$out" in *"cckit init --upgrade"*) echo "ok: notice names cckit init --upgrade" ;; *) echo "FAIL: notice lacks 'cckit init --upgrade': $out"; fail=1 ;; esac
+case "$out" in *"/kit-update"*) echo "ok: notice still names /kit-update" ;; *) echo "FAIL: notice lacks '/kit-update': $out"; fail=1 ;; esac
 
 # A project recorded AT the installed version → up to date (exit 0), still self-resolved.
 printf '{"kitVersion":"%s"}' "$INSTALLED" > "$tmp/cckit.config.json"

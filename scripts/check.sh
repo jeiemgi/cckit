@@ -32,24 +32,14 @@ else
   note "  (jq absent - skipping JSON validation)"
 fi
 
-# 3. No tedos branding leaked into what SHIPS (the de-tedos-ification gate). Scans TRACKED files
-# only (git grep) so gitignored runtime state (.cckit/), build output (dist/), and deps never trip
-# a false positive - only committed content must be tedos-free. Falls back to a filtered recursive
-# grep outside a git work tree.
-note "==> no tedos branding (tracked files)"
-_tedos_scan() {
-  if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    git grep -inI tedos -- . ':!scripts/check.sh'
-  else
-    grep -rniI --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=.cckit \
-      --exclude-dir=dist --exclude=check.sh tedos .
-  fi
-}
-if _tedos_scan >/dev/null 2>&1; then
-  note "x found 'tedos' references - cckit must be tedos-free:"
-  _tedos_scan | head -20 >&2
-  fail=1
-fi
+# 3. Leak fence - no private word (the legacy brand name, a product, a client, a person) in any
+# tracked file. One scan, three pattern sources: the built-in word, the gitignored
+# .cckit/leak-words list, and CCKIT_LEAK_WORDS in CI. Hits print as file:line only.
+# scripts/lib/leak-fence.sh is the single implementation; scripts/leak-fence-test.sh is its selftest.
+note "==> leak fence (tracked files)"
+. scripts/lib/kit-state.sh 2>/dev/null || true
+. scripts/lib/leak-fence.sh
+leak_fence_check || fail=1
 
 # 4. Secret + privacy guard - no secrets, keys, env, or private data in anything publishable.
 note "==> secret + privacy guard"
@@ -65,13 +55,33 @@ fi
 note "==> skill frontmatter context budget"
 bash scripts/skill-frontmatter-lint.sh || fail=1
 
+# 5b. Agent templates carry a `name:` equal to their file name and a non-empty `description:` —
+# Codex refuses a custom agent without either (#263). Skill references are step 7's.
+note "==> agent template name + description"
+bash scripts/agent-template-lint.sh || fail=1
+
+# 5c. Instruction-file budget. CLAUDE.md and every `.claude/rules/*.md` without a `paths:`
+# frontmatter load into every session; Claude Code warns once they pass 150k characters combined.
+# Same ratchet: an over-long file or an over-limit total is grandfathered in the baseline, and only
+# growth (or a new offender) fails the gate.
+note "==> instruction-file budget"
+bash scripts/instruction-budget-lint.sh || fail=1
+
 # 6. Codified review findings. Mechanical defect classes caught in past reviews, encoded as rules
 # in scripts/review-rules.conf so the same bug cannot land twice. Per-file ratchet: today's hits are
 # grandfathered in the baseline, only new or grown hits fail. Rules needing intent stay with review.
 note "==> codified review findings"
 bash scripts/review-lint.sh || fail=1
 
-# 7. Behavioral tests - run every *-test.sh through the test runner.
+# 7. Agent skill references. Every `skills:` entry in templates/agents/*.md must resolve to a skill
+# the kit ships or scaffolds, a `plugin:skill` reference, or a name declared third-party in
+# scripts/agent-skills-external.txt. An unresolved entry fails silently at runtime: the agent loads
+# with fewer skills than its frontmatter lists.
+note "==> agent skill references"
+bash scripts/agent-skills-lint.sh || fail=1
+
+# 8. Behavioral tests - run every *-test.sh through the test runner (several files at a time;
+# TEST_JOBS=1 for one at a time).
 note "==> behavioral tests"
 bash scripts/test.sh || fail=1
 

@@ -7,8 +7,7 @@ when_to_use: When the user says "fix #N and ship it", "do the full cycle on #N",
 # kit-ship
 
 Takes one issue from **open → implemented → merged on the base branch → closed → kit refreshed**,
-chaining the existing kit-task commands. This is the orchestrator that wraps the manual sequence,
-with the sharp edges baked in (see **Hard rules**). Plugin-direct — the kit-task skills it chains
+chaining the existing kit-task commands under the **Hard rules** below. Plugin-direct — the kit-task skills it chains
 resolve from `${CLAUDE_PLUGIN_ROOT}`.
 
 ## Inputs
@@ -24,7 +23,7 @@ resolve from `${CLAUDE_PLUGIN_ROOT}`.
 | - | ---- | ---------------- |
 | 1 | **Read the issue** | `gh issue view <N>` — understand scope. If ambiguous/large/decision-heavy → stop and ask (don't ship blind). |
 | 2 | **Start** | `/kit-task-start <N> --worktree` — branch `<kind>/<N>-<slug>` from the fresh base branch, mark **In Progress**. |
-| 3 | **Implement** | Do the actual work to the issue's acceptance criteria, following project conventions + the relevant agent's domain. |
+| 3 | **Implement** | Do the work to the issue's acceptance criteria, following project conventions + the relevant agent's domain. |
 | 4 | **Verify locally** | Run the affected workspace's `build` / `typecheck` / `lint` (e.g. `pnpm -F <pkg> build typecheck`) or `bash -n` for scripts. Don't open a PR on red. |
 | 5 | **PR** | `/kit-task-pr <N>` — commit, push, open PR to the base branch, mirror labels/milestone, add to board, move issue **In Review**. |
 | 6 | **Wait for CI** | If the project has a required check, poll until it's not pending (background `until` loop). **Pending ≠ failing — wait; never force-merge.** |

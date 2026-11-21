@@ -51,9 +51,9 @@ if [ -n "${KIT_EXPORT_TEST_INNER:-}" ]; then
 
   # matrix has the three surfaces.
   m="$(kit_export_matrix)"
-  t "matrix names claude.ai"  "$(printf '%s' "$m" | grep -qi 'claude.ai' && echo yes || echo no)" "yes"
-  t "matrix names Cowork"     "$(printf '%s' "$m" | grep -qi 'Cowork'    && echo yes || echo no)" "yes"
-  t "matrix names Terminal"   "$(printf '%s' "$m" | grep -qi 'Terminal'  && echo yes || echo no)" "yes"
+  t "matrix names claude.ai"  "$(grep -qi 'claude.ai' <<<"$m" && echo yes || echo no)" "yes"
+  t "matrix names Cowork"     "$(grep -qi 'Cowork' <<<"$m"    && echo yes || echo no)" "yes"
+  t "matrix names Terminal"   "$(grep -qi 'Terminal' <<<"$m"  && echo yes || echo no)" "yes"
 
   # Now make the hook tier-A via the manifest: --verify should pass (portable).
   kit_manifest_record .claude/rules/branch-naming.md A wire >/dev/null 2>&1

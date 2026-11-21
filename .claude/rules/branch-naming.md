@@ -8,7 +8,7 @@ Canonical naming + merge-order rules so you're never confused about *what a bran
 <kind>/<issue-number>-<slug>
 ```
 
-- `<kind>` — one of the closed set below, or one of the two effort prefixes named next. No others.
+- `<kind>` — one of the closed set below, one of the two effort prefixes, or `light` (a light task). No others.
 - `<issue-number>` — the issue this branch closes. **Always required** for human work.
 - `<slug>` — short kebab-case description (≤ 5 words).
 
@@ -31,6 +31,30 @@ it protects any branch whose issue is still open. One trailing letter only — `
 is not an issue number and gets no protection. (The parser honors the suffix for any kind, not
 just `sub` — it errs toward protection rather than risk deleting a misnamed live branch.)
 
+### Hotfix branches (created by `cckit hotfix`, not by hand)
+
+`cckit hotfix <pr|sha> [--base <branch>]` cherry-picks one merged change onto the release branch and
+names its branch after the **source PR**, not an issue — a cherry-pick has no issue of its own:
+
+| Pattern | When | `N` |
+| --- | --- | --- |
+| `fix/<N>-hotfix-<base>` | the source is a PR, or a commit whose subject names one | the **source PR's** number |
+| `fix/hotfix-<sha7>-<base>` | the source commit names no PR | none |
+
+`<base>` is the target branch, lowercased with every non-alphanumeric run turned into `-`
+(`release/1.x` → `release-1-x`), so the same PR can be carried to two release branches. `N` parses
+as an issue number, and a merged PR reads as closed, so `gc` treats the branch like any other whose
+issue is closed: prunable once its own PR merges. Do not run `cckit pr` in a hotfix worktree — it
+would read the source PR number as the issue to close.
+
+### Light-task branches (created by `cckit task start`, not by hand)
+
+A light task is work tracked in the project's task list, with no GitHub issue. `cckit task start
+<id>` cuts `light/<id>-<slug>`. `<id>` starts with a letter (`t3f9a`), so the branch never parses as
+an issue number; `gc` asks the task source and keeps the branch until the task is done on the base
+branch. `light/share-<timestamp>` is the branch `cckit task share` opens its PR from. Do not run
+`cckit pr` in a light worktree: `cckit task finish` opens the PR.
+
 ### Closed set of kinds
 
 | Kind       | For                                                | Typical risk |
@@ -45,6 +69,12 @@ just `sub` — it errs toward protection rather than risk deleting a misnamed li
 | `adr`      | Architecture Decision Record                       | low          |
 | `spike`    | Time-boxed research (may be thrown away)           | low          |
 | `plan`     | Plan/report deliverable                            | low          |
+
+**Content kinds are labels, never branch prefixes.** `post`, `campaign`, `brand` and `research`
+(`KIT_CONTENT_KINDS`, `scripts/lib/kinds.sh`) are `kind:` values for content work. `cckit start` maps
+each onto the set above — `kind:post` and `kind:brand` → `task/`, `kind:campaign` → `plan/`,
+`kind:research` → `spike/` — so the set `gc` and the hygiene hook parse does not grow. A PR opened
+from one is titled `docs:`.
 
 ### Bot branches (do not create by hand)
 
@@ -87,6 +117,12 @@ Lockfiles (`pnpm-lock.yaml`, `package-lock.json`, …) and manifest config confl
   live writer already owns refuses the launch, and the wave's other claims are released. A lease is
   reclaimed only on positive evidence — its worktree is gone, or its process died on the host that
   recorded it — never on a process check against another host.
+- **`start` enforces it too, with a session claim.** `orchestrate`'s lease covers a wave; a second
+  session running `cckit start <issue>` by hand is outside it. `wt_start` records one claim per
+  issue under `<git-common-dir>/kit-sessions/` (`scripts/lib/session-registry.sh`) and refuses a
+  start while another live session holds it — before any fetch, branch or worktree. `--force` /
+  `KIT_FORCE=1` starts anyway; a claim whose pid is dead is reaped; `cckit claims` lists the live
+  ones. A board Status of In Progress or In Review only warns.
 - Prefer giving local sub-agents their own worktree.
 - Remote CI agents (Auto-Dev) are isolated per runner — favor them for parallel fixes.
 - Before editing shared files, check whether another agent is active.
@@ -109,7 +145,7 @@ If the project adopts the kit's PR-automation workflows, these labels are applie
 
 One branch = one issue = one PR = **deleted on merge**. A branch is a short-lived container, not a place work lives.
 
-- **No long-lived uncommitted work.** Don't let a working tree sit dirty across sessions. Commit + PR, or discard. A branch sitting many commits behind the base with uncommitted work can silently revert merged work on a bad rebase — exactly the class of problem this section exists to prevent.
+- **No long-lived uncommitted work.** Don't let a working tree sit dirty across sessions. Commit + PR, or discard. A branch sitting many commits behind the base with uncommitted work can silently revert merged work on a bad rebase.
 - **Never work directly on the base branch (`main`/`develop`).** The `guard-base-branch-commit.sh` hook blocks commits there; start every change with `/kit-task-start <issue>` (it branches from a *fresh* base).
 - **Delete on merge.** `/kit-task-pr-merge` removes the worktree and deletes the local + remote branch automatically. Never leave a merged branch or its worktree lingering.
 - **One worktree per branch; remove it when its PR merges.** Parallel agents must use worktrees (never share a checkout).
@@ -120,10 +156,10 @@ One branch = one issue = one PR = **deleted on merge**. A branch is a short-live
 
 Local hooks + skills are **fast feedback**; the **durable, everyone-applies enforcement** belongs on GitHub. Move guardrails there as they mature — they then enforce for humans, CI agents (Auto-Dev), and the Claude Action alike, regardless of anyone's local setup.
 
-- **Do first (1 toggle):** repo Settings → **"Automatically delete head branches"** — eliminates remote-branch buildup entirely.
+- **Do first (1 toggle):** repo Settings → **"Automatically delete head branches"** — GitHub then deletes each remote branch when its PR merges.
 - **Branch protection** on the base branch: require PR, required CI checks, linear history, no direct pushes.
 - **Stale-branch / stale-PR Action** (scheduled) to flag/close abandoned branches + PRs.
 - **Scheduled sweep** that flags "PR merged but issue still open" and "branch merged but not deleted".
 - Extend any adopted `pr-labeler` / `pr-deps` / `pr-automerge` workflows as the enforcement surface.
 
-Principle: **prefer migrating enforcement to GitHub** as it matures; keep only the genuinely local concerns (worktrees, stale base, dirty tree) in hooks.
+Principle: keep only the local concerns (worktrees, stale base, dirty tree) in hooks.

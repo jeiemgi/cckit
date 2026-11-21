@@ -31,7 +31,7 @@ commitlint_check() {
     printf 'commitlint: empty subject — nothing to validate\n' >&2
     return 1
   fi
-  if printf '%s' "$subject" | grep -qE "$_CL_RE"; then
+  if grep -qE "$_CL_RE" <<<"$subject"; then
     return 0
   fi
   {

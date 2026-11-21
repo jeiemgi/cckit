@@ -21,7 +21,13 @@
     "knowledge-base",
     "mempalace",
     "plan-output-format",
-    "task-management"
+    "issue-lifecycle",
+    "merge-safety",
+    "gate-and-review",
+    "authoring",
+    "shared-checkout",
+    "task-management",
+    "review-pages"
   ],
   "roles": [
     "PM",
@@ -37,6 +43,8 @@
   ],
   "defaults": {
     "plans_format": "markdown",
-    "memory": "off"
+    "memory": "off",
+    "content_kinds": "on",
+    "pr_body": "content"
   }
 }

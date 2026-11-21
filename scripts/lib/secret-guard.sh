@@ -82,7 +82,7 @@ secret_guard_scan() {
     while IFS= read -r line; do
       [ -z "$line" ] && continue
       echo "x secret-guard: secret-like content: $line" >&2; findings=$((findings+1))
-    done < <(printf '%s\n' "${files[@]:-}" | tr '\n' '\0' | xargs -0 grep -nIE "$pat" 2>/dev/null | head -20)
+    done < <(printf '%s\n' "${files[@]:-}" | tr '\n' '\0' | xargs -0 grep -nIE "$pat" 2>/dev/null | sed -n 1,20p)
   done < <(_sg_secret_patterns)
 
   # (c) generic secret assignment (placeholders allowed)
@@ -90,7 +90,7 @@ secret_guard_scan() {
     [ -z "$line" ] && continue
     case "$line" in *YOUR_*|*example*|*EXAMPLE*|*placeholder*|*changeme*|*xxxx*|*redacted*|*'<'*|*'${'*) continue ;; esac
     echo "x secret-guard: secret-like assignment: $line" >&2; findings=$((findings+1))
-  done < <(printf '%s\n' "${files[@]:-}" | tr '\n' '\0' | xargs -0 grep -niIE "$_sg_assign_pattern" 2>/dev/null | head -20)
+  done < <(printf '%s\n' "${files[@]:-}" | tr '\n' '\0' | xargs -0 grep -niIE "$_sg_assign_pattern" 2>/dev/null | sed -n 1,20p)
 
   # (d) user-supplied privacy denylist (agnostic: YOU declare what is yours; file stays local)
   # Resolve against the shared .cckit/, not the CWD: the denylist is the user's declaration of what
@@ -105,7 +105,7 @@ secret_guard_scan() {
       while IFS= read -r line; do
         [ -z "$line" ] && continue
         echo "x secret-guard: private term '$term' present: $line" >&2; findings=$((findings+1))
-      done < <(printf '%s\n' "${files[@]:-}" | tr '\n' '\0' | xargs -0 grep -nIF "$term" 2>/dev/null | head -10)
+      done < <(printf '%s\n' "${files[@]:-}" | tr '\n' '\0' | xargs -0 grep -nIF "$term" 2>/dev/null | sed -n 1,10p)
     done < "$denylist"
   fi
 

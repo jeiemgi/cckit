@@ -36,12 +36,17 @@ acceptable paths (use an array when the answer is legitimately split across docs
 {"id": "abs-01", "q": "What is the DB admin password?", "expect": "NONE"}
 ```
 
-**Quality** — a claim-style prompt plus a `must` rubric (the required points). The judge scores the
-answer's coverage of those points, not its tone — the rubric is what de-biases the judge:
+**Quality** — a claim-style prompt plus a `must` rubric (the required points). The model writes a
+full answer from the docs, and the judge scores that answer's coverage of the points, not its tone —
+the rubric is what de-biases the judge:
 
 ```json
-{"id": "qual-01", "claim": "Summarize our release process.", "must": ["version bumped", "changelog updated", "tag published"]}
+{"id": "qual-01", "claim": "Summarize our release process.", "must": ["version bumped", "changelog updated", "tag published"], "source": "releasing.md"}
 ```
+
+`source` is optional and the runner does not read it: it names the doc the rubric was written from,
+so a reviewer can check each point against that page. Write one point per fact, and only facts the
+page states.
 
 ## Path matching
 
@@ -59,6 +64,7 @@ scripts/benchmark/run-quality.sh --dry
 # live run (uses the configured model backend)
 scripts/benchmark/run.sh                 # retrieval + adversarial + abstain
 scripts/benchmark/run-quality.sh         # quality (judged)
+scripts/benchmark/run-quality.sh --answers out/   # also keep each answer (out/<id>.txt) and the judge's reply (out/<id>.judge.txt)
 scripts/benchmark/report.sh              # writes RESULTS.md a non-expert can read
 ```
 

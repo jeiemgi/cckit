@@ -79,7 +79,7 @@ export async function createThingAction(input: CreateThingInput): Promise<{ id: 
 
 - **Local-first.** All DDL lands in `supabase/migrations/`; apply + validate locally. Never push DDL straight to prod.
 - **Validate the whole chain before a PR:** `supabase db reset` replays every migration + seed from scratch. A green reset is the gate to open the PR.
-- **Group a coupled chain into ONE PR/issue.** Don't fragment a sequenced migration set into a PR-per-file. Split only for genuinely independent migrations or a step needing its own review gate (data backfill, RLS behavior change). A single PR also has no siblings to silently revert.
+- **Group a coupled chain into ONE PR/issue.** Don't fragment a sequenced migration set into a PR-per-file. Split only for independent migrations or a step needing its own review gate (data backfill, RLS behavior change). A single PR also has no siblings to silently revert.
 - **Enum `ADD VALUE` is forward-only** and can't run in the same transaction that uses the new label — isolate it as its own earlier migration.
 - **Type regen is deliberate, not automatic.** `supabase gen types` may target a *remote* project (check the script) — running it blindly can hit prod or emit types from a stale schema. Regenerate after the chain applies, type-check, then commit the generated file (last / its own PR).
 - **Human-gate DDL merges** — review the SQL; don't auto-merge agent-authored migrations.

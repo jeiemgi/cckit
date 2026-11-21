@@ -6,15 +6,32 @@ description: Every activation tag, how you trigger it, and where it appears — 
 import { CardGrid, LinkCard } from '@astrojs/starlight/components';
 import TriggerSurfaces from '../../components/diagrams/TriggerSurfaces';
 import Tag from '../../components/Tag.astro';
+import TagLegend from '../../components/TagLegend.astro';
 
-Every coloured tag in these docs says **how a thing is triggered**. This is the directory: each tag
-explains **how you use it**, then lists everything of that kind. New to the colours? The
-[how-to-read guide](/how-to-read/#the-tags) introduces them.
+Every coloured tag in these docs says **how a thing is triggered**. A tag sits next to a heading or
+a name, and its colour means the same on every page. This page first says what each tag means, then
+is the directory: each tag explains **how you use it** and lists everything of that kind.
+
+## The tags
+
+<TagLegend />
+
+## How to use them
+
+- A page tagged <Tag kind="flow" /> describes a process you can run from start to finish.
+- A name tagged <Tag kind="command" /> is something you type in a terminal.
+- A name tagged <Tag kind="skill" /> is something you run inside Claude Code with a `/`.
+- A name tagged <Tag kind="conversational" /> happens just by asking Claude in plain words.
+
+You don't have to read top to bottom. Scan for the tag that matches what you want to do, and start
+there.
+
+## The directory
 
 <TriggerSurfaces client:only="react" />
 
 One question sorts every tag: **who pulls the trigger?** You act, the system fires on its own, an
-agent reads the machine surface — or nothing triggers it and it's simply a term worth knowing.
+agent reads the machine surface — or nothing triggers it and it's a term worth knowing.
 
 <div class="tags-row">
 
@@ -24,7 +41,7 @@ agent reads the machine surface — or nothing triggers it and it's simply a ter
 
 </div>
 
-**How you use it:** just say what you want to Claude Code in plain words — no command, no slash.
+**How you use it:** say what you want to Claude Code in plain words — no command, no slash.
 Asking to "contribute this upstream" starts the `kit-contribute` skill; "write docs for this" starts
 `kit-docs-writer`. Claude matches your intent to the right skill.
 
@@ -41,15 +58,15 @@ Asking to "contribute this upstream" starts the `kit-contribute` skill; "write d
 
 </div>
 
-**How you use it:** type it in your terminal — `cckit <verb>` (for example `cckit start 42`). Run
+**How you use it:** type it in your terminal — `cckit <verb>` (for example `cckit start <issue>`). Run
 `cckit help` for the full list, or `cckit <verb> --help` for one. Add `--llm` to any verb for
 machine-readable output.
 
 <CardGrid>
   <LinkCard title="CLI reference" href="/cli-reference/" description="Every cckit verb, flag, and --llm mode." />
   <LinkCard title="Quickstart" href="/getting-started/" description="cckit init, start, pr, sync, gc — the first lifecycle." />
-  <LinkCard title="The GitHub cycle" href="/github-cycle/" description="The command for each step of one issue." />
-  <LinkCard title="Wave" href="/wave/" description="cckit wave + cckit watch — the parallel loop." />
+  <LinkCard title="The GitHub cycle" href="/development/" description="The command for each step of one issue." />
+  <LinkCard title="Wave" href="/development/waves/" description="cckit wave + cckit watch — the parallel loop." />
 </CardGrid>
 
 <div class="tags-row">
@@ -62,7 +79,7 @@ machine-readable output.
 
 **How you use it:** in Claude Code, type `/` then the skill name — `/kit-next`, `/kit-ship`. The
 editor lists them as you type. Many skills *also* trigger conversationally (see above), so you can
-either run `/kit-contribute` or just ask to "contribute this upstream".
+either run `/kit-contribute` or ask to "contribute this upstream".
 
 <CardGrid>
   <LinkCard title="Skills cckit ships" href="/skills/" description="The full list, grouped by what you're trying to do." />
@@ -81,9 +98,9 @@ and skills carry out. You "use" it by running its steps in order (each step has 
 diagrams on these pages draw each flow left to right.
 
 <CardGrid>
-  <LinkCard title="The GitHub cycle" href="/github-cycle/" description="Issue → branch → PR → review → merge." />
-  <LinkCard title="Efforts, waves & worktrees" href="/efforts-and-waves/" description="Many issues at once, sorted into waves." />
-  <LinkCard title="Wave" href="/wave/" description="A wave of issues fanned out to parallel agents." />
+  <LinkCard title="The GitHub cycle" href="/development/" description="Issue → branch → PR → review → merge." />
+  <LinkCard title="Efforts, waves & worktrees" href="/project-management/efforts-and-waves/" description="Many issues at once, sorted into waves." />
+  <LinkCard title="Wave" href="/development/waves/" description="A wave of issues fanned out to parallel agents." />
 </CardGrid>
 
 <div class="tags-row">
@@ -95,7 +112,7 @@ diagrams on these pages draw each flow left to right.
 </div>
 
 **How you use it:** you don't — a hook runs **automatically** when an event happens (before a commit,
-on session start, and so on). cckit wires them when you set up a repo; you just see the result. The
+on session start, and so on). cckit wires them when you set up a repo; you see the result. The
 Hooks page lists each one and the command it guards.
 
 <CardGrid>
@@ -130,6 +147,24 @@ TOON, JSON otherwise) — this is the surface an agent reads instead of scraping
 (an effort, a wave, a worktree). Click through to where it's defined.
 
 <CardGrid>
-  <LinkCard title="Efforts, waves & worktrees" href="/efforts-and-waves/" description="Efforts, sub-issues, waves, worktrees — defined." />
-  <LinkCard title="How to read this guide" href="/how-to-read/" description="The tags and diagrams, explained once." />
+  <LinkCard title="Efforts, waves & worktrees" href="/project-management/efforts-and-waves/" description="Efforts, sub-issues, waves, worktrees — defined." />
+  <LinkCard title="How to read this guide" href="/tags/" description="The tags and diagrams, explained once." />
 </CardGrid>
+
+## Two tracks
+
+The switch beside the site title moves between the site's two tracks.
+
+| Track | For | Accent | Starts at |
+| --- | --- | --- | --- |
+| **Software** | developers who drive cckit from a terminal or from Claude Code | blue | [How an agency builds software](/software/) |
+| **Marketing** | marketing teams who work by talking to Claude and never open a terminal | red | [What cckit does for a marketing team](/marketing/) |
+
+Each track has its own sidebar. The Software sidebar follows the order a team works in: **Start
+here**, **Philosophy**, **Getting started**, **Memory**, **Project management**, **Design**,
+**Development**, **Review**, **Ship** and **Reference**. Only the group of the page you are on is
+open. A Software page that is not in the sidebar is one click away on its area's "More guides" page
+or on [All reference pages](/reference/), and search covers all of them.
+
+The Marketing pages are also in Spanish: use the language picker in the top bar of any Marketing
+page. Software pages are in English only.

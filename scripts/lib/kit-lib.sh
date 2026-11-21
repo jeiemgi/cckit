@@ -61,7 +61,7 @@ _kl_sentence() {
 kit_lib_purpose() {
   local f="$1" t
   [ -f "$f" ] || { printf '%s' "unknown"; return 0; }
-  t="$(sed -n '1,25p' "$f" | sed -n '/^#!/d; /^#[[:space:]]*shellcheck/d; /^#/p' | head -1)"
+  t="$(sed -n '1,25p' "$f" | sed -n '/^#!/d; /^#[[:space:]]*shellcheck/d; /^#/p' | sed -n 1p)"
   [ -n "$t" ] || { printf '%s' "unknown"; return 0; }
   t="${t#\#}"
   # trim leading blanks without a subprocess (portable across bash 3.2 + zsh)
@@ -112,7 +112,7 @@ _kl_header() {
 kit_lib_errors() {
   local v=""
   # Read the header block only (see _kl_header) so a body comment is never taken for the contract.
-  [ -f "$1" ] && v="$(_kl_header "$1" | sed -n 's/^#[[:space:]]*errors:[[:space:]]*\([a-z-]*\).*/\1/p' | head -1)"
+  [ -f "$1" ] && v="$(_kl_header "$1" | sed -n 's/^#[[:space:]]*errors:[[:space:]]*\([a-z-]*\).*/\1/p' | sed -n 1p)"
   [ -n "$v" ] || v="unknown"
   printf '%s' "$v"
 }
@@ -121,7 +121,7 @@ kit_lib_errors() {
 # file this is the ONLY thing saying which half propagates, so the catalog always shows it there.
 kit_lib_errors_reason() {
   local line=""
-  [ -f "$1" ] && line="$(_kl_header "$1" | sed -n 's/^#[[:space:]]*errors:[[:space:]]*//p' | head -1)"
+  [ -f "$1" ] && line="$(_kl_header "$1" | sed -n 's/^#[[:space:]]*errors:[[:space:]]*//p' | sed -n 1p)"
   case "$line" in
     *'— '*) printf '%s' "${line#*'— '}" ;;
     *) printf '' ;;

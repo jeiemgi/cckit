@@ -95,5 +95,31 @@ t "reap kept the live remote row" "$(grep -c 'remote' "$(bo_file)" 2>/dev/null |
 bo_claim effort/318-agents-run-by-profile-in-herdr agent-c "$WT_B" 2>/dev/null
 t "a slashed branch name round-trips" "$(bo_owner effort/318-agents-run-by-profile-in-herdr)" "agent-c"
 
+# ── the ledger lock excludes: of eight simultaneous attempts exactly one wins (#449) ───────────
+# The lock was `mkdir`, and the `mkdir` of uutils coreutils 0.10.0 (Ubuntu 26.04) exits 0 for the
+# loser of a race, so two claimants held the lock together. Each process makes ONE attempt on the
+# same path, released together by a start file; a check-then-create primitive reports several
+# winners in most rounds.
+L="$tmp/prim.lock"; go="$tmp/prim.go"; won="$tmp/prim.won"; lock_bad=0; r=0
+while [ "$r" -lt 25 ]; do
+  r=$((r+1)); rm -rf "$L" "$go"; : > "$won"; pids=""
+  for k in 1 2 3 4 5 6 7 8; do
+    (
+      waited=0
+      while [ ! -e "$go" ] && [ "$waited" -lt 20000 ]; do waited=$((waited+1)); done
+      _bo_lock_try "$L" && echo "$k" >> "$won"
+    ) &
+    pids="$pids $!"
+  done
+  : > "$go"
+  for pid in $pids; do wait "$pid"; done
+  [ "$(grep -c . "$won")" = 1 ] || lock_bad=$((lock_bad+1))
+done
+t "the ledger lock has exactly one winner in each of 25 races" "$lock_bad" "0"
+_bo_unlock "$L"; t "_bo_unlock removes the lock" "$([ -e "$L" ] && echo left || echo gone)" "gone"
+# A cckit from before #449 leaves a lock DIRECTORY at the same path: it must still block.
+mkdir "$L"; _bo_lock_try "$L"; rc "a lock directory from an older cckit still blocks" "$?" "1"
+_bo_unlock "$L"; t "_bo_unlock removes an older lock directory" "$([ -e "$L" ] && echo left || echo gone)" "gone"
+
 [ "$fail" -eq 0 ] && echo "ALL OK (branch-owner)" || echo "branch-owner: FAILURES"
 exit "$fail"

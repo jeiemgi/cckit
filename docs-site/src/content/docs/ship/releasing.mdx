@@ -1,0 +1,160 @@
+---
+title: Cut a release
+description: How the version is read from commit titles, how work is promoted to the release branch, how to add release-please to your project, and how a hotfix reaches the release branch.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
+
+Merging a change and shipping it to users are two decisions. If every merge shipped, a half-built
+feature would reach users as soon as its first pull request landed. If a release needed someone to
+pick a version number and write the notes by hand, it would be put off, and the number would be
+argued over.
+
+The team separates the two. Work merges all week and ships nothing. A release is one deliberate
+act: merging a single pull request when a batch is ready. Nobody chooses the number, because the
+commit messages since the last release already say whether it is a fix, a feature or a breaking
+change.
+
+**Who does it:** a person merges the release pull request. Agents contribute by titling every pull
+request so the version can be read from it; `cckit pr` and `cckit effort pr` write those titles.
+
+**What plugs in:** [release-please](https://github.com/googleapis/release-please), a GitHub
+workflow that keeps the release pull request, the tag and the changelog. cckit does not build it
+and `cckit init` does not add it to your project: you add it yourself, in step 3 below.
+
+**What cckit gives any project:** three parts.
+
+1. Commit titles a release tool can read.
+2. `cckit pr --base <branch>`, for the pull request that promotes work to the release branch.
+3. `cckit hotfix`, to carry one merged fix to the release branch.
+
+<Aside type="note" title="New here? The two terms">
+**Semantic Versioning** is the `MAJOR.MINOR.PATCH` number on a release (like `1.4.2`). **Conventional Commits** is a small rule for writing commit messages so a tool can read them — each subject starts with a `type:` such as `feat:` or `fix:`. Together they let cckit pick the next version from the commits alone.
+</Aside>
+
+## How the version is decided
+
+release-please reads every Conventional Commit since the last tag and picks the highest bump:
+
+| Commit | Bump | Example |
+| --- | --- | --- |
+| `feat!:` / `type!:` / a `BREAKING CHANGE:` footer | **major** | `1.4.2 → 2.0.0` |
+| `feat:` | **minor** | `1.4.2 → 1.5.0` |
+| `fix:` / `perf:` / `refactor:` / `revert:` | **patch** | `1.4.2 → 1.4.3` |
+| only `docs:` / `chore:` / `style:` / `test:` / `ci:` / `build:` or untyped commits, or no commits since the tag | **none** | no release |
+
+## Commit titles that carry the version
+
+- **Every PR title** uses a Conventional Commit subject: `type(scope): summary`. PRs are **squash-merged**, so the PR title becomes the single commit on the base branch — the exact line release-please reads to pick the next version.
+- **`cckit pr` generates a conventional title for you** — it derives the `type` from the issue's `kind:` label (`kind:feat` and `kind:task` → `feat`, `kind:fix` or a `bug` label → `fix`, `kind:chore` → `chore`, `kind:ci` → `ci`; the other kinds → `feat`) and strips the `[Effort N] M ·` / `[Tag]` prefix from the issue title. Pass a summary that is *already* a Conventional Commit subject (e.g. `cckit pr <issue> "fix: guard the empty case"`) to override the derived type when you know the change's true nature. A CI check on the title keeps a non-conventional one from merging; cckit's own is described in [How cckit itself is released](/releasing-cckit/#the-title-check-in-ci).
+- **`cckit effort pr` does the same for an effort PR** — `type(scope): name [#N]`, with the scope from the effort's `flow:` label and the type from `--type` or the `kind:` label (default `feat`). It refuses to open a PR whose title fails the title check CI runs, so an effort PR never needs a manual retitle to merge.
+- **Breaking changes** use `!` after the type/scope **or** a `BREAKING CHANGE:` footer — never a silent major.
+- **One logical change per PR** so the generated release notes read cleanly.
+
+## Release your project
+
+This assumes the usual two-branch setup: work integrates on a base branch such as `develop`, and
+releases are cut from `main`.
+
+### 1. Merge work into the base branch all week
+
+<Chat
+  title="opening a pull request whose title carries the version"
+  say="The opening hours section is done. Open the pull request."
+  ran='cckit pr <issue> "<summary>"'
+  means="Every pull request cckit pr opens has a title release-please can read. Nothing ships."
+>
+  The pull request for the hours section is open. Its title is a Conventional Commit subject, so
+  the version can be read from it later.
+</Chat>
+
+### 2. Promote a batch
+
+<Chat
+  title="promoting the week's work to the release branch"
+  say="That is enough for the launch. Open the pull request that promotes develop to main."
+  ran='cckit pr <issue> "<summary>" --base main'
+  means="From a branch cut from the base branch. An explicit --base wins over github.baseBranch, and the labels, milestone and board steps run as for any other pull request. KIT_BASE_BRANCH=main set for that one command also targets main; --base is the form to use because it is explicit and is not inherited by later commands."
+>
+  The promotion pull request is open against `main`.
+</Chat>
+
+### 3. Let release-please keep the release pull request
+
+Add its GitHub Action to your repository, following
+[release-please's own instructions](https://github.com/googleapis/release-please), in a workflow
+that runs on every push to the release branch. It opens one release pull request and rewrites it as
+more work lands. A workflow file is a change a person reviews and merges; no agent merges it alone.
+
+### 4. Merge the release pull request
+
+<Chat
+  title="releasing version 1.0.0 of the Bakery site"
+  say="The bakery goes online today. Merge the release pull request."
+  ran="cckit merge <pr>"
+  means="That merge is the release: release-please tags the version and writes the GitHub Release."
+>
+  The release pull request is merged. release-please tags the version and writes the GitHub
+  Release.
+</Chat>
+
+**How to check it worked:** the tag exists on the release branch and the GitHub Release lists the
+changes since the last one.
+
+A batch with only `chore` and `docs` commits produces no release pull request. Because the release
+is one pull request merge, two feature pull requests merging at once cannot race each other into
+the same tag.
+
+## Hotfix to the release branch
+
+A fix that cannot wait for the next `develop` → `main` promotion goes to `main` on its own. It lands
+on `develop` first, through the normal flow; then one command carries it across:
+
+<Chat
+  title="carrying a price fix to the release branch"
+  say="The menu price fix is merged on develop. Carry it to the release branch too."
+  ran={[
+    "cckit hotfix <pr>",
+    "cckit hotfix <sha>",
+    "cckit hotfix <pr> --base release/1.x",
+  ]}
+  means="The first takes a merged pull request by number, the second a commit, the third a release branch other than main."
+>
+  The fix is picked onto a branch cut from the release branch, and a pull request against it is
+  open.
+</Chat>
+
+<Outcomes of="cckit hotfix">
+
+| Step | What happens |
+| --- | --- |
+| Source | A digits-only argument is a PR number: its merge commit and title are read from GitHub, and an unmerged PR is refused. Anything else is a commit; its PR number is read from a squash `(#N)` suffix or a `Merge pull request #N` subject. |
+| Worktree | `.claude/worktrees/fix+<N>-hotfix-<base>` on branch `fix/<N>-hotfix-<base>`, cut from `origin/<base>`. A commit that names no PR gets `fix/hotfix-<sha7>-<base>`. |
+| Pick | `git cherry-pick -x`, with `-m 1` for a merge commit, so the branch carries the source commit's diff and its message records where it came from. A PR that was rebase-merged has no single commit carrying it (GitHub reports its last rebased commit as the merge commit), so each of its commits is picked, oldest first. It is recognized by the PR's commit subjects sitting unchanged under that commit; a PR whose commits cannot be read is refused, and a commit sha still works as the source. |
+| Push | `git push`, with `KIT_PR_BASE=<base>` in the environment of the git pre-push hook. |
+| PR | Opened against `<base>`, titled after the source PR (or the commit subject without its `(#N)` suffix), body `Cherry-pick of #N`. It has no `Closes` line: the issue was closed by the source PR. |
+
+</Outcomes>
+
+The command is re-runnable. A commit already picked is not picked again, and a PR already open for
+the branch is reported instead of re-created. If the pick conflicts, nothing is pushed: resolve it
+in the worktree, run `git cherry-pick --continue` there, and run the same `cckit hotfix` again. A
+change `origin/<base>` already carries is refused, and the worktree it made is removed.
+
+With `--llm` the result is one JSON object (`ok`, `url`, `worktree`, `detail`). A refusal or a
+conflict exits non-zero with `ok: false` and the reason in `detail`.
+
+For a hotfix that is new work, not a cherry-pick, branch from the release branch by hand and open the
+PR with `cckit pr <issue> "<summary>" --base main`.
+
+The hotfix PR's title becomes the squash commit release-please reads on `main`, so a `fix:` source
+produces a patch release there. Merge it with `cckit merge <pr>`.
+
+## How cckit itself is released
+
+`cckit release`, the benchmark check that can refuse it, publishing to npm and Homebrew, and the
+docs site deploy all act on the cckit repository. `cckit release` always runs from cckit's install
+root, whatever folder you call it from. They are described for maintainers in
+[How cckit itself is released](/releasing-cckit/).

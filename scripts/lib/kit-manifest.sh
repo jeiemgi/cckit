@@ -11,7 +11,7 @@
 # Source it:  source scripts/lib/kit-manifest.sh
 # Requires: jq + a sha256 tool (shasum -a 256 | sha256sum).
 #
-# Manifest shape (.claude/kit.manifest.json):
+# Manifest shape (.claude/kit.manifest.json; .cckit/kit.manifest.json in a Codex-only project):
 #   {
 #     "schema": 1,
 #     "entries": {
@@ -23,8 +23,14 @@
 
 # --- location -------------------------------------------------------------
 # Manifest lives at the project root's .claude/kit.manifest.json. Override with KIT_MANIFEST.
+# A Codex-only project has no .claude/ tree, so `cckit init --adapter codex` creates the manifest at
+# .cckit/kit.manifest.json instead (E257.3). It is found here by existence, and it stays there if the
+# Claude adapter is enabled later — the manifest never moves once a project has one.
 kit_manifest_path() {
   if [ -n "${KIT_MANIFEST:-}" ]; then printf '%s\n' "$KIT_MANIFEST"; return 0; fi
+  if [ ! -f ".claude/kit.manifest.json" ] && [ -f ".cckit/kit.manifest.json" ]; then
+    printf '%s\n' ".cckit/kit.manifest.json"; return 0
+  fi
   printf '%s\n' ".claude/kit.manifest.json"
 }
 
@@ -71,6 +77,32 @@ kit_manifest_record() {
   jq --arg p "$relpath" --arg h "$hash" --arg t "$tier" --arg o "$op" --arg v "$ver" --arg ts "$ts" \
      '.entries[$p] = {hash:$h, kitVersion:$v, tier:$t, op:$o, ts:$ts}' "$mf" > "$tmp" \
      && mv "$tmp" "$mf" || { rm -f "$tmp"; return 1; }
+}
+
+# kit_manifest_record_batch [op] [kitVersion] [ts]  — stdin: one "<tier>\t<relpath>" per line.
+# Records every listed file that exists, hashing its CURRENT content, in ONE manifest rewrite
+# (kit_manifest_record costs a jq run per file; init writes dozens). A path already in the manifest
+# is updated in place, so recording the same file twice never yields two entries.
+kit_manifest_record_batch() {
+  _kit_manifest_require || return 1
+  local op="${1:-wire}" ver="${2:-${KIT_VERSION:-0.0.0}}" ts="${3:-}" mf tier rel hash rows="" tmp tab
+  tab="$(printf '\t')"
+  mf="$(kit_manifest_path)"; kit_manifest_init || return 1
+  if [ -z "$ts" ]; then ts="$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo unknown)"; fi
+  while IFS="$tab" read -r tier rel; do
+    [ -n "$rel" ] || continue
+    case "$tier" in A|B) ;; *) echo "kit-manifest: tier must be A or B (got '$tier')" >&2; return 1;; esac
+    [ -f "$rel" ] || continue
+    hash="$(kit_manifest_hash "$rel")" || return 1
+    rows="${rows}${tier}${tab}${rel}${tab}${hash}
+"
+  done
+  [ -n "$rows" ] || return 0
+  tmp="$(mktemp)" || return 1
+  printf '%s' "$rows" | jq -Rn --arg o "$op" --arg v "$ver" --arg ts "$ts" --slurpfile m "$mf" '
+      reduce (inputs | select(length > 0) | split("\t")) as $r ($m[0];
+        .entries[$r[1]] = {hash:$r[2], kitVersion:$v, tier:$r[0], op:$o, ts:$ts})' > "$tmp" \
+    && mv "$tmp" "$mf" || { rm -f "$tmp"; return 1; }
 }
 
 # kit_manifest_get <relpath> -> the entry JSON (or empty + rc 1 if untracked)

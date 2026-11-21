@@ -1,0 +1,225 @@
+---
+title: "Run a UX audit"
+description: "Have the UX agent review flows, design-system consistency and accessibility across the app, and read its report."
+tutorial:
+  job: run a UX audit of a front-end app and read its report
+  difficulty: intermediate
+  time: "10 min"
+  prerequisites:
+    - { text: "cckit is installed and set up in this project", link: "Set it up", href: "/getting-started/initialize/" }
+    - "The project is a component front-end: Next.js, React Router v7, Vite React or Vue"
+    - "Claude Code is installed in this project"
+    - "`jq` and `perl` are installed"
+  ogTag: Design
+  keywords: [ux audit ai agent, design system consistency audit, accessibility source audit]
+  related: [design/annotate-the-ui, development/browser-debug, project-management/break-a-feature-into-an-effort]
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import TagRow from '../../../components/TagRow.astro';
+import TutorialMeta from '../../../components/TutorialMeta.astro';
+import TutorialSchema from '../../../components/TutorialSchema.astro';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
+
+<TagRow kinds={["skill", "conversational"]} />
+
+<TutorialMeta />
+
+An app built one issue at a time drifts. The same record ends up editable from three screens, a
+frequent action sits five clicks deep, one page uses a hand-made card where the rest use the
+shared one. Nobody decided any of it, and no single pull request shows it.
+
+A UX audit looks at the whole app at once. The `kit-ux-audit` skill builds a map of the app
+(routes, screens, components, the data they read and write, the forms), has the UX agent judge
+that map against a fixed list of checks, and writes one report you can read in a browser.
+
+**What you will have at the end:** the file `UX_FLOW_REPORT.html` in the app's directory, with
+findings ranked by severity, each one naming the screens involved, the evidence and a fix.
+
+## What it checks
+
+The audit has three lanes. Run one, or all three into the same report.
+
+| Lane | Question it answers | Checks |
+| --- | --- | --- |
+| `flows` | Where is the app confusing to move through? | 12 |
+| `consistency` | Where does the interface ignore its own design system? | 6 |
+| `a11y` | Where is the markup inaccessible? | 5 |
+
+- **`flows`** looks for the same data editable from several screens, a deep path to a frequent
+  action, a screen nothing links to, a heavy form, a create form that differs from its edit form,
+  an unguarded delete, and the risk of losing data when you navigate away.
+- **`consistency`** looks for hand-made versions of shared components, shared components
+  restyled in place, sibling screens whose layouts drift apart, and CSS nothing uses.
+- **`a11y`** looks for click handlers on non-interactive elements, images and icons with no text
+  alternative, controls with no label, missing headings and landmarks, and focus or keyboard
+  problems.
+
+In every lane a script finds the candidates and the UX agent judges them. The scripts call no
+model and need no API key.
+
+## 1. Preview the run
+
+<Chat
+  title="previewing a UX audit of the Bakery site"
+  say="Before you run anything, show me what a UX audit of the Bakery site would cover."
+  ran="/kit-ux-audit --lane all --dry-run"
+  means="A dry run changes nothing. It only prints what the audit would do."
+>
+  The audit would cover all three lanes (flows, consistency and accessibility) on the Bakery site.
+  Nothing has been run.
+</Chat>
+
+<Outcomes title="What a dry run prints, and how to pick the app">
+
+A dry run prints the lane, the app it would audit, where the map comes from and the checks it
+would run, then stops. In a repository with several front-end apps the skill asks which one; name
+it with `--app <name>` or `--path <dir>`.
+
+</Outcomes>
+
+## 2. Run the audit
+
+<Chat
+  title="running a UX audit of the Bakery site"
+  say="Run a UX audit of the Bakery site: flows, design-system consistency and accessibility. Open the report when it is done and show me the top findings."
+  ran="/kit-ux-audit --lane all"
+  means="The report is one file in the app's directory. The audit files no issues."
+>
+  The audit is done and the report is open. The top finding is on the contact form: the message
+  field has no label.
+</Chat>
+
+For the `consistency` lane the skill needs to know where your shared components and theme live.
+Pass them, or let it ask:
+
+<Chat
+  title="pointing the consistency lane at the Bakery site's shared components"
+  say="Check the consistency lane again. The shared components are in the ui barrel and the theme is theme.css."
+  ran="/kit-ux-audit --lane consistency --primitives <ui-barrel> --css <theme.css>"
+  means="Without these two the lane reads the default location, packages/ui/src/index.ts, and may find little."
+>
+  The consistency lane ran against the barrel and the theme file you named.
+</Chat>
+
+## 3. Read the report
+
+The skill opens `UX_FLOW_REPORT.html` and prints its `file://` address as the last line of the
+reply. Findings are grouped by severity, highest first. Each finding says where it is, why it slows
+people down, the evidence and the fix. A section named "Candidates for visual review" lists what
+the agent could not confirm from the source.
+
+<Outcomes title="The four severities">
+
+| Severity | Meaning |
+| --- | --- |
+| `crit` | blocks a core task or risks data loss |
+| `p1` | frequent friction |
+| `p2` | a problem in one place |
+| `p3` | polish |
+
+</Outcomes>
+
+## 4. Answer the open calls
+
+The skill ends by asking you about anything that is a decision: which of two competing treatments
+wins, how to split the work. A visual decision goes to the designer agent.
+
+## 5. Turn findings into work
+
+<Chat
+  title="turning the contact form findings into work"
+  say="The contact form findings touch several files. Plan them as one effort, with a step for the labels and a step for the error messages."
+  ran='cckit effort new "Fix the contact form" "Label the fields :: every input has a visible label" "Show form errors :: say what went wrong"'
+  means="The audit files no issues. For one screen or one component, start a single issue and fix it in its own working copy instead."
+>
+  The effort is created with one sub-issue for the labels and one for the error messages.
+  [Break a feature into an effort](/project-management/break-a-feature-into-an-effort/) takes it
+  from here.
+</Chat>
+
+## Check it worked
+
+- `UX_FLOW_REPORT.html` exists in the audited app's directory and opens in a browser.
+- The run facts at the top of the report name the lane, the target path and the graph source.
+- After a consistency fix, re-run the lane on the same scope. The pass is done when no shared
+  component is restyled in place for a visual reason and no hand-made copy remains outside the UI
+  package.
+
+## Who does the judging
+
+The **UX agent** receives slices of the map as compact data, not source files. It applies every
+check of the lane, cites the screen or `file:line` behind each finding, and opens at most 12
+source files to confirm one. When a verdict needs something the map does not show, it marks the
+finding for visual review. It does not assert it.
+
+The UX agent does not make visual decisions and does not write component code. A new visual value
+goes to the **designer**; an implementation with existing tokens goes to the **frontend** agent.
+See [Why design has one owner](/design/).
+
+No profile installs the UX agent. The skill starts it from the role cckit ships.
+
+## How it works
+
+The map comes from one of two places. If the project already has a graph built by graphify
+(`graphify-out/graph.json`), the skill uses it. If not, `scripts/ux-graph-scan.sh` builds an
+approximate one by matching patterns in the source. The report says which was used. The skill
+never rebuilds a graphify graph unless you pass `--rebuild-graph`.
+
+The `consistency` and `a11y` lanes read lists produced by `scripts/ux-ds-audit.sh` and
+`scripts/ux-a11y-scan.sh`. Both find candidates and decide nothing.
+
+`--visual` is the one option that looks at the running app. For the `crit` and `p1` findings
+marked for visual review, up to 8, it opens the screen in a browser, takes a screenshot and places
+it in the report. It needs the app running. Without the flag the audit is text only.
+
+## Limits
+
+- **It reads structure, not pixels.** For a critique of how one screen looks, ask the designer
+  agent, or [annotate the running interface](/design/annotate-the-ui/).
+- **The fallback map is approximate.** It is pattern matching over TypeScript, JSX and Vue files,
+  not a parser. Findings built on it lean on structure and say so in the report.
+- **The accessibility lane is a source check.** It does not replace an axe or Lighthouse run
+  against the rendered app. [`cckit debug`](/development/browser-debug/) can run Lighthouse for an
+  agent.
+- **It targets component front-ends:** Next.js, React Router v7, Vite React and Vue. With no such
+  app in the repository the skill stops.
+
+## Troubleshooting
+
+**"No component front-end found".** The skill found no package with `react`, `next` or `vue` and
+a `dev` script. Point it at the app with `--path <dir>`.
+
+**The report says "graph source: deterministic scan (approximate)".** No graphify graph exists,
+so the fallback ran. The findings stand. For a richer map, build a graphify graph of the app and
+run the audit again.
+
+**The consistency lane found little.** It read the default location for shared components,
+`packages/ui/src/index.ts`. Pass your own with `--primitives`, and the theme file with `--css`.
+
+**A script stops with "jq required" or "perl required".** Install the missing tool and re-run.
+
+## Related guides
+
+<CardGrid>
+  <LinkCard title="Annotate the running interface" href="/design/annotate-the-ui/" description="Point at one element in the running app and have it fixed." />
+  <LinkCard title="Break a feature into an effort" href="/project-management/break-a-feature-into-an-effort/" description="Where a finding that spans many files becomes planned work." />
+  <LinkCard title="Let the agent see the page" href="/development/browser-debug/" description="Screenshots, console logs and Lighthouse against the running app." />
+</CardGrid>
+
+<TutorialSchema
+  steps={[
+    { name: 'Preview the run', text: '/kit-ux-audit --lane all --dry-run prints the lane, the target app, the graph source and the checks, then stops.' },
+    { name: 'Run the audit', text: 'Drop --dry-run, or ask for a UX audit in plain words. The consistency lane takes --primitives and --css.' },
+    { name: 'Read the report', text: 'The skill opens UX_FLOW_REPORT.html, with findings grouped by severity: crit, p1, p2, p3.' },
+    { name: 'Answer the open calls', text: 'The skill asks about each decision. A visual decision goes to the designer agent.' },
+    { name: 'Turn findings into work', text: 'The audit files no issues. Plan an effort for a finding that spans many files, or start one issue for a single screen.' },
+  ]}
+  faqs={[
+    { q: 'Does the UX audit need an API key?', a: 'No. The detection scripts call no model, and the fallback graph is built by pattern matching.' },
+    { q: 'Does the audit look at the running app?', a: 'Only with --visual, which screenshots up to 8 of the most severe findings marked for visual review. Without it the audit reads source.' },
+    { q: 'Does the accessibility lane replace axe or Lighthouse?', a: 'No. It is a source check. A run against the rendered app still belongs on the list.' },
+    { q: 'Does the audit create GitHub issues?', a: 'No. Findings are analysis. You turn them into an effort or an issue.' },
+  ]}
+/>

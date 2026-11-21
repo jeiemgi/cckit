@@ -42,11 +42,11 @@ have to be true, the human-facing text carries the token and the machine-readabl
 Two concrete cases, both of which a token would break:
 
 - **The `## Relations` mirror — `- Depends on #N`.** `_eff_relations_add`
-  (`scripts/lib/effort-ops.sh:66`) is the one formatter for that line, and it matches an existing
-  one with `want = "- Depends on #" dep` (line 68). `effort_chain` re-checks it with
-  `grep -qE "^[[:space:]]*- Depends on #${prev}[[:space:]]*$"` (line 400) before writing through the
+  (`scripts/lib/effort-ops.sh:84`) is the one formatter for that line, and it matches an existing
+  one with `want = "- Depends on #" dep` (line 86). `effort_chain` re-checks it with
+  `grep -qE "^[[:space:]]*- Depends on #${prev}[[:space:]]*$"` (line 445) before writing through the
   same formatter. That literal match is what makes a re-run idempotent instead of appending a
-  duplicate line — a tested behavior (`effort-ops-test.sh:194`, "relations_add is idempotent (same
+  duplicate line — a tested behavior (`effort-ops-test.sh:370`, "relations_add is idempotent (same
   line twice)"). The blocker is often an effort, so a chained effort body legitimately contains a
   bare `#N` pointing at one.
 - **GitHub's own syntax — `Closes #N`, `blocked_by`.** GitHub parses these to link and auto-close;
@@ -61,14 +61,15 @@ parenthetical is GitHub's, not a person's, and it stays as GitHub writes it.
 ## Why `E241.2` and not the sub's own number
 
 `E241.2` is derivable from what you are already looking at. The sub's title says effort 241,
-step 2 — so you can act on it without first resolving `#243`. That is the whole point: the
-identifier you read is the identifier you type.
+step 2 — so you can act on it without first resolving `#243`. The identifier you read is the
+identifier you type.
 
 ```shell
 cckit start E241.2      # not: cckit start 243
 ```
 
-Both resolve to the same worktree. The number still works; `E241.2` is what you can remember.
+That is this rule's target, not today's CLI: `wt_start` (`scripts/lib/worktree-start.sh`) passes its
+argument to `gh issue view` as the issue number and parses no token. Until it does, type `243`.
 
 ## PR titles
 
@@ -91,6 +92,9 @@ chore(security): update docs-site deps to clear Dependabot alerts [#249]
 **Enforced now:** `effort_pr_title_check` (`scripts/lib/effort.sh`) requires a `[#<num>]` token —
 the exact `[#num]` when given a number, otherwise any `[#digits]` — and `effort_pr` refuses to open
 a PR without it. That check runs on **effort PRs only**; standalone task PRs are unchecked.
+`effort_pr_title` generates the conventional form above, `type(scope): <name> [#<num>]`, and under
+`pr.titleStyle: conventional` (the default) `effort_pr` also refuses, before calling `gh`, a title
+that `commitlint_check` (`scripts/lib/commitlint.sh`) rejects.
 
 **This rule targets** `[E<n>]` / `[E<n>.<step>]` on effort and sub PRs, and the check extended to
 every PR. Until that ships, `[#<num>]` is correct and `effort_pr` will keep generating it.
@@ -130,8 +134,6 @@ segment before the first `-` is `e241.2`, not digits — and a branch with no is
 That regression has happened before in this repo; see the comment block in
 `scripts/lib/worktree-issue.sh` explaining why sub-branch parsing exists at all.
 
-The token belongs where humans read. Branch names are where tooling parses safety.
-
 ## Chains
 
 A chain is a linear dependency between steps of one effort, written with `→`:
@@ -161,22 +163,26 @@ nobody consumes.
 | Prefix | Values | Read by | Purpose |
 | --- | --- | --- | --- |
 | `priority:` | `p0` `p1` `p2` `p3` | `pm_prio_sort` (wave ordering) | urgency within a wave |
-| `ctx:` | `S` `M` `L` `XL` | `_ep_weight` (session budget) | how much of a session it costs |
+| `ctx:` | `S` `M` `L` `XL` | `_ep_weight`, `_pm_weight` (session budget) | how much of a session it costs |
 | `flow:` | `core` `docs` … | effort dispatch | which flow owns it |
 | `role:` | `tech-lead` `docs` … | delegation brief | who it is written for |
-| `kind:` | must discriminate | board grouping | what sort of work it is |
+| `kind:` | `feat` `fix` `task` `chore` `security` `scaffold` `ci` `adr` `spike` `plan`; content kinds `post` `campaign` `brand` `research` | `wt_start` (branch prefix), `kto_pr_title` (commit type) | what sort of work it is |
 | `agent:` | one per declared profile | `ap_profile_from_labels` | which agent profile runs the work |
 | `slug:` | one per effort | `effort_slug_resolve` | resolve a name to an effort |
 
 ### Rules
 
-- **A label must vary.** `kind:task` on every issue in the repo's history tells you nothing.
-  Either give `kind:` real values or drop it.
+- **A label must vary.** `kind:task` on every issue tells you nothing. `kind:` is a closed set
+  (`KIT_KINDS`, `scripts/lib/kinds.sh`), the same one `rules/branch-naming.md` allows as a branch
+  prefix, because `cckit start` cuts `<kind>/<N>-<slug>` from the label. Set it with
+  `cckit new --kind` or `cckit effort new --kind`; a label outside the set starts on `task/`. A content kind (`KIT_CONTENT_KINDS`) is a label only: it starts on the prefix `kit_kind_branch` maps it to and titles its PR `docs:`.
 - **A label must be read.** If nothing consumes it, delete the label *and* the code that writes
-  it. `par:seq|wide|<n>` was written by `effort_new` and read by nothing.
-- **Every value in a scale needs a label.** `_ep_weight` scores `XL=8` and falls back to `2` for
-  anything unknown, so an `XL` effort with no `ctx:XL` label silently weighs the same as an `M`.
-  A scale the code knows but the board cannot express is a scale that quietly misreports.
+  it. `par:seq|wide|<n>` was written by `effort_new` and read by nothing, so both were removed.
+- **Every value in a scale needs a label.** `scripts/setup-labels.sh` provisions all four `ctx:`
+  values. A scale the code knows but the board cannot express quietly misreports: `ctx:XL` weighs 8
+  and had no label, so an `XL` effort was planned at the fallback weight of 2, the same as an `M`.
+  The fallback is still 2, and it is now named: an issue with no `ctx:` label shows `?` in the
+  plan, and a value outside the scale warns on stderr.
 - **Do not create per-item labels beyond `slug:`.** They grow without bound and match one issue
   each, which makes them useless as a board axis. `agent:<profile>` is not one of these: it is
   bounded by the profiles the config declares, and `scripts/setup-labels.sh` provisions exactly

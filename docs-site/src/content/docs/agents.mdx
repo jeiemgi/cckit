@@ -11,7 +11,7 @@ import TagRow from '../../components/TagRow.astro';
 
 Drive the whole GitHub work lifecycle from any agent that can run a shell — read the board, start an issue, open a pull request — all in machine-readable output.
 
-cckit is agent-agnostic. Claude Code is first-class (skills and slash commands), but the contract is a plain CLI. Any agent that can run a shell and parse text can run it. The full contract lives in `AGENTS.md` at the repo root.
+cckit is agent-agnostic. Claude Code is first-class (skills and slash commands), but the contract is a plain CLI. The full contract lives in `AGENTS.md` at the repo root.
 
 ## The one rule that makes it agent-friendly
 
@@ -19,15 +19,13 @@ Every verb takes `--llm`. Append it to any command and the verb switches from pr
 
 - **Uniform results come back as TOON.** TOON is a compact text format for uniform lists — the board, the wave plan, the next-issue set. It is smaller than JSON, so it costs fewer tokens in an agent's context.
 - **Single-result verbs come back as one JSON object** on stdout (the pretty text goes to stderr).
-- **Human output is markdown**, rendered through the `cckit render` seam — `glow` on a terminal, verbatim text when piped. So the same verb reads well to a person and parses cleanly to a machine.
+- **Human output is markdown**, rendered through `cckit render` — `glow` on a terminal, verbatim text when piped.
 
 <Aside type="note" title="New here? What an agent is">
 An agent is a program that runs commands on your behalf — Claude Code is one. cckit does not contain a model. It hands the agent commands to run, and the agent runs them. That is why cckit works with any agent: it only ever speaks shell.
 </Aside>
 
 ## Ground rules
-
-These five rules keep an agent's work safe and repeatable.
 
 - **Read state before acting.** `cckit sync --llm` returns the board. Decide from the data, never guess.
 - **One issue = one branch = one worktree = one PR.** `cckit start <issue>` creates the isolated worktree; do all the work there; `cckit pr <issue>` opens the pull request. Never commit to the base branch.
@@ -64,19 +62,61 @@ object — there's nothing to tabulate.
 | Find the next unblocked issue | `cckit next --llm` | **TOON** |
 | Get the wave plan | `cckit plan --llm` | **TOON** |
 | Get the fan-out brief | `cckit wave --llm` | **TOON** |
+| Collect a wave's results | `cckit orchestrate --results --llm` | JSON (one array) |
 | Start an issue | `cckit start <issue>` | JSON (one object) |
-| Open the PR | `cckit pr <issue> "<summary>"` | JSON (one object) |
+| Open the PR | `cckit pr <issue> "<summary>" [--base <branch>]` | JSON (one object) |
 | Close the issue | `cckit close <issue> "<summary>"` | JSON (one object) |
 | Render markdown to a terminal | `cckit render` | — |
 
-So the loop is **read in TOON, act in JSON**: pull state cheaply as TOON, then fire the one-shot
-action verbs. An agent that stays on the `--llm` reads spends a fraction of the tokens that scraping
-human output or re-fetching JSON would cost.
+So the loop is **read in TOON, act in JSON**.
 
+
+## Specialist agents, per runtime
+
+`cckit init` installs one specialist per profile role, and both runtimes get the same role. The
+source is one file, `templates/agents/<role>.md`.
+
+| | Claude Code | Codex |
+| --- | --- | --- |
+| Installed as | `.claude/agents/<role>/AGENT.md` | `.codex/agents/<role>.toml` |
+| Role text | the template's markdown body | the same body, as `developer_instructions` |
+| `description` | frontmatter `description` | `description` + `when_to_use` |
+| `tools:` allowlist | enforced by Claude Code | not translated — written as a TOML comment |
+| `skills:` | preloaded by name | listed in the instructions |
+
+Two lints in `scripts/check.sh` read the templates. `scripts/agent-skills-lint.sh` fails on a
+`skills:` entry that is neither a skill cckit ships (`skills/`, `templates/skills/`), a
+`plugin:skill` reference, nor a line in `scripts/agent-skills-external.txt` — see
+[Lint gates: baselines](/config-and-permissions/#agent-skills-lint--every-agent-skill-resolves). A line in
+that file is a statement that the name is intended; it does not check that the skill is installed
+on your machine. `scripts/agent-template-lint.sh` fails on a template whose `name:` is not its file
+name or whose `description:` is empty, the two fields Codex refuses a custom agent without.
+
+### Role identity
+
+An issue's `role:<slug>` label names the role the work is written for. `cckit pr` and
+`cckit effort pr` turn that slug into three things: a `Co-authored-by` trailer on the commit
+(`Editor (agent) <editor@agents.local>` — a synthetic address, not an inbox), a signature line at
+the end of the pull request body, and the board's Role option when Projects v2 is on.
+
+The slug resolves to a display name in two steps (`role_display`, `scripts/lib/role-identity.sh`):
+
+1. a fixed list covering every role the shipped profiles declare — `pm`, `tech-lead`, `designer`,
+   `devops`, `backend`, `frontend`, `qa`, `security`, `editor`, `researcher`, `analyst`,
+   `automation`, `generalist`;
+2. the project's own `roles` in the config: `"Brand Lead"` answers for the slug `brand-lead`.
+
+A slug neither step knows gets no trailer and no signature.
 
 ## Model endpoint
 
 cckit shells out to whatever agent invokes it; it does not embed a model. For the few verbs that synthesize text (digests, ingest), the model endpoint is set through environment variables.
+
+The effort-close judge reads an OpenAI-compatible endpoint from `CCKIT_MODEL_URL` (base URL; it
+POSTs to `<value>/chat/completions`), `CCKIT_MODEL` (model name) and `CCKIT_MODEL_TOKEN` (bearer
+token). A project with its own variables names them in the config instead — `model.urlEnv`,
+`model.modelEnv`, `model.tokenEnv` hold env var **names**, never values. See
+[Model endpoint for the effort judge](/config-and-permissions/#model-endpoint-for-the-effort-judge).
 
 Nothing in cckit picks a model — not `ctx:S|M|L|XL` (which estimates session size), not `role:*`
 (which records responsibility), and not the config schema. An **agent profile** declares a spend

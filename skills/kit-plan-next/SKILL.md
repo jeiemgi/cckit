@@ -20,9 +20,8 @@ Answer one question: **given everything the kit can already do, what is the high
 effort?** This wraps the `cckit plan-next` verb (the engine — never re-author its logic here;
 kit-engine-boundary) and turns its proposals into a scoped effort via `/kit-effort-new`.
 
-The verb introspects the CURRENT capability surface at runtime, so the plan is always consistent
-with what ships today — planning pre-grounded in current docs/skills/rules means the executing agent
-burns fewer tokens rediscovering context.
+The verb reads the CURRENT skills, commands, rules and docs at runtime, so the plan reflects what
+ships today.
 
 ## CRITICAL — context-anxiety rule
 
@@ -44,13 +43,18 @@ if you need to reason over the proposals structurally — but keep that output o
 context.
 
 Run it from the cckit repo for a full inventory, or from a host project where the kit is installed —
-there it degrades gracefully to whatever capability dirs exist (host docs only) and never crashes.
+there it inventories whatever capability dirs exist (host docs only).
 
 ## 2. Choose with the human
 
 Surface the proposals as a short, visual summary — lead with the human-meaningful outcome of each
 item (its `proposal`), not the verb noise. Confirm which one to pursue. Do not invent scope beyond
 what the inventory supports.
+
+Choosing between proposals is a **decision**: when `cckit page mode` prints `page`, present them as
+a review page with one recommendation and collect the choice there (`/kit-page`). When it prints
+`terminal`, show the same summary in the terminal. Either way, record the choice with
+`cckit page answer --kind decision` once it is made.
 
 ## 3. Hand off to /kit-effort-new
 

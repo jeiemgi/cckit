@@ -4,7 +4,7 @@
 #
 # Autopilot has two halves. `orchestrate`/`autopilot` LAUNCH the per-issue flows; the captain CLOSES
 # them — it inspects each PR, decides (CLEAN / CONFLICTING / CHECKS_FAILING / CHECKS_PENDING /
-# CHECKS_MISSING / DRAFT / BLOCKED), merges what is ready, and lets the freshly-merged issues unblock
+# CHECKS_MISSING / REVIEW_* / QA_* / DRAFT / BLOCKED), merges what is ready, and lets the freshly-merged issues unblock
 # the next wave. This is the half that used to be left to the driving agent; now it is a script the
 # agent (or `cckit watch`) runs in a loop.
 #
@@ -97,7 +97,38 @@ cap_review_summary() {
     || echo NONE
 }
 
-# cap_classify <mergeable> <mergeStateStatus> <checksSummary> — pure verdict for one PR.
+# cap_qa_summary <head-sha> — collapse a `qa` receipt (stdin, the one `cckit qa verdict` writes) to
+# FAIL / PASS / NONE. Same reading as cap_review_summary, with one difference: an EMPTY head is
+# NONE, not "skip the check". qa_verdict_state reads a verdict nobody can compare against a commit
+# as stale, and every qa receipt carries head_sha (qa_verdict refuses to record without one), so
+# there is no head-less legacy receipt to stay readable for.
+cap_qa_summary() {
+  local head="${1:-}"
+  [ -n "$head" ] || { cat >/dev/null; echo NONE; return 0; }
+  cap_review_summary "$head"
+}
+
+# cap_qa_required <labels-space> — echo 1 when a PR carrying <labels> must have a QA pass, else 0.
+# Pure: reads two env values the config bridge fills (env wins over config, as everywhere here).
+#   KIT_CAPTAIN_REQUIRE_QA=1     every PR needs one
+#   KIT_CAPTAIN_QA_LABELS="a b"  a PR carrying ANY of these labels needs one
+# The label list is the per-flow opt-in: effort PRs inherit the parent's labels, so `flow:ui` there
+# requires QA for that thread and leaves every other PR alone; a per-PR label works the same way.
+# Labels arrive space-joined (captain_gate), so a label whose name contains a space cannot be listed.
+cap_qa_required() {
+  local labels="${1:-}" l
+  case "${KIT_CAPTAIN_REQUIRE_QA:-0}" in 1|true|yes|on) echo 1; return 0 ;; esac
+  while IFS= read -r l; do
+    [ -n "$l" ] || continue
+    case " $labels " in *" $l "*) echo 1; return 0 ;; esac
+  done <<EOF
+$(printf '%s' "${KIT_CAPTAIN_QA_LABELS:-}" | tr ' ' '\n')
+EOF
+  echo 0
+}
+
+# cap_classify <mergeable> <mergeStateStatus> <checksSummary> [<review>] [<qa>] [<qa-required>] —
+# pure verdict for one PR.
 # mergeable: MERGEABLE|CONFLICTING|UNKNOWN · mss: CLEAN|DIRTY|DRAFT|BLOCKED|BEHIND|UNSTABLE|…
 #
 # CHECKS_MISSING — "the exit criteria could not be observed". An EMPTY statusCheckRollup collapses to
@@ -123,8 +154,17 @@ cap_review_summary() {
 # Required when review.command is configured (running a reviewer IS the opt-in) or when
 # KIT_CAPTAIN_REQUIRE_REVIEW=1 / captain.mergePolicy.requireReview:true says so; env wins, as it
 # does for checks. Off in both, captain_pass prints the advisory naming the key instead.
+#
+# QA_FAILING / QA_MISSING (#300) are the same pair for the human QA verdict (`cckit qa verdict`): a
+# recorded fail on this head always blocks, a missing or stale pass blocks only when QA is required
+# for this PR. <qa-required> is 1/0 from cap_qa_required, because the requirement can depend on the
+# PR's labels; omitted, it falls back to KIT_CAPTAIN_REQUIRE_QA. Default off.
+#
+# QA_MISSING is tested AFTER REVIEW_MISSING and that order is load-bearing: rs_needs_dispatch keys
+# the reviewer dispatch on REVIEW_MISSING, so a PR that is both unreviewed and un-QA'd must read
+# REVIEW_MISSING or its reviewer never runs. It also puts the agent review ahead of the human one.
 cap_classify() {
-  local mergeable="$1" mss="$2" checks="$3" review="${4:-NONE}" require review_req
+  local mergeable="$1" mss="$2" checks="$3" review="${4:-NONE}" qa="${5:-NONE}" qa_req="${6:-}" require review_req
   case "$mss" in DRAFT) echo DRAFT; return 0 ;; esac
   case "$mergeable" in CONFLICTING) echo CONFLICTING; return 0 ;; esac
   case "$mss" in DIRTY) echo CONFLICTING; return 0 ;; esac
@@ -135,9 +175,12 @@ cap_classify() {
   # A recorded failing review outranks the requirement flag: the reviewer ran and said no. This sits
   # AFTER the check verdicts because a PR with red CI will be rewritten before the review matters.
   case "$review" in FAIL) echo REVIEW_FAILING; return 0 ;; esac
+  case "$qa" in FAIL) echo QA_FAILING; return 0 ;; esac
   # Literal case patterns only (a variable in a case pattern matches literally under zsh).
   case "${KIT_CAPTAIN_REQUIRE_CHECKS:-0}" in 1|true|yes|on) require=1 ;; *) require=0 ;; esac
   case "${KIT_CAPTAIN_REQUIRE_REVIEW:-0}" in 1|true|yes|on) review_req=1 ;; *) review_req=0 ;; esac
+  [ -n "$qa_req" ] || qa_req="${KIT_CAPTAIN_REQUIRE_QA:-0}"
+  case "$qa_req" in 1|true|yes|on) qa_req=1 ;; *) qa_req=0 ;; esac
   case "$mergeable" in
     MERGEABLE)
       # passing or no required checks, and not draft/dirty/conflicting -> ready.
@@ -145,6 +188,7 @@ cap_classify() {
         CLEAN|UNSTABLE|HAS_HOOKS|"")
           if [ "$require" = "1" ] && [ "$checks" = "NONE" ]; then echo CHECKS_MISSING; return 0; fi
           if [ "$review_req" = "1" ] && [ "$review" = "NONE" ]; then echo REVIEW_MISSING; return 0; fi
+          if [ "$qa_req" = "1" ] && [ "$qa" != "PASS" ]; then echo QA_MISSING; return 0; fi
           echo CLEAN; return 0 ;;
       esac
       echo BLOCKED; return 0 ;;
@@ -165,6 +209,8 @@ cap_action() {
     CHECKS_MISSING) echo verify ;;
     REVIEW_FAILING) echo fix ;;
     REVIEW_MISSING) echo verify ;;
+    QA_FAILING)     echo fix ;;
+    QA_MISSING)     echo verify ;;
     DRAFT)          echo wait ;;
     HELD)           echo hold ;;
     *)              echo skip ;;
@@ -277,7 +323,18 @@ _cap_load_policy_config() {
              fi ;;
     esac
   fi
+  # QA requirement (#300). requireQa is `true` (every PR), `false`, or a list of label names (only
+  # PRs carrying one of them). Either env value being set means the env decides and the key is not
+  # read, so KIT_CAPTAIN_REQUIRE_QA=0 switches a configured label list off for one invocation.
+  if [ -z "${KIT_CAPTAIN_REQUIRE_QA:-}" ] && [ -z "${KIT_CAPTAIN_QA_LABELS:-}" ]; then
+    case "$(_cap_cfg_bool "$cfg" requireQa)" in
+      true) KIT_CAPTAIN_REQUIRE_QA=1 ;; false) KIT_CAPTAIN_REQUIRE_QA=0 ;;
+      *) KIT_CAPTAIN_QA_LABELS="$(jq -r '.captain.mergePolicy.requireQa
+             | if type == "array" then map(select(type == "string")) | join(" ") else "" end' "$cfg" 2>/dev/null || echo "")" ;;
+    esac
+  fi
   export KIT_CAPTAIN_FLOORS KIT_CAPTAIN_EXTRA_GLOBS KIT_CAPTAIN_REQUIRE_CHECKS KIT_CAPTAIN_REQUIRE_REVIEW
+  export KIT_CAPTAIN_REQUIRE_QA KIT_CAPTAIN_QA_LABELS
 }
 
 # _cap_issue_of_branch <branch> — issue number a flow branch encodes (task/47-x, fix/9-y, effort/12-z).
@@ -294,12 +351,12 @@ _cap_issue_of_branch() {
 }
 
 # captain_gate <pr#> — fetch + classify one PR. Echoes
-# "pr<TAB>issue<TAB>state<TAB>action<TAB>title<TAB>reason<TAB>checks". A CLEAN PR that trips a policy
+# "pr<TAB>issue<TAB>state<TAB>action<TAB>title<TAB>reason<TAB>checks<TAB>head<TAB>qa". A CLEAN PR that trips a policy
 # floor (cap_policy_floor) is downgraded to HELD/hold so the captain never auto-merges it; `reason`
 # carries the floor that tripped (empty otherwise). `checks` is the raw rollup token (FAIL/PENDING/
 # PASS/NONE) — REPORTED, not re-decided, so captain_pass can say when a merge rests on NONE.
 captain_gate() {
-  local repo="$CAPTAIN_REPO" pr="$1" j mergeable mss checks review head issue state action title branch files labels reason
+  local repo="$CAPTAIN_REPO" pr="$1" j mergeable mss checks review qa head issue state action title branch files labels reason
   j="$(gh pr view "$pr" --repo "$repo" --json number,title,headRefName,headRefOid,mergeable,mergeStateStatus,statusCheckRollup,files,labels 2>/dev/null)" \
     || { echo "captain: cannot read PR #$pr" >&2; return 1; }
   mergeable="$(printf '%s' "$j" | jq -r '.mergeable // "UNKNOWN"')"
@@ -319,7 +376,14 @@ captain_gate() {
     review="$(sr_latest "$issue" review 2>/dev/null | cap_review_summary "$head")"
     [ -n "$review" ] || review=NONE
   fi
-  state="$(cap_classify "$mergeable" "$mss" "$checks" "$review")"
+  # The QA verdict is the same kind of local state: the `qa` receipt `cckit qa verdict` wrote for
+  # this lane, read against the PR's head so a pass on an older commit is absent, not a pass.
+  qa=NONE
+  if [ -n "$issue" ] && command -v sr_latest >/dev/null 2>&1; then
+    qa="$(sr_latest "$issue" qa 2>/dev/null | cap_qa_summary "$head")"
+    [ -n "$qa" ] || qa=NONE
+  fi
+  state="$(cap_classify "$mergeable" "$mss" "$checks" "$review" "$qa" "$(cap_qa_required "$labels")")"
   action="$(cap_action "$state")"
   reason=""
   # Policy floor: only a would-be merge is at risk, so gate only the CLEAN/merge verdict.
@@ -327,7 +391,7 @@ captain_gate() {
     reason="$(cap_policy_floor "$files" "$labels")"
     [ -n "$reason" ] && { state="HELD"; action="hold"; }
   fi
-  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$pr" "${issue:-—}" "$state" "$action" "$title" "$reason" "$checks" "$head"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$pr" "${issue:-—}" "$state" "$action" "$title" "$reason" "$checks" "$head" "$qa"
 }
 
 # _cap_open_prs [effort] — open PR numbers, optionally only those whose branch-issue is a sub of <effort>.
@@ -365,9 +429,12 @@ captain_pass() {
   CAPTAIN_MERGED=0
   _cap_load_policy_config   # bridge captain.mergePolicy from config into the floor env (env wins)
 
-  local prs pr row state action issue issue_num title reason checks head merged_any=0 unproven=0 unreviewed=0
+  local prs pr row state action issue issue_num title reason checks head qa merged_any=0 unproven=0 unreviewed=0 unqa=0 qa_stack=0
   prs="$(_cap_open_prs "$effort")"
   [ -n "$prs" ] || { echo "captain: no open PRs in scope"; return 0; }
+  # A project that declared a QA stack (`qa.command`) is the only one the un-QA'd advisory speaks to.
+  [ -n "$CAPTAIN_CFG" ] && [ -f "$CAPTAIN_CFG" ] \
+    && [ -n "$(jq -r '.qa.command // ""' "$CAPTAIN_CFG" 2>/dev/null)" ] && qa_stack=1
 
   # The braces matter: redirections are processed left to right, so `: > "$f" 2>/dev/null` attempts
   # the redirect BEFORE the suppression applies and the shell reports the failure anyway. Wrapping
@@ -384,6 +451,7 @@ captain_pass() {
     reason="$(printf '%s' "$row" | cut -f6)"
     checks="$(printf '%s' "$row" | cut -f7)"
     head="$(printf '%s' "$row" | cut -f8)"
+    qa="$(printf '%s' "$row" | cut -f9)"
     # Field 2 is a DISPLAY field carrying `—` for a PR whose branch encodes no issue. rs_issue_num
     # is what everything keying storage off it goes through — see its comment for why.
     issue_num="$issue"
@@ -401,6 +469,9 @@ captain_pass() {
         && rv="$(sr_latest "$issue_num" review 2>/dev/null | cap_review_summary "$head")"
       [ "${rv:-NONE}" = "NONE" ] && unreviewed=$((unreviewed + 1))
     fi
+    # And for QA: a would-be merge with no pass on this head, in a project that has a QA stack.
+    # A required PR never gets here (QA_MISSING -> verify), so this self-silences too.
+    if [ "$action" = "merge" ] && [ "$qa_stack" = "1" ] && [ "$qa" != "PASS" ]; then unqa=$((unqa + 1)); fi
     # Review stage (#346). Dispatch runs INSIDE this pass, before the merge decision is acted on,
     # so a PR the captain would merge gets a reviewer first. A fresh dispatch never unblocks the
     # same pass: the receipt it writes is read by the gate on the NEXT pass, which is correct —
@@ -454,6 +525,14 @@ captain_pass() {
     printf '         reviewer and requires its verdict). To require a verdict WITHOUT cckit running\n'
     printf '         the reviewer, set captain.mergePolicy.requireReview:true. Those PRs then read\n'
     printf '         REVIEW_MISSING -> verify, and the captain will not merge them.\n'
+  fi
+
+  if [ "$unqa" -gt 0 ]; then
+    printf 'captain: %s PR(s) read CLEAN with NO QA pass recorded for their head.\n' "$unqa"
+    printf '         hold them for one: captain.mergePolicy.requireQa:true in your kit config, or a\n'
+    printf '         list of labels (["flow:ui"]) to require it only for PRs carrying one (or\n'
+    printf '         KIT_CAPTAIN_REQUIRE_QA=1). Those PRs then read QA_MISSING -> verify until\n'
+    printf '         `cckit qa verdict pass` is recorded against the current head.\n'
   fi
 
   # advance: after merges, the newly-unblocked work shows up as the next wave.

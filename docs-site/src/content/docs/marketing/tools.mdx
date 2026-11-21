@@ -1,0 +1,107 @@
+---
+title: "The tools we plug in"
+description: "The tools cckit connects and what each does for you: Claude Code, GitHub, the task list, review pages, optional memory and the design skills. cckit connects them; other people make them."
+---
+
+import Outcomes from '../../../components/Outcomes.astro';
+
+Handing over a piece takes one request because a few tools are connected behind it. This page
+says what each one does for you, who makes it, and whether your team has to do anything to get it.
+cckit connects these tools; other people make them. The technical person connects
+them when the [keys are given](/marketing/get-set-up/).
+
+## What each tool does for you
+
+### Claude Code: where you hand work over
+
+Claude Code is the app you talk to, and your assistant lives in it. You describe the piece, and
+your assistant plans, writes and builds it, and keeps the task list up to date. It is made by Anthropic. Every writer needs it on their
+computer; the desktop app is enough.
+
+The marketing setup adds three written methods that your assistant follows: one for writing copy, one for
+the [brand voice](/marketing/brand-voice/) and one for
+[planning a campaign](/marketing/campaigns/). It also adds the plain-language mode, in which
+your assistant says "draft", "review" and "approve".
+
+### GitHub: where the work is kept and where you approve
+
+GitHub holds the project and its history, and it hosts the page where you read the result,
+comment and approve. It is made by GitHub. Every writer and every approver needs an account with
+access to the project. An approver needs nothing else: a browser is enough.
+
+### The task list: what you handed over and where it stands
+
+The list of pieces is kept inside the project, in a folder named `tasks/`, one small file per
+piece. This part is cckit's own. Nothing has to be installed and no extra account is needed. You
+never open those files: you ask your assistant "where are we?" or "what is next?".
+
+A technical person can move the list to GitHub instead. The difference that matters to you is
+how a campaign is reviewed, and it is described on
+[Several pieces, one goal](/marketing/campaigns/#if-your-technical-person-moved-the-task-list-to-github).
+
+### Review pages: plans you answer in a browser
+
+A plan is hard to judge as a long message in a conversation. When your assistant proposes a campaign
+plan or asks you to choose between options, it opens a page in your browser where you can
+comment on each part and send your answer back.
+
+The tool behind those pages is Lavish, open-source software made by someone else. It is on by
+default and the page is served from your own computer. It needs Node.js there, which the
+technical person checks during setup. Without it, or when no browser is available, your assistant shows
+the same plan in the conversation, so nothing is lost. This is for plans and decisions. The review of a finished
+draft happens on GitHub.
+
+### Memory: the project remembers your decisions
+
+Without memory, each conversation with your assistant starts from what is written in the project: the
+brand voice, the task list, the drafts. For most teams that is enough.
+
+MemPalace adds a memory that carries decisions and context from one conversation to the next, so you
+do not explain the same choice twice. cckit adopts it; it does not build it. It is independent
+open-source software, it runs on your computer and it needs no account. The marketing setup
+leaves it **off**. A technical person turns it on and installs it. The automatic part works in
+Claude Code only.
+
+### Design skills: how a page is designed
+
+cckit ships one design skill of its own, `page-design`. It coordinates three design skills made
+by other people: `impeccable` sets the direction and the rules against a generic generated look,
+`emil-design-eng` covers interaction and motion, and `web-design-guidelines` audits the finished
+page. Before building, it writes a short design brief, and the review says which design skills
+were loaded in that run.
+
+None of the four is on after setup. The technical person turns them on once: `cckit add
+page-design`, then `cckit add` for each of the three and `cckit doctor --fix`, which asks before
+it installs anything. In the one run on record, the same bakery landing page took about seven
+minutes with the skills and under three without, and used about eight times the tokens. The
+brief named a concept, two typefaces and a palette, and listed eight generic patterns it refused.
+
+## What you have to do
+
+| Tool | Made by | On after setup? | You need |
+| --- | --- | --- | --- |
+| Claude Code | Anthropic | Yes | The app on your computer |
+| GitHub | GitHub | Yes | An account with access to the project |
+| Task list | cckit | Yes | Nothing |
+| Review pages | Lavish | Yes | A browser, and Node.js on your computer |
+| Memory | MemPalace | No | A technical person to turn it on |
+| Design skills | Other authors | No, installed with consent | A yes, once |
+
+## What is not connected
+
+No tool is connected for publishing, scheduling posts, sending email or analytics. cckit stops at
+an approved piece, and those jobs stay in the tools your team already uses. See
+[after approval](/marketing/review-and-approval/#after-approval).
+
+<Outcomes title="For the technical person">
+
+These pages are written for developers.
+
+- How integrations are switched on and installed, and who makes each one: [Integrations](/integrations/)
+- The task list in the project: [Tasks without GitHub issues](/project-management/light-tasks/)
+- Review pages and how to turn them off: [Plans you answer on a page](/project-management/plan-pages/)
+- Turning memory on: [Why an agent team needs memory](/memory/)
+
+</Outcomes>
+
+Next: [Set your brand voice](/marketing/brand-voice/)

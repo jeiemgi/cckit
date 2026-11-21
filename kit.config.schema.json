@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/tuempresadigital/claude-kit/kit.config.schema.json",
+  "$id": "https://github.com/jeiemgi/cckit/kit.config.schema.json",
   "title": "claude-kit project config (v2)",
   "description": "Identity layer of a kit project. Resolved in cascade workspace -> project -> island by scripts/lib/kit-config-resolve.sh; the nearest layer wins. The $schema reference in kit.config.json points here so editors validate + autocomplete.",
   "type": "object",
@@ -10,6 +10,13 @@
     "kitVersion": {
       "type": "string",
       "description": "Kit version that last wrote/wired this config. Drives self-heal: when it differs from the installed plugin, kit-wire re-converges."
+    },
+    "adapters": {
+      "type": "array",
+      "description": "Agent adapters this project installs, written by `cckit init --adapter <claude|codex|both>`. Absent means [\"claude\"]. `cckit init --upgrade` keeps the stored selection; `--upgrade --adapter <name>` adds one and never removes one.",
+      "items": { "enum": ["claude", "codex"] },
+      "minItems": 1,
+      "uniqueItems": true
     },
     "mode": {
       "type": "string",
@@ -37,7 +44,7 @@
         "slug": { "type": "string" },
         "owner": { "type": "string" },
         "language": { "type": "string", "description": "Comms language, e.g. en, es, mixed." },
-        "path": { "type": "string" }
+        "path": { "type": "string", "description": "Deprecated: no longer written by cckit init. It held an absolute machine path and nothing reads it; delete it from a config that still has it." }
       }
     },
     "profile": { "type": "string", "description": "Active role profile (minimal, software, content, research, automation, ...)." },
@@ -45,9 +52,48 @@
     "modules": {
       "type": "array",
       "items": { "type": "string" },
-      "description": "Stackable modules added on top of the profile (e.g. \"software\"). Empty/absent = base project."
+      "description": "Stackable modules added on top of the profile (e.g. \"software\", \"qa\"). Empty/absent = base project."
     },
     "roles": { "type": "array", "items": { "type": "string" } },
+    "qa": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "How THIS project's review stack boots, written by `kit-add.sh qa` from the QA interview (modules/qa.json). cckit records the answers; it does not boot the project by guessing and does not write a boot script. Credentials appear by env var NAME only — a value is refused at interview time and never stored.",
+      "required": ["command"],
+      "properties": {
+        "command": { "type": "string", "description": "The command that boots the whole review stack (every service a reviewer needs), run from the worktree root, e.g. \"pnpm dev:stack\"." },
+        "ports": {
+          "type": "array",
+          "description": "The port env vars the stack command honours, one entry per service. A lane sets each `env` to a port derived from its `base`, so two lanes never share a port. Every base must sit inside ONE `worktree.devPortStride`-wide window, the same invariant as `worktree.devPorts`.",
+          "items": {
+            "type": "object",
+            "required": ["env", "base"],
+            "properties": {
+              "env": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "description": "Env var NAME the stack command reads its port from (e.g. WEB_PORT)." },
+              "base": { "type": "integer", "description": "Base port for this service. The interview derives 3000 + position when the answer names no port." }
+            }
+          }
+        },
+        "readiness": {
+          "type": "array",
+          "description": "Readiness probes, one per service that must answer before the stack counts as usable (e.g. web AND API).",
+          "items": {
+            "type": "object",
+            "required": ["env", "path"],
+            "properties": {
+              "env": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "description": "Which service to probe, named by its port env var from `qa.ports`." },
+              "path": { "type": "string", "description": "Path requested on that port (e.g. \"/\" or \"/health\")." }
+            }
+          }
+        },
+        "route": { "type": "string", "default": "/", "description": "Route a reviewer lands on when the work declares none (e.g. \"/dashboard\")." },
+        "credentialEnv": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
+          "description": "NAMES of the env vars that hold the test account's credentials (e.g. [\"QA_EMAIL\", \"QA_PASSWORD\"]). Names only: the values stay in the reviewer's environment."
+        }
+      }
+    },
     "github": {
       "type": "object",
       "additionalProperties": true,
@@ -64,11 +110,59 @@
       }
     },
     "milestones": { "type": "array", "items": { "type": "string" } },
+    "tasks": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Light tasks (`cckit task`): work tracked in the project and not in GitHub issues.",
+      "properties": {
+        "source": {
+          "type": "string",
+          "pattern": "^[a-z0-9_]+$",
+          "default": "file",
+          "description": "The task source `cckit task` and `cckit gc` read. `file` (default, the one source shipped): one tracked file per task under `tasks.dir`. Another name loads `scripts/lib/task-source-<name>.sh`, which must define `task_<name>_list`, `_get`, `_create`, `_on_start`, `_on_finish` and `_state`. KIT_TASKS_SOURCE overrides it per invocation."
+        },
+        "default": {
+          "type": "string",
+          "enum": ["issues", "light"],
+          "default": "issues",
+          "description": "Which task list is this project's default. issues (default): GitHub issues, through `cckit new` / `cckit start` / `cckit pr`. light: the `cckit task` list. With light, a bare `cckit next` prints what `cckit task next` prints, and the campaign skill records a campaign's pieces as light tasks instead of sub-issues. Both lists stay usable whatever the value. `cckit task default` prints it. The marketing profile sets light."
+        },
+        "check": {
+          "type": "string",
+          "description": "The gate `cckit task run <id>` runs after the agent's round when no `--check` flag is given: a shell command run in the task's worktree. Exit 0 lets the pull request open; any other exit stops the run with exit 6 and opens none. Absent: no gate. The nextjs-shadcn recipe writes `pnpm build && pnpm lint`."
+        },
+        "design": {
+          "type": "boolean",
+          "default": false,
+          "description": "true = every task of this project builds or changes a page. `cckit task run` then tells the agent to use the `page-design` skill, records the skills the run loaded from the agent CLI's event output, and the pull request it opens lists them and asks the reviewer to open the page. `cckit init` installs the `page-design` skill where this is true. Absent or false: only a task whose kind is `page` (`cckit task new --kind page`) is a page task. The nextjs-shadcn recipe writes true."
+        },
+        "dir": {
+          "type": "string",
+          "default": "tasks",
+          "description": "The tracked directory the `file` source keeps one `<id>.md` per task in, relative to the project root. An absolute path, or one that climbs out of the project, is ignored with a warning. KIT_TASKS_DIR overrides it per invocation."
+        }
+      }
+    },
+    "plainLanguage": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "enabled": { "type": "boolean", "default": false, "description": "Plain language mode. `cckit init` installs the `plain-language` rule while this is true: the agent says draft, review and approve, and names worktree, branch and pull request only when asked. `cckit task` words its progress lines the same way (its `--llm` output and its stdout are unchanged). The marketing profile turns it on; `cckit init --plain-language on|off` sets it for any profile. On `--upgrade` the stored value wins over the profile default." }
+      }
+    },
+    "kinds": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "content": { "type": "boolean", "default": false, "description": "When true, `scripts/setup-labels.sh` (and the label step of `cckit init`) provisions the content kind labels `kind:post`, `kind:campaign`, `kind:brand` and `kind:research`. The content and marketing profiles set it. The kinds are accepted by `--kind` with or without this key: a content kind starts on a branch prefix from the closed set (post and brand: `task/`, campaign: `plan/`, research: `spike/`) and titles its PR `docs:`." }
+      }
+    },
     "pr": {
       "type": "object",
       "additionalProperties": true,
       "properties": {
-        "titleStyle": { "type": "string", "enum": ["conventional", "issue-title"], "default": "conventional", "description": "How `cckit pr` titles a single-issue PR. conventional (default): a Conventional Commits subject derived from the kind label, which release-please and a commitlint gate read. issue-title: the issue title, verbatim." },
+        "titleStyle": { "type": "string", "enum": ["conventional", "issue-title"], "default": "conventional", "description": "How `cckit pr` titles a single-issue PR. conventional (default): a Conventional Commits subject derived from the kind label, which release-please and a commitlint gate read. issue-title: the issue title, verbatim. `cckit effort pr` follows the same key: conventional gives `type(scope): name [#N]` and refuses a title that fails commitlint; issue-title gives `[Role] [#N] name`, unchecked." },
+        "bodyStyle": { "type": "string", "enum": ["code", "content"], "default": "code", "description": "The wording of the PR body `cckit pr`, `cckit effort pr` and `cckit task finish` generate. code (default): a Verification checklist that names the diff. content: a Review checklist for a draft (read it through, facts and links checked, voice matches the brand guide, only the files for this piece changed). `Closes #N`, the summary and the role signature are the same in both. The content and marketing profiles set content." },
         "orchestratorSection": { "type": "boolean", "default": false, "description": "When true, `cckit pr` opens the PR body with a two-line `## For the orchestrator` section: the issue number and what to review." }
       }
     },
@@ -77,8 +171,32 @@
       "additionalProperties": true,
       "properties": {
         "flows": { "type": "array", "items": { "type": "string" }, "description": "Controlled flow vocabulary for effort titles — the values accepted by the leading [Flow] title tag and `--flow` (also the flow:<flow> labels). Replaces the built-in default (Core UI API Docs Infra Auth Data Web App); an explicit EFFORT_FLOWS env var still wins per invocation." },
+        "preCloseHook": { "type": "string", "description": "Optional path to an executable `cckit effort close` runs BEFORE the snapshot and the merge, invoked as `<hook> <effort-number> <sub-number>…` with cwd = the effort worktree (wave-style close: the checkout the close was run from). A relative path resolves against the main checkout. A non-zero exit refuses the close with nothing written; so does a configured hook that is missing or not executable. `KIT_FORCE=1` skips the hook and says so. An explicit KIT_EFFORT_PRE_CLOSE_HOOK env var wins per invocation. No-op when unset; the kit ships no default." },
         "knowledgeIngestHook": { "type": "string", "description": "Optional path to an executable run after `cckit effort close`, invoked as `<hook> <effort-number> <trace-dir>` to fold the closed effort's work record into a knowledge base. No-op when unset or not executable; the kit ships no default." },
+        "planSource": { "type": "string", "description": "Optional path to an executable `cckit effort plan` calls for the open-effort rows instead of querying GitHub, invoked as `<source> <owner/repo>` from the project root (a relative path resolves against that root). It prints one `number<TAB>flow<TAB>ctx<TAB>title[<TAB>blockers]` line per open effort, `blockers` being a comma-separated list of issue numbers, and may print a `# age: <text>` line saying how old its data is. The plan prints which source it used, with that age. A source that is not executable, exits non-zero or prints no rows falls back to GitHub, and the plan says so. Unset: GitHub is read. An explicit EFFORT_PLAN_SOURCE env var wins per invocation." },
         "wipLimit": { "type": "integer", "minimum": 0, "description": "How many efforts may be in progress at once before `cckit effort start` refuses a NEW effort (default 2). In progress = an `effort/<N>-<slug>` branch exists as a local head or on origin (read with `git ls-remote`, not the cached refs/remotes; EFFORT_WIP_REMOTE=0 or an unreachable origin counts the cached refs instead). Refusal happens before anything is written; `--force` (or KIT_FORCE=1) starts anyway. 0 refuses every ordinary start of a NEW effort but not a forced one, and not a re-start of an effort already in progress (that adds no WIP, so it is never gated); a non-integer value is ignored with a warning and the default is used. An explicit EFFORT_WIP_LIMIT env var wins per invocation. Does not affect `cckit start <issue>`." }
+      }
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Which environment variables the hosted effort-metrics judge reads. Names only, never values — no URL or token belongs in this file. Every key is optional; unset, the built-in name is used. A value that is not a shell identifier (letters, digits, underscore, not starting with a digit) is ignored with a warning and the built-in name is used.",
+      "properties": {
+        "urlEnv": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "default": "CCKIT_MODEL_URL", "description": "Env var holding the OpenAI-compatible base URL; the judge POSTs to `<value>/chat/completions`. Empty or unset at run time: the hosted judge is skipped and the local model (if enabled) is tried." },
+        "modelEnv": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "default": "CCKIT_MODEL", "description": "Env var holding the model name sent in the request and recorded as the record's judge model id. Empty or unset at run time: the literal `default` is sent." },
+        "tokenEnv": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$", "default": "CCKIT_MODEL_TOKEN", "description": "Env var holding the bearer token. Empty or unset at run time: no Authorization header is sent." }
+      }
+    },
+    "night": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Night mode (`kit-autopilot` § Mode: night): what `scripts/night-grant.sh` adds to the owner's night grant before it launches `scripts/night-run.mjs`. Every key is optional; without the object a night run uses the base floors, the delegation brief's gate, and accepts a grant only from `github.owner` or a commenter GitHub reports as OWNER.",
+      "properties": {
+        "floors": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Extra always-human floors, name -> what a diff must touch to trip it. Added to the base floors (lockfile, auth, security-code, security-prose, workflows, cost, secret). A tripped floor parks the effort unless that night's grant waives it by its exact name." },
+        "neverWaivable": { "type": "array", "items": { "type": "string" }, "description": "Floor names no grant may waive, added to the base list (workflows, cost, secret). A grant that waives one is refused when it is read; the engine refuses it again at merge time." },
+        "gate": { "type": "string", "description": "The gate command executors and verifiers run, and the command the final check runs on the base branch once every wave merged. Unset: the gate commands in the project's delegation brief." },
+        "grantors": { "type": "array", "items": { "type": "string" }, "description": "GitHub logins allowed to write the night grant, besides `github.owner` and any commenter whose author_association is OWNER. Compared case-insensitively. Needed on an organization repo, where no commenter is OWNER and `github.owner` is the org. A grant comment from any other author is ignored." },
+        "refuseLabels": { "type": "array", "items": { "type": "string" }, "description": "Labels that hold an effort out of a night run: preflight refuses an effort carrying any of them. Default: none. The kit applies no such label itself." }
       }
     },
     "agents": {
@@ -117,7 +235,14 @@
           "additionalProperties": true,
           "properties": {
             "floors": { "type": "boolean", "description": "Auto-merge policy floors (default true). When on, `cckit watch --merge` never auto-merges a PR touching .github/workflows/**, lockfile/graph files, or security-sensitive paths, and always honors a `hold` label + draft state. Set false to disable (or KIT_CAPTAIN_FLOORS=0)." },
-            "protectedGlobs": { "type": "array", "items": { "type": "string" }, "description": "Extra path globs the captain must not auto-merge (added to the built-in floors). Also settable via KIT_CAPTAIN_EXTRA_GLOBS." }
+            "protectedGlobs": { "type": "array", "items": { "type": "string" }, "description": "Extra path globs the captain must not auto-merge (added to the built-in floors). Also settable via KIT_CAPTAIN_EXTRA_GLOBS." },
+            "requireQa": {
+              "oneOf": [
+                { "type": "boolean" },
+                { "type": "array", "items": { "type": "string" } }
+              ],
+              "description": "Hold a PR for a human QA pass (default false). true: `cckit watch --merge` reads every would-be merge with no `cckit qa verdict pass` recorded against its current head as QA_MISSING (action verify). A list of label names: only PRs carrying one of them, e.g. [\"flow:ui\"]. A recorded QA fail on the current head blocks regardless (QA_FAILING). Env: KIT_CAPTAIN_REQUIRE_QA=1|0, KIT_CAPTAIN_QA_LABELS (space-separated); either one set means the key is not read."
+            }
           }
         }
       }
@@ -138,6 +263,59 @@
         "provider": { "type": "string" },
         "wing": { "type": "string" },
         "claudeProjectSlug": { "type": "string" }
+      }
+    },
+    "local": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Local model layer: natural-language chores run on this machine through mlx_lm.server. Off when absent. `enabled` is the config key of the integration descriptor integrations/mlx-lm.json.",
+      "properties": {
+        "enabled": { "type": "boolean", "description": "true = `cckit doctor` installs the runtime (with consent) and starts the server." },
+        "port": { "type": "integer", "description": "Port mlx_lm.server listens on. Default 8080." },
+        "model": { "type": "string", "description": "Model the server loads. Default mlx-community/Qwen3-8B-4bit." },
+        "dismissed": { "type": "string", "description": "kitVersion at which the \"local layer down\" session notice was dismissed (`cckit doctor --dismiss-local`)." }
+      }
+    },
+    "codeGraph": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Code-graph retrieval: agents query an index of the code instead of grepping the tree. Off when absent. Turned on by an integration descriptor (integrations/<id>.json) whose `config.key` is `codeGraph.provider`.",
+      "properties": {
+        "provider": { "type": "string", "description": "Which integration provides the code graph, as the descriptor's `config.value` names it. Absent or \"none\" = no code graph; every path that would use one skips." }
+      }
+    },
+    "designDirection": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Design direction for a page: the visual idea, type, layout and colour, and the rules against a generic generated look. Off when absent. Turned on by an integration descriptor whose `config.key` is `designDirection.provider` (integrations/impeccable.json). The `page-design` skill reads the installed skill, not this key.",
+      "properties": {
+        "provider": { "type": "string", "description": "Which integration provides design direction, as the descriptor's `config.value` names it. Absent or \"none\" = `cckit doctor` installs nothing for it." }
+      }
+    },
+    "designMotion": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Interaction and motion craft on a chosen design. Off when absent. Turned on by an integration descriptor whose `config.key` is `designMotion.provider` (integrations/emil-design-eng.json).",
+      "properties": {
+        "provider": { "type": "string", "description": "Which integration provides the motion rules. Absent or \"none\" = `cckit doctor` installs nothing for it." }
+      }
+    },
+    "designAudit": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "The audit of a finished page's code: accessibility, focus, reduced motion. Off when absent. Turned on by an integration descriptor whose `config.key` is `designAudit.provider` (integrations/web-design-guidelines.json).",
+      "properties": {
+        "provider": { "type": "string", "description": "Which integration provides the audit. Absent or \"none\" = `cckit doctor` installs nothing for it." }
+      }
+    },
+    "reviewPages": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Review pages: a plan, a decision with options or a grilling round opens as an HTML page the reader annotates and answers (`cckit page`). ON when absent. `enabled` is the config key of the integration descriptor integrations/lavish.json, which is on by default.",
+      "properties": {
+        "enabled": { "type": "boolean", "description": "false = plans, decisions and grills print to the terminal; `cckit page open` never starts the page tool. Absent or true = a page opens in a session that has a browser." },
+        "answers": { "type": "string", "enum": ["issue", "file"], "description": "Where `cckit page answer` writes. Absent = a comment on the issue when `github.repo` is set and `--issue` is given, else a file. `issue` requires `--issue`; `file` always writes a file." },
+        "answersDir": { "type": "string", "description": "Directory, relative to the repo root, for answers written as files. Default `docs/answers`. A path that leaves the repo is refused." }
       }
     },
     "routines": {

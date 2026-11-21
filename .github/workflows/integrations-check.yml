@@ -1,0 +1,68 @@
+name: integrations-check
+
+# The monthly recipe check (E303.8). Every descriptor in integrations/ hardcodes upstream facts:
+# a package name, an installer's flags, a binary's name. The gate (scripts/check.sh) never installs
+# anything, so it cannot see one drift. This workflow installs each tool for real on a clean runner
+# through scripts/integrations-check.sh and opens an issue naming the descriptor and the step that
+# broke. `schedule` only fires from the default branch.
+on:
+  schedule:
+    - cron: "17 6 1 * *" # 06:17 UTC on the 1st of every month
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+defaults:
+  run:
+    shell: bash # explicit, so every step runs with `-o pipefail` and `| tee` keeps the exit code
+
+jobs:
+  check:
+    name: recipes on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # macos-15 is the arm64 runner: integrations/mlx-lm.json applies to Darwin + arm64 only and
+        # is skipped everywhere else.
+        os: [ubuntu-latest, macos-15]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tooling versions
+        run: |
+          uname -sm
+          bash --version | head -1
+          jq --version
+          for m in npm pnpm pipx uv brew; do
+            if command -v "$m" >/dev/null 2>&1; then echo "$m: $("$m" --version 2>&1 | head -1)"; else echo "$m: absent"; fi
+          done
+      - name: Check every recipe
+        run: bash scripts/integrations-check.sh --yes 2>&1 | tee integrations-check.log
+      - name: Open an issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          RUNNER_LABEL: ${{ matrix.os }}
+        run: |
+          title="Integration recipe check failed on $RUNNER_LABEL"
+          {
+            echo "The monthly integration recipe check failed on \`$RUNNER_LABEL\`."
+            echo
+            echo "Run: $RUN_URL"
+            echo
+            echo "Each \`FAIL <id>: <step>\` line names a descriptor in \`integrations/\` and the step of its recipe that broke."
+            echo
+            echo '```text'
+            if [ -s integrations-check.log ]; then tail -n 120 integrations-check.log; else echo "(no log: the check step did not start)"; fi
+            echo '```'
+          } > issue-body.md
+          # One open issue per runner: a second failing month comments on it instead of opening a twin.
+          open="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "in:title \"$title\"" --json number --jq '.[0].number // empty')"
+          if [ -n "$open" ]; then
+            gh issue comment "$open" --repo "$GITHUB_REPOSITORY" --body-file issue-body.md
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body-file issue-body.md
+          fi

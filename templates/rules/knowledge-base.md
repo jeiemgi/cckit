@@ -1,7 +1,7 @@
 # Knowledge base — governance
 
 The project's knowledge base lives in `knowledge/` (config: `knowledge.dir` in
-`.claude/kit.config.json`). It is the durable, agent-readable source of truth for product and
+`{{CONFIG_REL}}`). It is the durable, agent-readable source of truth for product and
 project knowledge: brand, design system, decisions, research, reference docs.
 
 ## Hard rules

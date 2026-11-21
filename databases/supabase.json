@@ -1,0 +1,70 @@
+{
+  "id": "supabase",
+  "label": "Supabase",
+  "summary": "A hosted database with sign-in built in. You create a free account on their website; there is nothing to install or run on your computer.",
+  "fits": "an app that needs accounts or saved information and has nobody to look after a server.",
+  "recommended": true,
+  "envFile": ".env.local",
+  "env": [
+    {
+      "name": "NEXT_PUBLIC_SUPABASE_URL",
+      "placeholder": "https://your-project-ref.supabase.co",
+      "what": "the address of your Supabase project (Project URL)",
+      "where": "Supabase dashboard > your project > Connect"
+    },
+    {
+      "name": "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+      "placeholder": "your-publishable-key",
+      "what": "the publishable key, which starts with sb_publishable_",
+      "where": "Supabase dashboard > your project > Connect, or Settings > API Keys"
+    }
+  ],
+  "guide": "supabase/guide.html",
+  "test": "../scripts/database-supabase-test.sh",
+  "steps": [
+    "Open https://supabase.com/dashboard/new/_ in your browser. Sign in, or create a free account first.",
+    "Fill in the new-project form: a project name, a database password (save it in a password manager; it is not one of the two values below), and the region closest to your users. Create the project and wait until it is ready.",
+    "On the project page, click \"Connect\" at the top. The dialog shows the Project URL and the publishable key for the framework you select; choose Next.js.",
+    "Copy the Project URL. In the env file named below, replace the placeholder after NEXT_PUBLIC_SUPABASE_URL= with it.",
+    "Copy the publishable key (it starts with sb_publishable_). Replace the placeholder after NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY= with it. Every key is also listed under Settings > API Keys.",
+    "Do not put a secret key (it starts with sb_secret_) or the legacy service_role key in this file: those are for servers only and must never reach a browser.",
+    "Save the file, then start the app again (pnpm dev) so it reads the new values."
+  ],
+  "stacks": {
+    "nextjs": {
+      "detect": {
+        "packageDependency": "next"
+      },
+      "install": "pnpm add @supabase/supabase-js @supabase/ssr",
+      "packages": [
+        "@supabase/supabase-js",
+        "@supabase/ssr"
+      ],
+      "files": [
+        {
+          "from": "supabase/nextjs/lib/supabase/client.ts",
+          "to": "lib/supabase/client.ts"
+        },
+        {
+          "from": "supabase/nextjs/lib/supabase/server.ts",
+          "to": "lib/supabase/server.ts"
+        }
+      ]
+    }
+  },
+  "lastVerified": "2026-11-12",
+  "sources": [
+    "https://supabase.com/docs/guides/getting-started/quickstarts/nextjs",
+    "https://supabase.com/docs/guides/auth/server-side/creating-a-client",
+    "https://supabase.com/docs/guides/api/api-keys",
+    "https://github.com/vercel/next.js/tree/canary/examples/with-supabase/lib/supabase"
+  ],
+  "recheck": {
+    "drifts": [
+      "the env variable names (NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY)",
+      "where the dashboard shows the URL and the key (the Connect dialog, Settings > API Keys)",
+      "the legacy anon / service_role keys: Supabase states they are deprecated by the end of 2026",
+      "the createBrowserClient / createServerClient signatures in @supabase/ssr"
+    ]
+  }
+}

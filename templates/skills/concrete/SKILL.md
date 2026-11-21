@@ -113,5 +113,5 @@ subject has become the thing it audits.
 ## Applied to itself
 
 This file was written under its own rules: no preamble, no closing summary, no adjective without a
-datum. The catalogue's first client is the assistant — commit messages that open with a
-self-narrating line (O2) and close by restating their own body (O4) are the most common case.
+datum. The catalogue's first client is the assistant: a commit message that opens with a
+self-narrating line (O2) and closes by restating its own body (O4).

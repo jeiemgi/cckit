@@ -112,7 +112,7 @@ fi
 echo "→ Installing agentation (dev dependency, $REACT_PKG_MANAGER)…"
 ( cd "$TARGET" && eval "$INSTALL_CMD" )
 
-if claude mcp list 2>/dev/null | grep -qi 'agentation'; then
+if grep -qi 'agentation' <<<"$(claude mcp list 2>/dev/null)"; then
   echo "  ✓ agentation MCP already registered for Claude"
 else
   echo "→ Registering the agentation MCP for Claude…"

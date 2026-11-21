@@ -1,6 +1,6 @@
 # Contributing to cckit
 
-Thanks for your interest in cckit. Contributions — issues, ideas, and pull requests — are welcome.
+Contributions — issues, ideas, and pull requests — are welcome.
 
 ## Where it lives
 
@@ -26,7 +26,53 @@ cckit pr <issue> "<summary>" # open the PR
   to set the type yourself. CI (`commitlint`) fails the PR until the title is valid; check one locally
   with `scripts/lib/commitlint.sh "feat: your summary"`.
 - Run the local gate before opening a PR: `bash scripts/check.sh` (shell syntax, valid manifests,
-  no stray branding, the commitlint rules). A green gate is the bar.
+  the leak fence, the commitlint rules, the skill-listing and instruction-file budgets). A green gate is the bar.
+- **The leak fence.** cckit is public and is developed next to private repositories, so gate step 3
+  fails on any tracked line that contains a private word: a product or client name, a person's name,
+  a private path. The built-in word is always on; your own patterns live in `.cckit/leak-words`
+  (local, gitignored, one extended regex per line) or in the `CCKIT_LEAK_WORDS` repository secret
+  (CI, `|`-separated). Never commit the list: a public denylist publishes the words it hides. A hit
+  prints `file:line` only. `bash scripts/leak-fence-test.sh` is its selftest. Write a word end as
+  `([^[:alnum:]]|$)`, not `\b`: `\b` matches nothing in `git grep -E` on macOS.
+- The gate ends with `bash scripts/test.sh`, which runs every `*-test.sh` under `bin/` and
+  `scripts/`, several files at a time (the CPU count, capped at 8). `bash scripts/test.sh <pattern>`
+  runs the files whose path matches; `-j <N>` or `TEST_JOBS=<N>` sets how many run at once,
+  `--serial` runs one at a time and `--timings` lists wall seconds per file. A new test file keeps
+  its fixtures under its own `mktemp -d` and binds no fixed port, because it runs beside others; if
+  it cannot, put `# test-runner: serial` in its first 30 lines and it runs alone after the rest.
+- **No pipe into a reader that stops early.** `producer | grep -q PAT` and `producer | head -1`
+  let the reader exit while the producer is still writing. The producer then gets SIGPIPE — or a
+  write error where SIGPIPE is ignored, which is the case on GitHub Actions — and under
+  `set -o pipefail` the pipeline fails although the match was found. A test written that way fails
+  at random under load (cckit issue 449: `printf: write error: Broken pipe`, then an assertion that
+  read `no` for `yes`). Write `grep -q PAT <<<"$var"`; capture a command first
+  (`out="$(cmd)"; grep -q PAT <<<"$out"`); use `sed -n 1p` for `head -1` and an `awk` rule without
+  `exit` for "first match". `scripts/review-lint.sh` fails the gate on a new `| grep -q` or
+  `| head -N` under `bin/` or `scripts/` (rule `pipe-into-early-exit-reader`).
+- **A lock is taken with the shell, not with `mkdir`.** `( set -C; : > "$lock" ) 2>/dev/null` is an
+  `O_EXCL` open. `mkdir "$lock"` is not exclusive everywhere: the `mkdir` of uutils coreutils
+  0.10.0 (Ubuntu 26.04, GitHub's `ubuntu-latest`) exits 0 for every process that races to create
+  the same directory. A test of a lock races the primitive itself — N processes, one attempt each,
+  exactly one winner — as `scripts/lib/worktree-ports-test.sh` section 7 does.
+
+## A rule declares when it loads
+
+Claude Code loads every `.claude/rules/*.md` without a `paths:` frontmatter into every session. A
+rule that covers one kind of file therefore opens with `paths:`, so it loads only when a matching file is read:
+
+```markdown
+---
+paths:
+  - "**/*.tsx"
+---
+```
+
+`templates/rules/react-annotate.md` is the shipped example. A cross-cutting rule (branch naming, the
+effort model) stays unscoped, and a behavioural routing rule must: scoped, it would not load until a
+matching file had already been read. A rule that outgrows 200 lines splits into a short rule plus a
+`knowledge/` doc it points at. `scripts/instruction-budget-lint.sh` is the gate — `--report` lists
+every file's cost; `scripts/instruction-budget-baseline.txt` grandfathers `effort-model.md` (209
+lines) and `naming-and-ids.md` (208), which may shrink but not grow.
 
 ## Durable prose goes through `concrete`
 
@@ -85,7 +131,7 @@ half regresses.
 
 - **bash CLI + lib** → `bin/cckit`, `scripts/lib/*.sh`.
 - **Claude Code plugin** → `skills/`, `commands/`, `.claude-plugin/`.
-- **Docs** → `docs/` (published to [cckit.dev](https://cckit.dev)).
+- **Docs** → `docs-site/` (published to [cckit.dev](https://cckit.dev)).
 - **What cckit installs for itself** → `.claude/skills/`, `.claude/rules/`, and the manifest in
   `scripts/self-install-test.sh`.
 

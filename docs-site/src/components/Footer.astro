@@ -15,9 +15,8 @@ const GA_ENABLED = Boolean(import.meta.env.PUBLIC_GA_MEASUREMENT_ID);
     Google's tools otherwise give no visibility into. */}
 <SpeedInsights />
 <p class="cckit-disclaimer">
-  Independent, educational project — <strong>not affiliated with or endorsed by Anthropic</strong>.
-  Claude and Claude Code are trademarks of Anthropic PBC.
-  <a href="/disclaimer/">Disclaimer &amp; trademarks</a>
+  Not affiliated with Anthropic.
+  <a href="/disclaimer/">Disclaimer</a>
   {GA_ENABLED && (
     <>
       {' · '}
@@ -31,7 +30,7 @@ const GA_ENABLED = Boolean(import.meta.env.PUBLIC_GA_MEASUREMENT_ID);
     <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
   </svg>
   <span class="sr-only">love</span>
-  by <a href="https://josegtz.com" target="_blank" rel="noopener noreferrer">josegtz</a>
+  by <a href="https://github.com/jeiemgi" target="_blank" rel="noopener noreferrer">jeiemgi</a>
 </p>
 
 <ConsentBanner />
@@ -75,7 +74,7 @@ const GA_ENABLED = Boolean(import.meta.env.PUBLIC_GA_MEASUREMENT_ID);
   // brief "Copied" flash. One delegated listener on document covers every table and survives page
   // swaps (the document element persists), so it's wired exactly once.
   document.addEventListener('click', function (e) {
-    var code = e.target && e.target.closest('.sl-markdown-content td code, .sl-markdown-content th code');
+    var code = e.target && e.target.closest('.sl-markdown-content td code, .sl-markdown-content th code, .sl-markdown-content .cckit-record code');
     if (!code || !navigator.clipboard) return;
     navigator.clipboard.writeText(code.textContent || '').then(function () {
       code.setAttribute('data-copied', '');

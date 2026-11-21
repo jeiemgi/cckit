@@ -42,12 +42,12 @@ if [[ "$MODE" == "apps" ]]; then
     has_dev="$(jq -r '(.scripts.dev // .scripts.start // "") | if . == "" then "0" else "1" end' "$pkg" 2>/dev/null || echo 0)"
     deps="$(jq -r '((.dependencies // {}) + (.devDependencies // {})) | keys[]?' "$pkg" 2>/dev/null || true)"
     fw=""
-    printf '%s\n' "$deps" | grep -qx next        && fw="next"
-    [[ -z "$fw" ]] && printf '%s\n' "$deps" | grep -qx '@react-router/dev' && fw="react-router"
-    [[ -z "$fw" ]] && printf '%s\n' "$deps" | grep -qx nuxt  && fw="nuxt"
-    [[ -z "$fw" ]] && printf '%s\n' "$deps" | grep -qx astro && fw="astro"
-    [[ -z "$fw" ]] && printf '%s\n' "$deps" | grep -qx vue   && fw="vue"
-    [[ -z "$fw" ]] && printf '%s\n' "$deps" | grep -qx react && fw="react"
+    grep -qx next <<<"$deps"        && fw="next"
+    [[ -z "$fw" ]] && grep -qx '@react-router/dev' <<<"$deps" && fw="react-router"
+    [[ -z "$fw" ]] && grep -qx nuxt <<<"$deps"  && fw="nuxt"
+    [[ -z "$fw" ]] && grep -qx astro <<<"$deps" && fw="astro"
+    [[ -z "$fw" ]] && grep -qx vue <<<"$deps"   && fw="vue"
+    [[ -z "$fw" ]] && grep -qx react <<<"$deps" && fw="react"
     [[ -n "$fw" && "$has_dev" == "1" ]] || continue
     router="unknown"
     if declare -f react_detect >/dev/null 2>&1; then

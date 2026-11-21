@@ -14,6 +14,12 @@
 # Source it:  source scripts/lib/kit-brief.sh
 # Depends on: kit-lib.sh (the helper catalog), and for the verb body: gh, git, the project config.
 
+# `${BASH_SOURCE[0]:-$0}`: BASH_SOURCE is empty under zsh (same fix as qa-lane.sh, #219).
+_kb_dir="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" >/dev/null 2>&1 && pwd)"
+# shellcheck source=/dev/null
+command -v kit_config_path >/dev/null 2>&1 || . "$_kb_dir/config-path.sh"
+unset _kb_dir
+
 # ── pure parsers (no gh, no git; every one is unit-tested against fixture text) ─────────────────
 
 # _kb_rtrim — drop leading AND trailing blank lines from stdin, so a section lifted out of a
@@ -107,6 +113,31 @@ kit_brief_gotchas() { kit_brief_rule_section '[Ss]tanding gotchas' "${1:-.}"; }
 # fire (that is why `concrete` shipped in PR 247 and no body records a pass; see #283).
 kit_brief_durable_prose() { kit_brief_rule_section '[Dd]urable prose' "${1:-.}"; }
 
+# kit_brief_qa_route [root] — the `## QA route` ask, or nothing. Printed ONLY when the project
+# recorded a review stack (`qa.command` in the kit config, written by `kit-add.sh qa`): the builder
+# is the one who knows which screen the change touched, and `cckit qa open` reads the line this
+# asks for out of the PR body (qa_route_declared, qa-lane.sh). A project with no `qa` block has
+# nothing that would read the line, so asking for it there is noise. best-effort: no config, no jq
+# or an unreadable config all print nothing.
+kit_brief_qa_route() {
+  local root="${1:-.}" cfg="" fallback=""
+  command -v jq >/dev/null 2>&1 || return 0
+  cfg="$(kit_config_path "$root" 2>/dev/null)" || return 0
+  [ -n "$cfg" ] && [ -f "$cfg" ] || return 0
+  [ -n "$(jq -r '.qa.command // empty' "$cfg" 2>/dev/null)" ] || return 0
+  fallback="$(jq -r '.qa.route // "/"' "$cfg" 2>/dev/null)"
+  cat <<EOF
+This project has a review stack, and the reviewer opens it with \`cckit qa open\`. Put ONE line in
+the PR body naming the screen this change touched, on a line of its own:
+
+    QA route: /path/of/the/changed/screen
+
+- The value is a path: it starts with \`/\`, holds no spaces, and may carry a query string.
+- Without the line the reviewer lands on the configured fallback, \`${fallback:-/}\`, not on your change.
+- A change with no screen to look at (a script, a migration, docs) omits the line.
+EOF
+}
+
 # ── real-state lookups ─────────────────────────────────────────────────────────────────────────
 
 # kit_brief_worktree <issue> — echo "<path>\t<branch>" for the worktree that belongs to this issue,
@@ -124,7 +155,7 @@ kit_brief_worktree() {
         n="$(wt_issue_number "$b")"
         [ "$n" = "$want" ] || continue
         printf '%s\t%s\n' "$wtpath" "$b"
-      done | head -1
+      done | sed -n 1p
 }
 
 # kit_brief_resolve <token> — echo the repo path a token refers to, plus a tab and a status word:
@@ -139,7 +170,7 @@ kit_brief_resolve() {
   esac
   if [ -e "$root/$tok" ]; then printf '%s\there' "$tok"; return 0; fi
   command -v git >/dev/null 2>&1 || { printf '%s\tnew' "$tok"; return 0; }
-  hits="$(git -C "$root" ls-files 2>/dev/null | grep -E "(^|/)$(printf '%s' "$tok" | sed 's/[.[\*^$]/\\&/g')$" | head -5)"
+  hits="$(git -C "$root" ls-files 2>/dev/null | grep -E "(^|/)$(printf '%s' "$tok" | sed 's/[.[\*^$]/\\&/g')$" | sed -n 1,5p)"
   n="$(printf '%s' "$hits" | grep -c . || true)"
   case "$n" in
     0) printf '%s\tnew' "$tok" ;;
@@ -172,7 +203,7 @@ _kb_rows() {
   local libdir="$1" want="$2" row _e _fn _p
   [ -n "$want" ] || return 0
   kit_lib_rows "$libdir" | while IFS="$(printf '\t')" read -r row _e _fn _p; do
-    printf '%s\n' "$want" | grep -qxF "$row" || continue
+    grep -qxF "$row" <<<"$want" || continue
     printf '| `%s` | %s | %s |\n' "$row" "$_e" "$_p"
   done
 }
@@ -185,7 +216,7 @@ _kb_rows() {
 # a brief that silently omits a section is the failure mode this verb exists to remove.
 kit_brief() {
   local n="${1:-}" root base repo body title state labels foragents files files_from wt wtpath wtbranch
-  local seed gotchas prose libdir row f gate
+  local seed gotchas prose libdir row f gate qaroute
   case "$n" in
     ''|--*) echo "usage: cckit brief <issue>" >&2; return 2 ;;
   esac
@@ -327,7 +358,7 @@ EOF
     cap="${KIT_BRIEF_MAX_HELPERS:-10}"
     shown_owned="$(_kb_rows "$libdir" "$(printf '%s\n' "$owned_libs" | grep . | sort -u)")"
     n_src="$(printf '%s' "$shown_owned" | grep -c . || true)"
-    shown_src="$(_kb_rows "$libdir" "$sourced_only" | head -n "$((cap > n_src ? cap - n_src : 0))")"
+    shown_src="$(_kb_rows "$libdir" "$sourced_only" | awk -v n="$((cap > n_src ? cap - n_src : 0))" 'NR <= n')"
     # `|| true`, never `|| echo 0`: `grep -c` on empty input already PRINTS 0 and exits 1, so the
     # `echo 0` fallback appends a SECOND zero and the arithmetic below sees "0\n0". Same bug class
     # as the #142 board-counter regression.
@@ -372,5 +403,14 @@ EOF
     printf '%s\n' "$prose"
   else
     echo "_No \`Durable prose\` section in \`delegation-brief.md\` — add one so an agent writing an issue body, a PR body or a commit message is told to run the \`concrete\` pass first._"
+  fi
+
+  # ── the review route, only where a review stack exists to open it (#297)
+  qaroute="$(kit_brief_qa_route "$root")"
+  if [ -n "$qaroute" ]; then
+    echo
+    echo "## QA route"
+    echo
+    printf '%s\n' "$qaroute"
   fi
 }

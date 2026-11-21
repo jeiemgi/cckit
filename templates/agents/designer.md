@@ -4,6 +4,7 @@ description: Designer sub-agent. Owns the design system, brand, screens, motion,
 when_to_use: Any visual decision (color, spacing, typography, layout, animation), component design, screen design, brand questions, design system updates, UX writing, accessibility for UI surfaces.
 tools: [Read, Edit, Write, Grep, Glob, Bash]
 skills:
+  - page-design
   - emil-design-eng
   - impeccable
   - web-design-guidelines
@@ -34,6 +35,7 @@ Authority:
 
 | Scenario                                | Skill(s)                                    |
 | --------------------------------------- | ------------------------------------------- |
+| Build or change a page                  | `page-design` — it calls the three below    |
 | New component                           | `emil-design-eng`                           |
 | Critique / audit an existing screen     | `impeccable`                                |
 | Review rendered UI — a11y, focus, UX    | `web-design-guidelines`                     |

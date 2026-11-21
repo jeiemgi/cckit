@@ -122,8 +122,7 @@ Invoked as skills/slash commands; the integration sets the separator (`-` → `/
 `specify → clarify → plan → tasks → analyze → implement`. `analyze` is a cheap safety net before `implement`.
 
 **Review gates:** `.specify/workflows/speckit/workflow.yml` chains specify→plan→tasks→implement
-with approve/reject gates after spec and after plan. Reject aborts. Keep the human in the loop
-at the two highest-leverage moments.
+with approve/reject gates after spec and after plan. Reject aborts.
 
 ## 5. Git extension (optional)
 
@@ -151,7 +150,7 @@ up asserting MUST-rules the code breaks on day one.
 
 1. **Map reality.** Inspect the actual structure against the skill's prescriptions — directory
    layout, module boundaries, the canonical form/component/handler patterns, data-access shape, and
-   the items from the Stack Interview (§7). Cheap, high-signal probes: `ls src/`, find the feature
+   the items from the Stack Interview (§7). Probes: `ls src/`, find the feature
    or route folders, grep for the patterns the skill mandates (e.g. `"use server"`, the prescribed
    client paths, shared primitive dirs).
 2. **Classify drift** per dimension as **conforms / partial / divergent (different architecture)**,
@@ -190,12 +189,12 @@ Concrete, copy-exactly pattern references the plan/tasks/implement steps cite:
 
 ### 6c. Pre-fill the plan template
 Edit `templates/plan-template.md` Technical Context with stack defaults and wire the
-Constitution Check checkboxes to the actual Core Principles, so every plan starts correct.
+Constitution Check checkboxes to the actual Core Principles.
 
 ## 7. Stack Interview (run before authoring the constitution + overrides)
 
 Skip any question answered by inspecting the repo (`package.json`, lockfiles, config, and
-`.claude/kit.config.json`). Ask the rest:
+`{{CONFIG_REL}}`). Ask the rest:
 
 **A. Runtime & framework** — language+version; framework+rendering model; monorepo/single + package manager.
 **B. Data & backend** — database + access layer; auth model + role hierarchy; hard domain invariants / common traps.

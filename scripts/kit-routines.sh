@@ -85,7 +85,7 @@ _kit_rt_expand_command() {
 # kit_routines_cron_has <sentinel> -> rc 0 if present in crontab
 kit_routines_cron_has() {
   local sentinel="$1"
-  crontab -l 2>/dev/null | grep -qF "$sentinel"
+  grep -qF "$sentinel" <<<"$(crontab -l 2>/dev/null)"
 }
 
 # kit_routines_cron_add <sentinel> <cron_line_pair>
@@ -173,7 +173,7 @@ kit_routines_list() {
     cad="$(printf '%s' "$cat"  | jq -r ".routines[$i].cadence")"
     cost="$(printf '%s' "$cat" | jq -r ".routines[$i].cost")"
     desc="$(printf '%s' "$cat" | jq -r ".routines[$i].description" | cut -c1-50)"
-    if printf '%s\n' "$accepted" | grep -qx "$id" 2>/dev/null; then
+    if grep -qx "$id" <<<"$accepted" 2>/dev/null; then
       status="accepted"
     else
       status="available"

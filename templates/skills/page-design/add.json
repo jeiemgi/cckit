@@ -1,0 +1,5 @@
+{
+  "label": "page-design",
+  "summary": "cckit's own skill for a page: a design brief before any code, three named third-party design skills in a fixed order, a self-review after. Also makes every task of the project a page task.",
+  "config": { "key": "tasks.design", "value": true }
+}

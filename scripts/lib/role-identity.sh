@@ -11,12 +11,24 @@
 # Tunables (env):
 #   KIT_ROLE_EMAIL_DOMAIN  synthetic author-email domain (default: agents.local — not a real inbox)
 #   KIT_AGENT_LABEL        suffix in the author/sig label (default: agent)
-# errors: pure — maps a role slug to an author + signature
+# errors: pure — maps a role slug to an author + signature; an unknown slug prints an empty line
 KIT_ROLE_EMAIL_DOMAIN="${KIT_ROLE_EMAIL_DOMAIN:-agents.local}"
 KIT_AGENT_LABEL="${KIT_AGENT_LABEL:-agent}"
 
 # role_display <slug> -> human label (empty for unknown/blank)
+# The fixed list covers every role a shipped profile declares. A slug outside it resolves through
+# the project's own roles (KIT_ROLES, newline-delimited display names from `roles` in the config,
+# exported by load_kit_config): "Brand Lead" answers for `brand-lead`. So a role a project adds to
+# its config signs its commits and pull requests without a code change here (#416).
 role_display() {
+  local _rd_role _rd_slug
+  case "$1" in
+    editor)     echo "Editor"; return 0 ;;
+    researcher) echo "Researcher"; return 0 ;;
+    analyst)    echo "Analyst"; return 0 ;;
+    automation) echo "Automation"; return 0 ;;
+    generalist) echo "Generalist"; return 0 ;;
+  esac
   case "$1" in
     designer)  echo "Designer" ;;
     devops)    echo "DevOps" ;;
@@ -29,7 +41,18 @@ role_display() {
     tech-lead) echo "Tech Lead" ;;
     research)  echo "Research" ;;
     backend)   echo "Backend" ;;
-    *)         echo "" ;;
+    '')        echo "" ;;
+    *)
+      # No pipe and no `<<<`: this file is sourced by bash 3.2 and zsh, and the loop must set the
+      # answer in this shell.
+      while IFS= read -r _rd_role; do
+        [ -n "$_rd_role" ] || continue
+        _rd_slug="$(printf '%s' "$_rd_role" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')"
+        if [ "$_rd_slug" = "$1" ]; then printf '%s\n' "$_rd_role"; return 0; fi
+      done <<_RD_EOF
+${KIT_ROLES:-}
+_RD_EOF
+      echo "" ;;
   esac
 }
 

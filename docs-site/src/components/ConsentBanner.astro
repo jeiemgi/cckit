@@ -97,6 +97,12 @@ const GA_ENABLED = Boolean(import.meta.env.PUBLIC_GA_MEASUREMENT_ID);
       var el = document.getElementById('cckit-consent');
       if (!el) return;
 
+      // Footer.astro mounts this inside Starlight's `.main-pane`, which sets `isolation: isolate`.
+      // That traps the banner's z-index in the main pane's stacking context, so the fixed sidebars
+      // paint over it and the Accept button cannot be clicked (#435). Re-parent to <body> so the
+      // banner stacks against the whole page. The scoped style follows the element.
+      if (el.parentElement !== document.body) document.body.appendChild(el);
+
       function hide() { el.hidden = true; }
       function show() { el.hidden = false; }
 

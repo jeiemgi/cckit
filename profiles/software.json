@@ -21,7 +21,13 @@
     "effort-model",
     "delegation-brief",
     "skill-gaps",
-    "task-management"
+    "issue-lifecycle",
+    "merge-safety",
+    "gate-and-review",
+    "authoring",
+    "shared-checkout",
+    "task-management",
+    "review-pages"
   ],
   "roles": ["PM", "Tech Lead", "Designer", "DevOps", "Backend", "Frontend", "QA", "Security"],
   "milestones": ["Foundation", "MVP", "Beta", "GA"],

@@ -134,7 +134,7 @@ printf '%s\n' "$FILES" | xargs perl -0ne 'while(/<[A-Za-z]*Icon\b((?:(?!\/>)[\s\
 
 # 10. Repeated className literals (3+ times, multi-word) — component candidates, with their locations.
 section "10 REPEATED_CLASSNAMES — identical multi-utility className literals appearing 3+ times (→ component or variant)"
-REPEATED=$(printf '%s\n' "$FILES" | xargs grep -ohE 'className="[^"]{24,}"' 2>/dev/null | sort | uniq -c | sort -rn | awk '$1>=3{c=$1; $1=""; sub(/^ /,""); printf "%d\t%s\n", c, $0}' | head -30)
+REPEATED=$(printf '%s\n' "$FILES" | xargs grep -ohE 'className="[^"]{24,}"' 2>/dev/null | sort | uniq -c | sort -rn | awk '$1>=3{c=$1; $1=""; sub(/^ /,""); printf "%d\t%s\n", c, $0}' | sed -n 1,30p)
 printf '%s\n' "$REPEATED" | awk -F'\t' 'NF{printf "  %3d  %s\n", $1, $2}'
 printf -- '-- occurrences (file:line) per repeated literal:\n'
 printf '%s\n' "$REPEATED" | cut -f2 | while IFS= read -r lit; do

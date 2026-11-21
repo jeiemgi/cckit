@@ -1,0 +1,31 @@
+---
+// Outcomes — the exhaustive list under a <Chat>, collapsed. Wraps the page's Markdown table of
+// outputs, meanings and exit codes unchanged; the table still renders as record cards. The summary
+// counts the rows: "All 3 outcomes of `cckit update`".
+//
+//   <Outcomes of="cckit update">
+//
+//   | Output | Meaning | Exit |
+//   | --- | --- | --- |
+//   | … | … | 10 |
+//
+//   </Outcomes>
+interface Props {
+  of: string;
+  title?: string;
+}
+const { of, title } = Astro.props;
+const es = /^\/es(\/|$)/.test(Astro.url.pathname);
+const html = Astro.slots.has('default') ? await Astro.slots.render('default') : '';
+const records = (html.match(/class="cckit-record"/g) ?? []).length;
+const body = html.split('<tbody')[1] ?? '';
+const rows = records || (body.match(/<tr[\s>]/g) ?? []).length;
+const lead = es
+  ? rows === 1 ? 'El resultado de' : rows > 1 ? `Los ${rows} resultados de` : 'Todos los resultados de'
+  : rows === 1 ? 'The outcome of' : rows > 1 ? `All ${rows} outcomes of` : 'All outcomes of';
+---
+
+<details class="cckit-outcomes">
+  <summary>{title ?? <>{lead} <code>{of}</code></>}</summary>
+  <Fragment set:html={html} />
+</details>

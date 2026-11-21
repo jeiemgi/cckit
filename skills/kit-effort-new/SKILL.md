@@ -14,8 +14,16 @@ Repo + board config come from `load_kit_config` (`$KIT_REPO`, `KIT_PROJECTS_V2`)
 `.claude/kit.config.json` from the working directory.
 
 Creates the **parent issue** (the plan) + **N native sub-issues** for one effort. See
-`rules/effort-model.md` for the model and the parent-issue template. GitHub is the single source of
-truth — the parent issue IS the plan (no separate plan file).
+`rules/effort-model.md` for the model and the parent-issue template.
+
+## Before creating — show the plan
+
+The parent issue is the plan, and nothing is created until the owner has seen it. When
+`cckit page mode` prints `page`, present the Goal, the sub-issue list and the open choices as a
+review page (`/kit-page`, kind `plan`) and collect the approval there; when it prints `terminal`,
+show the same in the terminal. After the effort exists, record the approval and any choice made on
+the way with `cckit page answer --kind plan --issue <parent>`. The page is recommended, not a
+gate: `cckit effort start` checks nothing.
 
 ## Inputs
 
@@ -31,14 +39,13 @@ truth — the parent issue IS the plan (no separate plan file).
 | Sub-issues   | ✓        | List of `name :: one-line desc` — one per concern (the skill numbers + prefixes them)        |
 | Depends on   | optional | `#N` list → native GitHub `blocked_by` edge + a `## Relations` line (the visible chain)      |
 | Priority     | optional | `p0`–`p3` → `priority:<p>` label (default `p1`)                                             |
+| Kind         | optional | `--kind`: feat / fix / task / chore / security / scaffold / ci / adr / spike / plan, or a content kind (post / campaign / brand / research) → `kind:<k>` on the parent and every sub (default `task`) |
 | Milestone    | optional | Inherited onto the parent (sub-issues inherit it too)                                       |
 
 ## Execution
 
-This skill is a **thin caller** of the shared creation core `effort_new`
-(`scripts/lib/effort-ops.sh`) — the SAME function `cckit effort new` runs (effort #98). The core owns
-body composition, the `ctx/kind/priority/role/flow` label set, per-sub title lint, native sub-issue
-links, `blocked_by` edges, and the board add. There is no second implementation here.
+The core `effort_new` owns body composition, the `ctx/kind/priority/role/flow` label set, per-sub
+title lint, native sub-issue links, `blocked_by` edges, and the board add.
 
 ```bash
 source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/kit-config.sh" && load_kit_config
@@ -72,9 +79,8 @@ PARENT_NUM=$(effort_new \
 echo "✓ effort #$PARENT_NUM created — next: /kit-effort-start $PARENT_NUM"
 ```
 
-> The block above is intentionally short: all creation logic lives in `effort_new`. If you need to
-> change what an effort looks like (body, labels, lint, board), change the core — both the skill and
-> the verb move together.
+> To change what an effort looks like (body, labels, lint, board), change the core — both the skill
+> and the verb move together.
 
 ## Output
 

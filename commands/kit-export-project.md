@@ -41,8 +41,6 @@ two artifacts, and checks the project is portable.
    bash "${CLAUDE_PLUGIN_ROOT}/scripts/kit-export-project.sh" $ARGUMENTS
    ```
 
-   (or `kit export $ARGUMENTS` — the CLI dispatches to the same canonical script.)
-
 2. For a full export, tell the user the two manual steps claude.ai needs:
    - paste `.kit-export/claude-instructions.md` into the Project's custom-instructions box
    - upload `.kit-export/project-knowledge/` as the Project's knowledge

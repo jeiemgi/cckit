@@ -1,0 +1,81 @@
+{
+  "id": "graft",
+  "label": "Graft",
+  "summary": "Code-graph retrieval: agents ask an index where code lives, who calls a symbol and what a diff reaches, instead of grepping the tree.",
+  "why": "The retrieval verbs (ask, grep, skeleton, callers, map, blast) parse with tree-sitter: no model, no API key. `graft build --deep` is the one command that calls an LLM, and cckit never runs it.",
+  "config": { "key": "codeGraph.provider", "value": "graft" },
+  "appliesWhen": {
+    "anyExtension": [
+      ".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs",
+      ".py", ".pyi", ".go", ".java", ".kt", ".kts", ".swift", ".php", ".r", ".R",
+      ".rs", ".c", ".h", ".cpp", ".cc", ".cxx", ".hpp", ".hh", ".rb", ".cs",
+      ".scala", ".sc", ".ex", ".exs", ".sol", ".ml", ".mli", ".zig", ".dart",
+      ".clj", ".cljs", ".cljc", ".bb", ".nix", ".lua"
+    ],
+    "note": "Read from dist/graph/extract.js (depth tier) and dist/graph/generic.js (breadth tier) of @nanonets/graft 0.18.0. A file whose extension is absent is skipped, not indexed. There is no shell grammar, so a repo of only .sh files gets an empty graph and the integration is not offered there."
+  },
+  "detect": { "run": "graft --version" },
+  "install": [
+    {
+      "manager": "npm",
+      "run": "npm install -g @nanonets/graft",
+      "note": "The upstream-documented install, and the one that runs here: 0.18.0 on darwin/arm64, Node v22.23.2."
+    },
+    {
+      "manager": "pnpm",
+      "run": "pnpm add -g @nanonets/graft",
+      "note": "Second on evidence: on darwin/arm64 with Node 22 (abi 127) the pnpm install exits 0 and every invocation, `graft --version` included, then dies with 'No native build was found' loaded from tree-sitter-kotlin. detect fails on that, so the runner reports the tool missing instead of installed."
+    }
+  ],
+  "wire": {
+    "run": "graft init --agents claude",
+    "dryRun": "graft init --agents claude --no-statusline --no-global --dry-run",
+    "writes": [
+      ".claude/settings.json (hook blocks, four permissions.allow entries, footerLinksRegexes)",
+      ".claude/helpers/graft-hooks.cjs",
+      ".claude/helpers/graft-statusline.cjs",
+      ".claude/skills/graft/SKILL.md",
+      ".mcp.json (mcpServers.graft)",
+      ".gitignore (/graft/)",
+      ".ignore",
+      "graft/ (the graph: init also runs `graft build`)"
+    ],
+    "declined": {
+      "--no-statusline": "cckit ships its own statusline, and a project-level statusLine hides a user-level one. The shim file .claude/helpers/graft-statusline.cjs is still written; no statusLine key is.",
+      "--no-global": "Without it graft init also writes ~/.claude/settings.json, ~/.claude/helpers/graft-hooks.cjs and ~/.claude.json, which change every repo on the machine. A per-project integration stays inside the project."
+    },
+    "kept": {
+      "hooks": "ON. Tested 2026-11-11 with graft 0.18.0: `graft init --agents claude --no-statusline --no-global` in a scratch repo whose .claude/settings.json already held one hook entry on each of SessionStart, UserPromptSubmit, PostToolUse and Stop. All four entries survived byte-identical and stayed first in their event; graft appended its own (one per event, two on PostToolUse). A second init left settings.json identical. Hooks are the push path (graft adds matching locations to a prompt unasked); the MCP server it also registers is the pull path."
+    }
+  },
+  "build": {
+    "run": "graft build",
+    "cost": "Local tree-sitter parse, no API key.",
+    "deep": { "run": "graft build --deep", "cost": "LLM calls under the user's own key.", "auto": false }
+  },
+  "rules": ["code-retrieval"],
+  "afterInstall": "run 'graft init --agents claude --no-statusline --no-global' in the repo to wire it",
+  "verify": {
+    "run": "graft --version",
+    "failsOn": "The binary is missing, or its native tree-sitter build does not load on this Node version. `graft check` is the per-repo freshness check: exit 1 when graft/ is absent or has drifted from the code."
+  },
+  "uninstall": "graft uninstall -y --no-global",
+  "recheck": {
+    "cadence": "monthly",
+    "drifts": [
+      "the package name @nanonets/graft on npm",
+      "the graft init flag names (--agents, --no-statusline, --no-global)",
+      "the indexed extension list",
+      "whether graft init still preserves existing hook entries"
+    ]
+  },
+  "docs": "https://github.com/trailhq/Trail-Code#readme",
+  "attribution": {
+    "author": "NanoNets / Trail",
+    "license": "MIT",
+    "homepage": "https://github.com/trailhq/Trail-Code",
+    "affiliated": false,
+    "notice": "Graft is open-source software by NanoNets / Trail, installed from its public npm package under its own MIT license. cckit is not affiliated with either.",
+    "telemetry": "Per the vendor README: a daily npm version check and one batched anonymous usage ping, opt-out. `graft telemetry disable` or DO_NOT_TRACK=1 turns the ping off. cckit sets neither."
+  }
+}

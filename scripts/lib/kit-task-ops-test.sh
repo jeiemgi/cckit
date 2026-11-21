@@ -29,6 +29,8 @@ if [ -n "${KTO_TEST_INNER:-}" ]; then
   # kto_base_branch / kto_board_enabled (portability toggles)
   eq "base default"        "$(unset KIT_BASE_BRANCH; kto_base_branch)"      "main"
   eq "base override"       "$(KIT_BASE_BRANCH=main; kto_base_branch)"       "main"
+  eq "base explicit wins"  "$(KIT_BASE_BRANCH=develop; kto_base_branch release)" "release"
+  eq "base explicit empty" "$(KIT_BASE_BRANCH=develop; kto_base_branch '')"  "develop"
   if ( unset KIT_PROJECTS_V2; kto_board_enabled ); then eq "board default on" "on" "on"; else eq "board default on" "off" "on"; fi
   ( KIT_PROJECTS_V2=false; if kto_board_enabled; then exit 0; else exit 1; fi ) \
     && eq "board off" "on" "off" || eq "board off" "off" "off"
@@ -52,6 +54,15 @@ if [ -n "${KTO_TEST_INNER:-}" ]; then
   eq "kind:chore → chore" \
      "$(kto_pr_title '[Effort 75] 7 · rich rendering' '' 'kind:chore')" \
      "chore: rich rendering"
+  eq "kind:post (content kind) → docs, never feat" \
+     "$(kto_pr_title 'Write the spring newsletter' '' 'kind:post,role:editor')" \
+     "docs: Write the spring newsletter"
+  eq "kind:research (content kind) → docs" \
+     "$(kto_pr_title 'Competitor pricing pages' '' 'kind:research')" \
+     "docs: Competitor pricing pages"
+  eq "kind:fix → fix" \
+     "$(kto_pr_title 'broken link' '' 'kind:fix')" \
+     "fix: broken link"
   eq "conventional summary wins over derivation" \
      "$(kto_pr_title '[Effort 182] 2 · Publish to npm' 'ci: publish via OIDC' 'kind:task')" \
      "ci: publish via OIDC"
@@ -79,6 +90,21 @@ if [ -n "${KTO_TEST_INNER:-}" ]; then
   case "$body" in *"Closes #42"*) ;; *) echo "FAIL($KTO_TEST_INNER): pr body missing Closes #42"; fail=1 ;; esac
   case "$body" in *"Did the thing."*) ;; *) echo "FAIL($KTO_TEST_INNER): pr body missing summary"; fail=1 ;; esac
 
+  # pr.bodyStyle = content (#418): draft-and-review wording, none of the code wording
+  eq "body style defaults to code" "$(kto_pr_body_style)" "code"
+  eq "body style content"          "$(KIT_PR_BODY_STYLE=content kto_pr_body_style)" "content"
+  eq "an unknown body style is code" "$(KIT_PR_BODY_STYLE=fancy kto_pr_body_style)" "code"
+  case "$body" in *"Reproduced manually"*"in the diff"*) ;; *) echo "FAIL($KTO_TEST_INNER): the code body lost its Verification wording"; fail=1 ;; esac
+  cb="$(KIT_PR_BODY_STYLE=content kto_compose_pr_body 42 'Drafted the post.' 'editor')"
+  case "$cb" in *"Closes #42"*) ;; *) echo "FAIL($KTO_TEST_INNER): content body missing Closes #42"; fail=1 ;; esac
+  case "$cb" in *"Drafted the post."*) ;; *) echo "FAIL($KTO_TEST_INNER): content body missing summary"; fail=1 ;; esac
+  case "$cb" in *"## Review"*"Read the draft from start to finish"*"The voice matches the brand guide"*) ;; *) echo "FAIL($KTO_TEST_INNER): content body missing the review checklist"; fail=1 ;; esac
+  for w in "diff" "Reproduced manually" "## Verification" "styles render"; do
+    case "$cb" in *"$w"*) echo "FAIL($KTO_TEST_INNER): content body still says '$w'"; fail=1 ;; esac
+  done
+  cb="$(KIT_PR_BODY_STYLE=content KIT_PR_ORCHESTRATOR_SECTION=true kto_compose_pr_body 42 'S.' 'editor' 'Spring post')"
+  eq "content orchestrator line 2" "$(printf '%s\n' "$cb" | sed -n 4p)" "Review: the summary below and the changed files."
+
   # kto_compose_issue_body must include the user body, and the Plan + Blocked lines when given
   ib="$(kto_compose_issue_body 'Context here' 'apps/admin/p.mdx' '#9' 'frontend')"
   case "$ib" in *"Context here"*) ;; *) echo "FAIL($KTO_TEST_INNER): issue body missing user body"; fail=1 ;; esac
@@ -86,6 +112,17 @@ if [ -n "${KTO_TEST_INNER:-}" ]; then
   case "$ib" in *"**Blocked by:** #9"*) ;; *) echo "FAIL($KTO_TEST_INNER): issue body missing Blocked line"; fail=1 ;; esac
   ib2="$(kto_compose_issue_body 'Only body' '' '' 'frontend')"
   case "$ib2" in *"**Plan:**"*) echo "FAIL($KTO_TEST_INNER): issue body has Plan line when none given"; fail=1 ;; *) ;; esac
+
+  # _kto_role_option_for_slug (#378): a slug role_display does not list still reaches the board
+  # lookup (role_display is stubbed to print nothing here, so EVERY slug is "unlisted").
+  role_option_id() { printf 'opt<%s>' "$1"; }
+  eq "role option: unlisted slug falls back to the slug" "$(_kto_role_option_for_slug data-eng)" "opt<data-eng>"
+  eq "role option: empty slug asks nothing"              "$(_kto_role_option_for_slug '')"       ""
+  role_display() { case "$1" in tech-lead) echo "Tech Lead" ;; esac; }
+  eq "role option: listed slug uses its display name"    "$(_kto_role_option_for_slug tech-lead)" "opt<Tech Lead>"
+  eq "role option: slug the display map lacks"           "$(_kto_role_option_for_slug backend)"   "opt<backend>"
+  role_display() { :; }
+  unset -f role_option_id
 
   if [ "$fail" -eq 0 ]; then echo "PASS($KTO_TEST_INNER): kit-task-ops helpers"; fi
   exit "$fail"

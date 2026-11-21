@@ -1,0 +1,99 @@
+---
+title: Why an agent team needs memory
+description: What a team of agents loses between sessions, what a session starts with once memory is on, and why memory in cckit is optional, off by default and provided by MemPalace.
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+A coding agent starts every session knowing nothing about yesterday. It has the files in the
+repository and whatever you type. It does not have the reason the team chose one database over
+another, the approach that was tried last week and dropped, or what the previous session left half
+done.
+
+On a team of agents that gap costs more than it does for one person. Each session asks again what
+was already answered and decides again what was already settled, and two sessions can settle the
+same question two different ways. The person running the team ends up carrying the memory for all
+of them.
+
+## What the team does about it
+
+The team keeps a shared record outside any single session, and every session does two things with
+it:
+
+1. **Reads it at the start.** The session opens with a short summary of the project and its recent
+   decisions. The summary is short: about 600 to 900 tokens, a few paragraphs, so nearly all of
+   what the session can hold is left for the work.
+2. **Writes to it at the end.** The finished session is filed back, so the next one can search it.
+
+What that buys:
+
+- **Continuity.** A session picks up where the last one stopped, whether that was you or another
+  agent.
+- **Decisions that stay decided.** An architecture decision, a trade-off, a "we tried that and it
+  failed" is still there a week later.
+- **A record you can search.** Everything filed can be queried by you and by later sessions.
+
+## Memory is optional, and off until you switch it on
+
+Every profile cckit ships (`software`, `content`, `marketing`, `research`, `automation`, `minimal`)
+sets memory to off. A project works without it: issues, pull requests and the docs in the
+repository already hold most of what a team has to remember. Turn memory on when sessions keep
+asking for context that lives in conversations and not in the repository.
+
+## Who does it
+
+Nobody has "memory" as a job. With memory on:
+
+- **Every session** reads the summary at the start and files its work at the end, through four
+  hooks. A hook is a script the agent's app runs by itself at a fixed moment, such as when a
+  session starts.
+- **Each specialist agent** (the project manager, the tech lead and the others in your profile)
+  keeps a diary of its own sessions and saves project decisions to the shared record.
+- **You** switch it on once, and edit one line that describes the project.
+
+## The tool that plugs in
+
+cckit does not build a memory tool. It adopts [MemPalace](https://github.com/MemPalace/mempalace),
+open-source software that runs on your machine and needs no API key. MemPalace stores the record,
+searches it and serves it to the agent. cckit adds the parts that connect it to a project: the four
+session hooks, one rule file that tells the agent when to read and when to write, and the install
+step in `cckit doctor`.
+
+MemPalace is one of the [integrations](/integrations/) cckit can install for you.
+
+## What you say, and what runs
+
+Memory is a conversation with your agent in the chat. These are the sentences you will use on the
+Bakery site, and the command your agent runs for each.
+
+<div data-table="grid">
+
+| What you say | What runs |
+| --- | --- |
+| "Set up the Bakery site with memory on." (sets up a project with memory on: the hooks, the rule and the config switch) | `cckit init --memory on` |
+| "Check that memory works, and install the tool if it is missing." (installs the MemPalace command-line tool after you say yes, and checks the project's memory files) | `cckit doctor` |
+| "Turn memory on in this project." (sets `memory.enabled` in a project that already has the memory files; it adds no file) | `cckit add mempalace` |
+| "Leave a note for the next session: the Christmas menu is half done." (needs no memory tool and works with memory off) | `cckit handoff "<note>"` |
+
+</div>
+
+## Codex
+
+Under Codex the automatic part does not run: no memory hook is installed. See
+[How cckit uses memory](/memory/how-cckit-uses-it/#under-codex).
+
+## Guides
+
+<CardGrid>
+  <LinkCard title="Install MemPalace" href="/memory/install-mempalace/" description="Switch memory on, install the tool, connect it to Claude Code and check that a session starts with context." />
+  <LinkCard title="How cckit uses memory" href="/memory/how-cckit-uses-it/" description="The four hooks, where each kind of note goes, the rule the agent follows, and what does not work under Codex." />
+</CardGrid>
+
+<Aside type="note" title="Not affiliated">
+The memory engine, the palace format and the MCP server are the work of the open-source
+[MemPalace](https://github.com/MemPalace/mempalace) project (maintainer
+[@milla-jovovich](https://github.com/MemPalace)). cckit is not a maintainer of MemPalace and has no
+affiliation with or endorsement from the project or its authors. MemPalace is independent software
+under its own license. Send MemPalace bugs and questions to
+[its own issue tracker](https://github.com/MemPalace/mempalace/issues), not to cckit.
+</Aside>

@@ -1,0 +1,178 @@
+---
+title: Install and check
+description: "Put the cckit command on your machine, then let cckit doctor confirm the dependencies and the GitHub sign-in."
+---
+
+import { LinkCard, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+import Chat from '../../../components/Chat.astro';
+
+Every step of the process is one `cckit` command, and every one of them talks to GitHub. So before
+a project can be set up, the machine needs two things: the command itself, and a GitHub sign-in it
+can use. This page gets you both and has cckit check its own work.
+
+Each step starts with the sentence you say to your agent in the chat. Below it is the command your
+agent runs for that sentence, and what it printed, pasted from a real run on the Bakery site, the
+example project of these guides. You can type any command yourself.
+
+**What you will have at the end:** `cckit` answers in any folder, `cckit doctor` reports nothing
+missing, and `gh` is signed in to GitHub. No repository has been touched yet.
+
+## Steps
+
+## 1. Confirm your platform is supported
+
+| Platform | Supported |
+| -------- | --------- |
+| macOS    | Yes, native |
+| Linux    | Yes, native |
+| Windows  | Yes, through WSL or Git Bash (not native cmd or PowerShell) |
+
+The command-line tools it needs are checked for you in step 4.
+
+## 2. Install cckit
+
+<Chat
+  title="installing cckit for the Bakery site"
+  say="Install cckit on this computer so we can set up the Bakery site."
+  ran="curl -fsSL https://cckit.dev/install.sh | bash"
+  means="This puts the cckit command on your machine. It does not touch any repository."
+>
+  I used the one-line installer. The next step checks that the command answers.
+</Chat>
+
+That is one way to install. Each tab is another; pick one and copy the box.
+
+<Tabs syncKey="install-method">
+  <TabItem label="One-liner">
+    ```sh title="macOS · Linux · WSL — no npm or brew"
+    curl -fsSL https://cckit.dev/install.sh | bash
+    ```
+  </TabItem>
+  <TabItem label="Homebrew">
+    ```sh title="Formula/cckit.rb"
+    brew install jeiemgi/cckit/cckit
+    ```
+  </TabItem>
+  <TabItem label="npm">
+    ```sh title="the bare name is taken, so cckit is scoped"
+    npm install -g @jeiemgi/cckit
+    ```
+  </TabItem>
+  <TabItem label="From source">
+    ```sh title="symlinks bin/cckit onto your PATH"
+    git clone https://github.com/jeiemgi/cckit.git
+    cd cckit && ./scripts/install.sh
+    ```
+  </TabItem>
+</Tabs>
+
+## 3. Confirm the command is there
+
+<Chat
+  title="checking that cckit is installed"
+  say="Is cckit installed? Which version?"
+  ran="cckit version"
+  output="cckit 0.9.0"
+  means="The command is on your PATH and prints the installed version."
+>
+  Yes, cckit 0.9.0 is installed.
+</Chat>
+
+## 4. Let the doctor check the rest
+
+You need `bash`, `git`, [`gh`](https://cli.github.com/) (the GitHub command-line tool), `jq` (a JSON
+reader) and `perl`. `cckit doctor` finds what is missing and, **when you run it in a terminal, asks
+before installing anything**.
+
+<Chat
+  title="checking the Bakery computer for missing tools"
+  say="Check that this computer has everything cckit needs, and tell me what is missing."
+  ran="cckit doctor"
+  output={[
+    "  ⡶ / claude-kit  kit-doctor",
+    "  onboarding preflight [dry-run] [no-install]",
+    "  - report-only — no terminal and no --fix, so nothing is installed and no file is written. To install: cckit doctor --fix",
+    "",
+    "  Tier 0 — bootstrap",
+    "  ✓  Homebrew                     Homebrew 7.0.13-97-g53c5856",
+    "",
+    "  Tier 1 — hard deps",
+    "  ✓  git                          2.55.0",
+    "  ✓  gh                           2.104.0 (Projects v2 ok)",
+    "  ✓  jq                           jq-1.8.2",
+    "  ✓  perl                         is",
+    "…",
+    "  Summary",
+    "       18 checked ok",
+  ]}
+  means="Run with no terminal to ask in, the doctor only reports: it installs nothing and writes no file. It says so on its second line."
+>
+  Nothing is missing: `git`, `gh`, `jq` and `perl` are all present, and 18 checks passed. Because I
+  ran this without a terminal, I installed nothing.
+</Chat>
+
+Run in a terminal, the doctor asks before it installs each missing piece (Homebrew, `gh`, `jq`, …).
+Say yes and it installs it. Say no and it prints the exact commands to run yourself. Run where there
+is no terminal to ask in (from an agent, a script, CI) it installs nothing and writes no file. To
+skip the question, use `--fix`:
+
+```bash title="Install the missing pieces without the prompt"
+cckit doctor --fix
+```
+
+## 5. Sign in to GitHub
+
+<Chat
+  title="signing in to GitHub for the Bakery site"
+  say="Sign this computer in to GitHub."
+  ran="gh auth login"
+  means="This one needs you. The command asks you questions and opens a browser to confirm the sign-in."
+>
+  I started the sign-in, but I cannot finish it for you: it waits on a code and a browser window.
+  Complete it in your terminal, then I will run the doctor again.
+</Chat>
+
+<Aside type="tip" title="New to the terminal? Start here">
+The terminal is the text window where you type commands. [`gh`](https://cli.github.com/) is GitHub's
+official command-line tool. Run `cckit doctor`, approve the prompt, and it installs `gh` (and anything
+else missing) for you; then `gh auth login` signs you in.
+</Aside>
+
+## Check it worked
+
+<Chat
+  title="running the doctor again on the Bakery computer"
+  say="Is everything in place now?"
+  ran="cckit doctor"
+  output={[
+    "…",
+    "  Tier 1 — hard deps",
+    "  ✓  git                          2.55.0",
+    "  ✓  gh                           2.104.0 (Projects v2 ok)",
+    "  ✓  jq                           jq-1.8.2",
+    "  ✓  perl                         is",
+    "…",
+    "  Summary",
+    "       18 checked ok",
+  ]}
+  means="A row that is still missing prints the command that fixes it."
+>
+  Yes. Everything cckit needs is installed and nothing is left to do.
+</Chat>
+
+It should report `git`, `gh` (authenticated), `jq` and `perl` as present and list nothing left to do. If a
+row is still missing, the doctor prints the command that fixes it.
+
+## Looking something up
+
+How each install route works, what it depends on and how it updates:
+[Install and update matrix](/install-matrix/).
+
+## Next step
+
+Installing only puts `cckit` on your PATH. Nothing has touched a repository yet.
+
+<LinkCard title="Initialize a project" href="/getting-started/initialize/" description="Set cckit up in a repository or a new folder, and pick the profile that matches your team." />
+
+A repository that already has cckit files copied in by hand follows
+[Add cckit to an existing repo](/getting-started/existing-repo/) instead.

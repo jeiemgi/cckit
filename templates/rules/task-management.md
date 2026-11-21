@@ -5,6 +5,16 @@
 - **GitHub issues** in `{{GH_REPO}}`<!-- IF:PROJECTS_V2 --> + the Projects v2 board (`https://github.com/users/{{GH_OWNER}}/projects/{{PROJECT_NUMBER}}`)<!-- /IF:PROJECTS_V2 -->
 - **Never** maintain task lists in markdown files. Use `gh issue` + the `task-*` skills so state stays in one place.
 - Always re-fetch from `gh` — never trust a stale session snapshot.
+<!-- IF:LIGHT_TASKS -->
+- **This project's default list is light tasks** (`tasks.default: "light"`). Work is recorded with
+  `cckit task new`, listed with `cckit task list`, started with `cckit task start <id>` and sent for
+  review with `cckit task finish <id> "<summary>" --all`, which opens the pull request (`--all`
+  includes the files created for the task; without it a new draft is left out).
+  `cckit task run <id>` does the start, one unattended round behind the project's check
+  (`tasks.check`) and the pull request in one step. The issue loop
+  below applies only to work {{OWNER_NAME}} asks to track as a GitHub issue. `tasks/` is that list
+  and `cckit task` keeps it: the "never maintain task lists in markdown" line does not cover it.
+<!-- /IF:LIGHT_TASKS -->
 
 ## Roles
 
@@ -15,6 +25,8 @@ The role determines which agent owns the work. Spawn that agent for the actual e
 ## Kinds
 
 `task` · `plan` · `adr` · `scaffold` · `spike` — drives the branch prefix `<kind>/<N>-<slug>`.
+Content kinds `post` · `campaign` · `brand` · `research` are labels only: the branch starts on
+`task/` · `plan/` · `task/` · `spike/`.
 
 ## Priorities
 
@@ -35,7 +47,7 @@ The role determines which agent owns the work. Spawn that agent for the actual e
 
 ## Rules
 
-- One PR per issue — no monster PRs. **Exception: a coupled migration/DDL chain ships as ONE PR (and ideally one issue)** — don't fragment a sequenced migration set into a PR-per-file. Split only for genuinely independent migrations or a step needing its own review gate (data backfill, RLS behavior change).
+- One PR per issue — no monster PRs. **Exception: a coupled migration/DDL chain ships as ONE PR (and ideally one issue)** — don't fragment a sequenced migration set into a PR-per-file. Split only for independent migrations or a step needing its own review gate (data backfill, RLS behavior change). `merge-safety.md` § 2 is the general form: any coupled chain, not only DDL.
 - PR title = issue title · body includes `Closes #N`
 - Labels + milestone inherited from the issue
 - Never file an issue without confirming title + role + priority with {{OWNER_NAME}}

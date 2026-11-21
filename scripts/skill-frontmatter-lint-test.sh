@@ -52,7 +52,7 @@ mk_skill bloated 700 200
 capture
 if [ "$run_rc" -eq 0 ]; then
   fail "new over-budget skill is rejected (exited 0)"
-elif printf '%s' "$run_out" | grep -q "over the .*listing budget"; then
+elif grep -q "over the .*listing budget" <<<"$run_out"; then
   pass "new over-budget skill is rejected"
 else
   fail "new over-budget skill is rejected (wrong message: $run_out)"
@@ -68,7 +68,7 @@ mk_skill bloated 900 200
 capture
 if [ "$run_rc" -eq 0 ]; then
   fail "growth past baseline is rejected (exited 0)"
-elif printf '%s' "$run_out" | grep -q "always-resident context may not grow"; then
+elif grep -q "always-resident context may not grow" <<<"$run_out"; then
   pass "growth past baseline is rejected"
 else
   fail "growth past baseline is rejected (wrong message: $run_out)"
@@ -79,7 +79,7 @@ mk_skill bloated 200 100
 capture
 if [ "$run_rc" -ne 0 ]; then
   fail "shrunk skill passes and nudges --update (exited $run_rc)"
-elif printf '%s' "$run_out" | grep -q "now under budget"; then
+elif grep -q "now under budget" <<<"$run_out"; then
   pass "shrunk skill passes and nudges --update"
 else
   fail "shrunk skill passes but no re-baseline nudge"
@@ -126,7 +126,7 @@ mkdir -p "$TMP/.claude/skills/scaffolded"
   echo "---"
 } > "$TMP/.claude/skills/scaffolded/SKILL.md"
 capture
-if [ "$run_rc" -ne 0 ] && printf '%s' "$run_out" | grep -q 'scaffolded'; then
+if [ "$run_rc" -ne 0 ] && grep -q 'scaffolded' <<<"$run_out"; then
   pass ".claude/skills/ is linted"
 else
   fail ".claude/skills/ is linted (rc=$run_rc: $run_out)"

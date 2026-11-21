@@ -39,7 +39,7 @@ green'
   no  "section stops at the next heading" "$sec" "green"
   no  "section excludes its own heading"  "$sec" "## For agents"
   # the trim runs at both ends, so a lifted section drops in without a stray gap
-  eq  "section trims leading blank"  "$(printf '%s\n' "$sec" | head -1)" "build order matters"
+  eq  "section trims leading blank"  "$(printf '%s\n' "$sec" | sed -n 1p)" "build order matters"
   eq  "section trims trailing blank" "$(printf '%s\n' "$sec" | tail -1)" '- `scripts/lib/a.sh`'
   eq  "absent section is empty"      "$(printf '%s\n' "$body" | kit_brief_section "Nope")" ""
   # heading match is case-insensitive but not a prefix match
@@ -88,7 +88,7 @@ EOF
 - not a gotcha
 EOF
   eq "falls back to the kit template" \
-     "$(kit_brief_gotchas "$tmp/proj" | head -1)" "- template gotcha"
+     "$(kit_brief_gotchas "$tmp/proj" | sed -n 1p)" "- template gotcha"
   cat > "$tmp/proj/.claude/rules/delegation-brief.md" <<'EOF'
 # Delegation brief
 ## Standing gotchas
@@ -99,7 +99,7 @@ EOF
 - not a gotcha
 EOF
   g="$(kit_brief_gotchas "$tmp/proj")"
-  eq  "project rule wins over the template" "$(printf '%s\n' "$g" | head -1)" "- project gotcha"
+  eq  "project rule wins over the template" "$(printf '%s\n' "$g" | sed -n 1p)" "- project gotcha"
   no  "gotchas stop at the next heading"    "$g" "not a gotcha"
   eq  "no rule file yields nothing"         "$(kit_brief_gotchas "$tmp/empty-root")" ""
 
@@ -268,6 +268,25 @@ EOF
     has "the brief reaches the helpers table"   "$brief_out" "## Helpers you already have"
     has "the brief reaches the standing gotchas" "$brief_out" "fixture gotcha"
     has "the brief reaches the durable-prose mandate" "$brief_out" 'concrete'
+
+    # ── the QA route ask appears only when a `qa` block is configured (#297) ───────────────────
+    # `cckit qa open` reads a `QA route:` line out of the PR body; the brief is where the builder
+    # is told to write it. With no review stack nothing reads the line, so the brief stays silent.
+    # KIT_CONFIG is unset so the config is found by the walk-up from the repo root, as in a project.
+    no  "no qa block: the brief does not ask for a route" "$brief_out" "QA route"
+    eq  "no config: the route ask is empty" "$(unset KIT_CONFIG; kit_brief_qa_route "$repo")" ""
+    printf '%s' '{"qa":{"route":"/dashboard"}}' > "$repo/cckit.config.json"
+    eq  "a qa block with no command is not a review stack" \
+        "$(unset KIT_CONFIG; kit_brief_qa_route "$repo")" ""
+    printf '%s' '{"qa":{"command":"pnpm dev:stack","route":"/dashboard"}}' > "$repo/cckit.config.json"
+    brief_qa="$(cd "$repo" && unset KIT_CONFIG && export PATH="$ghstub:$PATH" && ( set -eu; kit_brief 5 ) 2>&1)"
+    has "qa block: the brief has the route section"  "$brief_qa" "## QA route"
+    has "qa block: the brief shows the line to write" "$brief_qa" "QA route: /path/of/the/changed/screen"
+    has "qa block: the brief names the fallback route" "$brief_qa" '`/dashboard`'
+    has "qa block: the brief names the verb that reads it" "$brief_qa" 'cckit qa open'
+    has "the route section comes after the durable-prose mandate" \
+        "$(printf '%s\n' "$brief_qa" | sed -n '/^## Durable prose/,$p')" "## QA route"
+    rm -f "$repo/cckit.config.json"
   else
     echo "  (git, jq or kit-lib.sh absent — skipping the full-render assertions)"
   fi

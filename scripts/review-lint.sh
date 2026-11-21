@@ -178,7 +178,7 @@ fi
 # ---- --rule <ID> ------------------------------------------------------------
 if [ "$MODE" = "--rule" ]; then
   [ -n "$ARG" ] || { echo "usage: review-lint.sh --rule <ID>"; exit 2; }
-  rule_ids | grep -qx "$ARG" || { echo "x unknown rule '$ARG'"; exit 2; }
+  grep -qx "$ARG" <<<"$(rule_ids)" || { echo "x unknown rule '$ARG'"; exit 2; }
   echo "[$ARG] $(rule_field "$ARG" title)"
   echo "  why:    $(rule_field "$ARG" why)"
   echo "  source: $(rule_field "$ARG" source)"
@@ -243,7 +243,7 @@ while IFS= read -r id; do
       fi
       note "why:    $why"
       note "source: $src"
-      hits_for_rule "$id" | awk -F: -v p="$path" '$1 == p' | head -3 | sed 's/^/    /'
+      hits_for_rule "$id" | awk -F: -v p="$path" '$1 == p' | sed -n 1,3p | sed 's/^/    /'
       note "see all: scripts/review-lint.sh --rule $id"
     else
       grandfathered=$(( grandfathered + n ))

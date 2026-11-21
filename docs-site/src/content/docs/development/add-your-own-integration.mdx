@@ -1,0 +1,232 @@
+---
+title: "Add your own integration"
+description: "Step by step: describe a third-party tool in one JSON file so cckit can switch it on and install it after a yes."
+tutorial:
+  job: add a tool that is not in cckit's integration list
+  difficulty: advanced
+  time: "10 min"
+  prerequisites:
+    - { text: "cckit is installed and set up in this project", link: "Set it up", href: "/getting-started/initialize/" }
+    - "`git` and `jq` are installed"
+    - "The tool you add has a one-line install command"
+  ogTag: Integrations
+  keywords: [cckit integration descriptor, add a tool to cckit, optional tool installer]
+  related: [development/code-graph, development/local-model-digest, memory/install-mempalace]
+---
+
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import TagRow from '../../../components/TagRow.astro';
+import TutorialMeta from '../../../components/TutorialMeta.astro';
+import TutorialSchema from '../../../components/TutorialSchema.astro';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
+
+<TagRow kinds={["flow"]} />
+
+<TutorialMeta />
+
+Every team has a tool it wants on each project and on each machine: a formatter, a linter, a
+search index. Installing it by hand works once. The next project or the next teammate starts
+without it, and nobody notices until the output differs.
+
+cckit handles outside tools the same way for all of them. It does not build the tool and holds
+no install recipe in code. One file, `integrations/<id>.json`, says how to detect, install and
+verify the tool. `cckit add` reads it to switch the tool on for a project, and `cckit doctor`
+reads it to install the tool after a yes.
+
+This guide writes that file for a tool cckit does not ship. The example is `shfmt`, a shell
+formatter. Replace it with your tool.
+
+Each step that runs a command starts with what you say to your agent in the chat. Below it is the
+command your agent runs. The example is a technical helper adding `shfmt` to the Bakery site.
+
+**What you will have at the end:** a descriptor that passes validation, your tool switched on
+and installed in one of your projects, and the steps to propose it to cckit.
+
+## Steps
+
+### 1. Get a cckit checkout to write in
+
+Descriptors live in the `integrations/` directory of the cckit source, next to the schema that
+checks them.
+
+<Chat
+  title="getting a cckit checkout to write the shfmt descriptor"
+  say="Get a copy of cckit so we can write a descriptor for shfmt, and list the integrations it ships."
+  ran={['git clone https://github.com/jeiemgi/cckit', 'cd cckit', 'bash scripts/lib/integrations.sh --list']}
+  means="You should see the ids that ship: `graft`, `lavish`, `mempalace`, `mlx-lm`."
+>
+  I cloned cckit and listed the descriptors that ship.
+</Chat>
+
+### 2. Write the descriptor
+
+Create `integrations/shfmt.json`. The file name without `.json` must equal `id`:
+
+```json title="integrations/shfmt.json"
+{
+  "id": "shfmt",
+  "label": "shfmt",
+  "summary": "Shell formatter: one layout for every script in the repo.",
+  "config": { "key": "shellFormat.provider", "value": "shfmt" },
+  "appliesWhen": { "anyExtension": [".sh", ".bash"] },
+  "detect": { "run": "shfmt --version" },
+  "install": [
+    { "manager": "brew", "run": "brew install shfmt" }
+  ],
+  "verify": { "run": "shfmt --version" },
+  "docs": "https://github.com/mvdan/sh#shfmt",
+  "attribution": {
+    "author": "Daniel Martí",
+    "license": "BSD-3-Clause",
+    "homepage": "https://github.com/mvdan/sh",
+    "affiliated": false,
+    "notice": "shfmt is open-source software by Daniel Martí. cckit is not affiliated with its author."
+  }
+}
+```
+
+Three choices in that file are checked by the validator:
+
+| Field | Rule |
+| --- | --- |
+| `config.key` | Names the capability, not the vendor: `shellFormat.provider`, never `shfmt.enabled`. |
+| `install[].manager` | One of `brew`, `pipx`, `uv`, `npm`, `pnpm`, `npx`, `curl`. Candidates are tried in the order written. |
+| `attribution` | Required. `affiliated` is a boolean, and `notice` is the sentence `cckit add` prints. |
+
+### 3. Validate it
+
+<Chat
+  title="validating the shfmt descriptor"
+  say="Check that the shfmt descriptor is valid."
+  ran="bash scripts/lib/integrations.sh --validate"
+  means="A clean registry prints nothing and exits 0. A problem prints one line and exits 1."
+>
+  The registry is clean: the validator printed nothing and exited 0.
+</Chat>
+
+<Outcomes title="What the validator prints for a problem">
+
+```text
+shfmt: attribution: required field is missing
+shfmt: install[1].manager: must be one of brew, pipx, uv, npm, pnpm, npx, curl
+shfmt: config.key: names the tool (shfmt.enabled) — name the capability, e.g. <capability>.provider
+```
+
+</Outcomes>
+
+### 4. Try it on one of your repos
+
+Point cckit at the directory you just edited, then preview from inside a project.
+
+<Chat
+  title="previewing shfmt on the Bakery site"
+  say="Preview switching on shfmt in the Bakery site, using the descriptor we just wrote."
+  ran={['export KIT_INTEGRATIONS_DIR=/path/to/cckit/integrations', 'cd /path/to/your/project', 'cckit add', 'KIT_DRY_RUN=1 cckit add shfmt']}
+  output={[
+    "shfmt: not installed. Candidates, tried in this order until one works:",
+    "  1. brew install shfmt   (brew is available)",
+    "  consent: NOT recorded in …/.cckit/consent — nothing installs without it",
+  ]}
+  means="The list now shows shfmt as `[off]`. The plan names each candidate, whether its package manager is on `PATH`, and whether consent is recorded."
+>
+  The preview shows the config change and the install plan for shfmt. I wrote nothing.
+</Chat>
+
+### 5. Switch it on and install it
+
+Keep `KIT_INTEGRATIONS_DIR` exported for both commands.
+
+<Chat
+  title="switching on and installing shfmt on the Bakery site"
+  say="Switch on shfmt for the Bakery site and install it."
+  ran={['cckit add shfmt', 'cckit doctor']}
+  output={['shfmt is on: shellFormat.provider = "shfmt". Nothing was installed.']}
+  means="`cckit doctor` asks, then installs on yes; `--fix` skips the prompt. The doctor prints a `shfmt` row under Integrations: `missing` before the install, `installed` after it."
+>
+  shfmt is on for the project. The doctor installed it after your yes, and its row now reads `installed`.
+</Chat>
+
+### 6. Propose it
+
+To ship the descriptor to everyone, open a pull request against cckit from the checkout you
+edited. Add the config key to `kit.config.schema.json` and a row for the tool, with its credit and
+not-affiliated notice, to the Integrations page of the docs in the same pull request.
+
+
+## Check it worked
+
+- `bash scripts/lib/integrations.sh --validate` prints nothing and exits 0.
+- `cckit add` lists your tool as `on`.
+- `cckit doctor` shows its row under **Integrations** reading `installed`.
+
+## How it works
+
+The descriptor is data and one runner executes it. For a tool that is missing and has consent
+recorded, the runner tries the `install` candidates in the order written, skips one whose manager
+is not on `PATH`, and stops at the first candidate that exits 0 and leaves `detect.run` passing.
+When `detect.run` already passes, nothing runs.
+
+`KIT_INTEGRATIONS_DIR` replaces the registry; it does not add to it. With it set, `cckit add`
+lists only the descriptors in that directory, and the directory must also hold
+`integration.schema.json`. Pointing it at a full cckit checkout, as in step 4, keeps the shipped
+tools in the list.
+
+`appliesWhen` is optional. `anyExtension` holds when the repo has at least one tracked file ending
+in a listed extension; `platform` compares `uname -s` and `uname -m`. When a condition does not
+hold, `cckit add <id>` declines with exit 0 and the doctor prints a skip row.
+
+- Every descriptor field, including `wire`, `rules`, `afterInstall` and `bootstrap`:
+  [Config & permissions → Integrations](/config-and-permissions/#integrations).
+- What the monthly check installs and reports:
+  [The monthly recipe check](/config-and-permissions/#the-monthly-recipe-check).
+- What a yes records and how to withdraw it:
+  [Integrations → What your yes records](/integrations/#what-your-yes-records).
+
+<Aside type="caution" title="A descriptor runs commands on someone's machine">
+Every `run` string is executed by a shell after the user's yes. Write the vendor's documented
+install command, name the vendor in `attribution`, and set `affiliated` to `false` unless you
+maintain the tool. The validator refuses a descriptor with no `attribution` block.
+</Aside>
+
+## Troubleshooting
+
+**`cckit add shfmt` prints `invalid descriptor` and writes nothing.** The file fails the schema.
+Run `bash scripts/lib/integrations.sh --validate` and fix each `<id>: <field>: <problem>` line.
+
+**The list shows only your tool.** `KIT_INTEGRATIONS_DIR` points at a directory that holds only
+your descriptor. Point it at a cckit checkout's `integrations/` directory.
+
+**`integrations: schema not found`.** The directory `KIT_INTEGRATIONS_DIR` names has no
+`integration.schema.json`. Copy it from a cckit checkout.
+
+**The doctor has no row for the tool.** Either the config key is not set to the descriptor's ON
+value, or the doctor ran without `KIT_INTEGRATIONS_DIR` and read the shipped registry.
+
+**`cckit add shfmt` says "not offered here".** An `appliesWhen` condition does not hold for this
+repo or machine. `bash scripts/lib/integrations.sh --applies shfmt .` exits 0 when it holds.
+
+## Related guides
+
+<CardGrid>
+  <LinkCard title="Find code with a code graph" href="/development/code-graph/" description="A shipped integration with a wire step, end to end." />
+  <LinkCard title="Summarize long files locally" href="/development/local-model-digest/" description="A shipped integration limited to one platform." />
+  <LinkCard title="Install MemPalace" href="/memory/install-mempalace/" description="The memory integration." />
+</CardGrid>
+
+<TutorialSchema
+  steps={[
+    { name: 'Get a cckit checkout to write in', text: 'Clone cckit. Descriptors live in its integrations/ directory next to integration.schema.json.' },
+    { name: 'Write the descriptor', text: 'Create integrations/<id>.json with id, label, summary, config, detect, install, verify, docs and attribution.' },
+    { name: 'Validate it', text: 'bash scripts/lib/integrations.sh --validate prints one <id>: <field>: <problem> line per problem and exits 1, or prints nothing and exits 0.' },
+    { name: 'Try it on one of your repos', text: 'Export KIT_INTEGRATIONS_DIR to the edited directory, then run KIT_DRY_RUN=1 cckit add <id> inside a project to print the config diff and install plan.' },
+    { name: 'Switch it on and install it', text: 'cckit add <id> sets the config key; cckit doctor asks and installs the tool.' },
+    { name: 'Propose it', text: 'Open a pull request against cckit with the descriptor, the config schema key and the docs row.' },
+  ]}
+  faqs={[
+    { q: 'cckit add prints "invalid descriptor"', a: 'The file fails the schema. Run bash scripts/lib/integrations.sh --validate and fix each reported line.' },
+    { q: 'The list shows only my tool', a: 'KIT_INTEGRATIONS_DIR replaces the registry. Point it at a cckit checkout integrations/ directory that also holds the shipped descriptors.' },
+    { q: 'The doctor has no row for the tool', a: 'The config key is not set to the ON value, or the doctor ran without KIT_INTEGRATIONS_DIR.' },
+    { q: 'Which package managers can a descriptor name?', a: 'brew, pipx, uv, npm, pnpm, npx and curl.' },
+  ]}
+/>

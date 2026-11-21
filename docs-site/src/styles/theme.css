@@ -1,104 +1,119 @@
 /* cckit docs theme — DESIGNER-OWNED.
-   This is the single place the visual theme lives. The Designer's spec:
-     - elegant + sober: restrained, high-contrast, calm developer-tool aesthetic
-     - cckit's own identity — NEVER Anthropic/Claude colors (no rust-orange/terracotta/clay)
-   Identity: a sober STEEL-CYAN accent (hue ~195°). Cyan sits opposite Anthropic's warm
-   rust on the color wheel, so "not Anthropic" is structural, not incidental; the steel
-   (desaturated) variant keeps it technical and calm rather than tropical or neon. Accent is
-   a ≤10% spotlight (links + active state only); everything else is cool-tinted neutral.
-   Dark-by-default (devs read beside a dark editor); the light theme is the same brand by day.
-   Override Starlight's CSS custom properties below. Color tokens are hex for predictability;
-   fonts use system stacks only (portable — no web-font downloads, no dependencies). */
+   This is the single place the visual theme lives.
+   Palette: the Apple System Colors terminal scheme, chosen by the owner on a review page on
+   2026-11-13 (issue 510). Neutral greys with no tint; ONE action colour, system blue, on both
+   tracks. A track is told apart by its marker colour only (--cckit-track): Software sky blue,
+   Marketing purple. The prompt banner is the scheme's yellow.
+   Dark is the default when the reader has stored no choice (src/components/ThemeProvider.astro).
+   Type: Geist and Geist Mono, self-hosted through @fontsource-variable (imported below).
+   Measured WCAG 2.x contrast (AA needs 4.5:1 for text):
+     dark   body #d1d1d6 on #1e1e1e 10.96 · muted #98989d 5.81 · link #6ab7ff 7.80 (6.52 on inline code)
+            white on action #0071e3 4.70 · Software #76d6ff 10.19 · Marketing #bf5af2 4.73 · prompt #ffd60a 11.81
+     light  body #3a3a3c on #f5f5f7 10.42 · muted #636368 5.49 · link #0060c0 5.62 (5.01 on inline code)
+            white on action #0869cb 5.39 · Software #146b8e 5.47 · Marketing #8a3bb3 5.74 · prompt #7a6200 5.40 */
+@import '@fontsource-variable/geist';
+@import '@fontsource-variable/geist-mono';
 
 /* ── Dark theme (default) ─────────────────────────────────────────────── */
 :root,
 ::backdrop {
-	/* Neutrals — cool-charcoal, tinted toward the accent hue. No pure #000. */
-	--sl-color-white: #f1f6f7; /* highest-contrast text */
-	--sl-color-gray-1: #e3e9eb;
-	--sl-color-gray-2: #b5c0c4; /* body text */
-	--sl-color-gray-3: #889399; /* muted / secondary */
-	--sl-color-gray-4: #515b61;
-	--sl-color-gray-5: #2d363a;
-	--sl-color-gray-6: #1a2125; /* panels, inline-code, hairlines */
-	--sl-color-black: #0e1316; /* page background */
+	--sl-color-white: #ffffff;
+	--sl-color-gray-1: #ebebf0;
+	--sl-color-gray-2: #d1d1d6; /* body text */
+	--sl-color-gray-3: #98989d; /* muted / secondary */
+	--sl-color-gray-4: #636366;
+	--sl-color-gray-5: #3a3a3c;
+	--sl-color-gray-6: #2c2c2e; /* panels, inline code */
+	--sl-color-black: #1e1e1e; /* page background */
 
-	/* Accent — steel cyan (≤10% of the surface: links + active states) */
-	--sl-color-accent-low: #0f3038; /* selection / subtle accent fill */
-	--sl-color-accent: #2c8fa6; /* solid brand accent (active markers, buttons) */
-	--sl-color-accent-high: #8ed3df; /* light accent — headings-on-accent, badge text */
+	--sl-color-accent-low: #10263f;
+	--sl-color-accent: #0071e3; /* the one action colour: buttons, active markers */
+	--sl-color-accent-high: #a8d4ff;
 
-	/* Roles */
 	--sl-color-text: var(--sl-color-gray-2);
-	--sl-color-text-accent: #7ecdda; /* link text — AA on the dark page bg */
-	--sl-color-text-invert: var(--sl-color-black);
+	--sl-color-text-accent: #6ab7ff; /* link text */
+	--sl-color-text-invert: #ffffff; /* text ON the action colour */
 	--sl-color-bg: var(--sl-color-black);
-	--sl-color-bg-nav: #0b1013; /* chrome recedes a touch below content */
-	--sl-color-bg-sidebar: #0b1013;
+	--sl-color-bg-nav: #1a1a1a;
+	--sl-color-bg-sidebar: #1a1a1a;
 	--sl-color-bg-inline-code: var(--sl-color-gray-6);
 	--sl-color-bg-accent: var(--sl-color-accent);
 
-	/* Hairlines — tighter and quieter than the default black-on-black */
-	--sl-color-hairline-light: #2f383c;
-	--sl-color-hairline: #232b2f;
-	--sl-color-hairline-shade: #161d20;
+	/* One marker colour per track, constant on every page; --cckit-track is the current page's. */
+	--cckit-track-software: #76d6ff;
+	--cckit-track-marketing: #bf5af2;
+	--cckit-track: var(--cckit-track-software);
+	--cckit-prompt: #ffd60a;
+	/* Search controls: a surface that differs from the page and an edge at 3:1 against it. */
+	--cckit-field-bg: #2c2c2e;
+	--cckit-field-border: #7c7c80;
 
-	--sl-color-backdrop-overlay: hsla(198, 22%, 6%, 0.72);
+	/* Hairlines — tighter and quieter than the default black-on-black */
+	--sl-color-hairline-light: #48484a;
+	--sl-color-hairline: #3a3a3c;
+	--sl-color-hairline-shade: #2c2c2e;
+
+	--sl-color-backdrop-overlay: hsla(0, 0%, 6%, 0.72);
 
 	/* Softer shadows — sober, no heavy drop on dark */
-	--sl-shadow-sm: 0 1px 1px hsla(198, 30%, 3%, 0.4);
-	--sl-shadow-md: 0 2px 2px hsla(198, 30%, 3%, 0.3), 0 4px 6px hsla(198, 30%, 3%, 0.35);
-	--sl-shadow-lg: 0 4px 8px hsla(198, 30%, 3%, 0.3), 0 12px 24px hsla(198, 30%, 3%, 0.45);
+	--sl-shadow-sm: 0 1px 1px hsla(0, 0%, 3%, 0.4);
+	--sl-shadow-md: 0 2px 2px hsla(0, 0%, 3%, 0.3), 0 4px 6px hsla(0, 0%, 3%, 0.35);
+	--sl-shadow-lg: 0 4px 8px hsla(0, 0%, 3%, 0.3), 0 12px 24px hsla(0, 0%, 3%, 0.45);
 
-	/* Typography — refined system stacks (portable, no downloads).
-	   system-ui resolves to SF Pro / Segoe UI; ui-monospace to SF Mono / Cascadia. */
-	--sl-font: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
-		'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
-	--sl-font-mono: ui-monospace, 'SF Mono', 'SFMono-Regular', 'Cascadia Code', 'Cascadia Mono',
-		Menlo, Consolas, 'Liberation Mono', 'Roboto Mono', monospace;
+	--sl-font: 'Geist Variable', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+		Roboto, 'Helvetica Neue', Arial, sans-serif;
+	--sl-font-mono: 'Geist Mono Variable', ui-monospace, 'SF Mono', 'SFMono-Regular', 'Cascadia Code',
+		Menlo, Consolas, monospace;
 }
 
 /* ── Light theme ──────────────────────────────────────────────────────── */
 :root[data-theme='light'],
 [data-theme='light'] ::backdrop {
-	/* Neutrals — faintly cool paper; near-black ink, never pure #fff. */
-	--sl-color-white: #101719; /* highest-contrast text (ink) */
-	--sl-color-gray-1: #1b2327;
-	--sl-color-gray-2: #39444a; /* body text */
-	--sl-color-gray-3: #5b676d; /* muted / secondary */
-	--sl-color-gray-4: #8a969c;
-	--sl-color-gray-5: #c6ced2;
-	--sl-color-gray-6: #eef2f3;
-	--sl-color-gray-7: #f5f8f8;
-	--sl-color-black: #fbfdfd; /* page background */
+	--sl-color-white: #1d1d1f; /* highest-contrast text (ink) */
+	--sl-color-gray-1: #2c2c2e;
+	--sl-color-gray-2: #3a3a3c; /* body text */
+	--sl-color-gray-3: #636368; /* muted / secondary */
+	--sl-color-gray-4: #8e8e93;
+	--sl-color-gray-5: #c7c7cc;
+	--sl-color-gray-6: #e8e8ed;
+	--sl-color-gray-7: #efeff2;
+	--sl-color-black: #f5f5f7; /* page background */
 
-	/* Accent — the same steel cyan, darkened for contrast on light paper */
-	--sl-color-accent-low: #d7eef2; /* subtle accent fill */
-	--sl-color-accent: #157387; /* solid brand accent */
-	--sl-color-accent-high: #0a4250; /* deep accent — headings-on-accent */
+	--sl-color-accent-low: #dcebfb;
+	--sl-color-accent: #0869cb;
+	--sl-color-accent-high: #04386e;
 
-	/* Roles */
 	--sl-color-text: var(--sl-color-gray-2);
-	--sl-color-text-accent: #0a5666; /* link text — AA on the light page bg */
-	/* Text that sits ON the accent (active sidebar link, accent buttons). The light-mode accent is a
-	   deep teal, so this must be LIGHT — not the near-black ink `--sl-color-white` resolves to here. */
-	--sl-color-text-invert: #fbfdfd;
+	--sl-color-text-accent: #0060c0;
+	--sl-color-text-invert: #ffffff;
 	--sl-color-bg: var(--sl-color-black);
-	--sl-color-bg-nav: #f4f8f8;
-	--sl-color-bg-sidebar: #f4f8f8;
+	--sl-color-bg-nav: #ffffff;
+	--sl-color-bg-sidebar: #ffffff;
 	--sl-color-bg-inline-code: var(--sl-color-gray-6);
 	--sl-color-bg-accent: var(--sl-color-accent);
 
-	/* Hairlines */
-	--sl-color-hairline-light: #eef2f3;
-	--sl-color-hairline: #dde5e7;
-	--sl-color-hairline-shade: #e6eced;
+	--cckit-track-software: #146b8e;
+	--cckit-track-marketing: #8a3bb3;
+	--cckit-prompt: #7a6200;
+	--cckit-field-bg: #ffffff;
+	--cckit-field-border: #86868b;
 
-	--sl-color-backdrop-overlay: hsla(198, 18%, 30%, 0.33);
+	--sl-color-hairline-light: #ececf0;
+	--sl-color-hairline: #d8d8dc;
+	--sl-color-hairline-shade: #e3e3e8;
 
-	--sl-shadow-sm: 0 1px 1px hsla(198, 24%, 24%, 0.07), 0 2px 1px hsla(198, 24%, 24%, 0.05);
-	--sl-shadow-md: 0 2px 2px hsla(198, 24%, 24%, 0.06), 0 4px 6px hsla(198, 24%, 24%, 0.08);
-	--sl-shadow-lg: 0 4px 8px hsla(198, 24%, 24%, 0.06), 0 12px 24px hsla(198, 24%, 24%, 0.1);
+	--sl-color-backdrop-overlay: hsla(0, 0%, 30%, 0.33);
+
+	--sl-shadow-sm: 0 1px 1px hsla(0, 0%, 24%, 0.07), 0 2px 1px hsla(0, 0%, 24%, 0.05);
+	--sl-shadow-md: 0 2px 2px hsla(0, 0%, 24%, 0.06), 0 4px 6px hsla(0, 0%, 24%, 0.08);
+	--sl-shadow-lg: 0 4px 8px hsla(0, 0%, 24%, 0.06), 0 12px 24px hsla(0, 0%, 24%, 0.1);
+}
+
+/* ── Marketing track — its marker colour ──────────────────────────────── */
+/* Pages under /marketing/ carry <meta name="cckit-track" content="marketing"> (src/routeData.ts).
+   The action colour, neutrals, type and layout are shared; only the marker changes. */
+:root:has(meta[name='cckit-track'][content='marketing']) {
+	--cckit-track: var(--cckit-track-marketing);
 }
 
 /* ── Restrained polish ────────────────────────────────────────────────── */
@@ -117,14 +132,18 @@ body {
 
 /* Tighten heading tracking a hair for a more editorial, composed feel. */
 :where(h1, h2, h3, h4) {
-	letter-spacing: -0.012em;
-}
-
-/* The site title (cckit) is a CLI name — set it in the mono face so the
-   wordmark reads as a tool, not a brand logotype. Sober, on-identity. */
-.site-title {
-	font-family: var(--__sl-font-mono);
+	font-weight: 600;
 	letter-spacing: -0.02em;
+}
+:where(h1) { letter-spacing: -0.04em; line-height: 1.1; }
+:where(h2) { letter-spacing: -0.03em; line-height: 1.2; }
+
+/* The site title (cckit) is set in the sans face, bold: a name, not a terminal prompt. */
+.site-title {
+	font-family: var(--sl-font);
+	font-weight: 700;
+	letter-spacing: -0.04em;
+	font-size: 1.25rem;
 }
 
 /* ── Homepage hero ────────────────────────────────────────────────────── */
@@ -143,26 +162,17 @@ body {
 	border: 0;
 }
 
-/* Banner: full-width within the splash column, framed by a quiet hairline.
-   Short by design (3:1) — a header, not a tall billboard. */
-.hero-banner img {
-	display: block;
-	width: 100%;
-	height: auto;
-	border-radius: 0.75rem;
-	border: 1px solid var(--sl-color-hairline);
-	box-shadow: var(--sl-shadow-md);
-}
-
-/* Philosophy tagline under the banner — the one line that reveals the "you're the architect,
+/* Tagline under the hero — the one line that reveals the "you're the architect,
    cckit runs the mechanics" idea, linking to the human-written /philosophy/ page. */
 .hero-tagline {
 	max-width: 44rem;
 	margin: 1.5rem auto 0;
 	text-align: center;
-	font-size: var(--sl-text-lg);
-	line-height: 1.55;
-	color: var(--sl-color-gray-2);
+	font-size: clamp(2.25rem, 6vw, 4rem);
+	font-weight: 600;
+	letter-spacing: -0.05em;
+	line-height: 1.02;
+	color: var(--sl-color-white);
 	text-wrap: balance;
 }
 .hero-tagline strong { color: var(--sl-color-white); font-weight: 600; }
@@ -181,8 +191,7 @@ body {
 	border-radius: 999px;
 }
 
-/* Action links below the banner: one centered row, the accent lives on the
-   primary "Get started" button only (≤10% accent budget). */
+/* Secondary links below the two doors: one centered row. */
 .hero-actions {
 	display: flex;
 	flex-wrap: wrap;
@@ -192,42 +201,91 @@ body {
 	margin-top: 1.75rem;
 }
 
-/* Disabled "coming soon" pill — the future cckit.dev domain isn't live yet, so it
-   reads as an inert, muted chip beside the real action buttons (no href, no accent). */
-.coming-soon {
-	display: inline-flex;
-	align-items: center;
-	gap: 0.4em;
-	padding: 0.4rem 0.85rem;
+/* The two doors on the home page: one entry per docs track. Each door is one link; its top edge
+   and its label take that track's colour (blue for Software, red for Marketing) on every theme. */
+.doors {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+	gap: 1rem;
+	margin-top: 2rem;
+}
+.sl-markdown-content .door {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	padding: 1.25rem 1.4rem 1.4rem;
+	color: var(--sl-color-text);
+	text-decoration: none;
+	background: var(--sl-color-bg-sidebar);
+	border: 1px solid var(--sl-color-hairline-light);
+	border-top: 3px solid var(--door);
+	border-radius: 0.75rem;
+	box-shadow: var(--sl-shadow-sm);
+	transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.door[data-track='software'] { --door: var(--cckit-track-software); }
+.door[data-track='marketing'] { --door: var(--cckit-track-marketing); }
+.sl-markdown-content .door:hover {
+	border-color: var(--door);
+	box-shadow: var(--sl-shadow-md);
+}
+.door:focus-visible {
+	outline: 2px solid var(--door);
+	outline-offset: 3px;
+}
+.door-kicker {
+	font-size: var(--sl-text-sm);
+	font-weight: 600;
+	letter-spacing: 0;
+	text-transform: none;
+	color: var(--door);
+}
+.door-title {
+	font-size: var(--sl-text-h4);
+	font-weight: 600;
+	line-height: 1.25;
+	color: var(--sl-color-white);
+}
+.door-text { line-height: 1.6; }
+.door-go {
+	margin-top: auto;
+	padding-top: 0.5rem;
+	font-weight: 600;
+	color: var(--door);
+}
+.door-go::after { content: ' \2192'; }
+/* The line under the doors that points Spanish readers at /es/marketing/. */
+.sl-markdown-content .doors-note {
+	margin-top: 0.75rem;
+	text-align: end;
 	font-size: var(--sl-text-sm);
 	color: var(--sl-color-gray-3);
-	border: 1px dashed var(--sl-color-hairline);
-	border-radius: 999px;
-	cursor: not-allowed;
-	user-select: none;
 }
 
-/* Header version badge — a quiet, monospace pill before the social icons. Tells readers which
-   cckit version these docs describe; links to the releases list for older versions. */
+
+/* Header version — quiet text, not a pill. Tells readers which cckit version these docs describe;
+   links to the releases list for older versions. Hidden on Marketing (see below). */
 .site-version {
 	display: inline-flex;
 	align-items: center;
-	padding: 0.15rem 0.5rem;
-	margin-inline-end: 0.5rem;
-	font-family: var(--__sl-font-mono, ui-monospace, monospace);
-	font-size: var(--sl-text-xs);
-	font-weight: 600;
+	padding: 0.5rem 0.25rem;
+	font-family: var(--sl-font);
+	font-size: var(--sl-text-sm);
+	font-weight: 500;
 	line-height: 1.4;
-	color: var(--sl-color-accent);
-	background-color: var(--sl-color-accent-low);
-	border: 1px solid var(--sl-color-hairline);
-	border-radius: 999px;
+	color: var(--sl-color-gray-3);
+	background: none;
+	border: 0;
 	text-decoration: none;
 	white-space: nowrap;
 }
 .site-version:hover {
 	color: var(--sl-color-white);
-	background-color: var(--sl-color-accent);
+	background: none;
+	text-decoration: underline;
+}
+:root:has(meta[name='cckit-track'][content='marketing']) .site-version {
+	display: none;
 }
 
 /* ── Card icons — unify to the steel-cyan identity ────────────────────── */
@@ -241,22 +299,6 @@ body {
 	background-color: var(--sl-color-accent-low) !important;
 	color: var(--sl-color-accent) !important;
 	border: 1px solid var(--sl-color-hairline) !important;
-}
-
-/* ── Home splash: banner is the visual hero ───────────────────────────── */
-/* The hero banner image carries the title visually, so the auto-generated
-   page <h1> is hidden on the home only (scoped via :has) — it stays in the DOM
-   as the single semantic h1 for SEO/a11y. No duplicate headings. */
-:where(body):has(.hero-banner) h1#_top {
-	position: absolute;
-	width: 1px;
-	height: 1px;
-	margin: -1px;
-	padding: 0;
-	overflow: hidden;
-	clip: rect(0, 0, 0, 0);
-	white-space: nowrap;
-	border: 0;
 }
 
 /* ── Activation tags ──────────────────────────────────────────────────── */
@@ -383,9 +425,7 @@ h1 .cckit-tag, h2 .cckit-tag, h3 .cckit-tag { font-size: 0.65em; }
 /* The copy-paste prompts you hand an agent. Framed in the conversational accent (these ARE the
    conversational trigger) and given roomy line-height so the blank-line paragraph breaks read as
    real spacing. The code block keeps its native copy button. */
-.cckit-prompt { --cckit-prompt: #e0863c; }
 .sl-markdown-content .cckit-prompt { margin-block: var(--cckit-block-gap); }
-:root[data-theme='light'] .cckit-prompt { --cckit-prompt: #b9701f; }
 /* No custom border or background — the terminal "command window" frame is the whole visual. We only
    tint its title bar with the conversational accent so a prompt reads apart from a plain command block. */
 .cckit-prompt :where(.expressive-code) .ec-line { line-height: 1.7; }
@@ -394,6 +434,52 @@ h1 .cckit-tag, h2 .cckit-tag, h3 .cckit-tag { font-size: 0.65em; }
 	color: var(--cckit-prompt);
 	font-weight: 700;
 }
+
+/* ── Conversation window (src/components/Chat.astro, Outcomes.astro) ──── */
+/* Rows with a speaker column, not bubbles. Tokens only, so light, dark and the Marketing accent follow. */
+.sl-markdown-content .cckit-chat { margin: 1.25rem 0 0.75rem; border: 1px solid var(--sl-color-hairline); border-radius: 0.75rem;
+	background: var(--sl-color-bg-sidebar); overflow: hidden; }
+.cckit-chat__head { padding: 0.55rem 1rem; font-size: var(--sl-text-sm); line-height: 1.5; color: var(--sl-color-gray-3);
+	border-bottom: 1px solid var(--sl-color-hairline); }
+.cckit-chat__head strong { color: var(--sl-color-white); font-weight: 600; }
+.cckit-chat .cckit-chat__log { list-style: none; margin: 0; padding: 0.4rem 0; }
+.cckit-chat .cckit-chat__row { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr) 2rem; gap: 0.2rem 1rem;
+	align-items: start; margin: 0; padding: 0.6rem 1rem; font-size: 1rem; line-height: 1.6; }
+.cckit-chat .cckit-chat__row + .cckit-chat__row { margin-top: 0; }
+.cckit-chat__who { font-size: var(--sl-text-sm); font-weight: 600; line-height: 1.83; color: var(--sl-color-gray-3); }
+.cckit-chat__row--you { background: color-mix(in srgb, var(--cckit-track) 10%, transparent); color: var(--sl-color-white); }
+.cckit-chat__row--you .cckit-chat__who { color: var(--cckit-track); }
+.cckit-chat__body { min-width: 0; overflow-wrap: anywhere; }
+.cckit-chat .cckit-chat__body > * { margin: 0; }
+.cckit-chat .cckit-chat__body > * + * { margin-top: 0.5rem; }
+.cckit-chat .cckit-chat__body > .cckit-chat__out { margin-top: 0.35rem; }
+.cckit-chat .cckit-chat__body > .cckit-chat__cmd + .cckit-chat__cmd { margin-top: 0.25rem; }
+.cckit-chat .cckit-chat__cmd { display: block; font-family: var(--sl-font-mono); font-size: 0.875rem; color: var(--sl-color-white);
+	background: none; padding: 0; border: 0; white-space: pre-wrap; }
+.cckit-chat .cckit-chat__out { padding: 0 0 0 0.75rem; border: 0; border-inline-start: 2px solid var(--sl-color-hairline-light);
+	border-radius: 0; background: none; font-family: var(--sl-font-mono); font-size: 0.8125rem; line-height: 1.6;
+	color: var(--sl-color-gray-3); white-space: pre-wrap; overflow-wrap: anywhere; }
+.cckit-chat .cckit-chat__out samp { font: inherit; }
+.cckit-chat__copy { width: 2rem; height: 2rem; display: grid; place-items: center; border: 0; border-radius: 0.375rem;
+	background: none; color: var(--sl-color-gray-3); cursor: pointer; }
+.cckit-chat__copy:hover { color: var(--sl-color-white); background: var(--sl-color-gray-6); }
+.cckit-chat__copy:focus-visible { outline: 2px solid var(--sl-color-text-accent); outline-offset: 2px; }
+.cckit-chat__copy .cckit-chat__ico-done { display: none; }
+.cckit-chat__copy.is-copied { color: var(--sl-color-text-accent); }
+.cckit-chat__copy.is-copied .cckit-chat__ico-copy { display: none; }
+.cckit-chat__copy.is-copied .cckit-chat__ico-done { display: block; }
+.cckit-chat .cckit-chat__means { margin: 0; padding: 0.75rem 1rem; border-top: 1px solid var(--sl-color-hairline);
+	font-size: 0.9375rem; line-height: 1.55; color: var(--sl-color-gray-2); }
+.cckit-chat__means strong { color: var(--sl-color-white); font-weight: 600; }
+@media (max-width: 40rem) {
+	.cckit-chat .cckit-chat__row { grid-template-columns: minmax(0, 1fr) 2rem; }
+	.cckit-chat__who { grid-column: 1; }
+	.cckit-chat__body { grid-column: 1 / -1; grid-row: 2; }
+	.cckit-chat__copy { grid-column: 2; grid-row: 1; }
+}
+.sl-markdown-content .cckit-outcomes { margin: 0 0 1.5rem; }
+.cckit-outcomes > summary { cursor: pointer; padding: 0.6rem 0.25rem; font-size: 0.9375rem; font-weight: 600; color: var(--sl-color-text-accent); }
+.cckit-outcomes > summary code { font-size: 0.875em; }
 
 /* The legend — the key to the tags, as a table so pills + meanings line up in columns. Grouped by
    what kind of thing a tag marks via full-width sub-header rows. */
@@ -440,18 +526,98 @@ h1 .cckit-tag, h2 .cckit-tag, h3 .cckit-tag { font-size: 0.65em; }
    nowrap columns plus this minimum exceed the width, the wrapper scrolls rather than breaking. */
 .cckit-nowrap-2 :where(td, th):nth-child(n+3) { min-width: 14rem; }
 
+/* ── Record cards — a table of records, rendered as a list (#494) ─────── */
+/* src/lib/rehype-record-tables.mjs turns a Markdown table with 3+ columns and a long cell into this
+   list at build time: the first cell is the card's heading, every other cell is a labelled line
+   that takes the full width. A grid gave two code columns the width and left the description one
+   character per line. */
+.sl-markdown-content .cckit-records {
+	list-style: none;
+	margin: 1.25rem 0 1.75rem;
+	padding: 0;
+	display: grid;
+	gap: 0.75rem;
+}
+.sl-markdown-content .cckit-record {
+	margin: 0;
+	padding: 0.9rem 1.1rem 1rem;
+	border: 1px solid var(--sl-color-hairline);
+	border-radius: 0.5rem;
+	background: color-mix(in srgb, var(--sl-color-gray-6) 55%, transparent);
+}
+.cckit-record__head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 0.15rem 1rem;
+}
+.cckit-record__kicker { order: 2; }
+/* The repeated kicker ("Bucket", "Output") stays for screen readers and leaves the screen. */
+.cckit-record__kicker {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+}
+.cckit-record__label {
+	font-size: 0.875rem;
+	font-weight: 500;
+	letter-spacing: 0;
+	text-transform: none;
+	color: var(--sl-color-gray-3);
+}
+.cckit-record__title {
+	font-size: 1rem;
+	font-weight: 600;
+	color: var(--sl-color-white);
+	overflow-wrap: anywhere;
+}
+.sl-markdown-content .cckit-record__body {
+	margin: 0.35rem 0 0;
+	padding: 0;
+	border-top: 0;
+	display: grid;
+	gap: 0.35rem;
+}
+.cckit-record__line {
+	display: grid;
+	grid-template-columns: minmax(0, 9rem) minmax(0, 1fr);
+	gap: 0.25rem 1rem;
+	align-items: baseline;
+	margin: 0;
+}
+.sl-markdown-content .cckit-record__label { margin: 0; padding-top: 0.15rem; }
+.sl-markdown-content .cckit-record .cckit-record__value {
+	margin: 0;
+	padding: 0;
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+.cckit-record__index {
+	margin-inline-end: 0.6rem;
+	font-family: var(--sl-font-mono);
+	color: var(--sl-color-accent-high);
+}
+.cckit-record :where(code) { white-space: normal; overflow-wrap: anywhere; }
+@media (max-width: 40rem) {
+	.cckit-record__line { grid-template-columns: minmax(0, 1fr); }
+}
+
 /* Commands in table cells are click-to-copy (wired in Footer.astro). Show the affordance: pointer +
    a quiet hover, and a "Copied" flash via the data-copied attribute the script toggles. */
-.sl-markdown-content :where(td, th) code {
+.sl-markdown-content :where(td, th, .cckit-record) code {
 	position: relative;
 	cursor: pointer;
 	transition: background-color 0.15s ease, box-shadow 0.15s ease;
 }
-.sl-markdown-content :where(td, th) code:hover {
+.sl-markdown-content :where(td, th, .cckit-record) code:hover {
 	background: color-mix(in srgb, var(--sl-color-accent) 16%, var(--sl-color-gray-6));
 	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sl-color-accent) 45%, transparent);
 }
-.sl-markdown-content :where(td, th) code[data-copied]::after {
+.sl-markdown-content :where(td, th, .cckit-record) code[data-copied]::after {
 	content: 'Copied';
 	position: absolute;
 	bottom: calc(100% + 4px);
@@ -551,11 +717,12 @@ h1 .cckit-tag, h2 .cckit-tag, h3 .cckit-tag { font-size: 0.65em; }
 
 /* ── Sidebar group icons ──────────────────────────────────────────────── */
 /* Starlight sidebar entries don't take an icon, so we paint one before each top-level GROUP label
-   (Get started / Tutorials / Concepts / Guides / Reference) via a CSS mask — a line icon tinted with
+   (Philosophy … Reference) via a CSS mask — a line icon tinted with
    the accent. Matched by group order (the sidebar config order is stable); keep these in sync when a
-   group is added or reordered, or the last group renders as an empty square. */
-.top-level > li > details > summary .group-label { display: flex; align-items: center; }
-.top-level > li > details > summary .group-label::before {
+   group is added or reordered, or the last group renders as an empty square. Software only: the
+   Marketing groups carry no icon (the base rules below are scoped off that track). */
+:root:not(:has(meta[name='cckit-track'][content='marketing'])) .top-level > li > details > summary .group-label { display: flex; align-items: center; }
+:root:not(:has(meta[name='cckit-track'][content='marketing'])) .top-level > li > details > summary .group-label::before {
 	content: '';
 	width: 1.1em;
 	height: 1.1em;
@@ -565,23 +732,179 @@ h1 .cckit-tag, h2 .cckit-tag, h3 .cckit-tag { font-size: 0.65em; }
 	-webkit-mask: var(--cckit-nav-icon) center / contain no-repeat;
 	mask: var(--cckit-nav-icon) center / contain no-repeat;
 }
-/* 1 · Get started — rocket */
-.top-level > li:nth-child(1) > details > summary .group-label {
+/* The first entry (Start here) is a link, not a group, so groups start at the second item. */
+/* 2 · Philosophy — lightbulb */
+.top-level > li:nth-child(2) > details > summary .group-label {
+	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5'/%3E%3Cpath d='M9 18h6'/%3E%3Cpath d='M10 22h4'/%3E%3C/svg%3E");
+}
+/* 3 · Getting started — rocket */
+.top-level > li:nth-child(3) > details > summary .group-label {
 	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z'/%3E%3Cpath d='M12 15l-3-3a22 22 0 0 1 8-10c3 0 5 2 5 5a22 22 0 0 1-10 8z'/%3E%3Cpath d='M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0'/%3E%3Cpath d='M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5'/%3E%3C/svg%3E");
 }
-/* 2 · Tutorials — graduation cap */
-.top-level > li:nth-child(2) > details > summary .group-label {
-	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z'/%3E%3Cpath d='M22 10v6'/%3E%3Cpath d='M6 12.5V16a6 3 0 0 0 12 0v-3.5'/%3E%3C/svg%3E");
-}
-/* 3 · Concepts — layers */
-.top-level > li:nth-child(3) > details > summary .group-label {
+/* 4 · Project management — layers */
+.top-level > li:nth-child(4) > details > summary .group-label {
 	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 2 2 7l10 5 10-5-10-5z'/%3E%3Cpath d='M2 17l10 5 10-5'/%3E%3Cpath d='M2 12l10 5 10-5'/%3E%3C/svg%3E");
 }
-/* 4 · Guides — open book */
-.top-level > li:nth-child(4) > details > summary .group-label {
-	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 7v14'/%3E%3Cpath d='M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z'/%3E%3C/svg%3E");
-}
-/* 5 · Reference — list */
+/* 5 · Design — pen */
 .top-level > li:nth-child(5) > details > summary .group-label {
+	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 20h9'/%3E%3Cpath d='M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z'/%3E%3C/svg%3E");
+}
+/* 6 · Development — code */
+.top-level > li:nth-child(6) > details > summary .group-label {
+	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m16 18 6-6-6-6'/%3E%3Cpath d='m8 6-6 6 6 6'/%3E%3C/svg%3E");
+}
+/* 7 · Review — check */
+.top-level > li:nth-child(7) > details > summary .group-label {
+	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='m9 12 2 2 4-4'/%3E%3C/svg%3E");
+}
+/* 8 · Ship — paper plane */
+.top-level > li:nth-child(8) > details > summary .group-label {
+	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m22 2-7 20-4-9-9-4Z'/%3E%3Cpath d='M22 2 11 13'/%3E%3C/svg%3E");
+}
+/* 9 · Memory — database */
+.top-level > li:nth-child(9) > details > summary .group-label {
+	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cellipse cx='12' cy='5' rx='9' ry='3'/%3E%3Cpath d='M3 5v14a9 3 0 0 0 18 0V5'/%3E%3Cpath d='M3 12a9 3 0 0 0 18 0'/%3E%3C/svg%3E");
+}
+/* 10 · Reference — list */
+.top-level > li:nth-child(10) > details > summary .group-label {
 	--cckit-nav-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 6h13'/%3E%3Cpath d='M8 12h13'/%3E%3Cpath d='M8 18h13'/%3E%3Cpath d='M3 6h.01'/%3E%3Cpath d='M3 12h.01'/%3E%3Cpath d='M3 18h.01'/%3E%3C/svg%3E");
+}
+
+/* ── Reading size, measure and headings (stage 1 of the calmer look) ──── */
+:root {
+	--sl-text-code: 0.84375rem;
+	--sl-line-height: 1.65;
+	--cckit-measure: 40rem;
+}
+@media (min-width: 50em) {
+	:root {
+		--sl-text-h1: 2.5rem;
+		--sl-text-h2: 1.75rem;
+		--sl-text-h3: 1.375rem;
+		--sl-text-h4: 1.125rem;
+		--sl-text-h5: 1rem;
+	}
+	/* Body is 17px on a desktop. Setting --sl-text-body on :root does not reach the paragraphs. */
+	.sl-markdown-content {
+		font-size: 1.0625rem;
+	}
+	/* "On this page" links */
+	starlight-toc a,
+	mobile-starlight-toc a {
+		font-size: 0.875rem;
+	}
+}
+@media (max-width: 49.99em) {
+	:root {
+		--sl-text-h1: 2rem;
+		--sl-text-h2: 1.5rem;
+		--sl-text-h3: 1.25rem;
+		--sl-text-h4: 1.0625rem;
+	}
+}
+/* Prose holds ~80 characters a line. Code blocks, cards and the chat window keep the full column. */
+.sl-markdown-content > :where(p, ul, ol:not(.sl-steps), blockquote),
+.sl-steps > li > :where(p, ul) {
+	max-width: var(--cckit-measure);
+}
+.sl-markdown-content :not(pre) > code {
+	font-size: 0.875em;
+}
+.sidebar-content .top-level details ul a {
+	font-size: 0.9375rem;
+	padding-block: 0.375rem;
+}
+
+/* The current sidebar item: a quiet tint, not the loudest block on the page. */
+.sidebar-content a[aria-current='page'],
+.sidebar-content a[aria-current='page']:hover,
+.sidebar-content a[aria-current='page']:focus {
+	background: var(--sl-color-accent-low);
+	color: var(--sl-color-white);
+}
+
+/* Asides: a thin rule and a calm fill; caution and danger keep their tint. */
+.starlight-aside {
+	border-radius: 0.5rem;
+	border-inline-start-width: 3px;
+}
+.starlight-aside--note,
+.starlight-aside--tip {
+	background: color-mix(in srgb, var(--sl-color-gray-6) 55%, transparent);
+}
+
+/* A command block with no title is just a block: no empty window bar with three dots. */
+.expressive-code .frame.is-terminal:not(.has-title) .header {
+	display: none;
+}
+.expressive-code .frame.is-terminal:not(.has-title) pre {
+	border-radius: 0.5rem;
+	border-top-width: 1px;
+}
+
+/* ── Header: search trigger ───────────────────────────────────────────── */
+/* The trigger is centred on the page by the header grid (Header.astro), 34rem at most. Pagefind and DocSearch share the look. */
+@media (min-width: 50rem) {
+	.header sl-doc-search {
+		width: 100%;
+		max-width: 34rem;
+	}
+	.header .DocSearch-Button,
+	.header site-search button[data-open-modal] {
+		width: 100%;
+		max-width: 34rem;
+		height: 2.75rem;
+		padding-inline: 0.9rem;
+		border: 1px solid var(--cckit-field-border);
+		border-radius: 0.625rem;
+		background: var(--cckit-field-bg);
+		color: var(--sl-color-gray-3);
+		font-size: 1rem;
+	}
+	.header .DocSearch-Button:hover,
+	.header site-search button[data-open-modal]:hover {
+		border-color: var(--sl-color-gray-3);
+		color: var(--sl-color-gray-2);
+	}
+	.header .DocSearch-Button-Placeholder {
+		font-size: 1rem;
+	}
+}
+@media (max-width: 49.99rem) {
+	/* Phone: the trigger is an icon, 44px square. */
+	.header .DocSearch-Button,
+	.header site-search button[data-open-modal] {
+		width: 2.75rem;
+		height: 2.75rem;
+		justify-content: center;
+		font-size: var(--sl-text-xl);
+	}
+}
+
+/* ── Home hero (Starlight `hero:` frontmatter): centred, a heading rather than a billboard ── */
+.hero {
+	grid-template-columns: minmax(0, 1fr);
+	padding-block: 2rem 0.5rem;
+}
+.hero .stack {
+	text-align: center;
+}
+.hero .copy {
+	align-items: center;
+}
+.hero h1 {
+	font-size: clamp(2rem, 1.2rem + 2.6vw, 3rem);
+	text-wrap: balance;
+}
+.hero .copy > * {
+	max-width: 40rem;
+}
+.hero .tagline {
+	font-size: 1.125rem;
+	line-height: 1.6;
+}
+
+/* Search chips: list items are not prose. */
+.sl-markdown-content .sstart-chips > li {
+	margin: 0;
 }

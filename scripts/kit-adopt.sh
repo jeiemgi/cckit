@@ -37,7 +37,8 @@ _kit_adopt_tier() {
 }
 
 # Emit the set of kit-shaped paths that EXIST under the project but are NOT yet in the manifest.
-# "kit-shaped" = the directories the kit owns (skills/rules/agents/commands/hooks/lib) + the two
+# "kit-shaped" = the directories the kit owns (skills/rules/agents/commands/hooks/lib, and the Codex
+# adapter's .agents/skills + .agents/rules — never the rest of .agents/ or AGENTS.md) + the two
 # wired singletons. Never the user's content trees (knowledge/, plans/, drafts/, apps/, src/).
 # One relpath per line.
 kit_adopt_candidates() {
@@ -50,7 +51,7 @@ kit_adopt_candidates() {
     [ "$verdict" = "untracked" ] && printf '%s\n' "$p"
   done < <(
     find .claude/skills .claude/rules .claude/agents .claude/commands \
-         .claude/hooks .claude/lib -type f 2>/dev/null
+         .claude/hooks .claude/lib .agents/skills .agents/rules -type f 2>/dev/null
   )
   # The two wired singletons, if present.
   for p in .claude/statusline.sh .claude/settings.json; do

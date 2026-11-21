@@ -166,7 +166,7 @@ if [ -n "${KL_TEST_INNER:-}" ]; then
       has "TOON header"        "$llm" "{file,errors,functions,purpose}"
       has "TOON row"           "$llm" '"alpha.sh"'
       has "TOON keeps unknown" "$llm" '"unknown"'
-      eq  "TOON row count"     "$(printf '%s\n' "$llm" | head -1)" "[5]{file,errors,functions,purpose}:"
+      eq  "TOON row count"     "$(printf '%s\n' "$llm" | sed -n 1p)" "[5]{file,errors,functions,purpose}:"
       # an empty catalog is [] — never an error
       eq  "empty catalog is []" "$(KIT_LIB_DIR="$empty" CCKIT_OUTPUT=json kit_lib --llm)" "[]"
       err="$(KIT_LIB_DIR="$fix" CCKIT_OUTPUT=json kit_lib --llm --bogus)"; brc=$?

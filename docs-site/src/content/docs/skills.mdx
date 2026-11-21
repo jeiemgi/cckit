@@ -15,7 +15,7 @@ A **skill** is a packaged instruction set Claude Code can run. Every skill here 
 `/` (for example `/kit-next`) — that's the <Tag kind="skill" text>Skill</Tag> tag. Some also trigger
 when you just **describe the task in plain words** — that's the
 <Tag kind="conversational" text>Conversational</Tag> tag. New to the tags? See
-[How to read this guide](/how-to-read/).
+[How to read this guide](/tags/).
 
 ## Everyday loop
 
@@ -27,7 +27,7 @@ when you just **describe the task in plain words** — that's the
 | `kit-plan-next` | <Tag kind="skill" /> | Inventory what the kit can already do; propose what to build next. |
 | `kit-next` | <Tag kind="skill" /> | Pick up the next unblocked issue, or fan the wave out. |
 | `kit-ship` | <Tag kind="skill" /> | One request, code to merged. |
-| `kit-autopilot` | <Tag kind="skill" /> | Run a planned effort hands-off. |
+| `kit-autopilot` | <Tag kind="skill" /> | Run a planned effort hands-off. Its night mode runs waves the owner granted, under a runtime-enforced token budget — see [Night mode](/config-and-permissions/#night-mode). |
 | `kit-task-sync` | <Tag kind="skill" /> | Print the board by role; flag blockers. |
 
 </div>
@@ -53,7 +53,7 @@ when you just **describe the task in plain words** — that's the
 
 | Skill | Activates | What it does |
 | ----- | --------- | ------------ |
-| `kit-effort-new` | <Tag kind="skill" /> | Create an effort: a parent plus sub-issues. |
+| `kit-effort-new` | <Tag kind="skill" /> | Create an effort: a parent plus sub-issues. Shows the plan as a [review page](/project-management/plan-pages/) first. |
 | `kit-effort-start` | <Tag kind="skill" /> | Open the effort branch the subs merge into. |
 | `kit-effort-pr` | <Tag kind="skill" /> | Open the one PR for the whole effort. |
 | `kit-effort-close` | <Tag kind="skill" /> | Thin caller of `cckit effort close` — the one close op: merge, close, board Done, GC. |
@@ -71,6 +71,7 @@ when you just **describe the task in plain words** — that's the
 | `kit-security-sweep` | <Tag kind="skill" /> | Audit for injection, auth, CORS/CSP, deps. |
 | `kit-digest` | <Tag kind="skill" /> | Pre-digest long inputs with a local model. |
 | `kit-ux-audit` | <Tag kind="skill" /> | Graph-driven UX audit: flows, DS consistency, a11y. |
+| `kit-annotate` | <Tag kind="skill" /> | Set up click-to-annotate feedback on a running React app (Agentation), then triage the notes. Claude Code only. |
 
 </div>
 
@@ -84,8 +85,117 @@ when you just **describe the task in plain words** — that's the
 | `kit-customize` | <Tag kind="conversational" /> | Add or edit agents and skills in a project. |
 | `kit-contribute` | <Tag kind="conversational" /> | Open a PR to contribute your additions upstream. |
 | `kit-onboard` | <Tag kind="skill" /> | First-contact setup on a new machine. |
+| `kit-page` | <Tag kind="conversational" /> | Open a plan, a decision or a grilling round as a [review page](/project-management/plan-pages/), fall back to the terminal where there is no browser, and write the answer back. |
+| `kit-add` | <Tag kind="conversational" /> | Add an [integration](/integrations/) or a module: list what can be added, ask the descriptor's one question, run `cckit add`. |
 
 </div>
+
+## Skills a profile scaffolds
+
+The skills above ship with the plugin. `cckit init` also copies these into the project
+(`.claude/skills/<name>/SKILL.md`), chosen by the profile, so they can be edited there.
+
+<div class="cckit-nowrap-2">
+
+| Skill | Profiles | What it does |
+| ----- | -------- | ------------ |
+| `concrete` | all | Cut padding, hedges and unverifiable claims from durable prose: commits, PR and issue bodies, rules, docs. |
+| `karpathy-guidelines` | all | Guidelines against overcomplicated changes: state assumptions, change only what was asked, define what done means. |
+| `morning-briefing` | software, content, marketing, research, automation | What is active, what is blocked, what to focus on today. |
+| `copywriting` | content, marketing | Write or rewrite a page meant to persuade: homepage, landing, pricing, feature, headline, call to action. The `editor` agent lists it in `skills:`, so the Editor follows it for marketing copy. |
+| [`brand-voice`](#brand-voice) | marketing | Record the brand's voice, key messages and banned phrasings in `brand/voice.md`; check a draft against it. `copywriting` reads the file before it writes. |
+| [`campaign`](#campaign) | marketing | Turn one goal into a campaign plan, get it approved, then record its pieces as light tasks or as an effort's sub-issues. |
+| [`page-design`](#page-design) | marketing; the `nextjs-shadcn` recipe; an existing project with `cckit add page-design` | Build or change a page with three named third-party design skills in a fixed order — `impeccable`, `emil-design-eng`, `web-design-guidelines` — with a design brief before any code and a self-review after. |
+| `speckit` | software | Install or identify Spec Kit and drive the spec-driven lifecycle. |
+| `feature-build-refine` | software | Build strategy for a Next.js + RefineDev project; applies only when the stack matches. |
+| `supabase-patterns` | software | Supabase access conventions; applies only when the project uses Supabase. |
+
+</div>
+
+### brand-voice
+
+One tracked file, `brand/voice.md`, holds how the brand sounds. The skill does three things with
+it:
+
+| Job | When | What happens |
+| --- | --- | --- |
+| Record | the file does not exist, or you ask to set the voice down | reads the site and recent posts first, asks only what they do not answer, writes the file from `references/voice-template.md` |
+| Check | "does this sound like us?" | lists banned phrasings found, claims that go beyond a key message, and up to five off-voice passages with a rewrite, then a one-line verdict |
+| Change | a trait, a message or a banned phrase changes | records a `kind: brand` task, edits the file in that task's folder, and sends it for review — the new voice applies once the review merges |
+
+The file has seven sections — Audience, Voice, Key messages, Banned phrasings, Words we use,
+Examples, Changes. `copywriting` reads the middle four before it writes and does not ask you to
+decide them again. A key message with no proof is recorded as `unproven` and is not stated as fact.
+
+### campaign
+
+One goal, one plan file, and the pieces that deliver it. The skill does not write the pieces.
+
+1. Reads `brand/voice.md`, the plans folder and the open work.
+2. Fills a five-line brief — goal (one number with a date), audience, message, channels,
+   approver — asking one question at a time.
+3. Writes the plan to the plans folder from `references/plan-template.md`. Its **Pieces** table
+   has one row per piece, at most eight, each with a kind, one reader action and an order.
+4. Shows the plan for approval, as a [review page](/project-management/plan-pages/) where there is a browser.
+   Nothing is recorded before the approver says yes.
+5. Records the pieces in the list `cckit task default` names:
+
+| `cckit task default` prints | Pieces become | The plan is reviewed as |
+| --- | --- | --- |
+| `light` | one [light task](/project-management/light-tasks/) per piece, created inside the plan task's folder | one pull request carrying the plan file and every piece's task file (`cckit task finish <id> "<summary>" --all`) |
+| `issues` | one sub-issue per piece of an effort (`cckit effort new … --kind campaign`) | the effort's one pull request |
+
+`tasks.default` in the config decides which; see [Light tasks](/config-and-permissions/#light-tasks).
+
+### page-design
+
+cckit's own skill for a page. It coordinates three third-party design skills and contains none of
+their content. Each of the three is an [integration](/integrations/#the-design-skills): off until
+you add it, installed only with your consent.
+
+| Order | Skill | Decides | Source · licence |
+| --- | --- | --- | --- |
+| 1 | `impeccable` | direction: what the page is for, its type, layout and colour, and what it must not look like | [pbakaus/impeccable](https://github.com/pbakaus/impeccable) · Apache-2.0 |
+| 2 | `emil-design-eng` | interaction and motion on the chosen design; it may remove an animation step 1 added without a purpose | [emilkowalski/skills](https://github.com/emilkowalski/skills) · MIT |
+| 3 | `web-design-guidelines` | the audit of the finished code; its accessibility and reduced-motion findings win a disagreement | [vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills) · MIT per its README |
+
+What the skill has the agent do, in order:
+
+1. **Check what is installed** and whether the run is unattended (`CCKIT_HEADLESS` is set by
+   `cckit autopilot run` and `cckit task run`).
+2. **Write the design brief before any code**, in `docs/design/<task-id>.md`: the audience, ONE
+   visual idea, type, colour, and at least four concrete patterns the page refuses to have, picked
+   from the skill's list of what a generic generated page looks like (a centred hero with two
+   buttons, three icon cards in a row, one default sans-serif for everything, a fade-in on every
+   section). A fact it does not have is written `not known`.
+3. **Apply the three skills** in the order of the table, each for what it decides.
+4. **Write the self-review** into the same file: whether the one idea is on the page, each refusal
+   as `absent` or `present at <file:line>`, the final state of each skill, and what was not
+   verified.
+
+The limits it holds the agent to:
+
+| Case | What the skill says |
+| --- | --- |
+| An unattended run | never `impeccable`'s live mode (`live`, `generate`): it opens a browser session and can start the agent CLI with permission checks off |
+| No network, or the rules cannot be fetched | `audit: not run`, never passed. `web-design-guidelines` fetches its rules from GitHub on every run |
+| One of the three is not installed | `<skill>: not installed` in the design file, then cckit's own minimum rules for that step (`references/minimum-rules.md`). The missing skill is never written as used |
+
+The skill's instructions are not the check. For a page task, [`cckit task run`](/cli-reference/)
+reads which skills the run loaded from the events the agent CLI prints and puts that list in the
+pull request, with `docs/design/<id>.md` named beside it. A page task is a task whose kind is
+`page` (`cckit task new --kind page "<title>"`), or any task in a project whose config sets
+`tasks.design: true`.
+
+In a project that already exists, `cckit add page-design` sets that key and copies the skill into
+the skills folder of each adapter the project selects. It needs no version bump: `cckit init
+--upgrade` adds nothing to a project already at the installed version. With the key on and the
+folder absent, `cckit doctor` prints a failing `page-design skill` row naming the command.
+
+<Aside type="caution" title="Not measured yet">
+No page built with the three skills installed has been compared with one built without them. This
+section describes what the skill instructs and what cckit records, not a result.
+</Aside>
 
 <Aside type="note" title="Running a skill">
 In Claude Code, type `/` and the skill name (for example `/kit-next`). A

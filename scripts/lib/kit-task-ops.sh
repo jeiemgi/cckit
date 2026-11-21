@@ -17,10 +17,11 @@
 #   kto_labels_role <labels-csv>                      echo the role slug from a labels CSV (role:<slug>)
 #   kto_labels_kind <labels-csv>                      echo the kind slug from a labels CSV (kind:<slug>)
 #   kto_compose_pr_body <num> <summary> <role-slug>   echo a PR body from the template
+#   kto_pr_body_style                                 echo content|code (pr.bodyStyle, #418)
 #   kto_compose_issue_body <user-body> <plan> <blocked> <role-slug>   echo an issue body
 #   kto_closing_issue_numbers <pr-num>                echo the issue #s a merged PR closes
-#   kto_task_pr   <num> <summary> [commit-msg]        commit+push+open PR (board → In Review)
-#   kto_task_pr_merge [pr-num] [--squash|--merge|--rebase]   merge (squash default) + close issues + GC + update the PR base
+#   kto_task_pr   <num> <summary> [commit-msg] [--base <branch>]   commit+push+open PR (board → In Review)
+#   kto_task_pr_merge [pr-num] [--squash|--merge|--rebase]   merge (squash default) + close issues + GC + update the PR base; refuses an effort/* head
 #   kto_task_new  <title> <role> <kind> <prio> [ms] [plan] [blocked] <body>   create issue + board fields (ms may be empty)
 #   kto_task_close <num> <summary> [pr-num] [--reason R] [--duplicate-of N] [--superseded-by N]   close + reason + board → Done
 # errors: mixed — git/gh ops propagate; board + label side effects are best-effort
@@ -48,6 +49,17 @@ if ! type cckit_gh_rest >/dev/null 2>&1; then
   unset _kto_self
 fi
 type cckit_gh_rest >/dev/null 2>&1 || cckit_gh_rest() { return 1; }
+
+# The kind vocabulary (kinds.sh): kto_pr_title takes the commit type from kit_kind_commit_type.
+if ! type kit_kind_commit_type >/dev/null 2>&1; then
+  if [ -n "${BASH_SOURCE:-}" ]; then _kto_self="${BASH_SOURCE[0]}"
+  elif [ -n "${ZSH_VERSION:-}" ]; then eval '_kto_self="${(%):-%x}"'
+  else _kto_self="$0"; fi
+  _kto_self="$(cd "$(dirname "$_kto_self")" 2>/dev/null && pwd)/kinds.sh"
+  # shellcheck source=kinds.sh
+  [ -f "$_kto_self" ] && . "$_kto_self"
+  unset _kto_self
+fi
 type cckit_board_skipped >/dev/null 2>&1 || cckit_board_skipped() { return 1; }
 
 kto_repo() {
@@ -55,7 +67,9 @@ kto_repo() {
 }
 
 # The base branch a PR targets / pr-merge returns to (portable: KIT_BASE_BRANCH, default develop).
+# Args: [override] — a non-empty override wins over the configured base (#391: `cckit pr --base`).
 kto_base_branch() {
+  if [[ -n "${1:-}" ]]; then printf '%s' "$1"; return 0; fi
   printf '%s' "${KIT_BASE_BRANCH:-main}"
 }
 
@@ -73,17 +87,17 @@ kto_board_enabled() {
 # Parse the issue number from a `<kind>/<N>-<slug>` branch (e.g. feat/173-x -> 173). Empty if none.
 kto_branch_issue_number() {
   local branch="${1:-$(git rev-parse --abbrev-ref HEAD 2>/dev/null)}"
-  printf '%s' "$branch" | grep -oE '/[0-9]+-' | head -1 | tr -d '/-'
+  printf '%s' "$branch" | grep -oE '/[0-9]+-' | sed -n 1p | tr -d '/-'
 }
 
 # Echo the role slug from a comma-separated labels list (role:<slug>). Empty if absent.
 kto_labels_role() {
-  printf '%s' "$1" | tr ',' '\n' | grep '^role:' | head -1 | cut -d: -f2
+  printf '%s' "$1" | tr ',' '\n' | grep '^role:' | sed -n 1p | cut -d: -f2
 }
 
 # Echo the kind slug from a comma-separated labels list (kind:<slug>). Empty if absent.
 kto_labels_kind() {
-  printf '%s' "$1" | tr ',' '\n' | grep '^kind:' | head -1 | cut -d: -f2
+  printf '%s' "$1" | tr ',' '\n' | grep '^kind:' | sed -n 1p | cut -d: -f2
 }
 
 # Compose the PR title as a Conventional Commit subject. Because PRs are squash-merged, this title
@@ -114,17 +128,18 @@ kto_pr_title() {
   fi
   # 2) Derive the type from the kind:/bug label.
   kind="$(kto_labels_kind "$labels")"
-  case "$kind" in
-    feat)     ctype=feat ;;
-    chore)    ctype=chore ;;
-    docs)     ctype=docs ;;
-    ci)       ctype=ci ;;
-    test)     ctype=test ;;
-    perf)     ctype=perf ;;
-    refactor) ctype=refactor ;;
-    fix|bug)  ctype=fix ;;
-    *)        ctype=feat ;;   # kind:task (the default) and anything unknown → feat
-  esac
+  # The kind -> type map is kinds.sh's (kit_kind_commit_type): a content kind (post, campaign,
+  # brand, research) titles as `docs`, kind:task and anything unknown as `feat`.
+  if command -v kit_kind_commit_type >/dev/null 2>&1; then
+    ctype="$(kit_kind_commit_type "$kind")"
+  else
+    case "$kind" in
+      feat|chore|docs|ci|test|perf|refactor) ctype="$kind" ;;
+      fix|bug) ctype=fix ;;
+      post|campaign|brand|research) ctype=docs ;;
+      *) ctype=feat ;;
+    esac
+  fi
   case ",$labels," in *,bug,*) ctype=fix ;; esac   # a plain `bug` label → fix
   # 3) Strip "[Effort N] M · " (the "· " consumed here as a literal — byte-wise match is portable
   #    across BSD/GNU sed + locales; a negated class over the multibyte middot is not) and then a
@@ -137,14 +152,67 @@ kto_pr_title() {
   printf '%s: %s' "$ctype" "$desc"
 }
 
+# kto_pr_body_style — `content` or `code`: which wording a generated PR body uses (#418).
+# pr.bodyStyle in the config (KIT_PR_BODY_STYLE); anything but `content` is `code`. The content and
+# marketing profiles set `content`. Shared by `cckit pr`, `cckit effort pr` and `cckit task finish`.
+kto_pr_body_style() {
+  if [ "${KIT_PR_BODY_STYLE:-code}" = "content" ]; then printf 'content'; else printf 'code'; fi
+}
+
+# kto_content_review_checklist — the review checklist of a content-style PR body, one item per
+# line. The same four lines in every body the kit writes for content work.
+kto_content_review_checklist() {
+  printf '%s\n' \
+    '- [ ] Read the draft from start to finish' \
+    '- [ ] Facts, names, numbers and links are checked' \
+    '- [ ] The voice matches the brand guide' \
+    '- [ ] Only the files for this piece changed'
+}
+
 # Compose a PR body from the kit-task-pr template. Args: <num> <summary> <role-slug> [issue-title]
 # pr.orchestratorSection = true (KIT_PR_ORCHESTRATOR_SECTION) prepends a 2-line
 # `## For the orchestrator` section: the issue id + title, then what to review.
+# pr.bodyStyle = content swaps the code wording (diff, reproduced manually) for draft-and-review
+# wording; `Closes #N`, the summary and the signature are the same in both.
 kto_compose_pr_body() {
-  local num="$1" summary="$2" role="$3" title="${4:-}" sig=""
+  local num="$1" summary="$2" role="$3" title="${4:-}" sig="" style
+  style="$(kto_pr_body_style)"
   if type role_signature >/dev/null 2>&1; then sig="$(role_signature "$role")"; fi
   if [ "${KIT_PR_ORCHESTRATOR_SECTION:-false}" = "true" ]; then
-    printf '## For the orchestrator\n\n#%s%s\nReview: the summary below and the diff.\n\n' "$num" "${title:+ · $title}"
+    if [ "$style" = "content" ]; then
+      printf '## For the orchestrator\n\n#%s%s\nReview: the summary below and the changed files.\n\n' "$num" "${title:+ · $title}"
+    else
+      printf '## For the orchestrator\n\n#%s%s\nReview: the summary below and the diff.\n\n' "$num" "${title:+ · $title}"
+    fi
+  fi
+  if [ "$style" = "content" ]; then
+    cat <<EOF
+## Closes
+
+Closes #$num
+
+## Summary
+
+$summary
+
+## Review
+
+$(kto_content_review_checklist)
+
+## Notes for the reviewer
+
+—
+
+## Not in this piece
+
+—
+
+$sig
+
+---
+<sub>· \`claude-kit\` · kit-task-pr</sub>
+EOF
+    return 0
   fi
   cat <<EOF
 ## Closes
@@ -209,21 +277,50 @@ kto_closing_issue_numbers() {
 # --- the four ops (network; not exercised by the self-test) --------------------------------------
 
 # Map a role slug to the board's Role single-select option id (uses gh-project's role_option_id,
-# which takes a display name — translate slug -> display via role_display).
+# which takes a display name — translate slug -> display via role_display). A slug role_display
+# does not list is passed as-is (#378): role_option_id normalizes it to the same ROLE_OPT_<NAME>.
 _kto_role_option_for_slug() {
   local slug="$1" disp=""
+  [[ -z "$slug" ]] && return 0
   if type role_display >/dev/null 2>&1; then disp="$(role_display "$slug")"; fi
-  [[ -z "$disp" ]] && return 0
+  [[ -z "$disp" ]] && disp="$slug"
   if type role_option_id >/dev/null 2>&1; then role_option_id "$disp"; fi
 }
 
 # kit task pr — commit current changes (role identity in a Co-authored-by TRAILER, never the
 # author field — Vercel rejects unknown author emails), push, open the PR with the issue's
 # labels/milestone, add it to the board In Review, and move the issue to In Review.
-# Args: <issue-num> <summary> [commit-msg]
+# Args: <issue-num> <summary> [commit-msg] [--base <branch>]
+#
+# --base (#391) targets a branch other than the configured base — a release PR develop -> main.
+# load_kit_config re-exports KIT_BASE_BRANCH from the config, so an env override cannot do this.
+# The flag is parsed out before the positionals are read, anywhere on the line, and a missing value
+# returns 2 before the commit and the push. The target is exported to the push as KIT_PR_BASE (set
+# with or without the flag), so a project's git pre-push hook can compare against the branch the PR
+# targets (#360).
 kto_task_pr() {
   # Default-safe reads: callers (scripts/kit) may run under `set -u`.
-  local num="${1:-}" summary="${2:-}" commit_msg="${3:-}"
+  local num="" summary="" commit_msg="" base_override="" _pos=0
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --base)
+        if [ "$#" -lt 2 ] || [ -z "$2" ]; then
+          echo "✗ kto_task_pr: --base needs a branch — usage: cckit pr <issue> \"<summary>\" [--base <branch>]" >&2; return 2
+        fi
+        base_override="$2"; shift 2 ;;
+      --base=*)
+        base_override="${1#--base=}"
+        if [ -z "$base_override" ]; then
+          echo "✗ kto_task_pr: --base needs a branch — usage: cckit pr <issue> \"<summary>\" [--base <branch>]" >&2; return 2
+        fi
+        shift ;;
+      *)
+        _pos=$((_pos + 1))
+        case "$_pos" in 1) num="$1" ;; 2) summary="$1" ;; 3) commit_msg="$1" ;; esac
+        shift ;;
+    esac
+  done
+  local base; base="$(kto_base_branch "$base_override")"
   local repo branch meta title labels milestone role author="" url pr_num pr_node item role_opt issue_item
   repo="$(kto_repo)"
   branch="$(git rev-parse --abbrev-ref HEAD)"
@@ -258,14 +355,14 @@ kto_task_pr() {
     fi
   fi
 
-  git push -u origin "$branch" || return 1
+  KIT_PR_BASE="$base" git push -u origin "$branch" || return 1
 
   if cckit_gh_rest; then
-    url=$(gh_rest_pr_create "$repo" "$(kto_base_branch)" "$branch" "$pr_title" \
+    url=$(gh_rest_pr_create "$repo" "$base" "$branch" "$pr_title" \
       "$(kto_compose_pr_body "$num" "$summary" "$role" "$title")" "$labels" "$milestone") || return 1
   else
   url=$(gh pr create --repo "$repo" \
-    --base "$(kto_base_branch)" --head "$branch" \
+    --base "$base" --head "$branch" \
     --title "$pr_title" \
     --body "$(kto_compose_pr_body "$num" "$summary" "$role" "$title")" \
     --label "$labels" \
@@ -317,7 +414,7 @@ kto_task_pr_merge() {
     esac
   done
 
-  local repo branch base pr_num meta merge_state pr_base head issues n state wt main_wt base_wt common
+  local repo branch base pr_num meta merge_state pr_base head issues n state wt main_wt base_wt common effort_n
   repo="$(kto_repo)"
   base="$(kto_base_branch)"
   branch="$(git rev-parse --abbrev-ref HEAD)"
@@ -340,6 +437,20 @@ kto_task_pr_merge() {
   head=$(printf '%s' "$meta" | jq -r '.headRefName // empty'); head="${head:-$branch}"
   echo "→ PR #$pr_num: $head → $pr_base ($method)"
   echo "  mergeable=$merge_state status=$(printf '%s' "$meta" | jq -r '.mergeStateStatus // ""')"
+
+  # An effort's PR merges with `cckit effort close` (#379): that op snapshots each sub-issue's diff
+  # before the squash destroys the per-sub commits. Refused before the rebase and the merge, so a
+  # refusal writes nothing. KIT_FORCE=1 merges anyway.
+  if [[ "$head" == effort/* ]]; then
+    effort_n="${head#effort/}"; effort_n="${effort_n%%-*}"
+    if [[ "${KIT_FORCE:-0}" == "1" ]]; then
+      echo "⚠ KIT_FORCE=1: merging effort branch $head with cckit merge — no per-sub trace snapshot is taken (cckit effort close $effort_n takes it)" >&2
+    else
+      echo "✗ PR #$pr_num is an effort branch ($head) — merge it with: cckit effort close $effort_n" >&2
+      echo "  cckit merge would skip the per-sub trace snapshot effort close takes before the squash. KIT_FORCE=1 merges anyway." >&2
+      return 1
+    fi
+  fi
 
   # Branches that are never rebased, force-pushed or deleted here: the repo base, the PR's base
   # (it may be an effort branch), and the release branches (#366).
@@ -374,7 +485,10 @@ kto_task_pr_merge() {
 
   # Close linked issues (replaces issue-close-on-merge.yml; native auto-close only fires on main).
   issues="$(kto_closing_issue_numbers "$pr_num")"
-  for n in $issues; do
+  # Read line by line on fd 3, not `for n in $issues` (#379): word-splitting follows the caller's
+  # IFS, and a NUL-polluted IFS passed "1020\n1021" to gh as one issue number.
+  while IFS= read -r n <&3; do
+    [[ "$n" =~ ^[0-9]+$ ]] || continue
     if cckit_gh_rest; then state=$(gh_rest_issue_state "$repo" "$n" 2>/dev/null)
     else state=$(gh issue view "$n" --repo "$repo" --json state --jq .state 2>/dev/null); fi
     if [[ "$state" == "OPEN" ]] && cckit_gh_rest; then
@@ -388,7 +502,9 @@ kto_task_pr_merge() {
     elif [[ -n "$state" ]]; then
       echo "  issue #$n already $state — skipped"
     fi
-  done
+  done 3<<EOF
+$issues
+EOF
 
   # Clean up FROM the main checkout (#371): run from the PR's own worktree, removing it deletes our
   # cwd. Main checkout = parent of the shared git dir; fall back to the first `worktree list` entry.
@@ -397,7 +513,7 @@ kto_task_pr_merge() {
   common="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"
   main_wt=""
   [[ -n "$common" && "$(basename "$common")" == ".git" ]] && main_wt="$(dirname "$common")"
-  [[ -n "$main_wt" ]] || main_wt=$(git worktree list --porcelain | awk '/^worktree /{print $2; exit}')
+  [[ -n "$main_wt" ]] || main_wt=$(git worktree list --porcelain | awk '/^worktree / && !hit {print $2; hit=1}')
   cd "$main_wt" || { echo "✗ cannot reach the main checkout $main_wt for cleanup" >&2; return 1; }
 
   if [[ -n "$wt" && "$wt" != "$main_wt" ]] && ! _kto_protected "$head"; then
@@ -433,9 +549,36 @@ kto_task_pr_merge() {
   fi
 }
 
+# _kto_existing_labels <repo> <comma-labels> — the subset of <comma-labels> the repo has, comma-joined
+# on stdout; each one it lacks is named in a warning on stderr (#387). `gh issue create --label`
+# aborts on an unknown label before any issue exists, and the REST endpoint creates the label
+# instead, so both transports are filtered here: the issue is filed, no label is invented. Names
+# match case-insensitively, as GitHub's do. A label list that cannot be read filters nothing.
+_kto_existing_labels() {
+  local repo="$1" want="$2" have l keep=""
+  if cckit_gh_rest; then
+    have="$(gh_rest_label_names "$repo")" || { printf '%s' "$want"; return 0; }
+  else
+    have="$(gh label list --repo "$repo" --limit 1000 --json name --jq '.[].name' 2>/dev/null)" \
+      || { printf '%s' "$want"; return 0; }
+  fi
+  while IFS= read -r l; do
+    [[ -n "$l" ]] || continue
+    if grep -qixF -- "$l" <<<"$have"; then
+      keep="${keep:+$keep,}$l"
+    else
+      echo "⚠ label '$l' not found in $repo — issue created without it (scripts/setup-labels.sh provisions the kit's labels)" >&2
+    fi
+  done <<EOF
+$(printf '%s\n' "$want" | tr ',' '\n')
+EOF
+  printf '%s' "$keep"
+}
+
 # kit task new — create a GitHub issue with labels + milestone, add it to the board, set Role +
 # Status(Todo) + Plan Link. Inputs are passed (the caller does the AskUserQuestion). No invented
-# values; fails loudly on an unknown label family upstream (the caller validates the closed sets).
+# values: a label the repo does not have is dropped with a warning, never created, and the issue is
+# still filed (#387). Non-zero only when the issue itself was not created.
 # Args: <title> <role-display-or-slug> <kind> <priority> [milestone|""] [plan-link] [blocked-by] <body>
 kto_task_new() {
   local title="${1:-}" role="${2:-}" kind="${3:-}" prio="${4:-}" milestone="${5:-}" plan="${6:-}" blocked="${7:-}" body_user="${8:-}"
@@ -449,13 +592,14 @@ kto_task_new() {
   role_slug="$(printf '%s' "$role" | tr 'A-Z ' 'a-z-')"
   labels="kind:${kind},priority:${prio},role:${role_slug}"
   body="$(kto_compose_issue_body "$body_user" "$plan" "$blocked" "$role_slug")"
+  labels="$(_kto_existing_labels "$repo" "$labels")"
 
   if cckit_gh_rest; then
     url=$(gh_rest_issue_create "$repo" "$title" "$body" "$labels" "$milestone") || return 1
   else
   url=$(gh issue create --repo "$repo" \
     --title "$title" --body "$body" \
-    --label "$labels" ${milestone:+--milestone "$milestone"} --assignee "@me") || return 1
+    ${labels:+--label} ${labels:+"$labels"} ${milestone:+--milestone "$milestone"} --assignee "@me") || return 1
   fi
   num=$(basename "$url")
   echo "✓ $url"

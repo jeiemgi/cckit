@@ -1,0 +1,42 @@
+{
+  "id": "web-design-guidelines",
+  "label": "web-design-guidelines",
+  "summary": "An audit of a finished page's code against the Web Interface Guidelines: accessibility, focus, reduced motion. The third skill `page-design` applies, and the one whose findings win a disagreement.",
+  "why": "No API key and no paid product. The skill holds no rules: it fetches them from GitHub on every run, so it does not work offline and the rules can change between two runs. With no network `page-design` reports the audit as not run. Installing runs the third-party `skills` CLI through npx, which needs Node.js 22.20 or later.",
+  "config": { "key": "designAudit.provider", "value": "web-design-guidelines" },
+  "detect": {
+    "run": "test -f .claude/skills/web-design-guidelines/SKILL.md || test -f \"$HOME/.claude/skills/web-design-guidelines/SKILL.md\"",
+    "bin": "npx"
+  },
+  "install": [
+    {
+      "manager": "npx",
+      "run": "npx -y skills@latest add vercel-labs/agent-skills --skill web-design-guidelines -a claude-code -y",
+      "note": "`npx skills add vercel-labs/agent-skills --skill web-design-guidelines -a claude-code` is the example in the `skills` CLI README; `-y` (skip prompts) is from its docs/commands.md (both read 2026-11-13). One run is on record, on 2026-11-13, through `cckit doctor --fix` in a Next.js project: the skill landed in .claude/skills/web-design-guidelines and skills-lock.json was written; whether .agents/skills/ got a copy was not recorded. Per the CLI's docs it installs into the current project (`-g` would make it global): a copy under .agents/skills/, a link at .claude/skills/web-design-guidelines, and an entry in skills-lock.json."
+    }
+  ],
+  "verify": {
+    "run": "test -f .claude/skills/web-design-guidelines/SKILL.md || test -f \"$HOME/.claude/skills/web-design-guidelines/SKILL.md\"",
+    "failsOn": "The skill file is in neither this project nor ~/.claude/skills. A file check only: it does not prove the rules can be fetched."
+  },
+  "afterInstall": "reload the agent session so it lists the skill, and commit .claude/skills/web-design-guidelines, skills-lock.json and .agents/skills/web-design-guidelines when it exists",
+  "alsoWrites": ["skills-lock.json"],
+  "uninstall": "npx -y skills@latest remove web-design-guidelines -a claude-code -y",
+  "recheck": {
+    "cadence": "monthly",
+    "drifts": [
+      "the package name skills on npm and its `add` options --skill, -a, -y",
+      "the skill folder name web-design-guidelines in vercel-labs/agent-skills",
+      "the rules URL the skill fetches: raw.githubusercontent.com/vercel-labs/web-interface-guidelines/main/command.md"
+    ]
+  },
+  "docs": "https://github.com/vercel-labs/agent-skills#readme",
+  "attribution": {
+    "author": "Vercel (vercel-labs)",
+    "license": "MIT, as stated in the README",
+    "homepage": "https://github.com/vercel-labs/agent-skills",
+    "affiliated": false,
+    "notice": "web-design-guidelines is a skill by Vercel, installed from the public repository vercel-labs/agent-skills. That repository's README states MIT and it holds no LICENSE file (checked 2026-11-13); the rules the skill fetches come from vercel-labs/web-interface-guidelines, which has an MIT LICENSE file. cckit is not affiliated with Vercel and vendors none of its content.",
+    "telemetry": "The skill fetches its rules from raw.githubusercontent.com on every run. Nothing else is stated by the vendor."
+  }
+}

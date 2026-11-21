@@ -46,6 +46,22 @@ if [ -n "${KIT_ADOPT_TEST_INNER:-}" ]; then
   kit_adopt_check >/dev/null 2>&1
   t "check clean after adopt rc=0" "$?" "0"
 
+  # Codex-only project (E257.3): the adapter's .agents/skills + .agents/rules are kit-shaped, the
+  # rest of .agents/ and AGENTS.md are the project's; the manifest lives under .cckit/.
+  cx="$(mktemp -d)"; cd "$cx"
+  mkdir -p .agents/skills/concrete .agents/rules .cckit
+  printf '{"schema":1,"entries":{}}\n' > .cckit/kit.manifest.json
+  printf 'skill\n'  > .agents/skills/concrete/SKILL.md
+  printf 'rule\n'   > .agents/rules/branch-naming.md
+  printf 'mine\n'   > .agents/product-marketing.md
+  printf 'mine\n'   > AGENTS.md
+  t "codex candidates" "$(kit_adopt_candidates | LC_ALL=C sort | tr '\n' ',')" ".agents/rules/branch-naming.md,.agents/skills/concrete/SKILL.md,"
+  KIT_ASSUME_YES=1 kit_adopt_all >/dev/null 2>&1
+  t "codex skill tracked in .cckit manifest" "$(jq -r '.entries | has(".agents/skills/concrete/SKILL.md")' .cckit/kit.manifest.json)" "true"
+  t "codex adopt made no .claude tree"       "$([ -e .claude ] && echo yes || echo no)" "no"
+  t "user file under .agents NOT tracked"    "$(kit_manifest_verify .agents/product-marketing.md)" "untracked"
+  cd "$proj"; rm -rf "$cx"
+
   [ "$fail" -eq 0 ] && echo "ALL OK($KIT_ADOPT_TEST_INNER)"
   exit "$fail"
 fi

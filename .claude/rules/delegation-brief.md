@@ -67,16 +67,20 @@ The constraints, so this block is self-sufficient when the skill file is not in 
   fires, the fix is the underlying gap — verify the claim, or make the decision. Rewording it into
   fluent prose is the failure mode, not the fix.
 
-`communication-style.md` states the mandate; this block is what carries it into a delegated agent's
-context.
-
 ## Gate commands (cckit)
 
 - **`bash scripts/check.sh` is the whole gate** and the bar for a PR: `bash -n` over every script in
   `bin/` + `scripts/`, `shellcheck --severity=error`, JSON validity of `.claude-plugin/plugin.json`
-  and `cckit.config.json`, the branding scan, the secret + privacy guard, then `scripts/test.sh`
+  and `cckit.config.json`, the leak fence (`scripts/lib/leak-fence.sh`: no private word in a tracked file; the list is local or the `CCKIT_LEAK_WORDS` secret), the secret + privacy guard, then `scripts/test.sh`
   (every `*-test.sh` under `bin/` and `scripts/`). `shellcheck` and `jq` are skipped when absent
   locally; CI installs both, so run them locally before trusting a green.
+- `scripts/test.sh` runs the test files several at a time: the CPU count, capped at 8. `-j <N>` or
+  `TEST_JOBS=<N>` sets the count, `--serial` runs one file at a time, `--timings` prints wall
+  seconds per file, and a `<pattern>` argument filters by path. A failing file's output is printed
+  whole after the run. A test file must therefore keep its fixtures under its own `mktemp -d` and
+  bind no fixed port; one that cannot run beside others carries `# test-runner: serial` in its
+  first 30 lines and runs alone after the rest. The runner turns `commit.gpgsign` and `tag.gpgsign`
+  off for every test, so fixture commits are not signed with the developer's key.
 - CI runs the same script: `.github/workflows/test.yml` on push to `main`/`develop` and on every PR.
   `.github/workflows/commitlint.yml` separately fails a PR whose **title** is not a Conventional
   Commit subject — PRs are squash-merged, so the title becomes the commit.

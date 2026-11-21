@@ -155,7 +155,20 @@ sr_cli 500 --stage deploy </dev/null >/dev/null 2>&1; t "an unknown stage is ref
 sr_cli 500 </dev/null >/dev/null 2>&1;                t "a missing --stage is refused" "$?" "2"
 sr_cli abc --stage build </dev/null >/dev/null 2>&1;  t "a non-numeric issue is refused" "$?" "2"
 sr_cli 500 --stage build --nope x </dev/null >/dev/null 2>&1; t "an unknown flag is refused" "$?" "2"
-yes "the verb help names the stages" "$(sr_cli --help 2>&1)" "build review design docs none"
+printf 'outcome: pr-open\nurl: -\ngate: pass\nblocker: none\nnext stage: none\n' \
+  | sr_cli 501 --stage qa --no-remote >/dev/null 2>&1; t "qa is a stage a receipt can be recorded at" "$?" "0"
+t "a qa receipt reads back by its stage" "$(sr_cli show 501 qa | jq -r '.stage')" "qa"
+t "qa is a next stage a receipt may name" "$(sr_invalid_fields pr-open pass qa)" ""
+# zsh aborts on a glob that matches nothing; the first receipt of a NEW stage for an issue is
+# exactly that case once the receipts directory exists (#299 hit it recording a qa verdict).
+if command -v zsh >/dev/null 2>&1; then
+  out="$(KIT_STATE_DIR="$KIT_STATE_DIR" zsh -c "source '$ROOT/scripts/lib/stage-receipt.sh'; sr_next_attempt 500 docs; sr_next_attempt 500 build; sr_list 777 | wc -l | tr -d ' '" 2>&1)"
+  t "zsh: attempts count with and without a matching receipt, and an empty list is empty" \
+    "$(printf '%s' "$out" | tr '\n' ' ')" "1 3 0"
+else
+  echo "ok: zsh absent — skipping the zsh receipt pass (dependency-light gate)"
+fi
+yes "the verb help names the stages" "$(sr_cli --help 2>&1)" "build review design docs qa none"
 
 # ── the receipts dir is shared, not per-worktree ───────────────────────────────────────────────
 # kit_state_dir anchors a relative override to the repo's shared root, so standing somewhere else

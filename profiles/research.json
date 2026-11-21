@@ -18,7 +18,13 @@
     "knowledge-base",
     "mempalace",
     "plan-output-format",
-    "task-management"
+    "issue-lifecycle",
+    "merge-safety",
+    "gate-and-review",
+    "authoring",
+    "shared-checkout",
+    "task-management",
+    "review-pages"
   ],
   "roles": [
     "PM",

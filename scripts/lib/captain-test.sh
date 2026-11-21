@@ -211,6 +211,111 @@ if [ -n "${CAP_TEST_INNER:-}" ]; then
     rm -f "$rc1" "$rc2" "$rc3" "$rc4"
   fi
 
+  # ── the QA gate (#300) ───────────────────────────────────────────────────────────────────────
+  # cap_classify <mergeable> <mss> <checks> <review> <qa> <qa-required>. Requirement OFF: no existing
+  # verdict moves, whatever the qa token says short of a recorded fail.
+  ( KIT_CAPTAIN_REQUIRE_QA=; KIT_CAPTAIN_QA_LABELS=; KIT_CAPTAIN_REQUIRE_REVIEW=0; KIT_CAPTAIN_REQUIRE_CHECKS=0
+    eq "qa off: no verdict still CLEAN"      "$(cap_classify MERGEABLE CLEAN PASS NONE NONE)"    "CLEAN"
+    eq "qa off (explicit 0): still CLEAN"    "$(cap_classify MERGEABLE CLEAN PASS NONE NONE 0)"  "CLEAN"
+    eq "qa off: a pass is still CLEAN"       "$(cap_classify MERGEABLE CLEAN PASS PASS PASS 0)"  "CLEAN"
+    eq "qa off: failing checks unchanged"    "$(cap_classify MERGEABLE CLEAN FAIL NONE NONE 0)"  "CHECKS_FAILING"
+    eq "qa off: draft unchanged"             "$(cap_classify MERGEABLE DRAFT PASS NONE NONE 0)"  "DRAFT"
+    eq "qa off: conflict unchanged"          "$(cap_classify CONFLICTING DIRTY PASS NONE NONE 0)" "CONFLICTING"
+    eq "qa off: blocked unchanged"           "$(cap_classify UNKNOWN BLOCKED PASS NONE NONE 0)"  "BLOCKED"
+    eq "qa off: review fail unchanged"       "$(cap_classify MERGEABLE CLEAN PASS FAIL NONE 0)"  "REVIEW_FAILING" ) || fail=1
+  # Requirement ON: a MERGEABLE/CLEAN PR with no qa receipt for its head is QA_MISSING -> verify.
+  eq "qa on: no verdict is QA_MISSING"       "$(cap_classify MERGEABLE CLEAN PASS PASS NONE 1)"  "QA_MISSING"
+  eq "qa on: unstable is QA_MISSING too"     "$(cap_classify MERGEABLE UNSTABLE PASS PASS NONE 1)" "QA_MISSING"
+  eq "qa on: a pass merges"                  "$(cap_classify MERGEABLE CLEAN PASS PASS PASS 1)"  "CLEAN"
+  eq "QA_MISSING -> verify"                  "$(cap_action QA_MISSING)" "verify"
+  eq "QA_FAILING -> fix"                     "$(cap_action QA_FAILING)" "fix"
+  # The flag argument is what decides; omitted, the env stands in for it.
+  ( KIT_CAPTAIN_REQUIRE_QA=1
+    eq "qa on by env, 5-arg call"            "$(cap_classify MERGEABLE CLEAN PASS PASS NONE)"    "QA_MISSING"
+    eq "an explicit 0 beats the env"         "$(cap_classify MERGEABLE CLEAN PASS PASS NONE 0)"  "CLEAN" ) || fail=1
+  # A recorded fail is evidence: it blocks with the requirement off as well as on.
+  eq "qa fail blocks when not required"      "$(cap_classify MERGEABLE CLEAN PASS PASS FAIL 0)"  "QA_FAILING"
+  eq "qa fail blocks when required"          "$(cap_classify MERGEABLE CLEAN PASS PASS FAIL 1)"  "QA_FAILING"
+  # Only the would-be-CLEAN verdict changes; red CI, a conflict and a draft keep their own answers.
+  eq "qa on: failing checks outrank"         "$(cap_classify MERGEABLE CLEAN FAIL PASS NONE 1)"  "CHECKS_FAILING"
+  eq "qa on: pending checks outrank"         "$(cap_classify MERGEABLE CLEAN PENDING PASS NONE 1)" "CHECKS_PENDING"
+  eq "qa on: a conflict outranks a qa fail"  "$(cap_classify CONFLICTING DIRTY PASS PASS FAIL 1)" "CONFLICTING"
+  eq "qa on: a draft outranks"               "$(cap_classify MERGEABLE DRAFT PASS PASS NONE 1)"  "DRAFT"
+  # Order against the review gate. rs_needs_dispatch keys the reviewer on REVIEW_MISSING, so a PR
+  # that is both unreviewed and un-QA'd must read REVIEW_MISSING or its reviewer never runs.
+  ( KIT_CAPTAIN_REQUIRE_REVIEW=1
+    eq "unreviewed + un-QA'd reads REVIEW_MISSING" "$(cap_classify MERGEABLE CLEAN PASS NONE NONE 1)" "REVIEW_MISSING"
+    eq "reviewed + un-QA'd reads QA_MISSING"       "$(cap_classify MERGEABLE CLEAN PASS PASS NONE 1)" "QA_MISSING" ) || fail=1
+  ( KIT_CAPTAIN_REQUIRE_CHECKS=1
+    eq "no checks + un-QA'd reads CHECKS_MISSING"  "$(cap_classify MERGEABLE CLEAN NONE PASS NONE 1)" "CHECKS_MISSING" ) || fail=1
+
+  # cap_qa_summary: the qa receipt read against the PR's head. A pass recorded on an older head is
+  # NONE, which the classifier above turns into QA_MISSING.
+  if command -v jq >/dev/null 2>&1; then
+    eq "qa: pass on this head"          "$(printf '{"gate":"pass","head_sha":"abc"}' | cap_qa_summary abc)" "PASS"
+    eq "qa: annotated fail on this head" "$(printf '{"gate":"fail — the save button is dead","head_sha":"abc"}' | cap_qa_summary abc)" "FAIL"
+    eq "qa: a pass on an older head"    "$(printf '{"gate":"pass","head_sha":"abc"}' | cap_qa_summary def)" "NONE"
+    eq "qa: a fail on an older head"    "$(printf '{"gate":"fail","head_sha":"abc"}' | cap_qa_summary def)" "NONE"
+    eq "qa: no receipt"                 "$(printf '' | cap_qa_summary abc)" "NONE"
+    # Unlike the review summary, no head to compare is NONE: an uncheckable verdict is not fresh.
+    eq "qa: no head to compare"         "$(printf '{"gate":"pass","head_sha":"abc"}' | cap_qa_summary)" "NONE"
+    eq "an older-head pass still reads QA_MISSING" \
+      "$(cap_classify MERGEABLE CLEAN PASS PASS "$(printf '{"gate":"pass","head_sha":"abc"}' | cap_qa_summary def)" 1)" "QA_MISSING"
+  fi
+
+  # The same reading over a receipt written the way `cckit qa verdict` writes one (sr_record, stage
+  # qa, head_sha last), so the token is proved against the stored shape and not a hand-built object.
+  if command -v jq >/dev/null 2>&1 && command -v sr_record >/dev/null 2>&1; then
+    qst="$(mktemp -d)"
+    ( KIT_STATE_DIR="$qst"; CCKIT_RECEIPT_REMOTE=0; export KIT_STATE_DIR CCKIT_RECEIPT_REMOTE
+      eq "stored qa: nothing recorded" "$(sr_latest 4242 qa 2>/dev/null | cap_qa_summary abc)" "NONE"
+      printf 'outcome: pr-open\nurl: -\ngate: pass\nblocker: none\nnext stage: none\n' \
+        | sr_record 4242 qa 1 "" "" "cckit qa verdict" "read-only" abc >/dev/null 2>&1
+      eq "stored qa: pass on its head"  "$(sr_latest 4242 qa 2>/dev/null | cap_qa_summary abc)" "PASS"
+      eq "stored qa: stale after a push" "$(sr_latest 4242 qa 2>/dev/null | cap_qa_summary def)" "NONE"
+      printf 'outcome: blocked\nurl: -\ngate: fail — the save button is dead\nblocker: the save button is dead\nnext stage: build\n' \
+        | sr_record 4242 qa 2 "" "" "cckit qa verdict" "read-only" def >/dev/null 2>&1
+      eq "stored qa: a later fail wins" "$(sr_latest 4242 qa 2>/dev/null | cap_qa_summary def)" "FAIL"
+      exit "$fail" ) || fail=1
+    rm -rf "$qst"
+  fi
+
+  # cap_qa_required: every PR, or only the PRs carrying a listed label.
+  ( KIT_CAPTAIN_REQUIRE_QA=; KIT_CAPTAIN_QA_LABELS=
+    eq "qa required: off by default"    "$(cap_qa_required "flow:ui kind:task")" "0" ) || fail=1
+  ( KIT_CAPTAIN_REQUIRE_QA=1; KIT_CAPTAIN_QA_LABELS=
+    eq "qa required: on for every PR"   "$(cap_qa_required "")" "1" ) || fail=1
+  ( KIT_CAPTAIN_REQUIRE_QA=; KIT_CAPTAIN_QA_LABELS="flow:ui needs-qa"
+    eq "qa required: a listed label"    "$(cap_qa_required "kind:task flow:ui")" "1"
+    eq "qa required: the second label"  "$(cap_qa_required "needs-qa")" "1"
+    eq "qa required: no listed label"   "$(cap_qa_required "kind:task flow:core")" "0"
+    eq "qa required: no partial match"  "$(cap_qa_required "flow:ui-kit")" "0"
+    eq "qa required: no labels at all"  "$(cap_qa_required "")" "0" ) || fail=1
+
+  # The config bridge: requireQa is true, false or a list of labels; env wins.
+  if command -v jq >/dev/null 2>&1; then
+    qabridge() {
+      ( KIT_CONFIG="$1"; KIT_CAPTAIN_FLOORS=; KIT_CAPTAIN_EXTRA_GLOBS=; KIT_CAPTAIN_REQUIRE_CHECKS=
+        KIT_CAPTAIN_REQUIRE_REVIEW=; KIT_CAPTAIN_REQUIRE_QA="$2"; KIT_CAPTAIN_QA_LABELS="$3"
+        _cap_load_policy_config
+        printf '%s|%s|%s' "${KIT_CAPTAIN_REQUIRE_QA:-unset}" "${KIT_CAPTAIN_QA_LABELS:-none}" "$(cap_qa_required "flow:ui")" )
+    }
+    q1="$(mktemp)"; printf '{"captain":{"mergePolicy":{"requireQa":true}}}'  > "$q1"
+    q2="$(mktemp)"; printf '{"captain":{"mergePolicy":{"requireQa":false}}}' > "$q2"
+    q3="$(mktemp)"; printf '{"captain":{"mergePolicy":{"requireQa":["flow:ui","needs-qa"]}}}' > "$q3"
+    q4="$(mktemp)"; printf '{"qa":{"command":"pnpm dev"}}' > "$q4"
+    eq "bridge: requireQa true"             "$(qabridge "$q1" "" "")"  "1|none|1"
+    eq "bridge: requireQa false"            "$(qabridge "$q2" "" "")"  "0|none|0"
+    eq "bridge: requireQa label list"       "$(qabridge "$q3" "" "")"  "unset|flow:ui needs-qa|1"
+    # Declaring a QA stack is not the opt-in: the gate stays off until requireQa says otherwise.
+    eq "bridge: qa.command alone is off"    "$(qabridge "$q4" "" "")"  "unset|none|0"
+    eq "bridge: env 0 beats config true"    "$(qabridge "$q1" "0" "")" "0|none|0"
+    eq "bridge: env 0 beats a label list"   "$(qabridge "$q3" "0" "")" "0|none|0"
+    eq "bridge: env 1 beats config false"   "$(qabridge "$q2" "1" "")" "1|none|1"
+    eq "bridge: env labels beat config"     "$(qabridge "$q1" "" "kind:bug")" "unset|kind:bug|0"
+    rm -f "$q1" "$q2" "$q3" "$q4"
+  fi
+
   if [ "$fail" -eq 0 ]; then echo "PASS($CAP_TEST_INNER): captain gate policy"; fi
   exit "$fail"
 fi

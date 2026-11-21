@@ -50,6 +50,4 @@ CRITICAL findings block the distribution/release milestone.
 ## Rules
 
 - Never mark a security finding as "won't fix" without explicit owner sign-off
-- CRITICAL findings block the distribution/release milestone
-- All security issues use label `role:security`
-- Prompt injection findings also get label `kind:security`
+- Every security issue carries the labels `role:security` and `kind:security`

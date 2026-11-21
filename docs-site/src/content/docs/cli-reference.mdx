@@ -9,7 +9,10 @@ import TagRow from '../../components/TagRow.astro';
 
 <TagRow kinds={["command", "agent"]} />
 
-Every cckit verb, grouped by job, with the one-liner version of what it does.
+Open this page when you know which verb you want and need its exact flags, or when you want to
+see everything cckit can do in one place. It lists every cckit verb, with one line on what it does.
+To learn when and why to use a verb, start from its area: each area page in the
+[Software track](/software/) names its verbs and links here for the flags.
 
 cckit is a thin bash dispatcher over a git-mechanics bundle. Every verb reads from `cckit.config.json` — no org or repo is hardcoded. Append `--llm` to any verb for machine-readable output an agent can parse.
 
@@ -22,11 +25,13 @@ The tables are grouped by job: setup, the daily lifecycle, planning a wave, runn
 | Verb | Purpose |
 | --- | --- |
 | `cckit install [bin-dir]` | Symlink `cckit` onto your PATH. |
-| `cckit init --profile <p>` | Scaffold `cckit.config.json` + `.claude/` for this repo. |
+| `cckit init [<folder>]` | Guided project setup ([Initialize](/getting-started/initialize/)): classifies the folder before writing anything, asks what is missing (each question has one recommended answer; `--answers <file>` answers them without a terminal), starts a new project from a recipe (`--recipe nextjs-shadcn`), optionally adds a database option (`--database supabase`), scaffolds the kit, then runs the git + GitHub steps after one confirmation (`--yes` with no terminal): `git init` + first commit, `gh repo create` (private; `--public`), `develop` created and pushed, labels, milestones, delete-head-branches, base-branch protection, Projects v2 ids, the doctor report. Each step prints `done`, `skipped` or `failed`; a re-run skips finished steps. `--no-github` scaffolds only. `--dry-run` prints every step and writes nothing. Exit 0 · 1 a step failed · 2 refused before any write. A home or system folder is never scaffolded into. |
+| `cckit init --profile <p> --no-github` | Scaffold the project config (`.claude/kit.config.json`; the root `cckit.config.json` for a Codex-only project) and the adapter files for this repo, and nothing else. `--adapter <claude\|codex\|both>` selects the agent (default `claude`): `codex` writes `AGENTS.md` + `.agents/{skills,rules}` and, alone, no `.claude/` tree. `--upgrade` brings an existing project to the installed version ([Update a project](/getting-started/update/)): it adds missing files, keeps existing ones, and prints the files it added or modified as `Changed on disk`; `--upgrade --dry-run` runs the same upgrade on a temporary copy and prints that list as `Would change`, writing nothing. `--upgrade` keeps the stored selection; `--upgrade --adapter <name>` adds one. Both adapters get the guard and session-mail hooks; for Codex they are merged into `.codex/hooks.json` and run once trusted (`/hooks`). Each profile role is installed for both from one source: `.claude/agents/<role>/AGENT.md` and `.codex/agents/<role>.toml`. See [Adapters](/adapters/#choosing-adapters-at-install) and [Hooks](/hooks/#codex). |
 | `cckit scan` | Detect this repo's stack + kit state (JSON). |
-| `cckit doctor` | Onboarding preflight: deps present, `gh` authenticated, and (when enabled) the MemPalace CLI + per-wing wake-up header. Asks before installing; `--fix` installs and seeds without the prompt. |
+| `cckit doctor` | Onboarding preflight: deps present, `gh` authenticated, one row per [integration](/integrations/) the config switches on, each installed from its descriptor by the shared runner, one `page-design skill` row per adapter when `tasks.design` is on (failing, and naming `cckit add page-design`, when the skill folder is absent), and (when memory is on) the per-wing wake-up header. Asks before installing; `--fix` installs and seeds without the prompt. With no terminal and no `--fix` the run is report-only: no package is installed, `pnpm install` is not run, no file is seeded or refreshed and no server is started. An integration installs only after a yes or `--fix`; otherwise it is reported missing and the exit code is 1. Also reports the CLI of each selected adapter present or absent; `--agents` prints only those rows, offline, and exits 1 when one is absent. With `codex` selected it adds a row for the hooks registered in `.codex/hooks.json`. Also prints the resident instruction-file total against the 150k limit. |
+| `cckit add [<name>]` | No name: list the integrations described in `integrations/`, the modules and the kit skills that can be added. With an integration: set the one config key its descriptor names and copy the rules it lists into `.claude/rules/`; nothing is installed. Seven ship: `mempalace`, `mlx-lm`, `graft`, `lavish`, and the three design skills `impeccable`, `emil-design-eng` and `web-design-guidelines`. With a module (`software`): write this directory's `.claude/kit.config.json`. With `page-design`: set `tasks.design: true` and copy the [`page-design`](/skills/#page-design) skill into the skills folder of each adapter in the config; it asks nothing, needs no version bump, and keeps a copy already there. `KIT_DRY_RUN=1` previews, and for an integration also prints the install and wire plan. See [Integrations](/integrations/). |
 | `cckit adopt` | Record kit-shaped files a repo already has. |
-| `cckit migrate` | Reshuffle an old kit layout to the current one. |
+| `cckit migrate` | Reshuffle an old kit layout to the current one. `--dry-run` previews. Step 2 of [Update a project](/getting-started/update/). |
 
 ## The daily lifecycle
 
@@ -34,28 +39,39 @@ One issue becomes one branch, one worktree, one PR. These verbs walk that path.
 
 | Verb | Purpose |
 | --- | --- |
-| `cckit next [--effort N]` | The unblocked set + how to start the top issue. |
-| `cckit start <issue> [slug]` | Create an isolated worktree + branch for an issue, [bootstrapped](/config-and-permissions/#worktree-bootstrap) — env files copied, dev port assigned, deps installed at the selected targets (`worktree.installPaths` if set — those dirs regardless of their manifests — else a root that declares dependencies or is a workspace root with members, else nothing). |
-| `cckit pr <issue> <summary>` | Commit, push, and open the PR. |
+| `cckit next [--effort N]` | The unblocked set + how to start the top issue. In a project whose `tasks.default` is `light`, a bare `cckit next` prints what `cckit task next` prints (with `--llm`, one JSON object or `null`); with `--effort N` it asks about issues as before. Human output ends with the weekly cadence line: Monday `cckit plan`, daily `cckit next`, Friday `cckit gc`. `--llm` rows stay `{number,ctx,title}`. |
+| `cckit start <issue> [slug]` | Create an isolated worktree + branch for an issue, [bootstrapped](/config-and-permissions/#worktree-bootstrap) — env files copied, dev port assigned, deps installed at the selected targets (`worktree.installPaths` if set — those dirs regardless of their manifests — else a root that declares dependencies or is a workspace root with members, else nothing). [Claim-checked](#session-claims): refused when another live session already holds the issue, unless `--force` / `KIT_FORCE=1`. |
+| `cckit claims` | List the live [session claims](#session-claims) — issue, session pid, start time, branch, worktree. Read-only. `--llm` returns a JSON array. |
+| `cckit pr <issue> <summary> [--base <branch>]` | Commit, push, and open the PR. `--base <branch>` opens it against a branch other than the configured base — a release PR from `develop` to `main`, or a hotfix to the release branch — with the same labels, milestone and board steps. The push exports the target as `KIT_PR_BASE`, so a git pre-push hook can compare against the branch the PR targets. |
+| `cckit hotfix <pr\|sha> [--base <branch>]` | Cherry-pick one merged PR or commit onto the release branch (`main` by default): a worktree from `origin/<base>`, `git cherry-pick -x`, push, and a PR titled after the source with `Cherry-pick of #N` in its body. See [Hotfix to the release branch](/ship/releasing/#hotfix-to-the-release-branch). |
 | `cckit close <issue> <summary> [--reason R] [--duplicate-of N] [--superseded-by N]` | Close the issue with a summary comment and a reason (`completed`, `not-planned`, `duplicate`; superseded closes as not planned with a "Superseded by #N" comment), and mark it done on the board. |
-| `cckit new --role R "<title>"` | File one issue: labels, board add, Role and Status fields. Milestone optional. |
-| `cckit merge [<pr>] [--merge\|--rebase]` | Merge the PR (squash by default), close its linked issues, clean the branch and worktree, and update the PR's base, which may be an `effort/<N>` branch. |
+| `cckit new --role R "<title>"` | File one issue: labels, board add, Role and Status fields. Milestone optional. A label the repo does not have is left off with a warning that names it; the issue is still created, and the verb exits non-zero only when the issue itself is not. `R` matches any option of the board's Role field by name, ignoring case and treating spaces and hyphens alike (`backend`, `Tech Lead`, `tech-lead`); a role the board has no option for leaves Role unset and prints a warning on stderr naming the missing `ROLE_OPT_<NAME>`. |
+| `cckit merge [<pr>] [--merge\|--rebase]` | Merge the PR (squash by default), close its linked issues, clean the branch and worktree, and update the PR's base, which may be an `effort/<N>` branch. Refuses a PR whose **head** is `effort/*` and names `cckit effort close <N>`; `KIT_FORCE=1` merges anyway, with a warning. |
 | `cckit sync` | Board state: issues by role with Project Status, a merge-ordered open-PR queue, and blocked / not-on-board / stale (>14d) flags. |
-| `cckit status` | "Where are we?" in three buckets — local undone work, open PRs waiting on a human, cleanup available (local + remote) — plus the board and the resume handoff. Read-only. |
+| `cckit sync --json \| --write \| --cached [TTL] \| --watch [SECS] \| --plan` | The same board as one cached JSON document for a TUI or statusline — see [Board cache and watch mode](#board-cache-and-watch-mode). |
+| `cckit status` | "Where are we?" in three buckets — local undone work, open PRs waiting on a human, cleanup available (local + remote) — plus the board, the light tasks when the project has any (counts by state and the tasks somebody has to act on), the next effort that can start in each flow, and the resume handoff, and one line with the resident instruction-file total. Read-only. |
 | `cckit handoff "<note>"` | Save a resume-here note for the next session. |
 
 
+### Session claims
+
+`cckit start <issue>` records one claim per issue and refuses the start while another live session
+holds it; `cckit claims` lists the live ones. The record, the refusal, `--force`, and when a claim
+ends are on [Multi-session safety](/development/many-sessions/#session-claims).
+
 ### Where are we?
 
-`cckit status` answers the question a session actually opens with, which is not what `git status` answers. Plain `git` output describes refs; it cannot see which PRs are waiting on a person, or which branches are safe to delete. The three buckets, in this order:
+`cckit status` answers the question a session opens with, which is not what `git status` answers. Plain `git` output describes refs; it cannot see which PRs are waiting on a person, or which branches are safe to delete. The three buckets, in this order:
 
 | # | Bucket | What it reports |
 | --- | --- | --- |
-| 1 | **Local undone work** | Worktrees with uncommitted changes; branches holding commits reachable from **no** remote ref; effort subs not yet merged into their effort branch. Plus the worktree inventory, because a clean worktree on an issue branch is still work in progress. |
+| 1 | **Local undone work** | Worktrees with uncommitted changes; branches holding commits reachable from **no** remote ref; effort subs not yet merged into their effort branch. Plus the worktree inventory, because a clean worktree on an issue branch is still work in progress. A detached worktree that `cckit gc` rates LANDED (clean, HEAD on the base branch or `main`) is left out of the **In progress** list and counted in one line under it; `--llm` `worktrees` still carries every worktree. |
 | 2 | **PRs waiting on a human** | Each open PR with the one thing it needs: `conflict` · `checks` · `draft` · `wait` · `threads` · `ai-review` · `review` · `ready`. |
-| 3 | **Cleanup available** | What can go, local **and** remote, plus what is deliberately kept (orphan work, open-issue branches). `cckit gc` shows the same classification in full; acting on it is the `/kit-cleanup` skill. |
+| 3 | **Cleanup available** | What can go, local **and** remote, plus what is deliberately kept (orphan work, open-issue branches) and how many branches could not be classified because a GitHub read failed (`cleanup.unknown` in the JSON). `cckit gc` shows the same classification in full; acting on it is the `/kit-cleanup` skill. |
 
-Two details worth knowing, because both are places a naive reading gets it wrong:
+The report ends with one **Instruction files** line — the bytes `CLAUDE.md` and every rule without a `paths:` frontmatter load into every session, against Claude Code's 150k limit, and the three largest files. `cckit doctor` prints the same line and warns over the limit; `--llm` carries it as `instruction_budget` (`null` when the project has no instruction files). The gate behind it is [`instruction-budget-lint`](/review/gates/#instruction-budget-lint--what-every-session-loads).
+
+How two of the verdicts are computed:
 
 - **"Unpushed" means on no remote at all**, not "ahead of its own upstream". An effort sub whose commits were merged into a pushed effort branch has no upstream of its own, yet its work is safely on the remote — reporting it as undone would send you to re-push work that is already there.
 - **A superseded check run never counts.** Re-running a check, or retitling a PR and re-firing a title gate, leaves the old run in GitHub's rollup. Counting every context there reports a PR as failing a check that has since passed, so only the latest run per check name is read.
@@ -65,9 +81,76 @@ In Claude Code the same report is `/kit-status`, and it answers the question in 
 The `ai-review` verdict only appears when the repo evidently uses an AI reviewer — a reviewer config file, or an AI review already present on another open PR. In a repo with none, it never fires.
 
 ```bash
-cckit status          # the three buckets
-cckit status --llm    # the same verdicts as JSON: local_undone, worktrees, prs, cleanup
+cckit status          # the board, the light tasks, the next effort per flow, the three buckets
+cckit status --llm    # the same verdicts as JSON: local_undone, worktrees, prs, cleanup, next_efforts, light_tasks
 ```
+
+### Light tasks
+
+In a project that has [light tasks](/project-management/light-tasks/), `cckit status` prints a **Light tasks** section
+after the board. A project with none gets no section.
+
+```text
+## Light tasks
+
+review: 3   doing: 0   todo: 2   draft: 1   shared: 0   done: 0
+
+| task | state | title | what it needs |
+| --- | --- | --- | --- |
+| `ta01` | **review** | Spring newsletter | waiting for review: its pull request is open from light/ta01-spring-newsletter |
+| `tc01` | **draft** | Launch posts | only in this checkout; start it (cckit task start tc01) or share the list (cckit task share) |
+```
+
+The first line counts every task by state. The table lists the tasks somebody has to act on, in
+this order: `review`, `doing`, `draft`, `shared`. A `todo` task is counted and not listed. The
+states are the ones `cckit task list` prints, read from local git: this section makes no `gh` call
+and does not fetch, so a teammate's change shows after the next `git fetch` or `cckit task list`.
+
+`cckit status --llm` carries the same data as `light_tasks`:
+`{counts: {draft, todo, shared, doing, review, done, dropped}, attention: [{id, state, title, needs}]}`,
+or `null` when the project has no light task.
+
+### Next effort per flow
+
+Between the board and the three buckets, `cckit status` prints one row per flow that has an open effort: the effort that can start now. It reads the open issues carrying the `effort` label (the label `cckit effort new` applies), groups them by their `flow:` label, and in each flow picks:
+
+1. only efforts with **no open blocker** — any open `blocked_by` issue blocks, whether it is an effort in the same flow, an effort in another flow, or a plain issue. A closed blocker does not.
+2. among those, the most urgent `priority:pN` (p0 → p3, unlabelled last), then the lowest issue number.
+
+The last column counts the flow's efforts still waiting on an open blocker. A flow where every effort is blocked keeps its row and says none can start. The section also states its own emptiness: when no open issue carries the `effort` label it says so, and when the efforts could not be read (gh or jq absent, unauthenticated, offline) it says that instead — the two never look alike. The read costs one `gh issue list` plus one `gh api` call per open effort.
+
+In `--llm` output the same rows are the `next_efforts` array:
+
+```json
+{ "flow": "core", "number": 241, "ctx": "L", "title": "steady progress order and cadence", "waiting": 1 }
+```
+
+`number`, `ctx` and `title` are `null` for a flow where nothing can start. `next_efforts` itself is `null` — not `[]` — when the efforts could not be read. That alone does not change the exit status, which still follows `prs_read`.
+
+Below the table both `cckit status` and `cckit next` print the same weekly cadence line: Monday `cckit plan` orders the week, `cckit next` daily picks up one issue, Friday `cckit gc` reports what can be pruned.
+
+## Light tasks
+
+Work tracked in the project and not in GitHub issues: one file per task under `tasks/`, a worktree
+and a `light/<id>-<slug>` branch per task, a pull request for review. Guide:
+[Light tasks](/project-management/light-tasks/).
+
+| Verb | Purpose |
+| --- | --- |
+| `cckit task new [--priority p0\|p1\|p2\|p3] [--kind K] [--body B\|--body-file F] "<title>"` | Record a task: writes `tasks/<id>.md` in the current checkout and prints the id. Nothing is committed; the task is a `draft` until it is started or shared. Exit 2 without a title or with a priority outside `p0`–`p3`. `--llm` returns `{verb, ok, id, title, file}`. |
+| `cckit task list [--all]` | Every open task with its state — `draft`, `todo`, `shared`, `doing`, `review`; `--all` adds `done` and `dropped`. Fetches `origin` first (`KIT_TASK_FETCH=0` skips the fetch). `--llm` returns a JSON array of `{id, state, priority, kind, created, branch, title}`. |
+| `cckit task next` | The first `todo` or `draft` task by priority, then creation date, and the command that starts it. `--llm` returns that task plus `start`, or `null`. |
+| `cckit task start [--force] [--no-push] <id>` | Worktree `.claude/worktrees/light+<id>-<slug>` on branch `light/<id>-<slug>`, cut from `origin/<base>` and bootstrapped like `cckit start`. A draft is committed onto the branch and removed from the checkout it was created in. The branch is pushed so other clones list the task as `doing` (`--no-push` keeps it local). Re-running reuses the worktree. Refuses a `done` or `dropped` task, a `shared` task (its share pull request has not merged), and a task whose branch exists on `origin` but not here unless `--force`, which continues that branch. Prints `<worktree>\|<branch>\|<id>`; `--llm` returns `{verb, ok, id, worktree, branch}`. Alias: `take`. |
+| `cckit task finish [<id>] "<summary>" [--all]` | Set the task to `done` on its branch, commit the tracked changes (`--all` also commits new files; without it they are listed and left), push, and open the pull request against the base branch. The title is a Conventional Commits subject ending in `[<id>]`; the body has no `Closes` line. An open pull request for the branch is reported, not re-created. Inside the task's worktree the id may be omitted. The task reads `done` once the pull request merges. Never merges. `--llm` returns `{verb, ok, url, detail}`. Alias: `done`. |
+| `cckit task run <id> [--check "<cmd>"] [--max-iters N] [--max-seconds N] [--agent <cmd>] [--no-finish]` | Delegate one task end to end: start it (its worktree is reused when it exists), run ONE headless objective built from the task's title and notes through `cckit autopilot run`, then finish it with `--all` and a generated summary, and print the pull request link. The gate is `--check`, else `tasks.check` in the config, else none; it runs after the round and a failure opens no pull request. The run has no `--until`, so it is one round, and `--max-seconds` also bounds that round. `--agent-arg <arg>` (repeatable) is passed to the agent CLI; cckit adds no permission flag of its own. A stopped earlier run on the task's branch is discarded, not resumed. A task already in `review` starts no agent: the open pull request is reported, or opening it is retried. `--no-finish` stops after the run and prints `<worktree>\|<branch>\|<id>`. For a **page task** — a task whose kind is `page` (`cckit task new --kind page "<title>"`), or any task when the config sets `tasks.design: true`; nothing is inferred from the title — the objective tells the agent to load the [`page-design`](/skills/#page-design) skill and to write the design brief and self-review to `docs/design/<id>.md`, the agent is started so its CLI prints events (`claude -p --output-format stream-json --verbose`), and the pull request body gains a `## Design` section and the checklist item `Open the page in a browser and compare it with the design brief`. The section lists the skills the run loaded, read from those events and not from the agent's text: the design skills loaded, the design skills not loaded, other skills loaded, or `No design skill was loaded in this run.` A skill call that returned an error (a skill that is not installed) is not listed. With no event in a round's output, or no run on record, it says the list is not known. Exit codes are those of `cckit autopilot run` (3 agent failed · 4 limit · 5 the round changed nothing · 6 gate failed · 130 interrupted), plus 1 when the task could not be started and 7 when the pull request could not be opened; on any non-zero exit no pull request is opened and the last stderr line names the reason. Never merges. `--llm` returns `{verb, ok, id, url, detail}`. |
+| `cckit task share ["<summary>"]` | One pull request, from a `light/share-<timestamp>` branch, that adds every draft in the current checkout to the base branch as `todo`. The drafts are removed from the checkout once committed, and list as `shared` until the pull request merges. With no drafts: if an earlier share's branch is still in this repository and unmerged, it pushes that branch and opens its pull request (an open one is reported, not re-created), which is how a share that failed is retried; otherwise it prints a notice and exits 0. `--llm` returns `{verb, ok, url, detail}`. |
+
+| `cckit task default` | Print `light` or `issues`: which list is the project's default (`tasks.default` in the config; `issues` when unset). Reads the config only. `--llm` returns `{verb, ok, default}`. |
+
+Exit codes: 0 done · 1 refused or a failed step · 2 usage; `task run` adds the codes in its row. `tasks.default`, `tasks.source`, `tasks.dir` and `tasks.check` are in
+[Config & permissions](/config-and-permissions/#light-tasks). `tasks.design` (boolean, default
+`false`) is the page-task switch the `task run` row describes; its definition is in
+`kit.config.schema.json`.
 
 ## Verb ↔ skill map
 
@@ -85,6 +168,7 @@ Every verb below is drivable from the CLI. The ones with a skill are also reacha
 | `contribute` | `kit-contribute` | |
 | `digest` | `kit-digest` | |
 | `doctor` · `init` · `update` | `kit-doctor` · `kit-init` · `kit-update` | plugin commands |
+| `add` | `kit-add` | lists, asks the descriptor's one question, then runs the verb |
 | `effort` | `kit-effort-new` · `-start` · `-pr` · `-close` | one skill per phase |
 | `brief` | — | CLI-only |
 | `plan` · `wave` · `watch` · `orchestrate` | — | CLI-only |
@@ -98,12 +182,13 @@ A **wave** is a set of issues with no blockers between them, so they can run at 
 
 | Verb | Purpose |
 | --- | --- |
-| `cckit plan [--effort N]` | Wave plan: deps-ordered, file-disjoint, session-fit. Inside a wave, issues are ordered by their `priority:pN` label — p0 → p1 → p2 → p3, unlabeled last — with ties keeping the dependency-derived order. Dependencies always win: a blocker sits in an earlier wave than what it blocks, so priority never pulls a dependent ahead of its blocker. |
+| `cckit plan [--effort N]` | Wave plan: deps-ordered, file-disjoint, session-fit (`ctx:` weights S=1 M=2 L=4 XL=8; an issue with no `ctx:` label shows `?` and weighs 2, and a value outside the scale weighs 2 with a warning on stderr). Inside a wave, issues are ordered by their `priority:pN` label — p0 → p1 → p2 → p3, unlabeled last — with ties keeping the dependency-derived order. Dependencies always win: a blocker sits in an earlier wave than what it blocks, so priority never pulls a dependent ahead of its blocker. |
 | `cckit plan-next` | Forward plan: inventory the kit's own skills/verbs/rules/docs, propose what to build next. |
-| `cckit wave [--effort N]` | Read open efforts, propose incoming waves: subagent fan-out + captain drive. |
+| `cckit wave [--effort N] [--adapter <claude\|codex\|both>]` | Read open efforts, propose incoming waves: worker fan-out + captain drive. The wave data is the same for every runtime; `--adapter` picks the dispatch wording (default: the project's stored `adapters`). `--llm` emits the wave data only. |
 | `cckit watch [--merge] [--loop]` | Captain: gate open PRs, squash-merge clean ones, advance. Policy floors (default on) hold PRs touching CI workflows, lockfiles, or security paths — and any `hold`-labelled or draft PR — for human review. |
-| `cckit effort <new\|chain\|start\|pr\|close\|plan>` | The effort lifecycle (a parent issue + sub-issues). `new` takes `--slug`; `start`/`pr`/`close` accept a `<slug>` or the effort `<N>`. |
-| `cckit effort start [--force] <slug\|N> [slug]` | Create the effort's `effort/<N>-<slug>` branch + bootstrapped worktree. **WIP-limited:** refuses a *new* effort once `effort.wipLimit` (default 2) are already in progress — in progress meaning an `effort/<N>-<slug>` branch exists as a local head **or** on origin, read with `git ls-remote` rather than the cached `refs/remotes`. At the limit refuses; only strictly under it starts. Re-starting an effort that is already in progress is never gated. The check runs before anything is written, so a refusal makes no branch, no worktree and no board change. `--force` (or `KIT_FORCE=1`) starts anyway; `0` refuses every ordinary start but not a forced one. `EFFORT_WIP_REMOTE=0`, or an unreachable origin, counts the cached refs instead and the start still proceeds. Does not affect `cckit start <issue>`. |
+| `cckit effort <new\|chain\|start\|pr\|close\|plan>` | The effort lifecycle (a parent issue + sub-issues). `new` takes `--slug` and `--kind` (one of `feat fix task chore security scaffold ci adr spike plan`, default `task`, or a content kind `post campaign brand research`; sets the `kind:` label on the parent and every sub. A content kind is a label only: its branch starts on `task/`, `plan/`, `task/` or `spike/` and its PR is titled `docs:`); `start`/`pr`/`close` accept a `<slug>` or the effort `<N>`. |
+| `cckit effort start [--force] <slug\|N> [slug]` | Create the effort's `effort/<N>-<slug>` branch + bootstrapped worktree. **WIP-limited:** refuses a *new* effort once `effort.wipLimit` (default 2) are already in progress — in progress meaning an `effort/<N>-<slug>` branch exists as a local head **or** on origin, read with `git ls-remote` rather than the cached `refs/remotes`. At the limit refuses; only strictly under it starts. Re-starting an effort that is already in progress is never gated. The check runs before anything is written, so a refusal makes no branch, no worktree and no board change. `--force` (or `KIT_FORCE=1`) starts anyway; `0` refuses every ordinary start but not a forced one. `EFFORT_WIP_REMOTE=0`, or an unreachable origin, counts the cached refs instead and the start still proceeds. With no `[slug]` the slug comes from the issue title; if that read fails, the verb says so on stderr and continues with the effort's existing branch slug, or `effort`, instead of exiting 1 with no output. Does not affect `cckit start <issue>`. Creating the branch writes the start time to `<git-common-dir>/effort-metrics/<N>.start`; `cckit effort close` subtracts it for the record's `build_seconds`, and a re-start keeps the stamp already there (see [the metrics record](/project-management/efforts-and-waves/)). |
+| `cckit effort plan` | Session-fit plan over the open efforts: grouped by flow, ordered by `blocked_by`, packed into sessions under `KIT_SESSION_BUDGET` (default 4). Rows come from GitHub, or from the executable named by [`effort.planSource`](/config-and-permissions/#effort-plan-source) (`EFFORT_PLAN_SOURCE` overrides); a source that is not executable, exits non-zero or prints no rows falls back to GitHub. A `source:` line under the header names the source used, its age when reported, and any fallback. |
 | `cckit effort chain <a> <b> [<c> …]` | Declare a linear order over 2+ issues: `b` `blocked_by` `a`, `c` `blocked_by` `b`, plus a `- Depends on #<predecessor>` line in each successor's `## Relations` section. These are the edges `cckit plan` layers into waves. Idempotent, and additive — an issue already blocked by something else keeps that blocker. Refuses (and writes nothing) on fewer than two numbers, a non-numeric argument, an issue that does not exist, a repeated number, or an edge that would close a cycle. |
 
 
@@ -112,10 +197,18 @@ A **wave** is a set of issues with no blockers between them, so they can run at 
 | Verb | Purpose |
 | --- | --- |
 | `cckit receipt <issue> --stage <s>` | Record one stage receipt from stdin, locally and as a comment on the issue (`--no-remote` skips the comment). `receipt list [<issue>]` and `receipt show <issue> <stage> [<attempt>]` read them back. |
+| `cckit qa <up\|ready\|open\|stop\|verdict\|lanes> [--lane N]` | The [QA lane](/review/qa-lane/): `up` launches the stack command declared under `qa` on this lane's ports and exits 0 only once every readiness probe answers (`ready` waits on a launched lane), and refuses with exit 2 when a lane port is already in use; `open` opens the changed screen — the PR body's `QA route:` line, else `qa.route`; `stop` frees the lane's ports, leaving a listener the lane did not launch running unless `--force`; `verdict <pass\|fail>` records the verdict against the reviewed commit, and with no `pass\|fail` reads it back as `pass` · `fail` · `stale` · `none`; `lanes` takes no argument and prints one row per lane that has a port slot, a launch record or a verdict: branch, ports, `up` · `partial` · `down` · `unknown` by who listens on those ports, the verdict (`pass` · `fail` · `stale` · `none`, or `unknown` when a verdict exists and no local branch does) and the worktree. It is read-only — no launch, no stop, no write, no `gh` or `curl` call — and exits 0 with or without lanes (`--llm` prints a JSON array). |
+| `cckit page <mode\|open\|poll\|reply\|end\|answer>` | [Review pages](/project-management/plan-pages/). `mode` prints `page`, or `terminal: <reason>` for a session with no browser (CI, `CCKIT_HEADLESS`, a headless agent session, SSH, no display, no terminal, `reviewPages.enabled: false`). `open <html-file> [--fallback <md-file>]` opens the page through `lavish-axi` (`npx -y lavish-axi` when the binary is absent); in terminal mode, or when the tool exits non-zero, it prints the fallback file and exits 0; flags after `--` go to the tool. `poll`, `reply` and `end` pass their arguments to the tool and do nothing in terminal mode. `answer --kind <plan\|decision\|grill> --title "<t>" [--issue <n>] [--body-file <file>]` records the answer: a comment on the issue when `github.repo` is set and `--issue` is given, else `docs/answers/<date>-<kind>-<slug>.md`; the same answer twice writes nothing. Exit 0 · 1 the answer could not be written · 2 usage error. `--llm` → one JSON object. |
 | `cckit orchestrate <a> <b> …` | Run N flows in parallel worktrees (`--dry-run` / `--cap` / `--agent` / `--runtime tmux\|herdr`). |
+| `cckit orchestrate --results [--session=<s>] [--wait <secs>]` | Read how each worker of the wave ended: `success`, `failure` or `interrupted`; `launched` / `running` while unfinished; `untracked` on Herdr. rc 0 all success · 1 any failure/interrupted or no records · 3 none failed, some unfinished. `--llm` → JSON. |
 | `cckit autopilot [<a> …]` | Select the passed issues, or the current unblocked set, then call `orchestrate --detach`. It accepts the same cap, agent, profile, and runtime flags. |
+| `cckit autopilot run [<issue>] --objective "<text>"` | Run ONE objective headlessly on the current branch — `claude -p` or `codex exec`, chosen with `--agent` or `--profile` — one round at a time. Code stops the run on `--max-iters`, `--max-seconds`, `--round-seconds`, a passing `--until "<cmd>"`, a failing `--check "<cmd>"`, or a round that changed nothing; `--max-tokens` is checked between rounds. An `--until` that already passes before round 1 ends the run with exit 0 and no round; stderr then says nothing was changed and names `--check` as the flag for a gate. `--publish --summary "<s>"` opens the PR via `cckit pr` unless one is open; `--record-skills` starts Claude with `--output-format stream-json --verbose` and writes the skills each round loaded to `.skills` in the state file (`loaded`, `complete`, `source`), read from the CLI's events, with `complete: false` when a round printed none; `--prompt-file <f>` gives the objective as a file in place of `--objective`; `--agent-arg <arg>` (repeatable) passes one extra argument to the agent CLI, and cckit adds no permission flag of its own; `--resume` continues a stopped run and `--fresh` discards its state and starts over; a round cut short by a signal or a killed runner counts as usage `unknown`, and a start is refused while the agent an earlier run left alive is still running. The stop reason is written to `.cckit/autopilot/<branch>.json`. It never merges. [What is enforced and what is not](/agent-compatibility/#unattended-run-limits). |
 
 Both are launch verbs with no JSON result — use `--dry-run` to inspect the plan before anything starts.
+
+Both cut each worktree from the config's base branch. `KIT_BASE_BRANCH=<branch>` in the environment
+[overrides it for that run](/config-and-permissions/#overriding-the-base-branch-for-one-command) —
+that is how an effort's sub-issue starts from `effort/<N>-<slug>` — and the launch plan says so.
 
 ### Tmux and Herdr
 
@@ -125,13 +218,13 @@ selection, dependencies, branches, worktrees, pull requests, and cleanup; Herdr 
 persistence and live agent state.
 
 ```bash
-cckit orchestrate --dry-run --runtime herdr --agent codex 46 47 48
-cckit orchestrate --runtime herdr --agent codex 46 47 48
+cckit orchestrate --dry-run --runtime herdr --agent codex <issues…>
+cckit orchestrate --runtime herdr --agent codex <issues…>
 cckit autopilot --runtime herdr --agent codex --cap 3
 
 # or run a declared profile instead of naming a CLI:
-cckit orchestrate --runtime herdr --profile cheap 46 47 48
-cckit orchestrate --profile cheap 46 47 48              # tmux is the default runtime
+cckit orchestrate --runtime herdr --profile cheap <issues…>
+cckit orchestrate --profile cheap <issues…>              # tmux is the default runtime
 cckit autopilot --profile cheap --cap 3
 ```
 
@@ -161,18 +254,20 @@ A test greps the shipped `scripts/lib` and `bin` for any vendor model id and req
 
 | Verb | Purpose |
 | --- | --- |
-| `cckit gc [--prune [--yes]]` | Report (default) or prune merged branches + worktrees. Never touches a branch/worktree whose issue is still open — including an effort sub (`sub/<N><letter>-…`) of an open effort — and aborts rather than classify anything if that protection helper cannot load. |
-| `cckit cleanup [--yes]` | The guided destructive sweep over the `gc` classification: prints the plan (SAFE branches + worktrees, ZOMBIE worktrees, LANDED branches, ORPHAN, PROTECTED, stashes) and deletes nothing without `--yes`. A **LANDED** branch has no PR of its own but its work is already on base — by content (every file it changed since its merge base matches `origin/<base>`) or by lineage (`sub/<N>…`, `effort/<N>…`, or a `[#N]` commit subject names an issue closed with a merged PR): an effort's subs, an `effort/<N>` whose remote is gone, a Claude Code Agent-tool `worktree-agent-<hash>` isolation worktree. `--yes` deletes LANDED rows exactly like SAFE rows, under the same guards; a branch failing both checks stays ORPHAN. `effort close` runs the same LANDED prune over its `sub/<N>…` worktrees and branches, so an effort closes with no residue. Both verbs refresh remote-tracking refs (`git fetch --prune`) so the classification is not made against a stale view of the remote — that is the only write a plan-only run performs, and it touches no branch, worktree, stash, or commit of yours. `--yes` deletes the SAFE local branches, the **clean** SAFE worktrees (a dirty one is skipped with a warning, never destroyed), and the remote refs of branches proven exactly level with theirs. It also prunes the admin metadata of the **ZOMBIE** worktrees the plan listed — a worktree whose directory is gone but whose metadata lingers — after committing any staged work it still holds to its branch (recover-before-prune), so no blob is orphaned by the prune. An ORPHAN branch, a branch whose issue is still open, and a stash are never deletable — they are surfaced and left alone. |
+| `cckit gc [--prune [--yes]]` | Report (default) or prune merged branches + worktrees. Never touches a branch/worktree whose issue is still open — including an effort sub (`sub/<N><letter>-…`) of an open effort — and aborts rather than classify anything if that protection helper cannot load. A worktree with a **detached HEAD** has no branch, so it gets its own row: **LANDED** when its tree is clean and its HEAD is an ancestor of the base branch or of `main` (`--prune --yes` removes it), **ORPHAN** otherwise — uncommitted changes, or a HEAD on neither ref, where the worktree is the only handle on those commits. A failed `gh` read is not an empty answer: when the PR list or a branch's issue state cannot be read (rate limit, outage, no `gh`), the branch is reported `UNKNOWN (could not determine …)` — never `ORPHAN (no PR …)` and never LANDED — and no prune deletes it. `gh` answering "no such issue" is a definite answer and classifies as before. `--llm` counts those rows as `unknown`. |
+| `cckit cleanup [--yes]` | The guided destructive sweep over the `gc` classification: prints the plan (SAFE branches + worktrees, ZOMBIE worktrees, LANDED branches, ORPHAN, PROTECTED, UNKNOWN, stashes) and deletes nothing without `--yes`. A **LANDED** branch has no PR of its own but its work is already on base — by content (every file it changed since its merge base matches `origin/<base>`) or by lineage (`sub/<N>…`, `effort/<N>…`, or a `[#N]` commit subject names an issue closed with a merged PR): an effort's subs, an `effort/<N>` whose remote is gone, a Claude Code Agent-tool `worktree-agent-<hash>` isolation worktree. `--yes` deletes LANDED rows exactly like SAFE rows, under the same guards; a branch failing both checks stays ORPHAN. `effort close` runs the same LANDED prune over its `sub/<N>…` worktrees and branches, so an effort closes with no residue. Both verbs refresh remote-tracking refs (`git fetch --prune`) so the classification is not made against a stale view of the remote — that is the only write a plan-only run performs, and it touches no branch, worktree, stash, or commit of yours. `--yes` deletes the SAFE local branches, the **clean** SAFE worktrees (a dirty one is skipped with a warning, never destroyed), and the remote refs of branches proven exactly level with theirs. It also prunes the admin metadata of the **ZOMBIE** worktrees the plan listed — a worktree whose directory is gone but whose metadata lingers — after committing any staged work it still holds to its branch (recover-before-prune), so no blob is orphaned by the prune. An ORPHAN branch, a branch whose issue is still open, an UNKNOWN branch (a GitHub read failed, so its verdict could not be determined) and a stash are never deletable — they are surfaced and left alone. Detached worktrees follow the `gc` verdict: a LANDED one is listed with the worktrees `--yes` removes, an ORPHAN one is listed by path under ORPHAN and kept. A detached ZOMBIE is compared to its own HEAD's tree: with no staged delta its metadata is pruned; with one there is no branch to recover onto, so `--yes` locks that entry (git's `locked` file) and the prune leaves it for recovery by hand. |
 | `cckit render` | stdin markdown → rich output (glow on a TTY, verbatim when piped). |
 | `cckit encode-context` | stdin JSON → compact TOON (token-saving for subagents). |
 | `cckit digest <path\|url>` | Summarize a file or URL with the local model. |
 | `cckit bench [run\|report\|…]` | [Documentation benchmark](/benchmark/): score how well this project finds + uses its own canonical docs. |
+| `cckit bench checkpoint <X.Y.Z> [--passes N] [--from <run.json>] [--model <name>] [--note <text>] [--verbs <timings.json>]` | Record a benchmark run as a checkpoint of release `<X.Y.Z>` in `benchmarks/runs/<X.Y.Z>.json`. `cckit bench checkpoints [--json]` lists every checkpoint, `cckit bench check <X.Y.Z>` gives the release verdict (exit 0 · 1 · 2), `cckit bench page [--out <file>] [--check]` prints or verifies the [results page](/benchmark-results/). See [Checkpoints per release](/benchmark/#checkpoints-per-release). |
+| `cckit bench verbs [--runs N] [--checkout <dir>] [--verb "<verb>"] [--json]` | Wall time (fastest and median, in milliseconds) and `gh` call count of nine read-only verbs, each run N times (default 3). `cckit bench checkpoint <X.Y.Z> --verbs <file>` attaches the `--json` output to a checkpoint. See [Verb timings](/benchmark/#verb-timings). |
 | `cckit version` | The installed cckit version. |
 | `cckit commands` | List every verb (the command catalog). |
 | `cckit lib [--all] [--reasons]` | List every `scripts/lib` helper: its public functions, its one-line purpose, and its declared error behaviour. The companion to `commands` — that lists the verbs, this lists the library they are built from. |
 | `cckit brief <issue>` | Generate an issue's delegation brief from real repo state: its worktree and branch, whether that branch's seed is stale, the files it owns, the helpers those files sit on, and the project's standing gotchas. |
-| `cckit update` | Report whether this project is behind the installed cckit. |
-| `cckit release <ver> [--publish]` | Cut a release (dry-run by default). |
+| `cckit update` | Report whether this project is behind the installed cckit: `up to date` (exit 0), or `update available` with the command to run, `cckit init --upgrade` (exit 10). Changes nothing. See [Update a project](/getting-started/update/). |
+| `cckit release <ver> [--publish] [--skip-bench-check]` | Cut a release (dry-run by default). Refused, exit 1, when the version has no recorded benchmark checkpoint or its last checkpoint scores lower than the one before it over the questions both asked; `--skip-bench-check` overrides and prints that it did. See [the benchmark check](/releasing-cckit/#the-benchmark-check). |
 
 ### Finding a helper before you write one
 
@@ -189,7 +284,7 @@ Each row carries the four facts you need before sourcing a file:
 
 `*-test.sh` runners are excluded by default (they are test entry points, not a library); the footer always states how many, and `--all` includes them.
 
-Run from a project cckit is installed in, it catalogs that project's own `scripts/lib` when it has one and otherwise the cckit install itself — which is the library `cckit` on your PATH can actually source. `--root <dir>` points it somewhere else.
+Run from a project cckit is installed in, it catalogs that project's own `scripts/lib` when it has one and otherwise the cckit install itself — which is the library `cckit` on your PATH can source. `--root <dir>` points it somewhere else.
 
 ```bash
 cckit lib                 # the markdown table
@@ -200,7 +295,7 @@ cckit lib --reasons       # every failure reason, not only the mixed ones
 
 ### Briefing an agent without retyping the repo
 
-A hand-written delegation brief drops whatever its author forgot, and what gets forgotten is exactly what the delegated agent then rediscovers by hand. `cckit brief <issue>` reads it out of the repo instead:
+A hand-written delegation brief drops whatever its author forgot, and what gets forgotten is what the delegated agent then rediscovers by hand. `cckit brief <issue>` reads it out of the repo instead:
 
 | Section | Where it comes from |
 | --- | --- |
@@ -214,10 +309,61 @@ A hand-written delegation brief drops whatever its author forgot, and what gets 
 Every section that cannot be filled says so on its own line. A brief that silently omits a section is the failure this verb exists to remove, so an empty file list reads "the issue names no paths — ask before starting" rather than nothing at all.
 
 ```bash
-cckit brief 226           # the brief for issue #226
+cckit brief <issue>       # the brief for that issue
 ```
 
 Reading the issue is the verb's one hard dependency: a `gh` failure propagates rather than yielding a brief with an empty issue in it.
+
+## Board cache and watch mode
+
+A dashboard that polls the board — a TUI, a statusline — reads one JSON document instead of running its own `gh` queries:
+
+```bash
+cckit sync --json          # print the document (one JSON object)
+cckit sync --write         # fetch, then write it to <git-common-dir>/kit-sync-cache.json
+cckit sync --cached 60     # print the cache if it is under 60s old (no gh call), else refresh it
+cckit sync --watch 30      # refresh the cache every 30s until interrupted
+cckit sync --plan          # the human board plus an inline `effort plan`
+```
+
+| Flag | Behavior |
+| --- | --- |
+| `--json` | One JSON object on stdout. `--llm` and `--output=json` are unchanged: they still return the issue list as TOON. |
+| `--write` | Writes the document to `<git-common-dir>/kit-sync-cache.json` — one file shared by every worktree. The write goes to a temp file that is validated and then renamed, so a reader sees the old document or the new one. A failed or partial fetch (issues, the PR list, or the Projects v2 board when it is on) exits `1` and leaves the file untouched. Prints nothing on stdout unless `--json` is also given. |
+| `--cached [TTL]` | Prints the cache with no `gh` call when it is younger than `TTL` seconds (default `60`); otherwise refreshes, writes and prints it. A failed refresh exits `1` and leaves the cache as it was. |
+| `--watch [SECS]` | Refreshes and writes every `SECS` seconds (default `30`). A failed refresh logs `kept the last good cache` on stderr and the loop continues. `KIT_SYNC_WATCH_MAX=<n>` stops after `n` refreshes, exiting `1` if the last one failed. With `--json` each refreshed document is also printed, one per line. |
+| `--plan` | Adds `effort plan` output: an `### Effort plan` section on the human board, a `plan` string in the document. |
+
+`--write`, `--cached` and `--watch` refuse `--role` / `--milestone` (exit `2`): the cache is one file every reader shares, so it only ever holds the whole board.
+
+The document:
+
+```json
+{
+  "schema": 1,
+  "repo": "owner/repo",
+  "generatedAt": "2026-11-11T10:00:00Z",
+  "generatedEpoch": 1794391200,
+  "open": 3,
+  "roles": [
+    { "role": "Tech Lead", "slug": "tech-lead",
+      "issues": [ { "number": 1, "title": "…", "status": "—", "priority": "p1", "milestone": "v1", "blocked": false } ] }
+  ],
+  "unassigned": [],
+  "blocked": [2],
+  "notOnBoard": null,
+  "stale": { "days": 14, "issues": [ { "number": 2, "days": 20 } ] },
+  "mergeQueue": [
+    { "number": 14, "title": "…", "risk": "low", "size": "S", "state": "ready",
+      "blocked": false, "draft": false, "agent": false, "conflict": false, "approved": true }
+  ]
+}
+```
+
+- `roles` follows the config's role order; `unassigned` holds open issues with none of those `role:` labels.
+- `notOnBoard` is `null` when no Projects v2 board is configured, otherwise the issue numbers missing from it.
+- `mergeQueue` is in merge order — ready, then draft, then blocked; within a tier `risk:low` first, then smaller size. `state` is `ready`, `needs-review`, `conflict`, `draft` or `blocked`. It is the same ordering the human table prints.
+- Every fetch appends `op.start` and `op.done` (op `sync`, `payload.ok` true or false) to `<git-common-dir>/kit-events.jsonl`. A `--cached` hit makes no fetch and emits nothing.
 
 ## Structured output for agents
 

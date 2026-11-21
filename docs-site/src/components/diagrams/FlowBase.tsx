@@ -15,7 +15,7 @@ export type FlowNode = Node<{ label: React.ReactNode }>;
 // themes; the border carries the colour, the text stays high-contrast.
 type Kind = 'start' | 'work' | 'propose' | 'review' | 'success' | 'warn' | 'neutral';
 const HUE: Record<Kind, string> = {
-  start:   '#2c8fa6', // steel cyan — the brand / entry points
+  start:   '#0a84ff', // system blue — the brand / entry points
   work:    '#d99a2b', // amber — hands-on implementation
   propose: '#8b7cf6', // violet — proposing a change (a PR)
   review:  '#38a8c6', // sky — checks + review

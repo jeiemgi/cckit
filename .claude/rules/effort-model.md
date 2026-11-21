@@ -2,7 +2,7 @@
 
 **GitHub is the single source of truth.** An *effort* is the kit's larger unit of work: bigger than
 a single task, with its own decomposition. The same structure that organizes the work also produces
-a clean, per-unit **record** of it (goal → plan → patch → verify) — useful for review, audit, and as
+a per-unit **record** of it (goal → plan → patch → verify) — useful for review, audit, and as
 a dataset if you train on your own development history.
 
 > Two flows coexist in the kit. Use **tasks** (`task-*`) for a single self-contained change; use
@@ -60,9 +60,9 @@ name alone in any flat list.
 the `/kit-effort-new` skill — call the **same** shared function `effort_new` (`scripts/lib/effort-ops.sh`).
 That single core fills the four body sections, applies the `ctx/kind/priority/role/flow` label set
 (`ctx:*` via `effort_ctx_bucket`), lints the parent **and every sub** title up front, links the
-native sub-issues, and adds everything to the board. Change the core and both move together; there
-is no second implementation. `scripts/setup-labels.sh` provisions every label family the core
-applies (`ctx:* flow:* kind:* priority:* role:*`) so creation never fails on a missing label.
+native sub-issues, and adds everything to the board. `scripts/setup-labels.sh` provisions every
+label family the core applies (`ctx:* flow:* kind:* priority:* role:*`) so creation never fails on a
+missing label.
 
 ### Title rule, flow tags, relations, session-fit
 
@@ -104,7 +104,12 @@ how much of one working session it consumes before the context window fills. Der
 `effort_ctx_bucket` (`scripts/lib/effort-metrics.sh`) from difficulty + sub count: S=1 · M=2 · L=4 ·
 XL=8 weight. **`kit effort plan`** (`scripts/lib/effort-plan.sh`) reads the open efforts, groups by
 flow, orders each flow by the `blocked_by` edges, and packs them into **session-sized batches** under
-a budget (`KIT_SESSION_BUDGET`, default 4). L/XL efforts are flagged **"→ delegate subs"**:
+a budget (`KIT_SESSION_BUDGET`, default 4). Rows come from GitHub unless `effort.planSource` names
+an executable: it is called as `<source> <owner/repo>` from the project root and prints
+`number<TAB>flow<TAB>ctx<TAB>title[<TAB>blockers]` rows, plus an optional `# age: <text>` line. A
+source that is not executable, exits non-zero or prints no rows falls back to GitHub. The plan's
+`source:` line names the source used, its age when reported, and any fallback — a plan built from a
+snapshot says so. L/XL efforts are flagged **"→ delegate subs"**:
 delegating an effort's sub-issues to **sub-agents in their own worktrees** keeps the main session
 light (a sub-agent reads/writes in its own context; only a summary returns) — the lever that lets
 more efforts fit one session (`rules/agent-execution-routing.md`).
@@ -119,10 +124,10 @@ The parent carries the rich narrative; the **PR** carries the human-facing revie
 |------|------|
 | `effort-new` | parent issue (4-section body **filled** + `ctx/kind/priority/role/flow` labels) + native sub-issues, every title linted; optional `--slug` sets the handle |
 | `cckit effort chain <a> <b> …` | declare a running order over EXISTING issues: each successor `blocked_by` its predecessor + a `- Depends on #<predecessor>` line. Idempotent, additive, cycle-refusing (nothing is written on a refusal) |
-| `effort-start [--force] <slug\|N>` | `effort/<N>` branch + worktree; board → In Progress. **WIP-limited** — see below |
+| `effort-start [--force] <slug\|N>` | `effort/<N>` branch + worktree; board → In Progress. Creating the branch stamps the start time for the metrics record. **WIP-limited** — see below |
 | orchestrate | sub-issues in own worktrees (file-disjoint) → merge into `effort/<N>`; each closes + board Done as it lands |
 | `effort-pr <slug\|N>` | ONE PR `effort/<N>` → develop (rich body + `## For agents`) |
-| `effort-close <slug\|N>` | **snapshot sub-diffs pre-squash** → merge → close parent + subs → board Done(all) → GC prune → kit-sync drift check |
+| `effort-close <slug\|N>` | **snapshot sub-diffs pre-squash** → append the metrics record (`build_seconds` and `tokens_real` each name their source; with no source the field is `null`, never an estimate) → re-target open PRs based on the effort branch (refuses if one fails) → merge → close parent + subs → board Done(all) → GC prune → kit-sync drift check |
 
 Board + record state are correct **by construction** — the close op owns them. Never rely on a
 separate, skippable "mark done" step.
@@ -131,7 +136,7 @@ separate, skippable "mark done" step.
 effort once `effort.wipLimit` (default **2**) are already in progress. **In progress** means an
 `effort/<N>-<slug>` branch exists — a local head (`effort_branch_rows_local`) **or** a branch origin
 has right now (`effort_branch_rows_origin`, a `git ls-remote` read), unioned by
-`effort_wip_rows`. That is the kit's one definition of a started effort, not a second one:
+`effort_wip_rows`. That is the kit's one definition of a started effort:
 `effort_start` creates the branch and `effort_close` deletes it, so the set is exactly "started and
 not yet closed". The board Status is deliberately **not** the signal — it is written by the
 `/kit-effort-start` skill's board step, never by the verb, and it is empty whenever Projects v2 is
@@ -145,8 +150,7 @@ off.
   network-free. Resolution as a whole is not: with no branch matching the slug it falls through to
   `gh`, so a WIP refusal on a slug input can still make a GitHub read.
 - **At** the limit refuses; only strictly under it starts. `0` refuses every ordinary start of a NEW
-  effort — `--force` / `KIT_FORCE=1` still start, and a re-start of an effort already in progress is
-  never gated.
+  effort — `--force` / `KIT_FORCE=1` still start.
 - Re-running `effort start` on an effort already in progress is never gated — it adds no WIP, so the
   op stays safe to re-run.
 - The check runs **before** the fetch, branch, worktree and bootstrap — a refusal makes no branch,

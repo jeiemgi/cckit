@@ -1,0 +1,41 @@
+{
+  "id": "emil-design-eng",
+  "label": "emil-design-eng",
+  "summary": "Interaction and motion craft on a chosen design: which easing, duration and property an animation uses, and which animations a page should not have. The second skill `page-design` applies.",
+  "why": "No API key and no paid product. One skill is installed out of a pack of 19 (counted in the repository's skills/ folder on 2026-11-13): loading the whole pack costs context `page-design` does not need. Installing runs the third-party `skills` CLI through npx, which needs Node.js 22.20 or later.",
+  "config": { "key": "designMotion.provider", "value": "emil-design-eng" },
+  "detect": {
+    "run": "test -f .claude/skills/emil-design-eng/SKILL.md || test -f \"$HOME/.claude/skills/emil-design-eng/SKILL.md\"",
+    "bin": "npx"
+  },
+  "install": [
+    {
+      "manager": "npx",
+      "run": "npx -y skills@latest add emilkowalski/skills --skill emil-design-eng -a claude-code -y",
+      "note": "The pack's README documents only `npx skills@latest add emilkowalski/skills`, which installs every skill. `--skill`, `-a` and `-y` are options of the `skills` CLI (vercel-labs/skills, docs/commands.md, read 2026-11-13); the skill folder skills/emil-design-eng exists in the pack. One run is on record, on 2026-11-13, through `cckit doctor --fix` in a Next.js project: the skill landed in .claude/skills/emil-design-eng and skills-lock.json was written; whether .agents/skills/ got a copy was not recorded. Per the CLI's docs it installs into the current project (`-g` would make it global): a copy under .agents/skills/, a link at .claude/skills/emil-design-eng, and an entry in skills-lock.json."
+    }
+  ],
+  "verify": {
+    "run": "test -f .claude/skills/emil-design-eng/SKILL.md || test -f \"$HOME/.claude/skills/emil-design-eng/SKILL.md\"",
+    "failsOn": "The skill file is in neither this project nor ~/.claude/skills."
+  },
+  "afterInstall": "reload the agent session so it lists the skill, and commit .claude/skills/emil-design-eng, skills-lock.json and .agents/skills/emil-design-eng when it exists",
+  "alsoWrites": ["skills-lock.json"],
+  "uninstall": "npx -y skills@latest remove emil-design-eng -a claude-code -y",
+  "recheck": {
+    "cadence": "monthly",
+    "drifts": [
+      "the package name skills on npm and its `add` options --skill, -a, -y",
+      "the skill folder name emil-design-eng in emilkowalski/skills",
+      "that a project install for claude-code lands in .claude/skills/"
+    ]
+  },
+  "docs": "https://github.com/emilkowalski/skills#readme",
+  "attribution": {
+    "author": "Emil Kowalski (emilkowalski)",
+    "license": "MIT",
+    "homepage": "https://github.com/emilkowalski/skills",
+    "affiliated": false,
+    "notice": "emil-design-eng is a skill by Emil Kowalski, installed from his public repository under its own MIT licence (LICENSE read from the repository on 2026-11-13). cckit is not affiliated with its author and vendors none of its content."
+  }
+}

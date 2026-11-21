@@ -1,0 +1,177 @@
+---
+title: Take an issue to merged
+description: "Step by step: one GitHub issue through start, change, pull request, close and cleanup."
+tutorial:
+  job: take a GitHub issue to a merged PR
+  difficulty: beginner
+  time: "6 min"
+  prerequisites:
+    - { text: "cckit is installed and set up in this project", link: "Set it up", href: "/getting-started/initialize/" }
+    - "There is an open issue to work on"
+  ogTag: Lifecycle
+  keywords: [ai agent github issue to pr, claude code pull request, automate github workflow]
+  related: [getting-started/initialize, project-management/break-a-feature-into-an-effort, development/run-a-wave-in-parallel]
+---
+
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import TutorialMeta from '../../../components/TutorialMeta.astro';
+import TutorialSchema from '../../../components/TutorialSchema.astro';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
+
+<TutorialMeta />
+
+A single fix involves more bookkeeping than code. Someone has to make a branch from a current
+base, keep the change apart from other work, open a pull request that names the issue, move the
+card on the board, close the issue and delete the branch afterwards. Done by hand, one of those
+steps gets skipped.
+
+In this guide your agent takes one issue the whole way, and each of those steps is one cckit
+command. The agent runs them in order and does not improvise the branch or the pull request.
+
+Each step starts with what you say to your agent in the chat. Below it is the command your agent
+runs for that sentence. The example is the Bakery site: the `/menu` page, from issue to merged.
+
+**What you will have at the end:** one issue closed, its change merged through a reviewed pull
+request, and no leftover branch or folder on your machine.
+
+## Steps
+
+### 1. Ask for the next ready issue
+
+You do not name a number. The agent reads the board and takes the first issue nothing is blocking.
+
+<Chat
+  title="taking the next ready issue on the Bakery site"
+  say="What's the next issue that's ready? Start it."
+  ran={['cckit next', 'cckit start <issue>']}
+  means="Nothing is committed yet. The change will live in its own worktree, a separate folder with its own copy of the code, until the pull request merges."
+>
+  The next ready issue is the menu page, the `/menu` page with every bake and its price. I started it in
+  its own worktree on its own branch.
+</Chat>
+
+When the project uses a GitHub Projects board, `cckit start` also moves the issue to In Progress.
+
+### 2. The agent makes the change
+
+It works in that folder and nothing else, and runs the project's checks until they pass. Then it
+reports: the menu page is built, the checks pass, shall I open the pull request?
+
+### 3. The agent opens the pull request
+
+<Chat
+  title="opening the pull request for the menu page"
+  say="Yes, open it."
+  ran={'cckit pr <issue> "<summary>"'}
+  means="This is where you look at the work. The checks run on the pull request, and you or a reviewing agent read the change."
+>
+  The pull request for the menu page is open and links the issue with a `Closes` line. The checks are
+  running on it.
+</Chat>
+
+When the project uses a board, `cckit pr` also moves the issue to In Review.
+
+### 4. Merge, close and clean up
+
+Merging is your decision. Other changes may have merged since this one started. Before merging,
+the agent updates the branch with them, shows you anything the change would delete, and runs the
+project's checks (the gate) again. The commands are in
+[Land one pull request](/ship/merge-and-close/#land-one-pull-request).
+
+<Chat
+  title="merging the menu page and cleaning up"
+  say="The review passed. Merge it, close the issue and clean up."
+  ran="cckit merge"
+  means="The menu page is on the base branch, its issue is closed, and no leftover branch or folder remains."
+>
+  Merged. The issue is closed, and I removed the branch and the worktree.
+</Chat>
+
+<Outcomes title="What cckit merge does not do for you">
+
+`cckit merge` does not update a branch that is behind the base branch and has no conflict: it
+merges the pull request as GitHub has it. That is why the agent updates the branch and runs the
+gate first.
+
+</Outcomes>
+
+<Outcomes title="If the pull request was merged another way">
+
+If the pull request was merged another way, such as the button on GitHub, finish by hand:
+
+```bash frame="terminal"
+cckit close <issue> "<summary>"  # close the issue; the board moves to Done
+cckit gc --prune --yes           # remove merged branches and their worktrees
+```
+
+</Outcomes>
+
+## Check it worked
+
+<Chat
+  title="checking that the menu page issue is gone and nothing is left over"
+  say="Is the menu page issue closed, and is anything left over from it?"
+  ran={['cckit sync', 'cckit gc']}
+  means="The issue is no longer in the open list, and the cleanup report names no branch or worktree for it."
+>
+  The menu page issue is no longer open, and the cleanup report lists nothing left over for it.
+</Chat>
+
+The pull request page on GitHub shows it merged and links the issue.
+
+## How it works
+
+Starting an issue creates an isolated worktree and branch, so the change cannot collide with
+anything else you are running. The pull request, the board columns and the branch all carry the
+same issue number, and no step wires them together by hand. The board steps apply when the
+project uses a GitHub Projects board.
+
+Whether an agent may merge on its own is your decision, not the tool's. By default the agent
+stops after opening the pull request, which is why step 4 starts with you saying so. The [Review](/review/) area covers who approves, and
+[Merge, close and clean up](/ship/merge-and-close/) covers the last step in detail.
+
+<Aside type="tip" title="One issue, one worktree">
+`cckit start` makes the branch and the worktree in one step. The change lives in its own copy of
+the repository until the pull request merges. See
+[How one change is built](/development/).
+</Aside>
+
+## Troubleshooting
+
+**A verb errored.** cckit prints little when a step succeeds. An error means something is off: a
+missing dependency, uncommitted changes, a GitHub sign-in that expired. Read the message before
+retrying.
+
+**`cckit start` refused the issue.** Another live session already holds it. `cckit claims` shows
+which one. See [Many sessions, one repository](/development/many-sessions/).
+
+**The change touched more than the issue.** Keep the worktree to the one issue. If the scope
+grew, split it into an [effort](/project-management/break-a-feature-into-an-effort/) with
+sub-issues.
+
+**`gc` did not remove the branch.** `gc --prune` removes a branch only once its pull request has
+merged and its issue is closed. Finish the merge and the close first, then run cleanup.
+
+## Related guides
+
+<CardGrid>
+  <LinkCard title="Set up cckit in a repo" href="/getting-started/initialize/" description="Get the board and config ready first." />
+  <LinkCard title="Break a feature into an effort" href="/project-management/break-a-feature-into-an-effort/" description="When one issue is too big for a single pull request." />
+  <LinkCard title="Run a wave in parallel" href="/development/run-a-wave-in-parallel/" description="Clear a whole batch of ready work at once." />
+</CardGrid>
+
+<TutorialSchema
+  steps={[
+    { name: 'Ask for the next ready issue', text: 'Ask the agent which issue is ready next and tell it to start that one.' },
+    { name: 'The agent starts the issue', text: 'cckit next finds the issue; cckit start <issue> makes the worktree and branch.' },
+    { name: 'The agent makes the change', text: 'The change is made in the new worktree and the project checks are run until they pass.' },
+    { name: 'The agent opens the pull request', text: 'cckit pr <issue> "<summary>" commits, pushes and opens the pull request.' },
+    { name: 'Merge, close and clean up', text: 'cckit merge merges the pull request, closes its issue and removes the branch and worktree. After a merge made another way, cckit close closes the issue and cckit gc --prune --yes removes merged branches.' },
+  ]}
+  faqs={[
+    { q: 'A cckit verb errored', a: 'cckit prints little when a step succeeds, so an error means something is off: a missing dependency, uncommitted changes, or a GitHub sign-in that expired. Read the message before retrying.' },
+    { q: 'The change touched more than the issue', a: 'Keep the worktree to one issue. If the scope grew, split it into an effort with sub-issues.' },
+    { q: "gc didn't remove the branch", a: 'gc --prune removes a branch only once its pull request has merged and its issue is closed. Finish the merge and the close first, then run cleanup.' },
+  ]}
+/>

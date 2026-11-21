@@ -1,0 +1,254 @@
+---
+title: Agent review before a merge
+description: Turn on cckit's review stage so the captain sends each pull request it would merge to a read-only reviewer agent first, records the verdict against the reviewed commit, and refuses to merge on a fail.
+tutorial:
+  job: have an agent review a pull request before the captain merges it
+  difficulty: advanced
+  time: "8 min"
+  prerequisites:
+    - { text: "cckit is installed and set up in this project", link: "Set it up", href: "/getting-started/initialize/" }
+    - "The `claude` or `codex` CLI is installed and runs from your terminal"
+    - "There is an open pull request whose branch names its issue"
+  ogTag: Review
+  keywords: [ai code review before merge, claude code review agent, automated pr review gate, codex review]
+  related: [development/run-a-wave-in-parallel, development/run-one-objective-unattended, review/control-what-agents-can-do]
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import TagRow from '../../../components/TagRow.astro';
+import TutorialMeta from '../../../components/TutorialMeta.astro';
+import TutorialSchema from '../../../components/TutorialSchema.astro';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
+
+<TagRow kinds={["flow"]} />
+
+<TutorialMeta />
+
+The agent that wrote a change reads it with the same assumptions it wrote it with. A second
+reader with no stake in the change catches what the first one cannot. On a human team that is code
+review. When the captain merges on its own, nobody is doing it unless you give that job to a second
+agent.
+
+**What you will have at the end:** a reviewer agent that reads each pull request before
+`cckit watch --merge` lands it. The captain pipes a brief to the reviewer, the reviewer answers
+with a short report, and that report is stored as a receipt tied to the commit it read. A
+`gate: fail` blocks the merge until a new commit is pushed and reviewed.
+
+**Who does it:** the reviewer is an agent profile that lists the `review` stage and may not write
+to a branch. It runs on the `claude` or `codex` CLI you already have, or on any command you name.
+The stage is off until you configure it.
+
+## Steps
+
+### 1. Declare a reviewer and turn the stage on
+
+<Chat
+  title="adding a read-only reviewer to the Bakery site"
+  say="Add a reviewer to the Bakery site: a read-only agent that reads each pull request before the captain merges it."
+  ran="jq '{review, agents}' .claude/kit.config.json"
+  means="The reviewer is a profile that lists the review stage and does not set write, so it may not write to a branch."
+>
+  I added the reviewer profile and turned the review stage on in the project config, then read both
+  blocks back. Nothing is reviewed yet: that starts when a pull request is open.
+</Chat>
+
+Add both blocks to the project config (`.claude/kit.config.json`, or `cckit.config.json` at the
+root):
+
+```json
+{
+  "review": { "headless": true, "timeoutSeconds": 900 },
+  "agents": {
+    "profiles": {
+      "reviewer": { "kind": "claude", "tier": "low", "stages": ["review"] }
+    }
+  }
+}
+```
+
+<Outcomes of="the reviewer config" title="What these two blocks do">
+
+`headless: true` has cckit build the reviewer's command from the profile: `claude -p` for
+`kind: claude`, `codex exec -` for `kind: codex`. The profile lists the `review` stage and does
+not set `write`, so it may not write to a branch. A profile with `write: true` is refused as a
+reviewer.
+
+</Outcomes>
+
+### 2. Open a pull request the usual way
+
+<Chat
+  title="opening the pull request for the Bakery menu page"
+  say="The menu page is done. Open the pull request."
+  ran='cckit pr <issue> "<summary>"'
+  means="The review is recorded against the pull request's issue, so the branch has to name one. A pull request opened with cckit pr from a cckit start worktree does."
+>
+  The pull request for the menu page is open. Its branch names the issue, so the review can be
+  recorded against it.
+</Chat>
+
+### 3. Run one captain pass
+
+<Chat
+  title="sending the menu page pull request to the reviewer"
+  say="Check the open pull requests and send the ones that are ready to the reviewer."
+  ran="cckit watch"
+  means="The pass waits for the reviewer, up to timeoutSeconds. The pull request is held for the rest of the pass whether or not the reviewer succeeded."
+>
+  The menu page pull request was ready to merge, so the reviewer read it first. Its row now reads
+  `-> reviewed`.
+</Chat>
+
+### 4. Read the verdict
+
+<Chat
+  title="reading what the reviewer said about the menu page"
+  say="What did the reviewer say about the menu page?"
+  ran={[
+    "cckit receipt list <issue>",
+    "cckit receipt show <issue> review",
+  ]}
+  means="The same report is posted as a comment on the issue. Its gate line is pass or fail, and blocker names the defect when there is one."
+>
+  The reviewer read the pull request and failed it: the email field of the contact form has no
+  label. That is the blocker, and the merge waits until a new commit fixes it.
+</Chat>
+
+### 5. Run the next pass with the merge on
+
+<Chat
+  title="merging only what the reviewer passed"
+  say="Merge whatever the reviewer passed."
+  ran="cckit watch --merge"
+  means="A pull request with a pass on its current head is merged. One with a fail, or with no verdict on its current head, is held."
+>
+  Nothing merged on this pass: the menu page pull request still reads `REVIEW_FAILING`, so I left
+  it for its author.
+</Chat>
+
+<Outcomes of="cckit watch --merge">
+
+| The PR reads | Meaning | What happens |
+| --- | --- | --- |
+| `MERGED` | The reviewer said `gate: pass` on the current head. | The captain squash-merges it. |
+| `REVIEW_FAILING` | The reviewer said `gate: fail` on the current head. | Not merged. The author fixes the finding and pushes. |
+| `REVIEW_MISSING` | No verdict covers the current head. | Not merged. The pass sends it to the reviewer again. |
+
+</Outcomes>
+
+### 6. Fix and push to earn a new review
+
+<Chat
+  title="fixing the form label and getting a new review"
+  say="Give the email field a label and push, so the reviewer reads it again."
+  ran={[
+    "git push",
+    "cckit watch",
+  ]}
+  means="A verdict belongs to one commit. After a push the old verdict no longer counts, pass or fail."
+>
+  I fixed the label and pushed. The pass sent the new head to the reviewer, which is a fresh review
+  of the new commit.
+</Chat>
+
+## How to check it worked
+
+- `cckit receipt show <issue> review` prints a receipt whose `gate` line is `pass` or `fail`.
+- The same report is a comment on the issue.
+- `cckit watch --merge` merges a pull request with a pass on its current head and reports
+  `REVIEW_FAILING` or `REVIEW_MISSING` for one without.
+
+## How it works
+
+The reviewer gets a brief on stdin: the PR and issue, an instruction to report only defects it can
+point at in the diff, and a READ ONLY rule. It must end its reply with five lines, which is the
+format the receipt is parsed from:
+
+```text
+outcome: <pr-open|blocked>
+url: <the PR URL>
+gate: <pass|fail> — <what was read>
+blocker: <the defect that stops this merging, or none>
+next stage: <none if it may merge, build if it goes back to the author>
+```
+
+Configuring the stage also requires its result: with `review.headless` or `review.command` set, a
+PR with no verdict reads `REVIEW_MISSING` and the captain does not merge it. Every `cckit watch`
+pass dispatches, with or without `--merge`.
+
+**To run your own reviewer,** set `review.command` to a command line that reads the brief on stdin
+and prints that report on stdout. It wins over `headless`, and it receives the resolved profile in
+`CCKIT_REVIEW_PROFILE`, `CCKIT_REVIEW_KIND` and `CCKIT_REVIEW_ARGS`.
+
+**Which profile reviews.** With no `agent:<profile>` label on the issue or its parent effort, the
+reviewer is `agents.default`, or the lowest-`tier` profile when that is unset. That choice is not
+made per stage. If it lands on a profile that does not list `review`, the dispatch is refused:
+
+```text
+agent-profile: profile 'builder' is not allowed at stage 'review' (it lists: build )
+agent-resolve: rejected 'builder' (from agents.default)
+```
+
+The config in step 1 declares one profile so the default is the reviewer. With that config,
+launch build workers by naming the CLI (`cckit orchestrate --agent claude <issues…>`), which skips
+profiles; an unflagged launch would resolve the reviewer for the build stage and be refused.
+
+- Every key, the environment the command receives and the timeout rule:
+  [The agent review stage](/config-and-permissions/#the-agent-review-stage).
+- Profiles, tiers and the label that selects one:
+  [Agent profiles](/config-and-permissions/#agent-profiles).
+- Receipts, attempts and the issue comment:
+  [Stage receipts](/config-and-permissions/#stage-receipts).
+
+<Aside type="caution" title="What is and is not verified">
+cckit refuses a `write: true` reviewer, but it does not verify that the reviewer's process is
+read-only: what the agent may do is set by its CLI's defaults, your agent settings and the
+profile's `args`. The stage is tested with stub binaries; the reference states that no live
+reviewer has been run through `headless`. Run it first on a repository where a wrong verdict
+costs nothing.
+</Aside>
+
+## Troubleshooting
+
+**The row never reads `-> reviewed`.** The PR is not one the captain would merge: it conflicts, a
+check is failing or pending, it is a draft, or a policy floor holds it. Those are not sent to a
+reviewer.
+
+**`PR #<n> has no linked issue`.** The branch name carries no issue number, so there is nothing to
+record a receipt against. Open PRs from `cckit start <issue>` worktrees.
+
+**The PR stays `REVIEW_MISSING` on every pass.** The reviewer ran and left no receipt: it timed
+out, exited non-zero, or its reply had no `outcome:` line. Run the reviewer command by hand with a
+short prompt and check that its reply ends with the five lines above.
+
+**`review.headless is on but profile '<name>' is kind '<kind>'`.** `headless` builds a command for
+`claude` and `codex` only. Set `review.command` for any other reviewer.
+
+**You disagree with a `REVIEW_FAILING` verdict.** No setting turns a recorded fail off. Push a
+commit: that makes the verdict stale and the next pass reviews the new head.
+
+## Related guides
+
+<CardGrid>
+  <LinkCard title="Run a wave in parallel" href="/development/run-a-wave-in-parallel/" description="The captain loop the review stage sits inside." />
+  <LinkCard title="Run one objective unattended" href="/development/run-one-objective-unattended/" description="The builder side: one headless agent with limits." />
+  <LinkCard title="Control what agents may do" href="/review/control-what-agents-can-do/" description="The permission settings a reviewer runs under." />
+</CardGrid>
+
+<TutorialSchema
+  steps={[
+    { name: 'Declare a reviewer and turn the stage on', text: 'Add review.headless true and one agent profile that lists the review stage and does not set write to the project config.' },
+    { name: 'Open a pull request the usual way', text: 'The branch must name its issue; a PR opened with cckit pr from a cckit start worktree does.' },
+    { name: 'Run one captain pass', text: 'cckit watch sends each PR it would merge to the reviewer and holds it for that pass.' },
+    { name: 'Read the verdict', text: 'cckit receipt show <issue> review prints the latest review receipt; the report is also a comment on the issue.' },
+    { name: 'Run the next pass with the merge on', text: 'cckit watch --merge merges a PR with gate: pass on its current head and holds one that reads REVIEW_FAILING or REVIEW_MISSING.' },
+    { name: 'Fix and push to earn a new review', text: 'A verdict belongs to one commit. A push makes it stale and the next pass reviews the new head.' },
+  ]}
+  faqs={[
+    { q: 'Can the reviewer write to the branch?', a: 'A profile with write: true is refused as a reviewer and the brief says READ ONLY. cckit does not verify that the reviewer process is read-only.' },
+    { q: 'The PR stays REVIEW_MISSING on every pass', a: 'The reviewer ran and left no receipt: it timed out, exited non-zero, or its reply had no outcome: line.' },
+    { q: 'How do I override a REVIEW_FAILING verdict?', a: 'No setting turns it off. Push a commit: the verdict becomes stale and the next pass reviews the new head.' },
+    { q: 'Does cckit watch without --merge run the reviewer?', a: 'Yes. Every pass dispatches a reviewer for a PR that would otherwise merge.' },
+  ]}
+/>

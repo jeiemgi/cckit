@@ -4,7 +4,10 @@
 # Family 1 of kit-engine-boundary.md (rule #1/#2): one bash home for the op, consumed by the
 # kit-task-start skill, scripts/orchestrate.sh, and `kit task start`. No second implementation.
 #
-#   wt_start <issue-number> [slug-override]
+#   wt_start [--force] <issue-number> [slug-override]
+#     Refuses (rc 1, before any fetch / branch / worktree) when another LIVE session already holds
+#     the issue's claim in <git-common-dir>/kit-sessions (session-registry.sh). `--force` or
+#     KIT_FORCE=1 starts anyway and takes the claim over.
 #     stdout: "<worktree-path>|<branch>|<issue-number>"   (one line, machine-readable)
 #     stderr: human progress
 #     returns: 0 on success (created or reused), 1 on failure
@@ -21,6 +24,31 @@ if ! command -v cckit_gh_rest >/dev/null 2>&1; then
 fi
 command -v cckit_gh_rest >/dev/null 2>&1 || cckit_gh_rest() { return 1; }
 
+# The claims registry (#384). Guarded: a project scaffolded before session-registry.sh shipped has
+# worktree-start.sh without it, and there wt_start runs with no claim check rather than failing.
+if ! command -v sreg_claim >/dev/null 2>&1; then
+  _sr_lib="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)/session-registry.sh"
+  # shellcheck source=/dev/null
+  [ -f "$_sr_lib" ] && . "$_sr_lib"
+  unset _sr_lib
+fi
+
+# The closed kind: vocabulary (kinds.sh). The issue's `kind:` label becomes the branch prefix, so it
+# is mapped through the set: a label outside it (kind:bug, kind:docs, a typo) would otherwise produce
+# a branch the hygiene hook rejects as non-conventional.
+if ! command -v kit_kind_branch >/dev/null 2>&1; then
+  _wtk_lib="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)/kinds.sh"
+  # shellcheck source=/dev/null
+  [ -f "$_wtk_lib" ] && . "$_wtk_lib"
+  unset _wtk_lib
+fi
+# _wt_kind_prefix <kind> — the branch prefix for a kind label value. With kinds.sh loaded: the value
+# itself when it is in the closed set, else `task` plus a warning on stderr. Without kinds.sh (a
+# project scaffolded before it shipped) the value passes through unchanged, as it always did.
+_wt_kind_prefix() {
+  if command -v kit_kind_branch >/dev/null 2>&1; then kit_kind_branch "${1:-}"; else printf '%s\n' "${1:-task}"; fi
+}
+
 WT_START_REPO="${WT_START_REPO:-${KIT_REPO:-}}"
 
 # _wt_set_port <app-env-file> <port> <issue-num> — append a per-worktree dev PORT to an app's
@@ -31,7 +59,8 @@ WT_START_REPO="${WT_START_REPO:-${KIT_REPO:-}}"
 # file. A script like `next dev -p ${PORT:-3003}` is expanded by the npm-script shell, which never
 # reads .env.local, so the value is INERT for it and every worktree falls back to the same default.
 # cckit therefore does not RELY on it: everything cckit launches itself passes the port explicitly
-# (scripts/lib/qa-lane.sh injects one QA_PORT_<service> per service). Treat the .env.local write as
+# (scripts/lib/qa-lane.sh exports each port env var the project declared in `qa.ports`, set to that
+# lane's port, into the command it launches). Treat the .env.local write as
 # a convenience for apps that do read it — and if you start a dev server by hand in a worktree,
 # check which port you actually got.
 _wt_set_port() {
@@ -55,6 +84,16 @@ _wt_set_port() {
 # State lives beside the event log under the git-common-dir, so it is worktree-durable and shared by
 # every checkout. Each line: <issue>\t<slot>\t<worktree-path>. A slot whose worktree is gone is
 # reclaimed on the next call, which is what keeps the 40 slots from leaking away over a long project.
+# _wt_num_hash <key> — <key> itself when it is a number, else a number derived from it. The slot
+# ledger is keyed by issue number; a light task (#450) is keyed by its id (`t3f9a`), and the hashed
+# fallbacks below do arithmetic on the key.
+_wt_num_hash() {
+  case "$1" in
+    ''|*[!0-9]*) printf '%s' "$1" | cksum | cut -d' ' -f1 ;;
+    *) printf '%s' "$1" ;;
+  esac
+}
+
 _wt_slots_file() {
   local gcd
   gcd="$(git -C "${1:-.}" rev-parse --git-common-dir 2>/dev/null)" || return 1
@@ -68,34 +107,46 @@ _wt_slots_file() {
 # very defect the slot ledger exists to remove. The reclaim rewrite races worse than the append:
 # it `mv`s a snapshot over the ledger, silently dropping any row another process added in between.
 #
-# mkdir is the lock primitive. A stock macOS has no flock(1) and this file targets bash 3.2, while
-# `set -C` redirection is not atomic on every filesystem; mkdir is atomic everywhere and fails when
-# the name already exists.
+# The lock primitive is the shell's own noclobber redirection: `set -C; : > file` opens with
+# O_CREAT|O_EXCL, which the kernel makes exclusive, and no external tool is involved. A stock macOS
+# has no flock(1) and this file targets bash 3.2.
+#
+# It was `mkdir` until #449. `mkdir` is exclusive only when the binary makes ONE mkdir(2) call and
+# reports its EEXIST. uutils coreutils 0.10.0 (the `mkdir` of Ubuntu 26.04, and of GitHub's
+# `ubuntu-latest` runner) calls statx first and exits 0 for the loser of a race: 8 processes running
+# `mkdir <same path>` at once all "succeeded" in 183 of 200 rounds. Two `cckit start` runs then held
+# this lock together and were given the same slot.
 _WT_LOCK_WAIT="${_WT_LOCK_WAIT:-10}"   # seconds to wait for a held lock before giving up
 
-# _wt_lock <lockdir> — 0 when the lock is held, 1 when it is not. A caller that fails to lock
+# _wt_lock_try <lockfile> — ONE attempt: 0 when this call created the lock, 1 when it exists. The
+# subshell keeps noclobber out of the caller's shell. Never replace this with an external command
+# without racing it first (scripts/lib/worktree-ports-test.sh section 7 does).
+_wt_lock_try() { ( set -C; : > "$1" ) 2>/dev/null; }
+
+# _wt_lock <lockfile> — 0 when the lock is held, 1 when it is not. A caller that fails to lock
 # proceeds ANYWAY: an unserialized allocation can collide, but a `cckit start` that refuses to run
 # cannot be worked around. Degrade, don't block.
 #
-# A lock directory older than a minute is treated as abandoned and broken, so a process killed
+# A lock older than a minute is treated as abandoned and broken, so a process killed
 # mid-allocation cannot wedge every future start. The age floor is well above _WT_LOCK_WAIT, so a
-# slow-but-live holder is never stolen from.
+# slow-but-live holder is never stolen from. `rm -rf` because a cckit from before #449 leaves a
+# lock DIRECTORY at the same path; either kind blocks the other, so mixed versions still exclude.
 _wt_lock() {
   local d="$1" tries=0 max
   max=$(( _WT_LOCK_WAIT * 10 ))
   while [[ "$tries" -lt "$max" ]]; do
-    mkdir "$d" 2>/dev/null && return 0
+    _wt_lock_try "$d" && return 0
     sleep 0.1 2>/dev/null || sleep 1
     tries=$(( tries + 1 ))
   done
   if [[ -n "$(find "$d" -maxdepth 0 -mmin +1 2>/dev/null)" ]]; then
     rm -rf "$d" 2>/dev/null
-    mkdir "$d" 2>/dev/null && { echo "warn: broke an abandoned port-slot lock ($d)" >&2; return 0; }
+    _wt_lock_try "$d" && { echo "warn: broke an abandoned port-slot lock ($d)" >&2; return 0; }
   fi
   return 1
 }
 
-_wt_unlock() { rmdir "$1" 2>/dev/null || rm -rf "$1" 2>/dev/null; }
+_wt_unlock() { rm -rf "$1" 2>/dev/null; }
 
 # _wt_slot_alloc <ledger> <issue-num> <worktree> — the ledger transaction: reclaim dead rows,
 # return the issue's existing allocation if it has one, else take the lowest free slot and append
@@ -125,7 +176,7 @@ _wt_slot_alloc() {
     i=$(( i + 1 ))
   done
   echo "[#$num] warn: all 40 dev-port slots are held — falling back to a hashed port (collisions possible); run cckit gc" >&2
-  printf '%s' $(( num % 40 ))
+  printf '%s' $(( $(_wt_num_hash "$num") % 40 ))
 }
 
 # _wt_slot_for <root> <issue-num> <worktree> — echo this issue's slot (0-39), allocating on first
@@ -134,8 +185,10 @@ _wt_slot_alloc() {
 # a warning) only when every slot is genuinely held.
 _wt_slot_for() {
   local root="$1" num="$2" wt="$3" f lock out locked=0
-  f="$(_wt_slots_file "$root")" || { printf '%s' $(( num % 40 )); return 0; }
-  [[ -f "$f" ]] || : > "$f" 2>/dev/null || { printf '%s' $(( num % 40 )); return 0; }
+  f="$(_wt_slots_file "$root")" || { printf '%s' $(( $(_wt_num_hash "$num") % 40 )); return 0; }
+  # `>>`, not `>`: this line runs BEFORE the lock, so a truncating create could empty a ledger that
+  # another process created and wrote to between the test and the redirection.
+  [[ -f "$f" ]] || : >> "$f" 2>/dev/null || { printf '%s' $(( $(_wt_num_hash "$num") % 40 )); return 0; }
 
   lock="$f.lock"
   if _wt_lock "$lock"; then locked=1; else
@@ -144,6 +197,22 @@ _wt_slot_for() {
   out="$(_wt_slot_alloc "$f" "$num" "$wt")"
   [[ "$locked" = 1 ]] && _wt_unlock "$lock"
   printf '%s' "$out"
+}
+
+# wt_port_slot <root> <issue-num> <worktree> — the PUBLIC reader of the slot ledger: echo the slot
+# (0-39) this issue holds, allocating one on first call. Same row `cckit start` uses, so a caller
+# that launches something for an issue's worktree (the QA lane, qa-lane.sh) lands on the port block
+# that worktree already owns instead of deriving a second one.
+wt_port_slot() { _wt_slot_for "$1" "$2" "$3"; }
+
+# wt_port_stride <config-file> — the distance between one slot's port block and the next:
+# `worktree.devPortStride`, default 10. One reader, so wt_assign_ports and the QA lane cannot
+# disagree about where the next block starts.
+wt_port_stride() {
+  local stride=""
+  stride="$(jq -r '.worktree.devPortStride // empty' "${1:-}" 2>/dev/null)"
+  [[ "$stride" =~ ^[0-9]+$ && "$stride" -gt 0 ]] || stride=10
+  printf '%s' "$stride"
 }
 
 wt_assign_ports() {
@@ -168,8 +237,7 @@ wt_assign_ports() {
   # different worktrees. Real example (bases 3001/3003/3004, n=3): worktree offset k+1's admin port
   # (3004+3k) IS worktree offset k's api port. Configurable as `worktree.devPortStride`; the default
   # leaves room for up to 10 services per project.
-  stride="$(jq -r '.worktree.devPortStride // empty' "$cfg" 2>/dev/null)"
-  [[ "$stride" =~ ^[0-9]+$ && "$stride" -gt 0 ]] || stride=10
+  stride="$(wt_port_stride "$cfg")"
 
   # The invariant that keeps blocks disjoint: every base must sit inside ONE stride-wide window.
   # Warn rather than fail — the ports still work, they just stop being collision-proof, and a
@@ -180,7 +248,7 @@ wt_assign_ports() {
   fi
 
   offset="$(_wt_slot_for "$root" "$num" "$wt")"
-  [[ "$offset" =~ ^[0-9]+$ ]] || offset=$(( num % 40 ))
+  [[ "$offset" =~ ^[0-9]+$ ]] || offset=$(( $(_wt_num_hash "$num") % 40 ))
   i=0
   while [[ "$i" -lt "$n" ]]; do
     apppath="$(jq -r ".[$i].path // empty" <<<"$ports")"
@@ -216,7 +284,7 @@ _wt_json_has() {
   if command -v jq >/dev/null 2>&1; then
     jq -e "$filter" "$file" >/dev/null 2>&1
   else
-    tr -d ' \n\t' < "$file" 2>/dev/null | grep -qE "$re"
+    grep -qE "$re" <<<"$(tr -d ' \n\t' < "$file" 2>/dev/null)"
   fi
 }
 
@@ -423,7 +491,7 @@ wt_bootstrap() {
 #   • no LIVE session owns it (kit-sessions registry: no live pid sitting in that dir)
 
 # _wt_mtime <path> — file mtime as epoch seconds (BSD stat, then GNU stat). Picks the oldest tree.
-_wt_mtime() { stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null; }
+_wt_mtime() { stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null; }
 
 # _wt_list <root> — emit one "<path>\t<branch-or-->\t<locked:0|1>" line per worktree (porcelain).
 _wt_list() {
@@ -457,7 +525,8 @@ _wt_is_clean() {
 }
 
 # _wt_session_owns <root> <path> — true when a LIVE Claude session sits in <path> (or a subdir),
-# per the kit-sessions registry (.git/kit-sessions/*.json, written by session-registry.sh). A dead
+# per the kit-sessions registry (.git/kit-sessions/*.json — wt_start writes one claim per issue
+# through session-registry.sh, with `cwd` set to the worktree). A dead
 # pid is not an owner. No registry → no known live owner (returns false).
 _wt_session_owns() {
   local root="$1" wt_path="$2" common reg f opid ocwd
@@ -500,7 +569,7 @@ _wt_pool_find() {
 # mutates). Shows branch / merged-into-develop? / clean? / live-session? / overall reusable?.
 wt_pool_status() {
   local root wtdir wt_path branch locked merged clean owned reusable any=0
-  root="$(git worktree list --porcelain | awk '/^worktree /{print $2; exit}')"
+  root="$(git worktree list --porcelain | awk '/^worktree / && !hit {print $2; hit=1}')"
   [[ -n "$root" ]] || { echo "wt_pool_status: not in a git repo" >&2; return 1; }
   wtdir="$root/.claude/worktrees/"
   git -C "$root" fetch origin "${KIT_BASE_BRANCH:-main}" --quiet 2>/dev/null || true
@@ -522,15 +591,46 @@ wt_pool_status() {
   [[ "$any" == "1" ]] || echo "(no pooled worktrees under $wtdir)"
 }
 
+# _wt_claim_desc <tsv-row> — one human line for a claim row from sreg_issue_claim.
+_wt_claim_desc() {
+  local c_issue c_branch c_wt c_pid c_host c_started
+  IFS=$'\t' read -r c_issue c_branch c_wt c_pid c_host c_started <<EOF
+$1
+EOF
+  printf 'pid %s on %s, worktree %s' "$c_pid" "$c_host" "$c_wt"
+}
+
 wt_start() {
-  local num="${1:-}" slug_override="${2:-}" root meta title kind slug branch wt reused cand
+  local num="" slug_override="" root meta title kind slug branch wt reused cand
+  local force="${KIT_FORCE:-0}" _arg _claim _claimed="" _crc
+  for _arg in "$@"; do
+    case "$_arg" in
+      --force) force=1 ;;
+      -*) echo "wt_start: unknown flag '$_arg' (usage: start [--force] <issue> [slug])" >&2; return 1 ;;
+      *) if [[ -z "$num" ]]; then num="$_arg"; elif [[ -z "$slug_override" ]]; then slug_override="$_arg"; fi ;;
+    esac
+  done
   [[ -n "$num" ]] || { echo "wt_start: issue number required" >&2; return 1; }
 
-  root="$(git worktree list --porcelain | awk '/^worktree /{print $2; exit}')"
+  root="$(git worktree list --porcelain | awk '/^worktree / && !hit {print $2; hit=1}')"
   [[ -n "$root" ]] || { echo "wt_start: not in a git repo" >&2; return 1; }
 
-  # The board's Status is set server-side by built-in automations (Item closed→Done, PR
-  # merged→Done) — wt_start no longer writes In Progress, so no board helpers are loaded here.
+  # Claim check (#384) — BEFORE the issue read, the fetch and `git worktree add`, so a refusal
+  # makes no network call, no branch and no worktree. A claim this session already holds (same
+  # session pid, or the caller stands inside the claimed worktree) is not a collision: re-running
+  # start stays the no-op it always was.
+  if command -v sreg_issue_claim >/dev/null 2>&1 && _claim="$(sreg_issue_claim "$root" "$num")" \
+     && ! sreg_claim_mine "$root" "$num"; then
+    if [[ "$force" != "1" ]]; then
+      echo "[#$num] refused: a live session already claims this issue — $(_wt_claim_desc "$_claim")" >&2
+      echo "[#$num] see 'cckit claims'; 'cckit start --force $num' (or KIT_FORCE=1) starts anyway and takes the claim." >&2
+      return 1
+    fi
+    echo "[#$num] ⚠ --force: taking over the claim of a live session — $(_wt_claim_desc "$_claim")" >&2
+  fi
+
+  # The board helpers load lazily, further down: Status is otherwise set server-side by built-in
+  # automations (Item closed→Done, PR merged→Done), and In Progress is the one write wt_start owns.
 
   if cckit_gh_rest; then
     meta="$(gh_rest_issue_json "$WT_START_REPO" "$num" 2>/dev/null)" || { echo "[#$num] issue not found" >&2; return 1; }
@@ -540,6 +640,7 @@ wt_start() {
   fi
   title="$(echo "$meta" | jq -r '.title')"
   kind="$(echo "$meta" | jq -r '([.labels[].name | select(startswith("kind:"))][0] // "kind:task") | sub("^kind:";"")')"
+  kind="$(_wt_kind_prefix "$kind")"
   if [[ -n "$slug_override" ]]; then
     slug="$slug_override"
   else
@@ -552,8 +653,26 @@ wt_start() {
   branch="$kind/$num-$slug"
   wt="$root/.claude/worktrees/${kind}+${num}-${slug}"
 
+  # Take the claim now that the worktree path is known, still before the fetch. rc 3 = another
+  # session claimed the issue between the check above and here. An unwritable registry only warns:
+  # the registry is a guard, not a precondition for working.
+  if command -v sreg_claim >/dev/null 2>&1; then
+    # _claimed marks a claim THIS call writes (none before, or one taken over by force), so a
+    # failed `worktree add` below releases only that — never a claim the session already held.
+    sreg_claim_mine "$root" "$num" || _claimed="1"
+    # `&& … ||` so a caller running under `set -e` (bin/cckit) reaches the refusal message.
+    sreg_claim "$root" "$num" "$branch" "$wt" "$force" && _crc=0 || _crc=$?
+    if [[ "$_crc" -eq 3 ]]; then
+      echo "[#$num] refused: another session claimed this issue just now — see 'cckit claims'." >&2
+      return 1
+    elif [[ "$_crc" -ne 0 ]]; then
+      _claimed=""
+      echo "[#$num] ⚠ could not record the session claim; continuing without one." >&2
+    fi
+  fi
+
   git -C "$root" fetch origin "${KIT_BASE_BRANCH:-main}" --quiet
-  if git -C "$root" worktree list --porcelain | grep -q "/${kind}+${num}-${slug}$"; then
+  if grep -q "/${kind}+${num}-${slug}$" <<<"$(git -C "$root" worktree list --porcelain)"; then
     echo "[#$num] reusing worktree $wt" >&2
   else
     reused=""
@@ -575,7 +694,8 @@ wt_start() {
     fi
     if [[ -z "$reused" ]]; then
       git -C "$root" worktree add -B "$branch" "$wt" origin/${KIT_BASE_BRANCH:-main} >/dev/null 2>&1 \
-        || { echo "[#$num] worktree add failed (branch $branch may exist elsewhere)" >&2; return 1; }
+        || { if [[ -n "$_claimed" ]]; then sreg_release "$root" "$num" 2>/dev/null || true; fi
+             echo "[#$num] worktree add failed (branch $branch may exist elsewhere)" >&2; return 1; }
       echo "[#$num] created worktree $wt (branch $branch)" >&2
     fi
   fi
@@ -595,12 +715,14 @@ wt_start() {
     command -v cckit_board_skipped >/dev/null 2>&1 && cckit_board_skipped
   elif source "$root/scripts/lib/gh-project.sh" 2>/dev/null; then
     [[ -n "${STATUS_FIELD_ID:-}" ]] || load_project_ids >/dev/null 2>&1 || true
-    # Claim precheck (#124): if the issue is ALREADY In Progress on the board, another session may
-    # already own it — warn (never block; the start still proceeds) so two agents don't collide.
+    # Board precheck (#124, #384): an issue ALREADY In Progress or In Review may belong to someone
+    # the local claims registry cannot see (a teammate's machine). Warn only — wt_start writes In
+    # Progress itself and nothing resets it when a session dies, so refusing on board Status would
+    # lock out every restart after a crash. The refusal is the live claim, checked at the top.
     if command -v project_issue_status >/dev/null 2>&1; then
       local _prev_status; _prev_status="$(project_issue_status "$num" 2>/dev/null || true)"
-      [[ "$_prev_status" == "In Progress" ]] \
-        && echo "[#$num] ⚠ already In Progress on the board — another session may own this issue; continuing." >&2
+      [[ "$_prev_status" == "In Progress" || "$_prev_status" == "In Review" ]] \
+        && echo "[#$num] ⚠ already $_prev_status on the board — another session may own this issue; continuing." >&2
     fi
     item="$(project_find_item_by_issue "$num" 2>/dev/null)"
     if [[ -z "$item" ]]; then

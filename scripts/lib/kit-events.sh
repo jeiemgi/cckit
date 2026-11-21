@@ -17,6 +17,13 @@
 #   update-available                     — a kit version update is available
 #   flow.status                          — an orchestrate flow changed state
 #
+# Ops emitted today:
+#   qa.launch (op.start) · qa.ready | qa.timeout | qa.exited (op.done) — the QA lane, qa-lane.sh.
+#     payload: {lane, ports} plus pid/log/worktree on launch, seconds on ready, log + the probes
+#     still not answering on timeout and exited.
+#   qa.verdict (op.done) — one line per recorded QA verdict, qa-lane.sh.
+#     payload: {lane, verdict, head, pr, attempt, comment, mailed}; `head` is the reviewed commit.
+#
 # Public API (source this file, then call):
 #   emit_event <type> <op> [payload-json]   -> appends one event line; payload defaults to {}
 #   kit_events_path                         -> prints the absolute path to kit-events.jsonl

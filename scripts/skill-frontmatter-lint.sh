@@ -86,7 +86,7 @@ listing_chars() {
 baseline_for() {
   [ -f "$BASELINE" ] || { echo ""; return; }
   grep -v '^[[:space:]]*#' "$BASELINE" 2>/dev/null \
-    | awk -v s="$1" '$1 == s { print $2; exit }'
+    | awk -v s="$1" '$1 == s && !hit { print $2; hit = 1 }'
 }
 
 MODE="${1:-lint}"

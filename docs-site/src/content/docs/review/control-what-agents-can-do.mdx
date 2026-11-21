@@ -1,0 +1,151 @@
+---
+title: Control what agents may do
+description: Understand cckit's permission gate — read verbs that change nothing, a preview and a question before a config file is written, recorded consent before a third-party tool installs, and a separate confirmation for destructive operations.
+tutorial:
+  job: control what your agent is allowed to do
+  difficulty: intermediate
+  time: "5 min"
+  prerequisites:
+    - { text: "cckit is installed and set up in this project", link: "Set it up", href: "/getting-started/initialize/" }
+  ogTag: Security
+  keywords: [claude code permissions, ai agent permissions, control what ai can do repo]
+  related: [review/stop-committing-secrets, review/keep-private-data-out, development/checks-with-hooks]
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import TagRow from '../../../components/TagRow.astro';
+import TutorialMeta from '../../../components/TutorialMeta.astro';
+import TutorialSchema from '../../../components/TutorialSchema.astro';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
+
+<TagRow kinds={["concept"]} />
+
+<TutorialMeta />
+
+Handing a repository to an agent raises one question before any other: what can it change
+without asking me? A tool that writes config, installs software and pushes code on its own is hard
+to trust, and a tool that asks about everything is slower than doing the work by hand.
+
+cckit sorts what it does into four kinds and treats each differently: reading is free, a file it
+would write is shown first, an install needs a yes that is written down, and anything that cannot
+be undone asks every time.
+
+**What you will have at the end:** you will have watched each of the four happen in your own
+project, and you will know where the one recorded yes is stored and how to withdraw it.
+
+## Steps
+
+### 1. Start read-only
+
+<Chat
+  title="looking at the Bakery site without granting anything"
+  say="Look at the Bakery site and tell me what you find. Change nothing."
+  ran="cckit scan --llm"
+  means="The scan detects the repo root, stack hints and kit state. It only reads."
+>
+  I looked at the project and wrote nothing. The scan found the repository root, the stack and the
+  state of the kit files.
+</Chat>
+
+### 2. A config file is proposed before it is written
+
+<Chat
+  title="previewing a config change before it is written"
+  say="Show me what adding the software module would change. Don't write anything."
+  ran={[
+    "KIT_DRY_RUN=1 cckit add software",
+    "cckit init --profile software --dry-run",
+  ]}
+  means="The first prints the proposed config and writes nothing. The second prints the scaffold plan and writes nothing."
+>
+  Neither command wrote a file. You have the proposed config and the scaffold plan to read before
+  you say yes.
+</Chat>
+
+`cckit add <module>` and `cckit migrate` show what they would change and ask before writing. That
+yes is not stored: the next run asks again. `KIT_ASSUME_YES=1` skips the question, and still keeps
+a file you edited.
+
+### 3. An install is the one yes cckit records
+
+<Chat
+  title="letting cckit install a missing tool on the Bakery site"
+  say="Check what the Bakery site is missing. If a tool is missing, ask me before installing it."
+  ran="cckit doctor"
+  output={[
+    "  ⡶ / claude-kit  kit-doctor",
+    "  onboarding preflight [dry-run] [no-install]",
+    "  - report-only — no terminal and no --fix, so nothing is installed and no file is written. To install: cckit doctor --fix",
+    "…",
+    "  Summary",
+    "       18 checked ok",
+  ]}
+  means="With a terminal, cckit doctor asks before installing anything missing, and your yes is written as one install:<id> line in .cckit/consent (for example install:mempalace). It is gitignored, so it is explicit, local and never committed."
+>
+  This run had no terminal to ask in, so it only reported. All 18 checks passed and nothing was
+  installed.
+</Chat>
+
+A third-party tool (an [integration](/integrations/)) installs only after your yes to
+`cckit doctor`, at its prompt or with `--fix`.
+
+### 4. Destructive operations still ask every time
+
+Force-push, repo creation and history rewrites always require a separate, explicit confirmation:
+if you tell your agent to force-push the menu page branch, it stops and asks first. Recorded
+install consent does not cover them.
+
+## How to check it worked
+
+- After step 1 and step 2, `git status --short` prints nothing: neither run wrote a file.
+- After step 3, `.cckit/consent` holds one `install:<id>` line per tool you said yes to, and
+  `git status --short .cckit` prints nothing because the folder is gitignored.
+
+## How it works
+
+cckit resolves its config by walking up from where you invoke it (nearest wins: `$KIT_CONFIG`, then
+`cckit.config.json`, then `.claude/kit.config.json`, then its own fallback) — no org, repo, or path is
+hardcoded. Everything it writes about *you* — install consent, identity, your privacy denylist — lands in
+`.cckit/`, which is gitignored, so it never leaves your machine. Two things are **not** negotiable:
+the secret and privacy guard always runs before anything is committed, and consent never bypasses it.
+
+<Aside type="note" title="Install consent is per-repo, per-tool and local">
+An `install:<id>` line in `.cckit/consent` covers that one tool in that one repo, across all of the
+repo's worktrees, and stays on your machine. It permits nothing else cckit does. Delete the line to
+withdraw it. In a new repo nothing is recorded, so nothing installs until you say yes there.
+</Aside>
+
+## Troubleshooting
+
+**`cckit doctor` reports a tool missing and installs nothing.** No consent is recorded for it, and the
+run had no terminal to ask in. Run `cckit doctor --fix`, or answer yes at its prompt; the yes is
+stored as `install:<id>` in `.cckit/consent`.
+
+**A destructive op keeps asking.** By design — force-push, repo create, and history rewrite always
+require explicit confirmation, whatever is recorded in `.cckit/consent`.
+
+**The guard blocked a commit even though I consented.** Consent doesn't bypass the secret/privacy
+guard — that always runs. See [Stop agents committing secrets](/review/stop-committing-secrets/).
+
+## Related guides
+
+<CardGrid>
+  <LinkCard title="Stop agents committing secrets" href="/review/stop-committing-secrets/" description="The guard that runs regardless of consent." />
+  <LinkCard title="Keep private data out" href="/review/keep-private-data-out/" description="Your local denylist, stored in .cckit/." />
+  <LinkCard title="Run checks with hooks" href="/development/checks-with-hooks/" description="The guards that fire before a command runs." />
+</CardGrid>
+
+<TutorialSchema
+  steps={[
+    { name: 'Start read-only', text: 'cckit scan --llm detects repo root, stack hints, and kit state without granting anything.' },
+    { name: 'A config file is proposed before it is written', text: 'cckit add <module> and cckit migrate show what they would change and ask before writing. KIT_DRY_RUN=1 previews and writes nothing. That yes is not stored.' },
+    { name: 'An install is the one yes cckit records', text: 'A third-party tool installs only after your yes to cckit doctor (its prompt, or --fix). That yes is written as one install:<id> line in .cckit/consent (gitignored) — explicit, local, and never committed.' },
+    { name: 'Destructive operations still ask every time', text: 'Force-push, repo creation, and history rewrites always require a separate explicit confirmation; recorded install consent does not cover them.' },
+  ]}
+  faqs={[
+    { q: 'cckit doctor reports a tool missing and installs nothing', a: 'No consent is recorded for it, and the run had no terminal to ask in. Run cckit doctor --fix, or answer yes at its prompt; the yes is stored as install:<id> in .cckit/consent.' },
+    { q: 'A destructive op keeps asking', a: 'By design — force-push, repo create, and history rewrite always require explicit confirmation, whatever is recorded in .cckit/consent.' },
+    { q: 'The guard blocked a commit even though I consented', a: 'Consent does not bypass the secret/privacy guard — that always runs before anything is committed.' },
+  ]}
+/>

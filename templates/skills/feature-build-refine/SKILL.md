@@ -22,8 +22,6 @@ You are building features for a **Next.js 15 (App Router) + React 19 + TypeScrip
 - **i18n:** i18next — every user-facing string goes through `t()`
 - **Icons:** lucide-react, always with an explicit `className` for sizing
 
-Follow the conventions below exactly. They are non-negotiable.
-
 ---
 
 ## 1. Feature Folder Architecture
@@ -65,7 +63,7 @@ export * from "./constants";
 
 - **Inside** the feature boundary, use **relative** imports (`"./types"`, `"../constants"`) — never `@/features/<model>/…`.
 - **Outside** consumers import from the barrel: `import { ModelForm, FOO_LABELS } from "@/features/<model>"`.
-- **No `src/lib/<model>/`** — feature-specific helpers live in the feature's `constants.ts`. `src/lib/` is only for truly generic, feature-agnostic utilities (`date.ts`, `utils.ts`, `supabase/`, `validations.ts`).
+- **No `src/lib/<model>/`** — feature-specific helpers live in the feature's `constants.ts`. `src/lib/` is only for feature-agnostic utilities (`date.ts`, `utils.ts`, `supabase/`, `validations.ts`).
 - **No shims** — when moving code, rewrite all import paths with `sed` and delete the old files. Never leave a re-export stub behind.
 
 ---
@@ -119,7 +117,7 @@ export type ModelFormData = z.infer<ReturnType<typeof makeModelSchema>>;
 
 ### Populate edit data via `values` — NEVER `useEffect + reset()`
 
-This is critical. The fetched record arrives asynchronously; feed it through RHF's `values` prop, which re-initializes the form when its reference changes. `values: undefined` while loading keeps the form at `defaultValues`. `useEffect + reset()` is a banned anti-pattern (stale closures, fires after render).
+The fetched record arrives asynchronously; feed it through RHF's `values` prop, which re-initializes the form when its reference changes. `values: undefined` while loading keeps the form at `defaultValues`. `useEffect + reset()` is a banned anti-pattern (stale closures, fires after render).
 
 ```typescript
 const isEdit = !!modelId;

@@ -9,7 +9,11 @@ import TagRow from '../../components/TagRow.astro';
 
 <TagRow kinds={["concept"]} />
 
-How cckit finds its config, reads what kind of project it is pointed at, and asks before it changes anything — all without a single hardcoded org, repo, or path.
+Open this page when a guide names a config key and you need its exact name, default and
+environment override, or when you want to know what cckit will ask before it writes, installs or
+merges. It covers how cckit finds its config, reads what kind of project it is pointed at, and asks
+before it changes anything. Each section is linked from the area page that uses it, so the page is
+long on purpose and meant to be searched, not read through.
 
 ## Config resolution (nearest wins)
 
@@ -24,6 +28,58 @@ cckit runs in the directory you invoke it from. It finds the config for that pro
 
 No org, repo, or path is hardcoded — every value comes from this file. A repo with no config is invited to run `cckit init`.
 
+`cckit init` writes source 3 when the Claude adapter is selected and source 2 for a Codex-only
+project, which has no `.claude/` directory. The config's `adapters` array records the selection
+(`["claude"]`, `["codex"]` or both); a config without the key means `["claude"]`. The ownership
+manifest — the hashes the uninstall script (`scripts/kit-remove.sh`) and `--upgrade` use to tell a kit-owned file from an edited one —
+sits beside it: `.claude/kit.manifest.json`, or `.cckit/kit.manifest.json` in a project that started
+Codex-only. Neither file moves when the second adapter is enabled later.
+
+### Overriding the base branch for one command
+
+`github.baseBranch` is the default, not the last word. A `KIT_BASE_BRANCH` already in the
+environment wins over it:
+
+```bash
+KIT_BASE_BRANCH=effort/<N>-<slug> cckit orchestrate <sub>
+```
+
+```text
+orchestrate: repo owner/repo (base effort/42-auth), cap 4, runtime 'tmux', agent 'claude'
+orchestrate: base 'effort/42-auth' comes from KIT_BASE_BRANCH in the environment (the config says 'develop')
+```
+
+The second line appears only when the two differ. An empty `KIT_BASE_BRANCH` counts as unset.
+
+| Variable | Holds |
+| --- | --- |
+| `KIT_BASE_BRANCH` | The base in effect: the environment value when one is set, otherwise the config's. |
+| `KIT_BASE_BRANCH_CONFIG` | What the config says (`github.baseBranch` → `integrationBranch` → `flow` → `main`), whether or not it was overridden. |
+| `KIT_BASE_BRANCH_DEFAULTED` | The value cckit exported when it fell back to the config; empty when the caller overrode it. Internal: do not set it. |
+
+cckit exports the base it resolved, so a process it starts inherits `KIT_BASE_BRANCH`. That
+inherited value is not an override: a later `cckit` in another project compares it with
+`KIT_BASE_BRANCH_DEFAULTED`, finds them equal, and reads its own config. One limit follows: inside
+an environment cckit already exported into, an override that names that same exported value is read
+as the default.
+
+`orchestrate` hands an override to each agent it starts, so `cckit pr` inside the pane targets the
+same branch the worktree was cut from. On tmux the agent's command line becomes
+`env KIT_BASE_BRANCH='<branch>' <agent> …`; on Herdr the workspace and each tab are created with
+`--env KIT_BASE_BRANCH=<branch>`. A pane's environment comes from the tmux or Herdr server, not from
+the `orchestrate` process, so the variable alone would reach the pane only when `orchestrate`
+happened to start the server. `orchestrate` also starts a tmux server without `KIT_BASE_BRANCH` in
+its environment and removes one an earlier run left there, so panes opened later on other projects
+do not inherit it.
+
+Before using it:
+
+- **The branch must exist on origin.** `cckit start` and `orchestrate` fetch `origin/<base>` before
+  cutting the worktree, and the fetch fails on a branch that was never pushed.
+- **Every verb that loads the config reads it.** `cckit start` cuts from it, `cckit pr` opens the PR
+  against it, `cckit gc` measures "landed" against it. Set it on the one command that needs it;
+  a shell-wide `export` redirects all of them.
+
 <Aside type="note" title="New here? Why 'nearest wins'">
 "Nearest wins" means cckit uses the config closest to where you are standing in the folder tree. If you run a command three folders deep, cckit walks up until it finds the first config file and uses that one. This is the same idea many tools use so a sub-project can override its parent.
 </Aside>
@@ -31,7 +87,7 @@ No org, repo, or path is hardcoded — every value comes from this file. A repo 
 ### Where these live on disk
 
 Sources 2–4 are files; source 1 (`$KIT_CONFIG`) is an environment variable, so it isn't in the
-tree. Everything cckit writes about *you* — consent, identity — lands in `.cckit/`, which is
+tree. Everything cckit writes about *you* — install consent, identity — lands in `.cckit/`, which is
 gitignored, so it never leaves your machine.
 
 <FileTree>
@@ -41,7 +97,7 @@ gitignored, so it never leaves your machine.
     - kit.config.json    **source 3** · a kit-scaffolded project's config
     - …    agents, hooks, rules, skills
   - .cckit/    gitignored — cckit's local state, never committed
-    - consent    your recorded yes to mutate this repo
+    - consent    one `install:<id>` line per integration you approved installing
     - identity    your name, asked once on first run
     - privacy-denylist    extra paths the secret guard must block
   - … your existing files, untouched
@@ -76,9 +132,83 @@ resume-here handoff saved" everywhere else.
 
 cckit asks before it changes anything in a repo it has not worked in before.
 
-- **Read-only by default in an unknown repo.** Before the first *mutating* operation, cckit records your consent in `.cckit/consent` (gitignored).
-- **The secret and privacy guard always runs** before anything is committed or published. It is not optional and consent does not bypass it — see [Security](/security/).
+- **A config or `.claude/` file is proposed before it is written.** `cckit add <module>` and `cckit migrate` go through one machine (`scripts/lib/kit-operate.sh`): show the change, ask, apply, record. `KIT_DRY_RUN=1` previews and writes nothing; `KIT_ASSUME_YES=1` skips the question, and still keeps a file you edited. `cckit init --dry-run` prints the scaffold plan and writes nothing.
+- **A third-party tool installs only with recorded consent.** Your yes to `cckit doctor` (its prompt, or `--fix`) is written as one `install:<id>` line in `.cckit/consent` (gitignored). That file holds install consent and nothing else: no other verb reads or writes it. See [Integrations](/integrations/#what-your-yes-records).
+- **Where the secret and privacy guard is wired in, no consent bypasses it.** It runs as a git pre-commit hook (`githooks/pre-commit`) and inside the gate of cckit's own repository. `cckit init` does not copy it into your project: [Stop agents committing secrets](/review/stop-committing-secrets/) has the commands, and [The secret guard](/review/secret-guard/) says what it blocks.
 - **Destructive or irreversible operations** (force-push, repo create, history rewrite) always require a separate, explicit confirmation.
+
+## Lint gates: baselines
+
+The three lint scripts `cckit init` scaffolds are described in
+[Turn repeated review findings into checks](/review/gates/). This section is the detail behind
+them, plus the one lint that runs only in cckit's own repository, where `scripts/check.sh` runs all
+four.
+
+### Baselines are seeded once
+
+`cckit init` seeds each baseline the first time it scaffolds the lint, so a fresh project starts green
+and only *new* defects fail. It never regenerates an existing baseline — that would silently
+re-grandfather whatever drifted since the last upgrade.
+
+Seeding sets `KIT_LINT_WALK=1`, which forces the filesystem walk instead of `git ls-files`.
+Scaffolding usually lands in a repo that already has commits, so the kit's freshly written files are
+untracked and invisible to the index; without the walk the baseline comes out empty and the gate goes
+red on your first commit of the scaffold.
+
+Each lint reports its own baseline path, which is how `init.sh` finds it:
+
+```bash
+scripts/review-lint.sh --baseline-path             # scripts/review-lint-baseline.txt
+scripts/skill-frontmatter-lint.sh --baseline-path  # scripts/skill-frontmatter-baseline.txt
+scripts/instruction-budget-lint.sh --baseline-path # scripts/instruction-budget-baseline.txt
+```
+
+A freshly scaffolded project's instruction-budget baseline already lists two rules: the shipped
+`effort-model.md` (209 lines) and `naming-and-ids.md` (208) are over the 200-line limit, so they are
+grandfathered and may shrink but not grow.
+
+### The review-lint baseline is TAB-separated
+
+```text
+# <RULE>\t<path>\t<count>   (TAB-separated: a path may contain a space)
+fence-missing-language	docs/my file.md	1
+```
+
+A space-separated baseline written by an earlier version is still read, so upgrading does not turn
+the gate red.
+
+### agent-skills-lint — every agent skill resolves
+
+A `skills:` entry that names nothing fails silently: the agent loads, answers, and has fewer skills
+than its frontmatter lists. A rename is how it happens — `templates/agents/pm.md` kept listing
+`task-sync`, `task-new` and `task-close` after the kit shipped them as `kit-task-*`, so all three of
+the PM agent's lifecycle skills were dead.
+
+```bash
+scripts/agent-skills-lint.sh           # the gate: fails on any unresolved entry
+```
+
+It reads the frontmatter `skills:` key of every `templates/agents/*.md` (block list or inline
+`[a, b]`) and accepts an entry that is one of:
+
+| Form | Resolves against |
+| --- | --- |
+| a skill the kit ships | `skills/<name>/SKILL.md` |
+| a skill the kit scaffolds | `templates/skills/<name>/SKILL.md` |
+| another plugin's skill | the `plugin:skill` form, e.g. `agent-skills:context7` |
+| a third-party bare name | a line in `scripts/agent-skills-external.txt` |
+
+Anything else is reported as `<file>:<line>: <entry>` and fails `scripts/check.sh`.
+
+`scripts/agent-skills-external.txt` is the list of **optional** skills: names an agent template
+lists that come from a third-party skill pack or from the harness (`deep-research`, `impeccable`,
+the `gsap-*` and `n8n-*` sets). An agent scaffolded into a project without one of them runs without
+that skill. A name that is both in that file and shipped by the kit fails the lint, so the list
+cannot keep describing a kit skill as third-party.
+
+Unlike the three lints `cckit init` scaffolds, this lint has no baseline — every entry resolves or the gate is red —
+and it is **not** scaffolded by `cckit init`: it checks the kit's own agent templates. A
+`plugin:skill` entry is accepted on its form alone; the lint cannot see another plugin's skills.
 
 ## Captain merge policy
 
@@ -89,10 +219,43 @@ a single invocation without editing the file.
 
 | Key | Default | What it does | Env override |
 | --- | --- | --- | --- |
-| `floors` | `true` | Refuse to auto-merge a PR that touches `.github/workflows/**`, a lockfile or dependency-graph file, or a security-sensitive path — and always honour a `hold` label. Verdict becomes `HELD`. | `KIT_CAPTAIN_FLOORS=0` |
+| `floors` | `true` | Refuse to auto-merge a PR that touches `.github/workflows/**`, a lockfile or dependency-graph file, or a security-sensitive path, or that carries a `hold` label. Verdict becomes `HELD`. Switching the floors off disables the `hold` label too. | `KIT_CAPTAIN_FLOORS=0` |
 | `protectedGlobs` | `[]` | Extra path globs added to the floors above. | `KIT_CAPTAIN_EXTRA_GLOBS` |
 | `requireChecks` | `false` | Treat a PR with **no checks at all** as unverified rather than green. Verdict becomes `CHECKS_MISSING`, action `verify`. | `KIT_CAPTAIN_REQUIRE_CHECKS=1` |
-| `requireReview` | *(implied)* | Treat a PR with **no agent review recorded** as unverified. Verdict becomes `REVIEW_MISSING`, action `verify`. Defaults to on when `review.command` is set and off when it is not — set it explicitly to break that link either way. | `KIT_CAPTAIN_REQUIRE_REVIEW=1` |
+| `requireReview` | *(implied)* | Treat a PR with **no agent review recorded** as unverified. Verdict becomes `REVIEW_MISSING`, action `verify`. Defaults to on when `review.command` or `review.headless` is set and off when it is not — set it explicitly to break that link either way. | `KIT_CAPTAIN_REQUIRE_REVIEW=1` |
+| `requireQa` | `false` | Hold a PR for a **human QA pass**. `true` covers every PR; a list of label names (`["flow:ui"]`) covers only PRs carrying one of them. A would-be merge with no `cckit qa verdict pass` recorded against its current head becomes `QA_MISSING`, action `verify`. | `KIT_CAPTAIN_REQUIRE_QA=1`, `KIT_CAPTAIN_QA_LABELS` |
+
+The paths the floors cover:
+
+- a file under `.github/workflows/`;
+- a lockfile or dependency-graph file: `pnpm-lock.yaml`, `package.json`, `package-lock.json`,
+  `yarn.lock`, `turbo.json`, `*-workspace.yaml` / `*-workspace.yml`;
+- a security-sensitive path: `*.pem`, `*.key`, `.env`, `.env.*`, or a `secret` or `secrets` path
+  segment.
+
+A draft pull request is not a floor: it gets the verdict `DRAFT` and the action `wait`, with the
+floors on or off.
+
+### Holding merges for a QA pass
+
+`requireQa` reads the verdict `cckit qa verdict` records for a lane. It is off by default, and
+declaring a QA stack under `qa` does not turn it on.
+
+| Verdict | Action | What happened |
+| --- | --- | --- |
+| `QA_FAILING` | `fix` | A QA fail is recorded against the PR's current head. Blocks whether or not `requireQa` is set. |
+| `QA_MISSING` | `verify` | QA is required for this PR and no pass is recorded against its current head. |
+
+- A pass belongs to one commit. Push again and it reads as absent, so the PR is `QA_MISSING` until
+  the new head is reviewed. A fail recorded on an older head is absent too.
+- The label list is matched against the **PR's** labels. A label whose name contains a space
+  cannot be listed.
+- `KIT_CAPTAIN_QA_LABELS` is space-separated. Setting either environment value means
+  `requireQa` is not read, so `KIT_CAPTAIN_REQUIRE_QA=0` switches a configured list off for one run.
+- A PR that is both unreviewed and un-QA'd reads `REVIEW_MISSING` first: the agent reviewer runs
+  before the human one, and a PR held at `QA_MISSING` is still sent to the reviewer.
+- With `qa.command` configured and `requireQa` unset, `cckit watch` names every PR it would merge
+  with no QA pass on its head, and the key that holds them.
 
 ### Why `requireChecks` exists
 
@@ -124,11 +287,21 @@ rollup prints that green was assumed, not proved, and names this key. If your re
 ## The agent review stage
 
 The captain can run an agent over a pull request before it merges, and refuse to merge on what that
-agent finds. It is **off until you name the command that runs a reviewer**:
+agent finds. It is **off until you turn it on**, one of two ways:
 
 ```json
 { "review": { "command": "claude -p", "timeoutSeconds": 900 } }
 ```
+
+```json
+{ "review": { "headless": true, "timeoutSeconds": 900 } }
+```
+
+`command` is your own command line. `headless: true` has cckit build it from the resolved review
+profile's `kind` and `args`: `claude -p <args>` or `codex exec <args> -`. `command` wins when both
+are set. A profile whose `kind` is neither `claude` nor `codex` is refused under `headless` (no
+receipt, the PR stays at `verify`) — give that one a `command`. Either setting turns
+`requireReview` on.
 
 cckit pipes a brief to that command's **stdin** and reads the reviewer's report off its **stdout**.
 That report becomes a [stage receipt](#stage-receipts) at stage `review`, written locally and
@@ -151,14 +324,16 @@ reviewer that never returns blocks the whole pass — every other PR in it inclu
 watching. On expiry the process is killed and **no receipt is written**: a killed reviewer is not a
 verdict. A non-numeric or zero value falls back to the default rather than disabling the bound.
 
-<Aside type="note" title="Why you name the command and cckit does not">
-cckit has no way to start an agent without a terminal. Every launcher it has attaches to something
-a human is looking at — a Herdr pane, a tmux window — and the captain runs with neither. Running an
-agent non-interactively is [an open gap](/agent-compatibility/) tracked under effort 257.
+<Aside type="note" title="What headless builds, and what it does not">
+`headless` uses the same launcher as [`cckit autopilot run`](/agent-compatibility/#unattended-run-limits)
+(`scripts/lib/agent-launch.sh`). It adds no permission flag and names no model, so what the reviewer
+may do is set by the CLI's defaults, your own agent settings and the profile's `args` — cckit
+refuses a `write: true` profile but does not verify the process is read-only. Both command forms are
+read from each CLI's `--help`; the tests drive stub binaries, so no live reviewer has been run this
+way.
 
-So cckit does not guess at anyone's flags. You write the command that works on your machine; cckit
-only supplies the brief and reads the answer. That also means the reviewer can be anything that
-reads stdin and writes the report format — an agent CLI, a wrapper script, a hosted service.
+`command` remains for everything else: the reviewer can be anything that reads stdin and writes the
+report format — a wrapper script, a hosted service, an agent CLI cckit has no headless form for.
 </Aside>
 
 ### What gets reviewed, and when
@@ -210,7 +385,7 @@ state of every repository that has not run a reviewer yet. Requiring it uncondit
 every captain everywhere the moment you upgraded, so it blocks only when review is required.
 
 <Aside type="caution" title="Absence is not failure — and not a pass either">
-The distinction runs through both gates. Something that ran and went red is a fact you can act on.
+Something that ran and went red is a fact you can act on.
 Nothing having run is a hole where a fact should be. cckit reports them as different verdicts
 because the fix is different: one is "go read the finding", the other is "go produce the evidence".
 
@@ -219,10 +394,52 @@ with no verdict prints that, names both keys that close it, and goes quiet once 
 </Aside>
 
 <Aside type="tip" title="Not the same thing as review-lint">
-[Codified review gates](/review-gates/) are static linters that run inside `scripts/check.sh` —
+[Turn repeated review findings into checks](/review/gates/) are static linters that run inside `scripts/check.sh` —
 patterns earned from past review findings, enforced on every commit. This page's review stage is an
-**agent** reading a diff. They are complementary and neither replaces the other.
+**agent** reading a diff. Neither replaces the other.
 </Aside>
+
+## The QA lane
+
+`cckit qa` reads one block, `qa`, written by the `qa` module interview (`/kit-add qa`, or
+`scripts/kit-add.sh qa --answers <file>`). cckit records how the project's review stack boots; it
+does not guess a boot command and does not write a boot script. The walkthrough is the
+[QA lane guide](/review/qa-lane/).
+
+```json
+{
+  "modules": ["qa"],
+  "qa": {
+    "command": "pnpm dev:stack",
+    "ports": [{ "env": "WEB_PORT", "base": 3000 }, { "env": "API_PORT", "base": 4000 }],
+    "readiness": [{ "env": "WEB_PORT", "path": "/" }, { "env": "API_PORT", "path": "/health" }],
+    "route": "/dashboard",
+    "credentialEnv": ["QA_EMAIL", "QA_PASSWORD"]
+  }
+}
+```
+
+| Key | Default | What it does |
+| --- | --- | --- |
+| `qa.command` | *(required)* | The command that boots the whole review stack, run from the worktree root. Without it `cckit qa up` refuses with exit `2`. |
+| `qa.ports` | *(none)* | `{env, base}` per service: the port env var the command honours and its base port. A lane sets each `env` to `base + slot × worktree.devPortStride`. Empty refuses the launch. |
+| `qa.ports[].env` | — | Env var name, matching `^[A-Za-z_][A-Za-z0-9_]*$`. |
+| `qa.ports[].base` | `3000 + position` | Base port. The interview derives it when the answer names no port. |
+| `qa.readiness` | *(none)* | `{env, path}` per service that must answer before the lane counts as usable. Empty refuses the launch: with no probe, launched cannot be told from usable. |
+| `qa.readiness[].env` | — | Which service to probe, named by its port variable from `qa.ports`. |
+| `qa.readiness[].path` | `/` | Path requested on that port. |
+| `qa.route` | `/` | Route `cckit qa open` lands on when the PR body carries no `QA route:` line. Must start with `/` and hold no spaces. |
+| `qa.credentialEnv` | `[]` | **Names** of the env vars holding the test account's credentials. A value is refused at interview time and never stored. Recorded only: no verb reads it yet. |
+
+- Two `qa.ports` bases that differ by a multiple of the stride, fewer than 40 strides apart, are
+  refused before anything launches — two lanes would share a port.
+- A lane port that another process already listens on refuses `cckit qa up` with exit `2`. The
+  first lane's ports are the bases themselves, so pick bases no dev server of yours uses.
+  `cckit qa stop` leaves a listener the lane did not launch running unless it is given `--force`.
+- `captain.mergePolicy.requireQa` is the one other key the lane uses; see
+  [Holding merges for a QA pass](#holding-merges-for-a-qa-pass).
+- `qa` is a receipt stage, not an agent stage: it is in the [stage receipt](#stage-receipts)
+  vocabulary and not in `agents.stages`, because a person records it.
 
 ## Worktree bootstrap
 
@@ -253,7 +470,7 @@ and the ones below it are never consulted:
 
 </Steps>
 
-Rule 3 is the point. A root manifest with no dependencies has nothing to resolve, but pnpm would
+Rule 3 exists because a root manifest with no dependencies has nothing to resolve, but pnpm would
 still write an empty `pnpm-lock.yaml` (`importers: { .: {} }`) — a file that then trips the
 [captain's own lockfile policy floor](#captain-merge-policy) and holds the PR for human review. cckit
 itself is exactly this shape: a published bash CLI with zero dependencies whose only Node project is
@@ -308,8 +525,16 @@ A worktree's block is `base + slot * stride`, and the **slot** comes from a ledg
 offset used to be `issue % 40`, which hands two issues 40 apart byte-identical ports.
 
 Choosing a slot reads the ledger and writes it back, so the whole transaction runs under an
-exclusive lock: the directory `kit-portslots.tsv.lock`, since `flock(1)` is absent on a stock macOS.
+exclusive lock: the file `kit-portslots.tsv.lock`, created with the shell's noclobber redirection
+(`set -C`, an `O_EXCL` open), since `flock(1)` is absent on a stock macOS.
 Unserialized, eight concurrent `cckit start` runs produced as few as 3 distinct ports out of 24.
+
+The lock was a directory made with `mkdir` until cckit issue 449. On Ubuntu 26.04 `mkdir` is the
+uutils coreutils build, which exits 0 for every process that races to create the same directory,
+so two `cckit start` runs could hold the lock together and be given the same ports. The branch
+lease that `cckit orchestrate` takes (`branch-owners.tsv.lock`) used the same primitive and changed
+with it. A lock directory left by an older cckit still blocks, and is broken after a minute like
+any abandoned lock.
 
 A lock held by a live process is waited out for `_WT_LOCK_WAIT` seconds; one untouched for a minute
 is treated as abandoned and broken, so a process killed mid-allocation cannot wedge later starts.
@@ -322,11 +547,6 @@ Entries are worktree-**relative** and validated for containment: an absolute pat
 out with `..`, or a symlink pointing outside the tree, is refused with a message and skipped. A
 worktree sits three levels under the primary checkout, so an escaping entry would otherwise run pnpm
 in a shared checkout — writing `node_modules` and a lockfile into another session's working tree.
-</Aside>
-
-<Aside type="tip" title="Nothing is hardcoded">
-The kit carries no project's layout. Both keys are config, and the fallback is a question asked of
-*your* `package.json` — so a repo with real root dependencies still gets its install, unchanged.
 </Aside>
 
 ## PR conventions
@@ -344,8 +564,102 @@ The kit carries no project's layout. Both keys are config, and the fallback is a
 
 | Key | Default | What it does |
 | --- | --- | --- |
-| `pr.titleStyle` | `conventional` | `conventional`: a Conventional Commits title derived from the issue's kind label, which release-please and a commitlint gate read. `issue-title`: the issue title, verbatim. |
+| `pr.titleStyle` | `conventional` | `conventional`: a Conventional Commits title derived from the issue's kind label, which release-please and a commitlint gate read. `issue-title`: the issue title, verbatim. `cckit effort pr` follows the same key: `conventional` gives `type(scope): name [#N]` and refuses a title that fails commitlint; `issue-title` gives `[Role] [#N] name`, unchecked. |
 | `pr.orchestratorSection` | `false` | `true` opens the PR body with a two-line `## For the orchestrator` section: the issue number and what to review. |
+| `pr.bodyStyle` | `code` | The wording of the body `cckit pr`, `cckit effort pr` and `cckit task finish` generate. `code`: a `## Verification` checklist that names the diff. `content`: a `## Review` checklist for a draft — see [Content work](#content-work). |
+
+### Evidence on the pull request
+
+A pull request should show that the checks passed, not claim it. cckit ships a helper,
+`pr_attach_evidence` (`scripts/lib/pr-evidence.sh`), that attaches the output as a comment after
+the request opens: the build log, the typecheck log, a screenshot of the working screen. A
+reviewer, person or agent, can then trust the result without running everything again.
+
+Each piece of evidence gets its own comment, named by its caption: one for `build`, one for
+`typecheck`, one for a screenshot. Attach again and cckit updates that same comment in place, so
+a request that took ten pushes shows one current build log and not ten stale ones.
+
+<Aside type="caution" title="Evidence never breaks your work">
+By default, a comment that fails to post prints a warning and the run continues. A caller that
+needs the evidence to exist asks for the opposite with `--strict` or `PR_EVIDENCE_STRICT=1`, and
+the failure stops the run. Either way the failure is printed and never reported as success.
+</Aside>
+
+Image evidence has one limit. GitHub has no supported way to upload a file to a comment from the
+command line, so a screenshot is referenced by its path, with instructions. Drag it into the
+comment box yourself, or host the file, set `KIT_EVIDENCE_URL_BASE`, and cckit embeds it.
+
+## Light tasks
+
+[`cckit task`](/project-management/light-tasks/) tracks work without GitHub issues. Five keys, all optional:
+
+```json
+{
+  "tasks": {
+    "default": "light",
+    "source": "file",
+    "dir": "tasks"
+  }
+}
+```
+
+| Key | Default | What it does |
+| --- | --- | --- |
+| `tasks.default` | `issues` | Which list is the project's default: `issues` (GitHub issues) or `light` (the `cckit task` list). With `light`, a bare `cckit next` prints what `cckit task next` prints, and the `campaign` skill records a campaign's pieces as light tasks. `cckit next` with any argument still asks about issues, and both lists stay usable whatever the value. `cckit task default` prints it. A value that is neither is read as `issues`, with a warning. The `marketing` profile sets `light`; on `cckit init --upgrade` the stored value is kept. |
+| `tasks.source` | `file` | Where task records live. `file` is the one source cckit ships: one tracked file per task. Another name `<name>` loads `scripts/lib/task-source-<name>.sh`; a name with no such file is refused with exit 1. `KIT_TASKS_SOURCE` overrides it per invocation. |
+| `tasks.check` | none | The gate `cckit task run <id>` runs after the agent's round when no `--check "<cmd>"` is given: a shell command run in the task's worktree. Exit 0 lets the pull request open; any other exit stops the run with exit 6 and opens none. With no key and no flag there is no gate. The `nextjs-shadcn` recipe writes `pnpm build && pnpm lint`. |
+| `tasks.design` | `false` | With `true`, every task of the project is a page task: `cckit task run` tells the agent to use the [`page-design`](/skills/#page-design) skill, records the skills the run loaded, and the review gets a `## Design` section naming them. A single task is a page task with `cckit task new --kind page`. Set by the `marketing` profile, the `nextjs-shadcn` recipe and `cckit add page-design`. With the key on and the skill folder missing, `cckit doctor` fails and names `cckit add page-design`. |
+| `tasks.dir` | `tasks` | The tracked directory the `file` source keeps tasks in, relative to the project root. An absolute path, or one that climbs out of the project, is ignored with a warning and `tasks` is used. `KIT_TASKS_DIR` overrides it per invocation. |
+
+Keep the directory tracked: the list is shared through git, so a gitignored directory would leave
+every task a local draft.
+
+## Content work
+
+Keys the `content` and `marketing` profiles set at `cckit init`. A project on another profile can
+add them by hand.
+
+| Profile | `kinds.content` | `pr.bodyStyle` | `plainLanguage.enabled` | `tasks.default` |
+| --- | --- | --- | --- | --- |
+| `content` | `true` | `content` | not written (off) | not written (`issues`) |
+| `marketing` | `true` | `content` | `true` | `light` |
+| the other four | not written | not written | not written | not written |
+
+A key that is "not written" is absent from the config, and its default applies.
+
+| Key | Default | What it does |
+| --- | --- | --- |
+| `pr.bodyStyle` | `code` | `content` gives generated pull request bodies draft-and-review wording. Details below. |
+| `plainLanguage.enabled` | `false` | `true` installs the [`plain-language`](/rules/#plain-language) rule at `cckit init` and rewords the progress lines of `cckit task`. Set by `cckit init --plain-language on\|off`; the `marketing` profile turns it on and the `content` profile leaves it off. On `--upgrade` the stored value wins over the profile default. |
+| `kinds.content` | `false` | `true` makes `scripts/setup-labels.sh` — and the label step of `cckit init` — provision the four content kind labels: `kind:post`, `kind:campaign`, `kind:brand`, `kind:research`. The kinds work without the key; it only decides whether the labels are created. |
+
+A content kind is a label, never a branch prefix. `cckit start` maps it onto the closed set of
+branch kinds, and `cckit pr` takes the commit type from it:
+
+| `kind:` label | Branch `cckit start` cuts | PR title type |
+| --- | --- | --- |
+| `post` | `task/<N>-<slug>` | `docs:` |
+| `campaign` | `plan/<N>-<slug>` | `docs:` |
+| `brand` | `task/<N>-<slug>` | `docs:` |
+| `research` | `spike/<N>-<slug>` | `docs:` |
+
+`pr.bodyStyle: "content"` (see [PR conventions](#pr-conventions)) changes the generated pull
+request body for a reviewer who is not a developer. `Closes #N`, the summary and the role
+signature are the same in both styles; the checklist and two headings differ:
+
+| | `code` | `content` |
+| --- | --- | --- |
+| Checklist heading | `## Verification` | `## Review` |
+| Checklist | Reproduced manually · No unrelated files in the diff · Labels match the issue · If plan deliverable: opened in browser, styles render | Read the draft from start to finish · Facts, names, numbers and links are checked · The voice matches the brand guide · Only the files for this piece changed |
+| Other headings | `## Notes for review` · `## Out of scope` | `## Notes for the reviewer` · `## Not in this piece` |
+| `cckit task finish` body | "its diff carries the task record with `status: done`" | the same checklist, then "Approving and merging this pull request marks the task done" |
+
+`cckit effort pr` keeps `## For agents` in both styles and, under `content`, replaces its
+`## Verification` list (which ends in "Local lint/typecheck pass") with a `## Review` list.
+
+The branch set `cckit gc` and the SessionStart hygiene hook parse is unchanged, so a live branch of
+a content-kind issue keeps the same issue-open protection as any other
+(`scripts/lib/content-kinds-gc-test.sh`).
 
 ## Effort WIP limit
 
@@ -377,7 +691,406 @@ refusal leaves no branch, no worktree and no board change. It is not read-free: 
 origin, and a `<slug>` argument was resolved before it, which can run `gh issue list`. Re-running
 `cckit effort start` on an effort that is *already* in progress is never gated — it adds no WIP.
 `cckit start <issue>` (a plain task worktree) has no WIP limit. Full behaviour:
-[Only so many efforts at once](/efforts-and-waves/#only-so-many-efforts-at-once).
+[Only so many efforts at once](/effort-reference/#the-wip-limit).
+
+## Integrations
+
+This section is the reference. For the list of tools and the steps to switch one on, start at
+[Integrations](/integrations/).
+
+An optional third-party tool is described by one JSON file, `integrations/<id>.json`, checked
+against `integrations/integration.schema.json`. A descriptor carries a label, the config key that
+turns the tool on, a detect command, install candidates tried in the order written, a verify
+command, a docs link and an attribution block whose `affiliated` field is a boolean.
+
+An optional `appliesWhen` block says where the tool can work. It holds two kinds of condition, and
+every one present must hold:
+
+| Condition | Judges | Holds when |
+| --- | --- | --- |
+| `anyExtension` | the repo | At least one file ends in a listed extension. Inside a git work tree the file list is git's tracked and unignored files. |
+| `platform` (`os`, `arch`) | the machine | Each field present equals `uname -s` / `uname -m` verbatim, e.g. `{"os":"Darwin","arch":"arm64"}` for Apple silicon. |
+
+Three optional fields carry what an installer needs beyond the candidate list:
+
+| Field | What it does |
+| --- | --- |
+| `install[].bootstrap` (`manager`, `run`) | How to get that candidate's manager, e.g. `brew install uv`. Run only when **none** of the descriptor's managers is on `PATH`; a machine that already has any of them is never bootstrapped. |
+| `detect.bin` | The binary's name when `detect.run` does not start with it (a `command -v <bin>` probe, for a tool whose own flags are slow to answer). |
+| `afterInstall` | The one step left to the user after a successful install, shown once in the install report. |
+| `config.default` | `true` makes the integration ON in a project whose config does not hold the key; only an explicit other value (`false`, or `"none"` for a named key) turns it off, and `cckit add <id> --set enable=no` writes that value. The doctor reports a missing default-on tool as a skip row: no install, no failure. Omitted: off until `cckit add <id>`. |
+| `rules` | Rule templates (`templates/rules/<name>.md`) that `cckit add <id>` copies into the project's `.claude/rules/` when the integration is switched on. |
+| `wire.kept` | Tool features left **on** although a flag could decline them, each mapped to the test behind that decision. The counterpart of `wire.declined`; it never reaches the command line. |
+
+Four descriptors ship:
+
+| Descriptor | Config key | Candidates, in order | Bootstrap | Applies |
+| --- | --- | --- | --- | --- |
+| `integrations/mempalace.json` | `memory.enabled` | `pipx install mempalace`, then `uv tool install mempalace` | `brew install pipx` | any repo, any machine |
+| `integrations/mlx-lm.json` | `local.enabled` | `uv tool install mlx-lm`, then `pipx install mlx-lm` | `brew install uv` | `Darwin` + `arm64` only |
+| `integrations/graft.json` | `codeGraph.provider` = `graft` | `npm install -g @nanonets/graft`, then `pnpm add -g @nanonets/graft` | none | a repo with at least one file in a language Graft indexes |
+| `integrations/lavish.json` | `reviewPages.enabled`, **on by default** | `npm install -g lavish-axi`, then `brew install node` (only when neither `lavish-axi` nor `npx` is on `PATH`) | none | any repo, any machine |
+
+The config key names a capability, never the vendor: `<capability>.provider` whose value names the
+tool, or an existing `<capability>.enabled` switch. A key containing the descriptor's own id is
+refused by the validator.
+
+| Key | Default | What it does |
+| --- | --- | --- |
+| `codeGraph.provider` | *(unset — off)* | Which integration provides code-graph retrieval, as its descriptor's `config.value` names it. `graft` switches on `integrations/graft.json`. Unset or `none`: no code graph. |
+| `memory.enabled` | `false` | `true` switches on `integrations/mempalace.json`: `cckit doctor` installs the MemPalace CLI and checks the wake-up header and session-start hook. |
+| `local.enabled` | *(unset — off)* | `true` switches on `integrations/mlx-lm.json`: `cckit doctor` installs the runtime on Apple silicon and starts `mlx_lm.server` on `local.port` (default `8080`) with `local.model`. |
+| `local.port` | `8080` | The port `mlx_lm.server` listens on. |
+| `local.model` | `mlx-community/Qwen3-8B-4bit` | The model the server loads. The first start downloads it. |
+| `reviewPages.enabled` | *(unset — on)* | `false` turns [review pages](/project-management/plan-pages/) off: plans, decisions and grills print to the terminal. `integrations/lavish.json` sets `config.default: true`, so the unset key is on. |
+| `reviewPages.answers` | *(unset)* | `issue` or `file`: where `cckit page answer` writes. Unset: a comment on the issue when `github.repo` is set and `--issue` is given, else a file. |
+| `reviewPages.answersDir` | `docs/answers` | Directory, relative to the repo root, for answers written as files. |
+| `local.dismissed` | *(unset)* | The `kitVersion` at which the "local layer down" session notice was dismissed. Written by `cckit doctor --dismiss-local`. |
+
+`bash scripts/lib/integrations.sh --validate` checks every descriptor and prints one
+`<id>: <field>: <problem>` line per problem; `--list` prints the ids; `--applies <id> [dir]` exits
+0 when the tool can work on the repo at `dir`.
+
+The registry is the `integrations/` directory of the cckit install. `KIT_INTEGRATIONS_DIR` names
+another directory for one invocation: it replaces the registry and does not add to it, and it must
+also hold `integration.schema.json`. Walkthrough:
+[Add your own tool as an integration](/development/add-your-own-integration/).
+
+### Switching one on: `cckit add`
+
+`cckit add` with no name lists every descriptor in `integrations/`, each marked `on` or `off` for
+this project and flagged when it does not apply here, followed by the modules. It exits 0
+when the registry is empty. `cckit add --llm` prints the same list as one JSON object:
+`{"integrations":[{id,label,summary,key,enabled,applies}],"modules":[{id,label}]}`.
+
+`cckit add <id>` asks one question, derived from the descriptor, and on `yes` sets the
+descriptor's `config.key` to its `config.value` (boolean `true` when the descriptor names none).
+That is the only key it changes. The file it writes is the project config: a root
+`cckit.config.json`, else `.claude/kit.config.json`, found by walking up from the directory.
+A descriptor that lists `rules` also gets each rule copied into `.claude/rules/` beside that
+config. A rule file already there is kept, so an edited rule survives a second run and a deleted
+one is restored.
+
+| Case | What happens |
+| --- | --- |
+| `--set enable=no`, or answering no | Nothing is written. It does not switch off an integration that is already on. |
+| The key already holds the ON value | No write; the file stays byte-identical. |
+| An `appliesWhen` condition does not hold (no file with a listed extension, or the wrong machine) | Declined with the conditions named. Exit 0, nothing written. |
+| No project config found | Exit 1. Run `cckit init` first; `add` does not create a config for an integration. |
+| The descriptor fails the schema | Exit 1 with the `<id>: <field>: <problem>` lines. Nothing written. |
+| `KIT_DRY_RUN=1` | Prints the config diff, the rule files it would write, then the install plan (each candidate in order, and whether its manager is on `PATH`) and the wire command. Nothing written, nothing run. |
+
+`cckit add <id>` installs nothing: it records the choice, and the next `cckit doctor` run does the
+install. `cckit add software` is the module form of the same verb
+and writes this directory's `.claude/kit.config.json`. In Claude Code the `kit-add` skill drives
+the same verb; the typed-only `/kit-add` command it replaces is gone.
+
+### Installing one: the shared runner
+
+`scripts/lib/integration-install.sh` is the one place an integration is installed from. It runs
+only commands the descriptor names, and applies four rules in this order:
+
+| Rule | What happens |
+| --- | --- |
+| The descriptor's `detect.run` exits 0 | Status `present`. Nothing runs, so a second run is a no-op. |
+| `KIT_DRY_RUN=1` | Status `dry-run`. The plan is printed: each candidate in order, whether its manager is on `PATH`, whether consent is recorded, and the wire command. Nothing runs. |
+| No consent recorded for this integration | Status `no-consent`, exit 0. Nothing runs. `KIT_ASSUME_YES` is not consent. |
+| Otherwise | If no candidate's `manager` is on `PATH`, the candidates' `bootstrap` commands are tried in order until one puts a manager there. Then the `install` candidates are tried in the order written. One whose `manager` is not on `PATH` is skipped. The first whose command exits 0 **and** leaves the tool detectable wins (`installed <manager>`); later candidates never run. If none does: `failed`, exit 1. |
+
+Consent is one `install:<id>` line in `.cckit/consent`, the gitignored state file shared by every
+worktree of the repo. `cckit doctor` records it when you approve installs in that run — `--fix`
+(alias `--yes`), or a yes at its terminal prompt. `bash scripts/lib/integration-install.sh
+--consent <id>` records it without running the doctor.
+
+`uv` and `pipx` put binaries in `~/.local/bin`, which is often not on `PATH` in the session that
+ran the install. Every detect, install and wire command therefore runs with `$HOME/.local/bin`
+appended to `PATH`, so a tool installed there is found without opening a new shell.
+
+A descriptor's optional `wire` step runs in the project directory under the same dry-run and
+consent rules. Each key of `wire.declined` is appended to `wire.run` as a flag; the values are
+the reasons and never reach the command line. A candidate marked `"resident": false` (an `npx`
+form that leaves no binary) is judged by its exit code alone.
+
+`--plan <id> [dir]`, `--install <id> [dir]`, `--wire <id> [dir]` and `--wire-command <id>` are the
+script's CLI forms.
+
+### What `cckit doctor` does with them
+
+For every descriptor whose config key is on, the doctor prints one row under **Integrations**. It
+holds no tool's recipe: the row is the runner's status line.
+
+| Run | Tool missing | Row | Exit code |
+| --- | --- | --- | --- |
+| `cckit doctor --fix`, or yes at the prompt | Consent is recorded, then the runner installs | `installed via <manager> (<path>)` | 0 |
+| No terminal and no `--fix` | Nothing installs, no consent is recorded | `missing — nothing installs without your yes: cckit doctor --fix` | 1 |
+| `--dry-run` or `--no-install` | Nothing installs, no consent is recorded | `missing — <first candidate>` | 1 |
+| Any, on a machine or repo where `appliesWhen` does not hold | Nothing installs | a skip row naming the condition | unchanged |
+
+With the key off or unset there is no row and the exit code is what it would be without the
+descriptor. `cckit init` runs the doctor with `--yes`, so setup keeps installing.
+
+Before this, a doctor run with no terminal and no flag installed the MemPalace CLI and mlx-lm
+without asking. It now reports them missing; pass `--fix` in automation that relied on the install.
+
+### The monthly recipe check
+
+A descriptor hardcodes upstream facts: a package name, an installer's flags, a binary's name. The
+gate (`scripts/check.sh`) never installs anything, so it cannot see one of them drift.
+`.github/workflows/integrations-check.yml` does: at 06:17 UTC on the 1st of every month, and on a
+manual `gh workflow run integrations-check.yml`, it runs `bash scripts/integrations-check.sh --yes`
+on two clean runners, `ubuntu-latest` and `macos-15` (arm64, the one platform
+`integrations/mlx-lm.json` applies to).
+
+The script holds no recipe. Every command comes from the descriptor and runs through the shared
+runner, in a scratch git repo that also holds the consent for the run.
+
+| Step | What runs | A failure means |
+| --- | --- | --- |
+| `validate` | The descriptor against `integrations/integration.schema.json` | The descriptor is malformed |
+| `platform` | `appliesWhen.platform` against `uname` | Nothing: a mismatch is a `skip` line, exit code unchanged |
+| `install` | The runner's candidate walk | No candidate left the tool detectable |
+| `detect` | `detect.run` | The tool installed under another name |
+| `verify` | `verify.run` | The binary no longer loads, or its flag changed |
+| `wire` | `wire.run` plus the `wire.declined` flags, when the descriptor has a wire step | A flag was renamed or the tool refuses the repo |
+
+The first failing step ends that descriptor and prints `FAIL <id>: <step>: <detail>` followed by
+the step's captured output. The script exits 1 when any descriptor failed. The workflow then opens
+an issue titled `Integration recipe check failed on <runner>` carrying the last 120 log lines and
+the run URL; while that issue is open, a later failing run comments on it.
+
+Without `--yes` the script installs nothing: it validates each descriptor, prints its install
+plan and exits 0. `bash scripts/integrations-check.sh --yes graft` checks one descriptor. Pass
+`--yes` on a throwaway machine only, because the tools install onto the machine that runs it.
+
+What the check does not exercise:
+
+- Install candidates after the one that worked. The runner stops at the first.
+- A `bootstrap` command, on a machine that already holds one of the managers.
+- `uninstall` and `build.deep`.
+- The install recipe of a tool already on the machine: the line reads
+  `skip <id>: install: already on this machine`, and `detect`, `verify` and `wire` still run.
+- An `appliesWhen.anyExtension` predicate. The scratch repo is seeded with one file of the first
+  listed extension, because the recipe is under test and no repo is.
+
+### Code-graph retrieval: Graft
+
+`cckit add graft` sets `codeGraph.provider` to `graft` and writes `.claude/rules/code-retrieval.md`.
+The rule routes each kind of code question to a Graft verb:
+
+| Question | Verb |
+| --- | --- |
+| Where is X handled? | `graft ask "<task>"` |
+| Every occurrence of a pattern | `graft grep "<regex>"` |
+| The API of one file | `graft skeleton <file>` |
+| What breaks if I change X? | `graft callers <symbol> -d 2` |
+| Orient in an unfamiliar repo | `graft map` |
+| What does my diff reach? | `graft blast --base origin/<base>` |
+
+The rule's fallback is a hard rule: with no `graft` binary, no `graft/` directory, or a file in a
+language Graft does not index, the agent searches with Grep/Glob as before and reports nothing. A
+missing graph changes no exit code.
+
+Graft has no shell grammar, so in a repo of only `.sh` files `cckit add graft` declines (exit 0,
+nothing written). The extension list is `appliesWhen.anyExtension` in the descriptor, read from
+`@nanonets/graft` 0.18.0.
+
+| Step | Who runs it | Command |
+| --- | --- | --- |
+| Install | `cckit doctor --fix` | `npm install -g @nanonets/graft`, then `pnpm add -g @nanonets/graft` |
+| Wire into the repo | you | `graft init --agents claude --no-statusline --no-global` |
+
+No cckit verb runs the wire step yet; the doctor prints the command after it installs.
+`KIT_DRY_RUN=1 cckit add graft` prints both steps without running either.
+
+npm is first because the pnpm install does not run on darwin/arm64 with Node 22: it exits 0, and
+`graft --version` then dies with `No native build was found` loaded from `tree-sitter-kotlin`.
+
+The two declined flags and the one kept feature are recorded in the descriptor:
+
+| Feature | Decision | Why |
+| --- | --- | --- |
+| Statusline (`--no-statusline`) | off | cckit ships its own, and a project-level `statusLine` hides a user-level one. |
+| Out-of-repo writes (`--no-global`) | off | Without the flag `graft init` also writes `~/.claude/settings.json`, `~/.claude/helpers/graft-hooks.cjs` and `~/.claude.json`. |
+| Hooks | **on** | Tested with graft 0.18.0 on a `.claude/settings.json` that already held one hook entry on each of SessionStart, UserPromptSubmit, PostToolUse and Stop: all four survived unchanged and first in their event, and a second `graft init` left the file identical. |
+
+`GRAFT_MERGE_TEST=1 bash scripts/lib/integration-install-test.sh` re-runs that hook test against
+the installed `graft`, in a throwaway repo and `HOME`.
+
+`graft init` writes `.claude/settings.json` (hook blocks, four `permissions.allow` entries,
+`footerLinksRegexes`), `.claude/helpers/graft-hooks.cjs`, `.claude/helpers/graft-statusline.cjs`,
+`.claude/skills/graft/SKILL.md`, `.mcp.json`, `.gitignore`, `.ignore`, and builds `graft/`.
+`graft uninstall -y --no-global` removes them.
+
+Graft is by NanoNets / Trail (MIT); cckit is not affiliated with either. Its README reports 46%
+fewer tool calls, 42% fewer tokens and 54% → 66% on SWE-bench Verified. Those are the vendor's
+numbers and cckit has not reproduced them. Per the same README, Graft makes a daily npm version
+check and one batched anonymous usage ping; `graft telemetry disable` or `DO_NOT_TRACK=1` turns
+the ping off. `graft build --deep` is the one command that calls an LLM, and cckit never runs it.
+
+An upgrade (`/kit-update`, which runs `scripts/init.sh --upgrade`) over a config with `codeGraph.provider` set re-adds a missing
+`code-retrieval.md`, and a regenerated `CLAUDE.md` carries the line that points at it. A fresh
+`cckit init` writes neither: the integration is switched on by `cckit add`, never by an init flag.
+
+## Model endpoint for the effort judge
+
+`cckit effort close` asks a model to grade the closed effort (a difficulty and a score written into
+the local metrics record). The hosted path is an OpenAI-compatible endpoint read from three
+environment variables. cckit stores none of the values; the config can only **name** the variables,
+so a project that already exports its own does not have to rename them:
+
+```json
+{
+  "model": {
+    "urlEnv": "ACME_LLM_URL",
+    "modelEnv": "ACME_LLM_NAME",
+    "tokenEnv": "ACME_LLM_KEY"
+  }
+}
+```
+
+| Key | Default env var | What the variable holds | When it is empty |
+| --- | --- | --- | --- |
+| `model.urlEnv` | `CCKIT_MODEL_URL` | Base URL. The judge POSTs to `<value>/chat/completions`. | The hosted judge is skipped; the local model is tried if it is enabled. |
+| `model.modelEnv` | `CCKIT_MODEL` | Model name sent in the request and recorded as the judge's model id. | The literal `default` is sent. |
+| `model.tokenEnv` | `CCKIT_MODEL_TOKEN` | Bearer token. | No `Authorization` header is sent. |
+
+Each key is independent: name one and the other two keep their defaults. A named variable replaces
+the default one — with `model.urlEnv` set, `CCKIT_MODEL_URL` is not read. A value that is not a
+shell identifier (letters, digits and `_`, not starting with a digit) is ignored with a warning on
+stderr and the default name is used.
+
+## Effort plan source
+
+`cckit effort plan` reads the open efforts from GitHub: one listing call, then one `blocked_by` call
+per effort. A project that already keeps a local snapshot of that data can name an executable that
+prints it, and the plan calls that instead:
+
+```json
+{
+  "effort": {
+    "planSource": "tools/effort-rows.sh"
+  }
+}
+```
+
+| Key | Default | What it does | Env override |
+| --- | --- | --- | --- |
+| `effort.planSource` | unset — GitHub is read | Path to an executable that prints the open-effort rows. A relative path resolves against the project root (the directory holding `cckit.config.json`, or the parent of `.claude/` in the scaffolded layout). | `EFFORT_PLAN_SOURCE` |
+
+The source is called as `<source> <owner/repo>` with the project root as its working directory, and
+writes to stdout:
+
+| Line | Meaning |
+| --- | --- |
+| `number<TAB>flow<TAB>ctx<TAB>title` | One open effort. An empty `flow` is shown as `—`; an empty `ctx` as `?`, which weighs the same as `M`. |
+| `number<TAB>flow<TAB>ctx<TAB>title<TAB>blockers` | The same, with its blockers: a comma-separated list of issue numbers (`241,257`; a leading `#` is accepted). |
+| `# age: <text>` | Optional. How old the data is, in the source's own words (`2h`, `synced 09:14`). Printed verbatim. |
+
+Any other line starting with `#`, and any line whose first column is not a number, is ignored.
+
+The plan falls back to GitHub, with a one-line warning on stderr, when the source is not executable,
+exits non-zero, or prints no rows. A source that answers needs neither `gh` nor `jq`; the fallback
+needs both.
+
+Every plan prints a `source:` line under its header:
+
+```text
+  source: planSource tools/effort-rows.sh · age 2h
+  source: GitHub (acme/shop)
+  source: GitHub (acme/shop) — planSource tools/effort-rows.sh failed (exit 3), fell back
+```
+
+Resolution order, first non-empty wins: `EFFORT_PLAN_SOURCE` in the environment →
+`KIT_EFFORT_PLAN_SOURCE` (what `load_kit_config` exports from `effort.planSource`) → GitHub.
+
+## Effort close hooks
+
+`cckit effort close` runs two optional project hooks. Both are paths to an executable; a relative
+path resolves against the main checkout. cckit ships neither.
+
+```json
+{
+  "effort": {
+    "preCloseHook": "scripts/pre-close.sh",
+    "knowledgeIngestHook": "scripts/ingest-effort.sh"
+  }
+}
+```
+
+| Key | Called as | When | On failure | Env override |
+| --- | --- | --- | --- | --- |
+| `effort.preCloseHook` | `<hook> <effort#> <sub#…>`, cwd = the effort worktree | Before the snapshot and the merge | A non-zero exit refuses the close; the hook's output is printed and nothing is written. A configured hook that is missing or not executable refuses too. | `KIT_EFFORT_PRE_CLOSE_HOOK` |
+| `effort.knowledgeIngestHook` | `<hook> <effort#> <trace-dir>`, cwd = the main checkout | After the merge, the closes and the worktree cleanup | Non-fatal: the close has already landed. A missing or non-executable hook is skipped with a notice. The hook's output goes to stderr. | `KIT_EFFORT_KNOWLEDGE_HOOK` |
+
+`KIT_FORCE=1` skips the pre-close hook — it is not run — and prints
+`pre-close hook '<path>' skipped (KIT_FORCE=1)` on stderr. The same variable overrides the
+no-work-trace refusal, so a forced close bypasses both gates.
+
+The sub numbers are the effort's native sub-issues. On a wave-style close (no `effort/<N>` branch
+anywhere) there is no effort worktree: the pre-close hook runs from the checkout the close was
+invoked in, after every sub is verified closed with a merged PR and before the trace is written.
+
+## Night mode
+
+Night mode runs approved effort waves unattended. The `kit-autopilot` skill reads the owner's
+**night grant** with `scripts/night-grant.sh`, then launches the Workflow script
+`scripts/night-run.mjs`; the Workflow runtime enforces the grant's token budget. In a project that
+installed cckit as a plugin both scripts live under `${CLAUDE_PLUGIN_ROOT}/scripts/`.
+
+The grant is one comment on the plan parent issue:
+
+````markdown
+<!-- night-grant -->
+Tonight: run the two approved waves. I accept the lockfile floor.
+
+```json
+{ "budget": "+2000k", "waves": [[<effort>], [<effort>]], "waivers": ["lockfile"], "stopCommand": null }
+```
+````
+
+Replace each `<effort>` with the number of an effort from your own board; each inner list is one
+wave.
+
+**Only the owner's grant counts.** A grant sets the budget, the waivers and a shell `stopCommand`,
+and anyone can comment on a public repository. `night-grant.sh read` therefore keeps a marker
+comment only when GitHub reports its `author_association` as `OWNER`, or its author is
+`github.owner` or a login in `night.grantors`. The latest of those wins; a marker comment from any
+other author is ignored and named on stderr. With no owner grant the read exits 1.
+
+The optional `night` object in the config file resolved above adds to the grant:
+
+```json
+{
+  "night": {
+    "floors": { "auth-dep": "the auth library version" },
+    "neverWaivable": ["auth-dep"],
+    "gate": "pnpm typecheck && pnpm lint",
+    "grantors": ["a-maintainer"],
+    "refuseLabels": ["hold"]
+  }
+}
+```
+
+| Key | Default | What it does |
+| --- | --- | --- |
+| `night.floors` | none | Extra always-human floors, name → what a diff must touch to trip it. Added to the base floors `lockfile`, `auth`, `security-code`, `security-prose`, `workflows`, `cost`, `secret`. A tripped floor parks the effort unless the grant waives it by its exact name. |
+| `night.neverWaivable` | none | Floor names no grant may waive, added to the base list `workflows`, `cost`, `secret`. |
+| `night.gate` | the delegation brief's gate commands | The gate executors and verifiers run, and the final check on the base branch. |
+| `night.grantors` | none | Logins allowed to write the grant besides `github.owner` and an `OWNER` commenter. Needed on an organization repository, where no commenter is `OWNER` and `github.owner` is the org. |
+| `night.refuseLabels` | none | Labels that hold an effort out of a night run. cckit applies no such label itself. |
+
+What the engine holds in code:
+
+| Rule | Behaviour |
+| --- | --- |
+| Approval | An effort runs because the owner named its number in the grant's `waves`. No label or body section is required; preflight refuses only a closed issue, an issue without the `effort` label, or one carrying a `night.refuseLabels` label. |
+| Width | `effort.wipLimit` efforts at once (default `2`), never more than 4. Every executor runs `cckit effort start`, which refuses a new effort at that limit, so a wider run would only park efforts. Executors are told never to pass `--force`. A parked effort keeps its branch and takes a slot from the rest of its wave; efforts already in progress before the night take slots too. A limit of `0` refuses the grant. |
+| Wave order | Waves are dependency-ordered. A wave with any effort parked, refused or skipped ends the run `blocked`, and no later wave starts. |
+| Final check | Once every wave merged, the gate runs on the base branch and decides `done` or `blocked`. A `stopCommand` is a separate check after each wave that ends the night early when it exits 0. |
+| Waivers | Each waiver must equal one floor name. `"lockfile auth"` and `"*"` are refused when the grant is read. |
+
+`night-grant.sh` finds the config the way every verb does — `$KIT_CONFIG`, else a walk up from the
+current directory — so a project's floors and gate apply from any subdirectory.
 
 ## Agent profiles
 
@@ -385,7 +1098,7 @@ A **profile** is a named agent configuration: which CLI to run, roughly what it 
 permissions, and at which stages.
 
 **cckit never names a model.** A kit that suggests an expensive model in its own config schema
-pushes every user toward spending more, which is the opposite of the point. You spell your own
+pushes every user toward spending more. You spell your own
 flags in `args`; the only cost signal cckit reads is `tier`, and the cheapest profile is what runs
 when nothing else is chosen.
 
@@ -482,7 +1195,7 @@ Dropping whole sections rather than truncating mid-sentence, and naming the cut 
 it silently, are the same decision: **a partial brief has to read as partial.** A worker handed a
 brief that looks complete acts as though it is.
 
-The order is not arbitrary — the sections the worker cannot reconstruct come first. What the issue
+The sections the worker cannot reconstruct come first. What the issue
 owns is unrecoverable from anywhere else; the standing gotchas are a rule file the worker can open
 on its own.
 
@@ -501,7 +1214,7 @@ hold secrets, so cckit must never depend on it.
 So the worker records its own receipt, through a verb:
 
 ```bash
-cckit receipt 321 --stage build <<'RECEIPT'
+cckit receipt <issue> --stage build <<'RECEIPT'
 outcome:    pr-open
 url:        https://github.com/jeiemgi/cckit/pull/999
 gate:       pass
@@ -510,15 +1223,18 @@ next stage: review
 RECEIPT
 ```
 
+The stage is one of `build` · `review` · `design` · `docs` · `qa` · `none`. `qa` is the stage
+`cckit qa verdict` writes — see [the QA lane](/qa-reference/#record-the-verdict--cckit-qa-verdict).
+
 One JSON file per attempt, under `.cckit/receipts/`, keyed `<issue>-<stage>-<attempt>`. The
 directory resolves from the repo's shared git dir, so a receipt a worker writes inside its own
 isolation worktree is readable by a captain standing anywhere else.
 
 ```bash
-cckit receipt list 321          # 321  build   1  blocked
-                                # 321  build   2  pr-open
-                                # 321  review  1  merged
-cckit receipt show 321 build    # the latest attempt's JSON
+cckit receipt list <issue>      # <issue>  build   1  blocked
+                                # <issue>  build   2  pr-open
+                                # <issue>  review  1  merged
+cckit receipt show <issue> build    # the latest attempt's JSON
 ```
 
 **Every receipt is also posted as a comment on its issue.** `.cckit/` is gitignored and
@@ -532,7 +1248,7 @@ The comment carries an invisible marker keyed to the same `<issue>-<stage>-<atte
 file gives. A new attempt gets its own comment.
 
 ```bash
-cckit receipt 321 --stage build --no-remote <<'RECEIPT'   # write the file, post nothing
+cckit receipt <issue> --stage build --no-remote <<'RECEIPT'   # write the file, post nothing
 ```
 
 The mirror is best-effort, and the local write has already succeeded before it runs: a failure

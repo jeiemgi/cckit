@@ -1,0 +1,199 @@
+---
+title: "Summarize long files locally"
+description: "Step by step: switch on the mlx-lm integration and turn a long log or page into a short digest with cckit digest."
+tutorial:
+  job: summarize long files with a local model before Claude Code reads them
+  difficulty: intermediate
+  time: "7 min"
+  prerequisites:
+    - { text: "cckit is installed and set up in this project", link: "Set it up", href: "/getting-started/initialize/" }
+    - "You are on an Apple silicon Mac"
+    - "About 4.5 GB of disk space is free"
+  ogTag: Integrations
+  keywords: [local llm claude code, mlx-lm, summarize logs locally, reduce claude code tokens]
+  related: [development/code-graph, development/add-your-own-integration, memory/install-mempalace]
+---
+
+import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import TagRow from '../../../components/TagRow.astro';
+import TutorialMeta from '../../../components/TutorialMeta.astro';
+import TutorialSchema from '../../../components/TutorialSchema.astro';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
+
+<TagRow kinds={["flow"]} />
+
+<TutorialMeta />
+
+A long CI log holds a handful of lines that matter. An agent that reads the whole log to find
+them pays for every line, and has less room left for the fix.
+
+The answer is to shorten the input before the agent reads it, on a model that runs on your own
+machine. `cckit digest` reads a long file, URL or video transcript, summarizes it on the local
+model, and prints a digest of at most about 1,500 tokens plus a pointer to the original. The
+agent works from the digest and opens the original only for a detail.
+
+The runtime is mlx-lm, third-party software that cckit adopts and does not build. It runs on
+Apple silicon only.
+
+Each step starts with what you say to your agent in the chat. Below it is the command your agent
+runs. The example is the Bakery site, with a long build log to read.
+
+**What you will have at the end:** a model server on your Mac, and one verb, `cckit digest`,
+that the agent runs before a long read.
+
+## Steps
+
+### 1. Switch the local layer on
+
+`cckit add mlx-lm` asks one question and, on yes, sets `local.enabled` to `true` in the project
+config.
+
+<Chat
+  title="switching on the local model for the Bakery site"
+  say="Switch on the local model for the Bakery site."
+  ran={['KIT_DRY_RUN=1 cckit add mlx-lm', 'cckit add mlx-lm']}
+  means="The first line is the preview: the config diff and the install commands. Nothing is installed by this step. On a machine that is not Darwin and arm64 the command declines, exits 0 and writes nothing."
+>
+  The local layer is on in the project config. Nothing is installed yet.
+</Chat>
+
+### 2. Let the doctor install the runtime and start the server
+
+<Chat
+  title="installing the local model runtime"
+  say="Install the local model and start its server."
+  ran={['cckit doctor', 'cckit doctor --fix']}
+  means="`cckit doctor` asks in a terminal, then installs on yes. `cckit doctor --fix` installs without the prompt."
+>
+  The runtime is installed. Under Integrations the doctor shows an `mlx-lm` row reading `installed`,
+  and under Local model layer it starts `mlx_lm.server` in the background and reports its state.
+</Chat>
+
+<Outcomes of="cckit doctor (Local model layer)">
+
+| Row | Meaning |
+| --- | --- |
+| `started @ :8080` or `alive @ :8080` | The server answers. Go to step 4. |
+| `starting (pid …) — model still downloading/loading` | The first start downloads the model, about 4.5 GB. Go to step 3. |
+| `failed to start — see <log>` | Read the log named in the row: `~/.claude/kit-local-server.log`. |
+
+</Outcomes>
+
+### 3. Wait for the model, then confirm the server answers
+
+<Chat
+  title="checking that the local model server answers"
+  say="Is the local model server up yet?"
+  ran="curl -sf http://127.0.0.1:8080/v1/models"
+  means="It prints a JSON list of models and exits 0 once the server is up. While the model is still downloading it prints nothing and exits non-zero."
+>
+  The server answers once this prints the model list. Until then the model is still downloading.
+</Chat>
+
+### 4. Digest a long input
+
+<Chat
+  title="digesting a long Bakery site build log"
+  say="The build log is long. Digest it and tell me what matters."
+  ran={['cckit digest build.log --lang en', 'cckit digest https://example.com/long-article --lang en --focus "breaking changes"']}
+  means="You get a heading `# Digest (local: <model>) — <source>`, the bullets, and a last line naming the original with its word count. `--focus` weights the digest toward one topic. `--lang` takes `es` or `en`; without it the digest is written in Spanish."
+>
+  Here is the digest of the log: the few lines that matter, and a pointer to the original for the
+  detail.
+</Chat>
+
+### 5. Have your agent use it
+
+In Claude Code the `kit-digest` skill runs the same verb before a long read.
+
+<Chat
+  title="working from a digest instead of the whole log"
+  say="Before you read the CI log I am about to give you, digest it with the local model and work from the digest. Open the original only for the lines you need to quote."
+  ran="cckit digest <log file>"
+  means="The agent pays for the short digest, not for every line, and has more room left for the fix."
+>
+  I digested the log on the local model and I am working from the digest. I will open the original only
+  for the lines I need to quote.
+</Chat>
+
+
+## Check it worked
+
+- `curl -sf http://127.0.0.1:8080/v1/models` exits 0.
+- `cckit digest <a long file> --lang en` exits 0 and prints a heading that starts with
+  `# Digest (local:`.
+
+## How it works
+
+`cckit digest` splits the input into chunks of about 2,500 words, summarizes each chunk on the
+local server, then merges the partial digests when there is more than one. A YouTube URL is read
+from its subtitles and needs `yt-dlp` on `PATH`.
+
+The exit code tells the caller what to do:
+
+<Outcomes of="cckit digest">
+
+| Exit code | Meaning | What the caller does |
+| --- | --- | --- |
+| `0` | The digest was printed. | Read the digest. |
+| `2` | The local server is down. | Read the original directly. |
+| `1` | A usage or input error: no such file, a failed fetch, an empty input, an unknown flag. | Fix the argument. |
+
+</Outcomes>
+
+Nothing depends on the server being up. Every caller of the local layer treats a failure as "use
+the path that was there before".
+
+- The port, the model name and the other `local.*` keys:
+  [Config & permissions → Integrations](/config-and-permissions/#integrations).
+- The install commands and what your yes records: [Integrations](/integrations/).
+
+<Aside type="note" title="mlx-lm is not part of cckit">
+mlx-lm is open-source software (MIT) from Apple's
+[ml-explore](https://github.com/ml-explore/mlx-lm) project. cckit is not affiliated with Apple and
+does not maintain mlx-lm; report runtime bugs to its own repository. The model the server loads is
+downloaded by mlx-lm on the first start.
+</Aside>
+
+## Troubleshooting
+
+**`cckit digest` prints `local server down` and exits 2.** The server is not answering on the
+configured port. Run `cckit doctor --fix`, or start it by hand with the command the message
+prints: `mlx_lm.server --model <model> --port <port>`.
+
+**The doctor says `not running — would start mlx_lm.server in background`.** The doctor ran with
+no terminal and no `--fix`, or with `--dry-run`, so it started nothing. Run `cckit doctor --fix`.
+
+**`cckit add mlx-lm` declines.** The machine is not an Apple silicon Mac. The local layer has no
+other runtime; every caller keeps using its non-local path.
+
+**Every session prints a "local layer down" notice.** The layer is switched on and the server is
+not running. Start it with `cckit doctor --fix`, or silence the notice with
+`cckit doctor --dismiss-local`.
+
+**The digest came back in Spanish.** That is the default. Pass `--lang en`.
+
+## Related guides
+
+<CardGrid>
+  <LinkCard title="Find code with a code graph" href="/development/code-graph/" description="Another integration, switched on with the same two verbs." />
+  <LinkCard title="Add your own integration" href="/development/add-your-own-integration/" description="Describe a tool that is not in the list, and let the doctor install it." />
+  <LinkCard title="Install MemPalace" href="/memory/install-mempalace/" description="The memory integration." />
+</CardGrid>
+
+<TutorialSchema
+  steps={[
+    { name: 'Switch the local layer on', text: 'cckit add mlx-lm sets local.enabled to true in the project config. Nothing is installed. It declines on a machine that is not Apple silicon.' },
+    { name: 'Let the doctor install the runtime and start the server', text: 'cckit doctor asks, then installs mlx-lm and starts mlx_lm.server in the background; cckit doctor --fix skips the prompt.' },
+    { name: 'Wait for the model, then confirm the server answers', text: 'curl -sf http://127.0.0.1:8080/v1/models exits 0 once the server is up. The first start downloads about 4.5 GB.' },
+    { name: 'Digest a long input', text: 'cckit digest <path or URL> --lang en prints a digest of at most about 1,500 tokens and a pointer to the original.' },
+    { name: 'Have the agent use it', text: 'In Claude Code the kit-digest skill runs the same verb before a long read.' },
+  ]}
+  faqs={[
+    { q: 'cckit digest prints "local server down" and exits 2', a: 'The server is not answering on the configured port. Run cckit doctor --fix, or start mlx_lm.server by hand with the command the message prints.' },
+    { q: 'cckit add mlx-lm declines', a: 'The machine is not an Apple silicon Mac. mlx-lm runs on Darwin arm64 only.' },
+    { q: 'Every session prints a "local layer down" notice', a: 'The layer is on and the server is not running. Start it with cckit doctor --fix or silence the notice with cckit doctor --dismiss-local.' },
+    { q: 'The digest came back in Spanish', a: 'Spanish is the default output language. Pass --lang en.' },
+  ]}
+/>

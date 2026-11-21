@@ -6,17 +6,44 @@
 # sync (#811) flushes the buffer to the Postgres graph (schema #810) when the engine is connected.
 # The record shape below IS that schema.
 #
-#   record_effort_start <num>            — stamp start epoch + write the pre-build estimate (#808)
+#   record_effort_start <num>            — stamp start epoch + write the pre-build estimate (#808).
+#                                          Called by effort_start when it creates the branch (#453).
 #   capture_effort_metrics <num> [base]  — at close: build-time + signals + token/cost actuals (#807)
 #                                          + reconcile vs the estimate → append the record
+#
+# Where each measured field comes from (#453). A field with no source is null and the record says why:
+#   build_seconds   close time minus <num>.start (build_source "effort-start"); with no stamp, close
+#                   time minus the author time of the oldest commit in <base>..HEAD ("first-commit");
+#                   null when the branch has neither.
+#   tokens_real     1. sessions listed in <git-common-dir>/kit-usage.jsonl, summed from their Claude
+#                      transcripts (tokens_source "transcripts", cost at list price). cckit ships no
+#                      writer for that log; a project that keeps one gets this path.
+#                   2. else the `cckit autopilot run` state files of the effort branch and its
+#                      sub/<N><letter> branches — the usage the runtime printed (tokens_source
+#                      "autopilot-run", cost_source "runtime" when the runtime printed a cost).
+#                      Interactive sessions are not in that figure.
+#                   3. else null, with tokens_null_reason: "no-usage-source" (no usage log, no
+#                      autopilot run), "no-session-matched" (a usage log with no session for this
+#                      effort), "autopilot-usage-unknown" (a run whose rounds printed no usage — a
+#                      partial sum would be an undercount).
+# No figure is estimated: a null stays null.
 #
 # Cost = metered API; retroactively $ is computed from current Opus-4.8 list price (no per-call bill
 # access here) → cost_source="list-price". bash 3.2 compatible. Requires: git, jq.
 # errors: best-effort — local telemetry must never break the op it measures
 
+# This file's own directory, resolved ONCE at load time (#381) — the only point where both shells
+# agree. `BASH_SOURCE` is bash-only; inside a zsh *function* it is unset and `$0` is the function
+# name, so a per-call `dirname "${BASH_SOURCE[0]:-$0}"` resolved to the CALLER's directory:
+# engine-adapter.sh and kit-local.sh were never found and the sync buffered without saying why. At
+# FILE scope zsh sets `$0` to the sourced file's path, so one expansion covers both shells. Same
+# resolution as kit-gc.sh's `_KIT_GC_LIB_DIR`, whose comment explains why zsh prompt expansion
+# (`${(%):-%x}`) is avoided and why `cd`'s stdout is discarded.
+_EM_LIB_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" >/dev/null 2>&1 && pwd)"
+
 # The GitHub transport switch (#396): rest mode routes the gh calls below through gh-rest.sh.
 if ! command -v cckit_gh_rest >/dev/null 2>&1; then
-  _ghr_lib="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)/gh-rest.sh"
+  _ghr_lib="$_EM_LIB_DIR/gh-rest.sh"
   # shellcheck source=/dev/null
   [ -f "$_ghr_lib" ] && . "$_ghr_lib"
   unset _ghr_lib
@@ -37,8 +64,9 @@ record_effort_start() {
   [[ -n "$num" ]] || return 0
   d="$(_em_dir)" || return 0
   mkdir -p "$d" 2>/dev/null || return 0
-  date -u +%s > "$d/$num.start" 2>/dev/null || true
-  estimate_effort "$num" || true
+  # Keep an existing stamp: a re-run of `effort start` must not move the start forward.
+  [[ -s "$d/$num.start" ]] || date -u +%s > "$d/$num.start" 2>/dev/null || true
+  [[ -f "$d/$num.est" ]] || estimate_effort "$num" || true
 }
 
 # estimate_effort <num> — pre-build prediction from estimator.json + the effort's scope (#808).
@@ -141,7 +169,7 @@ _em_token_sum() {
   [[ -n "$sids" ]] || { echo "0 0 0 0"; return 0; }
   while IFS= read -r sid; do
     [[ -n "$sid" ]] || continue
-    tx="$(find "$HOME/.claude/projects" -name "$sid.jsonl" -type f 2>/dev/null | head -1)"
+    tx="$(find "$HOME/.claude/projects" -name "$sid.jsonl" -type f 2>/dev/null | sed -n 1p)"
     [[ -n "$tx" ]] || continue
     # -r (raw) is REQUIRED: without it jq wraps the result string in double-quotes, so $a
     # becomes `"1015901` and the `$(( ))` math below dies ("bad math expression") — the #829 bug.
@@ -152,7 +180,51 @@ _em_token_sum() {
   echo "$tin $tout $tcr $tcw"
 }
 
+# _em_usage_log — absolute path of the session usage log (it may not exist).
+_em_usage_log() {
+  local c; c="$(git rev-parse --git-common-dir 2>/dev/null)" || return 1
+  case "$c" in /*) : ;; *) c="$PWD/$c" ;; esac
+  printf '%s/kit-usage.jsonl' "$c"
+}
+
+# _em_autopilot_usage <num> <branch> — "<tokens> <cost-usd> <runs>" from the `cckit autopilot run`
+# state files (<state-dir>/autopilot/*.json, scripts/autopilot-run.sh) whose branch is <branch> or a
+# sub/<num><letter>-… branch of the effort. Those hold what the runtime itself printed (al_usage).
+#   tokens  a sum · `unknown` when any matching run reads unknown · `none` when no run matched
+#   cost    a sum · `unknown` when any matching run printed no cost
+# A run with zero rounds spent nothing and is skipped.
+_em_autopilot_usage() {
+  local num="$1" branch="$2" sdir f out
+  local files=()
+  if ! command -v kit_state_dir >/dev/null 2>&1; then
+    # shellcheck source=/dev/null
+    [[ -f "$_EM_LIB_DIR/kit-state.sh" ]] && . "$_EM_LIB_DIR/kit-state.sh"
+  fi
+  command -v kit_state_dir >/dev/null 2>&1 || { echo "none unknown 0"; return 0; }
+  sdir="$(kit_state_dir 2>/dev/null)/autopilot"
+  [[ -d "$sdir" ]] || { echo "none unknown 0"; return 0; }
+  # find, not a glob: an unmatched glob is an error under zsh.
+  while IFS= read -r f; do [[ -n "$f" ]] && files+=("$f"); done \
+    < <(find "$sdir" -maxdepth 1 -type f -name '*.json' 2>/dev/null)
+  (( ${#files[@]} > 0 )) || { echo "none unknown 0"; return 0; }
+  out="$(jq -rs --arg b "$branch" --arg n "$num" '
+    [ .[] | objects
+      | select((.branch? // "") as $x
+               | ($b != "" and $x == $b) or ($x | test("^sub/" + $n + "[a-z]-")))
+      | select((.rounds? // 0) > 0) ] as $runs
+    | if ($runs | length) == 0 then "none unknown 0" else
+        ( if any($runs[]; (.usage.tokens? | type) != "number") then "unknown"
+          else ([$runs[].usage.tokens] | add) end ) as $tok
+        | ( if any($runs[]; (.usage.cost_usd? | type) != "number") then "unknown"
+            else ([$runs[].usage.cost_usd] | add) end ) as $cost
+        | "\($tok) \($cost) \($runs | length)"
+      end' "${files[@]}" 2>/dev/null)"
+  [[ -n "$out" ]] || out="none unknown 0"
+  echo "$out"
+}
+
 capture_effort_metrics() {
+  local build_src tokens_src null_reason ap ap_tok ap_cost ap_runs first ulog
   local num="$1" base="${2:-origin/${KIT_BASE_BRANCH:-main}}" d start now build_s shortstat files added removed commits churn diff_auto branch
   local toks tin tout tcr tcw tokens_real cost_real cost_source tokens_est cost_est rec
   local IFS=' '   # force space-split for `set --` below (ambient IFS may carry a NUL)
@@ -160,17 +232,30 @@ capture_effort_metrics() {
   command -v jq >/dev/null 2>&1 || return 0
   d="$(_em_dir)" || return 0; mkdir -p "$d" 2>/dev/null || return 0
 
-  now="$(date -u +%s 2>/dev/null)"; build_s="null"
+  # build time (#453): the stamp effort_start wrote, else the oldest commit on the branch (below,
+  # once the base is fetched). Never a guess: with neither, build_seconds stays null.
+  now="$(date -u +%s 2>/dev/null)"; build_s="null"; build_src="null"; start=""
   if [[ -f "$d/$num.start" ]]; then
     start="$(cat "$d/$num.start" 2>/dev/null)"
-    [[ "$start" =~ ^[0-9]+$ && "$now" =~ ^[0-9]+$ ]] && build_s=$(( now - start ))
+    if [[ "$start" =~ ^[0-9]+$ && "$now" =~ ^[0-9]+$ ]] && (( now >= start )); then
+      build_s=$(( now - start )); build_src='"effort-start"'
+    else
+      start=""
+    fi
   fi
 
   git fetch origin --quiet 2>/dev/null || true
+  if [[ "$build_s" == "null" && "$now" =~ ^[0-9]+$ ]]; then
+    # Author time, not committer time: a rebase rewrites the second and keeps the first.
+    first="$(git log --format=%at "$base"..HEAD 2>/dev/null | sort -n | sed -n 1p)"
+    if [[ "$first" =~ ^[0-9]+$ ]] && (( now >= first )); then
+      start="$first"; build_s=$(( now - first )); build_src='"first-commit"'
+    fi
+  fi
   shortstat="$(git diff --shortstat "$base"...HEAD 2>/dev/null)"
-  files=$(printf '%s' "$shortstat"   | grep -oE '[0-9]+ file'      | grep -oE '[0-9]+' | head -1)
-  added=$(printf '%s' "$shortstat"   | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+' | head -1)
-  removed=$(printf '%s' "$shortstat" | grep -oE '[0-9]+ deletion'  | grep -oE '[0-9]+' | head -1)
+  files=$(printf '%s' "$shortstat"   | grep -oE '[0-9]+ file'      | grep -oE '[0-9]+' | sed -n 1p)
+  added=$(printf '%s' "$shortstat"   | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+' | sed -n 1p)
+  removed=$(printf '%s' "$shortstat" | grep -oE '[0-9]+ deletion'  | grep -oE '[0-9]+' | sed -n 1p)
   commits=$(git rev-list --count "$base"..HEAD 2>/dev/null)
   files=${files:-0}; added=${added:-0}; removed=${removed:-0}; commits=${commits:-0}
   churn=$(( added + removed )); diff_auto=$(_em_difficulty "$churn" "$files")
@@ -191,9 +276,19 @@ capture_effort_metrics() {
     cost_real=$(awk -v i="$tin" -v o="$tout" -v cr="$tcr" -v cw="$tcw" \
       -v pi="$_EM_PRICE_IN" -v po="$_EM_PRICE_OUT" -v pcr="$_EM_PRICE_CACHE_READ" -v pcw="$_EM_PRICE_CACHE_WRITE" \
       'BEGIN{printf "%.4f", (i*pi + o*po + cr*pcr + cw*pcw)/1000000}')
-    cost_source='"list-price"'
+    cost_source='"list-price"'; tokens_src='"transcripts"'; null_reason=null
   else
-    tokens_real=null; cost_real=null; cost_source=null
+    tokens_real=null; cost_real=null; cost_source=null; tokens_src=null
+    ulog="$(_em_usage_log 2>/dev/null)"
+    if [[ -n "$ulog" && -f "$ulog" ]]; then null_reason='"no-session-matched"'; else null_reason='"no-usage-source"'; fi
+    # No transcript figure: read what `cckit autopilot run` recorded for this effort's branches (#453).
+    ap="$(_em_autopilot_usage "$num" "$branch")"; read -r ap_tok ap_cost ap_runs <<< "$ap"
+    if [[ "$ap_tok" =~ ^[0-9]+$ ]]; then
+      tokens_real="$ap_tok"; tokens_src='"autopilot-run"'; null_reason=null
+      if [[ "$ap_cost" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then cost_real="$ap_cost"; cost_source='"runtime"'; fi
+    elif [[ "$ap_tok" == "unknown" ]]; then
+      null_reason='"autopilot-usage-unknown"'
+    fi
   fi
 
   # estimate (#808) for reconciliation.
@@ -207,17 +302,19 @@ capture_effort_metrics() {
         --argjson build "$build_s" --argjson files "$files" --argjson added "$added" \
         --argjson removed "$removed" --argjson commits "$commits" \
         --argjson tokens_real "$tokens_real" --argjson cost_real "$cost_real" --argjson cost_source "$cost_source" \
-        --argjson tokens_est "$tokens_est" --argjson cost_est "$cost_est" --argjson diff "$diff_auto" '
-    {effort:$num, branch:$branch, captured_at:$at, build_seconds:$build,
+        --argjson tokens_est "$tokens_est" --argjson cost_est "$cost_est" --argjson diff "$diff_auto" \
+        --argjson build_src "$build_src" --argjson tokens_src "$tokens_src" --argjson null_reason "$null_reason" '
+    {effort:$num, branch:$branch, captured_at:$at, build_seconds:$build, build_source:$build_src,
      signals:{files:$files, added:$added, removed:$removed, commits:$commits},
-     tokens_real:$tokens_real, cost_real_usd:$cost_real, cost_source:$cost_source,
+     tokens_real:$tokens_real, tokens_source:$tokens_src, tokens_null_reason:$null_reason,
+     cost_real_usd:$cost_real, cost_source:$cost_source,
      tokens_est:$tokens_est, cost_est_usd:$cost_est,
      difficulty_auto:$diff, score_auto:null, difficulty_judge:null, score_judge:null,
      synced_to_graph:false}' 2>/dev/null)" || return 0
   [[ -n "$rec" ]] || return 0
   printf '%s\n' "$rec" >> "$d/records.jsonl"
   rm -f "$d/$num.start" "$d/$num.est" 2>/dev/null || true
-  echo "[#$num] metrics: build=${build_s}s files=$files +$added/-$removed commits=$commits diff=$diff_auto tokens_real=$tokens_real cost_real=$cost_real est_tokens=$tokens_est → records.jsonl" >&2
+  echo "[#$num] metrics: build=${build_s}s (source=${build_src//\"/}) files=$files +$added/-$removed commits=$commits diff=$diff_auto tokens_real=$tokens_real (source=${tokens_src//\"/} reason=${null_reason//\"/}) cost_real=$cost_real est_tokens=$tokens_est → records.jsonl" >&2
   # Self-improving estimator (#812): recalibrate the medians/ratios from the now-larger dataset so the
   # next effort's pre-build estimate reflects reality (flips tokens_calibrated once ≥5 real-token rows).
   recalibrate_estimator >/dev/null 2>&1 || true
@@ -266,26 +363,64 @@ _em_judge_goal() {
   printf '%s\n' "$body" | awk '
     /^##[ \t]+[Gg]oal[ \t]*$/ { grab=1; next }
     /^##[ \t]/ { if (grab) exit }
-    grab { print }' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | grep -v '^$' | head -20
+    grab { print }' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | grep -v '^$' | sed -n 1,20p
 }
 
-# _em_judge_call <system> <user> — try CCKIT_MODEL (hosted, OpenAI-compat) then the local model.
+# _em_model_env <config-key> <default-name> — the VALUE of the env var the hosted judge reads for
+# one setting (#381). The config may NAME the variable (`model.urlEnv` / `model.modelEnv` /
+# `model.tokenEnv`) so a project that already exports its own model variables needs no fork; unset,
+# the built-in name is used. Names only, never values — the same contract as `engine.token_env`.
+# The name is expanded through `eval` (the one indirection bash 3.2 and zsh share), so anything
+# that is not a plain shell identifier is refused with a warning and the default name is used.
+_em_model_env() {
+  local key="$1" name="$2" cfg="" named=""
+  if ! command -v kit_config_path >/dev/null 2>&1 && [[ -f "$_EM_LIB_DIR/config-path.sh" ]]; then
+    # shellcheck source=/dev/null
+    source "$_EM_LIB_DIR/config-path.sh"
+  fi
+  command -v kit_config_path >/dev/null 2>&1 && cfg="$(kit_config_path 2>/dev/null || true)"
+  if [[ -n "$cfg" && -f "$cfg" ]]; then
+    named="$(jq -r --arg k "$key" '.model[$k] // empty | strings' "$cfg" 2>/dev/null)" || named=""
+  fi
+  if [[ -n "$named" ]]; then
+    if grep -qE '^[A-Za-z_][A-Za-z0-9_]*$' <<<"$named" && [[ "$named" != *$'\n'* ]]; then
+      name="$named"
+    else
+      echo "effort-metrics: model.$key is not an env var name — using $name" >&2
+    fi
+  fi
+  eval "printf '%s' \"\${$name:-}\""
+}
+
+# _em_judge_call <system> <user> — try the hosted model (OpenAI-compat) then the local model.
+# The hosted endpoint, model name and token come from CCKIT_MODEL_URL / CCKIT_MODEL /
+# CCKIT_MODEL_TOKEN, or from the env vars the config names (see _em_model_env).
 # Echoes "<model_id>\t<reply>" on success; non-zero + nothing on total failure. The model_id is the
 # hosted model name or the local tag, so the schema's model_id column records who judged.
 _em_judge_call() {
-  local system="$1" user="$2" url payload reply model
+  local system="$1" user="$2" url payload reply model base token
 
-  # PRIMARY: hosted CCKIT_MODEL (OpenAI-compatible chat completions).
-  if [[ -n "${CCKIT_MODEL_URL:-}" ]] && command -v curl >/dev/null 2>&1; then
-    url="${CCKIT_MODEL_URL%/}/chat/completions"
-    model="${CCKIT_MODEL:-default}"
+  # PRIMARY: hosted model (OpenAI-compatible chat completions).
+  base="$(_em_model_env urlEnv CCKIT_MODEL_URL)"
+  if [[ -n "$base" ]] && command -v curl >/dev/null 2>&1; then
+    url="${base%/}/chat/completions"
+    model="$(_em_model_env modelEnv CCKIT_MODEL)"; [[ -n "$model" ]] || model="default"
+    token="$(_em_model_env tokenEnv CCKIT_MODEL_TOKEN)"
     payload="$(jq -n --arg m "$model" --arg s "$system" --arg p "$user" \
       '{model:$m, messages:[{role:"system",content:$s},{role:"user",content:$p}], max_tokens:512, temperature:0.1}')" || payload=""
     if [[ -n "$payload" ]]; then
-      reply="$(curl -sf -m "${EM_JUDGE_TIMEOUT:-60}" "$url" \
-        -H 'Content-Type: application/json' \
-        ${CCKIT_MODEL_TOKEN:+-H "Authorization: Bearer $CCKIT_MODEL_TOKEN"} \
-        -d "$payload" 2>/dev/null | jq -r '.choices[0].message.content // empty' 2>/dev/null)" || reply=""
+      # Two explicit calls, not `${token:+-H "…"}`: zsh does not word-split that expansion, so the
+      # flag and its value reached curl as ONE argument and the token was never sent.
+      if [[ -n "$token" ]]; then
+        reply="$(curl -sf -m "${EM_JUDGE_TIMEOUT:-60}" "$url" \
+          -H 'Content-Type: application/json' \
+          -H "Authorization: Bearer $token" \
+          -d "$payload" 2>/dev/null | jq -r '.choices[0].message.content // empty' 2>/dev/null)" || reply=""
+      else
+        reply="$(curl -sf -m "${EM_JUDGE_TIMEOUT:-60}" "$url" \
+          -H 'Content-Type: application/json' \
+          -d "$payload" 2>/dev/null | jq -r '.choices[0].message.content // empty' 2>/dev/null)" || reply=""
+      fi
       if [[ -n "$reply" ]]; then
         printf '%s\t%s' "$model" "$reply"
         return 0
@@ -295,8 +430,8 @@ _em_judge_call() {
 
   # FALLBACK: local model via kit-local.sh.
   if ! declare -f kit_local_chat >/dev/null 2>&1; then
-    local _ldir; _ldir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
-    [[ -f "$_ldir/kit-local.sh" ]] && source "$_ldir/kit-local.sh"
+    # shellcheck source=/dev/null
+    [[ -f "$_EM_LIB_DIR/kit-local.sh" ]] && source "$_EM_LIB_DIR/kit-local.sh"
   fi
   if declare -f kit_local_chat >/dev/null 2>&1 && kit_local_alive 2>/dev/null; then
     reply="$(kit_local_chat "$system" "$user" 512 2>/dev/null)" || reply=""
@@ -351,7 +486,7 @@ ${diff}${truncated_note}"
   model="${out%%$'\t'*}"; reply="${out#*$'\t'}"
 
   # Extract the first {...} object from the reply (models often wrap it in prose/fences).
-  json="$(printf '%s' "$reply" | tr '\n' ' ' | grep -oE '\{[^{}]*\}' | head -1)"
+  json="$(printf '%s' "$reply" | tr '\n' ' ' | grep -oE '\{[^{}]*\}' | sed -n 1p)"
   if [[ -z "$json" ]]; then
     echo "[#$num] judge: model reply had no JSON object — leaving *_judge null (model=$model)" >&2
     return 0
@@ -363,7 +498,7 @@ ${diff}${truncated_note}"
     echo "[#$num] judge: difficulty_judge='$dj' out of range — leaving *_judge null (model=$model)" >&2
     return 0
   fi
-  if ! printf '%s' "$sj" | grep -qE '^[0-9]+(\.[0-9]+)?$' || ! awk -v s="$sj" 'BEGIN{exit !(s>=0 && s<=1)}'; then
+  if ! grep -qE '^[0-9]+(\.[0-9]+)?$' <<<"$sj" || ! awk -v s="$sj" 'BEGIN{exit !(s>=0 && s<=1)}'; then
     echo "[#$num] judge: score_judge='$sj' out of range — leaving *_judge null (model=$model)" >&2
     return 0
   fi
@@ -417,8 +552,8 @@ ${diff}${truncated_note}"
 sync_effort_metrics() {
   command -v jq >/dev/null 2>&1 || return 0
   if ! declare -f engine_call >/dev/null 2>&1; then
-    local _adir; _adir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
-    [[ -f "$_adir/engine-adapter.sh" ]] && source "$_adir/engine-adapter.sh"
+    # shellcheck source=/dev/null
+    [[ -f "$_EM_LIB_DIR/engine-adapter.sh" ]] && source "$_EM_LIB_DIR/engine-adapter.sh"
   fi
   declare -f engine_enabled >/dev/null 2>&1 || { echo "effort-metrics: engine adapter unavailable — buffered locally" >&2; return 0; }
   engine_enabled || { echo "effort-metrics: engine off — metrics stay in the local buffer" >&2; return 0; }
@@ -468,7 +603,12 @@ recalibrate_estimator() {
         median_commits: med([$rows[].commits]),
         median_build_seconds: med([$rows[]|select(.build!=null)|.build]),
         tokens_per_changed_line: (if $nrt>=$min then (([$rt[].tok]|add)/([$rt[].lines]|add)) else null end),
-        cost_per_changed_line_usd: (if $nrt>=$min then (([$rt[]|(.cost|tonumber? // 0)]|add)/([$rt[].lines]|add)) else null end),
+        cost_per_changed_line_usd: (
+          # Only rows that carry a cost: an autopilot-run row from a runtime that prints none has
+          # tokens and a null cost (#453), and counting it as 0 would lower the ratio.
+          ($rt | map(select(.cost != null))) as $rc
+          | if $nrt>=$min and ($rc|length) > 0 and ([$rc[].lines]|add) > 0
+            then (([$rc[]|(.cost|tonumber? // 0)]|add)/([$rc[].lines]|add)) else null end),
         recalibrated_at:$stamp }' "$f")"
   [[ -n "$model" ]] || { echo "effort-metrics: recalibrate produced nothing" >&2; return 1; }
   if [[ -f "$est" ]]; then

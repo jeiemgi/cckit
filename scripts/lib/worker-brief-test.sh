@@ -46,6 +46,11 @@ rc="$(wb_receipt_contract 41)"
 for f in outcome url gate blocker "next stage"; do
   yes "the receipt contract declares '$f'" "$rc" "$f:"
 done
+# The contract's next-stage line is the receipt vocabulary (SR_STAGES, stage-receipt.sh), `qa` included (#299): a
+# worker told a shorter list would have its `next stage: qa` flagged invalid.
+for st in build review design docs qa none; do
+  yes "the receipt contract offers next stage '$st'" "$(printf '%s\n' "$rc" | grep 'next stage:')" " $st"
+done
 yes "the receipt contract names the PR verb" "$rc" "cckit pr 41"
 yes "the receipt contract names the no-op close" "$rc" "cckit close 41"
 # The contract must name the verb that PERSISTS it (#322). A prompt that only asks the worker to

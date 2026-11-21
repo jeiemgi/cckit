@@ -1,0 +1,126 @@
+---
+title: Hand over your first piece
+description: Hand over one piece end to end with one request to your assistant, look at the review link, and take it to approved.
+tutorial:
+  job: hand over one piece end to end and take it to approved
+  difficulty: beginner
+  time: "10 min"
+  prerequisites:
+    - { text: "The keys are given and the project is open in the chat with your assistant", link: "The keys are given", href: "/marketing/get-set-up/" }
+  ogTag: Marketing
+  related: [marketing/write-together, marketing/ask-for-changes, marketing/review-and-approval, marketing/brand-voice]
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+import Chat from '../../../components/Chat.astro';
+import Outcomes from '../../../components/Outcomes.astro';
+import TutorialMeta from '../../../components/TutorialMeta.astro';
+
+<TutorialMeta />
+
+The first time, hand over something small and complete: one landing page, one post, one section
+of a site. You describe it, your assistant builds it in the background and returns a review link,
+and a person approves it. Pilot Light Bakery's project is set up and empty, and the first thing the
+shop needs is a landing page.
+
+**Who does it:** you describe the piece and read the result. Your assistant and its helpers build.
+Your colleague approves; if you work alone, you finish it yourself (step 3 says how).
+
+**What you will have at the end:** the piece as part of the shared version of the project, and the
+task marked done.
+
+**Before you start:** the [keys are given](/marketing/get-set-up/) and the project is open in the
+chat with your assistant.
+
+<Steps>
+
+1. **Describe the piece in one paragraph.** Say what it is and what goes on it. Your assistant
+   writes it down as a task and starts building:
+
+   <Chat
+     title="handing over the Pilot Light Bakery landing page"
+     say="I need a landing page for my bakery, Pilot Light. At the top the name and a short line about us, then three breads with prices, our opening hours and a contact form. Can you build it?"
+     means="Nothing is public yet. You will get a link, read the page and approve it or ask for changes."
+   >
+     I wrote it down as a task and started building. I will tell you when there is a link.
+   </Chat>
+
+   <Outcomes title="For the technical person: the two commands behind this step">
+
+   ```text
+   cckit task new "<title of the piece>" --body "<what goes on the page>"
+   cckit task run <id>
+   ```
+
+   `cckit task new` prints the task's id, and `<id>` is that id. The notes after `--body` are the
+   paragraph about what goes on the page.
+
+   </Outcomes>
+
+2. **Wait for the link.** Your assistant tells you when the page is ready and gives you one link.
+   Before it does, it checks that the site still works; when that check fails, or when nothing
+   changed, no review is opened and your assistant says why.
+
+   One round of a landing page like this one took under three minutes in a real run with nobody
+   stepping in; a second page, a menu, took about one minute.
+
+3. **Look at the result.** Open the review link. [Review and approval](/marketing/review-and-approval/)
+   says what the page shows. If you want something changed, say it:
+
+   <Chat
+     title="asking for changes on the Pilot Light Bakery landing page"
+     say="The line at the top is too long. Use 'Bread baked this morning'. And add a photo of the shop."
+     means="You only describe what to change. The review link stays the same, and nothing is approved by itself."
+   >
+     The line at the top is changed and the review is updated. I could not add a photo: there is
+     none in the project. Send me one and I will add it.
+   </Chat>
+
+   **Who approves.** Send the link to your colleague. GitHub does not let the person who asked for
+   a review approve it, so a second person reads the page and clicks **Approve**. If you work
+   alone there is no second reader: you read the review yourself and finish it, either by telling
+   your assistant the page is fine or with the green **Merge pull request** button on the review
+   page.
+
+4. **Approved.** Once it is approved, tell your assistant so, and it finishes the piece: the page
+   becomes part of the shared version and the task is marked done. See
+   [After approval](/marketing/review-and-approval/#after-approval).
+
+</Steps>
+
+For a page, your assistant loads the design skills described on
+[The tools we plug in](/marketing/tools/#design-skills-how-a-page-is-designed) and writes a short
+design brief before it builds. The review says which design skills were loaded in that run. A
+page built this way takes longer: in the one run on record, about seven minutes where the plain
+run took under three.
+
+You never edit code. Nothing is approved by itself, and cckit does not publish: the result is an
+approved site that works, and putting it on a public address is a separate step.
+
+## Check that it worked
+
+Ask "Where are we?". The landing page is no longer listed as in progress or waiting for a review,
+and it counts as done.
+
+## Coming back to a piece
+
+Pieces you have started are still there after you close the app. Open the project again and say:
+
+<Chat
+  title="coming back to the Bakery site the next day"
+  say="Where are we? Show me what I have started and anything waiting for a review."
+  means="Then say which one to continue. To pick new work instead, say: “Show me what is ready and I will pick.”"
+>
+  The landing page is done. You have one piece in progress, the post about the new rye loaf.
+  Nothing is waiting for a review. Do you want to continue the post?
+</Chat>
+
+<Aside type="note" title="Approved is not published">
+cckit stops at approved. See [after approval](/marketing/review-and-approval/#after-approval), and
+[Put an approved piece online](/marketing/go-live/) for what to hand the person who publishes.
+</Aside>
+
+Want to shape a post sentence by sentence instead of handing it over? See
+[Write a piece together](/marketing/write-together/).
+
+Next: [Write a piece together](/marketing/write-together/)

@@ -8,7 +8,7 @@ echo "→ Milestones on $KIT_REPO"
 existing=$(gh api "repos/$KIT_REPO/milestones?state=all" --jq '.[].title' 2>/dev/null || echo "")
 while IFS= read -r m; do
   [[ -z "$m" ]] && continue
-  if echo "$existing" | grep -qxF "$m"; then
+  if grep -qxF "$m" <<<"$existing"; then
     echo "  • $m (exists)"
   else
     gh api "repos/$KIT_REPO/milestones" -f title="$m" >/dev/null && echo "  ✓ $m"

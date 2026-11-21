@@ -1,0 +1,84 @@
+---
+title: What you can hand over
+description: Hand cckit a content-driven page, a landing page, a small app or a website, and get back a link to look at and approve. What you do, what happens behind the scenes, and where to start.
+---
+
+import { CardGrid, LinkCard, Aside } from '@astrojs/starlight/components';
+import SearchStart from '../../../components/SearchStart.astro';
+import Chat from '../../../components/Chat.astro';
+
+<SearchStart kind="marketing" />
+
+You hand over a piece of work: a content-driven page, a landing page, a small app, a website, a
+post. You describe what you want in plain words. cckit builds it in the background and gives you
+back a link to look at. You read it, and you approve it or ask for changes.
+
+<Chat
+  title="the owner of Pilot Light Bakery asking for a landing page"
+  say="I need a landing page for my bakery, Pilot Light. At the top the name and a short line about us, then three breads with prices, our opening hours and a contact form. Can you build it?"
+  means="That paragraph was the whole request. Nothing is public: the link is for you and whoever approves."
+>
+  It is ready. The page has the four parts you asked for, and I checked that the site still works
+  before showing it to you. Here is the link to look at it. For the short line I wrote "Bread for
+  Alder Row, out of the oven before the street wakes up"; say so if you want another.
+</Chat>
+
+<Aside type="note" title="We tried it">
+One paragraph describing a bakery landing page came back as a review link in under three minutes.
+Nobody edited code.
+</Aside>
+
+The steps in between (drafts, checks, review) happen behind the scenes. You do not run them and
+you do not need to learn them. [What happens after you hand it over](/marketing/how-we-work/)
+tells them briefly, so you know what you are trusting.
+
+## Where you act
+
+1. **Give the keys, once.** A technical person sets up the accounts and the project one time.
+   [Give the keys](/marketing/get-set-up/)
+2. **Say what you want.** A paragraph is enough: what the page or the piece is, what goes on it.
+   [Hand over your first piece](/marketing/your-first-piece/)
+3. **Read what came back.** A handed-over piece is built without stopping to ask. Where your
+   paragraph could be read two ways your assistant picks one, and you see which in the review.
+4. **Approve.** You open the link, read, and approve or ask for changes. A person decides, never
+   your assistant. [Review and approval](/marketing/review-and-approval/)
+
+## What you get
+
+A link to a version of the work you can look at, and an approved piece once a person says yes. The
+project remembers your brand voice and, with the optional memory turned on, the decisions you made
+in earlier conversations. See [The tools we plug in](/marketing/tools/).
+
+## After the first piece
+
+- [Write a piece together](/marketing/write-together/): shape a post sentence by sentence.
+- [Ask for changes to a piece](/marketing/ask-for-changes/): change a piece that is being written or in review.
+- [Update a page that already exists](/marketing/update-a-page/): a change to a piece that was approved.
+- [Put an approved piece online](/marketing/go-live/): what to hand the person who publishes.
+- [Several pieces, one goal](/marketing/campaigns/): a campaign planned together and approved piece by piece.
+- [See where everything stands](/marketing/where-things-stand/): pieces being written, pieces
+  waiting for a review, pieces done.
+
+## What cckit does not do
+
+- **It does not publish.** The result is an approved site that works. Putting it on a public
+  address is a separate step, done by the technical person or by your hosting service.
+- **It does not approve for you.** Nothing is approved by itself.
+- **It does not skip the setup.** Someone technical sets up the keys once, and the first setup
+  takes a terminal.
+
+## Where to start
+
+<CardGrid>
+  <LinkCard title="Nothing is set up yet" href="/marketing/get-set-up/" description="Give the keys: what the technical person does once, and what you need afterwards." />
+  <LinkCard title="The project is ready" href="/marketing/your-first-piece/" description="Hand over your first piece: describe it, get a link, approve." />
+  <LinkCard title="Someone sent you a review link" href="/marketing/review-and-approval/" description="Review and approval: how to read, comment and decide." />
+  <LinkCard title="Several pieces, one goal" href="/marketing/campaigns/" description="Hand over a campaign: the pieces are planned together and approved one by one." />
+</CardGrid>
+
+Two pages are for looking things up: [Who does what](/marketing/who-does-what/) lists the people
+and the assistants, and [Words you will hear](/marketing/words-you-will-hear/) translates the
+developer words you may meet on GitHub. The commands behind each request are listed for the
+technical person on [Give the keys](/marketing/get-set-up/#part-1-for-the-technical-person).
+
+Next: [What happens after you hand it over](/marketing/how-we-work/)

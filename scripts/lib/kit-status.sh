@@ -16,7 +16,8 @@
 # thin fetcher collected, so the verdicts are unit-tested against fixtures rather than the network.
 #
 # Source it:  source scripts/lib/kit-status.sh
-# Depends on: git; gh + jq for the PR bucket (absent → the bucket says so); kit-gc.sh for cleanup.
+# Depends on: git; gh + jq for the PR bucket (absent → the bucket says so); kit-gc.sh for cleanup;
+#             effort-plan.sh for the next-effort-per-flow section (not loaded → it says so).
 
 # ── bucket 1: local undone work ────────────────────────────────────────────────────────────────
 
@@ -81,7 +82,7 @@ status_local_rows() {
 $(git for-each-ref --format='%(refname:short)' "refs/heads/effort/*" 2>/dev/null)
 EOT
         [ -n "$found_in" ] && continue
-        effort="$(git for-each-ref --format='%(refname:short)' "refs/heads/effort/*" 2>/dev/null | head -1)"
+        effort="$(git for-each-ref --format='%(refname:short)' "refs/heads/effort/*" 2>/dev/null | sed -n 1p)"
         [ -n "$effort" ] || continue
         printf 'unmerged\t%s\tin no effort branch\n' "$b"
       done
@@ -103,6 +104,31 @@ status_worktree_rows() {
            /^HEAD /    { head=substr($0, 6); next }
            /^branch /  { b=substr($0, 8); sub(/^refs\/heads\//, "", b) }
            END         { emit() }'
+}
+
+# status_inprogress_rows — status_worktree_rows minus the detached worktrees gc rates LANDED (#390):
+# clean, HEAD already on the base branch or `main`. Nothing is in progress there — `cckit cleanup`
+# removes it — so listing it as work under way sends a session to look at an empty checkout. The
+# verdict is gc's own (_kit_gc_detached_rows), never re-derived here. A detached worktree gc rates
+# ORPHAN (a commit on no branch, or uncommitted changes) stays, and so does every attached one.
+# best-effort: without the gc classifier loaded there is no verdict, and every row is kept.
+status_inprogress_rows() {
+  local rows landed wtpath b
+  rows="$(status_worktree_rows)"
+  landed=""
+  if command -v _kit_gc_detached_rows >/dev/null 2>&1; then
+    landed="$(_kit_gc_detached_rows 2>/dev/null | awk -F'\t' '$3 ~ /^LANDED/ {print $1}')"
+  fi
+  while IFS="$(printf '\t')" read -r wtpath b; do
+    [ -n "$wtpath" ] || continue
+    case "$b" in
+      detached@*) [ -n "$landed" ] && grep -qxF -- "$wtpath" <<<"$landed" && continue ;;
+      *) : ;;
+    esac
+    printf '%s\t%s\n' "$wtpath" "$b"
+  done <<EOF
+$rows
+EOF
 }
 
 # ── bucket 2: open PRs waiting on a human ──────────────────────────────────────────────────────
@@ -238,18 +264,21 @@ status_ai_expected() {
 
 # ── bucket 3: cleanup available ────────────────────────────────────────────────────────────────
 
-# status_cleanup_counts — echo `safe<TAB>orphan<TAB>protected<TAB>remote_stale` for the current repo.
+# status_cleanup_counts — echo `safe<TAB>orphan<TAB>protected<TAB>remote_stale<TAB>unknown` for the
+# current repo. `unknown` (#330) counts the branches gc could not classify because a gh read failed:
+# without it a GitHub outage reads as "0 orphan / 0 protected", i.e. as a clean repo.
 # The local three come from kit_gc_analyze (the ONE classifier, so status and gc can never disagree);
 # `remote_stale` counts remote branches whose PR is merged and which are therefore deletable — the
 # half `gc --prune` does not touch and a plain `git branch` view never shows.
 # best-effort: an unavailable classifier yields zeros, never a broken bucket.
 status_cleanup_counts() {
-  local out safe=0 orphan=0 prot=0 rstale=0 r b st
+  local out safe=0 orphan=0 prot=0 rstale=0 unknown=0 r b st
   if command -v kit_gc_analyze >/dev/null 2>&1; then
     out="$(kit_gc_analyze 2>/dev/null || true)"
     safe="$(printf '%s\n'   "$out" | grep -c -- '> SAFE '      || true)"
     orphan="$(printf '%s\n' "$out" | grep -c -- '> ORPHAN'     || true)"
     prot="$(printf '%s\n'   "$out" | grep -c -- '> PROTECTED:' || true)"
+    unknown="$(printf '%s\n' "$out" | grep -c -- '> UNKNOWN '  || true)"
   fi
   if command -v git >/dev/null 2>&1 && command -v gh >/dev/null 2>&1; then
     local base="${KIT_BASE_BRANCH:-main}" idx
@@ -258,7 +287,8 @@ status_cleanup_counts() {
     # `while IFS= read -r`, not `for … in $(…)`: an ambient IFS carrying a NUL breaks word
     # splitting on a bare `for` (a bug this repo has already been bitten by).
     if command -v _kit_gc_pr_index >/dev/null 2>&1; then
-      idx="$(_kit_gc_pr_index "${KIT_GC_REPO:-${KIT_REPO:-}}")"
+      # 2>/dev/null: a failed read already shows as `unknown` rows from kit_gc_analyze above.
+      idx="$(_kit_gc_pr_index "${KIT_GC_REPO:-${KIT_REPO:-}}" 2>/dev/null || true)"
     else
       idx="$(gh pr list --repo "${KIT_REPO:-}" --state all --limit 200 \
                --json number,state,headRefName \
@@ -268,13 +298,154 @@ status_cleanup_counts() {
       [ -n "$r" ] || continue
       b="${r#origin/}"
       case "$b" in "$base"|main|master|develop) continue ;; esac
-      st="$(printf '%s\n' "$idx" | awk -F'\t' -v want="$b" '$1==want{print $2; exit}')"
+      st="$(printf '%s\n' "$idx" | awk -F'\t' -v want="$b" '$1==want && !hit {print $2; hit=1}')"
       case "$st" in *MERGED*) rstale=$((rstale + 1)) ;; *) : ;; esac
     done <<EOT
 $(git branch -r --format='%(refname:short)' 2>/dev/null | grep -v HEAD || true)
 EOT
   fi
-  printf '%s\t%s\t%s\t%s\n' "${safe:-0}" "${orphan:-0}" "${prot:-0}" "${rstale:-0}"
+  printf '%s\t%s\t%s\t%s\t%s\n' "${safe:-0}" "${orphan:-0}" "${prot:-0}" "${rstale:-0}" "${unknown:-0}"
+}
+
+# ── instruction-file budget ────────────────────────────────────────────────────────────────────
+
+# status_instruction_budget [kit_root] — one line: the resident instruction-file total against the
+# 150k limit and the three largest files, for the project the command is run in (#357). Claude Code
+# warns at startup once CLAUDE.md + the rules without `paths:` pass that limit; this puts the number
+# in front of the reader before the warning does.
+#
+# The measurement is scripts/instruction-budget-lint.sh --summary — the ONE implementation, so the
+# status line, the doctor row and the gate can never disagree. KIT_INSTRUCTION_LINT overrides where
+# it is looked up. best-effort: no lint, or nothing to measure, prints nothing.
+status_instruction_budget() {
+  local root="${1:-.}" lint proj
+  lint="${KIT_INSTRUCTION_LINT:-$root/scripts/instruction-budget-lint.sh}"
+  [ -f "$lint" ] || return 0
+  proj="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+  [ -n "$proj" ] || proj="$PWD"
+  INSTRUCTION_BUDGET_ROOT="$proj" bash "$lint" --summary 2>/dev/null || true
+}
+
+# ── next effort per flow ───────────────────────────────────────────────────────────────────────
+
+# status_next_efforts_rows [repo] — `flow<TAB>number<TAB>ctx<TAB>title<TAB>waiting`, one row per flow
+# that has an open effort: the next effort that can start (no open blocker; p0 → p3, then the lowest
+# number), or `-` when every effort in the flow is blocked. The pick is `effort_next_rows`
+# (scripts/lib/effort-plan.sh), which the caller sources — status.sh does, next to kit-gc.sh.
+# rc 1 when the efforts could not be read, or that lib is not loaded: unknown, not empty.
+status_next_efforts_rows() {
+  command -v effort_next_rows >/dev/null 2>&1 || return 1
+  effort_next_rows "${1:-${KIT_REPO:-}}"
+}
+
+# status_next_efforts_md [repo] — the section as markdown. It states its own emptiness, and tells
+# "no effort" apart from "could not read", for the same reason the buckets below do.
+status_next_efforts_md() {
+  local rows ne_rc=0 flow num ctx title waiting
+  echo "## Next effort per flow"
+  echo ""
+  rows="$(status_next_efforts_rows "${1:-}")" || ne_rc=$?
+  if [ "$ne_rc" -ne 0 ]; then
+    echo "_Could not read the open efforts (gh or jq absent, unauthenticated, or offline). This is NOT"
+    echo "the same as having none._"
+  elif [ -z "$rows" ]; then
+    echo "_No open issue carries the \`effort\` label, so there is no effort to order."
+    echo "\`cckit effort new\` applies the label; an effort created without it is invisible here._"
+  else
+    echo "| flow | next effort | ctx | waiting on a blocker |"
+    echo "| --- | --- | --- | --- |"
+    while IFS="$(printf '\t')" read -r flow num ctx title waiting; do
+      [ -n "$flow" ] || continue
+      if [ "$num" = "-" ]; then
+        printf '| %s | _none can start — every open effort has an open blocker_ | — | %s |\n' "$flow" "$waiting"
+      else
+        printf '| %s | **E%s** — %s | %s | %s |\n' "$flow" "$num" "$title" "$ctx" "$waiting"
+      fi
+    done <<EOF
+$rows
+EOF
+    echo ""
+    echo "_\`cckit effort start <N>\` starts one; \`cckit effort plan\` shows each flow's full order._"
+  fi
+  if command -v effort_cadence_md >/dev/null 2>&1; then
+    echo ""
+    effort_cadence_md
+  fi
+}
+
+# ── light tasks (#487) ─────────────────────────────────────────────────────────────────────────
+# A project whose work is tracked with `cckit task` has no GitHub issue per task, so the board
+# section reads "open issues: 0" while five tasks are open. These read the task source
+# (task-source.sh) — local git only: no fetch, no gh call.
+
+# status_light_task_rows — every light task as the source's TSV rows
+# (`id<TAB>state<TAB>priority<TAB>kind<TAB>created<TAB>branch<TAB>title`). Empty when the project
+# has none, when it is not a git repository, or when task-source.sh is not there to load.
+status_light_task_rows() {
+  if ! command -v task_source_call >/dev/null 2>&1; then
+    local _ks_dir
+    _ks_dir="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" >/dev/null 2>&1 && pwd)"
+    # shellcheck source=task-source.sh
+    [ -f "$_ks_dir/task-source.sh" ] && . "$_ks_dir/task-source.sh"
+  fi
+  command -v task_source_call >/dev/null 2>&1 || return 0
+  git rev-parse --show-toplevel >/dev/null 2>&1 || return 0
+  task_source_call list 2>/dev/null || true
+}
+
+# status_light_task_counts — stdin: those rows. stdout: one line,
+# `draft<TAB>todo<TAB>shared<TAB>doing<TAB>review<TAB>done<TAB>dropped`.
+status_light_task_counts() {
+  awk -F'\t' '
+    NF >= 2 { n[$2]++ }
+    END { printf "%d\t%d\t%d\t%d\t%d\t%d\t%d\n", n["draft"], n["todo"], n["shared"], n["doing"], n["review"], n["done"], n["dropped"] }'
+}
+
+# status_light_task_attention — stdin: those rows. stdout: `id<TAB>state<TAB>title<TAB>needs` for
+# the tasks somebody has to act on: review first (a pull request is waiting), then doing, then
+# draft and shared (not on the shared list yet). `todo` is only counted: nothing is wrong with it.
+status_light_task_attention() {
+  awk -F'\t' '
+    BEGIN { r["review"] = 1; r["doing"] = 2; r["draft"] = 3; r["shared"] = 4 }
+    ($2 in r) {
+      if ($2 == "review")      needs = "waiting for review: its pull request is open from " $6
+      else if ($2 == "doing")  needs = "in progress on " $6 "; when ready: cckit task finish " $1 " \"<summary>\" --all"
+      else if ($2 == "draft")  needs = "only in this checkout; start it (cckit task start " $1 ") or share the list (cckit task share)"
+      else                     needs = "in a share pull request (" $6 ") that has not merged"
+      print r[$2] "\t" $1 "\t" $2 "\t" $7 "\t" needs
+    }' | sort -t "$(printf '\t')" -k1,1n -k2,2 | cut -f2-
+}
+
+# status_light_tasks_md — the section as markdown; prints nothing when the project has no light task.
+status_light_tasks_md() {
+  local rows counts c_draft c_todo c_shared c_doing c_review c_done c_dropped att id state title needs
+  rows="$(status_light_task_rows)"
+  [ -n "$rows" ] || return 0
+  counts="$(printf '%s\n' "$rows" | status_light_task_counts)"
+  IFS="$(printf '\t')" read -r c_draft c_todo c_shared c_doing c_review c_done c_dropped <<EOF
+$counts
+EOF
+  echo "## Light tasks"
+  echo ""
+  printf 'review: %s   doing: %s   todo: %s   draft: %s   shared: %s   done: %s\n' \
+    "$c_review" "$c_doing" "$c_todo" "$c_draft" "$c_shared" "$c_done"
+  echo ""
+  att="$(printf '%s\n' "$rows" | status_light_task_attention)"
+  if [ -n "$att" ]; then
+    echo "| task | state | title | what it needs |"
+    echo "| --- | --- | --- | --- |"
+    while IFS="$(printf '\t')" read -r id state title needs; do
+      [ -n "$id" ] || continue
+      printf '| `%s` | **%s** | %s | %s |\n' "$id" "$state" "$title" "$needs"
+    done <<EOF
+$att
+EOF
+  elif [ "$c_todo" -gt 0 ]; then
+    echo "_Nothing is waiting on anyone. \`cckit next\` names the task to take._"
+  else
+    echo "_Every task is done._"
+  fi
+  echo ""
 }
 
 # ── the three-bucket report ────────────────────────────────────────────────────────────────────
@@ -283,8 +454,8 @@ EOT
 # emptiness explicitly ("nothing local-only", "no open PRs"), because a silently missing bucket is
 # indistinguishable from a clean one and this report is read to decide what to do next.
 status_buckets_md() {
-  local root="${1:-.}" base="${KIT_BASE_BRANCH:-main}" rows prs ai prrows counts safe orphan prot rstale
-  local kind name detail verdict num title n_local
+  local root="${1:-.}" base="${KIT_BASE_BRANCH:-main}" rows prs ai prrows counts safe orphan prot rstale unknown
+  local kind name detail verdict num title n_local budget_line
 
   echo "## 1 · Local undone work"
   echo ""
@@ -306,9 +477,10 @@ EOF
     echo "_Nothing local-only: every worktree is clean and every branch's commits are pushed._"
   fi
 
-  local wt_rows n_wt
-  wt_rows="$(status_worktree_rows)"
+  local wt_rows n_wt n_all
+  wt_rows="$(status_inprogress_rows)"
   n_wt="$(printf '%s' "$wt_rows" | grep -c . || true)"
+  n_all="$(status_worktree_rows | grep -c . || true)"
   if [ "${n_wt:-0}" -gt 0 ]; then
     echo ""
     printf -- '**In progress** — %s worktree(s) checked out:\n\n' "${n_wt:-0}"
@@ -318,6 +490,11 @@ EOF
     done <<EOF
 $wt_rows
 EOF
+  fi
+  if [ "${n_all:-0}" -gt "${n_wt:-0}" ]; then
+    echo ""
+    printf -- '_%s detached worktree(s) hold nothing to lose (clean, HEAD on the base branch) and are not listed — `cckit cleanup` removes them._\n' \
+      "$((n_all - n_wt))"
   fi
 
   echo ""
@@ -355,7 +532,8 @@ EOF
   counts="$(status_cleanup_counts)"
   safe="${counts%%	*}"; counts="${counts#*	}"
   orphan="${counts%%	*}"; counts="${counts#*	}"
-  prot="${counts%%	*}"; rstale="${counts##*	}"
+  prot="${counts%%	*}"; counts="${counts#*	}"
+  rstale="${counts%%	*}"; unknown="${counts##*	}"
   if [ "${safe:-0}" -gt 0 ] || [ "${rstale:-0}" -gt 0 ]; then
     printf -- '- **%s** local branch(es) SAFE to delete — merged PR, issue closed\n' "${safe:-0}"
     printf -- '- **%s** remote branch(es) whose PR merged\n' "${rstale:-0}"
@@ -367,12 +545,26 @@ EOF
     printf -- '_Nothing to clean. %s orphan / %s protected branch(es) are kept by design._\n' \
       "${orphan:-0}" "${prot:-0}"
   fi
+  if [ "${unknown:-0}" -gt 0 ]; then
+    echo ""
+    printf -- '- **%s** branch(es) could not be classified — a GitHub read failed. They are kept; the counts above are incomplete until `cckit gc` can read GitHub.\n' "${unknown:-0}"
+  fi
+
+  # Not a fourth bucket — nothing here is work to do — so it is one line, and absent when there is
+  # nothing to measure.
+  budget_line="$(status_instruction_budget "$root")"
+  if [ -n "$budget_line" ]; then
+    echo ""
+    echo "## Instruction files"
+    echo ""
+    printf -- '- %s\n' "$budget_line"
+  fi
 }
 
 # status_buckets_json [root] — the same three buckets as one JSON object, for an agent. Same
 # classifiers as the markdown path, so the two can never disagree about a verdict.
 status_buckets_json() {
-  local root="${1:-.}" base="${KIT_BASE_BRANCH:-main}" rows prs ai prrows counts safe orphan prot rstale
+  local root="${1:-.}" base="${KIT_BASE_BRANCH:-main}" rows prs ai prrows counts safe orphan prot rstale unknown
   # No jq means no JSON at all. Emitting `{}` with rc 0 would hand an agent an empty report that
   # reads as "nothing to do" — the exact confusion the markdown path is careful to avoid.
   command -v jq >/dev/null 2>&1 || {
@@ -388,22 +580,60 @@ status_buckets_json() {
   counts="$(status_cleanup_counts)"
   safe="${counts%%	*}"; counts="${counts#*	}"
   orphan="${counts%%	*}"; counts="${counts#*	}"
-  prot="${counts%%	*}"; rstale="${counts##*	}"
+  prot="${counts%%	*}"; counts="${counts#*	}"
+  rstale="${counts%%	*}"; unknown="${counts##*	}"
+  # `instruction files: <resident> of <limit> bytes resident …` — fields 3 and 5 are the numbers.
+  local budget_line budget_resident budget_limit
+  budget_line="$(status_instruction_budget "$root")"
+  budget_resident="$(printf '%s' "$budget_line" | awk '{print $3}')"
+  budget_limit="$(printf '%s' "$budget_line" | awk '{print $5}')"
+  case "$budget_resident" in ''|*[!0-9]*) budget_resident=0; budget_line="" ;; esac
+  case "$budget_limit"    in ''|*[!0-9]*) budget_limit=0 ;; esac
+  local ne_rows ne_rc=0
+  ne_rows="$(status_next_efforts_rows)" || ne_rc=$?
+  local lt_rows lt_counts="" lt_att=""
+  lt_rows="$(status_light_task_rows)"
+  if [ -n "$lt_rows" ]; then
+    lt_counts="$(printf '%s\n' "$lt_rows" | status_light_task_counts)"
+    lt_att="$(printf '%s\n' "$lt_rows" | status_light_task_attention)"
+  fi
 
   jq -n \
+    --arg lt_counts "$lt_counts" --arg lt_att "$lt_att" \
+    --arg ne_rows "$ne_rows" \
+    --argjson ne_read "$([ "$ne_rc" -eq 0 ] && echo true || echo false)" \
     --arg local_rows "$rows" \
     --arg wt_rows "$wt_rows" \
     --arg pr_rows "$prrows" \
     --argjson safe "${safe:-0}" --argjson orphan "${orphan:-0}" \
     --argjson protected "${prot:-0}" --argjson remote_stale "${rstale:-0}" \
+    --argjson unknown "${unknown:-0}" \
     --argjson ai_expected "${ai:-0}" \
     --argjson prs_read "$([ "$pr_rc" -eq 0 ] && echo true || echo false)" \
-    --argjson has_gh "$has_gh" --argjson has_git "$has_git" '
+    --argjson has_gh "$has_gh" --argjson has_git "$has_git" \
+    --arg budget_line "$budget_line" \
+    --argjson budget_resident "$budget_resident" --argjson budget_limit "$budget_limit" '
     def rows($s): if ($s | length) == 0 then [] else ($s | rtrimstr("\n") | split("\n") | map(select(length > 0) | split("\t"))) end;
     { local_undone: (rows($local_rows) | map({kind: .[0], name: .[1], detail: .[2]})),
       worktrees:    (rows($wt_rows)    | map({path: .[0], branch: .[1]})),
       prs:          (rows($pr_rows)    | map({verdict: .[0], number: (.[1]|tonumber?), title: .[2], detail: .[3]})),
-      cleanup:      { safe: $safe, orphan: $orphan, protected: $protected, remote_stale: $remote_stale },
+      # `unknown` > 0 means a GitHub read failed and those branches are unclassified, not clean (#330).
+      cleanup:      { safe: $safe, orphan: $orphan, protected: $protected, remote_stale: $remote_stale, unknown: $unknown },
+      # null means nothing was measured (no CLAUDE.md and no rules, or the lint is absent) — not zero.
+      instruction_budget: (if $budget_line == "" then null else
+        { resident_bytes: $budget_resident, limit_bytes: $budget_limit, summary: $budget_line } end),
+      # One row per flow with an open effort. `number: null` = every effort in that flow has an open
+      # blocker. The whole key is `null` (not `[]`) when the efforts could not be read.
+      next_efforts: (if $ne_read then (rows($ne_rows) | map({flow: .[0], number: (.[1] | tonumber? // null),
+                        ctx: (if .[2] == "-" then null else .[2] end),
+                        title: (if .[3] == "-" then null else .[3] end),
+                        waiting: (.[4] | tonumber? // 0)})) else null end),
+      # null = the project has no light task. `attention` holds the tasks somebody has to act on
+      # (review, doing, draft, shared); `todo` and `done` are only counted. Read from local git.
+      light_tasks: (if $lt_counts == "" then null else
+        ($lt_counts | split("\t") | map(tonumber? // 0)) as $c
+        | { counts: { draft: $c[0], todo: $c[1], shared: $c[2], doing: $c[3], review: $c[4], done: $c[5], dropped: $c[6] },
+            attention: (rows($lt_att) | map({id: .[0], state: .[1], title: .[2], needs: .[3]})) } end),
       ai_review_expected: ($ai_expected == 1),
       # `prs_read: false` means the PR bucket is UNKNOWN, not empty — never treat its `[]` as "none".
       prs_read: $prs_read,

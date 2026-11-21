@@ -42,8 +42,9 @@ mistake this skill exists to prevent.
 ## Execution
 
 ```bash
-cckit status          # the three buckets as markdown
-cckit status --llm    # the same verdicts as JSON, for an agent
+cckit status          # the board, the light tasks, the next effort per flow, the three buckets — as markdown
+cckit status --llm    # the same verdicts as JSON, for an agent: local_undone, worktrees, prs,
+                      # cleanup, next_efforts, light_tasks
 ```
 
 Read-only. It writes nothing, deletes nothing, and pushes nothing.
@@ -52,9 +53,39 @@ Read-only. It writes nothing, deletes nothing, and pushes nothing.
 
 | # | Bucket | What it answers |
 | --- | --- | --- |
-| 1 | **Local undone work** | What exists only on this machine: worktrees with uncommitted changes, branches holding commits reachable from **no** remote ref, and effort subs not yet merged into their effort branch. Plus the worktree inventory — a clean worktree on an issue branch is still work in progress. |
+| 1 | **Local undone work** | What exists only on this machine: worktrees with uncommitted changes, branches holding commits reachable from **no** remote ref, and effort subs not yet merged into their effort branch. Plus the worktree inventory — a clean worktree on an issue branch is still work in progress. A detached worktree that `cckit gc` rates LANDED (clean, HEAD on the base branch or `main`) is left out of the **In progress** list and counted in one line under it; `--llm` `worktrees` still carries every worktree. |
 | 2 | **PRs waiting on a human** | Every open PR with the ONE thing it needs: `conflict`, `checks`, `draft`, `wait`, `threads`, `ai-review`, `review`, or `ready`. |
-| 3 | **Cleanup available** | Branches and worktrees that can go — **local and remote** — plus what is deliberately kept (orphan work, open-issue branches). |
+| 3 | **Cleanup available** | Branches and worktrees that can go — **local and remote** — plus what is deliberately kept (orphan work, open-issue branches), and a count of branches that could not be classified because a GitHub read failed. |
+
+After the buckets the report prints one **Instruction files** line: the bytes `CLAUDE.md` and the
+rules without a `paths:` frontmatter load into every session, against Claude Code's 150k limit, and
+the three largest files. It is not a fourth bucket — nothing in it is pending work — and it is
+absent when the project has no instruction files. Relay it as printed;
+`scripts/instruction-budget-lint.sh --report` lists every file.
+
+## Light tasks
+
+In a project that tracks work with `cckit task`, the report prints a **Light tasks** section after
+the board: one line of counts by state (`review`, `doing`, `todo`, `draft`, `shared`, `done`), then
+a table of the tasks somebody has to act on — `review` (its pull request is waiting), `doing`,
+`draft` (only in this checkout) and `shared`. A `todo` task is counted, not listed. It is read from
+local git, with no `gh` call and no fetch. In `--llm` output it is `light_tasks`
+(`{counts, attention: [{id, state, title, needs}]}`), `null` when the project has no light task.
+Relay the rows before the buckets: in such a project they are the answer to "what is waiting",
+and the board line above them reads `open issues: 0`.
+
+## Next effort per flow
+
+Before the buckets the report prints one row per flow that has an open effort (an open issue with
+the `effort` label): the effort that can start now — no open blocker, most urgent `priority:pN`
+first, then the lowest number — and how many of the flow's efforts still wait on an open blocker.
+Any open `blocked_by` issue blocks, in the same flow or another; a closed one does not. A flow where
+nothing can start keeps its row and says so. In `--llm` output these rows are `next_efforts`
+(`{flow, number, ctx, title, waiting}`; `number` is `null` for a blocked flow, and the whole key is
+`null` when the efforts could not be read).
+
+The line under the table is the weekly cadence, the same line `cckit next` prints: Monday
+`cckit plan`, daily `cckit next`, Friday `cckit gc`. Relay it when the owner asks what to do next.
 
 ## Reading bucket 2
 

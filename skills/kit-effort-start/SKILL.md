@@ -10,7 +10,8 @@ Thin caller over the ONE canonical effort-start mechanic: the `cckit effort star
 `effort_start` (`${CLAUDE_PLUGIN_ROOT}/scripts/lib/effort-ops.sh`). The verb logic lives there,
 never inline here (kit-engine-boundary #1/#2 — same single-implementation principle as the PR
 title composer, #121). The dispatcher loads the project config first (#151), so `KIT_REPO` /
-`KIT_BASE_BRANCH` come from `.claude/kit.config.json` of the project you're standing in. The verb
+`KIT_BASE_BRANCH` come from `.claude/kit.config.json` of the project you're standing in — unless
+`KIT_BASE_BRANCH` is already set in the environment, which overrides the config's base (#352). The verb
 owns ALL of the mechanics:
 
 - resolving `<N|slug>` to the parent effort issue (slug handles work too)
@@ -108,7 +109,9 @@ fi
 - The integration branch is **always** `effort/<N>-<slug>` (branch-naming.md, effort-model.md) —
   never `task/` or `feat/` for the parent.
 - Branch from the base branch (`KIT_BASE_BRANCH`) only — never from a feature branch; the verb
-  enforces this.
+  enforces this. An effort starts from the config's base, so do not carry a `KIT_BASE_BRANCH`
+  override into `cckit effort start`; the override is for cutting a **sub-issue** from the effort
+  branch (`KIT_BASE_BRANCH=effort/<N>-<slug> cckit orchestrate <sub>`).
 - **Worktree always** — one branch per worktree, never share a checkout.
 - Sub-issue branches are `sub/<N><letter>-<slug>` off THIS branch and **never open their own PR to
   the base branch** — they merge into `effort/<N>`.

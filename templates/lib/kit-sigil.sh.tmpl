@@ -33,7 +33,7 @@ kit_color_mode() {
   local loc="${LC_ALL:-${LC_CTYPE:-${LANG:-}}}"
   if [ "${KIT_ASCII:-}" = "1" ]; then
     KIT_UNICODE=0
-  elif printf '%s' "$loc" | grep -qiE 'utf-?8'; then
+  elif grep -qiE 'utf-?8' <<<"$loc"; then
     KIT_UNICODE=1
   else
     KIT_UNICODE=0

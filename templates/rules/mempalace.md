@@ -46,7 +46,7 @@ write the session to memory **before** the closing summary — every time:
    "resume here" follow-up: `mempalace_add_drawer` (`wing={{WING}}`, room `planning`) with the branch,
    what's uncommitted/unpushed, the next step, and any open PR/issue refs — so the next session resumes
    cheaply instead of re-deriving context. Prefer committing/pushing the work; the drawer is for what
-   genuinely can't land yet.
+   can't land yet.
 
 (The `Stop` hook files the raw transcript; the `SessionEnd` hook is the safety net that captures
 unsynced work if you forgot step 4 — this is the curated, decision-level summary.)
