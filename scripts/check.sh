@@ -32,24 +32,14 @@ else
   note "  (jq absent - skipping JSON validation)"
 fi
 
-# 3. No tedos branding leaked into what SHIPS (the de-tedos-ification gate). Scans TRACKED files
-# only (git grep) so gitignored runtime state (.cckit/), build output (dist/), and deps never trip
-# a false positive - only committed content must be tedos-free. Falls back to a filtered recursive
-# grep outside a git work tree.
-note "==> no tedos branding (tracked files)"
-_tedos_scan() {
-  if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    git grep -inI tedos -- . ':!scripts/check.sh'
-  else
-    grep -rniI --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=.cckit \
-      --exclude-dir=dist --exclude=check.sh tedos .
-  fi
-}
-if _tedos_scan >/dev/null 2>&1; then
-  note "x found 'tedos' references - cckit must be tedos-free:"
-  _tedos_scan | sed -n 1,20p >&2
-  fail=1
-fi
+# 3. Leak fence - no private word (the legacy brand name, a product, a client, a person) in any
+# tracked file. One scan, three pattern sources: the built-in word, the gitignored
+# .cckit/leak-words list, and CCKIT_LEAK_WORDS in CI. Hits print as file:line only.
+# scripts/lib/leak-fence.sh is the single implementation; scripts/leak-fence-test.sh is its selftest.
+note "==> leak fence (tracked files)"
+. scripts/lib/kit-state.sh 2>/dev/null || true
+. scripts/lib/leak-fence.sh
+leak_fence_check || fail=1
 
 # 4. Secret + privacy guard - no secrets, keys, env, or private data in anything publishable.
 note "==> secret + privacy guard"

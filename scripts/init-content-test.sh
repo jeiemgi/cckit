@@ -154,7 +154,6 @@ bb="$tmp/base"; mkdir -p "$bb"
 KIT_BASE_BRANCH=develop init "$bb" --profile marketing >/dev/null 2>&1
 has   "CLAUDE.md names the project's base branch" "$(cat "$bb/CLAUDE.md")" 'lands on `develop` through a Pull Request'
 hasnt "CLAUDE.md does not say main when the base is develop" "$(cat "$bb/CLAUDE.md")" '`main`'
-t "no template names the old repository" "$(grep -rl 'tuempresadigital' "$ROOT/templates" "$ROOT/kit.config.schema.json" 2>/dev/null | wc -l | tr -d ' ')" "0"
 # #487: every state `cckit task list` can print has a plain wording in the rule.
 rule="$(cat "$m/.claude/rules/plain-language.md")"
 for st in draft todo shared doing review 'done' dropped; do

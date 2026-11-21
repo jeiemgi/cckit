@@ -17,7 +17,7 @@
 #   - arrays   : nearer REPLACES farther     (jq '*' default)        [KIT_MERGE_MODE=replace, default]
 #   - arrays   : "+item" entries APPEND onto the inherited array     [opt-in per-key, see _kit_merge]
 # The "+name" append convention (O1) is applied as a post-pass; flip KIT_MERGE_MODE=concat to make
-# arrays always concatenate instead. José reviews this knob at PR time (plan, O1).
+# arrays always concatenate instead. The maintainer reviews this knob at PR time (plan, O1).
 #
 # Source it:  source scripts/lib/kit-config-resolve.sh
 # CLI:        scripts/lib/kit-config-resolve.sh [--dir DIR] [--explain JQPATH] [--layers] [--get JQPATH]

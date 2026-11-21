@@ -1,8 +1,13 @@
 name: test
 
 # The gate in CI. scripts/check.sh is the single source of truth (shell syntax, shellcheck,
-# JSON manifests, the legacy-branding scan, secret guard, and the behavioral *-test.sh suite); CI
-# just runs it. Ubuntu runners ship bash, shellcheck, and jq, so the optional checks always run here.
+# JSON manifests, the leak fence, secret guard, and the behavioral *-test.sh suite); CI just runs
+# it. Ubuntu runners ship bash, shellcheck, and jq, so the optional checks always run here.
+#
+# CCKIT_LEAK_WORDS carries the private patterns the leak fence adds to its built-in word (see
+# scripts/lib/leak-fence.sh). It is a repository secret so the words never appear in the tree or in
+# this file; the fence prints file:line only, so they do not reach the public log either. With the
+# secret unset the fence runs on the built-in word alone.
 on:
   push:
     branches: [main, develop]
@@ -19,4 +24,6 @@ jobs:
           shellcheck --version | sed -n '2p'
           jq --version
       - name: Gate (scripts/check.sh)
+        env:
+          CCKIT_LEAK_WORDS: ${{ secrets.CCKIT_LEAK_WORDS }}
         run: bash scripts/check.sh

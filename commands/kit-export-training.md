@@ -23,7 +23,7 @@ Handler (under `${CLAUDE_PLUGIN_ROOT}`):
    `--builder` / `KIT_DATASET_BUILDER`.
 2. **Select what to export** — default is the **current git project** (matched by its slug under
    `~/.claude/projects`). Let the builder choose instead:
-   - `--match KEY ...` — project-dir name substrings (e.g. `cckit tuempresa`)
+   - `--match KEY ...` — project-dir name substrings (e.g. `cckit acme`)
    - `--sessions FILE ...` — individual `*.jsonl` transcripts (staged into a temp dir)
    - `--dirs DIR ...` — explicit `~/.claude/projects/<dir>` directories
 3. **Confirm (opt-in)** — on a TTY the handler asks before writing anything; aborting writes
