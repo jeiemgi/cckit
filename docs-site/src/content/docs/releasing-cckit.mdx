@@ -15,6 +15,10 @@ cckit follows [Semantic Versioning](https://semver.org/) driven by
 commit messages since the last tag ([How the version is decided](/ship/releasing/#how-the-version-is-decided));
 the local `cckit release` fallback applies the same rules via `scripts/lib/version-bump.sh`.
 
+cckit stays below 1.0: while the major is 0, a breaking change bumps the minor (`bump-minor-pre-major`
+in `release-please-config.json`, and the same rule in `version-bump.sh`), so versions go 0.11, 0.12, …
+Releasing 1.0 is a maintainer's decision, not a commit's.
+
 Check what the next version would be at any time:
 
 ```bash
@@ -36,10 +40,12 @@ package on npm and the Homebrew formula updated.
 
 3. **Merge the Release PR.** That merge is the release: release-please tags `vX.Y.Z` and cuts the GitHub Release, then the `publish` job pushes to npm and bumps the Homebrew tap automatically.
 
+4. **Merge the back-merge PR.** The same run opens a PR `main` → `develop` titled `chore(release): back-merge vX.Y.Z into develop` (it opens the PR and merges nothing). Merge it with a **merge commit**, never squash: the release commit bumps the version surfaces on `main` only, and cckit.dev builds `develop`, so until this merge the badge shows the previous version.
+
 </Steps>
 
 **How to check it worked:** the tag `vX.Y.Z` exists, `cckit version` on a freshly updated install
-prints the new number, and the badge on cckit.dev shows it
+prints the new number, `git show origin/develop:package.json` reads it after the back-merge, and the badge on cckit.dev shows it
 ([The docs site follows the release](#the-docs-site-follows-the-release)).
 
 A batch with only `chore`/`docs` noise produces no Release PR (`bump=none` → nothing to release). Because the release is a single PR merge, two feature PRs merging at once can no longer race each other into a corrupted tag.
