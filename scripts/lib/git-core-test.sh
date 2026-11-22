@@ -17,13 +17,24 @@ tc() { if grep -qE -- "$2" "$1"; then echo "ok: $3"; else echo "FAIL: $3 (no /$2
 
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 mkdir -p "$tmp/tools"
-# A PATH with the system tools only: gh lives elsewhere (Homebrew, /usr/local), so it is absent.
+# A PATH stripped of gh wherever it lives (Homebrew here, /usr/bin on Ubuntu): one dir of symlinks
+# to every executable on the current PATH except gh and curl, and PATH is that dir alone.
+_old_ifs="$IFS"; IFS=:
+for d in $PATH; do
+  [ -d "$d" ] || continue
+  for f in "$d"/*; do
+    n="${f##*/}"
+    case "$n" in gh|curl) continue ;; esac
+    [ -x "$f" ] && [ ! -e "$tmp/tools/$n" ] && ln -s "$f" "$tmp/tools/$n"
+  done
+done
+IFS="$_old_ifs"
 cat > "$tmp/tools/curl" <<'SH'
 #!/bin/sh
 echo "curl $*" >> "${CURL_LOG:-/dev/null}"; echo "curl stub: a request leaked: $*" >&2; exit 99
 SH
 chmod +x "$tmp/tools/curl"
-export PATH="$tmp/tools:/usr/bin:/bin:/usr/sbin:/sbin" CURL_LOG="$tmp/curl.log"; : > "$CURL_LOG"
+export PATH="$tmp/tools" CURL_LOG="$tmp/curl.log"; : > "$CURL_LOG"
 command -v jq >/dev/null 2>&1 || { echo "git-core-test: jq not on the stripped PATH ($PATH) — skipping"; exit 0; }
 t "gh is not on PATH"                      "$(command -v gh >/dev/null 2>&1 && echo yes || echo no)" "no"
 
