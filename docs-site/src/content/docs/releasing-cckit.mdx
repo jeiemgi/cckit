@@ -56,13 +56,20 @@ Changes to the release workflow are always reviewed by a person — the CI token
 
 ## The benchmark check
 
+<Aside type="note" title="Paused">
+The checkpoint steps below are paused while the current arc of work (git apart from GitHub, work in
+files, the advisor) lands: no checkpoint is recorded on `develop` and none is checked before the
+promotion. `cckit release` still refuses a version with no checkpoint; pass `--skip-bench-check`, which
+prints that the check was overridden. The release-please path never ran the check.
+</Aside>
+
 Every release records the [documentation benchmark](/benchmark/) for its version, and the score is
 published on the [Benchmark results](/benchmark-results/) page. The run is a checkpoint: run, fix
 what it showed, run again. A version can hold several.
 
 <Steps>
 
-1. **Record a checkpoint on `develop`** while the version is being built, from a worktree:
+1. **Record a checkpoint on `develop`** while the version is being built, from a worktree (paused: no new checkpoint under `benchmarks/runs/` until the arc ends):
 
    ```bash
    cckit release --next                 # the version the commits imply
@@ -81,7 +88,7 @@ what it showed, run again. A version can hold several.
 
 2. **Fix what the checkpoint shows as missed, then record another.** Repeat until the score holds.
 
-3. **Check the verdict** before the `develop` → `main` promotion: `cckit bench check X.Y.Z`.
+3. **Check the verdict** before the `develop` → `main` promotion: `cckit bench check X.Y.Z` (paused with step 1: the promotion goes ahead without it).
 
 </Steps>
 
