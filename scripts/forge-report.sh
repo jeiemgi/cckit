@@ -78,11 +78,11 @@ fr_closure() {
   while [ -n "$queue" ]; do
     f="${queue%% *}"; queue="${queue#"$f"}"; queue="${queue# }"
     [ -n "$f" ] || continue
-    printf '%s\n' "$seen" | grep -qxF "$f" && continue
+    grep -qxF "$f" <<<"$seen" && continue
     seen="$seen
 $f"
     for r in $(fr_refs_in_text < "$ROOT/$f" | while read -r x; do fr_resolve "$x"; done | sort -u); do
-      printf '%s\n' "$seen" | grep -qxF "$r" || queue="$queue $r"
+      grep -qxF "$r" <<<"$seen" || queue="$queue $r"
     done
   done
   printf '%s\n' "$seen" | sed '/^$/d'
@@ -103,7 +103,7 @@ fr_verb_rows() { # verb<TAB>needs<TAB>via (space-separated files with gh lines)
       block="$(printf '%s' "$block" | tr '\001' '\n')"
       verbs="$(printf '%s' "$label" | tr '|' ' ')"
       needs=no; via=""
-      if printf '%s\n' "$block" | grep -vE '^[[:space:]]*#' | grep -qE "$GH_RE"; then needs=yes; via="bin/cckit"; fi
+      blk="$(printf '%s\n' "$block" | grep -vE '^[[:space:]]*#' || true)"; if grep -qE "$GH_RE" <<<"$blk"; then needs=yes; via="bin/cckit"; fi
       files="$(printf '%s\n' "$block" | fr_refs_in_text | while read -r x; do fr_resolve "$x"; done | sort -u | tr '\n' ' ')"
       if [ -n "${files// /}" ]; then
         for f in $(fr_closure $files); do

@@ -693,6 +693,29 @@ origin, and a `<slug>` argument was resolved before it, which can run `gh issue 
 `cckit start <issue>` (a plain task worktree) has no WIP limit. Full behaviour:
 [Only so many efforts at once](/effort-reference/#the-wip-limit).
 
+## The forge
+
+cckit's core needs only git. A **forge** (today: GitHub) is the optional provider behind the
+issues, pull requests, labels and comments the lifecycle verbs write. Every call goes through one
+port, `scripts/lib/forge.sh`, with two providers:
+
+| Key | Default | What it does |
+| --- | --- | --- |
+| `forge.provider` | *(unset — `github` when a token resolves, else `none`)* | `github`: REST calls over `curl` with a bearer token. `none`: every forge call refuses with one line naming the verb that needs a forge, and the git steps of that verb still run. `CCKIT_FORGE=github\|none` overrides it for one command. |
+
+The token for `github` is read in this order: `GH_TOKEN`, `GITHUB_TOKEN`, then `gh auth token`
+when `gh` is installed and signed in. With `forge.provider: github` and no token, a forge call fails
+and says so; nothing falls back silently. `CCKIT_FORGE_API` points the provider at another API base
+(tests use it).
+
+A refusal looks like this, and it is the only thing the `none` provider ever prints:
+
+```text
+cckit pr: needs a forge (GitHub) and none is configured. Set forge.provider to github and a token in GH_TOKEN, or sign in with gh. The git steps of pr run without one.
+```
+
+`scripts/forge-report.sh` prints which files and which verbs need a forge today.
+
 ## Integrations
 
 This section is the reference. For the list of tools and the steps to switch one on, start at

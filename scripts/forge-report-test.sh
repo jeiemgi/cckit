@@ -64,7 +64,7 @@ t "common.sh counted as a file"                                    "$(row script
 t "-test.sh files are not measured"                                "$(row scripts/lib/noise-test.sh)" ""
 
 summary="$(bash "$R" --root "$fx" --summary)"
-t "summary: 7 files" "$(printf '%s\n' "$summary" | grep -oE 'files [0-9]+' | head -1)" "files 7"
+t "summary: 7 files" "$(printf '%s\n' "$summary" | grep -oE 'files [0-9]+' | sed -n 1p)" "files 7"
 t "summary: classes add up"  "$(printf '%s\n' "$summary" | grep -oE 'gh-only [0-9]+ · git-only [0-9]+ · both [0-9]+ · neither [0-9]+')" "gh-only 5 · git-only 1 · both 1 · neither 0"
 t "ratchet leaves the forge layer out (forge.sh, forge-github.sh)" "$(bash "$R" --root "$fx" --ratchet)" "4"
 
