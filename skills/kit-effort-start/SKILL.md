@@ -1,5 +1,6 @@
 ---
 name: kit-effort-start
+terms: Effort
 description: Start an effort — thin caller of `cckit effort start <N>`. Creates the `effort/<N>-<slug>` integration branch + isolated bootstrapped worktree from the base branch, then marks the parent issue In Progress on the board. Enforces the effort WIP limit (`effort.wipLimit`, default 2) — a new effort is refused, before anything is written, while that many are already in progress; `--force` starts anyway. Sub-issues later branch from this effort branch or commit directly on it.
 when_to_use: After `/kit-effort-new`, to begin building an effort. The effort branch is the single integration branch for the whole effort — its sub-issues merge into it, and exactly one PR opens from it (`/kit-effort-pr`). See rules/effort-model.md.
 ---

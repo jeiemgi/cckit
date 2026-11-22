@@ -707,7 +707,10 @@ cckit/
   scripts/benchmark/     # doc-retrieval benchmark harness (cckit bench)
   benchmarks/runs/       # recorded benchmark checkpoints, one file per release (format: its README.md)
   .claude-plugin/        # the Claude Code plugin manifest
-  skills/ commands/      # Claude Code skills + slash commands
+  skills/ commands/      # Claude Code skills + slash commands; skills/routing.yaml routes a task to a
+                         #   skill and the term it serves (the same table: AGENTS.md)
+  ontology/              # the terms: one JSON file per word the CLI, skills and rules share
+                         #   (format: ontology/README.md; checked by scripts/terms-check.sh)
   profiles/ templates/   # init profiles + scaffold templates
   routines/ modules/     # scheduled routines + optional modules
   integrations/          # one JSON descriptor per optional third-party tool + its schema

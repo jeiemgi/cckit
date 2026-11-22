@@ -1,5 +1,6 @@
 ---
 name: kit-contribute
+terms: none
 description: Contribute your additions and requests back upstream to claude-kit as a GitHub PR (or issue). Use AUTOMATICALLY whenever the user asks to contribute to claude-kit, submit a PR, open a PR upstream, propose a change to the kit, give back to the kit, share my agent / skill / profile with the kit, send or file a feature request, or request a feature. Opens a pull request (or, for a pure idea, an issue) against the kit's upstream repo. Works from a project scaffolded by /kit-init and customized with /kit-customize, but also stands alone.
 argument-hint: "[agent <name> | skill <name> | profile <name> | request]"
 allowed-tools: Bash, Read, Edit, Write, Glob, Grep, AskUserQuestion, Skill

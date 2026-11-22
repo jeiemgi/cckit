@@ -1,5 +1,6 @@
 ---
 name: kit-cleanup
+terms: Worktree
 description: Run the ONE guided destructive sweep over the repo — present the gc plan (SAFE / LANDED / ZOMBIE / ORPHAN / PROTECTED / stashes), then delete the SAFE + LANDED rows and prune the listed ZOMBIE metadata once the user confirms. Orphan, open-issue branches and stashes are surfaced, kept.
 when_to_use: When `cckit gc` (or the SessionStart hygiene hook) reports merged branches and worktrees piling up and you want them gone in one pass. Use this instead of hand-rolling `git branch -D` + `git push origin --delete` loops. For the read-only report alone, use `/kit-gc`.
 ---

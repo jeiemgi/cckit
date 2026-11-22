@@ -1,5 +1,6 @@
 ---
 name: kit-next
+terms: Task, Wave
 description: >
   The everyday cckit loop: find the next unblocked issue and pick it up, or fan the whole unblocked
   wave out to subagents. Wraps `cckit next` (what can I work on now?), `cckit start <N>` (isolated

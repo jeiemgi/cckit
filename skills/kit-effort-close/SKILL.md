@@ -1,5 +1,6 @@
 ---
 name: kit-effort-close
+terms: Effort
 description: Close an effort in ONE op — snapshot each sub-issue's diff BEFORE squash (work record), capture/judge/sync effort metrics, squash-merge the effort PR, close the parent + ALL native sub-issues, set the board Status=Done for each, garbage-collect the worktree/branch, run the optional knowledge-ingest hook, and finish with the kit-sync drift check.
 when_to_use: When the effort PR has been reviewed and is ready to land. This is the single close op for the effort lifecycle (effort-model.md) — board + record state are correct by construction. Replaces the separate merge / close / mark-done / gc steps.
 ---

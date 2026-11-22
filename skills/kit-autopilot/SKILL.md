@@ -1,5 +1,6 @@
 ---
 name: kit-autopilot
+terms: Captain
 description: Autonomous execution under hard caps — run ONE long objective hands-off, OR drive the planned effort/flow set in parallel. On an APPROVED plan the captain DECIDES, MERGES each wave, and CONTINUES; it pings the human ONLY on a genuine blocker. THIN wrapper over the built-in /loop + the kit's orchestrate scripts; never a new engine.
 when_to_use: When delegating work to run unattended — a single capped objective (overnight) or several planned flows at once without tab-juggling. A verifiable stop condition is required. Maps to Kun Chen's "Good Night Have Fun" (the loop) and "First Mate" (the multi-flow captain). Not for one-off tasks (just do them) or open-ended work with no measurable stop.
 ---

@@ -1,5 +1,6 @@
 ---
 name: kit-digest
+terms: none
 description: Pre-digest long inputs (video transcripts, CI logs, big files, web pages) with the LOCAL model (mlx_lm.server) so the Claude session reads a short digest + pointer instead of the full content — token saving on every long read.
 when_to_use: Before reading any long input into the session — a YouTube/video transcript, a CI failure log, a file or page over ~2k words. Especially "procesa este video/transcript/log". If the local server is down, the script says so — fall back to reading the original directly.
 ---

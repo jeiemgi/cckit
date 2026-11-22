@@ -1,5 +1,6 @@
 ---
 name: kit-customize
+terms: none
 description: Customize a kit-scaffolded project's .claude/ setup. Use AUTOMATICALLY whenever the user asks to create, add, edit, modify, rename, delete, or remove an agent in a project — and also to add a skill to an agent, attach skills, wire tools, find or search for a skill, suggest agents/skills for my project, lint my agents, validate an agent, build a custom profile, or pick a preset profile. Works on a project already scaffolded by /kit-init (a `.claude/` dir with `.claude/kit.config.json`).
 argument-hint: "[add-agent <name> | add-skill <agent> | lint | profile]"
 allowed-tools: Bash, Read, Edit, Write, Glob, Grep, AskUserQuestion, Skill

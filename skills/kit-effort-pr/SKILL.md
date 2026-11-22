@@ -1,5 +1,6 @@
 ---
 name: kit-effort-pr
+terms: Effort
 description: Open the ONE pull request for an effort — `effort/<N>` → base branch — with a rich human-facing review body plus a `## For agents` section listing the file paths/entry points. Title `type: <name> [#N]`. Inherits labels + milestone from the parent issue and moves it to In Review on the board.
 when_to_use: When an effort branch is ready for review (all its sub-issues built + merged into the effort branch). One effort = one PR (effort-model.md) — never open per-sub PRs to the base branch. Mirrors `kit-task-pr` for the effort lifecycle.
 ---

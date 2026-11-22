@@ -1,5 +1,6 @@
 ---
 name: kit-task-new
+terms: Task
 description: Create a new GitHub issue — applies labels, milestone, and (if enabled) Projects v2 fields in one flow. Prefer this over raw `gh issue create` so the board stays in sync.
 when_to_use: When the owner or a sub-agent identifies a new piece of work to track.
 ---

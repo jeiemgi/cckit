@@ -1,5 +1,6 @@
 ---
 name: kit-task-pr
+terms: Task
 description: Commit current changes, push the branch, open a PR with the right template, labels, milestone, and link to the parent issue (+ board if enabled).
 when_to_use: When work on an issue branch is ready for review. Replaces ad-hoc `gh pr create`.
 ---

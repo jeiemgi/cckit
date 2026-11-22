@@ -1,5 +1,6 @@
 ---
 name: kit-effort-new
+terms: Effort, SubIssue
 description: Create an effort — a parent GitHub issue using the effort-model template (Goal / Scope / For agents / Verification) plus N native GitHub sub-issues linked via the sub-issues REST API, all added to the project board. The parent issue IS the plan.
 when_to_use: When starting a new unit of work (a "plan"/effort) that decomposes into several sub-tasks. Replaces ad-hoc `gh issue create` for multi-part work. The effort splits into native sub-issues at scoping time; sequential subs commit on the effort branch, parallel subs use file-disjoint worktrees and merge in. See rules/effort-model.md.
 ---

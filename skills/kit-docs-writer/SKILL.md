@@ -1,5 +1,6 @@
 ---
 name: kit-docs-writer
+terms: none
 description: >
   Write and edit end-user documentation in the house voice: kind but robust, ADHD-oriented and
   scannable, ZERO analogies, beginner-inclusive but expert-skippable. Encodes the page template
