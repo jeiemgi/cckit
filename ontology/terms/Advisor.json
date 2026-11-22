@@ -1,0 +1,15 @@
+{
+  "id": "Advisor",
+  "label": ["advisor"],
+  "definition": "The role that reads the board and the terms and tells the owner which work to start, which word a thing has, and which skill serves it. Named here so the skills that will fill it have a term; the skill does not exist yet.",
+  "is_not": [
+    "The captain: the captain executes an approved plan; the advisor helps the owner decide one.",
+    "A builder: the advisor writes no code.",
+    "kit-plan-next: that skill proposes what to build; the advisor also answers what a word means and which skill to call."
+  ],
+  "avoid": ["assistant", "copilot", "consultant", "coach"],
+  "home": {
+    "skill": "kit-advisor"
+  },
+  "status": "seed"
+}

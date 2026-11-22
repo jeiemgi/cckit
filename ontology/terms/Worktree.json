@@ -1,0 +1,17 @@
+{
+  "id": "Worktree",
+  "label": ["worktree"],
+  "definition": "The directory one branch is checked out in, under .claude/worktrees/, created by cckit start or cckit effort start and bootstrapped (env files, a dev port, dependencies). One agent works in one worktree; the primary checkout stays parked on the base branch and is never moved by hand.",
+  "is_not": [
+    "The primary checkout: that is the directory the repository was cloned into, shared by every session.",
+    "A clone: a worktree shares refs, stash and .cckit/ state with the primary checkout.",
+    "A branch: the branch is what is checked out; the worktree is where."
+  ],
+  "avoid": ["checkout (for a worktree)", "sandbox", "workspace", "copy of the repo"],
+  "home": {
+    "cli": "start",
+    "skill": "kit-task-start",
+    "rule": ".claude/rules/shared-checkout.md"
+  },
+  "status": "tree"
+}
