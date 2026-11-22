@@ -12,8 +12,10 @@ when an agent rediscovers something it should have been handed, add it here.
 - Build/dep tooling: the CLI is bash with **no root dependencies** — there is no build step and no
   root lockfile (`/pnpm-lock.yaml` is gitignored as a stray artifact). `docs-site/` is the one
   installable package (Astro/Starlight, pnpm, `docs-site/pnpm-lock.yaml`).
-- **Secrets by NAME, never value** — no API-token env var is read anywhere in `bin/` or `scripts/`;
-  every GitHub call goes through the authenticated `gh` CLI. The one token in the repo is
+- **Secrets by NAME, never value** — no token value is written anywhere in `bin/` or `scripts/`;
+  every GitHub call goes through the forge port (`scripts/lib/forge.sh`, REST over `curl`), whose
+  token is read at run time from `GH_TOKEN`, `GITHUB_TOKEN` or a signed-in `gh`, never from a file
+  in the repo. No verb runs a `gh` subcommand. The one token in the repo is
   `GH_TOKEN` in `.github/workflows/release-please.yml`, fed from the `HOMEBREW_TAP_TOKEN` secret
   for the Homebrew tap push.
 - Config lives in **`cckit.config.json` at the repo root**, not `.claude/kit.config.json` — cckit is
@@ -71,7 +73,7 @@ The constraints, so this block is self-sufficient when the skill file is not in 
 
 - **`bash scripts/check.sh` is the whole gate** and the bar for a PR: `bash -n` over every script in
   `bin/` + `scripts/`, `shellcheck --severity=error`, JSON validity of `.claude-plugin/plugin.json`
-  and `cckit.config.json`, the leak fence (`scripts/lib/leak-fence.sh`: no private word in a tracked file; the list is local or the `CCKIT_LEAK_WORDS` secret), the secret + privacy guard, then `scripts/test.sh`
+  and `cckit.config.json`, the leak fence (`scripts/lib/leak-fence.sh`: no private word in a tracked file; the list is local or the `CCKIT_LEAK_WORDS` secret), the forge fence (`scripts/forge-fence.sh`: no file outside `scripts/lib/forge*.sh` and `gh-rest.sh` calls `gh` or names `api.github.com`; ratchet in `scripts/forge-fence.baseline`, 0 and 0), the secret + privacy guard, then `scripts/test.sh`
   (every `*-test.sh` under `bin/` and `scripts/`). `shellcheck` and `jq` are skipped when absent
   locally; CI installs both, so run them locally before trusting a green.
 - `scripts/test.sh` runs the test files several at a time: the CPU count, capped at 8. `-j <N>` or

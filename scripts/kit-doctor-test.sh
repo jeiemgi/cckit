@@ -6,9 +6,11 @@
 #
 # Hermetic: kit-doctor.sh runs against a throwaway project and HOME on a sealed PATH — symlinks to
 # the real tools it needs, plus STUBS for everything that would reach the machine or the network
-# (uname, brew, gh, node, pnpm, ssh, curl, sysctl, and the package managers pipx / uv). The real
-# descriptors (integrations/mempalace.json, integrations/mlx-lm.json) are the ones under test, so
-# no real pipx, uv or brew is ever run and nothing is installed.
+# (uname, brew, node, pnpm, ssh, sysctl, and the package managers pipx / uv), and the forge shim
+# (scripts/lib/test-forge-shim.sh) for GitHub: its `curl` answers the REST API from env knobs and
+# its `gh` fails on any subcommand but `gh auth token` (E537). The real descriptors
+# (integrations/mempalace.json, integrations/mlx-lm.json) are the ones under test, so no real pipx,
+# uv or brew is ever run and nothing is installed.
 # Run:  bash scripts/kit-doctor-test.sh
 # errors: strict — a test runner: rc 1 on any failed assertion
 set -u
@@ -47,15 +49,14 @@ mk sysctl <<'EOF'
 #!/bin/sh
 echo "Stub Silicon"
 EOF
-mk gh <<'EOF'
-#!/bin/sh
-case "$1 ${2:-}" in
-  "--version ") echo "gh version 2.50.0 (stub)" ;;
-  "auth status") echo "  - Token scopes: 'project', 'repo'" ;;
-  "api user") echo "stub-user" ;;
-esac
-exit 0
-EOF
+# The forge (E537): GitHub is REST over curl with a token. The shim's `curl` answers like the API
+# and logs every request; its `gh` answers only `gh auth token` / `gh --version` and FAILS on any
+# other subcommand, so a leftover gh call in the doctor is a red row here, not a silent pass.
+# shellcheck source=/dev/null
+. "$ROOT/scripts/lib/test-forge-shim.sh"
+forge="$tmp/forge"; forge_shim_install "$forge"
+export GH_LOG="$tmp/forge.log"; : > "$GH_LOG"
+cp "$forge/gh" "$stubs/gh"
 mk node <<'EOF'
 #!/bin/sh
 echo v22.0.0
@@ -69,8 +70,13 @@ mk ssh <<'EOF'
 #!/bin/sh
 exit 1
 EOF
+# curl: a request to the forge API goes to the shim; anything else (the local model server probe)
+# answers with the exit code in $tmp/curl-rc.
 mk curl <<EOF
 #!/bin/sh
+for a in "\$@"; do
+  case "\$a" in https://api.github.com/*) exec "$forge/curl" "\$@" ;; esac
+done
 exit "\$(cat "$tmp/curl-rc")"
 EOF
 
@@ -119,8 +125,10 @@ doctor() {
   mkdir -p "$home"
   [ -f "$home/.gitconfig" ] || printf '[user]\n\tname = Stub User\n\temail = stub@example.invalid\n' > "$home/.gitconfig"
   ( cd "$proj" && PATH="$stubs:$sealed" HOME="$home" KIT_ASCII=1 NO_COLOR=1 LC_ALL=C \
+      GH_TOKEN="${DOCTOR_TOKEN-test-token}" CCKIT_FORGE="${DOCTOR_FORGE-github}" \
       bash "$DOCTOR" "$@" </dev/null 2> "$tmp/err" )
 }
+frow() { printf '%s\n' "$1" | grep -E "^ +(ok|FAIL|warn|-) +$2 " | sed -E 's/^ +//; s/ +/ /g'; }
 rows() { printf '%s\n' "$1" | grep -E '^ +(ok|FAIL|warn|-) +(mempalace CLI|mlx-lm) ' | sed -E 's/^ +//; s/ +/ /g'; }
 
 # ── 0. the doctor holds no tool's recipe (the sub's acceptance, verbatim) ──────────────────────
@@ -139,6 +147,41 @@ hasnt "both keys false -> no Integrations section" "$out_off" "Integrations"
 hasnt "both keys false -> no Memory section" "$out_off" "Memory (MemPalace)"
 hasnt "both keys false -> no Local section" "$out_off" "Local model layer"
 t "both keys false -> no manager was called" "$(calls)" ""
+
+# ── 1a. the forge rows (E537): a token is the sign-in; gh is optional and never installed ──────
+has "forge: a working token -> github, signed in as the token's login" "$(frow "$out_bare" forge)" "ok forge github — signed in as @me"
+has "forge: the login was read from GET user" "$(cat "$GH_LOG")" "GET user "
+t   "forge: no gh subcommand was run" "$(grep -c '^GH-SUBCOMMAND' "$GH_LOG")" "0"
+has "gh: present -> an optional row, its version from gh --version" "$(frow "$out_bare" 'gh \(optional\)')" "ok gh (optional) 2.0.0 — its token is used when GH_TOKEN is unset"
+has "token scope: Projects v2 off -> not needed" "$(frow "$out_bare" 'token scope:project')" "- token scope:project Projects v2 is off — not needed"
+out="$(DOCTOR_FORGE=none DOCTOR_TOKEN= doctor "$tmp/h1" "$bare" --dry-run)"; r=$?
+has "forge none -> a warning row that names git-only and how to sign in" "$(frow "$out" forge)" "warn forge none — git-only. Issues, pull requests and labels are unavailable until a token is set: export GH_TOKEN=<token>, or gh auth login"
+t   "forge none -> a warning, not a failure: exit 0" "$r" "0"
+hasnt "forge none -> no token scope row" "$out" "token scope:project"
+has "forge none -> listed under what is left to do" "$out" "Sign in to GitHub: export GH_TOKEN=<token> (or: gh auth login)"
+: > "$GH_LOG"
+out="$(DOCTOR_FORGE=none DOCTOR_TOKEN= doctor "$tmp/h1" "$bare" --yes)"
+# --yes with gh present is the one place a gh subcommand is legitimate: the interactive sign-in.
+t   "forge none, --yes, gh present -> gh auth login is the sign-in offered, once" "$(grep -c '^GH-SUBCOMMAND gh auth login' "$GH_LOG")" "1"
+t   "forge none, --yes -> no API request without a token" "$(grep -c '^GET user' "$GH_LOG")" "0"
+has "forge none, --yes, sign-in failed -> still the warning row" "$(frow "$out" forge)" "warn forge none — git-only"
+out="$(GH_FAIL_EP=user doctor "$tmp/h1" "$bare" --dry-run)"; r=$?
+has "forge: a token GitHub rejects -> a failing row" "$(frow "$out" forge)" "FAIL forge github — the token does not work (GH_TOKEN, GITHUB_TOKEN, or gh's). Re-issue it, or gh auth login"
+t   "forge: a rejected token -> exit 1" "$r" "1"
+pv2="$(project pv2 '{"github":{"projectsV2":true,"repo":"o/r","baseBranch":"main"}}')"
+out="$(doctor "$tmp/h1" "$pv2" --dry-run)"
+has "token scope: Projects v2 on, a token with no scope header -> a skip row for a fine-grained token" "$(frow "$out" 'token scope:project')" "- token scope:project a fine-grained token lists no scopes — give it Projects access if the board stays empty"
+has "base branch: read from GET repos/<r> default_branch" "$(cat "$GH_LOG")" "GET repos/o/r "
+rm -f "$stubs/gh"
+: > "$log"
+out="$(doctor "$tmp/h1" "$bare" --dry-run)"; r=$?
+has "gh absent -> a skip row: a token works without it" "$(frow "$out" 'gh \(optional\)')" "- gh (optional) not installed — a GH_TOKEN works without it; install it for an interactive sign-in"
+has "gh absent, a token -> the forge is still github" "$(frow "$out" forge)" "ok forge github — signed in as @me"
+t   "gh absent -> exit 0, gh is optional" "$r" "0"
+out="$(doctor "$tmp/h1" "$bare" --yes)"
+t   "gh absent, --yes -> gh is never installed" "$(grep -c 'brew install gh' "$log")" "0"
+cp "$forge/gh" "$stubs/gh"
+: > "$GH_LOG"
 
 # ── 1b. on by default (#451): Lavish has a row in a project that set no key. Missing, it is a
 # skip row — reported, never installed, never a failure, whatever the flags. An explicit key gets

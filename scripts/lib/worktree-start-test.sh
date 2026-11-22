@@ -6,7 +6,7 @@
 # fetch, branch or worktree; `--force` / KIT_FORCE=1 proceeds; a dead session's claim is reaped;
 # the claimant's own re-run stays a no-op; `cckit claims` lists and writes nothing.
 #
-# Hermetic: a throwaway repo with a local bare origin, a stubbed `gh` (no network, no auth) and a
+# Hermetic: a throwaway repo with a local bare origin, the forge shim in place of GitHub (no network) and a
 # stubbed `zoxide` (so no temp path lands in the developer's jump database). A "session" is a
 # background `sleep` whose pid is handed to wt_start through KIT_SESSION_PID.
 #
@@ -33,21 +33,16 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 # ── fixture: stubs, a bare origin with `main`, and a clone to start worktrees from ─────────────
-mkdir -p "$tmp/bin"
-cat > "$tmp/bin/gh" <<'SH'
-#!/usr/bin/env bash
-# Every call is logged, so a test can assert a refusal made NO GitHub read.
-printf '%s\n' "$*" >> "${GH_CALL_LOG:-/dev/null}"
-case "$*" in
-  *"issue view"*) echo '{"title":"Claimed thing","labels":[{"name":"kind:task"}]}' ;;
-  *graphql*)      echo '{"data":{}}' ;;
-  *)              echo '[]' ;;
-esac
-SH
+# The forge shim (test-forge-shim.sh): the issue read answers title + kind label over REST, every
+# request is logged, and a gh subcommand fails — so a test can assert a refusal made NO GitHub read.
+# shellcheck source=/dev/null
+. "$LIB/test-forge-shim.sh"; forge_shim_install "$tmp/bin"
+export GH_TITLE="Claimed thing" GH_LABELS='[{"name":"kind:task"}]'
+export GH_TOKEN=test-token CCKIT_FORGE=github
 printf '#!/bin/sh\nexit 0\n' > "$tmp/bin/zoxide"
-chmod +x "$tmp/bin/gh" "$tmp/bin/zoxide"
+chmod +x "$tmp/bin/zoxide"
 PATH="$tmp/bin:$PATH"; export PATH
-export GH_CALL_LOG="$tmp/gh.calls"; : > "$GH_CALL_LOG"
+export GH_LOG="$tmp/gh.calls"; : > "$GH_LOG"
 
 git init -q --bare "$tmp/origin.git"
 git init -q "$tmp/repo"
@@ -79,6 +74,8 @@ out="$(start_as "$SESS_A" 7 2>/dev/null)"; rc=$?
 t "first start succeeds" "$rc" "0"
 WT7="$REPO/.claude/worktrees/task+7-claimed-thing"
 t "first start prints path|branch|issue" "$out" "$WT7|task/7-claimed-thing|7"
+has "the issue is read over REST" "$(cat "$GH_LOG")" "GET repos/octo/fx/issues/7 "
+t "no gh subcommand ran" "$(grep -c '^GH-SUBCOMMAND' "$GH_LOG")" "0"
 t "claim file written" "$([ -f "$REG/issue-7.json" ] && echo yes || echo no)" "yes"
 t "claim records the session pid" "$(jq -r .pid "$REG/issue-7.json" 2>/dev/null)" "$SESS_A"
 t "claim records the worktree"    "$(jq -r .worktree "$REG/issue-7.json" 2>/dev/null)" "$WT7"
@@ -98,7 +95,7 @@ jq -n --argjson pid "$SESS_A" --arg host "$(hostname)" --arg wt "$REPO/.claude/w
   --argjson started "$(date +%s)" \
   '{issue:9, branch:"task/9-claimed-thing", worktree:$wt, cwd:$wt, pid:$pid, host:$host, started:$started}' \
   > "$REG/issue-9.json"
-b_before="$(branches)"; w_before="$(worktrees)"; : > "$GH_CALL_LOG"
+b_before="$(branches)"; w_before="$(worktrees)"; : > "$GH_LOG"
 fetch_before="$(stat -c %Y "$REPO/.git/FETCH_HEAD" 2>/dev/null || stat -f %m "$REPO/.git/FETCH_HEAD" 2>/dev/null)"
 err="$(start_as "$SESS_B" 9 2>&1 >/dev/null)"; rc=$?
 t "second session on a claimed issue is refused (rc 1)" "$rc" "1"
@@ -107,7 +104,7 @@ has "refusal names the escape hatch" "$err" "--force"
 t "refusal creates no branch"   "$(branches)" "$b_before"
 t "refusal creates no worktree" "$(worktrees)" "$w_before"
 t "refusal creates no worktree dir" "$([ -e "$REPO/.claude/worktrees/task+9-claimed-thing" ] && echo yes || echo no)" "no"
-t "refusal makes no gh call (it runs before the issue read)" "$(wc -l < "$GH_CALL_LOG" | tr -d ' ')" "0"
+t "refusal makes no forge call (it runs before the issue read)" "$(wc -l < "$GH_LOG" | tr -d ' ')" "0"
 t "refusal runs before the fetch (FETCH_HEAD untouched)" \
   "$(stat -c %Y "$REPO/.git/FETCH_HEAD" 2>/dev/null || stat -f %m "$REPO/.git/FETCH_HEAD" 2>/dev/null)" "$fetch_before"
 t "refusal leaves the claim with its owner" "$(jq -r .pid "$REG/issue-9.json")" "$SESS_A"

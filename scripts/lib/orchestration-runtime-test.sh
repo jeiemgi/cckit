@@ -53,14 +53,15 @@ cat > "$stub/codex" <<'SH'
 #!/usr/bin/env bash
 exit 0
 SH
-cat > "$stub/gh" <<'SH'
-#!/usr/bin/env bash
-case "${1:-}" in
-  api) exit 0 ;;
-  *) echo '[]' ;;
-esac
-SH
-chmod +x "$stub/herdr" "$stub/codex" "$stub/gh"
+chmod +x "$stub/herdr" "$stub/codex"
+# The forge (E537): the dry runs below read the blocked_by edge over REST. The shim's `curl`
+# answers it with no blocker; its `gh` fails on any subcommand, so a gh call left in orchestrate
+# would turn the dry run red here.
+# shellcheck source=/dev/null
+. "$ROOT/scripts/lib/test-forge-shim.sh"
+forge_shim_install "$stub"
+export GH_LOG="$stub/forge.log" GH_TOKEN=test-token CCKIT_FORGE=github
+: > "$GH_LOG"
 
 seed_for() { printf 'seed issue %s on %s in %s' "$1" "$2" "$3"; }
 old_path="$PATH"
@@ -193,6 +194,8 @@ PATH="$old_path"
 dry="$(cd "$ROOT" && PATH="$stub:$PATH" "$ROOT/bin/cckit" orchestrate --runtime herdr --agent codex --dry-run 41 2>&1)"
 yes "orchestrate accepts the Herdr runtime flag" "$dry" "runtime 'herdr', agent 'codex'"
 yes "Herdr dry-run creates no runtime state" "$dry" "no worktrees created, no panes started"
+yes "the dry run read the blocked_by edge over the forge" "$(cat "$GH_LOG")" "GET repos/jeiemgi/cckit/issues/41/dependencies/blocked_by "
+t   "the dry run ran no gh subcommand" "$(grep -c '^GH-SUBCOMMAND' "$GH_LOG")" "0"
 
 auto="$(cd "$ROOT" && PATH="$stub:$PATH" "$ROOT/bin/cckit" autopilot --runtime herdr --agent codex --dry-run 41 2>&1)"
 yes "autopilot passes the runtime to orchestrate" "$auto" "runtime 'herdr', agent 'codex'"

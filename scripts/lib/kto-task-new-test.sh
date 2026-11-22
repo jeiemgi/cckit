@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# kto-task-new-test.sh — kto_task_new against a stubbed gh (#387): a label the repo does not have
-# is dropped with a warning and the issue is still created; with every label present the create
-# call is unchanged; a failed create returns non-zero and prints no URL.
+# kto-task-new-test.sh — kto_task_new over the forge shim (#387, E537): a label the repo does not have
+# is dropped with a warning and the issue is still created; with every label present the POST
+# repos/o/r/issues body is unchanged; a failed create returns non-zero and prints no URL.
 # Run: bash scripts/lib/kto-task-new-test.sh
 # errors: strict — a test runner: rc 1 on any failed assertion
 set -u
@@ -13,83 +13,72 @@ tn() { if grep -qE -- "$2" "$1"; then echo "FAIL: $3 (/$2/ in $1)"; fail=1; else
 
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 export GH_LOG="$tmp/gh.log"; : > "$GH_LOG"
-mkdir -p "$tmp/bin"
-# GH_HAVE: the repo's labels, comma-separated. GH_LIST_FAIL=1: `gh label list` fails.
-# GH_CREATE_FAIL=1: `gh issue create` fails. Like real gh, a create naming a label the repo does
-# not have fails with "could not add label".
-cat > "$tmp/bin/gh" <<'SH'
-#!/usr/bin/env bash
-echo "$*" >> "$GH_LOG"
-case "$1 $2" in
-  "label list")
-    [ -n "${GH_LIST_FAIL:-}" ] && { echo "gh: HTTP 403" >&2; exit 1; }
-    printf '%s\n' "$GH_HAVE" | tr ',' '\n' ;;
-  "issue create")
-    [ -n "${GH_CREATE_FAIL:-}" ] && { echo "gh: HTTP 500" >&2; exit 1; }
-    want=""; while [ $# -gt 0 ]; do [ "$1" = "--label" ] && want="${2:-}"; shift; done
-    for l in $(printf '%s' "$want" | tr ',' ' '); do
-      case ",$(printf '%s' "$GH_HAVE" | tr 'A-Z' 'a-z')," in *",$l,"*) ;; *) echo "could not add label: '$l' not found" >&2; exit 1 ;; esac
-    done
-    echo "https://github.com/o/r/issues/50" ;;
-  *) exit 0 ;;
-esac
-SH
-chmod +x "$tmp/bin/gh"
-export PATH="$tmp/bin:$PATH" KIT_REPO="o/r" KIT_BASE_BRANCH="main" KIT_PROJECTS_V2="false"
-unset KIT_CONFIG CLAUDE_CODE_REMOTE CCKIT_GH_TRANSPORT GH_LIST_FAIL GH_CREATE_FAIL
+# shellcheck source=/dev/null
+. "$LIB/test-forge-shim.sh"; forge_shim_install "$tmp/bin"
+export PATH="$tmp/bin:$PATH" GH_TOKEN=test-token CCKIT_FORGE=github
+export KIT_REPO="o/r" KIT_BASE_BRANCH="main" KIT_PROJECTS_V2="false"
+export GH_N="$tmp/n"
+unset KIT_CONFIG CLAUDE_CODE_REMOTE CCKIT_GH_TRANSPORT GH_FAIL_EP
 cd "$tmp" || exit 1
+# have <names…> — the repo's label list (GH_REPO_LABELS), as GET repos/o/r/labels answers it.
+# fresh — an empty request log, and the next created issue is #50.
+fresh() { : > "$GH_LOG"; echo 49 > "$GH_N"; }
+have() { GH_REPO_LABELS="$(printf '%s\n' "$@" | jq -R . | jq -sc 'map({name:.})')"; export GH_REPO_LABELS; }
 
 # shellcheck source=/dev/null
 . "$LIB/kit-task-ops.sh"
 
 # ── a missing label is a warning, not an abort ────────────────────────────────────────────────────
-export GH_HAVE="kind:task,priority:p2,role:backend"
-: > "$GH_LOG"
+have kind:task priority:p2 role:backend
+fresh
 kto_task_new "Test" backend feat p2 "" "" "" x >"$tmp/out" 2>"$tmp/err"; rc=$?
 t  "missing kind label: rc 0"                        "$rc" "0"
 tc "$tmp/out" '^✓ https://github.com/o/r/issues/50$' "missing kind label: prints the issue URL"
 t  "missing kind label: echoes the number"           "$(tail -1 "$tmp/out")" "50"
 tc "$tmp/err" "kind:feat"                            "missing kind label: the warning names kind:feat"
-tc "$GH_LOG" '^issue create .*--label priority:p2,role:backend( |$)' "missing kind label: only existing labels are sent"
-tn "$GH_LOG" '^issue create .*kind:feat'             "missing kind label: kind:feat is not sent"
-tn "$GH_LOG" '^label create'                         "missing kind label: no label is created"
+tc "$GH_LOG" '^POST repos/o/r/issues \{"title":"Test","body":"x","labels":\["priority:p2","role:backend"\]\}$' "missing kind label: only existing labels are sent"
+tn "$GH_LOG" '^POST repos/o/r/issues .*kind:feat'    "missing kind label: kind:feat is not sent"
+tn "$GH_LOG" '^POST repos/o/r/labels'                "missing kind label: no label is created"
+tc "$GH_LOG" '^POST repos/o/r/issues/50/assignees \{"assignees":\["me"\]\}$' "missing kind label: the author is assigned"
 
 # Label names are case-insensitive on GitHub.
-export GH_HAVE="Kind:Feat,priority:p2,role:backend"
-: > "$GH_LOG"
+have Kind:Feat priority:p2 role:backend
+fresh
 kto_task_new "Test" backend feat p2 "" "" "" x >"$tmp/out" 2>"$tmp/err"; rc=$?
 t  "case-insensitive match: rc 0"                    "$rc" "0"
 t  "case-insensitive match: no warning"              "$(grep -c 'kind:feat' "$tmp/err")" "0"
-tc "$GH_LOG" '^issue create .*--label kind:feat,priority:p2,role:backend ' "case-insensitive match: the label is sent"
+tc "$GH_LOG" '^POST repos/o/r/issues .*"labels":\["kind:feat","priority:p2","role:backend"\]' "case-insensitive match: the label is sent"
 
-# ── every label missing: the issue is created with no --label at all ──────────────────────────────
-export GH_HAVE="bug"
-: > "$GH_LOG"
+# ── every label missing: the issue is created with no labels field at all ──────────────────────────────
+have bug
+fresh
 kto_task_new "Test" backend feat p2 "" "" "" x >"$tmp/out" 2>"$tmp/err"; rc=$?
 t  "no label exists: rc 0"                           "$rc" "0"
 tc "$tmp/out" '^✓ https://github.com/o/r/issues/50$' "no label exists: prints the issue URL"
-tn "$GH_LOG" '^issue create .*--label'               "no label exists: no --label flag"
+tc "$GH_LOG" '^POST repos/o/r/issues \{"title":"Test","body":"x"\}$' "no label exists: no labels field"
 t  "no label exists: three labels warned"            "$(grep -cE 'kind:feat|priority:p2|role:backend' "$tmp/err")" "3"
 
-# ── all labels present: the create call is unchanged ──────────────────────────────────────────────
-export GH_HAVE="kind:feat,priority:p2,role:backend"
-: > "$GH_LOG"
+# ── all labels present: the create body is unchanged ──────────────────────────────────────────────
+have kind:feat priority:p2 role:backend
+fresh
 kto_task_new "Test" backend feat p2 "" "" "" x >"$tmp/out" 2>"$tmp/err"; rc=$?
 t  "all labels present: rc 0"                        "$rc" "0"
-tc "$GH_LOG" '^issue create --repo o/r --title Test --body .*--label kind:feat,priority:p2,role:backend --assignee @me$' "all labels present: the create call is unchanged"
+tc "$GH_LOG" '^POST repos/o/r/issues \{"title":"Test","body":"x","labels":\["kind:feat","priority:p2","role:backend"\]\}$' "all labels present: the create body is unchanged"
+tc "$GH_LOG" '^POST repos/o/r/issues/50/assignees \{"assignees":\["me"\]\}$' "all labels present: the author is assigned"
 t  "all labels present: no warning"                  "$(wc -c < "$tmp/err" | tr -d ' ')" "0"
 
 # ── the label list cannot be read: send every label, as before ────────────────────────────────────
-: > "$GH_LOG"
-GH_LIST_FAIL=1 kto_task_new "Test" backend feat p2 "" "" "" x >"$tmp/out" 2>"$tmp/err"; rc=$?
+fresh
+GH_FAIL_EP="repos/o/r/labels" kto_task_new "Test" backend feat p2 "" "" "" x >"$tmp/out" 2>"$tmp/err"; rc=$?
 t  "unreadable label list: rc 0"                     "$rc" "0"
-tc "$GH_LOG" '^issue create .*--label kind:feat,priority:p2,role:backend ' "unreadable label list: every label is sent"
+tc "$GH_LOG" '^POST repos/o/r/issues .*"labels":\["kind:feat","priority:p2","role:backend"\]' "unreadable label list: every label is sent"
 
 # ── the create itself fails: non-zero, no URL ─────────────────────────────────────────────────────
-: > "$GH_LOG"
-GH_CREATE_FAIL=1 kto_task_new "Test" backend feat p2 "" "" "" x >"$tmp/out" 2>"$tmp/err"; rc=$?
+fresh
+GH_FAIL_EP="repos/o/r/issues" kto_task_new "Test" backend feat p2 "" "" "" x >"$tmp/out" 2>"$tmp/err"; rc=$?
 t  "create fails: rc non-zero"                       "$([ "$rc" -ne 0 ] && echo nonzero)" "nonzero"
 t  "create fails: prints nothing on stdout"          "$(wc -c < "$tmp/out" | tr -d ' ')" "0"
+t  "no gh subcommand ran"                            "$(grep -c '^GH-SUBCOMMAND' "$GH_LOG")" "0"
 
 [ "$fail" -eq 0 ] && echo "kto-task-new: all passed" || echo "kto-task-new: FAILURES"
 exit "$fail"

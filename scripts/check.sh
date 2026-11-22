@@ -42,6 +42,12 @@ note "==> leak fence (tracked files)"
 leak_fence_check || fail=1
 
 # 4. Secret + privacy guard - no secrets, keys, env, or private data in anything publishable.
+# 3b. The forge fence (E537.5). Every GitHub call goes through scripts/lib/forge*.sh and gh-rest.sh;
+# a file outside that layer calling gh or naming api.github.com fails here, against the ratchet in
+# scripts/forge-fence.baseline (0 and 0).
+note "==> forge fence"
+bash scripts/forge-fence.sh || fail=1
+
 note "==> secret + privacy guard"
 if [ -f scripts/lib/secret-guard.sh ]; then
   . scripts/lib/secret-guard.sh

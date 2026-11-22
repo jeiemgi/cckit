@@ -18,19 +18,26 @@ cat > "$FIXTURE_BOARD" <<'JSON'
  {"number":4,"title":"ordinary task","labels":[],"assignees":[]}
 ]
 JSON
-cat > "$TMP/bin/gh" <<'STUB'
-#!/usr/bin/env bash
-case "$1 $2" in
- 'issue list') [ "${FAIL_BOARD:-0}" = 0 ] || exit 1; cat "$FIXTURE_BOARD" ;;
- 'api '*)
-   [ "${FAIL_DEPS:-0}" = 0 ] || exit 1
-   [ "${BLOCKER_STATE:-}" = '' ] || echo 99
-   exit 0 ;;
- 'issue view') echo "${BLOCKER_STATE:-OPEN}" ;;
- *) echo "unexpected gh call: $*" >&2; exit 1 ;;
+# The forge (E537): the board and the blockers are read over REST. The shim's `curl` answers from
+# this fixture — the board from $FIXTURE_BOARD, a blocker #99 on every issue when BLOCKER_STATE is
+# set, a 500 when FAIL_BOARD / FAIL_DEPS is — and its `gh` fails on any subcommand.
+# shellcheck source=/dev/null
+. "$ROOT/scripts/lib/test-forge-shim.sh"
+forge_shim_install "$TMP/bin"
+export GH_LOG="$TMP/forge.log" GH_TOKEN=test-token CCKIT_FORGE=github GH_FIXTURE="$TMP/fixture.sh"
+cat > "$GH_FIXTURE" <<'FIX'
+fail500() { out='{"message":"fixture failure"}'; code=500; }
+case "$method $ep" in
+  "GET repos/fixture/project/issues")
+    if [ "${FAIL_BOARD:-0}" != 0 ]; then fail500; else out="$(cat "$FIXTURE_BOARD")"; fi ;;
+  "GET repos/fixture/project/issues/"*"/dependencies/blocked_by")
+    if [ "${FAIL_DEPS:-0}" != 0 ]; then fail500
+    elif [ -n "${BLOCKER_STATE:-}" ]; then out='[{"number":99}]'
+    else out='[]'; fi ;;
+  "GET repos/fixture/project/issues/99")
+    out="{\"number\":99,\"title\":\"blocker\",\"state\":\"$(printf '%s' "${BLOCKER_STATE:-OPEN}" | tr '[:upper:]' '[:lower:]')\",\"labels\":[],\"body\":\"\"}" ;;
 esac
-STUB
-chmod +x "$TMP/bin/gh"
+FIX
 export PATH="$TMP/bin:$PATH"
 cd "$TMP/project"
 run() { bash "$TMP/install/scripts/autopilot.sh" --dry-run "$@"; }
@@ -62,9 +69,18 @@ export FAIL_BOARD=1
 fails run
 has "$(cat "$TMP/failure")" 'could not read the board'
 unset FAIL_BOARD
+has "$(cat "$GH_LOG")" 'GET repos/fixture/project/issues?state=open&per_page=100'
+has "$(cat "$GH_LOG")" 'GET repos/fixture/project/issues/3/dependencies/blocked_by'
+[ "$(grep -c '^GH-SUBCOMMAND' "$GH_LOG")" = 0 ] || { echo 'FAIL: a gh subcommand was run'; exit 1; }
+# A body that is not JSON is diagnosed, never driven as an empty board. The diagnosis may come from
+# autopilot ("invalid board data") or from the board read failing ("could not read the board").
 printf '%s\n' 'invalid JSON' > "$FIXTURE_BOARD"
+echo 'case: a board that is not JSON'
 fails run
-has "$(cat "$TMP/failure")" 'invalid board data'
+case "$(cat "$TMP/failure")" in
+  *'invalid board data'*|*'could not read the board'*) : ;;
+  *) echo 'FAIL: an unreadable board was not diagnosed'; cat "$TMP/failure"; exit 1 ;;
+esac
 printf '%s\n' '[]' > "$FIXTURE_BOARD"
 has "$(run 2>&1)" 'nothing open to drive'
 fails run --cap 0 3

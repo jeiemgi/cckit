@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# effort-ops-test.sh — covers the effort lifecycle ops (#48). Hermetic: stubs gh (no network/auth)
-# and uses a throwaway git repo with a bare remote. Run:  bash scripts/lib/effort-ops-test.sh
+# effort-ops-test.sh — covers the effort lifecycle ops (#48). Hermetic: the forge shim
+# (test-forge-shim.sh) answers like the REST API over a curl stand-in and logs `METHOD path {json}`;
+# a throwaway git repo with a bare remote. Run:  bash scripts/lib/effort-ops-test.sh
 # errors: strict — a test runner: rc 1 on any failed assertion
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -17,43 +18,37 @@ command -v jq  >/dev/null 2>&1 || { echo "effort-ops-test: jq required"  >&2; ex
 command -v git >/dev/null 2>&1 || { echo "effort-ops-test: git required" >&2; exit 1; }
 
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
-export GH_LOG="$tmp/gh.log"; export GH_N="$tmp/n"; : > "$GH_LOG"
+export GH_LOG="$tmp/gh.log"; export GH_N="$tmp/n"; : > "$GH_LOG"; printf '0' > "$GH_N"
 
-# Stub gh: log every call, return canned output keyed on the subcommand.
-stub="$tmp/bin"; mkdir -p "$stub"
-cat > "$stub/gh" <<'SH'
-#!/usr/bin/env bash
-echo "$*" >> "$GH_LOG"
-case "$1 $2" in
-  "issue create")  n=$(( $(cat "$GH_N" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$GH_N"
-                   echo "https://github.com/o/r/issues/$n" ;;
-  "issue edit"|"issue close"|"pr merge") exit 0 ;;
-  "issue view")    case "$*" in                                 # effort_pr reads title+labels+milestone
-                     *labels,milestone*) echo '{"title":"[Effort] 99 · demo effort","labels":[{"name":"role:tech-lead"},{"name":"kind:task"}],"milestone":{"title":"M1"}}' ;;
-                     *) echo "[Effort] 99 · demo effort" ;;     # --json title -q .title
-                   esac ;;
-  "pr create")     echo "https://github.com/o/r/pull/7" ;;
-  "pr view")       echo "${GH_MERGEABLE:-MERGEABLE}" ;;           # --json mergeable (#394)
-  "pr list")       echo "${GH_DEP_PRS:-[]}" ;;                    # open PRs based on the effort branch (#358)
-  "pr edit")       exit "${GH_PR_EDIT_RC:-0}" ;;                  # re-target a dependent PR (#358)
-  "pr diff")       # a merged sub PR's diff (wave-style close, #164): one kit-managed + one app file
-                   # + one project-owned rule, which the drift check must NOT name (#218)
-    printf 'diff --git a/.claude/skills/demo.md b/.claude/skills/demo.md\n+kit\ndiff --git a/src/app.ts b/src/app.ts\n+app\ndiff --git a/.claude/rules/project-owned.md b/.claude/rules/project-owned.md\n+own\n' ;;
-  "api "*|"api")
-    case "$*" in
-      *"--method POST"*"/sub_issues"*) exit 0 ;;                # link a sub
-      *"/sub_issues"*".[].number"*)    printf '101\n102\n' ;;   # list subs (for close)
-      # wave-style close (#164): per-sub "sub|state|pr|merge-oid|title" rows by parent number
-      *closedByPullRequestsReferences*n=77*) printf '301|CLOSED|501|abc1234def|first sub\n302|CLOSED|502|bcd2345eab|second sub\n' ;;
-      *closedByPullRequestsReferences*n=78*) printf '201|CLOSED|401|abc1234def|done sub\n202|OPEN|||still open sub\n' ;;
-      *".id"*)                         echo "55501" ;;          # issue db id
-      *) exit 0 ;;
-    esac ;;
-  *) exit 0 ;;
+# The forge shim: a `curl` that answers like the REST API from the GH_* knobs and logs one line per
+# request, plus a `gh` that fails on any subcommand (a leftover gh call is a red test). The issue
+# effort_pr reads is #99 (GH_TITLE/GH_LABELS); its PR is #9 from effort/99-demo onto main.
+stub="$tmp/bin"
+# shellcheck source=/dev/null
+. "$LIB/test-forge-shim.sh"; forge_shim_install "$stub"
+export PATH="$stub:$PATH" GH_TOKEN=test-token CCKIT_FORGE=github
+export GH_TITLE="[Effort] 99 · demo effort" GH_LABELS='[{"name":"role:tech-lead"},{"name":"kind:task"}]'
+export GH_HEAD="effort/99-demo" GH_BASE="main" GH_MERGEABLE=true
+# What the shim does not know, answered by request (GH_FIXTURE is sourced after the shim's own case):
+#   GH_DEP_PRS     the open PRs based on the effort branch (REST shape), to GET pulls?base=… (#358)
+#   GH_DEP_PRS_RC  an HTTP status that makes that read fail · GH_PR_EDIT_RC=1 fails the re-target PATCH
+#   the sub-issues of #77 are 301 + 302 (both closed), of #78 201 (closed) + 202 (still open) (#164)
+export GH_FIXTURE="$tmp/fixture.sh"
+cat > "$GH_FIXTURE" <<'SH'
+case "$method $ep" in
+  "GET repos/o/r/pulls")
+    case "$path" in *base=*) out="${GH_DEP_PRS:-[]}"; [ "${GH_DEP_PRS_RC:-200}" = 200 ] || code="$GH_DEP_PRS_RC" ;; esac ;;
+  "PATCH repos/o/r/pulls/"*) [ "${GH_PR_EDIT_RC:-0}" = 0 ] || code=422 ;;
+  "GET repos/o/r/issues/77/sub_issues") out='[{"number":301,"state":"closed"},{"number":302,"state":"closed"}]' ;;
+  "GET repos/o/r/issues/78/sub_issues") out='[{"number":201,"state":"closed"},{"number":202,"state":"open"}]' ;;
 esac
 SH
-chmod +x "$stub/gh"
-export PATH="$stub:$PATH"
+# The REST lines the lifecycle leaves in the log.
+MERGE_RE='^PUT repos/o/r/pulls/[0-9]+/merge '
+CLOSE_RE='^PATCH repos/o/r/issues/[0-9]+ \{"state":"closed"'
+CREATE_RE='^POST repos/o/r/issues '
+PR_RE='^POST repos/o/r/pulls '
+no_gh() { t "$1: no gh subcommand ran" "$(grep -c '^GH-SUBCOMMAND' "$GH_LOG")" "0"; }
 export KIT_REPO="o/r" EFFORT_REPO="o/r" KIT_BASE_BRANCH="main"
 export KIT_WT_INSTALL=0   # #119: skip the dependency install during the hermetic worktree bootstrap
 # shellcheck source=/dev/null
@@ -65,19 +60,20 @@ source "$LIB/effort-ops.sh"
 : > "$GH_LOG"
 parent="$(effort_new --flow Core "demo effort" "first sub" "second sub" 2>/dev/null)"
 t  "effort_new returns the parent number"          "$parent" "1"
-t  "effort_new creates parent + 2 subs (3 issues)" "$(grep -c 'issue create' "$GH_LOG")" "3"
-t  "effort_new links 2 native sub-issues"          "$(grep -c 'method POST .*sub_issues' "$GH_LOG")" "2"
-tc "$GH_LOG" 'issue create .*--title \[Effort\] · \[Core\] demo effort' "effort_new titles the parent"
+t  "effort_new creates parent + 2 subs (3 issues)" "$(grep -cE "$CREATE_RE" "$GH_LOG")" "3"
+t  "effort_new links 2 native sub-issues"          "$(grep -c '^POST repos/o/r/issues/1/sub_issues ' "$GH_LOG")" "2"
+tc "$GH_LOG" '^POST repos/o/r/issues \{"title":"\[Effort\] · \[Core\] demo effort"' "effort_new titles the parent"
 # every kit-defined label is ensured (created idempotently) BEFORE the issue create uses it (#153)
-tc "$GH_LOG" 'label create ctx:'        "effort_new ensures the ctx:* label exists"
-tc "$GH_LOG" 'label create kind:task'   "effort_new ensures the kind label exists"
-tc "$GH_LOG" 'label create priority:p1' "effort_new ensures the priority label exists"
-tc "$GH_LOG" 'label create flow:core'   "effort_new ensures the flow label exists"
+tc "$GH_LOG" '^POST repos/o/r/labels \{"name":"ctx:'         "effort_new ensures the ctx:* label exists"
+tc "$GH_LOG" '^POST repos/o/r/labels \{"name":"kind:task"'   "effort_new ensures the kind label exists"
+tc "$GH_LOG" '^POST repos/o/r/labels \{"name":"priority:p1"' "effort_new ensures the priority label exists"
+tc "$GH_LOG" '^POST repos/o/r/labels \{"name":"flow:core"'   "effort_new ensures the flow label exists"
+no_gh "effort_new"
 # a jargon/long name is rejected before any issue is created
 : > "$GH_LOG"
 effort_new "refactor the whole scripts/kit wiring layer" >/dev/null 2>&1 && rc=0 || rc=1
 t  "effort_new rejects a bad title"                "$rc" "1"
-t  "effort_new creates nothing on a bad title"     "$(grep -c 'issue create' "$GH_LOG")" "0"
+t  "effort_new creates nothing on a bad title"     "$(grep -cE "$CREATE_RE" "$GH_LOG")" "0"
 
 # ── effort_start / effort_pr / effort_close (real git + bare remote) ───────────────────────────
 ( cd "$tmp" && git init -q --bare remote.git )
@@ -110,14 +106,16 @@ t  "re-running effort_start keeps the start stamp" "$(cat "$start_stamp" 2>/dev/
 cd "$tmp/work/.claude/worktrees/effort+99-demo"
 : > "$GH_LOG"
 effort_pr 99 --summary "SUMMARY-MARKER" --for-agents "AGENTS-MARKER" >/dev/null 2>&1
-tc "$GH_LOG" 'pr create .*--base main --head effort/99-demo' "effort_pr opens effort/99 → main"
+tc "$GH_LOG" '^POST repos/o/r/pulls \{"title":"[^"]*","head":"effort/99-demo","base":"main"' "effort_pr opens effort/99 → main"
 # #363: parity with the kit-effort-pr skill — the verb is the one implementation.
-tc "$GH_LOG" 'pr create .*--title feat: demo effort \[#99\]' "effort_pr titles with a conventional subject + the [#N] id"
-tc "$GH_LOG" '[-]-label role:tech-lead,kind:task' "effort_pr inherits the parent's labels"
-tc "$GH_LOG" '[-]-milestone M1'                 "effort_pr inherits the parent's milestone"
-tc "$GH_LOG" 'SUMMARY-MARKER'                                "effort_pr puts --summary in the body"
-tc "$GH_LOG" 'AGENTS-MARKER'                                 "effort_pr puts --for-agents in the body"
-tc "$GH_LOG" '^Closes #99$'                                  "effort_pr body closes the parent"
+tc "$GH_LOG" '^POST repos/o/r/pulls \{"title":"feat: demo effort \[#99\]"' "effort_pr titles with a conventional subject + the [#N] id"
+# labels, milestone (M1 is milestone 3 in the shim) and the author land in ONE PATCH on the PR
+tc "$GH_LOG" '^PATCH repos/o/r/issues/7 \{"labels":\["role:tech-lead","kind:task"\]' "effort_pr inherits the parent's labels"
+tc "$GH_LOG" '^PATCH repos/o/r/issues/7 \{.*"milestone":3\}$' "effort_pr inherits the parent's milestone"
+tc "$GH_LOG" '^POST repos/o/r/pulls \{.*SUMMARY-MARKER'       "effort_pr puts --summary in the body"
+tc "$GH_LOG" '^POST repos/o/r/pulls \{.*AGENTS-MARKER'        "effort_pr puts --for-agents in the body"
+tc "$GH_LOG" '^POST repos/o/r/pulls \{.*\\nCloses #99(\\n|")' "effort_pr body closes the parent"
+no_gh "effort_pr"
 t  "effort_pr never commits an untracked .env.local" "$(git ls-files .env.local)" ""
 # #418: pr.bodyStyle = content swaps the Verification checklist for a Review one; the machine line,
 # the summary and the For agents block stay.
@@ -131,24 +129,24 @@ t  "effort body (content) drops the code wording"  "$(printf '%s\n' "$eb" | grep
 : > "$GH_LOG"
 effort_pr 99 --title "feat(x): a conventional title" >/dev/null 2>&1 && rc=0 || rc=1
 t  "effort_pr refuses a --title without the [#N] id" "$rc" "1"
-t  "effort_pr opened nothing on a bad --title"      "$(grep -c 'pr create' "$GH_LOG")" "0"
+t  "effort_pr opened nothing on a bad --title"      "$(grep -cE "$PR_RE" "$GH_LOG")" "0"
 effort_pr 99 --title "feat(x): a conventional title [#99]" >/dev/null 2>&1
-tc "$GH_LOG" 'pr create .*--title feat\(x\): a conventional title \[#99\]' "effort_pr honours --title"
+tc "$GH_LOG" '^POST repos/o/r/pulls \{"title":"feat\(x\): a conventional title \[#99\]"' "effort_pr honours --title"
 # #237: a title the commitlint gate would reject never reaches gh — built or passed in.
 : > "$GH_LOG"
 effort_pr 99 --type bogus >/dev/null 2>&1 && rc=0 || rc=1
 t  "effort_pr refuses a built title that fails commitlint" "$rc" "1"
-t  "effort_pr opened nothing on a non-conventional built title" "$(grep -c 'pr create' "$GH_LOG")" "0"
+t  "effort_pr opened nothing on a non-conventional built title" "$(grep -cE "$PR_RE" "$GH_LOG")" "0"
 : > "$GH_LOG"
 effort_pr 99 --title "[Tech Lead] [#99] demo effort" >/dev/null 2>&1 && rc=0 || rc=1
 t  "effort_pr refuses a non-conventional --title"   "$rc" "1"
-t  "effort_pr opened nothing on a non-conventional --title" "$(grep -c 'pr create' "$GH_LOG")" "0"
+t  "effort_pr opened nothing on a non-conventional --title" "$(grep -cE "$PR_RE" "$GH_LOG")" "0"
 : > "$GH_LOG"
 effort_pr 99 --type fix >/dev/null 2>&1
-tc "$GH_LOG" 'pr create .*--title fix: demo effort \[#99\]' "effort_pr --type sets the conventional type"
+tc "$GH_LOG" '^POST repos/o/r/pulls \{"title":"fix: demo effort \[#99\]"' "effort_pr --type sets the conventional type"
 : > "$GH_LOG"
 KIT_PR_TITLE_STYLE=issue-title effort_pr 99 >/dev/null 2>&1
-tc "$GH_LOG" 'pr create .*--title \[#99\] demo effort' "effort_pr issue-title style keeps the [#N] name form, no commitlint refusal"
+tc "$GH_LOG" '^POST repos/o/r/pulls \{"title":"(\[Tech Lead\] )?\[#99\] demo effort"' "effort_pr issue-title style keeps the [#N] name form, no commitlint refusal"
 
 # ── effort_close #120: refuse-squash-without-trace backstop ────────────────────────────────────
 # With NO commits on the effort branch, effort_snapshot_subs captures no trace → close must refuse
@@ -157,7 +155,7 @@ tc "$GH_LOG" 'pr create .*--title \[#99\] demo effort' "effort_pr issue-title st
 close_out="$(effort_close 99 2>&1)"; rc=$?
 t  "effort_close refuses without a trace (rc 1)" "$rc" "1"
 case "$close_out" in *"refusing to squash"*) echo "ok: refuse message explains itself" ;; *) echo "FAIL: refuse message: $close_out"; fail=1 ;; esac
-t  "effort_close did NOT merge without a trace" "$(grep -c 'pr merge' "$GH_LOG")" "0"
+t  "effort_close did NOT merge without a trace" "$(grep -cE "$MERGE_RE" "$GH_LOG")" "0"
 
 # ── effort_close #120: happy path — commit present → trace captured → full close ────────────────
 # A real commit on the effort branch gives snapshot something to trace; close then proceeds through
@@ -190,22 +188,22 @@ close_out="$(PREHOOK_RC=1 KIT_CONFIG="$tmp/prehook-config.json" effort_close 99 
 t  "pre-close hook: a failing hook refuses the close (rc 1)" "$rc" "1"
 case "$close_out" in *"PREHOOK-SAYS: gate output"*) echo "ok: pre-close hook: the hook's output is printed" ;; *) echo "FAIL: pre-close hook output missing: $close_out"; fail=1 ;; esac
 case "$close_out" in *"pre-close hook"*"refus"*) echo "ok: pre-close hook: the refusal names the hook" ;; *) echo "FAIL: pre-close refusal message: $close_out"; fail=1 ;; esac
-t  "pre-close hook: a failing hook merges nothing" "$(grep -c 'pr merge' "$GH_LOG")" "0"
+t  "pre-close hook: a failing hook merges nothing" "$(grep -cE "$MERGE_RE" "$GH_LOG")" "0"
 t  "pre-close hook: a failing hook writes no trace" \
    "$(ls "$(git rev-parse --git-common-dir)/traces/effort-99" 2>/dev/null | grep -cE '(\.diff|\.meta|index\.jsonl)$')" "0"
 # a configured hook that is missing is a gate that cannot run — refuse rather than skip it
 : > "$GH_LOG"
 close_out="$(KIT_EFFORT_PRE_CLOSE_HOOK="$stub/no-such-hook" effort_close 99 2>&1)"; rc=$?
 t  "pre-close hook: a missing hook refuses the close (rc 1)" "$rc" "1"
-t  "pre-close hook: a missing hook merges nothing" "$(grep -c 'pr merge' "$GH_LOG")" "0"
+t  "pre-close hook: a missing hook merges nothing" "$(grep -cE "$MERGE_RE" "$GH_LOG")" "0"
 rm -f "$PREHOOK_MARKER" "$PREHOOK_MARKER.cwd"
 PREHOOK_WT="$(pwd -P)"
 
 # ── effort_close #394: a CONFLICTING PR is refused before the metrics capture writes a row ──────
 : > "$GH_LOG"
-close_out="$(GH_MERGEABLE=CONFLICTING effort_close 99 2>&1)"; rc=$?
+close_out="$(GH_MERGEABLE=false effort_close 99 2>&1)"; rc=$?
 t  "effort_close refuses a conflicting PR (rc 1)" "$rc" "1"
-t  "effort_close did NOT merge a conflicting PR" "$(grep -c 'pr merge' "$GH_LOG")" "0"
+t  "effort_close did NOT merge a conflicting PR" "$(grep -cE "$MERGE_RE" "$GH_LOG")" "0"
 case "$close_out" in
   *"metrics:"*) echo "FAIL: metrics captured before the conflict refusal"; fail=1 ;;
   *"nothing was written"*) echo "ok: conflict refused before the metrics capture" ;;
@@ -213,8 +211,10 @@ case "$close_out" in
 esac
 
 # ── effort_close #358: open PRs based on the effort branch are re-targeted before it is deleted ──
-# The selector is pure: `gh pr list --json number,baseRefName` in, the PR numbers on <branch> out.
+# The selector is pure: the `{number, baseRefName}` rows read from GET pulls?base=… in, the PR
+# numbers on <branch> out. DEPS_REST is the same list as the API answers it (the fixture's shape).
 DEPS='[{"number":41,"baseRefName":"effort/99-demo"},{"number":42,"baseRefName":"main"},{"number":43,"baseRefName":"effort/99-demo"}]'
+DEPS_REST='[{"number":41,"base":{"ref":"effort/99-demo"}},{"number":42,"base":{"ref":"main"}},{"number":43,"base":{"ref":"effort/99-demo"}}]'
 t  "_eo_dependent_prs keeps only the PRs based on the branch" \
    "$(printf '%s' "$DEPS" | _eo_dependent_prs effort/99-demo | tr '\n' ' ')" "41 43 "
 t  "_eo_dependent_prs: no dependents → no output" "$(printf '[]' | _eo_dependent_prs effort/99-demo)" ""
@@ -225,20 +225,20 @@ t  "_eo_dependent_prs: a prefix-sharing branch is not a match" \
 records="$(git rev-parse --git-common-dir)/effort-metrics/records.jsonl"
 rows_before="$(cat "$records" 2>/dev/null | wc -l | tr -d ' ')"
 : > "$GH_LOG"
-close_out="$(GH_DEP_PRS="$DEPS" GH_PR_EDIT_RC=1 effort_close 99 2>&1)"; rc=$?
+close_out="$(GH_DEP_PRS="$DEPS_REST" GH_PR_EDIT_RC=1 effort_close 99 2>&1)"; rc=$?
 t  "effort_close refuses when a dependent PR cannot be re-targeted (rc 1)" "$rc" "1"
-t  "effort_close did NOT merge after a failed re-target" "$(grep -c 'pr merge' "$GH_LOG")" "0"
+t  "effort_close did NOT merge after a failed re-target" "$(grep -cE "$MERGE_RE" "$GH_LOG")" "0"
 t  "effort_close appended no metrics row on that refusal" "$(cat "$records" 2>/dev/null | wc -l | tr -d ' ')" "$rows_before"
 case "$close_out" in
   *"metrics:"*) echo "FAIL: metrics captured before the re-target refusal"; fail=1 ;;
   *"PR 41"*"nothing was merged"*) echo "ok: re-target refusal names the PR" ;;
   *) echo "FAIL: re-target refusal message: $close_out"; fail=1 ;;
 esac
-# `gh pr list` failing is not "no dependents": the close refuses instead of deleting blind.
+# A failed GET pulls?base=… is not "no dependents": the close refuses instead of deleting blind.
 : > "$GH_LOG"
-close_out="$(GH_DEP_PRS='not json' effort_close 99 2>&1)"; rc=$?
+close_out="$(GH_DEP_PRS_RC=500 effort_close 99 2>&1)"; rc=$?
 t  "effort_close refuses when the dependent-PR list is unreadable (rc 1)" "$rc" "1"
-t  "effort_close did NOT merge on an unreadable list" "$(grep -c 'pr merge' "$GH_LOG")" "0"
+t  "effort_close did NOT merge on an unreadable list" "$(grep -cE "$MERGE_RE" "$GH_LOG")" "0"
 
 # #148: the VERB sets board Status=Done (guarded). Stub the board helpers + captured ids in-shell —
 # _eo_source_board must see them and skip sourcing the real gh-project.sh.
@@ -249,23 +249,27 @@ export KIT_PROJECTS_V2="true" STATUS_FIELD_ID="SF1" STATUS_OPT_DONE="OPT_DONE"
 
 : > "$GH_LOG"
 # (#380 case 2) a passing pre-close hook rides this happy path: called with effort + subs, close proceeds.
-close_out="$(GH_DEP_PRS="$DEPS" KIT_EFFORT_PRE_CLOSE_HOOK="$stub/prehook" effort_close 99 2>&1)"; rc=$?
+close_out="$(GH_DEP_PRS="$DEPS_REST" KIT_EFFORT_PRE_CLOSE_HOOK="$stub/prehook" effort_close 99 2>&1)"; rc=$?
 export KIT_PROJECTS_V2="false"
 cd "$tmp/work"   # our cwd (the effort worktree) is GC'd by the close — step to the main checkout
 t  "effort_close succeeds with a trace (rc 0)" "$rc" "0"
 t  "pre-close hook: called as <hook> <effort#> <sub#…>" "$(cat "$PREHOOK_MARKER" 2>/dev/null)" "99 101 102"
 t  "pre-close hook: runs from the effort worktree" "$(cat "$PREHOOK_MARKER.cwd" 2>/dev/null)" "$PREHOOK_WT"
-tc "$GH_LOG" 'pr merge effort/99-demo .*--squash' "effort_close squash-merges the PR"
+tc "$GH_LOG" '^GET repos/o/r/pulls\?head=o%3Aeffort%2F99-demo&state=open' "effort_close finds the PR for the effort branch"
+tc "$GH_LOG" '^PUT repos/o/r/pulls/9/merge \{"merge_method":"squash"\}$' "effort_close squash-merges the PR"
+# the remote branch goes through git, not the API — and it is gone (a cloud session keeps it, #396)
+t  "effort_close deleted the remote branch" "$(git -C "$tmp/work" ls-remote --heads origin effort/99-demo | wc -l | tr -d ' ')" "0"
 # #358: both dependents re-targeted to the base, and before the merge that deletes the branch
-tc "$GH_LOG" 'pr list .*--base effort/99-demo .*--state open' "effort_close lists open PRs based on the effort branch"
-tc "$GH_LOG" 'pr edit 41 .*--base main' "effort_close re-targets dependent PR 41 to the base"
-tc "$GH_LOG" 'pr edit 43 .*--base main' "effort_close re-targets dependent PR 43 to the base"
-t  "effort_close leaves a PR on another base alone" "$(grep -c 'pr edit 42' "$GH_LOG")" "0"
+tc "$GH_LOG" '^GET repos/o/r/pulls\?base=effort%2F99-demo&state=open&per_page=100' "effort_close lists open PRs based on the effort branch"
+tc "$GH_LOG" '^PATCH repos/o/r/pulls/41 \{"base":"main"\}$' "effort_close re-targets dependent PR 41 to the base"
+tc "$GH_LOG" '^PATCH repos/o/r/pulls/43 \{"base":"main"\}$' "effort_close re-targets dependent PR 43 to the base"
+t  "effort_close leaves a PR on another base alone" "$(grep -c '^PATCH repos/o/r/pulls/42 ' "$GH_LOG")" "0"
 t  "effort_close re-targets before the merge deletes the branch" \
-   "$(grep -nE 'pr edit 43|pr merge' "$GH_LOG" | sed -E 's/^[0-9]+:(pr [a-z]+).*/\1/' | tr '\n' ' ')" "pr edit pr merge "
+   "$(grep -nE 'PATCH repos/o/r/pulls/43 |PUT repos/o/r/pulls/9/merge' "$GH_LOG" | sed -E 's/^[0-9]+:(PATCH|PUT).*/\1/' | tr '\n' ' ')" "PATCH PUT "
 case "$close_out" in *"PR 41 re-targeted to main"*) echo "ok: close output carries the re-targeted line" ;; *) echo "FAIL: no re-targeted line in close output"; fail=1 ;; esac
-tc "$GH_LOG" 'issue close 101'  "effort_close closes sub #101"
-tc "$GH_LOG" 'issue close 99 '  "effort_close closes the parent"
+tc "$GH_LOG" '^PATCH repos/o/r/issues/101 \{"state":"closed","state_reason":"completed"\}$' "effort_close closes sub #101"
+tc "$GH_LOG" '^PATCH repos/o/r/issues/99 \{"state":"closed","state_reason":"completed"\}$'  "effort_close closes the parent"
+no_gh "effort_close"
 case "$close_out" in *"metrics:"*) echo "ok: capture_effort_metrics composed into close" ;; *) echo "FAIL: no metrics capture in close"; fail=1 ;; esac
 # #453: the row that close wrote carries a build time measured from the start stamp.
 t  "effort_close records build_seconds from the start stamp" \
@@ -304,7 +308,8 @@ forced_out="$(PREHOOK_RC=1 KIT_EFFORT_PRE_CLOSE_HOOK="$stub/prehook" KHOOK_MARKE
 cd "$tmp/work"
 case "$forced_out" in *"pre-close hook"*"skipped (KIT_FORCE=1)"*) echo "ok: pre-close hook: KIT_FORCE=1 says the hook was skipped" ;; *) echo "FAIL: no pre-close skip notice: $forced_out"; fail=1 ;; esac
 t  "pre-close hook: KIT_FORCE=1 does not run the hook" "$([ -e "$PREHOOK_MARKER" ] && echo ran || echo skipped)" "skipped"
-tc "$GH_LOG" 'pr merge effort/88-forced .*--squash' "KIT_FORCE=1 close merges despite no trace"
+tc "$GH_LOG" '^GET repos/o/r/pulls\?head=o%3Aeffort%2F88-forced&state=open' "KIT_FORCE=1 close reads the PR of effort/88-forced"
+tc "$GH_LOG" '^PUT repos/o/r/pulls/[0-9]+/merge \{"merge_method":"squash"\}$' "KIT_FORCE=1 close merges despite no trace"
 t  "knowledge-ingest hook ran with the effort number" "$(cat "$tmp/khook.out" 2>/dev/null)" "ingested 88"
 # #371: the close GCs the worktree it was run from; the hook must run in the main checkout, not in
 # that deleted directory (where every relative path and git call fails).
@@ -343,32 +348,40 @@ case "$gone_out" in *"post-close hook not read"*) echo "ok: a config that vanish
 close_out="$(effort_close 78 2>&1)"; rc=$?
 t  "wave close refuses while a sub is open (rc 1)" "$rc" "1"
 case "$close_out" in *"not done"*"#202"*) echo "ok: wave refuse lists the straggler sub" ;; *) echo "FAIL: wave refuse output: $close_out"; fail=1 ;; esac
-t  "wave refuse closes nothing" "$(grep -c 'issue close' "$GH_LOG")" "0"
+t  "wave refuse closes nothing" "$(grep -cE "$CLOSE_RE" "$GH_LOG")" "0"
 
 # #380: the wave path has no effort worktree; the hook runs from the checkout the close was run in.
 : > "$GH_LOG"; rm -f "$PREHOOK_MARKER"
 close_out="$(PREHOOK_RC=1 KIT_EFFORT_PRE_CLOSE_HOOK="$stub/prehook" effort_close 77 2>&1)"; rc=$?
 t  "pre-close hook: a failing hook refuses a wave close (rc 1)" "$rc" "1"
 t  "pre-close hook: wave hook gets the effort + its subs" "$(cat "$PREHOOK_MARKER" 2>/dev/null)" "77 301 302"
-t  "pre-close hook: a refused wave close closes nothing" "$(grep -c 'issue close' "$GH_LOG")" "0"
+t  "pre-close hook: a refused wave close closes nothing" "$(grep -cE "$CLOSE_RE" "$GH_LOG")" "0"
 
 # happy: every sub CLOSED with a merged PR → trace from the PR diffs → parent closed, board Done
-# for parent + subs, drift check fires off the union of the merged PR diffs
+# for parent + subs, drift check read off the union of the merged PR diffs. The shim's diff for any
+# PR is one app file (src/app.ts) and that answer cannot be changed from a fixture, so the drift
+# check is asserted silent here — the kit-managed warning itself is covered on the branch path above.
 : > "$BOARD_LOG"
 export KIT_PROJECTS_V2="true"
 : > "$GH_LOG"
 close_out="$(effort_close 77 2>&1)"; rc=$?
 export KIT_PROJECTS_V2="false"
 t  "wave close succeeds when all subs merged (rc 0)" "$rc" "0"
-tc "$GH_LOG" 'pr diff 501' "wave close snapshots the merged sub PR diffs"
-tc "$GH_LOG" 'issue close 77 ' "wave close closes the parent"
-t  "wave close closes ONLY the parent (subs already closed)" "$(grep -c 'issue close' "$GH_LOG")" "1"
-t  "wave close never squash-merges anything" "$(grep -c 'pr merge' "$GH_LOG")" "0"
+# the closing PR of sub #301 is #5301 in the shim's timeline (#6301 only mentions it); its diff is
+# the `GET pulls/<n>` read with the diff Accept header
+tc "$GH_LOG" '^GET repos/o/r/issues/301/timeline' "wave close reads each sub's timeline for its closing PR"
+tc "$GH_LOG" '^GET repos/o/r/pulls/5301 $' "wave close snapshots the merged sub PR diffs"
+tc "$GH_LOG" '^PATCH repos/o/r/issues/77 \{"state":"closed","state_reason":"completed"\}$' "wave close closes the parent"
+t  "wave close closes ONLY the parent (subs already closed)" "$(grep -cE "$CLOSE_RE" "$GH_LOG")" "1"
+t  "wave close never squash-merges anything" "$(grep -cE "$MERGE_RE" "$GH_LOG")" "0"
 tc "$BOARD_LOG" 'ITEM-77 SF1 OPT_DONE'  "wave close sets board Done for the parent"
 tc "$BOARD_LOG" 'ITEM-301 SF1 OPT_DONE' "wave close sets board Done for sub #301"
 tc "$BOARD_LOG" 'ITEM-302 SF1 OPT_DONE' "wave close sets board Done for sub #302"
-case "$close_out" in *"kit-sync"*".claude/skills/demo.md"*) echo "ok: wave drift check reads the merged PR diffs" ;; *) echo "FAIL: no kit-sync warning in wave close output"; fail=1 ;; esac
+wave_trace="$(git -C "$tmp/work" rev-parse --git-common-dir)/traces/effort-77"
+t  "wave close traces the merged sub PR diffs" "$(cat "$wave_trace"/*.diff 2>/dev/null | grep -c '^diff --git a/src/app.ts ')" "2"
+case "$close_out" in *"kit-sync"*) echo "FAIL: wave kit-sync warning fired with no kit-managed file in the merged diffs: $close_out"; fail=1 ;; *) echo "ok: wave drift check stays silent when the merged diffs touch no kit-managed file" ;; esac
 case "$close_out" in *"project-owned.md"*) echo "FAIL: wave kit-sync warning names a project-owned rule"; fail=1 ;; *) echo "ok: wave drift check skips a project-owned rule" ;; esac
+no_gh "wave close"
 
 # ── #218 · _EO_KIT_MANAGED_RE — only the rules the kit ships are kit-managed ──────────────────────
 # init.sh writes .claude/rules/<name>.md only for a templates/rules/<name>.md, so the regex lists
@@ -405,58 +418,48 @@ t "relations_add respects a mid-body section" \
 # single mangled line `## Relations- Depends on #4- Depends on #9`. Both now go through the formatter.
 : > "$GH_LOG"; printf '0' > "$GH_N"
 effort_new --depends-on "#4,9" "depends on effort" >/dev/null 2>&1
-tc "$GH_LOG" '^## Relations$'    "--depends-on writes ## Relations on its own line"
-tc "$GH_LOG" '^- Depends on #4$' "--depends-on writes the first dep on its own line"
-tc "$GH_LOG" '^- Depends on #9( |$)' "--depends-on writes the second dep on its own line"
+# the body travels as a JSON string in the POST issues line, so a line break is a literal \n there
+tc "$GH_LOG" '^POST repos/o/r/issues \{.*\\n## Relations\\n'    "--depends-on writes ## Relations on its own line"
+tc "$GH_LOG" '^POST repos/o/r/issues \{.*\\n- Depends on #4\\n' "--depends-on writes the first dep on its own line"
+tc "$GH_LOG" '^POST repos/o/r/issues \{.*\\n- Depends on #9(\\n|")' "--depends-on writes the second dep on its own line"
 t  "--depends-on does not mangle the heading" "$(grep -c '## Relations-' "$GH_LOG")" "0"
 
 # ── #243 · effort_chain — a linear blocked_by chain, idempotent, cycle-refusing ────────────────────
-# Its own gh stub (prepended to PATH) with real STATE: which issues exist, the blocked_by edge set,
-# and per-issue bodies — so the edges and the body lines can be asserted, not just the call log.
-cstub="$tmp/cbin"; mkdir -p "$cstub"
+# A stateful fixture for the shim — which issues exist, the blocked_by edge set, and per-issue
+# bodies — so the edges and the body lines can be asserted, not just the request log. The log of
+# this section is $CH_LOG (the shim writes wherever GH_LOG points).
 export CH_DIR="$tmp/chain"; mkdir -p "$CH_DIR"
 export CH_LOG="$CH_DIR/gh.log" CH_EDGES="$CH_DIR/edges" CH_EXISTS="$CH_DIR/exists"
 printf '501\n502\n503\n504\n601\n' > "$CH_EXISTS"   # #999 deliberately absent
 : > "$CH_EDGES"; : > "$CH_LOG"
-for n in 501 502 503 504; do printf '## Goal\ng%s\n\n## Verification\nv\n' "$n" > "$CH_DIR/body.$n"; done
-cat > "$cstub/gh" <<'SH'
-#!/usr/bin/env bash
-# stub gh with state. DB id of issue N is 900000+N (the dependencies API takes the blocker's db id).
-echo "$*" | tr '\n' ' ' >> "$CH_LOG"; echo >> "$CH_LOG"
-_n() { printf '%s' "$1" | sed -nE 's#.*issues/([0-9]+).*#\1#p'; }
-case "$1" in
-  issue)
-    case "$2" in
-      view) cat "$CH_DIR/body.$3" 2>/dev/null; exit 0 ;;
-      edit) n="$3"; shift 3
-            # CH_FAIL_EDIT=<n> makes the edit fail for that issue — a POST-validation failure, the
-            # only way to reach effort_chain's rc=1 path (pre-flight refusals never write at all).
-            [ -n "${CH_FAIL_EDIT:-}" ] && [ "$n" = "$CH_FAIL_EDIT" ] && exit 1
-            while [ $# -gt 0 ]; do
-              [ "$1" = "--body" ] && { printf '%s' "$2" > "$CH_DIR/body.$n"; break; }
-              shift
-            done
-            exit 0 ;;
-      *) exit 0 ;;
-    esac ;;
-  api)
-    case "$*" in
-      *"--method POST"*"/dependencies/blocked_by"*)
-        n="$(_n "$*")"; bid="$(printf '%s' "$*" | sed -nE 's#.*issue_id=([0-9]+).*#\1#p')"
-        b=$((bid - 900000))
-        grep -qx "$n $b" "$CH_EDGES" && exit 1     # GitHub rejects a duplicate edge
-        echo "$n $b" >> "$CH_EDGES"; exit 0 ;;
-      *"/dependencies/blocked_by"*)
-        awk -v k="$(_n "$*")" '$1==k{print $2}' "$CH_EDGES"; exit 0 ;;
-      *".id"*)     n="$(_n "$*")"; echo $((900000 + n)); exit 0 ;;
-      *".number"*) n="$(_n "$*")"; grep -qx "$n" "$CH_EXISTS" || exit 1; echo "$n"; exit 0 ;;
-      *) exit 0 ;;
-    esac ;;
-  *) exit 0 ;;
+for n in 501 502 503 504 601; do printf '## Goal\ng%s\n\n## Verification\nv\n' "$n" > "$CH_DIR/body.$n"; done
+CHAIN_FIXTURE="$tmp/chain-fixture.sh"
+cat > "$CHAIN_FIXTURE" <<'SH'
+# DB id of issue N is 900000+N (the dependencies API takes the blocker's db id). Edges are "issue
+# blocker" lines in $CH_EDGES; a body is $CH_DIR/body.N. CH_FAIL_EDIT=<n> makes that issue's PATCH
+# fail — a POST-validation failure, the only way to reach effort_chain's rc=1 path (pre-flight
+# refusals never write at all).
+_n() { printf '%s' "$ep" | sed -nE 's#^repos/o/r/issues/([0-9]+).*#\1#p'; }
+case "$method $ep" in
+  "GET repos/o/r/issues/"*"/dependencies/blocked_by")
+    out="$(awk -v k="$(_n)" 'BEGIN{printf "["} $1==k{printf "%s{\"number\":%s}", (c++?",":""), $2} END{printf "]"}' "$CH_EDGES")" ;;
+  "POST repos/o/r/issues/"*"/dependencies/blocked_by")
+    n="$(_n)"; bid="$(printf '%s' "$body" | jq -r .issue_id)"; b=$((bid - 900000))
+    if grep -qx "$n $b" "$CH_EDGES"; then code=422; else echo "$n $b" >> "$CH_EDGES"; fi ;;   # GitHub rejects a duplicate edge
+  "GET repos/o/r/issues/"*)
+    n="$(_n)"
+    if grep -qx "$n" "$CH_EXISTS"; then
+      out="$(jq -n --argjson n "$n" --rawfile b "$CH_DIR/body.$n" '{number:$n, id:(900000+$n), title:"issue", state:"open", body:$b, labels:[]}')"
+    else code=404; out='{"message":"Not Found"}'; fi ;;
+  "PATCH repos/o/r/issues/"*)
+    n="$(_n)"
+    if [ "${CH_FAIL_EDIT:-}" = "$n" ]; then code=500
+    else printf '%s' "$body" | jq -r '.body // empty' > "$CH_DIR/body.$n"; fi ;;
 esac
 SH
-chmod +x "$cstub/gh"
-export PATH="$cstub:$PATH"
+export GH_FIXTURE="$CHAIN_FIXTURE" GH_LOG="$CH_LOG"
+POST_DEP_RE='^POST repos/o/r/issues/[0-9]+/dependencies/blocked_by '
+EDIT_RE='^PATCH repos/o/r/issues/'
 edges() { sort "$CH_EDGES" | tr '\n' ';'; }
 
 # happy path: 502 blocked_by 501, 503 blocked_by 502, each body records its predecessor
@@ -474,13 +477,13 @@ t "chain leaves the head issue's body alone" "$(grep -c 'Depends on' "$CH_DIR/bo
 effort_chain 501 502 503 >/dev/null 2>&1; rc=$?
 t "chain re-run returns 0"                   "$rc" "0"
 t "chain re-run sets no new edge"            "$(edges)" "502 501;503 502;"
-t "chain re-run POSTs no dependency"         "$(grep -c 'method POST' "$CH_LOG")" "0"
-t "chain re-run edits no body"               "$(grep -c 'issue edit' "$CH_LOG")" "0"
+t "chain re-run POSTs no dependency"         "$(grep -cE "$POST_DEP_RE" "$CH_LOG")" "0"
+t "chain re-run edits no body"               "$(grep -cE "$EDIT_RE" "$CH_LOG")" "0"
 t "chain re-run leaves ONE Depends on line"  "$(grep -c 'Depends on #501' "$CH_DIR/body.502")" "1"
 # a `#`-prefixed number is the same issue
 : > "$CH_LOG"
 effort_chain '#501' '#502' >/dev/null 2>&1
-t "chain accepts #-prefixed numbers"         "$(grep -c 'method POST' "$CH_LOG")" "0"
+t "chain accepts #-prefixed numbers"         "$(grep -cE "$POST_DEP_RE" "$CH_LOG")" "0"
 
 # arity: fewer than two numbers is a usage error and writes nothing
 : > "$CH_LOG"
@@ -488,32 +491,32 @@ effort_chain 501 >/dev/null 2>&1 && rc=0 || rc=1
 t "chain refuses a single issue (rc 1)"      "$rc" "1"
 effort_chain >/dev/null 2>&1 && rc=0 || rc=1
 t "chain refuses zero issues (rc 1)"         "$rc" "1"
-t "chain arity refusal writes nothing"       "$(grep -cE 'method POST|issue edit' "$CH_LOG")" "0"
+t "chain arity refusal writes nothing"       "$(grep -cE "$POST_DEP_RE|$EDIT_RE" "$CH_LOG")" "0"
 
 # a non-numeric argument is rejected up front
 : > "$CH_LOG"
 effort_chain 501 not-a-number >/dev/null 2>&1 && rc=0 || rc=1
 t "chain refuses a non-numeric arg (rc 1)"   "$rc" "1"
-t "chain non-numeric refusal writes nothing" "$(grep -cE 'method POST|issue edit' "$CH_LOG")" "0"
+t "chain non-numeric refusal writes nothing" "$(grep -cE "$POST_DEP_RE|$EDIT_RE" "$CH_LOG")" "0"
 
 # a nonexistent issue aborts the WHOLE chain — the earlier, valid link is not written either
 : > "$CH_LOG"
 effort_chain 504 999 >/dev/null 2>&1 && rc=0 || rc=1
 t "chain refuses a nonexistent issue (rc 1)" "$rc" "1"
-t "chain missing-issue refusal writes nothing" "$(grep -cE 'method POST|issue edit' "$CH_LOG")" "0"
+t "chain missing-issue refusal writes nothing" "$(grep -cE "$POST_DEP_RE|$EDIT_RE" "$CH_LOG")" "0"
 t "chain missing-issue refusal adds no edge" "$(edges)" "502 501;503 502;"
 
 # a repeated number is a cycle (`chain 1 2 1`) — refused whole
 : > "$CH_LOG"
 effort_chain 504 501 504 >/dev/null 2>&1 && rc=0 || rc=1
 t "chain refuses a repeated number (rc 1)"   "$rc" "1"
-t "chain repeat refusal writes nothing"      "$(grep -cE 'method POST|issue edit' "$CH_LOG")" "0"
+t "chain repeat refusal writes nothing"      "$(grep -cE "$POST_DEP_RE|$EDIT_RE" "$CH_LOG")" "0"
 
 # a cycle through edges GitHub ALREADY holds: 503 → 502 → 501 exists, so 501 blocked_by 503 loops
 : > "$CH_LOG"
 effort_chain 503 501 >/dev/null 2>&1 && rc=0 || rc=1
 t "chain refuses a transitive cycle (rc 1)"  "$rc" "1"
-t "chain cycle refusal writes nothing"       "$(grep -cE 'method POST|issue edit' "$CH_LOG")" "0"
+t "chain cycle refusal writes nothing"       "$(grep -cE "$POST_DEP_RE|$EDIT_RE" "$CH_LOG")" "0"
 t "chain cycle refusal adds no edge"         "$(edges)" "502 501;503 502;"
 
 # an issue already blocked by something ELSE keeps that blocker — chain only ever ADDS its edge
@@ -554,8 +557,9 @@ wtmp="$tmp/wip"; mkdir -p "$wtmp"
   && git push -q origin HEAD:main )
 cd "$wtmp/work" || exit 1
 unset EFFORT_WIP_LIMIT KIT_EFFORT_WIP_LIMIT KIT_FORCE 2>/dev/null || true
-# `gh` on PATH here is the chain stub, which logs to $CH_LOG — that is the log a refusal must leave
-# empty, so the "writes nothing" assertions read it rather than $GH_LOG.
+# The shim logs to $CH_LOG here (GH_LOG points at it since the chain section) — that is the log a
+# refusal must leave empty. The chain fixture stays installed: the title read of an issue it does not
+# know is a 404, which effort_start survives (#330), and every start below names its slug anyway.
 
 wip_started() { git show-ref --verify --quiet "refs/heads/effort/$1" && echo yes || echo no; }
 wip_reset() { git checkout -q main 2>/dev/null; \
@@ -584,17 +588,18 @@ case "$out" in *"effort.wipLimit"*) echo "ok: refusal names the config key" ;; *
 # …and the refusal WRITES nothing: no branch, no worktree dir, no board change.
 t "wip: refusal created no branch"   "$(wip_started 703-three)" "no"
 t "wip: refusal created no worktree" "$(ls -d .claude/worktrees/effort+703-three 2>/dev/null | wc -l | tr -d ' ')" "0"
-# For a NUMERIC argument the refusal also makes no gh call — the number is passed through, so no
+# For a NUMERIC argument the refusal also makes no forge call — the number is passed through, so no
 # resolution happens. This is NOT the guarantee for a <slug> argument (see the next assertion), and
 # the docs claim only "no branch, no worktree, no board change" (#244 review).
-t "wip: a numeric-arg refusal made no gh call" "$(grep -c . "$CH_LOG" | tr -d ' ')" "0"
-# A SLUG argument is resolved BEFORE the gate, and the resolver falls through to `gh issue list`
-# when no branch matches — so a refusal on that path can read from GitHub. Asserted on the resolver
+t "wip: a numeric-arg refusal made no forge call" "$(grep -c . "$CH_LOG" | tr -d ' ')" "0"
+# A SLUG argument is resolved BEFORE the gate, and the resolver falls through to the issue list
+# (the slug: label, then the open effort titles) when no branch matches — so a refusal on that path
+# can read from GitHub. Asserted on the resolver
 # itself, which is the mechanism the narrowed doc claim refers to.
 : > "$CH_LOG"
 effort_slug_resolve no-such-effort-anywhere >/dev/null 2>&1 || true
-t "wip: resolving a slug with no branch DOES call gh" \
-  "$(grep -c 'issue list' "$CH_LOG" | tr -d ' ')" "2"
+t "wip: resolving a slug with no branch DOES read the forge" \
+  "$(grep -cE '^GET repos/o/r/issues\?' "$CH_LOG" | tr -d ' ')" "2"
 
 # 4. --force starts anyway (and says so).
 out="$(effort_start --force 703 three 2>&1)"; rc=$?
@@ -751,7 +756,7 @@ cd "$tmp/work" || exit 1
 #     it. `cckit effort plan` therefore answered "no open efforts found" for every effort ever
 #     made, in every repo, with no error anywhere. A static check because the failure mode is
 #     silence — there is nothing at runtime to notice.
-plan_label="$(sed -n 's/.*gh issue list [^|]*--label \([a-z][a-z-]*\).*/\1/p' "$LIB/effort-plan.sh" | sed -n 1p)"
+plan_label="$(sed -n 's/.*forge_rest "repos\/\$repo\/issues" [^|]*-f labels=\([a-z][a-z-]*\).*/\1/p' "$LIB/effort-plan.sh" | sed -n 1p)"
 t "plan queries a label at all" "${plan_label:-MISSING}" "effort"
 t "effort_new applies the label plan queries" \
   "$(grep -c "labels=\"$plan_label," "$LIB/effort-ops.sh" | tr -d ' ')" "1"
@@ -760,41 +765,41 @@ t "effort_new ensures the label exists before using it" \
 t "setup-labels provisions the label plan queries" \
   "$(grep -c "ensure_label \"$plan_label\"" "$SCRIPTS/setup-labels.sh" | tr -d ' ')" "1"
 
-# 16. #330 — a failed gh read is said, never a silent rc 1. With GraphQL failing, the bare
-#     `title="$(gh issue view …)"` assignment ended effort_start under `set -e` with no output at all.
-fstub="$tmp/failbin"; mkdir -p "$fstub"
-printf '#!/usr/bin/env bash\necho "GraphQL: API rate limit exceeded" >&2\nexit 1\n' > "$fstub/gh"
-chmod +x "$fstub/gh"
+# 16. #330 — a failed forge read is said, never a silent rc 1. With the issue read failing, the bare
+#     `title="$(…)"` assignment ended effort_start under `set -e` with no output at all. GH_FAIL_EP
+#     makes the shim answer 404 on that one endpoint.
 wip_reset
-out="$( set -e; PATH="$fstub:$PATH"; CCKIT_GH_TRANSPORT=graphql EFFORT_WIP_REMOTE=0 effort_start --force 801 2>&1 )"; rc=$?
+out="$( set -e; GH_FAIL_EP="repos/o/r/issues/801" EFFORT_WIP_REMOTE=0 effort_start --force 801 2>&1 )"; rc=$?
 t "#330: effort_start survives a failed title read (rc 0)" "$rc" "0"
 case "$out" in *"could not read the title of issue #801"*) echo "ok: #330: the failed title read is named on stderr" ;;
   *) echo "FAIL: #330: no message for the failed title read -> '$out'"; fail=1 ;; esac
 t "#330: the fallback slug made the branch" "$(git show-ref --verify --quiet refs/heads/effort/801-effort && echo yes)" "yes"
 # A re-start during the outage lands on the effort's existing branch, not on a second one.
 git branch -q effort/802-real-slug
-out="$( set -e; PATH="$fstub:$PATH"; CCKIT_GH_TRANSPORT=graphql EFFORT_WIP_REMOTE=0 effort_start --force 802 2>&1 )"; rc=$?
-t "#330: a re-start with gh failing keeps rc 0" "$rc" "0"
-t "#330: a re-start with gh failing cuts no fallback branch" \
+out="$( set -e; GH_FAIL_EP="repos/o/r/issues/802" EFFORT_WIP_REMOTE=0 effort_start --force 802 2>&1 )"; rc=$?
+t "#330: a re-start with the forge failing keeps rc 0" "$rc" "0"
+t "#330: a re-start with the forge failing cuts no fallback branch" \
   "$(git show-ref --verify --quiet refs/heads/effort/802-effort && echo yes || echo no)" "no"
-# effort_close: a failed PR read refuses by name instead of dying on the bare assignment.
+# effort_close: a failed PR read (GET pulls?head=…) refuses by name instead of dying on the bare
+# assignment — and before the capture writes a records.jsonl row and consumes the start marker (the
+# write-then-fail #394 exists to prevent).
+: > "$CH_LOG"
 out="$( set -e; cd "$(git worktree list --porcelain | awk -v b=refs/heads/effort/801-effort '/^worktree /{w=$2} $2==b{print w}')" \
-        && PATH="$fstub:$PATH" && CCKIT_GH_TRANSPORT=graphql KIT_FORCE=1 effort_close 801 2>&1 )"; rc=$?
+        && GH_FAIL_EP="repos/o/r/pulls" KIT_FORCE=1 effort_close 801 2>&1 )"; rc=$?
 t "#330: effort_close refuses when the PR cannot be read (rc 1)" "$rc" "1"
 case "$out" in *"could not read the PR for effort/801-effort"*) echo "ok: #330: effort_close names the failed PR read" ;;
   *) echo "FAIL: #330: effort_close gave no reason -> '$out'"; fail=1 ;; esac
-# The REST twin. REST is the transport in use when GraphQL is unavailable, and there the failed read
-# was swallowed: the capture wrote a records.jsonl row and consumed the start marker, then the merge
-# failed — the write-then-fail #394 exists to prevent.
+t "#330: nothing was merged on the failed read" "$(grep -cE "$MERGE_RE" "$CH_LOG")" "0"
 out="$( set -e; cd "$(git worktree list --porcelain | awk -v b=refs/heads/effort/801-effort '/^worktree /{w=$2} $2==b{print w}')" \
         && echo work > rest-twin.txt && git add rest-twin.txt \
         && git -c user.email=t@t -c user.name=t commit -q -m "feat: work (#801)" \
-        && PATH="$fstub:$PATH" && CCKIT_GH_TRANSPORT=rest KIT_FORCE=1 effort_close 801 2>&1 )"; rc=$?
-t "#330: rest: effort_close refuses when the PR cannot be read (rc 1)" "$rc" "1"
+        && GH_FAIL_EP="repos/o/r/pulls" KIT_FORCE=1 effort_close 801 2>&1 )"; rc=$?
+t "#330: with a trace, effort_close still refuses the failed PR read (rc 1)" "$rc" "1"
 case "$out" in
-  *"metrics:"*) echo "FAIL: #330: rest: metrics captured before the failed PR read was refused -> '$out'"; fail=1 ;;
-  *"could not read the PR for effort/801-effort"*"nothing was written"*) echo "ok: #330: rest: effort_close names the failed PR read" ;;
-  *) echo "FAIL: #330: rest: effort_close gave no reason -> '$out'"; fail=1 ;; esac
+  *"metrics:"*) echo "FAIL: #330: metrics captured before the failed PR read was refused -> '$out'"; fail=1 ;;
+  *"could not read the PR for effort/801-effort"*"nothing was written"*) echo "ok: #330: the refusal says nothing was written" ;;
+  *) echo "FAIL: #330: effort_close gave no reason -> '$out'"; fail=1 ;; esac
+no_gh "the whole wip + #330 section"
 
 [ "$fail" -eq 0 ] && echo "ALL OK (effort-ops)" || echo "effort-ops: FAILURES"
 exit "$fail"

@@ -4,7 +4,8 @@
 # built from the task record, finish, the review link.
 #
 # Hermetic, in the style of scripts/autopilot-run-test.sh: `claude` and `codex` are one stub script
-# on PATH whose behaviour STUB_MODE selects, `gh` is a stub that logs every call, origin is a bare
+# on PATH whose behaviour STUB_MODE selects, the forge is the shared shim (test-forge-shim.sh) that
+# logs every REST request, origin is a bare
 # repository in the temp dir. It proves what cckit decides around the agent process (which steps
 # run, what opens a review, the exit code); it does not prove a real agent does the task.
 #
@@ -70,16 +71,17 @@ STUB
 chmod +x "$tmp/bin/agent-stub"
 cp "$tmp/bin/agent-stub" "$tmp/bin/claude"; cp "$tmp/bin/agent-stub" "$tmp/bin/codex"
 
-cat > "$tmp/bin/gh" <<'SH'
-#!/usr/bin/env bash
-{ printf '%s' "$*" | tr '\n' '\036'; echo; } >> "$GH_LOG"
-case "$1 $2" in
-  "pr list")   case " $* " in *" --head "*) [ -n "$GH_OPEN_URL" ] && echo "$GH_OPEN_URL" ;; esac ;;
-  "pr create") echo "https://github.com/o/r/pull/77" ;;
-  *) exit 0 ;;
+# The forge shim answers the REST API over a curl stand-in and logs every request; `GET pulls?head=…`
+# (the open-review lookup, GH_OPEN_URL) and `POST pulls` (#77) come from this fixture.
+# shellcheck source=/dev/null
+. "$LIB/test-forge-shim.sh"; forge_shim_install "$tmp/bin"
+export GH_FIXTURE="$tmp/fixture.sh" GH_TOKEN=test-token CCKIT_FORGE=github
+cat > "$GH_FIXTURE" <<'SH'
+case "$method $ep" in
+  "GET repos/o/r/pulls")  case "$path" in *head=*) out="[$( [ -n "${GH_OPEN_URL:-}" ] && printf '{"number":77,"html_url":"%s"}' "$GH_OPEN_URL" )]" ;; esac ;;
+  "POST repos/o/r/pulls") out='{"number":77,"html_url":"https://github.com/o/r/pull/77","user":{"login":"me"}}' ;;
 esac
 SH
-chmod +x "$tmp/bin/gh"
 export PATH="$tmp/bin:$PATH" KIT_WT_INSTALL=0 KIT_STATE_DIR="$tmp/state"
 
 git init -q --bare "$tmp/remote.git"
@@ -95,7 +97,8 @@ printf '.claude/worktrees/\n.cckit/\n' > .gitignore
 git add -A; git commit -q -m init; git branch -M develop; git push -q origin develop 2>/dev/null
 W="$tmp/work"
 
-creates() { grep -c '^pr create' "$GH_LOG" || true; }
+creates() { grep -c '^POST repos/o/r/pulls ' "$GH_LOG" || true; }
+create()  { grep '^POST repos/o/r/pulls ' "$GH_LOG"; }
 rounds()  { cat "$tmp/rounds" 2>/dev/null || echo 0; }
 state()   { "$CCKIT" task list --all --llm | jq -r --arg id "$1" '.[] | select(.id == $id) | .state'; }
 
@@ -120,11 +123,12 @@ has "the objective carries the task title" "$(cat "$tmp/claude.prompt")" "Do thi
 has "the objective carries the task notes" "$(cat "$tmp/claude.prompt")" "Three sections: hero, menu, contact."
 has "the objective names the task record" "$(cat "$tmp/claude.prompt")" "tasks/$A.md"
 hasnt "a task that is not a page task is not told to use page-design" "$(cat "$tmp/claude.prompt")" "page-design"
-hasnt "and its review has no design section" "$(grep '^pr create' "$GH_LOG")" "## Design"
-hasnt "and no open-the-page item" "$(grep '^pr create' "$GH_LOG")" "Open the page"
+hasnt "and its review has no design section" "$(create)" "## Design"
+hasnt "and no open-the-page item" "$(create)" "Open the page"
 t "exactly one review was opened" "$(creates)" "1"
-has "the review targets the base branch from the task branch" "$(grep '^pr create' "$GH_LOG")" "--base develop --head $BR"
-has "its title ends in the task id" "$(grep '^pr create' "$GH_LOG")" "--title feat: Landing page for a bakery [$A]"
+has "the review targets the base branch from the task branch" "$(create)" "\"head\":\"$BR\",\"base\":\"develop\","
+has "its title ends in the task id" "$(create)" "\"title\":\"feat: Landing page for a bakery [$A]\","
+t "no gh subcommand ran" "$(grep -c '^GH-SUBCOMMAND' "$GH_LOG")" "0"
 t "the pushed branch says the task is done" "$(git --git-dir="$tmp/remote.git" show "$BR:tasks/$A.md" | sed -n 3p)" "status: done"
 t "a file the agent left uncommitted is in the review" "$(git --git-dir="$tmp/remote.git" show "$BR:made.txt")" "made in round 1"
 t "the draft moved off the starting checkout" "$([ -f "$W/tasks/$A.md" ] && echo left || echo moved)" "moved"
@@ -185,7 +189,7 @@ D="$("$CCKIT" task new "Contact form" --llm | jq -r .id)"
 has "and says there is no gate" "$(cat "$tmp/none.err")" "gate: none"
 
 # ── page tasks (#504) ───────────────────────────────────────────────────────────────────────────
-body()   { grep '^pr create' "$GH_LOG" | tail -n 1; }
+body()   { create | tail -n 1; }
 sfile()  { printf '%s/state/autopilot/light_%s-%s.json' "$tmp" "$1" "$2"; }
 
 # kind `page`: the objective names the skill, the run records skills, the review lists exactly the

@@ -3,8 +3,9 @@
 # the work (#297); a stop leaves the ports with no listener (#298); a verdict is bound to the
 # commit that was reviewed and a later commit reads it stale (#299).
 #
-# Hermetic: `curl` is a stub on PATH that answers from a table, the "stack" is a `sleep`, and every
-# file lands in a scratch repo. `open`, `xdg-open` and `gh` are stubs too: no browser starts and no
+# Hermetic: `curl` is a stub on PATH that answers the probes from a table and hands GitHub requests
+# to the forge shim (test-forge-shim.sh), the "stack" is a `sleep`, and every
+# file lands in a scratch repo. `open` and `xdg-open` are stubs too: no browser starts and no
 # network is touched. Only the stop sections listen on a port — a loopback port the kernel picked —
 # and they skip with a printed reason when perl, or both lsof and ss, are absent.
 #
@@ -44,7 +45,7 @@ done < "$CURL_TABLE"
 printf '000'; exit 7
 SH
 chmod +x "$STUB/curl"
-# ── the browser openers and gh: each logs its arguments; gh answers a PR body from a file ──────
+# ── the browser openers: each logs its arguments ──────────────────────────────────────────────
 OPEN_LOG="$TMP/open.log"; export OPEN_LOG; : > "$OPEN_LOG"
 for o in open xdg-open; do
   cat > "$STUB/$o" <<'SH'
@@ -53,34 +54,63 @@ printf '%s %s\n' "${0##*/}" "$*" >> "$OPEN_LOG"
 SH
   chmod +x "$STUB/$o"
 done
+# ── the forge: test-forge-shim.sh, beside the probe curl ───────────────────────────────────────
+# The shim's curl answers like the REST API and logs `METHOD path {json}` to $GH_LOG; its gh fails
+# on any subcommand. It lives in its own dir, and $STUB/curl above hands every api.github.com
+# request to it, so the readiness probes and the forge share one PATH. A fixture answers the PR
+# (`GET repos/o/r/pulls/<n>`, and the lookup by head branch) from $PR_BODY + $PR_META — a PR exists
+# while either file does; the number, url, head sha and branch are $PR_META's four lines (31 and
+# a generic url without it) — and keeps the PR's comments in $GH_COMMENTS as `<id><TAB><json body>`
+# rows: list, create, edit in place.
+FORGE_BIN="$TMP/forge"
+# shellcheck source=/dev/null
+. "$ROOT/scripts/lib/test-forge-shim.sh"; forge_shim_install "$FORGE_BIN"
+cp "$FORGE_BIN/gh" "$STUB/gh"
+mv "$STUB/curl" "$STUB/curl.probe"
+cat > "$STUB/curl" <<EOF
+#!/usr/bin/env bash
+url=""; for a in "\$@"; do url="\$a"; done
+case "\$url" in *api.github.com/*) exec "$FORGE_BIN/curl" "\$@" ;; esac
+exec "$STUB/curl.probe" "\$@"
+EOF
+chmod +x "$STUB/curl"
 GH_LOG="$TMP/gh.log"; export GH_LOG; : > "$GH_LOG"
+export GH_TOKEN=test-token CCKIT_FORGE=github KIT_REPO=o/r PR_EVIDENCE_REPO=o/r
 PR_BODY="$TMP/pr.body"; export PR_BODY
 PR_META="$TMP/pr.meta"; export PR_META
 GH_COMMENTS="$TMP/gh.comments"; export GH_COMMENTS; : > "$GH_COMMENTS"
-cat > "$STUB/gh" <<'SH'
-#!/usr/bin/env bash
-# stub: `gh pr view <ref> --json body --jq …` prints the body file; no file means no PR (rc 1).
-# For the verdict (#299) it also answers the PR's number/url/head/branch from $PR_META and keeps
-# the PR's comments in $GH_COMMENTS as `<id><TAB><json body>` rows: list, create, edit in place.
-printf '%s\n' "$*" >> "$GH_LOG"
-case "$*" in
-  *"--json number,url,headRefOid,headRefName"*)
-    [ -f "$PR_META" ] || { echo "no pull requests found" >&2; exit 1; }
-    cat "$PR_META"; exit 0 ;;
-  "api --paginate "*) cat "$GH_COMMENTS" 2>/dev/null; exit 0 ;;
-  "api --method PATCH "*)
-    id="${4##*/}"; f="${6#body=@}"
+GH_FIXTURE="$TMP/forge.fixture"; export GH_FIXTURE
+cat > "$GH_FIXTURE" <<'FIX'
+pr_json() {  # <number> → the PR as the API answers it, from $PR_BODY + $PR_META
+  local n="$1" body="" url="" sha="" ref=""
+  [ -f "$PR_BODY" ] && body="$(cat "$PR_BODY")"
+  if [ -f "$PR_META" ]; then
+    n="$(sed -n 1p "$PR_META")"; url="$(sed -n 2p "$PR_META")"; sha="$(sed -n 3p "$PR_META")"; ref="$(sed -n 4p "$PR_META")"
+  fi
+  [ -n "$url" ] || url="https://github.com/o/r/pull/$n"
+  jq -n --argjson n "$n" --arg b "$body" --arg u "$url" --arg s "$sha" --arg r "$ref" \
+    '{number: $n, title: "qa", body: $b, state: "open", merged_at: null, mergeable: true, html_url: $u,
+      base: {ref: "main"}, head: {sha: $s, ref: $r}}'
+}
+pr_exists() { [ -f "$PR_BODY" ] || [ -f "$PR_META" ]; }
+case "$method $ep" in
+  "GET repos/o/r/pulls")
+    if pr_exists; then out="[$(pr_json 31)]"; else out='[]'; fi ;;
+  "GET repos/o/r/pulls/"*)
+    if pr_exists; then out="$(pr_json "${ep##*/}")"; else code=404; out='{"message":"Not Found"}'; fi ;;
+  "GET repos/o/r/issues/"*"/comments")
+    out="$(jq -R 'split("\t") | {id: (.[0] | tonumber), body: (.[1] | fromjson)}' "$GH_COMMENTS" 2>/dev/null | jq -sc .)" ;;
+  "PATCH repos/o/r/issues/comments/"*)
+    id="${ep##*/}"
     grep -v "^$id	" "$GH_COMMENTS" > "$GH_COMMENTS.tmp"
-    printf '%s\t%s\n' "$id" "$(jq -Rs . < "$f")" >> "$GH_COMMENTS.tmp"
-    mv "$GH_COMMENTS.tmp" "$GH_COMMENTS"; exit 0 ;;
-  "pr comment "*)
+    printf '%s\t%s\n' "$id" "$(printf '%s' "$body" | jq -c .body)" >> "$GH_COMMENTS.tmp"
+    mv "$GH_COMMENTS.tmp" "$GH_COMMENTS"; out="{\"id\":$id}" ;;
+  "POST repos/o/r/issues/"*"/comments")
     n=$(( $(wc -l < "$GH_COMMENTS" 2>/dev/null || echo 0) + 9001 ))
-    printf '%s\t%s\n' "$n" "$(jq -Rs . < "$5")" >> "$GH_COMMENTS"; exit 0 ;;
+    printf '%s\t%s\n' "$n" "$(printf '%s' "$body" | jq -c .body)" >> "$GH_COMMENTS"
+    out="{\"id\":$n,\"html_url\":\"https://github.com/o/r/pull/31#issuecomment-$n\"}" ;;
 esac
-[ -f "$PR_BODY" ] || { echo "no pull requests found" >&2; exit 1; }
-cat "$PR_BODY"
-SH
-chmod +x "$STUB/gh"
+FIX
 PATH="$STUB:$PATH"; export PATH
 answers() { printf '%s\n' "$@" > "$CURL_TABLE"; }
 
@@ -218,7 +248,7 @@ url="$(qa_cli open 2>"$TMP/open.err")"; rc=$?
 t "open on a usable lane returns 0" "$rc" "0"
 t "a declared route opens on the lane's first port" "$url" "http://localhost:$web7/settings/billing"
 t "the opener got exactly that URL, once" "$(cat "$OPEN_LOG")" "open http://localhost:$web7/settings/billing"
-yes "the PR is looked up by the lane's branch" "$(cat "$GH_LOG")" "pr view task/7-review-stack"
+yes "the PR is looked up by the lane's branch" "$(cat "$GH_LOG")" "GET repos/o/r/pulls?state=all&head=o:task/7-review-stack&per_page=1 "
 yes "open says where the route came from" "$(cat "$TMP/open.err")" "declared route /settings/billing"
 t "open appended one event" "$(events qa.open)" "1"
 t "the open event carries the url and the source" \
@@ -230,7 +260,7 @@ printf 'Summary only, no route line.\n' > "$PR_BODY"
 : > "$OPEN_LOG"
 t "with no declared route the configured one is used" "$(qa_cli open 2>/dev/null)" "http://localhost:$web7/dashboard"
 t "the opener got the configured route" "$(cat "$OPEN_LOG")" "open http://localhost:$web7/dashboard"
-# No PR at all (gh fails) reads the same as no declared line.
+# No PR at all (the forge has none for the branch) reads the same as no declared line.
 rm -f "$PR_BODY"
 t "with no PR the configured route is used" "$(qa_cli open --print 2>/dev/null)" "http://localhost:$web7/dashboard"
 
@@ -238,7 +268,8 @@ t "with no PR the configured route is used" "$(qa_cli open --print 2>/dev/null)"
 printf 'QA route: /from-pr-31\n' > "$PR_BODY"
 : > "$GH_LOG"; : > "$OPEN_LOG"
 t "--pr reads the named PR" "$(qa_cli open --pr 31 --print 2>/dev/null)" "http://localhost:$web7/from-pr-31"
-yes "--pr is what gh was asked for" "$(cat "$GH_LOG")" "pr view 31"
+yes "--pr is what the forge was asked for" "$(cat "$GH_LOG")" "GET repos/o/r/pulls/31 "
+no  "--pr skips the lookup by branch" "$(cat "$GH_LOG")" "head=o:task/7-review-stack"
 t "--route overrides the declared route" "$(qa_cli open --route /override --print 2>/dev/null)" "http://localhost:$web7/override"
 t "--port-env picks another port variable" "$(qa_cli open --port-env API_PORT --print 2>/dev/null)" "http://localhost:$api7/from-pr-31"
 t "--print opens no browser" "$(cat "$OPEN_LOG")" ""
@@ -587,6 +618,7 @@ yes "the verdict comment was edited in place" "$(grep 'qa-verdict' "$GH_COMMENTS
 t "the screenshot is its own upserted comment" "$(grep -c 'key=qa-screenshot-1' "$GH_COMMENTS")" "1"
 yes "the screenshot is a path reference" "$(grep 'qa-screenshot-1' "$GH_COMMENTS")" "$TMP/broken-save.png"
 t "verdict and screenshot are the only comments" "$(ncomments)" "2"
+t "no gh subcommand ran" "$(grep -c '^GH-SUBCOMMAND' "$GH_LOG")" "0"
 t "the lane now reads fail" "$(qa_cli verdict 2>/dev/null)" "fail"
 qa_cli verdict >/dev/null 2>&1; t "a fresh fail is rc 1" "$?" "1"
 yes "a PR behind the reviewed commit is said out loud" "$(cat "$TMP/v.err")" "reads stale against it until $sha2 is pushed"

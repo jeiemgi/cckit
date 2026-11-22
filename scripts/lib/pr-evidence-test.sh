@@ -5,13 +5,13 @@
 # Two defects are under test, and both were invisible before:
 #   1. the helper posted with a plain `gh pr comment`, so every push stacked ANOTHER evidence
 #      comment on the PR. The fix is a marker-based upsert, and the assertion that matters is
-#      "two consecutive calls produce one create and one edit" — which is why the gh stub here is
-#      STATEFUL: a stub that only counts calls cannot tell an upsert from an append.
+#      "two consecutive calls produce one create and one edit" — which is why the forge stand-in
+#      here is STATEFUL: a stub that only counts calls cannot tell an upsert from an append.
 #   2. best-effort swallowed a failed API call, so a caller that needed the evidence to exist had
 #      no way to learn it did not. The fix is an opt-in strict mode, asserted per failure class.
 #
 # NETWORK-FREE and gh-FREE. The pure halves (key, marker, body, match, api path) are driven with
-# fixtures; the three gh seams are driven through a PATH shim in a temp dir, so nothing here can
+# fixtures; the three forge seams are driven through the forge shim in a temp dir, so nothing here can
 # reach GitHub or spam a real PR. Run:  bash scripts/lib/pr-evidence-test.sh
 # errors: strict — a test runner: rc 1 on any failed assertion
 set -u
@@ -82,75 +82,60 @@ t "match rejects a non-numeric id"     "$(row abc "$m_build" | _pr_evidence_matc
 
 # ── 5. api path: gh placeholders when the repo is unset (pure) ──────────────────────────────────
 t "api path with an explicit repo" "$(_pr_evidence_api_path acme/widgets 'issues/7/comments')" "repos/acme/widgets/issues/7/comments"
-t "api path defers to gh"          "$(_pr_evidence_api_path '' 'issues/7/comments')"           "repos/{owner}/{repo}/issues/7/comments"
+t "api path defers to the origin remote" "$(_pr_evidence_api_path '' 'issues/7/comments')"      "repos/{owner}/{repo}/issues/7/comments"
 
-# ── the gh stub: stateful, so an append is distinguishable from an upsert ───────────────────────
+# ── the forge stand-in: STATEFUL, so an append is distinguishable from an upsert ────────────────
+# test-forge-shim.sh installs a `curl` that answers like the REST API and a `gh` that fails on any
+# subcommand. The comment store lives in a GH_FIXTURE snippet the shim sources per request, over
+# the same state files the old gh stub kept: $GH_STATE/index (id<TAB>bodyfile) + $GH_STATE/body.<id>.
+# The shim logs `METHOD path {json}` per request; log_calls maps those lines back onto
+# "list" (GET …/issues/7/comments) | "create" (POST …/issues/7/comments) | "edit <id>" (PATCH …/comments/<id>).
+# GH_FAIL_LIST=1 makes the lookup fail (502); GH_FAIL_WRITE=1 makes create+edit fail (502).
 mkdir -p "$tmp/bin" "$tmp/state"
-cat > "$tmp/bin/gh" <<'STUB'
-#!/usr/bin/env bash
-# Stateful `gh` stub. State: $GH_STATE/index (id<TAB>bodyfile) + $GH_STATE/body.<id>.
-# Log: one line per call in $GH_LOG ("list" | "create" | "edit <id>").
-# GH_FAIL_LIST=1 makes the lookup fail; GH_FAIL_WRITE=1 makes create+edit fail.
-set -u
+# shellcheck source=/dev/null
+. "$LIB/test-forge-shim.sh"; forge_shim_install "$tmp/bin"
+cat > "$tmp/fixture" <<'FIX'
 idx="$GH_STATE/index"; [ -f "$idx" ] || : > "$idx"
-
-if [ "${1:-}" = api ]; then
-  path=""; method=GET; bodyfile=""
-  while [ "$#" -gt 0 ]; do
-    case "$1" in
-      --method) method="$2"; shift 2 ;;
-      -F) case "$2" in body=@*) bodyfile="${2#body=@}" ;; esac; shift 2 ;;
-      --jq) shift 2 ;;
-      --paginate|api) shift ;;
-      -*) shift ;;
-      *) path="$1"; shift ;;
-    esac
-  done
-  if [ "$method" = PATCH ]; then
-    id="${path##*/}"
-    echo "edit $id" >> "$GH_LOG"
-    [ "${GH_FAIL_WRITE:-0}" = 1 ] && exit 1
-    grep -qx "$id" <<<"$(cut -f1 "$idx")" || exit 1   # 404 on an unknown comment, like the real API
-    cp "$bodyfile" "$GH_STATE/body.$id"
-    exit 0
-  fi
-  echo "list" >> "$GH_LOG"
-  [ "${GH_FAIL_LIST:-0}" = 1 ] && exit 1
-  # Mirror `--jq '.[] | "\(.id)\t\(.body | @json)"'`: one line per comment, newlines/tabs escaped.
-  while read -r id _; do
-    [ -n "$id" ] || continue
-    printf '%s\t%s\n' "$id" "$(awk '{ gsub(/\t/, "\\t"); printf "%s\\n", $0 }' "$GH_STATE/body.$id")"
-  done < "$idx"
-  exit 0
-fi
-
-if [ "${1:-}" = pr ] && [ "${2:-}" = comment ]; then
-  bodyfile=""
-  while [ "$#" -gt 0 ]; do
-    case "$1" in --body-file) bodyfile="$2"; shift 2 ;; *) shift ;; esac
-  done
-  echo "create" >> "$GH_LOG"
-  [ "${GH_FAIL_WRITE:-0}" = 1 ] && exit 1
-  n=$(( $(wc -l < "$idx" | tr -d ' ') + 1 ))
-  id=$(( 1000 + n ))
-  cp "$bodyfile" "$GH_STATE/body.$id"
-  printf '%s\t%s\n' "$id" "$GH_STATE/body.$id" >> "$idx"
-  echo "https://github.com/o/r/pull/7#issuecomment-$id"
-  exit 0
-fi
-echo "stub gh: unhandled: $*" >&2
-exit 1
-STUB
-chmod +x "$tmp/bin/gh"
+case "$method $ep" in
+  "GET repos/o/r/issues/"*"/comments")
+    if [ "${GH_FAIL_LIST:-0}" = 1 ]; then code=502; out='{"message":"Server Error"}'
+    else
+      out="$(while read -r id _; do
+               [ -n "$id" ] || continue
+               jq -n --arg id "$id" --rawfile b "$GH_STATE/body.$id" '{id: ($id|tonumber), body: $b}'
+             done < "$idx" | jq -sc .)"
+    fi ;;
+  "PATCH repos/o/r/issues/comments/"*)
+    id="${ep##*/}"
+    if [ "${GH_FAIL_WRITE:-0}" = 1 ]; then code=502; out='{"message":"Server Error"}'
+    elif ! grep -qx "$id" <<<"$(cut -f1 "$idx")"; then code=404; out='{"message":"Not Found"}'   # like the real API
+    else printf '%s' "$body" | jq -r .body > "$GH_STATE/body.$id"; out="{\"id\":$id}"
+    fi ;;
+  "POST repos/o/r/issues/"*"/comments")
+    if [ "${GH_FAIL_WRITE:-0}" = 1 ]; then code=502; out='{"message":"Server Error"}'
+    else
+      n=$(( $(wc -l < "$idx" | tr -d ' ') + 1 )); id=$(( 1000 + n ))
+      printf '%s' "$body" | jq -r .body > "$GH_STATE/body.$id"
+      printf '%s\t%s\n' "$id" "$GH_STATE/body.$id" >> "$idx"
+      out="{\"id\":$id,\"html_url\":\"https://github.com/o/r/pull/7#issuecomment-$id\"}"
+    fi ;;
+esac
+FIX
 
 reset_stub() { rm -rf "$tmp/state"; mkdir -p "$tmp/state"; : > "$tmp/gh.log"; }
-# attach [env...] -- runs pr_attach_evidence in a subshell with ONLY the stub bin on PATH, so a
-# real gh on the developer's machine can never be reached.
+# attach [env...] -- runs pr_attach_evidence in a subshell with ONLY the shim bin on PATH, so a
+# real gh or curl on the developer's machine can never be reached. The repo is given explicitly:
+# the fixture repo has no origin remote for the forge to resolve.
 attach() {
-  GH_STATE="$tmp/state" GH_LOG="$tmp/gh.log" PATH="$tmp/bin:/usr/bin:/bin:/usr/sbin:/sbin" \
+  GH_STATE="$tmp/state" GH_LOG="$tmp/gh.log" GH_FIXTURE="$tmp/fixture" GH_TOKEN=test-token CCKIT_FORGE="${CCKIT_FORGE:-github}" \
+    PR_EVIDENCE_REPO=o/r PATH="$tmp/bin:/usr/bin:/bin:/usr/sbin:/sbin" \
     pr_attach_evidence "$@" 2>>"$tmp/stderr.log"
 }
-log_calls() { tr '\n' ' ' < "$tmp/gh.log" | sed 's/ *$//'; }
+log_calls() {
+  sed -E -e 's#^GET repos/o/r/issues/7/comments.*#list#' \
+         -e 's#^POST repos/o/r/issues/7/comments.*#create#' \
+         -e 's#^PATCH repos/o/r/issues/comments/([0-9]+).*#edit \1#' "$tmp/gh.log" | tr '\n' ' ' | sed 's/ *$//'
+}
 
 # ── 6. idempotence: two calls == one create + one edit ─────────────────────────────────────────
 reset_stub; : > "$tmp/stderr.log"
@@ -220,13 +205,17 @@ attach --strict --bogus 7 "$tmp/build.log" 2>/dev/null; t "strict rc 2 on a bad 
 attach --strict 7 "$tmp/nope.log" build;              t "strict rc 4 on a missing file" "$?" "4"
 attach 7 "$tmp/nope.log" build;                       t "best-effort rc 0 on a missing file" "$?" "0"
 t "missing file is recorded" "$(attach 7 "$tmp/nope.log" build; printf '%s' "$PR_EVIDENCE_LAST_RESULT")" "no-file"
-# gh absent: an empty PATH dir, so `command -v gh` genuinely fails. `hash -r` first, or bash's
-# cached path for gh would still resolve and the case would pass without testing anything.
-mkdir -p "$tmp/nogh"
-( hash -r 2>/dev/null; PATH="$tmp/nogh" pr_attach_evidence --strict 7 "$tmp/build.log" build ) 2>/dev/null
-t "strict rc 3 without gh" "$?" "3"
-( hash -r 2>/dev/null; PATH="$tmp/nogh" pr_attach_evidence 7 "$tmp/build.log" build ) 2>/dev/null
-t "best-effort rc 0 without gh" "$?" "0"
+# no forge configured (CCKIT_FORGE=none): strict is rc 3 and the result names it; best-effort is
+# rc 0. Nothing is asked of the network either way.
+: > "$tmp/gh.log"
+( unset _FORGE_LOADED; CCKIT_FORGE=none attach --strict 7 "$tmp/build.log" build ) 2>/dev/null
+t "strict rc 3 without a forge" "$?" "3"
+( unset _FORGE_LOADED; CCKIT_FORGE=none attach 7 "$tmp/build.log" build ) 2>/dev/null
+t "best-effort rc 0 without a forge" "$?" "0"
+t "no forge is recorded as the result" "$(unset _FORGE_LOADED; CCKIT_FORGE=none attach 7 "$tmp/build.log" build; printf '%s' "$PR_EVIDENCE_LAST_RESULT")" "no-forge"
+t "no forge makes no request" "$(log_calls)" ""
+# and the whole run above never fell back to a gh subcommand
+t "no gh subcommand ran" "$(grep -c '^GH-SUBCOMMAND' "$tmp/gh.log")" "0"
 
 # ── 9. the contract surface the callers depend on ──────────────────────────────────────────────
 has "usage documents the upsert"      "$(pr_evidence_usage)" "cckit:pr-evidence key="
@@ -242,13 +231,13 @@ t "marker prefix is frozen" "$PR_EVIDENCE_MARKER_PREFIX" '<!-- cckit:pr-evidence
 if command -v zsh >/dev/null 2>&1; then
   reset_stub
   zsh -c "cd '$ROOT'; . scripts/lib/pr-evidence.sh; \
-    export GH_STATE='$tmp/state' GH_LOG='$tmp/gh.log'; PATH='$tmp/bin:/usr/bin:/bin'; \
+    export GH_STATE='$tmp/state' GH_LOG='$tmp/gh.log' GH_FIXTURE='$tmp/fixture' GH_TOKEN=test-token CCKIT_FORGE=github PR_EVIDENCE_REPO=o/r; PATH='$tmp/bin:/usr/bin:/bin'; \
     pr_attach_evidence 7 '$tmp/build.log' build >/dev/null 2>&1; \
     pr_attach_evidence 7 '$tmp/build.log' build >/dev/null 2>&1" >/dev/null 2>&1
   t "zsh: two calls == one create + one edit" "$(log_calls)" "list create list edit 1001"
   reset_stub
   zrc="$(zsh -c "cd '$ROOT'; . scripts/lib/pr-evidence.sh; \
-    export GH_STATE='$tmp/state' GH_LOG='$tmp/gh.log' GH_FAIL_WRITE=1; PATH='$tmp/bin:/usr/bin:/bin'; \
+    export GH_STATE='$tmp/state' GH_LOG='$tmp/gh.log' GH_FIXTURE='$tmp/fixture' GH_TOKEN=test-token CCKIT_FORGE=github PR_EVIDENCE_REPO=o/r GH_FAIL_WRITE=1; PATH='$tmp/bin:/usr/bin:/bin'; \
     pr_attach_evidence --strict 7 '$tmp/build.log' build >/dev/null 2>&1; echo \$?" 2>/dev/null | tail -1)"
   t "zsh: strict rc 7 on a failed write" "$zrc" "7"
 else

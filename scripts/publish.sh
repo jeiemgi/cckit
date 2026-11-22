@@ -20,6 +20,12 @@
 # release check to that project's runs without a word. KIT_RELEASE_BENCH_DIR points the check
 # elsewhere (the tests use it), and the release prints the directory when it is set.
 # Env: TAP_DIR=~/Dev/jeiemgi/homebrew-cckit (where the tap repo is cloned)
+# The forge port (E537): every GitHub call goes through forge_* / gh_rest_* (scripts/lib/gh-rest.sh).
+if ! command -v gh_rest_issue_json >/dev/null 2>&1; then
+  # shellcheck source=/dev/null
+  . "$(cd "$(dirname "$0")" && pwd)/lib/gh-rest.sh"
+fi
+
 set -euo pipefail
 
 VERSION="${1:-}"; shift || true
@@ -62,7 +68,7 @@ if [ "$PUBLISH" = 1 ]; then
   [ -z "$(git -C "$root" status --porcelain)" ] || { echo "x working tree not clean" >&2; exit 1; }
   [ "$(git -C "$root" branch --show-current)" = "main" ] || { echo "x not on main" >&2; exit 1; }
   ! git -C "$root" rev-parse "$tag" >/dev/null 2>&1 || { echo "x tag $tag already exists" >&2; exit 1; }
-  command -v gh >/dev/null || { echo "x gh required" >&2; exit 1; }
+  forge_need release || exit 1
 fi
 
 # 1. Stamp the version on ALL FOUR version surfaces via the ONE shared bumper (#173 — an inline jq
@@ -76,7 +82,7 @@ run git -C "$root" commit -m "release: $tag"
 # aborts there with "fatal: no tag message?" and kills the publish mid-run (#167).
 run git -C "$root" tag -m "$tag" "$tag"
 run git -C "$root" push origin main "$tag"
-run gh release create "$tag" --repo "$repo" --title "$tag" --generate-notes
+run forge_rest "repos/$repo/releases" -X POST -f "tag_name=$tag" -f "name=$tag" -F generate_release_notes=true
 
 # 2. Compute the tarball sha256 for the stable Homebrew formula.
 if [ "$PUBLISH" = 1 ]; then
@@ -110,7 +116,7 @@ if [ "$DO_BREW" = 1 ]; then
     run git -C "$tap_dir" push
     echo "   users: brew tap jeiemgi/cckit && brew install cckit"
   else
-    echo "  ! tap repo not at $tap_dir - create it: gh repo create jeiemgi/homebrew-cckit --public"
+    echo "  ! tap repo not at $tap_dir - create the public repository jeiemgi/homebrew-cckit on GitHub and clone it there"
   fi
 fi
 

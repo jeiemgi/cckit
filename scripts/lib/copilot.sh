@@ -21,6 +21,12 @@
 # Requires: gh, jq (via the plan machine). bash 3.2 / zsh compatible.
 # errors: strict — refuses to emit a brief without gh + jq
 
+# The forge port (E537): every GitHub call goes through forge_* / gh_rest_* (scripts/lib/gh-rest.sh).
+if ! command -v gh_rest_issue_json >/dev/null 2>&1; then
+  # shellcheck source=/dev/null
+  . "$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)/gh-rest.sh"
+fi
+
 COPILOT_REPO="${COPILOT_REPO:-${KIT_REPO:-}}"
 # Resolved at source time: inside a function zsh's $0 is the function's name, not this file.
 _COPILOT_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" >/dev/null 2>&1 && pwd)"
@@ -29,7 +35,7 @@ _COPILOT_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" >/dev/nu
 # Runtime-neutral on purpose: it is wave data, so it must read the same whichever agent receives it.
 _copilot_seed() {
   local num="$1" title="$2"
-  printf 'You are a worker in a cckit wave run — NO human is present, so never ask: decide autonomously and apply effort proportional to the task. Your worktree and branch for issue #%s are already isolated. Do: `gh issue view %s`, implement "%s", run `bash scripts/check.sh` until green, then open the PR with `cckit pr %s "<summary>"`. If it is a no-op, run `cckit close %s "<reason>"` with why. Return a one-line result.' \
+  printf 'You are a worker in a cckit wave run — NO human is present, so never ask: decide autonomously and apply effort proportional to the task. Your worktree and branch for issue #%s are already isolated. Do: read the issue with `cckit brief %s`, implement "%s", run `bash scripts/check.sh` until green, then open the PR with `cckit pr %s "<summary>"`. If it is a no-op, run `cckit close %s "<reason>"` with why. Return a one-line result.' \
     "$num" "$num" "$title" "$num" "$num"
 }
 
@@ -64,7 +70,7 @@ _copilot_dispatch() {
 }
 
 copilot_brief() {
-  command -v gh >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 || { echo "copilot: needs gh + jq" >&2; return 1; }
+  forge_need copilot || return 1; command -v jq >/dev/null 2>&1 || { echo "copilot: needs jq" >&2; return 1; }
   local repo="$COPILOT_REPO" out="${CCKIT_OUTPUT:-human}" effort="" cap="" adapter_arg="" adapters planargs=()
   while [ "$#" -gt 0 ]; do
     case "$1" in

@@ -169,6 +169,8 @@ export CCKIT_OUTPUT
 
 # Bare `cckit` (no verb) resumes the last session's handoff (locked behavior).
 cmd="${1:-resume}"; shift || true
+# The verb name, for a forge refusal that names it (scripts/lib/forge.sh forge_need).
+export CCKIT_VERB="$cmd"
 
 case "$cmd" in
   version)

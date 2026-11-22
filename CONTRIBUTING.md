@@ -26,7 +26,7 @@ cckit pr <issue> "<summary>" # open the PR
   to set the type yourself. CI (`commitlint`) fails the PR until the title is valid; check one locally
   with `scripts/lib/commitlint.sh "feat: your summary"`.
 - Run the local gate before opening a PR: `bash scripts/check.sh` (shell syntax, valid manifests,
-  the leak fence, the commitlint rules, the skill-listing and instruction-file budgets). A green gate is the bar.
+  the leak fence, the forge fence, the commitlint rules, the skill-listing and instruction-file budgets). A green gate is the bar.
 - **The leak fence.** cckit is public and is developed next to private repositories, so gate step 3
   fails on any tracked line that contains a private word: a product or client name, a person's name,
   a private path. The built-in word is always on; your own patterns live in `.cckit/leak-words`

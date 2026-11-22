@@ -688,10 +688,41 @@ read straight from the config file → the built-in default `2`.
 
 The check runs before the base-branch fetch, the branch, the worktree and the bootstrap, so a
 refusal leaves no branch, no worktree and no board change. It is not read-free: the gate queries
-origin, and a `<slug>` argument was resolved before it, which can run `gh issue list`. Re-running
+origin, and a `<slug>` argument was resolved before it, which can read the issue list from GitHub. Re-running
 `cckit effort start` on an effort that is *already* in progress is never gated — it adds no WIP.
 `cckit start <issue>` (a plain task worktree) has no WIP limit. Full behaviour:
 [Only so many efforts at once](/effort-reference/#the-wip-limit).
+
+## The forge
+
+cckit's core needs only git. A **forge** (today: GitHub) is the optional provider behind the
+issues, pull requests, labels and comments the lifecycle verbs write. Every call goes through one
+port, `scripts/lib/forge.sh`, with two providers:
+
+| Key | Default | What it does |
+| --- | --- | --- |
+| `forge.provider` | *(unset — `github` when a token resolves, else `none`)* | `github`: REST calls over `curl` with a bearer token. `none`: every forge call refuses with one line naming the verb that needs a forge, and the git steps of that verb still run. `CCKIT_FORGE=github\|none` overrides it for one command. |
+
+The token for `github` is read in this order: `GH_TOKEN`, `GITHUB_TOKEN`, then `gh auth token`
+when `gh` is installed and signed in. With `forge.provider: github` and no token, a forge call fails
+and says so; nothing falls back silently. `CCKIT_FORGE_API` points the provider at another API base
+(tests use it).
+
+A refusal looks like this, and it is the only thing the `none` provider ever prints:
+
+```text
+cckit pr: needs a forge (GitHub) and none is configured. Set forge.provider to github and a token in GH_TOKEN, or sign in with gh. The git steps of pr run without one.
+```
+
+What runs on git alone, with one line saying what was skipped: `cckit start` (the branch is
+`task/<N>-<slug>`, the issue is not read), `cckit pr` (commit and push; the compare page is printed,
+no pull request is opened), `cckit merge` (the branch lands on the base through git and is pushed;
+no issue is closed), `cckit hotfix <sha>` (cherry-pick and push, no pull request), `cckit gc` (every
+issue branch is UNKNOWN and kept). The verbs that only read or write the forge — `new`, `close`,
+`sync`, `plan`, `next`, `status`'s board section, the effort verbs, `watch` — refuse by name. The
+note for a skipped step is printed once per verb and process: `cckit <verb>: no forge — <what>`.
+
+`scripts/forge-report.sh` prints which files and which verbs need a forge today.
 
 ## Integrations
 
@@ -989,7 +1020,7 @@ writes to stdout:
 Any other line starting with `#`, and any line whose first column is not a number, is ignored.
 
 The plan falls back to GitHub, with a one-line warning on stderr, when the source is not executable,
-exits non-zero, or prints no rows. A source that answers needs neither `gh` nor `jq`; the fallback
+exits non-zero, or prints no rows. A source that answers needs neither a forge nor `jq`; the fallback
 needs both.
 
 Every plan prints a `source:` line under its header:

@@ -39,6 +39,12 @@
 # Requires: git, gh, jq. bash 3.2 compatible.
 # errors: best-effort — a failed step is reported and counted in INIT_FAILED; the run continues
 
+# The forge port (E537): every GitHub call goes through forge_* / gh_rest_* (scripts/lib/gh-rest.sh).
+if ! command -v gh_rest_issue_json >/dev/null 2>&1; then
+  # shellcheck source=/dev/null
+  . "$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)/gh-rest.sh"
+fi
+
 IG_CREATED=0     # 1 when THIS run created the GitHub repository
 IG_REPO_OK=0     # 1 once the project has a GitHub repository to write to
 IG_FIRST_COMMIT=0  # 1 when THIS run made the repository's first commit (the cckit files are in it)
@@ -226,9 +232,9 @@ _gs_step_repo() {
   fi
   case "$IG_REPO" in
     */*) ;;
-    *) init_step failed "GitHub repository" "could not read your GitHub account. Run: gh auth login — then run cckit init again"; return 0 ;;
+    *) init_step failed "GitHub repository" "could not read your GitHub account. Sign in (GH_TOKEN, or gh auth login) — then run cckit init again"; return 0 ;;
   esac
-  if out="$(gh repo view "$IG_REPO" --json url,sshUrl -q '[.url, .sshUrl] | @tsv' 2>/dev/null)" && [ -n "$out" ]; then
+  if out="$(forge_rest "repos/$IG_REPO" --jq '[.html_url, .ssh_url] | @tsv' 2>/dev/null)" && [ -n "$out" ]; then
     url="$(printf '%s' "$out" | cut -f1).git"
     [ "${IG_PROTO:-https}" = "ssh" ] && [ -n "$(printf '%s' "$out" | cut -f2)" ] && url="$(printf '%s' "$out" | cut -f2)"
     if _gs_git remote add origin "$url" 2>/dev/null; then
@@ -238,12 +244,27 @@ _gs_step_repo() {
     fi
     return 0
   fi
-  if out="$(gh repo create "$IG_REPO" "--$IG_VISIBILITY" --source "$IG_TARGET" --remote origin 2>&1)"; then
+  if out="$(_gs_repo_create "$IG_REPO" "$IG_VISIBILITY" 2>&1)" && _gs_git remote add origin "$out" 2>/dev/null; then
     IG_CREATED=1; IG_REPO_OK=1
     init_step done "GitHub repository" "created $IG_REPO ($IG_VISIBILITY)"
   else
     init_step failed "GitHub repository" "$(_gs_last "$out")"
   fi
+}
+
+# _gs_repo_create <owner/name> <private|public> → the clone url to add as origin (ssh when IG_PROTO
+# is ssh). POST /user/repos for the signed-in user, POST /orgs/<owner>/repos for an organization.
+_gs_repo_create() {
+  local repo="$1" vis="$2" owner="${1%%/*}" name="${1##*/}" login priv=true out
+  [ "$vis" = public ] && priv=false
+  login="$(gh_rest_user_login 2>/dev/null || true)"
+  if [ -n "$login" ] && [ "$login" != "$owner" ]; then
+    out="$(forge_rest "orgs/$owner/repos" -X POST -f "name=$name" -F "private=$priv")" || return 1
+  else
+    out="$(forge_rest user/repos -X POST -f "name=$name" -F "private=$priv")" || return 1
+  fi
+  if [ "${IG_PROTO:-https}" = ssh ]; then printf '%s' "$out" | jq -r '.ssh_url'
+  else printf '%s.git' "$(printf '%s' "$out" | jq -r '.html_url')"; fi
 }
 
 _gs_remote_has() { _gs_git ls-remote --exit-code --heads origin "$1" >/dev/null 2>&1; }
@@ -285,13 +306,13 @@ _gs_step_base_branch() {
 _gs_step_default_branch() {
   local def out
   [ "$IG_REPO_OK" -eq 1 ] || { init_step skipped "default branch" "needs the GitHub repository (see above)"; return 0; }
-  def="$(gh repo view "$IG_REPO" --json defaultBranchRef -q '.defaultBranchRef.name' 2>/dev/null || true)"
+  def="$(gh_rest_repo_default_branch "$IG_REPO" 2>/dev/null || true)"
   if [ "$def" = "$IG_BASE" ]; then init_step skipped "default branch" "already $IG_BASE"; return 0; fi
   if [ "$IG_CREATED" -ne 1 ]; then
-    init_step skipped "default branch" "it is '${def:-unknown}'; an existing repository keeps its own (to change it: gh repo edit $IG_REPO --default-branch $IG_BASE)"
+    init_step skipped "default branch" "it is '${def:-unknown}'; an existing repository keeps its own (change it in the repository settings on GitHub)"
     return 0
   fi
-  if out="$(gh repo edit "$IG_REPO" --default-branch "$IG_BASE" 2>&1)"; then
+  if out="$(forge_rest "repos/$IG_REPO" -X PATCH -f "default_branch=$IG_BASE" 2>&1)"; then
     init_step done "default branch" "$IG_BASE"
   else
     init_step failed "default branch" "$(_gs_last "$out")"
@@ -303,14 +324,14 @@ _gs_step_labels() {
   [ "$IG_REPO_OK" -eq 1 ] || { init_step skipped "labels" "needs the GitHub repository (see above)"; return 0; }
   want="$( cd "$IG_TARGET" && KIT_LABELS_LIST=1 bash "$IG_KIT_ROOT/scripts/setup-labels.sh" 2>/dev/null )" || want=""
   [ -n "$want" ] || { init_step failed "labels" "could not read the label list from the project config"; return 0; }
-  if ! have="$(gh label list --repo "$IG_REPO" --limit 1000 --json name -q '.[].name' 2>&1)"; then
+  if ! have="$(gh_rest_label_names "$IG_REPO" 2>&1)"; then
     init_step failed "labels" "$(_gs_last "$have")"; return 0
   fi
   while IFS="$(printf '\t')" read -r name color desc; do
     [ -n "$name" ] || continue
     total=$((total + 1))
     grep -qxF "$name" <<<"$have" && continue
-    if out="$(gh label create "$name" --repo "$IG_REPO" --color "$color" --description "$desc" 2>&1)"; then made=$((made + 1)); else bad=$((bad + 1)); fi
+    if out="$(forge_rest "repos/$IG_REPO/labels" -X POST -f "name=$name" -f "color=$color" -f "description=$desc" 2>&1)"; then made=$((made + 1)); else bad=$((bad + 1)); fi
   done <<EOF
 $want
 EOF
@@ -333,11 +354,11 @@ _gs_step_milestones() {
 _gs_step_delete_head_branches() {
   local cur out
   [ "$IG_REPO_OK" -eq 1 ] || { init_step skipped "delete head branches on merge" "needs the GitHub repository (see above)"; return 0; }
-  if ! cur="$(gh api "repos/$IG_REPO" --jq '.delete_branch_on_merge' 2>&1)"; then
+  if ! cur="$(forge_rest "repos/$IG_REPO" --jq '.delete_branch_on_merge' 2>&1)"; then
     init_step failed "delete head branches on merge" "$(_gs_last "$cur")"; return 0
   fi
   if [ "$cur" = "true" ]; then init_step skipped "delete head branches on merge" "already on"; return 0; fi
-  if out="$(gh api -X PATCH "repos/$IG_REPO" -F delete_branch_on_merge=true 2>&1)"; then
+  if out="$(forge_rest -X PATCH "repos/$IG_REPO" -F delete_branch_on_merge=true 2>&1)"; then
     init_step done "delete head branches on merge"
   else
     init_step failed "delete head branches on merge" "$(_gs_last "$out")"
@@ -353,11 +374,11 @@ _GS_PLAN_REASON="GitHub does not offer branch protection for a private repositor
 _gs_step_protection() {
   local out
   [ "$IG_REPO_OK" -eq 1 ] || { init_step skipped "protect $IG_BASE" "needs the GitHub repository (see above)"; return 0; }
-  if out="$(gh api "repos/$IG_REPO/branches/$IG_BASE/protection" 2>&1)"; then
+  if out="$(forge_rest "repos/$IG_REPO/branches/$IG_BASE/protection" 2>&1)"; then
     init_step skipped "protect $IG_BASE" "already protected"; return 0
   fi
   if _gs_refused_by_plan "$out"; then init_step skipped "protect $IG_BASE" "$_GS_PLAN_REASON"; return 0; fi
-  if out="$(printf '%s' "$_GS_PROTECTION" | gh api -X PUT "repos/$IG_REPO/branches/$IG_BASE/protection" --input - 2>&1)"; then
+  if out="$(printf '%s' "$_GS_PROTECTION" | forge_rest -X PUT "repos/$IG_REPO/branches/$IG_BASE/protection" --input - 2>&1)"; then
     init_step done "protect $IG_BASE" "pull request required, branch up to date, no force-push"
   elif _gs_refused_by_plan "$out"; then
     init_step skipped "protect $IG_BASE" "$_GS_PLAN_REASON"
@@ -393,7 +414,11 @@ _gs_step_doctor() {
 # init_setup_run -> every step, in order. rc 0 always; INIT_FAILED carries the failures.
 init_setup_run() {
   export GH_PROMPT_DISABLED=1
-  IG_PROTO="$(gh config get git_protocol 2>/dev/null || echo https)"
+  # https, or ssh when gh's own config says so (read as a file: no gh is run) or CCKIT_GIT_PROTOCOL=ssh.
+  # `|| true`: with no gh config file sed exits 2, and under pipefail that failed the assignment and
+  # ended init silently — for exactly the user with no gh.
+  IG_PROTO="${CCKIT_GIT_PROTOCOL:-$({ sed -nE 's/^[[:space:]]*git_protocol:[[:space:]]*([a-z]+).*/\1/p' "${XDG_CONFIG_HOME:-$HOME/.config}/gh/config.yml" 2>/dev/null || true; } | sed -n 1p)}"
+  IG_PROTO="${IG_PROTO:-https}"
   echo ""
   echo "Project setup — $IG_TARGET"
   _gs_step_git_init

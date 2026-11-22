@@ -5,7 +5,7 @@
 # setup-labels.sh provisions, the set `effort new --kind` accepts, and the prefixes the hygiene hook
 # accepts must be the same list. Also pins the ctx:S|M|L|XL scale setup-labels.sh provisions.
 # Runs the pure helpers under bash AND zsh.
-# Hermetic: stubs gh. Run:  bash scripts/lib/kinds-test.sh
+# Hermetic: the forge shim (test-forge-shim.sh) stands in for GitHub. Run:  bash scripts/lib/kinds-test.sh
 # errors: strict — a test runner: rc 1 on any failed assertion
 
 dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
@@ -89,35 +89,32 @@ t "no kind is in both sets" "$both" ""
 t "wt_start maps the kind label through _wt_kind_prefix" \
   "$(grep -c 'kind="$(_wt_kind_prefix "$kind")"' "$dir/worktree-start.sh" | tr -d ' ')" "1"
 
-# 4. run setup-labels.sh against a stub gh: it provisions every kind + the whole ctx scale, and only
-#    label families the rule documents.
+# 4. run setup-labels.sh over the forge shim (test-forge-shim.sh): it provisions every kind + the
+#    whole ctx scale, and only label families the rule documents. Each label is one
+#    `POST repos/<r>/labels {"name":…}` line in the REST log; no gh subcommand runs.
 command -v jq >/dev/null 2>&1 || { echo "skip: jq missing — setup-labels run not exercised"; exit "$fail"; }
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
-mkdir -p "$tmp/bin"
-cat > "$tmp/bin/gh" <<'SH'
-#!/bin/sh
-echo "$*" >> "$GH_LOG"
-exit 0
-SH
-chmod +x "$tmp/bin/gh"
+. "$dir/test-forge-shim.sh"; forge_shim_install "$tmp/bin"
 GH_LOG="$tmp/gh.log"; export GH_LOG; : > "$GH_LOG"
+export GH_TOKEN=test-token CCKIT_FORGE=github
+# kind_labels <log> → the kind:<k> names created, sorted, space-separated
+kind_labels() { sed -n 's/^POST repos\/[^ ]*\/labels {"name":"kind:\([a-z]*\)".*/\1/p' "$1" | sort | tr '\n' ' ' | sed 's/ *$//'; }
 ( cd "$root" && PATH="$tmp/bin:$PATH" KIT_CONFIG="$root/cckit.config.json" bash scripts/setup-labels.sh ) >/dev/null 2>&1
 t "setup-labels ran" "$?" "0"
-got="$(sed -n 's/^label create kind:\([a-z]*\) .*/\1/p' "$GH_LOG" | sort | tr '\n' ' ' | sed 's/ *$//')"
-t "setup-labels provisions exactly the kind set" "$got" "$want"
+t "setup-labels provisions exactly the kind set" "$(kind_labels "$GH_LOG")" "$want"
+t "setup-labels runs no gh subcommand" "$(grep -c '^GH-SUBCOMMAND' "$GH_LOG")" "0"
 # 4b. with kinds.content on, the content kind labels are provisioned too.
 : > "$GH_LOG"
 jq '.kinds = {content:true}' "$root/cckit.config.json" > "$tmp/content.config.json"
 ( cd "$root" && PATH="$tmp/bin:$PATH" KIT_CONFIG="$tmp/content.config.json" bash scripts/setup-labels.sh ) >/dev/null 2>&1
 t "setup-labels ran with kinds.content" "$?" "0"
-got="$(sed -n 's/^label create kind:\([a-z]*\) .*/\1/p' "$GH_LOG" | sort | tr '\n' ' ' | sed 's/ *$//')"
-t "kinds.content adds exactly the content kinds" "$got" "$(sorted "$KIT_KINDS $KIT_CONTENT_KINDS")"
+t "kinds.content adds exactly the content kinds" "$(kind_labels "$GH_LOG")" "$(sorted "$KIT_KINDS $KIT_CONTENT_KINDS")"
 : > "$GH_LOG"
 ( cd "$root" && PATH="$tmp/bin:$PATH" KIT_CONFIG="$root/cckit.config.json" bash scripts/setup-labels.sh ) >/dev/null 2>&1
-got="$(sed -n 's/^label create ctx:\([A-Z]*\) .*/\1/p' "$GH_LOG" | tr '\n' ' ' | sed 's/ *$//')"
+got="$(sed -n 's/^POST repos\/[^ ]*\/labels {"name":"ctx:\([A-Z]*\)".*/\1/p' "$GH_LOG" | tr '\n' ' ' | sed 's/ *$//')"
 t "setup-labels provisions ctx S M L XL" "$got" "S M L XL"
 # roles and agent profiles come from the project config, so those two families may be absent.
-got="$(sed -n 's/^label create \([a-z]*\):.*/\1/p' "$GH_LOG" | sort -u \
+got="$(sed -n 's/^POST repos\/[^ ]*\/labels {"name":"\([a-z]*\):.*/\1/p' "$GH_LOG" | sort -u \
   | grep -vE '^(agent|ctx|flow|kind|priority|role)$' | tr '\n' ' ' | sed 's/ *$//')"
 t "setup-labels creates no family the rule does not document" "$got" ""
 

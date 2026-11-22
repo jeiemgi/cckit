@@ -18,6 +18,12 @@
 #   unassigned:[same rows — issues carrying none of the configured role: labels; [] under --role],
 #   blocked:[n], notOnBoard:[n]|null (null = no Projects v2 board), stale:{days, issues:[{number,days}]},
 #   mergeQueue:[{number,title,risk,size,state,blocked,draft,agent,conflict,approved}], plan? }
+# The forge port (E537): every GitHub call goes through forge_* / gh_rest_* (scripts/lib/gh-rest.sh).
+if ! command -v gh_rest_issue_json >/dev/null 2>&1; then
+  # shellcheck source=/dev/null
+  . "$(cd "$(dirname "$0")" && pwd)/lib/gh-rest.sh"
+fi
+
 set -euo pipefail
 source "$(dirname "$0")/lib/kit-config.sh" && load_kit_config
 # Pure board-view helpers (merge queue, stale flag, not-on-board flag, Project Status).
@@ -79,8 +85,11 @@ ISSUES="[]"; STATUS_MAP="{}"; PRS_JSON="[]"; PLAN_TEXT=""; DOC=""
 # empty queue / "—" Status and still renders, as it always has.
 sync_fetch() {
   local mode="${1:-lenient}" raw
-  raw="$(gh issue list --repo "$KIT_REPO" --state open --limit 200 \
-    --json number,title,labels,milestone,assignees,updatedAt,body)" || return 1
+  raw="$(forge_rest "repos/$KIT_REPO/issues" -X GET -f state=open -f per_page=100 --paginate \
+    --jq '[.[] | select(.pull_request | not) | {number, title, labels: [.labels[] | {name}],
+           milestone: (if .milestone then {title: .milestone.title} else null end),
+           assignees: [.assignees[]? | {login}], updatedAt: .updated_at, body: (.body // "")}]' \
+    | jq -s 'add // []')" || return 1
   # Only the data path validates: --raw-json hands gh's bytes to its caller verbatim, and the
   # caller (autopilot) owns the "invalid board data" diagnosis.
   if [ "$mode" = strict ]; then
@@ -97,7 +106,7 @@ sync_fetch() {
   if [ "${KIT_PROJECTS_V2:-false}" = "true" ] && [ -n "${KIT_PROJECT_NUMBER:-}" ] && [ -n "${KIT_OWNER:-}" ]; then
     local root map
     case "${KIT_PROJECT_OWNER_TYPE:-user}" in org|organization) root=organization ;; *) root=user ;; esac
-    map="$(gh api graphql -f query="
+    map="$(forge_rest graphql -f query="
       query(\$login:String!,\$number:Int!){
         $root(login:\$login){ projectV2(number:\$number){ items(first:200){ nodes{
           content{ ... on Issue { number } ... on PullRequest { number } }
@@ -111,8 +120,10 @@ sync_fetch() {
   fi
 
   # Open PRs for the merge queue (fetched once; risk/size labels + draft/review state drive the order).
-  if raw="$(gh pr list --repo "$KIT_REPO" --state open --limit 100 \
-       --json number,title,labels,isDraft,headRefName,reviewDecision,mergeable 2>/dev/null)" \
+  if raw="$(forge_rest "repos/$KIT_REPO/pulls" -X GET -f state=open -f per_page=100 \
+       --jq '[.[] | {number, title, labels: [.labels[]? | {name}], isDraft: .draft, headRefName: .head.ref,
+              reviewDecision: null,
+              mergeable: (if .mergeable == true then "MERGEABLE" elif .mergeable == false then "CONFLICTING" else "UNKNOWN" end)}]' 2>/dev/null)" \
      && printf '%s' "$raw" | jq -e 'type == "array"' >/dev/null 2>&1; then
     PRS_JSON="$raw"
   elif [ "$mode" = strict ]; then

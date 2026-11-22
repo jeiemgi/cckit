@@ -27,6 +27,12 @@
 # errors: mixed — kit_gc_analyze is read-only and forgiving; the prune path propagates
 
 # The GitHub transport switch (#396): rest mode routes the gh calls below through gh-rest.sh.
+# The forge port (E537): every GitHub call goes through forge_* / gh_rest_* (scripts/lib/gh-rest.sh).
+if ! command -v gh_rest_issue_json >/dev/null 2>&1; then
+  # shellcheck source=/dev/null
+  . "$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)/gh-rest.sh"
+fi
+
 if ! command -v cckit_gh_rest >/dev/null 2>&1; then
   _ghr_lib="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)/gh-rest.sh"
   # shellcheck source=/dev/null
@@ -85,21 +91,15 @@ _kit_gc_require_deps() {
 # always: kit-status.sh calls this in a bare assignment under `set -e`.
 _kit_gc_pr_index() {
   local repo="${1:-$KIT_GC_REPO}" out
-  if cckit_gh_rest; then
-    out="$(gh api "repos/$repo/pulls" -X GET -f state=all -f per_page=100 \
-      --jq '.[] | "\(.head.ref)\tPR#\(.number) \(if .merged_at then "MERGED" else (.state | ascii_upcase) end)"' 2>/dev/null)" \
-      || { _kit_gc_pr_index_failed; return 0; }
-  else
-    out="$(gh pr list --repo "$repo" --state all --limit 200 --json number,state,headRefName \
-      --jq '.[] | "\(.headRefName)\tPR#\(.number) \(.state)"' 2>/dev/null)" \
-      || { _kit_gc_pr_index_failed; return 0; }
-  fi
+  out="$(forge_rest "repos/$repo/pulls" -X GET -f state=all -f per_page=100 --paginate \
+    --jq '.[] | "\(.head.ref)\tPR#\(.number) \(if .merged_at then "MERGED" else (.state | ascii_upcase) end)"' 2>/dev/null)" \
+    || { _kit_gc_pr_index_failed; return 0; }
   [ -n "$out" ] && printf '%s\n' "$out"
   return 0
 }
 
 _kit_gc_pr_index_failed() {
-  echo "kit-gc: could not read the PR list from GitHub (gh failed) — a branch whose PR is not known is reported UNKNOWN and kept" >&2
+  echo "kit-gc: could not read the PR list from GitHub — a branch whose PR is not known is reported UNKNOWN and kept" >&2
   printf '?\tUNKNOWN\n'
 }
 
@@ -201,25 +201,19 @@ _kit_gc_cache_reset() { rm -rf "$_KIT_GC_CACHE_DIR" 2>/dev/null; mkdir -p "$_KIT
 _kit_gc_issue_merged_pr() {
   local n="$1" repo="${2:-$KIT_GC_REPO}" depth="${3:-0}" cache="" cand result="" parent
   [ -n "$n" ] || return 0
-  command -v gh >/dev/null 2>&1 || return 0
+  forge_available || { forge_note_none gc "merged pull requests cannot be read; a branch whose issue state is unknown is kept, never deleted"; return 0; }
   [ -d "$_KIT_GC_CACHE_DIR" ] && cache="$_KIT_GC_CACHE_DIR/issue-$n"
   if [ -n "$cache" ] && [ -f "$cache" ]; then cat "$cache"; return 0; fi
   while IFS= read -r cand; do
     [ -n "$cand" ] || continue
     case "$cand" in *[!0-9]*) continue ;; esac
-    if cckit_gh_rest; then
-      # REST: the candidate came from a merged cross-reference that closes <n> (gh_rest_wave_rows).
-      result="$cand"; break
-    elif [ "$(gh pr view "$cand" --repo "$repo" --json state --jq .state 2>/dev/null)" = "MERGED" ]; then
-      result="$cand"; break
-    fi
+    # The candidate came from a merged cross-reference that closes <n> (gh_rest_issue_closing_prs).
+    result="$cand"; break
   done <<EOF
-$(if cckit_gh_rest; then gh_rest_issue_closing_prs "$repo" "$n" 2>/dev/null || true
-  else gh issue view "$n" --repo "$repo" --json closedByPullRequestsReferences \
-     --jq '.closedByPullRequestsReferences[].number' 2>/dev/null || true; fi)
+$(gh_rest_issue_closing_prs "$repo" "$n" 2>/dev/null || true)
 EOF
   if [ -z "$result" ] && [ "$depth" -eq 0 ]; then
-    parent="$(gh api "repos/$repo/issues/$n/parent" --jq .number 2>/dev/null || true)"
+    parent="$(forge_rest "repos/$repo/issues/$n/parent" --jq .number 2>/dev/null || true)"
     case "$parent" in ''|*[!0-9]*) parent="" ;; esac
     if [ -n "$parent" ]; then
       result="$(_kit_gc_issue_merged_pr "$parent" "$repo" 1)"
@@ -330,6 +324,9 @@ _kit_gc_detached_rows() {
 kit_gc_analyze() {
   _kit_gc_require_deps || return 1
   _kit_gc_cache_reset
+  # Without a forge no issue or pull request state can be read: every issue branch is UNKNOWN and
+  # kept. Said once here, since the per-branch reads below are quiet.
+  forge_available || forge_note_none gc "issue and pull request states cannot be read; every issue branch is UNKNOWN and kept, never deleted"
   # `wtpath`, not `path`: under zsh `path` is tied to PATH (special array), so a bare `path` local
   # here would clobber the command search path on assignment. A namespaced name is inert.
   local repo="$KIT_GC_REPO" b ref wtpath reason
@@ -757,7 +754,7 @@ ZEOF
   printf '%s\n' "$orphan_list" | grep . | sed 's/^/      /' || true
   printf '  PROTECTED kept    %3s  issue still OPEN\n' "$n_prot"
   printf '%s\n' "$prot_list" | grep . | sed 's/^/      /' || true
-  printf '  UNKNOWN kept      %3s  a GitHub read failed — could not determine, rerun when gh answers\n' "$n_unknown"
+  printf '  UNKNOWN kept      %3s  a GitHub read failed — could not determine, rerun when GitHub answers\n' "$n_unknown"
   printf '%s\n' "$unknown_list" | grep . | sed 's/^/      /' || true
   printf '  stashes kept      %3s  irreversible — drop by hand after reading each diff\n' "$n_stash"
   printf '%s\n' "$stash_list" | grep . | sed 's/^/      /' || true

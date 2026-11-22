@@ -7,6 +7,12 @@
 # verbatim markdown otherwise (renders natively in Claude Code, always pipe-safe — no escape codes
 # leak into a redirect). This is the lightweight cockpit; the rich opentui TUI is an OPTIONAL
 # separate adapter — the core stays pure bash and dependency-light, so `cckit status` works anywhere.
+# The forge port (E537): every GitHub call goes through forge_* / gh_rest_* (scripts/lib/gh-rest.sh).
+if ! command -v gh_rest_issue_json >/dev/null 2>&1; then
+  # shellcheck source=/dev/null
+  . "$(cd "$(dirname "$0")" && pwd)/lib/gh-rest.sh"
+fi
+
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source=/dev/null
@@ -36,9 +42,9 @@ _status_md() {
   # concatenates onto the partial output, yielding a value like "1\n0" that breaks `[ "$open" -gt 8 ]`
   # with "integer expression expected"). A clean JSON array keeps every count a single integer.
   echo "## Board"
-  if command -v jq >/dev/null 2>&1 && command -v gh >/dev/null 2>&1; then
+  if command -v jq >/dev/null 2>&1 && forge_available; then
     local board open blocked
-    board="$(gh issue list --repo "$KIT_REPO" --state open --limit 200 --json number,title,body 2>/dev/null \
+    board="$(forge_rest "repos/$KIT_REPO/issues" -X GET -f state=open -f per_page=100 --paginate --jq '[.[] | select(.pull_request | not) | {number, title, body}]' 2>/dev/null | jq -s 'add // []' \
       | jq -c '[.[] | {number, title, blocked: ((.body // "") | test("Blocked by"))}]' 2>/dev/null || echo '[]')"
     [ -n "$board" ] || board='[]'
     open="$(printf '%s' "$board" | jq 'length' 2>/dev/null || echo 0)"

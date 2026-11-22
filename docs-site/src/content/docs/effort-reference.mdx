@@ -160,7 +160,7 @@ directions, and a WIP gate is wrong with it:
 and it writes nothing: no fetch, no prune, no ref touched. `effort_slug_resolve` still reads the
 cached refs, because resolving a slug handle sits on the hot path of every effort verb — that
 **cached-ref lookup** is network-free. Resolution as a whole is not: when no branch matches the
-slug it falls through to `gh` (see below), which is why a WIP refusal on a slug input can still
+slug it falls through to GitHub (see below), which is why a WIP refusal on a slug input can still
 make a GitHub read.
 
 The rules, exactly:
@@ -194,7 +194,7 @@ same validate-then-write discipline `cckit effort new` and `cckit effort chain` 
 start leaves **no branch, no worktree and no board change**.
 
 It does *read*, though: the gate queries origin, and when you pass a `<slug>` instead of a number
-`effort_slug_resolve` has already run — which can fall through to `gh issue list`. "Writes nothing"
+`effort_slug_resolve` has already run — which can fall through to a GitHub issue list. "Writes nothing"
 is the guarantee; "reads nothing" is not.
 </Aside>
 

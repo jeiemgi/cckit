@@ -16,6 +16,12 @@
 # errors: mixed — name parsing is pure; the issue-open check needs gh
 
 # The GitHub transport switch (#396): rest mode routes the gh calls below through gh-rest.sh.
+# The forge port (E537): every GitHub call goes through forge_* / gh_rest_* (scripts/lib/gh-rest.sh).
+if ! command -v gh_rest_issue_json >/dev/null 2>&1; then
+  # shellcheck source=/dev/null
+  . "$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)/gh-rest.sh"
+fi
+
 if ! command -v cckit_gh_rest >/dev/null 2>&1; then
   _ghr_lib="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)/gh-rest.sh"
   # shellcheck source=/dev/null
@@ -90,15 +96,9 @@ wt_issue_number() {
 wt_issue_state() {
   local n="$1" repo="${2:-}" out
   [[ -z "$n" ]] && return 0
-  command -v gh >/dev/null 2>&1 || { printf 'unknown\n'; return 0; }
-  if cckit_gh_rest; then
-    repo="${repo:-${KIT_REPO:-}}"; [[ -n "$repo" ]] || { printf 'unknown\n'; return 0; }
-    out="$(gh api "repos/$repo/issues/$n" --jq .state 2>&1)" || { _wt_issue_state_failed "$out"; return 0; }
-  else
-    local args=(issue view "$n" --json state --jq .state)
-    [[ -n "$repo" ]] && args+=(--repo "$repo")
-    out="$(gh "${args[@]}" 2>&1)" || { _wt_issue_state_failed "$out"; return 0; }
-  fi
+  forge_available || { forge_note_none "${CCKIT_VERB:-gc}" "issue states cannot be read; every issue reads unknown and its branch is kept"; printf 'unknown\n'; return 0; }
+  repo="${repo:-${KIT_REPO:-}}"; [[ -n "$repo" ]] || repo="$(forge_repo_from_git 2>/dev/null)" || { printf 'unknown\n'; return 0; }
+  out="$(forge_rest "repos/$repo/issues/$n" --jq .state 2>&1)" || { _wt_issue_state_failed "$out"; return 0; }
   printf '%s\n' "$out" | tr '[:upper:]' '[:lower:]' | grep -E -x 'open|closed' | sed -n 1p
   return 0
 }
@@ -107,7 +107,7 @@ wt_issue_state() {
 # answer (REST 404, GraphQL "Could not resolve to an Issue") is a definite absence and stays empty;
 # every other failure is `unknown`.
 _wt_issue_state_failed() {
-  if grep -qiE 'HTTP 404|Could not resolve to an? (Issue|PullRequest)' <<<"$1"; then return 0; fi
+  if grep -qiE 'HTTP 404|answered 404 on|Could not resolve to an? (Issue|PullRequest)' <<<"$1"; then return 0; fi
   printf 'unknown\n'
 }
 

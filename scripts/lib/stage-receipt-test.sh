@@ -10,9 +10,9 @@ command -v jq >/dev/null 2>&1 || { echo "stage-receipt-test: jq absent — skipp
 # Every receipt lands in a scratch dir, never the real .cckit/.
 KIT_STATE_DIR="$(mktemp -d)/state"; export KIT_STATE_DIR
 
-# The GitHub mirror (#333) is ON by default, and `gh` is authenticated on a developer machine — an
+# The GitHub mirror (#333) is ON by default, and a forge token is usually at hand on a developer machine — an
 # unguarded `sr_cli` case here would post real comments to the real repo from the test suite. Off
-# for every case above; the mirror's own cases below stub `gh` and turn it back on explicitly.
+# for every case above; the mirror's own cases below put the forge shim on PATH and turn it back on explicitly.
 CCKIT_RECEIPT_REMOTE=0; export CCKIT_RECEIPT_REMOTE
 # shellcheck source=/dev/null
 source "$ROOT/scripts/lib/stage-receipt.sh"
@@ -179,22 +179,28 @@ there="$(cd /tmp && KIT_STATE_DIR="$KIT_STATE_DIR" bash -c "source '$ROOT/script
 t "sr_dir is the same from another directory" "$there" "$here"
 
 # ── the GitHub mirror (#333) ───────────────────────────────────────────────────────────────────
-# `gh` is stubbed on PATH: it logs every invocation and serves a canned comment list, so the upsert
-# is exercised end to end with no network and no real repo touched.
+# The forge shim (test-forge-shim.sh) stands in for GitHub: its curl logs every request as
+# `METHOD path {json}` and a fixture serves the canned comment list from $GH_COMMENTS (one
+# `<id><TAB><json body>` line per comment), so the upsert is exercised end to end with no network and
+# no real repo touched. GH_RC=1 makes every request fail (502).
 ghtmp="$(mktemp -d)"; mkdir -p "$ghtmp/bin"
-export GH_LOG="$ghtmp/gh.log"; export GH_COMMENTS="$ghtmp/comments.txt"
+# shellcheck source=/dev/null
+. "$ROOT/scripts/lib/test-forge-shim.sh"; forge_shim_install "$ghtmp/bin"
+export GH_LOG="$ghtmp/gh.log"; export GH_COMMENTS="$ghtmp/comments.txt"; export GH_FIXTURE="$ghtmp/fixture"
+export GH_TOKEN=test-token CCKIT_FORGE=github SR_REPO=o/r
 : > "$GH_LOG"; : > "$GH_COMMENTS"
-cat > "$ghtmp/bin/gh" <<'SH'
-#!/usr/bin/env bash
-echo "$*" >> "$GH_LOG"
-case "$*" in
-  *"issues/"*"/comments"*) cat "$GH_COMMENTS" ;;   # the listing (--jq is applied by the real gh)
-  *) : ;;
-esac
-exit "${GH_RC:-0}"
-SH
-chmod +x "$ghtmp/bin/gh"
+cat > "$GH_FIXTURE" <<'FIX'
+if [ "${GH_RC:-0}" != 0 ]; then code=502; out='{"message":"Server Error"}'
+else
+  case "$method $ep" in
+    "GET repos/o/r/issues/"*"/comments")
+      out="$(jq -R 'split("\t") | {id: (.[0] | tonumber), body: (.[1] | fromjson)}' "$GH_COMMENTS" | jq -sc .)" ;;
+    "PATCH repos/o/r/issues/comments/"*) out="{\"id\":${ep##*/}}" ;;
+  esac
+fi
+FIX
 OLDPATH="$PATH"; PATH="$ghtmp/bin:$PATH"; export PATH
+CREATE='^POST repos/o/r/issues/42/comments '
 
 # ── pure: the marker is the identity, and it is per ATTEMPT ────────────────────────────────────
 t "the marker keys on issue, stage and attempt" \
@@ -215,21 +221,31 @@ printf '%s\n' "$REPORT" | CCKIT_RECEIPT_REMOTE=0 sr_cli 42 --stage build --attem
 # ── a first mirror CREATES ─────────────────────────────────────────────────────────────────────
 CCKIT_RECEIPT_REMOTE=1 sr_mirror 42 build 1 >/dev/null 2>&1
 t "a first mirror creates" "$SR_MIRROR_LAST_RESULT" "created"
-yes "and it commented on the issue" "$(cat "$GH_LOG")" "issue comment 42"
+yes "and it commented on the issue" "$(cat "$GH_LOG")" "POST repos/o/r/issues/42/comments "
+yes "the comment carries the marker" "$(cat "$GH_LOG")" "cckit:receipt key=42-build-1"
+t "the lookup read the issue's comments over REST" "$(grep -c '^GET repos/o/r/issues/42/comments' "$GH_LOG")" "1"
 
 # ── the same attempt again EDITS the one comment, it does not append a second ──────────────────
 printf '%s\t%s\n' 777 '"<!-- cckit:receipt key=42-build-1 --> already here"' > "$GH_COMMENTS"
 : > "$GH_LOG"
 CCKIT_RECEIPT_REMOTE=1 sr_mirror 42 build 1 >/dev/null 2>&1
 t "a second identical run edits" "$SR_MIRROR_LAST_RESULT" "updated"
-yes "and it PATCHed the existing comment" "$(cat "$GH_LOG")" "issues/comments/777"
-t "it did not also create one" "$(grep -c 'issue comment' "$GH_LOG" || true)" "0"
+yes "and it PATCHed the existing comment" "$(cat "$GH_LOG")" "PATCH repos/o/r/issues/comments/777 "
+t "it did not also create one" "$(grep -c "$CREATE" "$GH_LOG" || true)" "0"
 
 # ── a FAILED lookup must not post: a blind post is how a duplicate appears ─────────────────────
 : > "$GH_LOG"
 GH_RC=1 CCKIT_RECEIPT_REMOTE=1 sr_mirror 42 build 1 >/dev/null 2>&1
 t "a failed lookup does not post" "$SR_MIRROR_LAST_RESULT" "lookup-failed"
-t "and nothing was created"       "$(grep -c 'issue comment' "$GH_LOG" || true)" "0"
+t "and nothing was created"       "$(grep -c "$CREATE" "$GH_LOG" || true)" "0"
+
+# ── no forge configured: the receipt stays local, the result says so, nothing is asked ─────────
+: > "$GH_LOG"
+( unset _FORGE_LOADED; CCKIT_FORGE=none CCKIT_RECEIPT_REMOTE=1 sr_mirror 42 build 1 >/dev/null 2>&1 ); t "no forge exits 0" "$?" "0"
+noforge="$(unset _FORGE_LOADED; CCKIT_FORGE=none CCKIT_RECEIPT_REMOTE=1 sr_mirror 42 build 1 2>&1 >/dev/null; printf '|%s' "$SR_MIRROR_LAST_RESULT")"
+t "no forge is the recorded result"  "${noforge##*|}" "no-forge"
+yes "no forge says the receipt stayed local" "$noforge" "no forge is configured — receipt written locally only"
+t "no forge makes no request"        "$(wc -l < "$GH_LOG" | tr -d ' ')" "0"
 
 # ── an unreachable GitHub still leaves the local file, and exits 0 ─────────────────────────────
 GH_RC=1 CCKIT_RECEIPT_REMOTE=1 sr_mirror 42 build 1 >/dev/null 2>&1
@@ -256,7 +272,9 @@ yes "the body carries its marker"   "$body" "<!-- cckit:receipt key=42-build-1 -
 yes "the body names the stage"      "$body" 'stage `build`'
 yes "the body embeds the JSON"      "$body" '"outcome": "pr-open"'
 
+t "no gh subcommand ran in the mirror cases" "$(grep -c '^GH-SUBCOMMAND' "$GH_LOG")" "0"
 PATH="$OLDPATH"; export PATH
+unset GH_FIXTURE SR_REPO
 rm -rf "$ghtmp"
 
 

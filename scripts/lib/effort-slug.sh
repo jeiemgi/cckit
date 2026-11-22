@@ -29,6 +29,12 @@
 #         effort_branch_rows_origin reaches the network and returns rc 1 when it cannot
 
 # The GitHub transport switch (#396): rest mode routes the gh calls below through gh-rest.sh.
+# The forge port (E537): every GitHub call goes through forge_* / gh_rest_* (scripts/lib/gh-rest.sh).
+if ! command -v gh_rest_issue_json >/dev/null 2>&1; then
+  # shellcheck source=/dev/null
+  . "$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)/gh-rest.sh"
+fi
+
 if ! command -v cckit_gh_rest >/dev/null 2>&1; then
   _ghr_lib="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)/gh-rest.sh"
   # shellcheck source=/dev/null
@@ -149,20 +155,13 @@ effort_slug_resolve() {
   matches="$(printf '%s' "$matches" | grep -E '^[0-9]+$' | sort -un)"
 
   # 2. gh fallback (only when no branch matched): slug:<slug> label first, then open effort titles.
-  if [ -z "$matches" ] && command -v gh >/dev/null 2>&1; then
+  if [ -z "$matches" ] && forge_available; then
     local repo; repo="$(_eff_slug_repo)"
     if [ -n "$repo" ]; then
-      if cckit_gh_rest; then
-        matches="$(gh_rest_issue_numbers_by_label "$repo" "slug:$norm" 2>/dev/null | grep -E '^[0-9]+$' | sort -un)"
-      else
-      matches="$(gh issue list --repo "$repo" --state open --label "slug:$norm" \
-                   --json number -q '.[].number' 2>/dev/null | grep -E '^[0-9]+$' | sort -un)"
-      fi
+      matches="$(gh_rest_issue_numbers_by_label "$repo" "slug:$norm" 2>/dev/null | grep -E '^[0-9]+$' | sort -un)"
       if [ -z "$matches" ]; then
         local in it
-        matches="$( { if cckit_gh_rest; then gh_rest_open_issue_titles "$repo" | grep -F '[Effort]'
-                      else gh issue list --repo "$repo" --state open --search '[Effort] in:title' --limit 200 \
-                     --json number,title -q '.[] | "\(.number)\t\(.title)"'; fi; } 2>/dev/null \
+        matches="$( { gh_rest_open_issue_titles "$repo" | grep -F '[Effort]'; } 2>/dev/null \
                    | while IFS="$(printf '\t')" read -r in it; do
                        [ "$(_eff_title_slug "$it")" = "$norm" ] && printf '%s\n' "$in"
                      done | grep -E '^[0-9]+$' | sort -un)"

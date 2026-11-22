@@ -242,16 +242,15 @@ h4.sh
   # `bin/cckit` runs `set -eu`, and a while loop's rc is its LAST iteration's: an issue whose file
   # list ended in a non-file token (`templates/skills/` — the parser keeps directory tokens) made
   # the sourced-helpers assignment rc 1 and killed the brief mid-render. Every section after the
-  # helpers table — standing gotchas, the durable-prose mandate — was silently absent. gh is stubbed
-  # so this stays network-free; jq and git are real, because the verb requires both.
+  # helpers table — standing gotchas, the durable-prose mandate — was silently absent. The forge
+  # shim (test-forge-shim.sh) answers the issue read so this stays network-free; jq and git are
+  # real, because the verb requires both.
   if command -v git >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 && [ -f "$dir/kit-lib.sh" ]; then
-    ghstub="$tmp/ghbin"; mkdir -p "$ghstub"
-    cat > "$ghstub/gh" <<'EOF'
-#!/bin/sh
-# stub: only `gh issue view … --json …` is used by kit_brief.
-printf '%s' '{"title":"t","state":"OPEN","labels":[],"body":"Files: scripts/lib/only-here.sh, templates/skills/"}'
-EOF
-    chmod +x "$ghstub/gh"
+    ghstub="$tmp/ghbin"
+    . "$dir/test-forge-shim.sh"; forge_shim_install "$ghstub"
+    export GH_LOG="$tmp/gh.log" GH_TOKEN=test-token CCKIT_FORGE=github KIT_REPO=o/r
+    export GH_TITLE="t" GH_BODY="Files: scripts/lib/only-here.sh, templates/skills/"
+    : > "$GH_LOG"
     mkdir -p "$repo/.claude/rules"
     cat > "$repo/.claude/rules/delegation-brief.md" <<'EOF'
 # Delegation brief
@@ -268,6 +267,19 @@ EOF
     has "the brief reaches the helpers table"   "$brief_out" "## Helpers you already have"
     has "the brief reaches the standing gotchas" "$brief_out" "fixture gotcha"
     has "the brief reaches the durable-prose mandate" "$brief_out" 'concrete'
+    eq  "the brief reads the issue once, over REST" "$(grep -c '^GET repos/o/r/issues/5 ' "$GH_LOG")" "1"
+    eq  "the brief runs no gh subcommand" "$(grep -c '^GH-SUBCOMMAND' "$GH_LOG")" "0"
+    # No forge configured: the verb refuses with the one forge_need line, before any read.
+    : > "$GH_LOG"
+    noforge="$(cd "$repo" && export PATH="$ghstub:$PATH" && ( CCKIT_FORGE=none; export CCKIT_FORGE; unset _FORGE_LOADED; kit_brief 5 ) 2>&1)"; rc=$?
+    eq  "no forge: rc 1" "$rc" "1"
+    has "no forge: the refusal names the verb" "$noforge" "cckit brief: needs a forge (GitHub) and none is configured"
+    has "no forge: the refusal names the fix" "$noforge" "Set forge.provider to github and a token in GH_TOKEN, or sign in with gh"
+    eq  "no forge: nothing was read" "$(wc -l < "$GH_LOG" | tr -d ' ')" "0"
+    # An issue the forge does not have: the read fails and the verb says which issue, rc 1.
+    missing="$(cd "$repo" && export PATH="$ghstub:$PATH" && ( GH_FAIL_EP="repos/o/r/issues/404"; export GH_FAIL_EP; kit_brief 404 ) 2>&1)"; rc=$?
+    eq  "a failed issue read is rc 1" "$rc" "1"
+    has "a failed issue read names the issue" "$missing" "could not read issue #404 from o/r"
 
     # ── the QA route ask appears only when a `qa` block is configured (#297) ───────────────────
     # `cckit qa open` reads a `QA route:` line out of the PR body; the brief is where the builder
@@ -291,7 +303,7 @@ EOF
     echo "  (git, jq or kit-lib.sh absent — skipping the full-render assertions)"
   fi
 
-  # ── the verb's argument contract (no gh call: it must reject before reaching for the network) ──
+  # ── the verb's argument contract (no forge call: it must reject before reaching for the network) ──
   out="$(kit_brief 2>&1)"; rc=$?
   eq  "no argument is rc 2"     "$rc" "2"
   has "no argument prints usage" "$out" "usage: cckit brief"

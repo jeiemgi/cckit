@@ -40,6 +40,12 @@
 #   KIT_EVIDENCE_MAX_BYTES  inline truncation cap for text/log files (default 60000)
 # errors: mixed — pr_attach_evidence is best-effort by default (warns, rc 0) and propagates every failure with a distinct rc under --strict / PR_EVIDENCE_STRICT=1; the marker/body builders are pure
 
+# The forge port (E537): every GitHub call goes through forge_* / gh_rest_* (scripts/lib/gh-rest.sh).
+if ! command -v gh_rest_issue_json >/dev/null 2>&1; then
+  # shellcheck source=/dev/null
+  . "$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)/gh-rest.sh"
+fi
+
 PR_EVIDENCE_REPO="${PR_EVIDENCE_REPO:-}"
 PR_EVIDENCE_STRICT="${PR_EVIDENCE_STRICT:-0}"
 PR_EVIDENCE_LAST_RESULT="${PR_EVIDENCE_LAST_RESULT:-}"
@@ -86,7 +92,7 @@ _pr_evidence_match_id() {
   return "$found"
 }
 
-# _pr_evidence_api_path <repo> <suffix> — the gh api path. An empty repo yields the
+# _pr_evidence_api_path <repo> <suffix> — the forge_rest path. An empty repo yields the
 # {owner}/{repo} placeholders, which gh fills from the current repo (matching the old
 # "omit --repo" behaviour).
 _pr_evidence_api_path() {
@@ -189,23 +195,20 @@ _pr_evidence_compose() {
 _pr_evidence_list() {
   local p
   p="$(_pr_evidence_api_path "$1" "issues/$2/comments")"
-  gh api --paginate "$p" --jq '.[] | "\(.id)\t\(.body | @json)"' 2>/dev/null
+  forge_rest --paginate "$p" --jq '.[] | "\(.id)\t\(.body | @json)"' 2>/dev/null
 }
 
 # _pr_evidence_edit <repo> <comment-id> <body-file> — PATCH an existing comment in place.
 _pr_evidence_edit() {
   local p
   p="$(_pr_evidence_api_path "$1" "issues/comments/$2")"
-  gh api --method PATCH "$p" -F "body=@$3" >/dev/null 2>&1
+  forge_rest --method PATCH "$p" -F "body=@$3" >/dev/null 2>&1
 }
 
 # _pr_evidence_create <repo> <pr> <body-file> — post a new comment.
 _pr_evidence_create() {
-  if [ -n "$1" ]; then
-    gh pr comment "$2" --repo "$1" --body-file "$3" >/dev/null 2>&1
-  else
-    gh pr comment "$2" --body-file "$3" >/dev/null 2>&1
-  fi
+  local repo="$1"; [ -n "$repo" ] || repo="$(forge_repo_from_git 2>/dev/null)" || return 1
+  gh_rest_issue_comment "$repo" "$2" "@$3" >/dev/null 2>&1
 }
 
 # ── the entry point ────────────────────────────────────────────────────────────────────────────
@@ -246,9 +249,9 @@ pr_attach_evidence() {
     pr_evidence_usage >&2
     return "$rc"
   fi
-  if ! command -v gh >/dev/null 2>&1; then
-    _pr_evidence_bail "$strict" 3 no-gh \
-      "gh CLI not found — cannot post evidence to PR #$pr (skipping)"
+  if ! forge_available; then
+    _pr_evidence_bail "$strict" 3 no-forge \
+      "no forge is configured — cannot post evidence to PR #$pr (skipping)"
     return $?
   fi
   if [ ! -f "$file" ]; then
@@ -330,7 +333,7 @@ pr-evidence.sh — upsert PR evidence (build/typecheck logs, screenshots) as a P
 
 kit-effort-pr should call it AFTER the PR is opened, once per gate artifact:
 
-  pr_num=$(gh pr list --head "$branch" --json number --jq '.[0].number')
+  pr_num=$(gh_rest_pr_for_head "$repo" "$branch")
   pr_attach_evidence "$pr_num" build.log     "build"                    || true
   pr_attach_evidence "$pr_num" typecheck.log "typecheck"                || true
   pr_attach_evidence "$pr_num" screen.png    "rendered — success state" || true

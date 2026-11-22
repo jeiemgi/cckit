@@ -7,6 +7,12 @@
 # Usage:
 #   cckit contribute "<one-line summary>"   # gate -> push branch -> open PR to the upstream base
 #   cckit contribute --dry-run "<summary>"  # run the gate + preconditions, push/PR nothing
+# The forge port (E537): every GitHub call goes through forge_* / gh_rest_* (scripts/lib/gh-rest.sh).
+if ! command -v gh_rest_issue_json >/dev/null 2>&1; then
+  # shellcheck source=/dev/null
+  . "$(cd "$(dirname "$0")" && pwd)/lib/gh-rest.sh"
+fi
+
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source=/dev/null
@@ -43,6 +49,5 @@ if [ "$dry" -eq 1 ]; then
 fi
 
 git push -u origin "$branch" 2>&1 | tail -1
-gh pr create --repo "$repo" --base "$base" --head "$branch" \
-  --title "$summary" \
-  --body "$(printf '## Contribution\n\n%s\n\nChecks gate (scripts/check.sh): green.\nDual-licensed MIT OR Apache-2.0 per CONTRIBUTING.md.\n' "$summary")"
+gh_rest_pr_create "$repo" "$base" "$branch" "$summary" \
+  "$(printf '## Contribution\n\n%s\n\nChecks gate (scripts/check.sh): green.\nDual-licensed MIT OR Apache-2.0 per CONTRIBUTING.md.\n' "$summary")" "" ""
