@@ -147,4 +147,45 @@ out="$(check)"; t "AGENTS.md extra row: exit 1" "$?" "1"; has "extra row named" 
 fixture; rm "$fx/AGENTS.md"
 out="$(check)"; t "no AGENTS.md: not a defect" "$?" "0"
 
+# the skills page
+page() { mkdir -p "$fx/docs-site/src/content/docs"; cat > "$fx/docs-site/src/content/docs/skills.mdx"; }
+good_page() { page <<'MDX'
+---
+title: Skills
+---
+## Effort
+
+| Skill | Activates | What it does |
+| ----- | --------- | ------------ |
+| `kit-a` | <Tag kind="skill" /> | a |
+
+## The kit itself
+
+| Skill | Activates | What it does |
+| ----- | --------- | ------------ |
+| `kit-b` | <Tag kind="skill" /> | b |
+
+## Skills a profile scaffolds
+
+| Skill | Profiles | What it does |
+| ----- | -------- | ------------ |
+| `concrete` | all | not one of skills/ |
+MDX
+}
+fixture; good_page
+out="$(check)"; t "page grouped by term: exit 0" "$?" "0"
+fixture; good_page; sed -i.bak '/kit-b/d' "$fx/docs-site/src/content/docs/skills.mdx"
+out="$(check)"; t "page row missing: exit 1" "$?" "1"; has "missing page row named" "$out" "skills.mdx: no row for kit-b"
+fixture; good_page; sed -i.bak 's/^## Effort$/## Task/' "$fx/docs-site/src/content/docs/skills.mdx"
+out="$(check)"; t "page row under its other term: exit 0" "$?" "0"
+fixture; good_page; sed -i.bak 's/^## Effort$/## Gate/' "$fx/docs-site/src/content/docs/skills.mdx"
+out="$(check)"; t "page row under a wrong heading: exit 1" "$?" "1"; has "wrong heading named" "$out" 'skills.mdx: kit-a is under "Gate", not under a heading of its terms'
+fixture; good_page; printf '| `kit-zz` | <Tag kind="skill" /> | zz |\n' > "$tmp/prow"; mkdir -p "$fx/skills/kit-zz"; : > "$fx/skills/kit-zz/SKILL.md"
+sed -i.bak '/kit-b/r '"$tmp/prow" "$fx/docs-site/src/content/docs/skills.mdx"; printf -- '- task: "zz"\n  skill: kit-zz\n  term: none\n' >> "$fx/skills/routing.yaml"
+printf '| zz | `kit-zz` | none |\n' > "$tmp/arow"; sed -i.bak '/kit-b/r '"$tmp/arow" "$fx/AGENTS.md"; printf -- '---\nname: kit-zz\nterms: none\n---\n' > "$fx/skills/kit-zz/SKILL.md"
+out="$(check)"; t "page: a routed skill added everywhere: exit 0" "$?" "0"
+fixture; good_page; printf '| `kit-zz` | <Tag kind="skill" /> | zz |\n' > "$tmp/prow"; mkdir -p "$fx/skills/kit-zz"; printf -- '---\nname: kit-zz\nterms: none\n---\n' > "$fx/skills/kit-zz/SKILL.md"
+sed -i.bak '/kit-b/r '"$tmp/prow" "$fx/docs-site/src/content/docs/skills.mdx"
+out="$(check)"; t "page row for an unrouted skill: exit 1" "$?" "1"; has "unrouted page row named" "$out" "skills.mdx: row for kit-zz, which skills/routing.yaml does not route"
+
 [ "$fail" -eq 0 ] && echo "terms-check-test: all ok" || { echo "terms-check-test: FAILED"; exit 1; }

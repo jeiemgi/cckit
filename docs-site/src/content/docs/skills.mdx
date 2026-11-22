@@ -1,6 +1,6 @@
 ---
 title: Skills cckit ships
-description: The skills cckit installs — what each one does, and how it's triggered.
+description: The skills cckit installs, grouped by the term each one serves — what each does, and how it's triggered.
 ---
 
 import { CardGrid, LinkCard, Aside } from '@astrojs/starlight/components';
@@ -9,7 +9,10 @@ import TagRow from '../../components/TagRow.astro';
 
 <TagRow kinds={["skill", "conversational"]} />
 
-The skills cckit installs, grouped by what you're trying to do.
+The skills cckit installs, grouped by the term each one serves — the word for the thing it acts
+on, defined in one file under `ontology/terms/`. The route from what you want to the skill is
+`skills/routing.yaml`; `bash scripts/terms-check.sh` keeps this page, that file and `AGENTS.md` in
+step. Eight skills serve the kit's own setup and no process term yet; they are the last group.
 
 A **skill** is a packaged instruction set Claude Code can run. Every skill here you can run with a
 `/` (for example `/kit-next`) — that's the <Tag kind="skill" text>Skill</Tag> tag. Some also trigger
@@ -17,76 +20,133 @@ when you just **describe the task in plain words** — that's the
 <Tag kind="conversational" text>Conversational</Tag> tag. New to the tags? See
 [How to read this guide](/tags/).
 
-## Everyday loop
+## Report
+
+What comes back when delegated work stops, or when you ask where things stand.
 
 <div class="cckit-nowrap-2">
 
 | Skill | Activates | What it does |
 | ----- | --------- | ------------ |
 | `kit-status` | <Tag kind="skill" /> | Where are we? Local undone work, PRs waiting on a human, cleanup available. |
-| `kit-plan-next` | <Tag kind="skill" /> | Inventory what the kit can already do; propose what to build next. |
-| `kit-next` | <Tag kind="skill" /> | Pick up the next unblocked issue, or fan the wave out. |
-| `kit-ship` | <Tag kind="skill" /> | One request, code to merged. |
-| `kit-autopilot` | <Tag kind="skill" /> | Run a planned effort hands-off. Its night mode runs waves the owner granted, under a runtime-enforced token budget — see [Night mode](/config-and-permissions/#night-mode). |
+
+</div>
+
+## Sync
+
+The verb that reads the board from GitHub and writes nothing to it.
+
+<div class="cckit-nowrap-2">
+
+| Skill | Activates | What it does |
+| ----- | --------- | ------------ |
 | `kit-task-sync` | <Tag kind="skill" /> | Print the board by role; flag blockers. |
 
 </div>
 
-## Task lifecycle (one issue)
+## Task
+
+One self-contained change tracked as one issue: one branch, one worktree, one PR.
 
 <div class="cckit-nowrap-2">
 
 | Skill | Activates | What it does |
 | ----- | --------- | ------------ |
+| `kit-next` | <Tag kind="skill" /> | Pick up the next unblocked issue, or fan the wave out to builders. |
 | `kit-task-new` | <Tag kind="skill" /> | Create an issue with labels and board fields. |
-| `kit-task-start` | <Tag kind="skill" /> | Isolated worktree + branch (via `cckit start`); mark it in progress. |
 | `kit-task-pr` | <Tag kind="skill" /> | Commit, push, open a PR linked to the issue. |
-| `kit-task-pr-merge` | <Tag kind="skill" /> | Squash-merge the PR, switch to base, pull. |
 | `kit-task-pr-auto` | <Tag kind="skill" /> | Open the PR and merge it in one step. |
 | `kit-task-close` | <Tag kind="skill" /> | Close the issue; set the board to Done. |
+| `kit-ship` | <Tag kind="skill" /> | One request, code to merged. |
 
 </div>
 
-## Effort lifecycle (many issues, one goal)
+## Effort
+
+One goal that decomposes into sub-issues and ships as one PR.
 
 <div class="cckit-nowrap-2">
 
 | Skill | Activates | What it does |
 | ----- | --------- | ------------ |
-| `kit-effort-new` | <Tag kind="skill" /> | Create an effort: a parent plus sub-issues. Shows the plan as a [review page](/project-management/plan-pages/) first. |
+| `kit-plan-next` | <Tag kind="skill" /> | Inventory what the kit can already do; propose what to build next, then hand the choice to `kit-effort-new`. |
+| `kit-effort-new` | <Tag kind="skill" /> | Create an effort: a parent plus its deliverables as sub-issues. Shows the plan as a [review page](/project-management/plan-pages/) first. |
 | `kit-effort-start` | <Tag kind="skill" /> | Open the effort branch the subs merge into. |
 | `kit-effort-pr` | <Tag kind="skill" /> | Open the one PR for the whole effort. |
 | `kit-effort-close` | <Tag kind="skill" /> | Thin caller of `cckit effort close` — the one close op: merge, close, board Done, GC. |
 
 </div>
 
-## Maintenance & delivery
+## Captain
+
+Whoever drives an approved plan: merges each wave once the gate is green and pings a person only
+on a genuine blocker.
 
 <div class="cckit-nowrap-2">
 
 | Skill | Activates | What it does |
 | ----- | --------- | ------------ |
+| `kit-autopilot` | <Tag kind="skill" /> | Run a planned effort hands-off. Its night mode runs waves the owner granted, under a runtime-enforced token budget — see [Night mode](/config-and-permissions/#night-mode). |
+
+</div>
+
+## Worktree
+
+The directory one branch is checked out in; one agent works in one worktree.
+
+<div class="cckit-nowrap-2">
+
+| Skill | Activates | What it does |
+| ----- | --------- | ------------ |
+| `kit-task-start` | <Tag kind="skill" /> | Isolated worktree + branch (via `cckit start`); mark it in progress. |
 | `kit-gc` | <Tag kind="skill" /> | Report prunable branches and worktrees — classifies, deletes nothing. |
 | `kit-cleanup` | <Tag kind="skill" /> | Act on that report — plan first, then delete only the SAFE and LANDED rows and prune the listed zombies. |
+
+</div>
+
+## Gate
+
+The bar a change must pass before it lands: the project's check command on the current base.
+
+<div class="cckit-nowrap-2">
+
+| Skill | Activates | What it does |
+| ----- | --------- | ------------ |
+| `kit-task-pr-merge` | <Tag kind="skill" /> | Squash-merge the PR, switch to base, pull. |
+
+</div>
+
+## Check
+
+One verification with a pass or fail answer and a named subject.
+
+<div class="cckit-nowrap-2">
+
+| Skill | Activates | What it does |
+| ----- | --------- | ------------ |
 | `kit-security-sweep` | <Tag kind="skill" /> | Audit for injection, auth, CORS/CSP, deps. |
-| `kit-digest` | <Tag kind="skill" /> | Pre-digest long inputs with a local model. |
 | `kit-ux-audit` | <Tag kind="skill" /> | Graph-driven UX audit: flows, DS consistency, a11y. |
 | `kit-annotate` | <Tag kind="skill" /> | Set up click-to-annotate feedback on a running React app (Agentation), then triage the notes. Claude Code only. |
 
 </div>
 
-## Authoring & contributing
+## The kit itself
+
+Skills that set up, extend or document cckit and a project's use of it. None serves a process term
+yet; each is a candidate for a term or for a merge.
 
 <div class="cckit-nowrap-2">
 
 | Skill | Activates | What it does |
 | ----- | --------- | ------------ |
-| `kit-docs-writer` | <Tag kind="conversational" /> | Write docs in the house voice. |
+| `kit-onboard` | <Tag kind="skill" /> | First-contact setup on a new machine. |
+| `kit-add` | <Tag kind="conversational" /> | Add an [integration](/integrations/) or a module: list what can be added, ask the descriptor's one question, run `cckit add`. |
 | `kit-customize` | <Tag kind="conversational" /> | Add or edit agents and skills in a project. |
 | `kit-contribute` | <Tag kind="conversational" /> | Open a PR to contribute your additions upstream. |
-| `kit-onboard` | <Tag kind="skill" /> | First-contact setup on a new machine. |
+| `kit-dev` | <Tag kind="skill" /> | Change cckit itself and test it live with `claude --plugin-dir`, then ship the bump. |
+| `kit-docs-writer` | <Tag kind="conversational" /> | Write docs in the house voice. |
+| `kit-digest` | <Tag kind="skill" /> | Pre-digest long inputs with a local model. |
 | `kit-page` | <Tag kind="conversational" /> | Open a plan, a decision or a grilling round as a [review page](/project-management/plan-pages/), fall back to the terminal where there is no browser, and write the answer back. |
-| `kit-add` | <Tag kind="conversational" /> | Add an [integration](/integrations/) or a module: list what can be added, ask the descriptor's one question, run `cckit add`. |
 
 </div>
 

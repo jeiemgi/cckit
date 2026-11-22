@@ -13,6 +13,8 @@
 #    each skill's `terms:` frontmatter line equals its routing terms.
 # 4. AGENTS.md's "Which skill does what" table has one row per routed skill, with the same tasks
 #    (joined by " · ") and terms (joined by ", ") as routing.yaml.
+# 5. docs-site/src/content/docs/skills.mdx, when present, has one row per routed skill under the
+#    `## <Label>` heading of one of its terms (`none` → "The kit itself") and no row for an unrouted one.
 #
 # Prints one `x <where>: <reason>` line per defect and one line of counts; --llm prints the counts
 # as one JSON object on stdout and the defect lines on stderr. Exit 0 with no defect, 1 with one, 2 when jq is missing or ontology/terms/ is
@@ -191,6 +193,38 @@ if [ -f AGENTS.md ]; then
       grep -qx -- "$s" <<< "$routed_skills" || x "AGENTS.md: row for $s, which skills/routing.yaml does not route"
     done <<< "$agents_rows"
   fi
+fi
+
+# ── 5. the skills page, grouped by term ─────────────────────────────────────────────────────────
+# docs-site/src/content/docs/skills.mdx (when present): every routed skill has one row, each row sits
+# under the `## <Label>` heading of one of its terms (the term's preferred label, first letter
+# upper-cased; `none` → "The kit itself"), and no row names a skill routing.yaml does not route.
+PAGE=docs-site/src/content/docs/skills.mdx
+if [ -f "$PAGE" ]; then
+  heading_of() { # heading_of <Term|none>
+    if [ "$1" = none ]; then echo "The kit itself"; return; fi
+    jq -r '(if (.label | type) == "array" then .label[0] else .label end) | (.[:1] | ascii_upcase) + .[1:]' "ontology/terms/$1.json"
+  }
+  # rows as `skill<TAB>heading`, H2 headings only
+  page_rows="$(awk '
+    /^## / { h = $0; sub(/^## /, "", h); next }
+    /^\| `[a-z][a-z0-9-]*` \|/ { s = $2; gsub(/`/, "", s); printf "%s\t%s\n", s, h }' "$PAGE")"
+  for s in $routed_skills; do
+    found="$(printf '%s\n' "$page_rows" | awk -F'\t' -v s="$s" '$1==s{print $2}')"
+    n_rows="$(printf '%s\n' "$found" | grep -c . || true)"
+    if [ "$n_rows" -eq 0 ]; then x "$PAGE: no row for $s"; continue; fi
+    [ "$n_rows" -eq 1 ] || x "$PAGE: $s has $n_rows rows"
+    ok=0
+    for term in $(printf '%s\n' "$routes" | awk -F'\t' -v s="$s" '$2==s{print $3}' | sort -u); do
+      [ "$found" = "$(heading_of "$term")" ] && ok=1
+    done
+    [ "$ok" -eq 1 ] || x "$PAGE: $s is under \"$found\", not under a heading of its terms"
+  done
+  while IFS=$'\t' read -r s _; do
+    [ -n "$s" ] || continue
+    [ -f "skills/$s/SKILL.md" ] || continue          # a scaffolded template skill, not one of skills/
+    grep -qx -- "$s" <<< "$routed_skills" || x "$PAGE: row for $s, which skills/routing.yaml does not route"
+  done <<< "$page_rows"
 fi
 
 # ── counts ───────────────────────────────────────────────────────────────────────────────────────
