@@ -11,7 +11,8 @@
 #   scripts/forge-report.sh --json          everything as one JSON object (no jq needed to produce it)
 #   scripts/forge-report.sh --root <dir>    measure another checkout (default: this repository)
 #
-# What is measured (non-test files only: bin/*, scripts/*.sh, scripts/lib/*.sh, never *-test.sh):
+# What is measured (non-test files only: bin/*, scripts/*.sh, scripts/lib/*.sh; never *-test.sh nor
+# the scripts/lib/test-*.sh test doubles):
 #   gh line  — a non-comment line that runs `gh <subcommand>` in command position (line start, after
 #              `(`, `$(`, `|`, `;`, `&`, `!`, `{`, or after if/then/else/do/while/exec), a `gh "$…"`
 #              form, or a probe (`command -v gh`, `has_cmd gh`, `_eff_need gh`). A message that
@@ -52,7 +53,7 @@ fr_files() {
   ( cd "$ROOT" && {
       for f in bin/*; do [ -f "$f" ] && echo "$f"; done
       for f in scripts/*.sh scripts/lib/*.sh; do [ -f "$f" ] && echo "$f"; done
-    } | grep -v -- '-test\.sh$' | sort -u )
+    } | grep -vE -- '-test\.sh$|^scripts/lib/test-[a-z-]+\.sh$' | sort -u )
 }
 # fr_count <regex> <file>: matching non-comment lines.
 fr_count() { grep -vE '^[[:space:]]*#' "$ROOT/$2" 2>/dev/null | grep -cE "$1" || true; }
