@@ -3,6 +3,13 @@
 # Usage: ./scripts/install.sh [target-bin-dir]   (default: ~/.local/bin, then /usr/local/bin)
 set -euo pipefail
 
+# git is the one hard dependency of the core: every verb runs on it, and nothing works without it.
+# Refused here, before anything is linked, with the way to get it.
+command -v git >/dev/null 2>&1 || {
+  echo "cckit: git is required and is not on your PATH. Install it (macOS: xcode-select --install, or brew install git; Debian/Ubuntu: apt install git), then run this again." >&2
+  exit 1
+}
+
 root="$(cd "$(dirname "$0")/.." && pwd)"
 src="$root/bin/cckit"
 [ -x "$src" ] || { echo "cckit: $src not found or not executable" >&2; exit 1; }

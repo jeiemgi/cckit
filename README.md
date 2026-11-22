@@ -40,8 +40,9 @@ run a shell can drive every operation.
 - **Scales from one issue to a wave.** The same verbs that take one issue to a merged PR also plan
   and run a whole wave of parallel agents — with a captain that gates and merges behind policy
   floors.
-- **Zero hard dependencies.** Pure bash with fallbacks; it auto-detects optional tools
-  (`gh`, `jq`, `fzf`, `gum`) and degrades instead of failing.
+- **Git is the one hard dependency.** Pure bash over `git`; GitHub is an optional forge behind a
+  token, and optional tools (`gh`, `fzf`, `gum`, `glow`) are auto-detected. A missing forge degrades
+  with one line saying so, never silently.
 - **Portable.** No company, framework, or repo is baked in — everything is driven from
   `cckit.config.json`.
 

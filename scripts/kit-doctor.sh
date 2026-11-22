@@ -301,6 +301,20 @@ else
   ACTIONS_NEEDED+=("Install jq: brew install jq")
 fi
 
+# ---- curl (the forge is REST over curl) -------------------------------------
+if has_cmd curl; then
+  row "$MARK_OK" "curl" "$(curl --version 2>/dev/null | sed -n 1p | awk '{print $2}')"
+  CHECKS_OK=$((CHECKS_OK + 1))
+elif brew_install curl; then
+  row "$MARK_OK" "curl" "installed"
+  CHECKS_OK=$((CHECKS_OK + 1))
+  ACTIONS_TAKEN+=("Installed curl via brew")
+else
+  row "$MARK_FAIL" "curl" "missing — brew install curl (every GitHub call is REST over curl)"
+  CHECKS_FAIL=$((CHECKS_FAIL + 1))
+  ACTIONS_NEEDED+=("Install curl: brew install curl")
+fi
+
 # ---- perl -----------------------------------------------------------------
 if has_cmd perl; then
   row "$MARK_OK" "perl" "$(perl --version 2>/dev/null | sed -n 1,2p | tail -1 | tr -d '()' | awk '{print $2}')"

@@ -42,7 +42,7 @@ You don't need me to name the commands; follow the AGENTS.md contract.
 
 ## Configure cckit in a repo (one-time)
 
-**Configure.** cckit needs `git`, `gh` (authenticated), and `jq`. It reads everything from `cckit.config.json`, which `init` scaffolds.
+**Configure.** cckit needs `git`, `jq`, `curl`, and a GitHub token (`GH_TOKEN`, or a signed-in `gh`) for the verbs that write to GitHub. It reads everything from `cckit.config.json`, which `init` scaffolds.
 
 **Prompt:**
 
@@ -62,7 +62,7 @@ Then show me what it detected about the stack so I can verify it looks right.
 
 ```bash
 cckit init        # scaffold cckit.config.json + .claude/
-cckit doctor      # preflight: deps + gh auth
+cckit doctor      # preflight: deps + the forge (the GitHub token)
 cckit scan --llm  # verify detected stack + kit state (JSON)
 ```
 

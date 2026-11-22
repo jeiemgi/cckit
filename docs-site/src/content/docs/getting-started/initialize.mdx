@@ -270,15 +270,16 @@ The issue loop in full, with what to check at each step:
   Yes. The tools are all there, the project is `configured`, and nothing local is unfinished.
 </Chat>
 
-`doctor` prints a green check for `git`, `gh` (authenticated), `jq` and `perl`. `scan` prints the
+`doctor` prints a green check for `git`, `jq`, `perl` and `curl`, and a `forge` row naming the GitHub login the token belongs to. `scan` prints the
 detected language and framework. If both look right, cckit is live in the repository.
 `cckit status` lists local work that is not finished, pull requests waiting on a person, and
 cleanup that is available; after step 5 it should list nothing for the task you ran.
 
 ## Troubleshooting
 
-**`doctor` says `gh` isn't authenticated.** Run `gh auth login` once, then re-run the setup prompt.
-cckit uses your existing GitHub CLI session; it never stores a token of its own.
+**`doctor` says the forge is `none`.** No GitHub token was found. Run `gh auth login` once, or
+`export GH_TOKEN=<token>`, then re-run the setup prompt. cckit reads the token at run time and never
+stores one of its own.
 
 **`scan` detected the wrong stack.** The detection is a starting point you can correct. Open the
 project config and adjust the project fields; every verb picks up the change. The config is

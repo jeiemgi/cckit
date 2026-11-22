@@ -42,7 +42,8 @@ api_files="$(cd "$ROOT" && { for f in bin/*; do [ -f "$f" ] && echo "$f"; done; 
   | grep -vE -- '-test\.sh$|^scripts/lib/test-[a-z-]+\.sh$' | sort -u | while IFS= read -r f; do
       is_layer "$f" && continue
       case "$f" in scripts/forge-fence.sh|scripts/forge-report.sh) continue ;; esac
-      if grep -vE '^[[:space:]]*#' "$f" | grep -q 'api\.github\.com'; then printf '%s\n' "$f"; fi
+      body="$(grep -vE '^[[:space:]]*#' "$f" || true)"
+      if grep -q 'api\.github\.com' <<<"$body"; then printf '%s\n' "$f"; fi
     done)"
 api_n="$(printf '%s\n' "$api_files" | sed '/^$/d' | wc -l | tr -d ' ')"
 
