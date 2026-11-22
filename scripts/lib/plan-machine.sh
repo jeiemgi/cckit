@@ -34,6 +34,12 @@
 # Requires: gh, jq. bash 3.2 (no associative arrays — parallel indexed arrays + linear scan; N small).
 # errors: strict — refuses to plan without gh + jq
 
+# The forge port (E537): every GitHub call goes through forge_* / gh_rest_* (scripts/lib/gh-rest.sh).
+if ! command -v gh_rest_issue_json >/dev/null 2>&1; then
+  # shellcheck source=/dev/null
+  . "$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)/gh-rest.sh"
+fi
+
 PLAN_REPO="${PLAN_REPO:-${KIT_REPO:-}}"
 
 # _pm_weight <ctx> [issue] — session weight of a ctx: value. Anything outside S|M|L|XL weighs
@@ -168,7 +174,7 @@ _pm_files() {
 }
 
 plan_machine() {
-  command -v gh >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 || { echo "plan: needs gh + jq" >&2; return 1; }
+  forge_need plan || return 1; command -v jq >/dev/null 2>&1 || { echo "plan: needs jq" >&2; return 1; }
   # output mode: the dispatcher strips --llm and exports CCKIT_OUTPUT=json, so honor that env first;
   # --llm/--output=json are kept for direct lib calls / tests.
   local repo="$PLAN_REPO" budget="${KIT_SESSION_BUDGET:-4}" out="${CCKIT_OUTPUT:-human}" effort="" ms=""
@@ -191,15 +197,15 @@ plan_machine() {
   # 1. the issue set: an effort's sub-issues, or the open board.
   local raw
   if [ -n "$effort" ]; then
-    raw="$(gh api "repos/$repo/issues/$effort/sub_issues" --paginate \
+    raw="$(forge_rest "repos/$repo/issues/$effort/sub_issues" --paginate \
       --jq '.[] | select(.state=="open") | [(.number|tostring), .title, .body] | @tsv' 2>/dev/null)" \
       || { echo "plan: failed to read sub-issues of #$effort" >&2; return 1; }
   else
     local mjq='.[]'
     [ -n "$ms" ] && mjq=".[] | select((.milestone.title // \"\") == \"$ms\")"
-    raw="$(gh issue list --repo "$repo" --state open --limit 200 --json number,title,body,milestone \
-      --jq "$mjq | [(.number|tostring), .title, .body] | @tsv" 2>/dev/null)" \
-      || { echo "plan: gh query failed (check gh auth)" >&2; return 1; }
+    raw="$(forge_rest "repos/$repo/issues" -X GET -f state=open -f per_page=100 --paginate \
+      --jq "[.[] | select(.pull_request | not) | {number, title, body: (.body // \"\"), milestone}] | $mjq | [(.number|tostring), .title, .body] | @tsv" 2>/dev/null)" \
+      || { echo "plan: the issue read failed (is the forge reachable and the token valid?)" >&2; return 1; }
   fi
   [ -n "$raw" ] || { [ "$out" = "json" ] && echo "[]" || echo "plan: no open issues to plan"; return 0; }
 
@@ -211,7 +217,7 @@ plan_machine() {
     [ -n "$n" ] || continue
     nums+=("$n"); titles+=("$t")
     # one label read serves both ctx: (session weight) and priority: (intra-wave order).
-    lab="$(gh issue view "$n" --repo "$repo" --json labels --jq \
+    lab="$(forge_rest "repos/$repo/issues/$n" --jq \
       '[ ([.labels[].name|select(startswith("ctx:"))|ltrimstr("ctx:")]|first // "?"),
          ([.labels[].name|select(startswith("priority:"))|ltrimstr("priority:")]|first // "") ]|@tsv' 2>/dev/null)"
     ctxlab="${lab%%"$labtab"*}"
@@ -221,7 +227,7 @@ plan_machine() {
     prios+=("$priolab")
     files+=("$(_pm_files "$body")")
     # only OPEN blockers gate execution; closed ones are already satisfied.
-    b="$(gh api "repos/$repo/issues/$n/dependencies/blocked_by" \
+    b="$(forge_rest "repos/$repo/issues/$n/dependencies/blocked_by" \
       --jq '[.[]|select(.state=="open")|.number]|join(",")' 2>/dev/null)"
     blkall+=("$b")
   done <<EOF

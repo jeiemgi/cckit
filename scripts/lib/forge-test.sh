@@ -51,6 +51,7 @@ case "$method $url" in
   "GET "*"/pulls?"*)            out='[{"number":30,"title":"P","state":"open","head":{"ref":"fix/1-x"},"base":{"ref":"develop"},"html_url":"https://x/pull/30"}]' ;;
   "GET "*"/pulls/30")           out='{"number":30,"title":"P","body":"b","state":"open","base":{"ref":"develop"},"head":{"ref":"fix/1-x"},"mergeable":true,"merged":false,"html_url":"https://x/pull/30"}' ;;
   "PUT "*"/pulls/30/merge")     out='{"merged":true}' ;;
+  "POST "*"/graphql")           out='{"data":{"ok":true}}' ;;
   *) code=500; out='{"message":"unexpected '"$method $url"'"}' ;;
 esac
 printf '%s\n%s' "$out" "$code"
@@ -151,8 +152,32 @@ run CCKIT_FORGE=github -- forge_api GET repos/o/r; t "github with no token is rc
 tc "$tmp/err" "no forge token" "github with no token says so"
 t "no gh subcommand ran in the github provider" "$(grep -c 'gh shim: a gh subcommand' "$tmp/err" "$CURL_LOG" | awk -F: '{s+=$2} END{print s}')" "0"
 
+# --- forge_rest: the gh api argument form ---------------------------------------------------------
+: > "$CURL_LOG"
+run "${G[@]}" -- forge_rest repos/o/r/issues/7 --jq .title; t "rest: a bare endpoint is GET, --jq applies" "$(cat "$tmp/out")" "Seven"
+tc "$CURL_LOG" "^GET https://api.test/repos/o/r/issues/7 " "rest: GET with no body"
+: > "$CURL_LOG"
+run "${G[@]}" -- forge_rest repos/o/r/issues -X POST -f title=T -f 'labels[]=a' -f 'labels[]=b' -F milestone=9 -F draft=true --jq .number; t "rest: POST fields rc" "$?" "0"
+t "rest: -f strings, -f k[] arrays, -F typed, in argument order" "$(sed -E 's/^POST [^ ]+ (.*) Authorization.*/\1/' "$CURL_LOG" | jq -c .)" '{"title":"T","labels":["a","b"],"milestone":9,"draft":true}'
+t "rest: --jq applies to the response" "$(cat "$tmp/out")" "12"
+: > "$CURL_LOG"
+run "${G[@]}" -- forge_rest repos/o/r/issues -f state=open -f per_page=100 -X GET --jq 'length'; t "rest: GET fields go to the query string" "$(grep -oE 'issues\?[^ ]*' "$CURL_LOG")" "issues?state=open&per_page=100"
+: > "$CURL_LOG"
+run "${G[@]}" -- forge_rest repos/o/r/issues/7 -f body=x; t "rest: fields with no method mean POST" "$(awk '{print $1}' "$CURL_LOG")" "POST"
+run "${G[@]}" -- forge_rest repos/o/r/issues/404; t "rest: an HTTP error is rc 1" "$?" "1"
+t "rest: an HTTP error prints nothing" "$(cat "$tmp/out")" ""
+: > "$CURL_LOG"
+run "${G[@]}" -- forge_rest repos/o/r/pulls/30 -H 'Accept: application/vnd.github.v3.diff'; t "rest: -H Accept passes through" "$(grep -c 'pulls/30' "$CURL_LOG")" "1"
+: > "$CURL_LOG"
+run "${G[@]}" -- forge_rest graphql -f query='query($o:String!,$n:Int!){x}' -F o=octo -F n=7 --jq '.data'; t "rest graphql: rc" "$?" "0"
+t "rest graphql: POST graphql with query and typed variables" "$(sed -E 's/^POST [^ ]+ (.*) Authorization.*/\1/' "$CURL_LOG" | jq -c .)" '{"query":"query($o:String!,$n:Int!){x}","variables":{"o":"octo","n":7}}'
+: > "$CURL_LOG"
+run "${G[@]}" -- forge_graphql 'mutation{y}' project=P item=I; t "forge_graphql variables" "$(sed -E 's/^POST [^ ]+ (.*) Authorization.*/\1/' "$CURL_LOG" | jq -c .variables)" '{"project":"P","item":"I"}'
+run CCKIT_FORGE=none -- forge_rest repos/o/r; t "none: forge_rest rc 1" "$?" "1"
+run CCKIT_FORGE=none -- forge_graphql 'query{x}'; t "none: forge_graphql rc 1" "$?" "1"
+
 # --- the layer is the port: no gh subcommand in forge-github.sh; forge-report leaves the layer out
-t "forge-github.sh runs no gh subcommand" "$(grep -vE '^[[:space:]]*#' "$LIB/forge-github.sh" | grep -cE '(^|[;&|({`]|\$\(|if|then|do|exec)[[:space:]]*gh (api|pr|issue|repo|auth|label)')" "0"
+t "forge-github.sh runs no gh subcommand but auth (login, refresh, token)" "$(grep -vE '^[[:space:]]*#' "$LIB/forge-github.sh" | grep -cE '(^|[;&|({`]|\$\(|if|then|do|exec)[[:space:]]*gh (api|pr|issue|repo|label|run|release)')" "0"
 t "forge-report lists the layer and keeps it out of the ratchet" \
   "$(bash "$LIB/../forge-report.sh" --files | awk '$1 ~ /scripts\/lib\/forge/ {print $1}' | sort | tr '\n' ' ')" \
   "scripts/lib/forge-github.sh scripts/lib/forge-none.sh scripts/lib/forge.sh "

@@ -2,7 +2,8 @@
 # shellcheck shell=bash
 # task-sync-test.sh — covers the dashboard layer of `cckit sync` (#383): the `--json` summary, the
 # atomic `--write` cache, `--cached [TTL]`, one `--watch` iteration, the op.start/op.done events and
-# `--plan`. Hermetic: a throwaway repo + a stubbed gh that counts its calls and fails on demand.
+# `--plan`. Hermetic: a throwaway repo + the forge shim (scripts/lib/test-forge-shim.sh), whose log
+# counts the requests and whose fixture fails on demand.
 # Run: bash scripts/task-sync-test.sh
 # errors: strict — a test runner: rc 1 on any failed assertion
 set -u
@@ -23,43 +24,48 @@ CALLS="$tmp/gh-calls"
 
 OLD20="$(date -u -v-20d +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d '20 days ago' +%Y-%m-%dT%H:%M:%SZ)"
 NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+# The issues as `GET repos/<r>/issues` answers them (REST field names).
 cat > "$tmp/issues.json" <<JSON
-[ {"number":1,"title":"lead work","labels":[{"name":"role:tech-lead"},{"name":"priority:p1"}],"milestone":{"title":"v1"},"assignees":[],"updatedAt":"$NOW","body":"plain"},
-  {"number":2,"title":"docs work","labels":[{"name":"role:docs"}],"milestone":null,"assignees":[],"updatedAt":"$OLD20","body":"Blocked by #1"},
-  {"number":3,"title":"no role","labels":[],"milestone":null,"assignees":[],"updatedAt":"$NOW","body":""} ]
+[ {"number":1,"title":"lead work","labels":[{"name":"role:tech-lead"},{"name":"priority:p1"}],"milestone":{"title":"v1"},"assignees":[],"updated_at":"$NOW","body":"plain"},
+  {"number":2,"title":"docs work","labels":[{"name":"role:docs"}],"milestone":null,"assignees":[],"updated_at":"$OLD20","body":"Blocked by #1"},
+  {"number":3,"title":"no role","labels":[],"milestone":null,"assignees":[],"updated_at":"$NOW","body":""} ]
 JSON
-# Same five PRs board-view-test.sh orders: ready(risk asc, size asc) → draft → blocked.
+# Same five PRs board-view-test.sh orders: ready(risk asc, size asc) → draft → blocked. prs.json is
+# what `GET repos/<r>/pulls` answers; prs-view.json the same PRs in the shape board_merge_queue
+# reads (REST has no reviewDecision, so sync maps it to null — the view fixture says so too).
 cat > "$tmp/prs.json" <<'JSON'
 [
- {"number":10,"title":"blocked one","labels":[{"name":"risk:low"},{"name":"size:S"},{"name":"blocked"}],"isDraft":false,"headRefName":"feat/10","reviewDecision":"APPROVED","mergeable":"MERGEABLE"},
- {"number":11,"title":"draft one","labels":[{"name":"risk:low"},{"name":"size:XS"}],"isDraft":true,"headRefName":"feat/11","reviewDecision":null,"mergeable":"MERGEABLE"},
- {"number":12,"title":"ready high risk","labels":[{"name":"risk:high"},{"name":"size:S"}],"isDraft":false,"headRefName":"claude/12","reviewDecision":"APPROVED","mergeable":"MERGEABLE"},
- {"number":13,"title":"ready low risk L","labels":[{"name":"risk:low"},{"name":"size:L"}],"isDraft":false,"headRefName":"feat/13","reviewDecision":"APPROVED","mergeable":"MERGEABLE"},
- {"number":14,"title":"ready low risk S","labels":[{"name":"risk:low"},{"name":"size:S"}],"isDraft":false,"headRefName":"feat/14","reviewDecision":"APPROVED","mergeable":"MERGEABLE"}
+ {"number":10,"title":"blocked one","labels":[{"name":"risk:low"},{"name":"size:S"},{"name":"blocked"}],"draft":false,"head":{"ref":"feat/10"},"mergeable":true},
+ {"number":11,"title":"draft one","labels":[{"name":"risk:low"},{"name":"size:XS"}],"draft":true,"head":{"ref":"feat/11"},"mergeable":true},
+ {"number":12,"title":"ready high risk","labels":[{"name":"risk:high"},{"name":"size:S"}],"draft":false,"head":{"ref":"claude/12"},"mergeable":true},
+ {"number":13,"title":"ready low risk L","labels":[{"name":"risk:low"},{"name":"size:L"}],"draft":false,"head":{"ref":"feat/13"},"mergeable":true},
+ {"number":14,"title":"ready low risk S","labels":[{"name":"risk:low"},{"name":"size:S"}],"draft":false,"head":{"ref":"feat/14"},"mergeable":true}
 ]
 JSON
+jq '[.[] | {number, title, labels, isDraft: .draft, headRefName: .head.ref, reviewDecision: null, mergeable: "MERGEABLE"}]' \
+  "$tmp/prs.json" > "$tmp/prs-view.json"
 
-# Stub gh: every call is counted; GH_FAIL=1 fails every call, GH_FAIL_PR=1 only `pr list`.
-# `issue list --label effort` is effort_plan's query (effort_open_rows parses the --json array).
-stub="$tmp/bin"; mkdir -p "$stub"
-cat > "$stub/gh" <<'SH'
-#!/usr/bin/env bash
-echo "$*" >> "$GH_CALLS"
-[ "${GH_FAIL:-0}" = 1 ] && { echo "gh: network down" >&2; exit 1; }
-case "$1 $2" in
-  "issue list")
-    case " $* " in
-      *" --label effort "*) echo '[{"number":42,"title":"[Effort] 42 · [Core] demo effort","labels":[{"name":"effort"},{"name":"flow:core"},{"name":"ctx:M"}]}]' ;;
-      *) cat "$GH_ISSUES" ;;
+# The forge shim: every request is one line in $CALLS; GH_FAIL=1 fails every call (HTTP 500),
+# GH_FAIL_PR=1 only the PR list. The open-issue list filtered on `labels=effort` is effort_plan's
+# query (effort_open_rows parses the array).
+stub="$tmp/bin"
+# shellcheck source=/dev/null
+. "$ROOT/scripts/lib/test-forge-shim.sh"; forge_shim_install "$stub"
+cat > "$tmp/fixture.sh" <<'SH'
+[ "${GH_FAIL:-0}" = 1 ] && code=500
+case "$method $ep" in
+  "GET repos/octo/fixture/issues")
+    case "$path" in
+      *labels=effort*) out='[{"number":42,"title":"[Effort] 42 · [Core] demo effort","labels":[{"name":"effort"},{"name":"flow:core"},{"name":"ctx:M"}]}]' ;;
+      *) out="$(cat "$GH_ISSUES")" ;;
     esac ;;
-  "pr list") [ "${GH_FAIL_PR:-0}" = 1 ] && { echo "gh: pr list failed" >&2; exit 1; }; cat "$GH_PRS" ;;
-  *) echo "" ;;
+  "GET repos/octo/fixture/pulls") [ "${GH_FAIL_PR:-0}" = 1 ] && code=500; out="$(cat "$GH_PRS")" ;;
 esac
 SH
-chmod +x "$stub/gh"
 
 sync() {  # run task-sync.sh against the fixture; extra env via leading VAR=val words in "$ENVV"
-  ( cd "$fix" && env KIT_CONFIG="$fix/cckit.config.json" PATH="$stub:$PATH" GH_CALLS="$CALLS" \
+  ( cd "$fix" && env KIT_CONFIG="$fix/cckit.config.json" PATH="$stub:$PATH" GH_LOG="$CALLS" \
+      GH_FIXTURE="$tmp/fixture.sh" GH_TOKEN=test-token CCKIT_FORGE=github \
       GH_ISSUES="$tmp/issues.json" GH_PRS="$tmp/prs.json" CCKIT_OUTPUT=human ${ENVV:-} \
       bash "$ROOT/scripts/task-sync.sh" "$@" )
 }
@@ -80,11 +86,14 @@ t "--json stale section" "$(printf '%s' "$doc" | jq -c '.stale')" '{"days":14,"i
 t "--json notOnBoard is null with the board off" "$(printf '%s' "$doc" | jq -r '.notOnBoard')" "null"
 # shellcheck source=/dev/null
 source "$ROOT/scripts/lib/board-view.sh"
-rendered="$(board_merge_queue "$(cat "$tmp/prs.json")" | grep -oE '#1[0-4]' | tr -d '#' | tr '\n' ' ')"
+rendered="$(board_merge_queue "$(cat "$tmp/prs-view.json")" | grep -oE '#1[0-4]' | tr -d '#' | tr '\n' ' ')"
 t "--json merge queue order matches board_merge_queue" "$(printf '%s' "$doc" | jq -r '[.mergeQueue[].number|tostring]|join(" ")') " "$rendered"
 t "--json merge queue order is ready, draft, blocked" "$(printf '%s' "$doc" | jq -r '[.mergeQueue[].number|tostring]|join(" ")')" "14 13 12 11 10"
 t "--json does not write the cache on its own" "$([ -f "$CACHE" ] && echo yes || echo no)" "no"
 t "--json applies --role" "$(sync --json --role Docs 2>/dev/null | jq -r '([.roles[].role]|join(",")) + " " + (.unassigned|length|tostring)')" "Docs 0"
+has "--json reads the open issues over REST" "$(cat "$CALLS")" "GET repos/octo/fixture/issues?state=open&per_page=100 "
+has "--json reads the open PRs over REST"    "$(cat "$CALLS")" "GET repos/octo/fixture/pulls?state=open&per_page=100 "
+t "no gh subcommand ran" "$(grep -c '^GH-SUBCOMMAND' "$CALLS")" "0"
 
 # ── (5) events: op.start + op.done for the sync ────────────────────────────────────────────────
 t "kit-events.jsonl has an op.start for sync" "$(jq -rs '[.[]|select(.type=="op.start" and .op=="sync")]|length > 0' "$EVENTS" 2>/dev/null)" "true"
@@ -99,7 +108,7 @@ t "the cache is the --json document" "$(jq -r '.mergeQueue|length' "$CACHE" 2>/d
 t "--write leaves no temp file behind" "$(find "$fix/.git" -maxdepth 1 -name 'kit-sync-cache.json.*' | wc -l | tr -d ' ')" "0"
 before="$(sum "$CACHE")"
 ENVV="GH_FAIL=1"; sync --write >/dev/null 2>&1; rc=$?
-t "--write with a failing gh exits non-zero" "$([ "$rc" -ne 0 ] && echo nz || echo z)" "nz"
+t "--write with a failing forge exits non-zero" "$([ "$rc" -ne 0 ] && echo nz || echo z)" "nz"
 t "a failing fetch leaves the cache byte-identical" "$(sum "$CACHE")" "$before"
 ENVV="GH_FAIL_PR=1"; sync --write >/dev/null 2>&1; rc=$?
 t "a partial fetch (PR list down) exits non-zero" "$([ "$rc" -ne 0 ] && echo nz || echo z)" "nz"
@@ -109,15 +118,15 @@ ENVV=""; sync --write --role Docs >/dev/null 2>&1; rc=$?
 t "--write refuses a filtered document" "$rc" "2"
 t "the refusal leaves the cache byte-identical" "$(sum "$CACHE")" "$before"
 
-# ── (3) --cached: zero gh calls inside the TTL, one refresh past it ─────────────────────────────
+# ── (3) --cached: zero forge calls inside the TTL, one refresh past it ─────────────────────────────
 rm -f "$CALLS"
 ENVV=""; out="$(sync --cached 600 2>/dev/null)"
-t "--cached inside the TTL makes zero gh calls" "$(calls)" "0"
+t "--cached inside the TTL makes zero forge calls" "$(calls)" "0"
 t "--cached serves the cache bytes" "$(printf '%s\n' "$out" | cksum)" "$before"
 # Age the cache past the TTL by rewriting its timestamp (no sleep).
 jq '.generatedEpoch = 1000' "$CACHE" > "$CACHE.aged" && mv "$CACHE.aged" "$CACHE"
 out="$(sync --cached 600 2>/dev/null)"
-t "--cached past the TTL refreshes (gh called)" "$([ "$(calls)" -gt 0 ] && echo yes || echo no)" "yes"
+t "--cached past the TTL refreshes (the forge is called)" "$([ "$(calls)" -gt 0 ] && echo yes || echo no)" "yes"
 t "the refresh rewrote the cache" "$([ "$(jq -r '.generatedEpoch' "$CACHE")" -gt 1000 ] && echo yes || echo no)" "yes"
 t "the refresh prints the fresh document" "$(printf '%s' "$out" | jq -r '.open')" "3"
 n1="$(calls)"; sync --cached 600 >/dev/null 2>&1
@@ -146,7 +155,7 @@ t "--json without --plan has no plan key" "$(printf '%s' "$doc" | jq -r 'has("pl
 
 # ── unchanged surfaces ─────────────────────────────────────────────────────────────────────────
 has "human board still renders" "$(sync 2>/dev/null)" "## Board — octo/fixture"
-t "--raw-json still returns the gh issue objects" "$(sync --raw-json 2>/dev/null | jq -r '.[0].labels[0].name')" "role:tech-lead"
+t "--raw-json still returns the issue objects" "$(sync --raw-json 2>/dev/null | jq -r '.[0].labels[0].name')" "role:tech-lead"
 has "--llm is still TOON" "$(sync --llm 2>/dev/null)" '[3]{number,title,priority,labels,milestone,assignees,blocked}:'
 ENVV=""; sync --bogus >/dev/null 2>&1; t "an unknown flag still exits 1" "$?" "1"
 

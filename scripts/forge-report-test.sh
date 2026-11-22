@@ -25,7 +25,8 @@ case "$cmd" in
   b|bee)       exec "$ROOT/scripts/local.sh" "$@" ;;
   c)           echo "nothing here" ;;
   d)           gh pr view "$1" ;;
-  e)           source "$LIB/forge.sh"; forge_issue "$@" ;;
+  e)           source "$LIB/forge.sh"; forge_issue_view "$@" ;;
+  f)           source "$LIB/clean.sh"; clean_run "$@" ;;
   help|--help) echo usage ;;
 esac
 CCKIT
@@ -45,7 +46,10 @@ git fetch origin develop
 git -C "$PWD" rev-parse HEAD
 SH
 cat > "$fx/scripts/lib/forge.sh" <<'SH'
-forge_issue() { gh api "repos/$1"; }
+forge_issue_view() { gh api "repos/$1"; }
+SH
+cat > "$fx/scripts/lib/clean.sh" <<'SH'
+clean_run() { git status; forge_available || echo "git only"; }
 SH
 cat > "$fx/scripts/lib/forge-github.sh" <<'SH'
 gh api graphql
@@ -64,8 +68,8 @@ t "common.sh counted as a file"                                    "$(row script
 t "-test.sh files are not measured"                                "$(row scripts/lib/noise-test.sh)" ""
 
 summary="$(bash "$R" --root "$fx" --summary)"
-t "summary: 7 files" "$(printf '%s\n' "$summary" | grep -oE 'files [0-9]+' | sed -n 1p)" "files 7"
-t "summary: classes add up"  "$(printf '%s\n' "$summary" | grep -oE 'gh-only [0-9]+ · git-only [0-9]+ · both [0-9]+ · neither [0-9]+')" "gh-only 5 · git-only 1 · both 1 · neither 0"
+t "summary: 8 files" "$(printf '%s\n' "$summary" | grep -oE 'files [0-9]+' | sed -n 1p)" "files 8"
+t "summary: classes add up"  "$(printf '%s\n' "$summary" | grep -oE 'gh-only [0-9]+ · git-only [0-9]+ · both [0-9]+ · neither [0-9]+')" "gh-only 5 · git-only 2 · both 1 · neither 0"
 t "ratchet leaves the forge layer out (forge.sh, forge-github.sh)" "$(bash "$R" --root "$fx" --ratchet)" "4"
 
 verbs="$(bash "$R" --root "$fx" --verbs)"
@@ -76,13 +80,14 @@ t "b: git only"                                     "$(vrow b)"   "no"
 t "bee: an alias label is its own row"              "$(vrow bee)" "no"
 t "c: nothing"                                      "$(vrow c)"   "no"
 t "d: an inline gh call in the dispatcher"          "$(vrow d)"   "yes"
-t "e: through the forge layer still needs a forge"  "$(vrow e)"   "yes"
+t "e: a call into the forge layer needs a forge"     "$(vrow e)"   "yes"
+t "f: a forge_available probe alone is git only"     "$(vrow f)"   "no"
 t "help labels are not verbs"                       "$(vrow help)" ""
-t "verb summary"  "$(printf '%s\n' "$summary" | grep -oE 'verbs [0-9]+ · needs a forge [0-9]+ · git only [0-9]+')" "verbs 6 · needs a forge 3 · git only 3"
+t "verb summary"  "$(printf '%s\n' "$summary" | grep -oE 'verbs [0-9]+ · needs a forge [0-9]+ · git only [0-9]+')" "verbs 7 · needs a forge 3 · git only 4"
 
 if command -v jq >/dev/null 2>&1; then
   j="$(bash "$R" --root "$fx" --json)"
-  t "--json parses" "$(printf '%s' "$j" | jq -r '.summary.files')" "7"
+  t "--json parses" "$(printf '%s' "$j" | jq -r '.summary.files')" "8"
   t "--json verbs carry via" "$(printf '%s' "$j" | jq -r '.verbs[] | select(.verb=="a") | .via | length')" "2"
   t "--json needs_forge is a boolean" "$(printf '%s' "$j" | jq -r '.verbs[] | select(.verb=="d") | .needs_forge')" "true"
 fi

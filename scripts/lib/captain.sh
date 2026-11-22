@@ -18,6 +18,12 @@
 # is unit-tested without the network. Requires gh + jq. bash 3.2 / zsh compatible.
 # errors: mixed — cap_* are pure; captain_gate/captain_pass propagate a gh failure
 
+# The forge port (E537): every GitHub call goes through forge_* / gh_rest_* (scripts/lib/gh-rest.sh).
+if ! command -v gh_rest_issue_json >/dev/null 2>&1; then
+  # shellcheck source=/dev/null
+  . "$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)/gh-rest.sh"
+fi
+
 CAPTAIN_REPO="${CAPTAIN_REPO:-${KIT_REPO:-}}"
 
 # State lives in the shared .cckit/ (kit-state.sh), never CWD-relative: the captain gates the whole
@@ -350,6 +356,27 @@ _cap_issue_of_branch() {
   printf '%s' "$1" | sed -nE 's#^[a-z]+/([0-9]+)-.*#\1#p'
 }
 
+# _cap_pr_json <repo> <pr> — the PR in the shape captain_gate reads (gh's --json field names), from
+# three REST reads: the pull, its files, and the head commit's check runs + statuses.
+_cap_pr_json() {
+  local repo="$1" pr="$2" p files checks statuses sha
+  p="$(forge_rest "repos/$repo/pulls/$pr")" || return 1
+  sha="$(printf '%s' "$p" | jq -r '.head.sha // ""')"
+  files="$(forge_rest "repos/$repo/pulls/$pr/files" -X GET -f per_page=100 --paginate 2>/dev/null | jq -s 'add // []' 2>/dev/null)" || files='[]'
+  checks="$(forge_rest "repos/$repo/commits/$sha/check-runs" -X GET -f per_page=100 2>/dev/null | jq '.check_runs // []' 2>/dev/null)" || checks='[]'
+  statuses="$(forge_rest "repos/$repo/commits/$sha/status" 2>/dev/null | jq '.statuses // []' 2>/dev/null)" || statuses='[]'
+  printf '%s' "$p" | jq --argjson files "${files:-[]}" --argjson checks "${checks:-[]}" --argjson statuses "${statuses:-[]}" '{
+    number, title,
+    headRefName: .head.ref, headRefOid: .head.sha,
+    mergeable: (if .mergeable == true then "MERGEABLE" elif .mergeable == false then "CONFLICTING" else "UNKNOWN" end),
+    mergeStateStatus: ((.mergeable_state // "unknown") | ascii_upcase),
+    isDraft: .draft,
+    statusCheckRollup: ([ $checks[] | {name, conclusion: (.conclusion // (if .status == "completed" then "" else .status end)), state: null} ]
+                        + [ $statuses[] | {name: .context, state, conclusion: null} ]),
+    files: [ $files[] | {path: .filename} ],
+    labels: [ .labels[]? | {name} ] }'
+}
+
 # captain_gate <pr#> — fetch + classify one PR. Echoes
 # "pr<TAB>issue<TAB>state<TAB>action<TAB>title<TAB>reason<TAB>checks<TAB>head<TAB>qa". A CLEAN PR that trips a policy
 # floor (cap_policy_floor) is downgraded to HELD/hold so the captain never auto-merges it; `reason`
@@ -357,7 +384,7 @@ _cap_issue_of_branch() {
 # PASS/NONE) — REPORTED, not re-decided, so captain_pass can say when a merge rests on NONE.
 captain_gate() {
   local repo="$CAPTAIN_REPO" pr="$1" j mergeable mss checks review qa head issue state action title branch files labels reason
-  j="$(gh pr view "$pr" --repo "$repo" --json number,title,headRefName,headRefOid,mergeable,mergeStateStatus,statusCheckRollup,files,labels 2>/dev/null)" \
+  j="$(_cap_pr_json "$repo" "$pr" 2>/dev/null)" \
     || { echo "captain: cannot read PR #$pr" >&2; return 1; }
   mergeable="$(printf '%s' "$j" | jq -r '.mergeable // "UNKNOWN"')"
   mss="$(printf '%s' "$j" | jq -r '.mergeStateStatus // "UNKNOWN"')"
@@ -398,15 +425,15 @@ captain_gate() {
 _cap_open_prs() {
   local repo="$CAPTAIN_REPO" effort="${1:-}"
   if [ -n "$effort" ]; then
-    local subs; subs="$(gh api "repos/$repo/issues/$effort/sub_issues" --paginate --jq '.[].number' 2>/dev/null | tr '\n' ' ')"
+    local subs; subs="$(forge_rest "repos/$repo/issues/$effort/sub_issues" --paginate --jq '.[].number' 2>/dev/null | tr '\n' ' ')"
     local pr br iss
-    gh pr list --repo "$repo" --state open --json number,headRefName \
-      --jq '.[] | "\(.number)\t\(.headRefName)"' 2>/dev/null | while IFS="$(printf '\t')" read -r pr br; do
+    forge_rest "repos/$repo/pulls" -X GET -f state=open -f per_page=100 \
+      --jq '.[] | "\(.number)\t\(.head.ref)"' 2>/dev/null | while IFS="$(printf '\t')" read -r pr br; do
         iss="$(_cap_issue_of_branch "$br")"
         case " $subs " in *" $iss "*) printf '%s\n' "$pr" ;; esac
       done
   else
-    gh pr list --repo "$repo" --state open --json number --jq '.[].number' 2>/dev/null
+    forge_rest "repos/$repo/pulls" -X GET -f state=open -f per_page=100 --jq '.[].number' 2>/dev/null
   fi
 }
 
@@ -414,7 +441,7 @@ _cap_open_prs() {
 # Returns the count of PRs merged this pass via the CAPTAIN_MERGED global (for the loop to detect progress).
 CAPTAIN_MERGED=0
 captain_pass() {
-  command -v gh >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 || { echo "captain: needs gh + jq" >&2; return 1; }
+  forge_need watch || return 1; command -v jq >/dev/null 2>&1 || { echo "captain: needs jq" >&2; return 1; }
   local repo="$CAPTAIN_REPO" do_merge=0 effort="" dry=0
   while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -490,7 +517,9 @@ captain_pass() {
       fi
     fi
     if [ "$action" = "merge" ] && [ "$do_merge" = "1" ] && [ "$dry" = "0" ]; then
-      if gh pr merge "$pr" --repo "$repo" --squash --delete-branch >/dev/null 2>&1; then
+      if gh_rest_pr_merge "$repo" "$pr" squash >/dev/null 2>&1; then
+        # The remote branch goes with the merge (git, not the API); kept in a cloud session (#396).
+        cckit_in_cloud || { _br="$(forge_rest "repos/$repo/pulls/$pr" --jq '.head.ref' 2>/dev/null)"; [ -n "$_br" ] && git push origin --delete "$_br" >/dev/null 2>&1 || true; }
         printf '  PR #%-4s %-14s MERGED   (#%s %s)\n' "$pr" "$state" "$issue" "$title"
         merged_any=$((merged_any + 1))
       else

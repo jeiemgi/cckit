@@ -25,6 +25,12 @@
 # "." and the sibling source below silently missed. Same defect and same fix as kit-gc.sh:38 (#219):
 # `${BASH_SOURCE[0]:-$0}` covers zsh, CDPATH='' and the redirect stop an interactive zsh echoing the
 # directory into the substitution.
+# The forge port (E537): every GitHub call goes through forge_* / gh_rest_* (scripts/lib/gh-rest.sh).
+if ! command -v gh_rest_issue_json >/dev/null 2>&1; then
+  # shellcheck source=/dev/null
+  . "$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)/gh-rest.sh"
+fi
+
 _ar_dir="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" >/dev/null 2>&1 && pwd)"
 # shellcheck source=/dev/null
 [ -n "${AP_STAGES_DEFAULT:-}" ] || . "$_ar_dir/agent-profile.sh"
@@ -69,8 +75,8 @@ ap_parent_effort_num() {
 ap_labels_fetch() {
   local repo="${1:-}" num="${2:-}"
   [ -n "$repo" ] && [ -n "$num" ] || return 0
-  command -v gh >/dev/null 2>&1 || return 0
-  gh api "repos/$repo/issues/$num" --jq '[.labels[].name] | join(",")' 2>/dev/null || true
+  forge_available || return 0
+  forge_rest "repos/$repo/issues/$num" --jq '[.labels[].name] | join(",")' 2>/dev/null || true
 }
 
 # ap_resolve <cfg> <stage> <override> <issue-labels> <parent-labels> — echo the resolved profile.
@@ -133,8 +139,8 @@ ap_resolve_source() {
 ap_pr_issue() {
   local repo="${1:-}" pr="${2:-}" br
   [ -n "$repo" ] && [ -n "$pr" ] || return 0
-  command -v gh >/dev/null 2>&1 || return 0
-  br="$(gh pr view "$pr" --repo "$repo" --json headRefName --jq '.headRefName' 2>/dev/null)" || return 0
+  forge_available || return 0
+  br="$(forge_rest "repos/$repo/pulls/$pr" --jq '.head.ref' 2>/dev/null)" || return 0
   [ -n "$br" ] || return 0
   wt_issue_number "$br"
 }
@@ -144,8 +150,8 @@ ap_pr_issue() {
 ap_issue_title() {
   local repo="${1:-}" num="${2:-}"
   [ -n "$repo" ] && [ -n "$num" ] || return 0
-  command -v gh >/dev/null 2>&1 || return 0
-  gh api "repos/$repo/issues/$num" --jq '.title // ""' 2>/dev/null || true
+  forge_available || return 0
+  forge_rest "repos/$repo/issues/$num" --jq '.title // ""' 2>/dev/null || true
 }
 
 # ap_pr_context <repo> <pr> — echo "<issue>\t<issue-labels>\t<parent-labels>", TAB-separated.

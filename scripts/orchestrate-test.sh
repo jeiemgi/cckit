@@ -2,8 +2,8 @@
 # orchestrate-test.sh — scenario A06 as a fixture: parallel workers, a blocked dependent, a cap,
 # and three distinct collected results, under both launch kinds (E257.6, #263).
 #
-# Hermetic. A real git repository with a bare origin, and four stubs on PATH:
-#   gh      serves the fixture issues and the blocked_by edge (stateful: an issue can be closed)
+# Hermetic. A real git repository with a bare origin, the forge shim, and three stubs on PATH:
+#   curl    (the forge shim) serves the fixture issues and the blocked_by edge over REST (stateful: an issue can be closed)
 #   tmux    a pane is a recorded working directory; `send-keys` runs the typed command line in it
 #           with bash, in the background — so the test executes the exact line orchestrate types
 #   claude  \_ one stub agent under two names: it writes a marker into its working directory, then
@@ -36,36 +36,29 @@ cleanup() {
 trap cleanup EXIT
 BIN="$TMP/bin"; mkdir -p "$BIN"
 
-# --- gh stub -------------------------------------------------------------------------------
-cat > "$BIN/gh" <<'STUB'
-#!/usr/bin/env bash
-# Fixture gh. $FX_STATE/closed lists closed issue numbers; issue 13 is blocked_by 11.
-set -u
-JQ=""; POS=()
-while [ "$#" -gt 0 ]; do
-  case "$1" in
-    --jq) JQ="$2"; shift 2 ;;
-    --repo|--json|--state|--limit|-f|-F) shift 2 ;;
-    --*) shift ;;
-    *) POS+=("$1"); shift ;;
-  esac
-done
-out() { if [ -n "$JQ" ]; then jq -r "$JQ"; else cat; fi; }
-case "${POS[0]:-} ${POS[1]:-}" in
-  "issue view")
-    n="${POS[2]:-}"
-    case "$n" in 11|12|13|14) ;; *) exit 1 ;; esac
-    st=OPEN; grep -qx "$n" "$FX_STATE/closed" 2>/dev/null && st=CLOSED
-    printf '{"title":"wave fixture %s","labels":[{"name":"kind:task"}],"state":"%s","number":%s,"body":""}\n' "$n" "$st" "$n" | out ;;
-  api\ *)
-    case "${POS[1]:-}" in
-      */issues/13/dependencies/blocked_by) echo '[{"number":11}]' | out ;;
-      */dependencies/blocked_by)           echo '[]' | out ;;
-      *) exit 1 ;;
+# --- the forge (E537) ------------------------------------------------------------------------
+# GitHub is the shim's `curl`, answering from this fixture: issues 11-14 (closed when listed in
+# $FX_STATE/closed), and issue 13 blocked_by 11. The shim's `gh` fails on any subcommand, so a gh
+# call left in orchestrate or wt_start turns a launch red here.
+# shellcheck source=/dev/null
+. "$ROOT/scripts/lib/test-forge-shim.sh"
+forge_shim_install "$BIN"
+export GH_TOKEN=test-token CCKIT_FORGE=github GH_FIXTURE="$TMP/fixture.sh" GH_LOG="$TMP/forge.log"
+: > "$GH_LOG"
+cat > "$GH_FIXTURE" <<'FIX'
+case "$method $ep" in
+  "GET repos/fixture/wave/issues/13/dependencies/blocked_by") out='[{"number":11}]' ;;
+  "GET repos/fixture/wave/issues/"*"/dependencies/blocked_by") out='[]' ;;
+  "GET repos/fixture/wave/issues/"*)
+    n="${ep##*/}"
+    case "$n" in
+      11|12|13|14)
+        st=open; grep -qx "$n" "$FX_STATE/closed" 2>/dev/null && st=closed
+        out="{\"number\":$n,\"title\":\"wave fixture $n\",\"labels\":[{\"name\":\"kind:task\"}],\"state\":\"$st\",\"body\":\"\",\"html_url\":\"https://github.com/fixture/wave/issues/$n\"}" ;;
+      *) out='{"message":"Not Found"}'; code=404 ;;
     esac ;;
-  *) exit 1 ;;
 esac
-STUB
+FIX
 
 # --- tmux stub -----------------------------------------------------------------------------
 cat > "$BIN/tmux" <<'STUB'
@@ -105,7 +98,7 @@ case "$(cat "$FX_STATE/behavior.$num" 2>/dev/null)" in
   *)    exit 0 ;;
 esac
 STUB
-chmod +x "$BIN/gh" "$BIN/tmux" "$BIN/agent-stub"
+chmod +x "$BIN/tmux" "$BIN/agent-stub"
 cp "$BIN/agent-stub" "$BIN/claude"; cp "$BIN/agent-stub" "$BIN/codex"
 
 wait_for() {  # wait_for <file> — up to 30s
@@ -184,6 +177,9 @@ done
 t "claude and codex results differ only in the agent field" \
   "$(cd "$TMP/claude/repo" && FX_STATE="$TMP/claude/state" PATH="$BIN:$PATH" bash "$ROOT/bin/cckit" orchestrate --results --session="a06 claude" --llm 2>/dev/null | jq -c '[.[] | {issue, result, rc, runtime}]')" \
   "$(cd "$TMP/codex/repo"  && FX_STATE="$TMP/codex/state"  PATH="$BIN:$PATH" bash "$ROOT/bin/cckit" orchestrate --results --session="a06 codex"  --llm 2>/dev/null | jq -c '[.[] | {issue, result, rc, runtime}]')"
+
+t "no gh subcommand was run in any wave: every read went over the forge" "$(grep -c '^GH-SUBCOMMAND' "$GH_LOG")" "0"
+has "the blocked_by edge was read over REST" "$(cat "$GH_LOG")" "GET repos/fixture/wave/issues/13/dependencies/blocked_by "
 
 echo ""
 [ "$fail" -eq 0 ] && echo "PASS: orchestrate A06 — worktree per writer, blocked dependent, cap, three distinct results (claude + codex)" || echo "FAILED"

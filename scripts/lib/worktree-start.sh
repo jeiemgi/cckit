@@ -16,6 +16,12 @@
 # errors: strict — rc 1 on failure; a half-made worktree is never reported as ready
 
 # The GitHub transport switch (#396): rest mode routes the gh calls below through gh-rest.sh.
+# The forge port (E537): every GitHub call goes through forge_* / gh_rest_* (scripts/lib/gh-rest.sh).
+if ! command -v gh_rest_issue_json >/dev/null 2>&1; then
+  # shellcheck source=/dev/null
+  . "$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)/gh-rest.sh"
+fi
+
 if ! command -v cckit_gh_rest >/dev/null 2>&1; then
   _ghr_lib="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)/gh-rest.sh"
   # shellcheck source=/dev/null
@@ -635,7 +641,7 @@ wt_start() {
   if cckit_gh_rest; then
     meta="$(gh_rest_issue_json "$WT_START_REPO" "$num" 2>/dev/null)" || { echo "[#$num] issue not found" >&2; return 1; }
   else
-  meta="$(gh issue view "$num" --repo "$WT_START_REPO" --json title,labels 2>/dev/null)" \
+  meta="$(gh_rest_issue_json "$WT_START_REPO" "$num" 2>/dev/null)" \
     || { echo "[#$num] issue not found" >&2; return 1; }
   fi
   title="$(echo "$meta" | jq -r '.title')"
@@ -727,7 +733,7 @@ wt_start() {
     item="$(project_find_item_by_issue "$num" 2>/dev/null)"
     if [[ -z "$item" ]]; then
       local content_id
-      content_id="$(gh api graphql -f query='query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){issue(number:$n){id}}}' \
+      content_id="$(forge_rest graphql -f query='query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){issue(number:$n){id}}}' \
         -F o="${WT_START_REPO%/*}" -F r="${WT_START_REPO#*/}" -F n="$num" --jq '.data.repository.issue.id' 2>/dev/null)"
       [[ -n "$content_id" ]] && item="$(project_add_item "$content_id" 2>/dev/null)"
     fi

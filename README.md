@@ -80,7 +80,7 @@ cd cckit && ./scripts/install.sh    # symlinks bin/cckit onto your PATH
 | Linux | ✅ native |
 | Windows | ✅ via WSL or Git Bash (not native cmd/PowerShell) |
 
-Requirements: `bash` 3.2+, `git`, `gh` (GitHub CLI) authenticated, `jq` and `perl`. `cckit doctor` checks each one.
+Requirements: `bash` 3.2+, `git`, `jq`, `perl` and `curl`; a GitHub token (`GH_TOKEN`, or a signed-in `gh`) for the verbs that write issues and pull requests. `gh` itself is optional. `cckit doctor` checks each one.
 
 ## Quick start
 
@@ -644,19 +644,19 @@ through one renderer (`cckit_render`, `scripts/lib/render.sh`), so board tables,
 status dashboard read the same in all three and print no escape codes into a pipe (`cckit render` exposes
 it for any script).
 
-### Cloud sessions
+### The forge, and cloud sessions
 
-Claude Code cloud sessions reach GitHub through a proxy that refuses GraphQL, and `gh pr` /
-`gh issue` use GraphQL. There cckit switches to REST (`gh api repos/<owner>/<repo>/…`):
+Every GitHub call is REST over `curl` with a token, through one port (`scripts/lib/forge.sh`;
+`forge.provider` in the config, `github` when a token resolves from `GH_TOKEN`, `GITHUB_TOKEN` or a
+signed-in `gh`, else `none`). No verb runs a `gh` subcommand; `gh` is the optional way to sign in.
+With no forge, a verb that needs GitHub refuses with one line naming itself, and its git steps run.
 
-- **Works:** `cckit pr`, `merge`, `close`, `new`, `effort new`, `effort pr`, `effort close`, plus
-  the issue reads behind `start` and `effort start`.
-- **Skipped:** board (Projects v2) steps, with one line on stderr: `cckit: board step skipped …`.
-  Turn on the board's built-in workflows (item closed → Done, PR merged → Done, auto-add) and the
-  card still moves. Remote branch deletion is skipped too: the proxy rejects it. Delete merged
-  branches on GitHub.
-- **Switch:** `CCKIT_GH_TRANSPORT=rest|graphql` forces a transport. Unset, it is `rest` when
-  `CLAUDE_CODE_REMOTE=true` and the `gh` subcommands otherwise.
+Claude Code cloud sessions reach GitHub through a proxy that refuses GraphQL. REST works there, so
+every lifecycle verb does; two things are skipped, each with one line on stderr:
+
+- **Board (Projects v2) steps**, GraphQL-only: `cckit: board step skipped …`. Turn on the board's
+  built-in workflows (item closed → Done, PR merged → Done, auto-add) and the card still moves.
+- **Remote branch deletion** after a merge: the proxy rejects it. Delete merged branches on GitHub.
 
 ## cckit builds cckit
 

@@ -5,7 +5,8 @@
 # blob->path map. `git worktree prune` deletes that index, orphaning the blobs (real data loss). gc
 # must (a) detect zombies + staged deltas as their own analysis bucket, (b) recover any staged delta
 # to its branch as a commit BEFORE pruning, and (c) never prune in a dry-run.
-# Hermetic: a throwaway git repo, no network/gh. Run:  bash scripts/lib/kit-gc-test.sh
+# Hermetic: a throwaway git repo and the forge shim (test-forge-shim.sh) in place of GitHub, no network.
+# Run:  bash scripts/lib/kit-gc-test.sh
 # errors: strict — a test runner: rc 1 on any failed assertion
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -69,22 +70,48 @@ t "pr index lookup finds a branch"        "$(_kit_gc_pr_for "$IDX" feat/1-a)" "P
 t "pr index lookup finds another branch"  "$(_kit_gc_pr_for "$IDX" feat/2-b)" "PR#22 OPEN"
 t "pr index lookup misses an absent branch" "$(_kit_gc_pr_for "$IDX" feat/9-z)" ""
 
-# kit_gc_analyze must issue exactly ONE `gh pr list` regardless of branch count (no per-branch N+1).
+# kit_gc_analyze must issue exactly ONE PR list read regardless of branch count (no per-branch N+1).
 git branch feat/30-x >/dev/null 2>&1; git branch feat/31-y >/dev/null 2>&1; git branch feat/32-z >/dev/null 2>&1
-stub="$tmp/ghbin"; mkdir -p "$stub"
-cat > "$stub/gh" <<'SH'
-#!/usr/bin/env bash
-echo "$*" >> "$GH_CALLS"
-case "$1 $2" in
-  "pr list") printf 'feat/30-x\tPR#30 MERGED\n' ;;
-  "issue view") echo "open" ;;
-  *) : ;;
+# The forge shim stands in for GitHub. Every section below writes ONE fixture (GH_FIXTURE), a bash
+# snippet the shim's curl sources with $method, $ep (the path without its query string) and may set
+# `out` (the JSON body) and `code`. gcfix writes it from case arms; the defaults after the arms are:
+# an issue's timeline carries no closing PR (the shim's own default would land every issue), the
+# parent lookup is a 404, issue 41 is open and every other issue closed.
+stub="$tmp/ghbin"
+# shellcheck source=/dev/null
+. "$LIB/test-forge-shim.sh"; forge_shim_install "$stub"
+export GH_TOKEN=test-token CCKIT_FORGE=github GH_FIXTURE="$tmp/gc-fixture"
+export GH_CALLS="$tmp/ghcalls" GH_LOG="$tmp/ghcalls"; : > "$GH_CALLS"
+gcfix() {
+  cat > "$GH_FIXTURE" <<FIX
+case "\$method \$ep" in
+$1
+  "GET repos/o/r/issues/"*"/timeline") out='[]' ;;
+  "GET repos/o/r/issues/"*"/parent")   code=404; out='{"message":"Not Found"}' ;;
+  "GET repos/o/r/issues/"*) n="\${ep##*/}"; case "\$n" in 41) st=open ;; *) st=closed ;; esac
+                            out="{\"number\":\$n,\"state\":\"\$st\"}" ;;
 esac
-SH
-chmod +x "$stub/gh"
-export GH_CALLS="$tmp/ghcalls"; : > "$GH_CALLS"
+FIX
+}
+# pulls_json "<branch>\tPR#<n> <STATE>" … → the REST PR list those rows describe
+pulls_json() {
+  local row b pr st j="" sep=""
+  for row in "$@"; do
+    b="${row%%	*}"; pr="${row#*	}"; st="${pr#* }"; pr="${pr%% *}"; pr="${pr#PR#}"
+    case "$st" in
+      MERGED) j="$j$sep{\"number\":$pr,\"head\":{\"ref\":\"$b\"},\"state\":\"closed\",\"merged_at\":\"2026-01-01T00:00:00Z\"}" ;;
+      *)      j="$j$sep{\"number\":$pr,\"head\":{\"ref\":\"$b\"},\"state\":\"$(printf '%s' "$st" | tr '[:upper:]' '[:lower:]')\",\"merged_at\":null}" ;;
+    esac
+    sep=","
+  done
+  printf '[%s]' "$j"
+}
+PR_LIST='^GET repos/o/r/pulls?state=all&per_page=100 '
+gcfix "  \"GET repos/o/r/pulls\") out='$(pulls_json "feat/30-x	PR#30 MERGED")' ;;"
+: > "$GH_CALLS"
 PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_analyze >/dev/null 2>&1
-t "kit_gc_analyze makes exactly ONE gh pr list call" "$(grep -c '^pr list' "$GH_CALLS")" "1"
+t "kit_gc_analyze makes exactly ONE PR list read" "$(grep -c "$PR_LIST" "$GH_CALLS")" "1"
+t "kit_gc_analyze runs no gh subcommand"          "$(grep -c '^GH-SUBCOMMAND' "$GH_CALLS")" "0"
 
 # ── the protection helper is MANDATORY (#219) ───────────────────────────────────────────────────
 # With worktree-issue.sh absent, `wt_protected_reason` is undefined and every issue-open check would
@@ -111,18 +138,7 @@ git branch task/41-open    >/dev/null 2>&1
 git checkout -q -b task/42-orphan
 echo "only here" > orphan.txt; git add orphan.txt; git commit -qm "orphan work"
 git checkout -q "$init_branch"
-cat > "$stub/gh" <<'SH'
-#!/usr/bin/env bash
-echo "$*" >> "$GH_CALLS"
-case "$1 $2" in
-  "pr list")   printf 'task/40-merged\tPR#40 MERGED\n' ;;
-  "issue view")
-    for a in "$@"; do case "$a" in 41) echo open; exit 0 ;; esac; done
-    echo closed ;;
-  *) : ;;
-esac
-SH
-chmod +x "$stub/gh"
+gcfix "  \"GET repos/o/r/pulls\") out='$(pulls_json "task/40-merged	PR#40 MERGED")' ;;"
 
 plan="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_cleanup 2>&1)"
 has "cleanup prints a plan"                    "$plan" "# cleanup plan"
@@ -199,15 +215,7 @@ t "_kit_gc_remote_ahead sees remote-only history" "$(_kit_gc_remote_ahead task/4
 t "_kit_gc_has_unpushed clears it (local ⊆ remote)" "$(_kit_gc_has_unpushed task/44-behind && echo yes || echo no)" "no"
 
 # End to end: a MERGED PR on a branch with unpushed commits must survive --yes.
-cat > "$stub/gh" <<'SH'
-#!/usr/bin/env bash
-case "$1 $2" in
-  "pr list")    printf 'task/43-ahead\tPR#43 MERGED\n' ;;
-  "issue view") echo closed ;;
-  *) : ;;
-esac
-SH
-chmod +x "$stub/gh"
+gcfix "  \"GET repos/o/r/pulls\") out='$(pulls_json "task/43-ahead	PR#43 MERGED")' ;;"
 out="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_prune --yes 2>&1)"
 t   "merged-but-ahead branch survives prune --yes" "$(git branch --list task/43-ahead | wc -l | tr -d ' ')" "1"
 has "prune says why it skipped it"                 "$out" "unpushed commits"
@@ -249,17 +257,7 @@ echo "agent two" > ../agentwt2/agent2.txt; git -C ../agentwt2 add agent2.txt; gi
 git checkout -q worktree-agent-def456 -- agent2.txt; git commit -qm "feat: squash of agent two"
 echo "uncommitted" > ../agentwt2/scratch.txt
 
-cat > "$stub/gh" <<'SH'
-#!/usr/bin/env bash
-case "$1 $2" in
-  "pr list")    printf 'effort/50-thing\tPR#55 MERGED\n' ;;
-  "issue view")
-    for a in "$@"; do case "$a" in 41) echo open; exit 0 ;; esac; done
-    echo closed ;;
-  *) : ;;
-esac
-SH
-chmod +x "$stub/gh"
+gcfix "  \"GET repos/o/r/pulls\") out='$(pulls_json "effort/50-thing	PR#55 MERGED")' ;;"
 
 analysis="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_analyze 2>/dev/null)"
 row() { printf '%s\n' "$analysis" | awk -v b="$1" '$1==b && $2=="->" && !hit {sub(/^  [^ ]+ -> /, ""); print; hit=1}'; }
@@ -317,32 +315,23 @@ echo "agent old" > agentold.txt; git add agentold.txt; git commit -qm "feat: age
 git checkout -q "$init_branch"
 git checkout -q worktree-agent-old777 -- agentold.txt; git commit -qm "squash of the agent's part"
 echo "changed again" > agentold.txt; git add agentold.txt; git commit -qm "later change on base"
-cat > "$stub/gh" <<'SH'
-#!/usr/bin/env bash
-echo "$*" >> "$GH_CALLS"
-case "$1 $2" in
-  "pr list") printf 'effort/50-thing\tPR#55 MERGED\n' ;;      # nothing for #60: scrolled out
-  "issue view")
-    case "$*" in
-      *closedByPullRequestsReferences*) for a in "$@"; do case "$a" in 60) echo 61; exit 0 ;; esac; done ;;
-      *) echo closed ;;
-    esac ;;
-  "pr view") for a in "$@"; do case "$a" in 61) echo MERGED; exit 0 ;; esac; done; echo CLOSED ;;
-  *) : ;;
-esac
-SH
-chmod +x "$stub/gh"
+# REST has no closedByPullRequestsReferences: the closing PR is the merged cross-reference in the
+# issue's timeline whose body closes #60 (gh_rest_issue_closing_prs). The timeline also carries an
+# OPEN PR 62 that says "Closes #60" — a PR that is not merged lands nothing, so PR#61 must be the one
+# named (the MERGED confirmation the old `pr view 61` made, now read off the same timeline entry).
+gcfix "  \"GET repos/o/r/pulls\") out='$(pulls_json "effort/50-thing	PR#55 MERGED")' ;;
+  \"GET repos/o/r/issues/60/timeline\") out='[{\"event\":\"cross-referenced\",\"source\":{\"issue\":{\"number\":62,\"body\":\"Closes #60\",\"repository_url\":\"https://api.github.com/repos/o/r\",\"pull_request\":{\"merged_at\":null}}}},{\"event\":\"cross-referenced\",\"source\":{\"issue\":{\"number\":61,\"body\":\"Closes #60\",\"repository_url\":\"https://api.github.com/repos/o/r\",\"pull_request\":{\"merged_at\":\"2026-01-01T00:00:00Z\"}}}}]' ;;"
 : > "$GH_CALLS"
 analysis="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_analyze 2>/dev/null)"
 has "sub landed via the issue's closing PR"        "$(row sub/60a-old)"            "LANDED (issue #60 closed by merged PR#61)"
 has "agent branch with [#60] subject landed too"   "$(row worktree-agent-old777)"  "LANDED (agent worktree; issue #60 closed by merged PR#61)"
 t   "the closedBy lookup ran ONCE for #60 across both branches" \
-    "$(grep -c 'issue view 60 .*closedByPullRequestsReferences' "$GH_CALLS")" "1"
-t   "the PR state was confirmed ONCE" "$(grep -c '^pr view 61' "$GH_CALLS")" "1"
+    "$(grep -c '^GET repos/o/r/issues/60/timeline' "$GH_CALLS")" "1"
+t   "the merged state came from the timeline, not a PR read" "$(grep -c 'repos/o/r/pulls/6[12] ' "$GH_CALLS")" "0"
 # A fresh run must not trust the previous run's cache (the issue could have been reopened).
 : > "$GH_CALLS"
 PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_prune >/dev/null 2>&1
-t   "a new run looks the issue up again" "$(grep -c 'issue view 60 .*closedByPullRequestsReferences' "$GH_CALLS")" "1"
+t   "a new run looks the issue up again" "$(grep -c '^GET repos/o/r/issues/60/timeline' "$GH_CALLS")" "1"
 
 # ── `(#N)` subjects + a sub-issue closed through its parent's PR ──────────────────────────────
 # Measured on a consuming repo: agent branches whose subjects end in `(#N)` — GitHub's own trailing ref,
@@ -357,30 +346,16 @@ echo "changed again" > onto.txt; git add onto.txt; git commit -qm "later change 
 git checkout -q -b effort/80-not-planned
 echo "abandoned" > np.txt; git add np.txt; git commit -qm "[Effort 80] 1 · never landed"
 git checkout -q "$init_branch"
-cat > "$stub/gh" <<'SH'
-#!/usr/bin/env bash
-echo "$*" >> "$GH_CALLS"
-case "$1 $2" in
-  "pr list") printf 'effort/50-thing\tPR#55 MERGED\n' ;;
-  "issue view")
-    case "$*" in
-      *closedByPullRequestsReferences*) for a in "$@"; do case "$a" in 75) echo 76; exit 0 ;; esac; done ;;  # 70, 80: nothing
-      *) echo closed ;;
-    esac ;;
-  "pr view") for a in "$@"; do case "$a" in 76) echo MERGED; exit 0 ;; esac; done; echo CLOSED ;;
-  "api repos/o/r/issues/70/parent") echo 75 ;;
-  "api repos/o/r/issues/80/parent") echo "gh: Not Found (HTTP 404)" >&2; exit 1 ;;
-  *) : ;;
-esac
-SH
-chmod +x "$stub/gh"
+gcfix "  \"GET repos/o/r/pulls\") out='$(pulls_json "effort/50-thing	PR#55 MERGED")' ;;
+  \"GET repos/o/r/issues/75/timeline\") out='[{\"event\":\"cross-referenced\",\"source\":{\"issue\":{\"number\":76,\"body\":\"Closes #75\",\"repository_url\":\"https://api.github.com/repos/o/r\",\"pull_request\":{\"merged_at\":\"2026-01-01T00:00:00Z\"}}}}]' ;;
+  \"GET repos/o/r/issues/70/parent\") out='{\"number\":75}' ;;"
 : > "$GH_CALLS"
 analysis="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_analyze 2>/dev/null)"
 has "(#N) subject lands through the parent's merged PR" "$(row worktree-agent-sub70)" \
     "LANDED (agent worktree; issue #70 closed, parent #75 closed by merged PR#76)"
 has "closed NOT_PLANNED with no PR and no parent stays ORPHAN" "$(row effort/80-not-planned)" "ORPHAN"
-t   "the parent was climbed once for #70" "$(grep -c '^api repos/o/r/issues/70/parent' "$GH_CALLS")" "1"
-t   "the parent lookup for #80 ran once and was cached as a miss" "$(grep -c '^api repos/o/r/issues/80/parent' "$GH_CALLS")" "1"
+t   "the parent was climbed once for #70" "$(grep -c '^GET repos/o/r/issues/70/parent ' "$GH_CALLS")" "1"
+t   "the parent lookup for #80 ran once and was cached as a miss" "$(grep -c '^GET repos/o/r/issues/80/parent ' "$GH_CALLS")" "1"
 applied="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_prune --yes --only '^(worktree-agent-sub70|effort/80-)' 2>&1)"
 t   "--yes deleted the parent-landed agent branch" "$(git branch --list worktree-agent-sub70 | wc -l | tr -d ' ')" "0"
 t   "--yes KEPT the not-planned effort branch"     "$(git branch --list effort/80-not-planned | wc -l | tr -d ' ')" "1"
@@ -486,20 +461,18 @@ echo base > base.txt; git add base.txt; git commit -q -m init
 export KIT_BASE_BRANCH=main
 git branch task/41-fresh
 git checkout -q -b task/42-work; echo w > w.txt; git add w.txt; git commit -q -m "work"; git checkout -q "$KIT_BASE_BRANCH"
-ghfail() {   # ghfail <case-arms> — a gh that answers the given arms and FAILS everything else
-  cat > "$stub/gh" <<SH
-#!/usr/bin/env bash
-case "\$1 \$2" in
+ghfail() {   # ghfail <case-arms> — a forge that answers the given arms and FAILS everything else (403)
+  cat > "$GH_FIXTURE" <<FIX
+case "\$method \$ep" in
 $1
-  *) echo "GraphQL: API rate limit exceeded" >&2; exit 1 ;;
+  *) code=403; out='{"message":"API rate limit exceeded"}' ;;
 esac
-SH
-  chmod +x "$stub/gh"
+FIX
 }
-for transport in graphql rest; do
-  export CCKIT_GH_TRANSPORT="$transport"
+# REST over the forge is the one transport (E537.3): the graphql/rest pair of #396 is one pass now.
+transport=rest
   # (b) the PR list read fails; the issue-state read answers `closed`.
-  ghfail '  "issue view"|"api repos/o/r/issues/41"|"api repos/o/r/issues/42") echo closed ;;'
+  ghfail '  "GET repos/o/r/issues/41"|"GET repos/o/r/issues/42") out='"'"'{"state":"closed"}'"'"' ;;'
   analysis="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_analyze 2>"$tmp/outage.err")"
   has   "$transport: PR list failed -> could not determine" "$(row task/42-work)" "UNKNOWN (could not determine"
   lacks "$transport: PR list failed -> never 'no PR'"       "$(row task/42-work)" "no PR"
@@ -526,35 +499,43 @@ for transport in graphql rest; do
   t     "$transport: cleanup plan counts no LANDED"            "$(printf '%s\n' "$plan" | awk '/^  LANDED branches/{print $3}')" "0"
 
   # (e) only the issue-state read fails; the PR list answers, and it is empty.
-  ghfail '  "pr list"|"api repos/o/r/pulls") : ;;'
+  ghfail '  "GET repos/o/r/pulls") out='"'"'[]'"'"' ;;'
   analysis="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_analyze 2>/dev/null)"
   has   "$transport: issue read failed, PR list ok -> 41 is UNKNOWN" "$(row task/41-fresh)" "state read for issue #41 failed"
 
-  # (d) the verbs' JSON stays valid JSON with the failing gh, and carries the count.
+  # (d) the verbs' JSON stays valid JSON with the failing forge, and carries the count.
   if command -v jq >/dev/null 2>&1; then
     ghfail ''
     js="$(PATH="$stub:$PATH" KIT_REPO="o/r" KIT_GC_REPO="o/r" "$ROOT/bin/cckit" gc --llm 2>/dev/null)"
-    t "$transport: cckit gc --llm is valid JSON with gh failing" "$(printf '%s' "$js" | jq -r 'type' 2>/dev/null)" "object"
+    t "$transport: cckit gc --llm is valid JSON with the forge failing" "$(printf '%s' "$js" | jq -r 'type' 2>/dev/null)" "object"
     t "$transport: cckit gc --llm counts the unknown rows"       "$(printf '%s' "$js" | jq -r '.unknown' 2>/dev/null)" "2"
     t "$transport: cckit gc --llm reports no orphan"             "$(printf '%s' "$js" | jq -r '.orphan' 2>/dev/null)" "0"
     js="$(PATH="$stub:$PATH" KIT_REPO="o/r" KIT_GC_REPO="o/r" "$ROOT/bin/cckit" cleanup --llm 2>/dev/null)"
     t "$transport: cckit cleanup --llm counts the unknown rows"  "$(printf '%s' "$js" | jq -r '.unknown' 2>/dev/null)" "2"
   fi
-done
-unset CCKIT_GH_TRANSPORT
 
-# A definite answer still classifies as before: gh says "no such issue" for #41 (404 / GraphQL
-# not-found) and returns an empty PR list — the branch is LANDED by content, not UNKNOWN.
-cat > "$stub/gh" <<'SH'
-#!/usr/bin/env bash
-case "$1 $2" in
-  "pr list") : ;;
-  "issue view") echo "GraphQL: Could not resolve to an Issue with the number of 41. (repository.issue)" >&2; exit 1 ;;
-  *) exit 1 ;;
+  # (f) no forge at all: the PR list and the issue states are all "could not determine", nothing is
+  #     prunable, and nothing is asked of the network.
+  : > "$GH_CALLS"
+  analysis="$(unset _FORGE_LOADED; PATH="$stub:$PATH" CCKIT_FORGE=none KIT_GC_REPO="o/r" kit_gc_analyze 2>/dev/null)"
+  has   "no forge -> 41 is UNKNOWN" "$(row task/41-fresh)" "UNKNOWN (could not determine"
+  has   "no forge -> 42 is UNKNOWN" "$(row task/42-work)"  "UNKNOWN (could not determine"
+  t     "no forge -> nothing is prunable" \
+        "$(unset _FORGE_LOADED; PATH="$stub:$PATH" CCKIT_FORGE=none KIT_GC_REPO="o/r" kit_gc_has_prunable && echo yes || echo no)" "no"
+  t     "no forge -> no request was made" "$(wc -l < "$GH_CALLS" | tr -d ' ')" "0"
+  t     "no forge -> the merged-PR lookup answers nothing" "$(unset _FORGE_LOADED; CCKIT_FORGE=none _kit_gc_issue_merged_pr 41 o/r)" ""
+unset _FORGE_LOADED
+
+# A definite answer still classifies as before: GitHub says "no such issue" for #41 (404) and
+# returns an empty PR list — the branch is LANDED by content, not UNKNOWN.
+cat > "$GH_FIXTURE" <<'FIX'
+case "$method $ep" in
+  "GET repos/o/r/pulls") out='[]' ;;
+  "GET repos/o/r/issues/41") code=404; out='{"message":"Not Found"}' ;;
+  *) code=403; out='{"message":"API rate limit exceeded"}' ;;
 esac
-SH
-chmod +x "$stub/gh"
-analysis="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" CCKIT_GH_TRANSPORT=graphql kit_gc_analyze 2>/dev/null)"
+FIX
+analysis="$(PATH="$stub:$PATH" KIT_GC_REPO="o/r" kit_gc_analyze 2>/dev/null)"
 has "an absent issue is not a failed read: 41 is LANDED" "$(row task/41-fresh)" "LANDED (ancestor of"
 unset KIT_BASE_BRANCH
 

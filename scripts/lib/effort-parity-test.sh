@@ -7,7 +7,7 @@
 #   - the ctx/kind/priority/role/flow label set is applied to the parent
 #   - sub-issues carry kind/priority/role labels and are native-linked
 #   - every sub title is linted UP FRONT (a bad sub name aborts before anything is created)
-# Hermetic: stubs gh (no network/auth). Run:  bash scripts/lib/effort-parity-test.sh
+# Hermetic: the forge shim answers over a curl stand-in. Run:  bash scripts/lib/effort-parity-test.sh
 # errors: strict — a test runner: rc 1 on any failed assertion
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -21,27 +21,15 @@ command -v jq  >/dev/null 2>&1 || { echo "effort-parity-test: jq required"  >&2;
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 export GH_LOG="$tmp/gh.log"; export GH_N="$tmp/n"; : > "$GH_LOG"
 
-# Stub gh: log every call as ONE physical line (newlines in the multi-line --body flattened to spaces
-# so a single-line grep can see --label, which follows --body), return canned output.
-stub="$tmp/bin"; mkdir -p "$stub"
-cat > "$stub/gh" <<'SH'
-#!/usr/bin/env bash
-echo "$*" | tr '\n' ' ' >> "$GH_LOG"; echo >> "$GH_LOG"
-case "$1 $2" in
-  "issue create")  n=$(( $(cat "$GH_N" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$GH_N"
-                   echo "https://github.com/o/r/issues/$n" ;;
-  "issue edit")    exit 0 ;;
-  "api "*|"api")
-    case "$*" in
-      *"--method POST"*"/sub_issues"*) exit 0 ;;
-      *".id"*) echo "55501" ;;
-      *) exit 0 ;;
-    esac ;;
-  *) exit 0 ;;
-esac
-SH
-chmod +x "$stub/gh"
-export PATH="$stub:$PATH"
+# The forge shim (test-forge-shim.sh): a `curl` that answers like the REST API and logs ONE line
+# per request — `METHOD path {compact-json}` — so a single-line grep sees the title, the body and
+# the labels of one POST together; plus a `gh` that fails on any subcommand.
+stub="$tmp/bin"
+# shellcheck source=/dev/null
+. "$LIB/test-forge-shim.sh"; forge_shim_install "$stub"
+export PATH="$stub:$PATH" GH_TOKEN=test-token CCKIT_FORGE=github
+printf '0' > "$GH_N"   # the first created issue is #1
+CREATE_RE='^POST repos/o/r/issues '
 export KIT_REPO="o/r" EFFORT_REPO="o/r" KIT_BASE_BRANCH="main" KIT_PROJECTS_V2="false"
 # shellcheck source=/dev/null
 source "$LIB/effort.sh" 2>/dev/null
@@ -61,8 +49,9 @@ parent="$(effort_new \
   "demo parity effort" "share core :: factor the logic" "fill the body :: verb wiring")"
 
 t  "core returns the parent number"               "$parent" "1"
-t  "core creates parent + 2 subs (3 issues)"      "$(grep -c 'issue create' "$GH_LOG")" "3"
-t  "core links 2 native sub-issues"               "$(grep -c 'method POST .*sub_issues' "$GH_LOG")" "2"
+t  "core creates parent + 2 subs (3 issues)"      "$(grep -cE "$CREATE_RE" "$GH_LOG")" "3"
+t  "core links 2 native sub-issues"               "$(grep -c '^POST repos/o/r/issues/1/sub_issues ' "$GH_LOG")" "2"
+t  "core ran no gh subcommand"                    "$(grep -c '^GH-SUBCOMMAND' "$GH_LOG")" "0"
 
 # Body is FILLED — every section heading present AND the placeholder comments are gone.
 tc "$GH_LOG" 'Close the parity gap between the verb' "body fills ## Goal"
@@ -74,13 +63,13 @@ tn "$GH_LOG" '<!--'                                  "no template placeholder le
 # Label set on the parent: effort + ctx + kind + priority + role + flow (flow lowercased).
 # `effort` leads: it is the one `effort_plan` queries, and it was read by that verb while nothing
 # wrote it — so `cckit effort plan` answered "no open efforts found" on every repo.
-tc "$GH_LOG" 'issue create .*--label effort,ctx:[SMLX]+,kind:task,priority:p2,role:tech-lead,flow:core' \
+tc "$GH_LOG" '^POST repos/o/r/issues \{"title":"\[Effort\] · .*"labels":\["effort","ctx:[SMLX]+","kind:task","priority:p2","role:tech-lead","flow:core"\]' \
    "parent carries effort/ctx/kind/priority/role/flow labels"
 # Flow tag on the composed title.
-tc "$GH_LOG" 'issue edit 1 .*--title \[Effort\] 1 · \[Core\] demo parity effort' \
+tc "$GH_LOG" '^PATCH repos/o/r/issues/1 \{"title":"\[Effort\] 1 · \[Core\] demo parity effort"\}$' \
    "parent title carries the [Core] flow tag + injected number"
 # Sub labels: kind/priority/role (no ctx/flow on subs — those are parent-level).
-tc "$GH_LOG" 'issue create .*--title \[Effort 1\] 1 · share core.*--label kind:task,priority:p2,role:tech-lead' \
+tc "$GH_LOG" '^POST repos/o/r/issues \{"title":"\[Effort 1\] 1 · share core".*"labels":\["kind:task","priority:p2","role:tech-lead"\]' \
    "sub #1 carries kind/priority/role labels + a proper [Effort N] M title"
 
 # ── A bad sub title aborts the whole op BEFORE anything is created (parity contract) ─────────────
@@ -88,7 +77,7 @@ tc "$GH_LOG" 'issue create .*--title \[Effort 1\] 1 · share core.*--label kind:
 effort_new --role tech-lead --goal G --scope S --for-agents A --verification V \
   "clean parent name" "refactor the whole wiring layer thing now" >/dev/null 2>&1 && rc=0 || rc=1
 t  "core rejects a bad sub title"                 "$rc" "1"
-t  "core creates nothing on a bad sub title"      "$(grep -c 'issue create' "$GH_LOG")" "0"
+t  "core creates nothing on a bad sub title"      "$(grep -cE "$CREATE_RE" "$GH_LOG")" "0"
 
 # ── A bare verb-style call (no body flags) still yields the 4-section scaffold ───────────────────
 : > "$GH_LOG"; printf '0' > "$GH_N"
@@ -125,13 +114,13 @@ effort_pr_title_check "[#7] anything" 2>/dev/null; t "check accepts any [#N] whe
 # ── #277: --kind picks the kind: label (parent + subs) from the closed set; --par is gone ──────────
 : > "$GH_LOG"; printf '0' > "$GH_N"
 effort_new --flow Core --kind fix "kind fix effort" "a :: x" >/dev/null 2>&1
-tc "$GH_LOG" 'issue create .*--title \[Effort\] · .*--label effort,ctx:[SMLX]+,kind:fix,' "--kind fix labels the parent kind:fix"
-tc "$GH_LOG" 'issue create .*--title \[Effort 1\] 1 · a.*--label kind:fix,'              "--kind fix labels every sub kind:fix"
-tc "$GH_LOG" 'label create kind:fix'                                                      "--kind ensures the kind label exists"
+tc "$GH_LOG" '^POST repos/o/r/issues \{"title":"\[Effort\] · .*"labels":\["effort","ctx:[SMLX]+","kind:fix",' "--kind fix labels the parent kind:fix"
+tc "$GH_LOG" '^POST repos/o/r/issues \{"title":"\[Effort 1\] 1 · a".*"labels":\["kind:fix",'              "--kind fix labels every sub kind:fix"
+tc "$GH_LOG" '^POST repos/o/r/labels \{"name":"kind:fix"'                                                   "--kind ensures the kind label exists"
 tn "$GH_LOG" 'kind:task'                                                                  "--kind fix leaves no kind:task behind"
 : > "$GH_LOG"; printf '0' > "$GH_N"
 effort_new --kind=chore "kind chore effort" >/dev/null 2>&1
-tc "$GH_LOG" 'issue create .*--label effort,ctx:[SMLX]+,kind:chore,' "--kind=chore (equals form) is accepted"
+tc "$GH_LOG" '^POST repos/o/r/issues \{.*"labels":\["effort","ctx:[SMLX]+","kind:chore",' "--kind=chore (equals form) is accepted"
 for k in $KIT_KINDS; do
   : > "$GH_LOG"; printf '0' > "$GH_N"
   effort_new --kind "$k" "kind vocabulary effort" >/dev/null 2>&1 && rc=0 || rc=1
@@ -141,13 +130,13 @@ for k in $KIT_CONTENT_KINDS; do
   : > "$GH_LOG"; printf '0' > "$GH_N"
   effort_new --kind "$k" "content kind effort" >/dev/null 2>&1 && rc=0 || rc=1
   t "--kind $k (content kind) is accepted" "$rc" "0"
-  tc "$GH_LOG" "issue create .*--label effort,ctx:[SMLX]+,kind:$k," "--kind $k labels the parent kind:$k"
+  tc "$GH_LOG" "^POST repos/o/r/issues \\{.*\"labels\":\\[\"effort\",\"ctx:[SMLX]+\",\"kind:$k\"," "--kind $k labels the parent kind:$k"
 done
 t  "effort_pr_title: a content kind titles as docs" "$(effort_pr_title 115 'spring launch' 'kind:campaign')" "docs: spring launch [#115]"
 : > "$GH_LOG"; printf '0' > "$GH_N"
 err="$(effort_new --kind bug "bad kind effort" 2>&1 >/dev/null)" && rc=0 || rc=1
 t  "--kind rejects a value outside the closed set"   "$rc" "1"
-t  "--kind creates nothing on a bad value"           "$(grep -c 'issue create' "$GH_LOG")" "0"
+t  "--kind creates nothing on a bad value"           "$(grep -cE "$CREATE_RE" "$GH_LOG")" "0"
 t  "the refusal lists the accepted set"              "$(printf '%s' "$err" | grep -c "must be one of: $KIT_KINDS")" "1"
 : > "$GH_LOG"; printf '0' > "$GH_N"
 effort_new --par wide "parallel wide effort" >/dev/null 2>&1 && rc=0 || rc=1
@@ -158,10 +147,10 @@ t  "nothing in effort-ops.sh writes a par: label"    "$(grep -c 'par:' "$LIB/eff
 # ── #121: flags are position-INDEPENDENT — trailing --flow/--role no longer become junk sub-issues ─
 : > "$GH_LOG"; printf '0' > "$GH_N"
 effort_new "flags after title effort" "real sub :: desc" --flow Docs --role docs >/dev/null 2>&1
-t  "trailing flags do NOT create junk subs (parent + 1 real sub)" "$(grep -c 'issue create' "$GH_LOG")" "2"
-tc "$GH_LOG" 'issue create .*--label [^ ]*,flow:docs'  "trailing --flow is honored (flow:docs label)"
-tc "$GH_LOG" 'issue create .*--title \[Effort 1\] 1 · real sub' "the one real sub is created from the positional"
-tn "$GH_LOG" 'issue create .*--title \[Effort 1\] [0-9]+ · --flow' "no '--flow' junk sub-issue created"
+t  "trailing flags do NOT create junk subs (parent + 1 real sub)" "$(grep -cE "$CREATE_RE" "$GH_LOG")" "2"
+tc "$GH_LOG" '^POST repos/o/r/issues \{.*"labels":\[[^]]*"flow:docs"\]'  "trailing --flow is honored (flow:docs label)"
+tc "$GH_LOG" '^POST repos/o/r/issues \{"title":"\[Effort 1\] 1 · real sub"' "the one real sub is created from the positional"
+tn "$GH_LOG" '^POST repos/o/r/issues \{"title":"\[Effort 1\] [0-9]+ · --flow' "no '--flow' junk sub-issue created"
 
 [ "$fail" -eq 0 ] && echo "ALL OK (effort-parity)" || echo "effort-parity: FAILURES"
 exit "$fail"

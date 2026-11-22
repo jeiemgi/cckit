@@ -13,10 +13,16 @@
 # Requires gh + jq (via the plan machine). bash 3.2 / zsh compatible.
 # errors: strict — refuses to recommend an issue without gh + jq
 
+# The forge port (E537): every GitHub call goes through forge_* / gh_rest_* (scripts/lib/gh-rest.sh).
+if ! command -v gh_rest_issue_json >/dev/null 2>&1; then
+  # shellcheck source=/dev/null
+  . "$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)/gh-rest.sh"
+fi
+
 NEXT_REPO="${NEXT_REPO:-${KIT_REPO:-}}"
 
 next_issue() {
-  command -v gh >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 || { echo "next: needs gh + jq" >&2; return 1; }
+  forge_need next || return 1; command -v jq >/dev/null 2>&1 || { echo "next: needs jq" >&2; return 1; }
   local repo="$NEXT_REPO" out="${CCKIT_OUTPUT:-human}" effort="" planargs=()
   while [ "$#" -gt 0 ]; do
     case "$1" in

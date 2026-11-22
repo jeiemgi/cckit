@@ -12,8 +12,10 @@ when an agent rediscovers something it should have been handed, add it here.
 - Build/dep tooling: the CLI is bash with **no root dependencies** — there is no build step and no
   root lockfile (`/pnpm-lock.yaml` is gitignored as a stray artifact). `docs-site/` is the one
   installable package (Astro/Starlight, pnpm, `docs-site/pnpm-lock.yaml`).
-- **Secrets by NAME, never value** — no API-token env var is read anywhere in `bin/` or `scripts/`;
-  every GitHub call goes through the authenticated `gh` CLI. The one token in the repo is
+- **Secrets by NAME, never value** — no token value is written anywhere in `bin/` or `scripts/`;
+  every GitHub call goes through the forge port (`scripts/lib/forge.sh`, REST over `curl`), whose
+  token is read at run time from `GH_TOKEN`, `GITHUB_TOKEN` or a signed-in `gh`, never from a file
+  in the repo. No verb runs a `gh` subcommand. The one token in the repo is
   `GH_TOKEN` in `.github/workflows/release-please.yml`, fed from the `HOMEBREW_TAP_TOKEN` secret
   for the Homebrew tap push.
 - Config lives in **`cckit.config.json` at the repo root**, not `.claude/kit.config.json` — cckit is

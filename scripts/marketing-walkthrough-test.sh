@@ -17,7 +17,7 @@
 #   8. no shipped command, skill or template holds an absolute home-directory path.
 # (4 and 5 — the instruction file and the plain-language rule — are in init-content-test.sh.)
 #
-# Hermetic: HOME is a temp dir, `gh` is a stub that logs every call, "GitHub" is a bare repository
+# Hermetic: HOME is a temp dir, the forge shim logs every REST request, "GitHub" is a bare repository
 # in the temp dir. No network, no real repository.
 # Run:  bash scripts/marketing-walkthrough-test.sh
 # errors: strict — a test runner: rc 1 on any failed assertion
@@ -39,39 +39,33 @@ tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 tmp="$(cd "$tmp" && pwd -P)"
 export HOME="$tmp/home"; mkdir -p "$HOME"
 printf '[user]\n\tname = Test Person\n\temail = test@example.com\n' > "$HOME/.gitconfig"
-export GH_LOG="$tmp/gh.log"; : > "$GH_LOG"
+export GH_LOG="$tmp/forge.log"; : > "$GH_LOG"
 
+# The forge (E537): GitHub is the shim's `curl`, which logs every REST request to $GH_LOG and
+# answers "nothing there yet" for reads and success for writes; this fixture adds the pull request
+# the walkthrough opens. The shim's `gh` fails on any subcommand.
 mkdir -p "$tmp/stubs"
-cat > "$tmp/stubs/gh" <<'STUB'
-#!/usr/bin/env bash
-# Logs every call. Reads answer "nothing there yet"; writes succeed.
-printf '%s\n' "$*" >> "$GH_LOG"
-case "${1:-} ${2:-}" in
-  "auth status") exit 0 ;;
-  "config get") echo https; exit 0 ;;
-  "api user") echo tester; exit 0 ;;
-  "repo view") exit 1 ;;
-  "label list") exit 0 ;;
-  "label create") exit 0 ;;
-  "pr list") exit 0 ;;
-  "pr create") echo "https://github.com/tester/site/pull/1"; exit 0 ;;
-  "issue list") echo '[]'; exit 0 ;;
-  "api graphql") exit 1 ;;
+# shellcheck source=/dev/null
+. "$ROOT/scripts/lib/test-forge-shim.sh"
+forge_shim_install "$tmp/stubs"
+export GH_TOKEN=test-token CCKIT_FORGE=github GH_FIXTURE="$tmp/fixture.sh"
+cat > "$GH_FIXTURE" <<'FIX'
+case "$method $ep" in
+  "GET user")                          out='{"login":"tester","type":"User"}' ;;
+  "GET repos/"*"/pulls")               out='[]' ;;
+  "POST repos/"*"/pulls")              out='{"number":1,"html_url":"https://github.com/tester/site/pull/1","user":{"login":"tester"},"node_id":"PR_1"}' ;;
+  "GET repos/"*"/issues")              out='[]' ;;
+  "GET repos/"*"/milestones")          out='[]' ;;
+  "GET repos/"*"/branches/"*"/protection") out='{"message":"Branch not protected"}'; code=404 ;;
 esac
-if [ "${1:-}" = "api" ]; then
-  case " $* " in
-    *"/protection "*) case " $* " in *" -X PUT "*) cat >/dev/null; echo '{}'; exit 0 ;; esac
-                      echo "gh: Branch not protected (HTTP 404)" >&2; exit 1 ;;
-    *"/milestones"*)  exit 0 ;;
-    *" -X PATCH "*)   exit 0 ;;
-    *)                echo false; exit 0 ;;
-  esac
-fi
-exit 1
-STUB
-chmod +x "$tmp/stubs/gh"
+FIX
 export PATH="$tmp/stubs:$PATH"
 export KIT_INIT_PREFLIGHT=0 KIT_INIT_TTY=0 KIT_ASCII=1 NO_COLOR=1 KIT_WT_INSTALL=0
+# The git protocol is read from gh's config FILE (~/.config/gh/config.yml) or this variable; set it
+# here so the setup does not depend on a gh install the reader may not have. (Without either, init
+# exits 1 before the setup: scripts/lib/init-github.sh:418 fails its assignment under pipefail when
+# the file is absent — asserted in init-guided-test.sh, section 7b.)
+export CCKIT_GIT_PROTOCOL=https
 unset KIT_CONFIG KIT_BASE_BRANCH 2>/dev/null || true
 
 # new_project <dir> — a project with one commit on `main` and an empty bare `origin`.
@@ -140,7 +134,8 @@ has "status: lists the task" "$out" "| \`$id\` | **review** | Spring newsletter 
 js="$("$CCKIT" status --llm 2>/dev/null)"
 t "status --llm: the task is in attention" "$(printf '%s' "$js" | jq -r '.light_tasks.attention[0] | .id + " " + .state')" "$id review"
 t "status --llm: the count" "$(printf '%s' "$js" | jq -r '.light_tasks.counts.review')" "1"
-t "status: no gh call names the task" "$(grep -c -e "$id" -e 'light/' "$GH_LOG" | tr -d ' ')" "0"
+t "status: no forge request names the task" "$(grep -c -e "$id" -e 'light/' "$GH_LOG" | tr -d ' ')" "0"
+t "the whole walkthrough ran no gh subcommand" "$(grep -c '^GH-SUBCOMMAND' "$tmp/forge.log")" "0"
 
 # ── 8. no absolute home-directory path in what cckit ships ──────────────────────────────────────
 hits="$(grep -rlE '/(Users|home)/[a-z][a-z0-9_-]+/' "$ROOT/commands" "$ROOT/skills" "$ROOT/templates" 2>/dev/null | sed "s#^$ROOT/##" | tr '\n' ' ')"

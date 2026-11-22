@@ -688,7 +688,7 @@ read straight from the config file → the built-in default `2`.
 
 The check runs before the base-branch fetch, the branch, the worktree and the bootstrap, so a
 refusal leaves no branch, no worktree and no board change. It is not read-free: the gate queries
-origin, and a `<slug>` argument was resolved before it, which can run `gh issue list`. Re-running
+origin, and a `<slug>` argument was resolved before it, which can read the issue list from GitHub. Re-running
 `cckit effort start` on an effort that is *already* in progress is never gated — it adds no WIP.
 `cckit start <issue>` (a plain task worktree) has no WIP limit. Full behaviour:
 [Only so many efforts at once](/effort-reference/#the-wip-limit).
@@ -1012,7 +1012,7 @@ writes to stdout:
 Any other line starting with `#`, and any line whose first column is not a number, is ignored.
 
 The plan falls back to GitHub, with a one-line warning on stderr, when the source is not executable,
-exits non-zero, or prints no rows. A source that answers needs neither `gh` nor `jq`; the fallback
+exits non-zero, or prints no rows. A source that answers needs neither a forge nor `jq`; the fallback
 needs both.
 
 Every plan prints a `source:` line under its header:

@@ -100,7 +100,7 @@ cckit gc --prune --yes           # remove the merged branch + worktree
 
 ### Feed a statusline or TUI from the board cache
 
-Poll the cache, not GitHub. `--cached` makes no `gh` call while the cache is inside its TTL:
+Poll the cache, not GitHub. `--cached` makes no GitHub call while the cache is inside its TTL:
 
 ```bash
 cckit sync --watch 30 &                                   # one refresher: rewrites the cache every 30s

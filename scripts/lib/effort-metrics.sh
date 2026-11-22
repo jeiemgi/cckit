@@ -39,6 +39,12 @@
 # FILE scope zsh sets `$0` to the sourced file's path, so one expansion covers both shells. Same
 # resolution as kit-gc.sh's `_KIT_GC_LIB_DIR`, whose comment explains why zsh prompt expansion
 # (`${(%):-%x}`) is avoided and why `cd`'s stdout is discarded.
+# The forge port (E537): every GitHub call goes through forge_* / gh_rest_* (scripts/lib/gh-rest.sh).
+if ! command -v gh_rest_issue_json >/dev/null 2>&1; then
+  # shellcheck source=/dev/null
+  . "$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)/gh-rest.sh"
+fi
+
 _EM_LIB_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" >/dev/null 2>&1 && pwd)"
 
 # The GitHub transport switch (#396): rest mode routes the gh calls below through gh-rest.sh.
@@ -82,7 +88,7 @@ estimate_effort() {
   repo="${EFFORT_REPO:-${KIT_REPO:-}}"
   if cckit_gh_rest; then subs="$(gh_rest_sub_issue_numbers "$repo" "$num" 2>/dev/null | grep -c .)"
   else
-  subs="$(gh api graphql -f query='query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){issue(number:$n){subIssues(first:50){totalCount}}}}' \
+  subs="$(forge_rest graphql -f query='query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){issue(number:$n){subIssues(first:50){totalCount}}}}' \
         -F o="${repo%/*}" -F r="${repo#*/}" -F n="$num" --jq '.data.repository.issue.subIssues.totalCount' 2>/dev/null)"
   fi
   [[ "$subs" =~ ^[0-9]+$ ]] || subs=1; [[ "$subs" -lt 1 ]] && subs=1
@@ -354,10 +360,9 @@ _em_judge_diff() {
 # string when gh is unavailable or the section is absent — the judge still runs on the diff alone.
 _em_judge_goal() {
   local num="$1" repo body
-  command -v gh >/dev/null 2>&1 || { printf ''; return 0; }
+  forge_available || { printf ''; return 0; }
   repo="${EFFORT_REPO:-${KIT_REPO:-}}"
-  if cckit_gh_rest; then body="$(gh api "repos/$repo/issues/$num" --jq '.body // ""' 2>/dev/null)" || { printf ''; return 0; }
-  else body="$(gh issue view "$num" --repo "$repo" --json body --jq '.body' 2>/dev/null)" || { printf ''; return 0; }; fi
+  body="$(forge_rest "repos/$repo/issues/$num" --jq '.body // ""' 2>/dev/null)" || { printf ''; return 0; }
   [[ -n "$body" ]] || { printf ''; return 0; }
   # Extract the lines after "## Goal" up to the next "## " heading.
   printf '%s\n' "$body" | awk '

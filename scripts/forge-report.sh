@@ -12,16 +12,20 @@
 #   scripts/forge-report.sh --root <dir>    measure another checkout (default: this repository)
 #
 # What is measured (non-test files only: bin/*, scripts/*.sh, scripts/lib/*.sh, never *-test.sh):
-#   gh line  — a non-comment line that runs `gh <subcommand>` or probes `command -v gh`. A message
-#              that mentions gh is not a call.
+#   gh line  — a non-comment line that runs `gh <subcommand>` in command position (line start, after
+#              `(`, `$(`, `|`, `;`, `&`, `!`, `{`, or after if/then/else/do/while/exec), a `gh "$…"`
+#              form, or a probe (`command -v gh`, `has_cmd gh`, `_eff_need gh`). A message that
+#              tells a person to run gh is not a call.
 #   git line — a non-comment line that runs `git <subcommand>` or `git -C`.
 #   class    — gh-only · git-only · both · neither, from those two counts.
 #   verb     — a label of the `case "$cmd"` dispatcher in bin/cckit. A verb needs a forge when its
-#              own block has a gh line, or any file it execs or sources (followed transitively
-#              through `source`/`.` of *.sh files under scripts/ and scripts/lib/) has one. The
-#              preamble before the case is shared by every verb and is not attributed to any.
-#   forge layer — scripts/lib/forge.sh, scripts/lib/forge-*.sh (E537.2): gh calls there are the
-#              port, so --ratchet leaves them out.
+#              own block, or any file it execs or sources (followed transitively through `source`/`.`
+#              of *.sh files under scripts/ and scripts/lib/), has a gh line or calls into the forge
+#              layer (forge_*, gh_rest_*; a bare forge_available probe does not count). The forge
+#              layer's own files are not attributed to a verb. The preamble before the case is
+#              shared by every verb and is not attributed to any.
+#   forge layer — scripts/lib/forge.sh, scripts/lib/forge-*.sh and scripts/lib/gh-rest.sh (E537.2):
+#              gh runs there only (gh auth token), so --ratchet leaves the layer out.
 # errors: strict — set -e; an unreadable root or a bin/cckit without a dispatcher exits 1
 set -euo pipefail
 
@@ -37,7 +41,10 @@ while [ $# -gt 0 ]; do
 done
 [ -f "$ROOT/bin/cckit" ] || { echo "forge-report: no bin/cckit under $ROOT" >&2; exit 1; }
 
-GH_RE='(^|[^[:alnum:]_./-])gh[[:space:]]+(api|pr|issue|repo|run|release|auth|label|project|search|workflow|secret|variable|cache|gist|browse|extension|--version)([^[:alnum:]_-]|$)|(command -v|has_cmd|_eff_need) gh([^[:alnum:]_-]|$)|(^|[^[:alnum:]_./-])gh[[:space:]]+["$]'
+GH_PRE='(^|[;&|(){!`]|\$\(|(^|[^[:alnum:]_])(if|then|else|elif|do|while|until|exec|time|env|nohup)[[:space:]]+)[[:space:]]*'
+GH_RE="${GH_PRE}gh[[:space:]]+(api|pr|issue|repo|run|release|auth|label|project|search|workflow|secret|variable|cache|gist|browse|extension|config|--version)([^[:alnum:]_-]|\$)|(command -v|has_cmd|_eff_need) gh([^[:alnum:]_-]|\$)|${GH_PRE}gh[[:space:]]+\"\\\$"
+# A call into the forge layer: the verb needs a forge even though no gh runs (E537.2+).
+FORGE_RE='(^|[^[:alnum:]_])(forge_(rest|graphql|api|issue_[a-z]+|pr_[a-z]+|need|login[a-z_]*)|gh_rest_[a-z_]+|_ghr_api)([^[:alnum:]_]|$)'
 GIT_RE='(^|[^[:alnum:]_./-])git[[:space:]]+(-C[[:space:]]|-c[[:space:]]|[a-z][a-z-]*([^[:alnum:]_-]|$))'
 
 # fr_files: the measured files, repo-relative, sorted.
@@ -55,7 +62,9 @@ fr_class() { # <gh> <git>
   elif [ "$2" -gt 0 ]; then echo git-only
   else echo neither; fi
 }
-fr_is_forge_layer() { case "$1" in scripts/lib/forge.sh|scripts/lib/forge-*.sh) return 0 ;; *) return 1 ;; esac; }
+fr_is_forge_layer() { case "$1" in scripts/lib/forge.sh|scripts/lib/forge-*.sh|scripts/lib/gh-rest.sh) return 0 ;; *) return 1 ;; esac; }
+# fr_calls_forge <file-or-text-on-stdin>: a non-comment, non-definition line that calls the layer.
+fr_calls_forge_text() { local t; t="$(grep -vE '^[[:space:]]*#|^[[:space:]]*[a-z_]+\(\)' || true)"; grep -qE "$FORGE_RE" <<<"$t"; }
 
 # fr_resolve <name>: a *.sh basename (or scripts/… path) → repo-relative path, or nothing.
 fr_resolve() {
@@ -103,12 +112,14 @@ fr_verb_rows() { # verb<TAB>needs<TAB>via (space-separated files with gh lines)
       block="$(printf '%s' "$block" | tr '\001' '\n')"
       verbs="$(printf '%s' "$label" | tr '|' ' ')"
       needs=no; via=""
-      blk="$(printf '%s\n' "$block" | grep -vE '^[[:space:]]*#' || true)"; if grep -qE "$GH_RE" <<<"$blk"; then needs=yes; via="bin/cckit"; fi
+      blk="$(printf '%s\n' "$block" | grep -vE '^[[:space:]]*#' || true)"
+      if grep -qE "$GH_RE" <<<"$blk" || printf '%s\n' "$blk" | fr_calls_forge_text; then needs=yes; via="bin/cckit"; fi
       files="$(printf '%s\n' "$block" | fr_refs_in_text | while read -r x; do fr_resolve "$x"; done | sort -u | tr '\n' ' ')"
       if [ -n "${files// /}" ]; then
         for f in $(fr_closure $files); do
+          fr_is_forge_layer "$f" && continue
           gh="$(fr_count "$GH_RE" "$f")"
-          [ "$gh" -gt 0 ] && { needs=yes; via="$via $f"; }
+          if [ "$gh" -gt 0 ] || fr_calls_forge_text < "$ROOT/$f"; then needs=yes; via="$via $f"; fi
         done
       fi
       for v in $verbs; do
