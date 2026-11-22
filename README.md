@@ -704,6 +704,8 @@ cckit/
   bin/cckit              # the CLI dispatcher
   scripts/lib/*.sh       # the git-mechanics bundle (effort, worktree, gh, gc, …)
                          #   each declares `# errors:` — see CONTRIBUTING.md
+  scripts/forge-report.sh # where cckit needs a forge (gh) and where git alone: per file, per verb,
+                         #   and the ratchet (files outside the forge layer that call gh)
   scripts/benchmark/     # doc-retrieval benchmark harness (cckit bench)
   benchmarks/runs/       # recorded benchmark checkpoints, one file per release (format: its README.md)
   .claude-plugin/        # the Claude Code plugin manifest
