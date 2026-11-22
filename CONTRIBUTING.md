@@ -19,6 +19,9 @@ cckit pr <issue> "<summary>" # open the PR
 
 - Branch from `develop` (the integration branch); one issue = one branch = one PR. `main` is
   releases-only. `cckit start` already branches from the configured base.
+- **Scope after v0.10.** The landing-site rebranding and the docs rewrite are paused: cckit changes
+  only for what the projects built with it need, through weekly contributions. The paused issues
+  stay open and resume by decision, not by default.
 - Use [Conventional Commits](https://www.conventionalcommits.org/) — releases are cut from them.
   PRs are squash-merged, so **the PR title must be a Conventional Commit subject** (`type(scope): summary`).
   **`cckit pr` builds one for you** (derived from the issue's `kind:` label, `[Effort …]` prefix
