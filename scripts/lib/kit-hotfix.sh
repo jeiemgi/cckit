@@ -102,6 +102,7 @@ kto_hotfix() {
       ;;
     *)
       pr="${src#\#}"
+      forge_available || { echo "✗ hotfix: no forge — PR #$pr cannot be read; pass the merge commit's sha instead" >&2; return 1; }
       meta="$(gh_rest_pr_json "$repo" "$pr" || true)"
       [ -n "$meta" ] || { echo "✗ hotfix: PR #$pr not found in $repo" >&2; return 1; }
       [ "$(printf '%s' "$meta" | jq -r '.state // ""')" = "MERGED" ] \
@@ -118,8 +119,7 @@ kto_hotfix() {
       # merge it is the LAST of the PR's commits, the others sitting right under it with their
       # subjects unchanged — that run of subjects is the tell, and then the whole run is picked.
       if [ "$(git -C "$root" rev-list --parents -n 1 "$sha" | wc -w | tr -d ' ')" -eq 2 ]; then
-        if cckit_gh_rest; then subjects="$(gh_rest_pr_commit_subjects "$repo" "$pr" || true)"
-        else subjects="$(printf '%s' "$meta" | jq -r '.commits[]?.messageHeadline // empty')"; fi
+        subjects="$(gh_rest_pr_commit_subjects "$repo" "$pr" || true)"
         n="$(printf '%s\n' "$subjects" | grep -c . || true)"
         [ "$n" -ge 1 ] || { echo "✗ hotfix: cannot read the commits of PR #$pr, so cannot tell a squash from a rebase merge — pass the commit sha instead" >&2; return 1; }
         if [ "$n" -gt 1 ] \
@@ -195,7 +195,14 @@ kto_hotfix() {
   KIT_PR_BASE="$base" git -C "$wt" push -u origin "$branch" >&2 || return 1
   echo "worktree: $wt"
 
-  # 5. the PR
+  # 5. the PR — without a forge the branch is pushed and the compare page printed, nothing opened.
+  if ! forge_available; then
+    forge_note_none hotfix "the pull request is not opened; $branch is pushed"
+    url="$(forge_compare_url "$base" "$branch" "$wt" 2>/dev/null || true)"
+    if [ -n "$url" ]; then echo "✓ pushed $branch → open the pull request: $url"
+    else echo "✓ pushed $branch (no forge: open the pull request on your forge, $branch → $base)"; fi
+    return 0
+  fi
   url="$(gh_rest_pr_url_for_head "$repo" "$branch" 2>/dev/null || true)"
   if [ -n "$url" ]; then
     echo "[hotfix] a PR is already open for $branch" >&2

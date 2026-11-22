@@ -638,14 +638,17 @@ wt_start() {
   # The board helpers load lazily, further down: Status is otherwise set server-side by built-in
   # automations (Item closed→Done, PR merged→Done), and In Progress is the one write wt_start owns.
 
-  if cckit_gh_rest; then
+  # Without a forge the issue is not read: the branch is task/<N>-<slug> with the slug given on the
+  # command line, else issue-<N>. Said once, never silent.
+  if forge_available; then
     meta="$(gh_rest_issue_json "$WT_START_REPO" "$num" 2>/dev/null)" || { echo "[#$num] issue not found" >&2; return 1; }
+    title="$(echo "$meta" | jq -r '.title')"
+    kind="$(echo "$meta" | jq -r '([.labels[].name | select(startswith("kind:"))][0] // "kind:task") | sub("^kind:";"")')"
   else
-  meta="$(gh_rest_issue_json "$WT_START_REPO" "$num" 2>/dev/null)" \
-    || { echo "[#$num] issue not found" >&2; return 1; }
+    forge_note_none start "issue #$num is not read; the branch is task/$num-${slug_override:-issue-$num} (pass a slug to name it)"
+    title=""; kind="task"
+    [[ -n "$slug_override" ]] || slug_override="issue-$num"
   fi
-  title="$(echo "$meta" | jq -r '.title')"
-  kind="$(echo "$meta" | jq -r '([.labels[].name | select(startswith("kind:"))][0] // "kind:task") | sub("^kind:";"")')"
   kind="$(_wt_kind_prefix "$kind")"
   if [[ -n "$slug_override" ]]; then
     slug="$slug_override"

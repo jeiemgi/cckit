@@ -201,7 +201,7 @@ _kit_gc_cache_reset() { rm -rf "$_KIT_GC_CACHE_DIR" 2>/dev/null; mkdir -p "$_KIT
 _kit_gc_issue_merged_pr() {
   local n="$1" repo="${2:-$KIT_GC_REPO}" depth="${3:-0}" cache="" cand result="" parent
   [ -n "$n" ] || return 0
-  forge_available || return 0
+  forge_available || { forge_note_none gc "merged pull requests cannot be read; a branch whose issue state is unknown is kept, never deleted"; return 0; }
   [ -d "$_KIT_GC_CACHE_DIR" ] && cache="$_KIT_GC_CACHE_DIR/issue-$n"
   if [ -n "$cache" ] && [ -f "$cache" ]; then cat "$cache"; return 0; fi
   while IFS= read -r cand; do
@@ -324,6 +324,9 @@ _kit_gc_detached_rows() {
 kit_gc_analyze() {
   _kit_gc_require_deps || return 1
   _kit_gc_cache_reset
+  # Without a forge no issue or pull request state can be read: every issue branch is UNKNOWN and
+  # kept. Said once here, since the per-branch reads below are quiet.
+  forge_available || forge_note_none gc "issue and pull request states cannot be read; every issue branch is UNKNOWN and kept, never deleted"
   # `wtpath`, not `path`: under zsh `path` is tied to PATH (special array), so a bare `path` local
   # here would clobber the command search path on assignment. A namespaced name is inert.
   local repo="$KIT_GC_REPO" b ref wtpath reason

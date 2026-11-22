@@ -75,7 +75,7 @@ ap_parent_effort_num() {
 ap_labels_fetch() {
   local repo="${1:-}" num="${2:-}"
   [ -n "$repo" ] && [ -n "$num" ] || return 0
-  forge_available || return 0
+  forge_available || { forge_note_none "${CCKIT_VERB:-orchestrate}" "issue labels are not read; the agent profile comes from agents.default"; return 0; }
   forge_rest "repos/$repo/issues/$num" --jq '[.labels[].name] | join(",")' 2>/dev/null || true
 }
 
@@ -139,7 +139,7 @@ ap_resolve_source() {
 ap_pr_issue() {
   local repo="${1:-}" pr="${2:-}" br
   [ -n "$repo" ] && [ -n "$pr" ] || return 0
-  forge_available || return 0
+  forge_available || { forge_note_none "${CCKIT_VERB:-orchestrate}" "issue labels are not read; the agent profile comes from agents.default"; return 0; }
   br="$(forge_rest "repos/$repo/pulls/$pr" --jq '.head.ref' 2>/dev/null)" || return 0
   [ -n "$br" ] || return 0
   wt_issue_number "$br"
@@ -150,7 +150,7 @@ ap_pr_issue() {
 ap_issue_title() {
   local repo="${1:-}" num="${2:-}"
   [ -n "$repo" ] && [ -n "$num" ] || return 0
-  forge_available || return 0
+  forge_available || { forge_note_none "${CCKIT_VERB:-orchestrate}" "issue labels are not read; the agent profile comes from agents.default"; return 0; }
   forge_rest "repos/$repo/issues/$num" --jq '.title // ""' 2>/dev/null || true
 }
 

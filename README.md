@@ -649,7 +649,9 @@ it for any script).
 Every GitHub call is REST over `curl` with a token, through one port (`scripts/lib/forge.sh`;
 `forge.provider` in the config, `github` when a token resolves from `GH_TOKEN`, `GITHUB_TOKEN` or a
 signed-in `gh`, else `none`). No verb runs a `gh` subcommand; `gh` is the optional way to sign in.
-With no forge, a verb that needs GitHub refuses with one line naming itself, and its git steps run.
+With no forge the git core stands alone: `start`, `pr` (commit + push, the compare page printed),
+`merge` (the branch lands on the base through git), `hotfix <sha>` and `gc` run and say, once, what
+they skipped; a verb that only exists on the forge refuses with one line naming itself.
 
 Claude Code cloud sessions reach GitHub through a proxy that refuses GraphQL. REST works there, so
 every lifecycle verb does; two things are skipped, each with one line on stderr:

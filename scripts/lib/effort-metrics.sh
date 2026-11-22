@@ -360,7 +360,7 @@ _em_judge_diff() {
 # string when gh is unavailable or the section is absent — the judge still runs on the diff alone.
 _em_judge_goal() {
   local num="$1" repo body
-  forge_available || { printf ''; return 0; }
+  forge_available || { forge_note_none "effort close" "the effort's goal is not read; the judge reads the diff alone"; printf ''; return 0; }
   repo="${EFFORT_REPO:-${KIT_REPO:-}}"
   body="$(forge_rest "repos/$repo/issues/$num" --jq '.body // ""' 2>/dev/null)" || { printf ''; return 0; }
   [[ -n "$body" ]] || { printf ''; return 0; }

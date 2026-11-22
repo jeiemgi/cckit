@@ -96,7 +96,7 @@ wt_issue_number() {
 wt_issue_state() {
   local n="$1" repo="${2:-}" out
   [[ -z "$n" ]] && return 0
-  forge_available || { printf 'unknown\n'; return 0; }
+  forge_available || { forge_note_none "${CCKIT_VERB:-gc}" "issue states cannot be read; every issue reads unknown and its branch is kept"; printf 'unknown\n'; return 0; }
   repo="${repo:-${KIT_REPO:-}}"; [[ -n "$repo" ]] || repo="$(forge_repo_from_git 2>/dev/null)" || { printf 'unknown\n'; return 0; }
   out="$(forge_rest "repos/$repo/issues/$n" --jq .state 2>&1)" || { _wt_issue_state_failed "$out"; return 0; }
   printf '%s\n' "$out" | tr '[:upper:]' '[:lower:]' | grep -E -x 'open|closed' | sed -n 1p

@@ -714,6 +714,14 @@ A refusal looks like this, and it is the only thing the `none` provider ever pri
 cckit pr: needs a forge (GitHub) and none is configured. Set forge.provider to github and a token in GH_TOKEN, or sign in with gh. The git steps of pr run without one.
 ```
 
+What runs on git alone, with one line saying what was skipped: `cckit start` (the branch is
+`task/<N>-<slug>`, the issue is not read), `cckit pr` (commit and push; the compare page is printed,
+no pull request is opened), `cckit merge` (the branch lands on the base through git and is pushed;
+no issue is closed), `cckit hotfix <sha>` (cherry-pick and push, no pull request), `cckit gc` (every
+issue branch is UNKNOWN and kept). The verbs that only read or write the forge — `new`, `close`,
+`sync`, `plan`, `next`, `status`'s board section, the effort verbs, `watch` — refuse by name. The
+note for a skipped step is printed once per verb and process: `cckit <verb>: no forge — <what>`.
+
 `scripts/forge-report.sh` prints which files and which verbs need a forge today.
 
 ## Integrations

@@ -12,6 +12,8 @@
 #   forge_need [verb]                    rc 0 with a forge; without one, ONE line naming the verb that
 #                                        needs it (CCKIT_VERB when the verb is not given), rc 1
 #   forge_available                      rc 0 iff the provider is not none (no message)
+#   forge_note_none <verb> <what>        the git-only path says what it skipped, once per verb
+#   forge_compare_url <base> <branch>    the GitHub compare page for a pushed branch, or rc 1
 #   forge_api <method> <path> [json]     raw REST call, the body on stdout; rc 1 on an HTTP error
 #   forge_rest <endpoint> [forge_rest flags] the `gh api` argument form (-X -f -F --jq --paginate -H --input)
 #   forge_graphql <query> [k=v …]        POST /graphql; a value N:<int> is an Int variable
@@ -84,6 +86,24 @@ forge_load() {
 }
 
 forge_available() { [ "$(forge_provider)" != "none" ]; }
+
+# forge_note_none <verb> <what>: the git-only path's one line, printed ONCE per verb and process:
+# `cckit <verb>: no forge — <what>`. A forge-less step is never silent; it is also never a wall of
+# repeats when a verb loops over branches.
+forge_note_none() {
+  case " ${_FORGE_NONE_SAID:-} " in *" $1 "*) return 0 ;; esac
+  _FORGE_NONE_SAID="${_FORGE_NONE_SAID:-} $1"
+  printf 'cckit %s: no forge — %s\n' "$1" "$2" >&2
+}
+
+# forge_compare_url <base> <branch> [dir]: the forge's compare page for a pushed branch, built from
+# the origin remote when it is a GitHub URL; empty (rc 1) otherwise. What `cckit pr` prints when it
+# has pushed but cannot open the pull request itself.
+forge_compare_url() {
+  local repo; repo="$(forge_repo_from_git "${3:-.}")" || return 1
+  local url; url="$(git -C "${3:-.}" remote get-url origin 2>/dev/null)"
+  case "$url" in *github.com*) printf 'https://github.com/%s/compare/%s...%s' "$repo" "$1" "$2" ;; *) return 1 ;; esac
+}
 
 forge_need() {
   forge_available && return 0

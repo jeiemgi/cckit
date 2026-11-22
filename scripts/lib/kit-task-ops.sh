@@ -128,8 +128,13 @@ kto_pr_title() {
     local _cl; _cl="$(git rev-parse --show-toplevel 2>/dev/null)/scripts/lib/commitlint.sh"
     [ -f "$_cl" ] && . "$_cl" 2>/dev/null || true
   fi
-  # 1) Prefer an author-provided conventional summary.
+  # 1) Prefer an author-provided conventional summary. Without commitlint.sh (a project that is not
+  #    cckit), the shape alone decides: `type(scope)!: subject`.
   if [ -n "$summary" ] && type commitlint_check >/dev/null 2>&1 && commitlint_check "$summary" >/dev/null 2>&1; then
+    printf '%s' "$summary"; return 0
+  fi
+  if [ -n "$summary" ] && ! type commitlint_check >/dev/null 2>&1 \
+     && grep -qE '^[a-z]+(\([^)]*\))?!?: [^[:space:]]' <<<"$summary"; then
     printf '%s' "$summary"; return 0
   fi
   # 2) Derive the type from the kind:/bug label.
@@ -155,6 +160,8 @@ kto_pr_title() {
     -e 's/^\[[^]]+\] +//' \
     -e 's/^[[:space:]]+//')"
   [ -n "$desc" ] || desc="$raw"
+  # No issue title (no forge read it): the summary is the subject.
+  [ -n "$desc" ] || desc="$(printf '%s' "$summary" | sed -E 's/^[a-z]+(\([^)]*\))?!?: //')"
   printf '%s: %s' "$ctype" "$desc"
 }
 
@@ -326,10 +333,17 @@ kto_task_pr() {
   [[ -n "$num" ]] || { echo "✗ kto_task_pr: branch '$branch' doesn't match <kind>/<N>-<slug> and no issue number passed" >&2; return 1; }
   [[ -n "$summary" ]] || { echo "✗ kto_task_pr: a Summary is required (never invent one)" >&2; return 1; }
 
-  meta=$(gh_rest_issue_json "$repo" "$num") || return 1
-  title=$(printf '%s' "$meta" | jq -r .title)
-  labels=$(printf '%s' "$meta" | jq -r '[.labels[].name] | join(",")')
-  milestone=$(printf '%s' "$meta" | jq -r '.milestone.title // ""')
+  if forge_available; then
+    meta=$(gh_rest_issue_json "$repo" "$num") || return 1
+    title=$(printf '%s' "$meta" | jq -r .title)
+    labels=$(printf '%s' "$meta" | jq -r '[.labels[].name] | join(",")')
+    milestone=$(printf '%s' "$meta" | jq -r '.milestone.title // ""')
+  else
+    # The git steps run: commit and push. The issue is not read and the pull request is not opened;
+    # the compare page is printed when origin is on GitHub.
+    forge_note_none pr "issue #$num is not read and the pull request is not opened; the branch is committed and pushed"
+    title=""; labels=""; milestone=""
+  fi
   role="$(kto_labels_role "$labels")"
   # Conventional Commit PR title (squash-merge commit release-please reads + the commitlint gate).
   local pr_title; pr_title="$(kto_pr_title "$title" "$summary" "$labels")"
@@ -353,6 +367,12 @@ kto_task_pr() {
 
   KIT_PR_BASE="$base" git push -u origin "$branch" || return 1
 
+  if ! forge_available; then
+    local cmp; cmp="$(forge_compare_url "$base" "$branch" 2>/dev/null || true)"
+    if [[ -n "$cmp" ]]; then echo "✓ pushed $branch → open the pull request: $cmp"
+    else echo "✓ pushed $branch (no forge: open the pull request on your forge, $branch → $base)"; fi
+    return 0
+  fi
   url=$(gh_rest_pr_create "$repo" "$base" "$branch" "$pr_title" \
     "$(kto_compose_pr_body "$num" "$summary" "$role" "$title")" "$labels" "$milestone") || return 1
   echo "✓ $url"
@@ -407,6 +427,12 @@ kto_task_pr_merge() {
 
   if [[ -n "$(git status --porcelain)" ]]; then
     echo "✗ Working tree is dirty — commit or stash changes first" >&2; return 1
+  fi
+
+  if ! forge_available; then
+    [[ -z "$input_pr" ]] || { echo "✗ cckit merge: no forge — a pull request number cannot be read; run it from the branch's worktree with no argument" >&2; return 1; }
+    _kto_local_merge "$branch" "$base" "$method"
+    return $?
   fi
 
   pr_num="$input_pr"
@@ -480,6 +506,57 @@ kto_task_pr_merge() {
 $issues
 EOF
 
+  _kto_merge_cleanup "$head" "$pr_base" "$base"
+}
+
+# _kto_local_merge <branch> <base> <squash|merge|rebase> — the forge-less merge (E537.4): the
+# branch lands on the base through git alone. From the main checkout: fetch the base, fast-forward
+# it, merge the branch (a squash commit titled after the branch's last commit; --merge keeps the
+# commits under a merge commit; --rebase replays the branch first and fast-forwards), push the base.
+# Then the usual cleanup. Linked issues are not closed: that needs a forge, and the note says so.
+_kto_local_merge() {
+  local head="$1" base="$2" method="$3" main_wt common subject rc=0
+  forge_note_none merge "the branch lands on $base through git; no pull request is merged and no issue is closed"
+  if [[ "$head" == effort/* ]]; then
+    echo "✗ $head is an effort branch — merge it with: cckit effort close ${head#effort/}" >&2; return 1
+  fi
+  case "$head" in "$base"|main|master|develop|HEAD) echo "✗ cckit merge: run it from the branch to merge, not from $head" >&2; return 1 ;; esac
+  common="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"
+  main_wt=""
+  [[ -n "$common" && "$(basename "$common")" == ".git" ]] && main_wt="$(dirname "$common")"
+  [[ -n "$main_wt" ]] || main_wt=$(git worktree list --porcelain | awk '/^worktree / && !hit {print $2; hit=1}')
+  if [[ -n "$(git -C "$main_wt" status --porcelain --untracked-files=no)" ]]; then
+    echo "✗ cckit merge: the main checkout $main_wt has uncommitted changes — commit or discard them first" >&2; return 1
+  fi
+  git -C "$main_wt" fetch -q origin "$base" 2>/dev/null || true
+  git -C "$main_wt" checkout -q "$base" 2>/dev/null || { echo "✗ cckit merge: cannot check out $base in $main_wt" >&2; return 1; }
+  git -C "$main_wt" merge -q --ff-only "origin/$base" 2>/dev/null || true
+  subject="$(git log -1 --format=%s "$head")"
+  case "$method" in
+    squash)
+      git -C "$main_wt" merge -q --squash "$head" >/dev/null 2>&1 || rc=1
+      [[ $rc -eq 0 ]] && { git -C "$main_wt" commit -q -m "$subject" >/dev/null 2>&1 || rc=1; } ;;
+    merge)
+      git -C "$main_wt" merge -q --no-ff -m "Merge branch '$head' into $base" "$head" >/dev/null 2>&1 || rc=1 ;;
+    rebase)
+      git -C "$(git rev-parse --show-toplevel)" rebase -q "$base" >/dev/null 2>&1 || rc=1
+      [[ $rc -eq 0 ]] && { git -C "$main_wt" merge -q --ff-only "$head" >/dev/null 2>&1 || rc=1; } ;;
+  esac
+  if [[ $rc -ne 0 ]]; then
+    git -C "$main_wt" merge --abort >/dev/null 2>&1 || git -C "$main_wt" reset -q --hard "origin/$base" >/dev/null 2>&1 || true
+    echo "✗ cckit merge: $head does not merge cleanly onto $base — rebase it onto origin/$base in its worktree and rerun" >&2
+    return 1
+  fi
+  git -C "$main_wt" push -q origin "$base" 2>/dev/null || { echo "✗ cckit merge: merged locally on $base but the push to origin failed — push $base yourself" >&2; return 1; }
+  echo "✓ $head merged into $base ($method) and pushed"
+  _kto_merge_cleanup "$head" "$base" "$base"
+}
+
+# _kto_merge_cleanup <head> <pr-base> <base> — remove the merged branch's worktree and branches,
+# then bring the PR's base up to date where it lives. Shared by the forge and the git-only merge.
+_kto_merge_cleanup() {
+  local head="$1" pr_base="$2" base="$3" wt base_wt common main_wt
+  _kto_protected() { case "$1" in "$base"|"$pr_base"|main|master|develop|HEAD) return 0 ;; esac; return 1; }
   # Clean up FROM the main checkout (#371): run from the PR's own worktree, removing it deletes our
   # cwd. Main checkout = parent of the shared git dir; fall back to the first `worktree list` entry.
   wt=$(git worktree list --porcelain | awk -v b="refs/heads/$head" '/^worktree /{p=$2} /^branch /{if($2==b) print p}')
