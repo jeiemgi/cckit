@@ -39,5 +39,25 @@ t "plugin.json matches kitVersion ($v)"            "$(jq -r .version "$ROOT/.cla
 t "package.json matches kitVersion ($v)"           "$(jq -r .version "$ROOT/package.json")"               "$v"
 t "docs-site/package.json matches kitVersion ($v)" "$(jq -r .version "$ROOT/docs-site/package.json")"     "$v"
 
+# (4) #534: --next from a fixture repo. Below 1.0 a breaking change bumps the MINOR, never the major;
+# at 1.x it bumps the major. Driven end to end through the script, not through its functions.
+vb_fixture_next() { # <tag> <subject> -> what --next prints
+  local r; r="$(mktemp -d)"
+  mkdir -p "$r/scripts/lib"; cp "$ROOT/scripts/lib/version-bump.sh" "$r/scripts/lib/"
+  git -C "$r" init -q; git -C "$r" -c user.name=t -c user.email=t@t -c commit.gpgsign=false commit -q --allow-empty -m "chore: seed"
+  git -C "$r" -c tag.gpgsign=false -c commit.gpgsign=false tag "v$1"
+  git -C "$r" -c user.name=t -c user.email=t@t -c commit.gpgsign=false commit -q --allow-empty -m "$2"
+  (cd "$r" && bash scripts/lib/version-bump.sh --next); rm -rf "$r"
+}
+t "fix at 0.10.0 -> 0.10.1"     "$(vb_fixture_next 0.10.0 "fix: a")"   "0.10.1"
+t "feat at 0.10.0 -> 0.11.0"    "$(vb_fixture_next 0.10.0 "feat: a")"  "0.11.0"
+t "feat! at 0.10.0 -> 0.11.0"   "$(vb_fixture_next 0.10.0 "feat!: a")" "0.11.0"
+t "feat! at 1.2.3 -> 2.0.0"     "$(vb_fixture_next 1.2.3 "feat!: a")"  "2.0.0"
+
+# (5) the script and release-please agree: the config says bump-minor-pre-major, so a drift either
+# way (config flag dropped, or the script going back to major below 1.0) fails here.
+t "release-please-config.json has bump-minor-pre-major: true" \
+  "$(jq -r '.packages["."]["bump-minor-pre-major"]' "$ROOT/release-please-config.json")" "true"
+
 [ "$fail" -eq 0 ] && echo "ALL OK (version-bump)"
 exit "$fail"
