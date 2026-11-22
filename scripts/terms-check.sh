@@ -1,16 +1,23 @@
 #!/usr/bin/env bash
-# terms-check.sh — validate the terms under ontology/terms/ (format: ontology/README.md).
+# terms-check.sh — the terms under ontology/terms/, their homes, and the skill routing.
 #
 #   bash scripts/terms-check.sh [--root <dir>] [--llm]
 #
-# Every ontology/terms/<Term>.json must hold exactly the seven fields: id (PascalCase, equal to
-# the file name), label (a word or a list of words), definition (20+ characters), is_not (one or
-# more clauses), avoid (a list, may be empty), home (an object with any of cli, skill, rule) and
-# status (seed | sapling | tree). A sapling or a tree needs at least one home.
+# 1. Every ontology/terms/<Term>.json validates (format: ontology/README.md): exactly the seven
+#    fields id, label, definition, is_not, avoid, home, status; a sapling or a tree has a home.
+# 2. Every home resolves: `cli` is a top-level verb of bin/cckit (the first word is checked, so
+#    `effort plan` resolves through `effort`), `skill` is a folder with a SKILL.md under skills/ or
+#    .claude/skills/, `rule` is a file. A seed's unresolved home is printed, not counted a defect.
+# 3. skills/routing.yaml parses in its strict subset (stated at the top of that file); every entry
+#    names an existing skill and an existing term or `none`; every skill under skills/ is routed;
+#    each skill's `terms:` frontmatter line equals its routing terms.
+# 4. AGENTS.md's "Which skill does what" table has one row per routed skill, with the same tasks
+#    (joined by " · ") and terms (joined by ", ") as routing.yaml.
 #
-# Prints one `x <file>: <field>: <reason>` line per defect and one line of counts; --llm prints the
-# counts as one JSON object. Exit 0 with no defect, 1 with one, 2 when jq is missing or the folder
-# is absent. bash + jq only: cckit installs no YAML parser, so terms are JSON.
+# Prints one `x <where>: <reason>` line per defect and one line of counts; --llm prints the counts
+# as one JSON object on stdout and the defect lines on stderr. Exit 0 with no defect, 1 with one, 2 when jq is missing or ontology/terms/ is
+# absent. bash + jq + awk only: cckit installs no YAML parser, so terms are JSON and the routing
+# file is a flat subset awk reads. scripts/check.sh runs this in warn mode: it prints, never fails.
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -28,8 +35,10 @@ cd "$ROOT" || exit 2
 command -v jq >/dev/null 2>&1 || { echo "terms-check: jq is required" >&2; exit 2; }
 [ -d ontology/terms ] || { echo "terms-check: no ontology/terms/ under $ROOT" >&2; exit 2; }
 
+# Defect lines and notes go to stdout for a person; with --llm they go to stderr so stdout is one JSON object.
 defects=0
-x() { printf 'x %s\n' "$*"; defects=$((defects + 1)); }
+say() { if [ "$OUT" = json ]; then printf '%s\n' "$*" >&2; else printf '%s\n' "$*"; fi; }
+x() { say "x $*"; defects=$((defects + 1)); }
 
 # ── 1. every term validates ──────────────────────────────────────────────────────────────────────
 TERM_FILTER='
@@ -74,11 +83,126 @@ for f in ontology/terms/*.json; do
 done
 [ "$terms" -gt 0 ] || x "ontology/terms/: no term file"
 
-# ── counts ───────────────────────────────────────────────────────────────────────────────────────
-if [ "$OUT" = json ]; then
-  jq -n --argjson terms "$terms" --argjson defects "$defects" \
-    '{terms: $terms, defects: $defects, ok: ($defects == 0)}'
+# ── 2. every home resolves ───────────────────────────────────────────────────────────────────────
+# Top-level verbs: the two-space-indented `label)` lines of the dispatcher's case, `|`-separated.
+verbs=""
+if [ -f bin/cckit ]; then
+  verbs="$(grep -E '^  [a-z][a-z0-9|-]*\)' bin/cckit | sed -E 's/^  ([a-z0-9|-]*)\).*/\1/' | tr '|' '\n' | sort -u)"
+fi
+skill_dir() { # the folder holding <name>/SKILL.md, or nothing
+  for d in skills .claude/skills; do [ -f "$d/$1/SKILL.md" ] && { echo "$d/$1"; return 0; }; done; return 1
+}
+homes=0; homes_ok=0
+for stem in $valid_terms; do
+  f="ontology/terms/$stem.json"
+  status="$(jq -r .status "$f")"
+  while IFS=$'\t' read -r kind value; do
+    [ -n "$kind" ] || continue
+    homes=$((homes + 1)); ok=0
+    case "$kind" in
+      cli)   grep -qx -- "${value%% *}" <<< "$verbs" && ok=1 ;;
+      skill) skill_dir "$value" >/dev/null && ok=1 ;;
+      rule)  [ -f "$value" ] && ok=1 ;;
+    esac
+    if [ "$ok" -eq 1 ]; then homes_ok=$((homes_ok + 1))
+    elif [ "$status" = seed ]; then say "  seed $stem: home $kind $value does not exist yet (allowed)"
+    else x "$f: home $kind $value does not exist"
+    fi
+  done < <(jq -r '.home | to_entries[] | "\(.key)\t\(.value)"' "$f")
+done
+
+# ── 3. the routing table ─────────────────────────────────────────────────────────────────────────
+# routing.yaml → `task<TAB>skill<TAB>term` rows, or `!<line>: <reason>` for a line outside the subset.
+routes=""
+if [ -f skills/routing.yaml ]; then
+  routes="$(awk '
+    function bad(why) { printf "!%d: %s\n", NR, why; expect = 0; next_ok = 0 }
+    BEGIN { expect = 0 }
+    /^[[:space:]]*(#|$)/ { next }
+    expect == 0 {
+      if ($0 ~ /^- task: "[^"]+"$/) { task = $0; sub(/^- task: "/, "", task); sub(/"$/, "", task); expect = 1; next }
+      bad("expected `- task: \"...\"`")
+    }
+    expect == 1 {
+      if ($0 ~ /^  skill: [a-z][a-z0-9-]*$/) { skill = $2; expect = 2; next }
+      bad("expected `  skill: <name>`")
+    }
+    expect == 2 {
+      if ($0 ~ /^  term: ([A-Z][A-Za-z0-9]*|none)$/) { printf "%s\t%s\t%s\n", task, skill, $2; expect = 0; next }
+      bad("expected `  term: <Term>` or `  term: none`")
+    }
+    END { if (expect != 0) printf "!%d: entry ends before its term line\n", NR }
+  ' skills/routing.yaml)"
+  while IFS= read -r line; do
+    case "$line" in '!'*) x "skills/routing.yaml:${line#!}" ;; esac
+  done <<< "$routes"
+  routes="$(printf '%s\n' "$routes" | grep -v '^!' || true)"
 else
-  printf 'terms-check: %d terms · %d defects\n' "$terms" "$defects"
+  x "skills/routing.yaml: missing"
+fi
+
+all_terms="$(for f in ontology/terms/*.json; do [ -e "$f" ] && basename "$f" .json; done)"
+routed_skills="$(printf '%s\n' "$routes" | awk -F'\t' 'NF==3{print $2}' | sort -u | grep . || true)"
+no_term_skills="$(printf '%s\n' "$routes" | awk -F'\t' 'NF==3 && $3=="none"{print $2}' | sort -u | grep . || true)"
+while IFS=$'\t' read -r task skill term; do
+  [ -n "$skill" ] || continue
+  skill_dir "$skill" >/dev/null || x "skills/routing.yaml: skill $skill has no SKILL.md"
+  [ "$term" = none ] || grep -qx -- "$term" <<< "$all_terms" || x "skills/routing.yaml: term $term is not under ontology/terms/"
+done <<< "$routes"
+
+skills_total=0; unrouted=0; routed=0
+for d in skills/*/; do
+  [ -f "${d}SKILL.md" ] || continue
+  s="$(basename "$d")"; skills_total=$((skills_total + 1))
+  if grep -qx -- "$s" <<< "$routed_skills"; then
+    routed=$((routed + 1))
+    want="$(printf '%s\n' "$routes" | awk -F'\t' -v s="$s" '$2==s{print $3}' | sort -u | awk '{a = (a ? a ", " : "") $0} END{print a}')"
+    have="$(awk '/^---/{c++; if (c==2) exit; next} c==1 && /^terms:/{sub(/^terms:[[:space:]]*/, ""); print; exit}' "${d}SKILL.md" \
+            | tr ',' '\n' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | grep . | sort -u | awk '{a = (a ? a ", " : "") $0} END{print a}')"
+    [ "$have" = "$want" ] || x "${d}SKILL.md: terms: '$have' but skills/routing.yaml says '$want'"
+  else
+    unrouted=$((unrouted + 1)); x "skills/$s: not routed in skills/routing.yaml"
+  fi
+done
+
+# ── 4. the same table in AGENTS.md ───────────────────────────────────────────────────────────────
+if [ -f AGENTS.md ]; then
+  # rows of the section, as `skill<TAB>tasks<TAB>terms`
+  agents_rows="$(awk -F' \\| ' '
+    /^## Which skill does what/ { in_sec = 1; next }
+    in_sec && /^## / { exit }
+    in_sec && /^\| / && !/^\| What you want/ && !/^\| ---/ {
+      line = $0; sub(/^\| /, "", line); sub(/ \|$/, "", line); n = split(line, c, / \| /)
+      if (n == 3) { gsub(/`/, "", c[2]); printf "%s\t%s\t%s\n", c[2], c[1], c[3] }
+    }' AGENTS.md)"
+  if [ -z "$agents_rows" ]; then
+    x 'AGENTS.md: no "Which skill does what" table'
+  else
+    for s in $routed_skills; do
+      want_tasks="$(printf '%s\n' "$routes" | awk -F'\t' -v s="$s" '$2==s{a = (a ? a " · " : "") $1} END{print a}')"
+      want_terms="$(printf '%s\n' "$routes" | awk -F'\t' -v s="$s" '$2==s{a = (a ? a ", " : "") $3} END{print a}')"
+      row="$(printf '%s\n' "$agents_rows" | awk -F'\t' -v s="$s" '$1==s{print; exit}')"
+      if [ -z "$row" ]; then x "AGENTS.md: no row for $s"; continue; fi
+      [ "$(printf '%s' "$row" | cut -f2)" = "$want_tasks" ] || x "AGENTS.md: $s tasks differ from skills/routing.yaml"
+      [ "$(printf '%s' "$row" | cut -f3)" = "$want_terms" ] || x "AGENTS.md: $s terms differ from skills/routing.yaml"
+    done
+    while IFS=$'\t' read -r s _; do
+      [ -n "$s" ] || continue
+      grep -qx -- "$s" <<< "$routed_skills" || x "AGENTS.md: row for $s, which skills/routing.yaml does not route"
+    done <<< "$agents_rows"
+  fi
+fi
+
+# ── counts ───────────────────────────────────────────────────────────────────────────────────────
+no_term=$(printf '%s\n' "$no_term_skills" | grep -c . || true)
+if [ "$OUT" = json ]; then
+  jq -n --argjson terms "$terms" --argjson homes "$homes" --argjson homes_ok "$homes_ok" \
+    --argjson skills "$skills_total" --argjson routed "$routed" --argjson unrouted "$unrouted" \
+    --argjson no_term "$no_term" --argjson defects "$defects" \
+    '{terms: $terms, homes: $homes, homes_resolved: $homes_ok, skills: $skills, skills_routed: $routed,
+      unrouted: $unrouted, skills_no_term: $no_term, defects: $defects, ok: ($defects == 0)}'
+else
+  printf 'terms-check: %d terms · %d/%d homes resolved · %d/%d skills routed · %d unrouted · %d with no term · %d defects\n' \
+    "$terms" "$homes_ok" "$homes" "$routed" "$skills_total" "$unrouted" "$no_term" "$defects"
 fi
 [ "$defects" -eq 0 ]

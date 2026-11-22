@@ -80,6 +80,13 @@ bash scripts/review-lint.sh || fail=1
 note "==> agent skill references"
 bash scripts/agent-skills-lint.sh || fail=1
 
+# 7b. Terms and skill routing — WARN mode. Every term under ontology/terms/ validates, every home
+# resolves, every skill is routed and AGENTS.md's table mirrors skills/routing.yaml. It prints its
+# defects and counts and never fails the gate: the terms are new and a word under discussion must
+# not block an unrelated PR. scripts/terms-check-test.sh (step 8) is what fails on a broken checker.
+note "==> terms and skill routing (warn mode)"
+bash scripts/terms-check.sh || note "  (warning: terms-check found defects; the gate does not fail on them)"
+
 # 8. Behavioral tests - run every *-test.sh through the test runner (several files at a time;
 # TEST_JOBS=1 for one at a time).
 note "==> behavioral tests"
