@@ -59,13 +59,12 @@ t "no branch + no window sums to zero"          "$(_em_token_sum '' 0 0)" "0 0 0
 # Inside a zsh FUNCTION `BASH_SOURCE` is unset and `$0` is the function name, so a per-call
 # `dirname "${BASH_SOURCE[0]:-$0}"` pointed at the caller's directory and kit-local.sh was never
 # found. Run from a dir OUTSIDE the repo, with no config, so only the lib-dir lookup can find it.
-# #561: the lib no longer pushes metrics anywhere, so loading it defines no sync and no engine call.
+# #561: the lib no longer pushes metrics anywhere, so loading it defines no sync.
 outside="$tmp/outside"; mkdir -p "$outside"
-_helpers_probe() {  # _helpers_probe <shell> [flag] — prints SYNC-*, ENGINE-* and LOCAL-* markers
+_helpers_probe() {  # _helpers_probe <shell> [flag] — prints SYNC-* and LOCAL-* markers
   ( cd "$outside" && env -u KIT_CONFIG LIB="$LIB" "$@" -c '
       source "$LIB/effort-metrics.sh"
       if declare -f sync_effort_metrics >/dev/null 2>&1; then echo SYNC-DEFINED; else echo SYNC-UNDEFINED; fi
-      if declare -f engine_call >/dev/null 2>&1; then echo ENGINE-DEFINED; else echo ENGINE-UNDEFINED; fi
       _em_judge_call s u >/dev/null 2>&1
       if declare -f kit_local_chat >/dev/null 2>&1; then echo LOCAL-DEFINED; else echo LOCAL-UNDEFINED; fi' 2>&1 )
 }
@@ -73,7 +72,6 @@ _helpers_case() {  # _helpers_case <label> <shell> [flag]
   local label="$1" out; shift
   out="$(CCKIT_MODEL_URL='' KIT_LOCAL_ENABLED=false _helpers_probe "$@")"
   t "$label: no metrics sync is defined"          "$(printf '%s\n' "$out" | grep -cx 'SYNC-UNDEFINED')" "1"
-  t "$label: no engine call is defined"           "$(printf '%s\n' "$out" | grep -cx 'ENGINE-UNDEFINED')" "1"
   t "$label: judge fallback finds kit-local.sh"   "$(printf '%s\n' "$out" | grep -cx 'LOCAL-DEFINED')" "1"
 }
 _helpers_case bash bash

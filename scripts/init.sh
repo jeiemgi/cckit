@@ -1249,7 +1249,6 @@ safe_copy "$KIT_ROOT/scripts/lib/gh-project.sh"     "$TARGET/scripts/lib/gh-proj
 safe_copy "$KIT_ROOT/scripts/lib/worktree-issue.sh" "$TARGET/scripts/lib/worktree-issue.sh"
 safe_copy "$KIT_ROOT/scripts/lib/role-identity.sh"  "$TARGET/scripts/lib/role-identity.sh"
 safe_copy "$KIT_ROOT/scripts/lib/kit-local.sh"      "$TARGET/scripts/lib/kit-local.sh"
-safe_copy "$KIT_ROOT/scripts/lib/engine-adapter.sh" "$TARGET/scripts/lib/engine-adapter.sh"
 safe_copy "$KIT_ROOT/scripts/lib/effort-metrics.sh" "$TARGET/scripts/lib/effort-metrics.sh"
 safe_copy "$KIT_ROOT/scripts/lib/gh-log.sh"         "$TARGET/scripts/lib/gh-log.sh"
 safe_copy "$KIT_ROOT/scripts/lib/kit-events.sh"     "$TARGET/scripts/lib/kit-events.sh"
