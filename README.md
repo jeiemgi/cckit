@@ -750,7 +750,8 @@ cckit's own sets are in `benchmarks/`: 55 retrieval, adversarial and abstain que
 quality claims over `docs-site/src/content/docs`. Recorded runs of the first three tiers are under
 `benchmarks/runs/`.
 
-cckit records its own benchmark per release: `cckit bench checkpoint <X.Y.Z>` appends a scored run to
+cckit records its own benchmark per release (paused while the current arc of work lands: no new
+checkpoint, `cckit release` is run with `--skip-bench-check`): `cckit bench checkpoint <X.Y.Z>` appends a scored run to
 `benchmarks/runs/<X.Y.Z>.json`, a version can hold several checkpoints, and `cckit release <X.Y.Z>`
 refuses when the version has none or its last one scores lower than the checkpoint before it
 (`--skip-bench-check` overrides and says so). The two are compared over the questions both asked,
