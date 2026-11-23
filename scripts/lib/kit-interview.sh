@@ -22,6 +22,12 @@
 # Requires: jq.
 # errors: pure — the deriving half: catalog, context, render, apply — no side effects
 
+# The forge port (E537): every GitHub call goes through forge_* / gh_rest_* (scripts/lib/gh-rest.sh).
+if ! command -v gh_rest_issue_json >/dev/null 2>&1; then
+  # shellcheck source=/dev/null
+  . "$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)/gh-rest.sh"
+fi
+
 _kit_iv_dir="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
 # shellcheck source=/dev/null
 . "$_kit_iv_dir/kit-cli.sh"      # kit_is_main, kit_say/warn/die

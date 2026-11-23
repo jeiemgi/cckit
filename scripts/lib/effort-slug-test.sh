@@ -3,7 +3,7 @@
 # effort-slug-test.sh — covers the effort slug layer (#93/#94/#96): slug derivation (doubling fix),
 # `slug #N` display, and effort_slug_resolve (number passthrough, branch match, ambiguity, no-match,
 # slug:<slug> label vs title-derived precedence). Hermetic: a throwaway git repo with effort/* branches
-# + a stubbed gh (no network/auth). Run:  bash scripts/lib/effort-slug-test.sh
+# + the forge shim (no network/auth). Run:  bash scripts/lib/effort-slug-test.sh
 # errors: strict — a test runner: rc 1 on any failed assertion
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -16,20 +16,21 @@ command -v git >/dev/null 2>&1 || { echo "effort-slug-test: git required" >&2; e
 
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 
-# Stub gh so the issue-based fallback is deterministic (label lookup + title-derived).
-stub="$tmp/bin"; mkdir -p "$stub"
-cat > "$stub/gh" <<'SH'
-#!/usr/bin/env bash
-# issue list --label slug:explicit-handle  → #207 ; title search → #205 "[Effort] 205 · [Core] Title Only Effort"
-case "$*" in
-  *"--label slug:explicit-handle"*) echo "207" ;;
-  *"--label slug:"*)                : ;;                       # unknown label → no match
-  *"in:title"*)                     printf '205\t[Effort] 205 · [Core] Title Only Effort\n' ;;
-  *) : ;;
+# The forge shim (test-forge-shim.sh) makes the issue-based fallback deterministic: the open issue
+# list carries #205 "[Effort] 205 · [Core] Title Only Effort" (title-derived match), and a fixture
+# answers the slug:explicit-handle label query with #207; any other slug: label matches nothing.
+stub="$tmp/bin"
+# shellcheck source=/dev/null
+. "$LIB/test-forge-shim.sh"; forge_shim_install "$stub"
+export PATH="$stub:$PATH" GH_TOKEN=test-token CCKIT_FORGE=github GH_LOG="$tmp/gh.log"
+export GH_ISSUES='[{"number":205,"title":"[Effort] 205 · [Core] Title Only Effort","state":"open","labels":[]},{"number":206,"title":"plain issue","state":"open","labels":[]}]'
+export GH_FIXTURE="$tmp/fixture.sh"
+cat > "$GH_FIXTURE" <<'SH'
+case "$method $path" in
+  "GET repos/o/r/issues?"*"labels=slug%3Aexplicit-handle"*) out='[{"number":207,"title":"[Effort] 207 · handle","state":"open","labels":[{"name":"slug:explicit-handle"}]}]' ;;
+  "GET repos/o/r/issues?"*"labels=slug%3A"*)                out='[]' ;;
 esac
 SH
-chmod +x "$stub/gh"
-export PATH="$stub:$PATH"
 export EFFORT_REPO="o/r" KIT_REPO="o/r"
 
 # shellcheck source=/dev/null
@@ -75,14 +76,29 @@ rc "ambiguous slug returns nonzero rc" "$r" "1"
 case "$out" in *ambiguous*) echo "ok: ambiguous slug explains itself" ;; *) echo "FAIL: ambiguous message: $out"; fail=1 ;; esac
 git branch -D effort/103-resolve-slug >/dev/null 2>&1
 
-# ── gh fallback: slug:<slug> label wins; title-derived used when no branch/label matches ───────
+# ── forge fallback: slug:<slug> label wins; title-derived used when no branch/label matches ────
+: > "$GH_LOG"
 t  "resolve via slug label (no branch)"     "$(effort_slug_resolve explicit-handle)"   "207"
+t  "the label lookup is one REST read of the open issues" \
+  "$(grep -c '^GET repos/o/r/issues?state=open&labels=slug%3Aexplicit-handle&per_page=100 $' "$GH_LOG")" "1"
+: > "$GH_LOG"
 t  "resolve via title-derived (no branch)"  "$(effort_slug_resolve title-only-effort)" "205"
+t  "the title pass reads the open issues after the label miss" \
+  "$(grep -c '^GET repos/o/r/issues?state=open&per_page=100 $' "$GH_LOG")" "1"
+t  "the fallback ran no gh subcommand" "$(grep -c '^GH-SUBCOMMAND' "$GH_LOG")" "0"
 
 # ── no match anywhere → nonzero rc ─────────────────────────────────────────────────────────────
 out="$(effort_slug_resolve nope-not-here 2>&1)"; r=$?
 rc "unknown slug returns nonzero rc" "$r" "1"
 case "$out" in *"no effort matches"*) echo "ok: unknown slug explains itself" ;; *) echo "FAIL: no-match message: $out"; fail=1 ;; esac
+
+# ── no forge configured: the branch scan still answers; the issue fallback is skipped, not failed ─
+: > "$GH_LOG"
+t  "no forge: a branch slug still resolves" "$(CCKIT_FORGE=none effort_slug_resolve resolve-slug 2>/dev/null)" "101"
+out="$(CCKIT_FORGE=none effort_slug_resolve explicit-handle 2>&1)"; r=$?
+rc "no forge: a label-only slug is a no-match (rc 1)" "$r" "1"
+case "$out" in *"no effort matches"*) echo "ok: no forge: the no-match line is the same" ;; *) echo "FAIL: no-forge message: $out"; fail=1 ;; esac
+t  "no forge: no request was made" "$(wc -l < "$GH_LOG" | tr -d ' ')" "0"
 
 # ── #244 · effort_branch_rows — the ONE effort-branch scan (shared with the WIP gate) ──────────
 # `<N>\t<slug>` per effort/<N>-<slug> ref, local heads AND remote-tracking. #101 is local+remote

@@ -34,6 +34,12 @@
 # errors: strict — rc 1 on any failed step; nothing is pushed or opened after a failure
 # Runs under the dispatcher's `set -eu`: every read that may fail carries `|| true` or an `if`.
 
+# The forge port (E537): every GitHub call goes through forge_* / gh_rest_* (scripts/lib/gh-rest.sh).
+if ! command -v gh_rest_issue_json >/dev/null 2>&1; then
+  # shellcheck source=/dev/null
+  . "$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)/gh-rest.sh"
+fi
+
 _LT_LIB_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" >/dev/null 2>&1 && pwd)"
 if ! command -v task_source_call >/dev/null 2>&1; then
   # shellcheck source=task-source.sh
@@ -304,23 +310,13 @@ _lt_open_pr() {
     echo "✗ could not push $branch — the commit is kept in $wt; run the same command again to retry" >&2
     return 1
   fi
-  if cckit_gh_rest; then
-    n="$(gh_rest_pr_for_head "$repo" "$branch" 2>/dev/null || true)"
-    if [ -n "$n" ]; then url="https://github.com/$repo/pull/$n"; fi
-  else
-    url="$(gh pr list --repo "$repo" --head "$branch" --state open --json url --jq '.[0].url // empty' 2>/dev/null || true)"
-  fi
+  url="$(gh_rest_pr_url_for_head "$repo" "$branch" 2>/dev/null || true)"
   if [ -n "$url" ]; then
     _lt_say "[task] a pull request is already open for $branch" \
             "[task] this draft is already waiting for review" >&2
     echo "✓ $url"; return 0
   fi
-  if cckit_gh_rest; then
-    url="$(gh_rest_pr_create "$repo" "$base" "$branch" "$title" "$body" "" "")" || url=""
-  else
-    url="$(gh pr create --repo "$repo" --base "$base" --head "$branch" \
-      --title "$title" --body "$body" --assignee "@me")" || url=""
-  fi
+  url="$(gh_rest_pr_create "$repo" "$base" "$branch" "$title" "$body" "" "")" || url=""
   if [ -z "$url" ]; then
     echo "✗ could not open the pull request for $branch — the branch is pushed; run the same command again to retry" >&2
     return 1

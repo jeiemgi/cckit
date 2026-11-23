@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# light-task-test.sh — `cckit task <new|list|next|start|finish|share>` end to end (#450), against a
-# stubbed gh, a throwaway repo and a bare remote. Covers every verb in human and `--llm` form, the
+# light-task-test.sh — `cckit task <new|list|next|start|finish|share>` end to end (#450, E537), over
+# the forge shim, a throwaway repo and a bare remote. Covers every verb in human and `--llm` form, the
 # derived states (draft → doing → review → done; shared), the move of a draft onto its branch, the pull
 # request `finish` opens (no `Closes`, title ending in the task id), the gc protection of a live
 # `light/<id>-<slug>` branch and its release once the task is done on the base branch, a second
@@ -22,26 +22,30 @@ hasnt() { case "$2" in *"$3"*) echo "FAIL: $1 -> '[$2]' has '[$3]'"; fail=1 ;; *
 command -v jq >/dev/null 2>&1 || { echo "light-task-test: jq required" >&2; exit 1; }
 
 tmp="$(cd "$(mktemp -d)" && pwd -P)"; trap 'rm -rf "$tmp"' EXIT
-export GH_LOG="$tmp/gh.log" GH_OPEN_URL="" GH_PR_INDEX=""
+export GH_LOG="$tmp/gh.log" GH_OPEN_URL="" GH_PR_INDEX="[]"
 : > "$GH_LOG"
-mkdir -p "$tmp/bin"
-# A gh that logs one call per line (newlines in a body become \036). `pr list --head` answers the
-# open-PR lookup; a bare `pr list` answers gc's PR index.
-cat > "$tmp/bin/gh" <<'SH'
-#!/usr/bin/env bash
-{ printf '%s' "$*" | tr '\n' '\036'; echo; } >> "$GH_LOG"
-case "$1 $2" in
-  "pr list")
-    case " $* " in
-      *" --head "*) [ -n "$GH_OPEN_URL" ] && echo "$GH_OPEN_URL" ;;
-      *) [ -n "$GH_PR_INDEX" ] && printf '%b' "$GH_PR_INDEX" ;;
+# shellcheck source=/dev/null
+. "$LIB/test-forge-shim.sh"; forge_shim_install "$tmp/bin"
+# The pull-request fixtures the shim does not know: `GET pulls?head=…` answers the open-PR lookup
+# (GH_OPEN_URL, empty = none), a bare `GET pulls` answers gc's PR index (GH_PR_INDEX, a JSON array),
+# and `POST pulls` opens #77 — or answers 500 with GH_CREATE_FAIL=1.
+export GH_FIXTURE="$tmp/fixture.sh"
+cat > "$GH_FIXTURE" <<'SH'
+case "$method $ep" in
+  "GET repos/o/r/pulls")
+    case "$path" in
+      *head=*) out="[$( [ -n "${GH_OPEN_URL:-}" ] && printf '{"number":77,"html_url":"%s"}' "$GH_OPEN_URL" )]" ;;
+      *)       out="${GH_PR_INDEX:-[]}" ;;
     esac ;;
-  "pr create") [ -n "${GH_CREATE_FAIL:-}" ] && exit 1; echo "https://github.com/o/r/pull/77" ;;
-  "issue view") echo "issue lookups are not expected for a light task" >&2; exit 1 ;;
-  *) exit 0 ;;
+  "POST repos/o/r/pulls")
+    if [ -n "${GH_CREATE_FAIL:-}" ]; then out='{"message":"boom"}'; code=500
+    else out='{"number":77,"html_url":"https://github.com/o/r/pull/77","user":{"login":"me"}}'; fi ;;
+  "GET repos/o/r/issues/"*) echo "issue lookups are not expected for a light task" >&2; out='{"message":"Not Found"}'; code=404 ;;
 esac
 SH
-chmod +x "$tmp/bin/gh"
+export GH_TOKEN=test-token CCKIT_FORGE=github
+# The PR a verb opens: ONE POST on repos/o/r/pulls; its JSON body is the log line's third field.
+pr_post() { grep '^POST repos/o/r/pulls ' "$GH_LOG"; }
 export PATH="$tmp/bin:$PATH" KIT_WT_INSTALL=0
 
 git init -q --bare "$tmp/remote.git"
@@ -126,7 +130,7 @@ out="$("$CCKIT" gc 2>/dev/null)"
 has "cckit gc keeps a started task (no commit beyond base would otherwise read LANDED)" \
   "$(printf '%s\n' "$out" | grep "  light/$B-")" "PROTECTED: light task $B still OPEN"
 hasnt "cckit gc offers no light branch for deletion" "$(printf '%s\n' "$out" | grep 'light/')" "> LANDED"
-t "gc never asked GitHub about an issue for a light branch" "$(grep -c '^issue view' "$GH_LOG")" "0"
+t "gc never asked GitHub about an issue for a light branch" "$(grep -c '^GET repos/o/r/issues/' "$GH_LOG")" "0"
 out="$(cd "$W" && KIT_TASKS_SOURCE=nosuch bash -c '. "$1/worktree-issue.sh"; wt_task_state t3f9a light/t3f9a-x; wt_protected_reason light/t3f9a-x' _ "$LIB")"
 t "a source that cannot be read is unknown, and unknown is kept" "$out" "unknown
 light task t3f9a state unknown"
@@ -141,16 +145,17 @@ t "the work is committed with the task" "$(git -C "$WT" show --stat --format= HE
 has "a new file is reported, not committed" "$(cat "$tmp/fin.err")" "new-post.txt"
 t "the new file stays untracked without --all" "$(git -C "$WT" ls-files new-post.txt | grep -c .)" "0"
 t "the pushed branch carries the done mark" "$(git --git-dir="$tmp/remote.git" show "$BR:tasks/$A.md" | sed -n 3p)" "status: done"
-create="$(grep '^pr create' "$GH_LOG")"
-has "the PR targets the base branch" "$create" "--base develop --head $BR"
-has "the PR title is a Conventional Commit subject ending in the task id" "$create" "--title feat: Write the spring newsletter [$A]"
+create="$(pr_post)"
+has "the PR targets the base branch" "$create" "\"head\":\"$BR\",\"base\":\"develop\","
+has "the PR title is a Conventional Commit subject ending in the task id" "$create" "\"title\":\"feat: Write the spring newsletter [$A]\","
 has "the PR body names the task" "$create" "\`$A\` · Write the spring newsletter"
 hasnt "the PR body has no Closes line" "$create" "Closes #"
+t "no gh subcommand ran in finish" "$(grep -c '^GH-SUBCOMMAND' "$GH_LOG")" "0"
 t "list shows the task in review" "$("$CCKIT" task list --llm | jq -r --arg id "$A" '.[] | select(.id == $id) | .state')" "review"
 : > "$GH_LOG"
 out="$(GH_OPEN_URL="https://github.com/o/r/pull/77" "$CCKIT" task done "$A" "again" --all --llm)"
 t "done is finish; --llm reports the url" "$(printf '%s' "$out" | jq -r '[.verb, .ok, .url] | join(" ")')" "task finish true https://github.com/o/r/pull/77"
-t "an open PR is reported, not re-created" "$(grep -c '^pr create' "$GH_LOG")" "0"
+t "an open PR is reported, not re-created" "$(pr_post | grep -c .)" "0"
 t "--all commits new files" "$(git -C "$WT" ls-files new-post.txt | grep -c .)" "1"
 "$CCKIT" task finish "$B" >/dev/null 2>&1; t "finish without a summary is a usage error" "$?" "2"
 "$CCKIT" task finish zz9 "x" >/dev/null 2>&1; t "finish refuses an unknown task" "$?" "1"
@@ -174,8 +179,8 @@ has "plain language: start says how to send it for review" "$(cat "$tmp/start-pl
 hasnt "the default wording's finish hint does not add --all" "$(cat "$tmp/start.err")" "<summary>\" --all"
 hasnt "plain language: start does not say 'created worktree'" "$(cat "$tmp/start-plain.err")" "created worktree"
 hasnt "plain language: start does not name the branch" "$(cat "$tmp/start-plain.err")" "(branch "
-create="$(grep '^pr create' "$GH_LOG")"
-has "a conventional summary becomes the PR title, with the id" "$create" "--title fix: launch posts scheduled [$B]"
+create="$(pr_post)"
+has "a conventional summary becomes the PR title, with the id" "$create" "\"title\":\"fix: launch posts scheduled [$B]\","
 has "content body: names the task" "$create" "\`$B\` · "
 has "content body: review checklist" "$create" "Read the draft from start to finish"
 has "content body: says what approving does" "$create" "Approving and merging this pull request marks the task done"
@@ -216,7 +221,7 @@ t "share prints the PR url" "$out" "✓ https://github.com/o/r/pull/77"
 SB="$(git for-each-ref --format='%(refname:short)' 'refs/heads/light/share-*')"
 t "the share branch carries both tasks and nothing else" "$(git diff --name-only origin/develop "$SB" | sort | tr '\n' ' ')" \
   "$(printf 'tasks/%s.md\ntasks/%s.md\n' "$C" "$D" | sort | tr '\n' ' ')"
-has "the share PR title counts the tasks" "$(grep '^pr create' "$GH_LOG")" "--title chore(tasks): add 2 tasks [share-"
+has "the share PR title counts the tasks" "$(pr_post)" "\"title\":\"chore(tasks): add 2 tasks [share-"
 t "share leaves the checkout clean" "$(git status --porcelain)" ""
 t "shared tasks stay listed, as shared, on the share branch" "$("$CCKIT" task list --llm | jq -r --arg id "$C" '.[] | select(.id == $id) | .state + " " + .branch')" "shared $SB"
 t "next does not offer a shared task" "$("$CCKIT" task next --llm | jq -r --arg c "$C" --arg d "$D" 'if . == null then "none" elif .id == $c or .id == $d then "shared" else "other" end')" "none"
@@ -226,7 +231,7 @@ has "the refusal names the share branch" "$out" "share pull request ($SB)"
 : > "$GH_LOG"
 out="$(GH_OPEN_URL="https://github.com/o/r/pull/77" "$CCKIT" task share 2>/dev/null)"
 t "share with no new drafts reports the open share PR" "$out" "✓ https://github.com/o/r/pull/77"
-t "and does not create a second one" "$(grep -c '^pr create' "$GH_LOG")" "0"
+t "and does not create a second one" "$(pr_post | grep -c .)" "0"
 # The share PR merges: the tasks are todo, and a share with nothing pending is a no-op.
 ( cd "$tmp/merger" && git fetch -q origin && git checkout -q develop && git pull -q origin develop \
   && git merge -q --squash "origin/$SB" >/dev/null 2>&1 && git commit -q -m "chore(tasks): add 2 tasks (#78)" \
@@ -241,7 +246,7 @@ t "the task of a failed share is still listed" "$("$CCKIT" task list --llm | jq 
 : > "$GH_LOG"
 out="$("$CCKIT" task share --llm)"
 t "re-running share opens the PR for the pending branch" "$(printf '%s' "$out" | jq -r '[.verb, .ok, .url] | join(" ")')" "task share true https://github.com/o/r/pull/77"
-has "the retried PR lists the pending task" "$(grep '^pr create' "$GH_LOG")" "\`$G\`"
+has "the retried PR lists the pending task" "$(pr_post)" "\`$G\`"
 out="$(cd "$WTB" && GH_CREATE_FAIL=1 "$CCKIT" task finish "fix: launch posts scheduled" 2>&1)"; t "finish exits 1 when the PR cannot be opened" "$?" "1"
 has "finish says the branch is pushed and how to retry" "$out" "the branch is pushed; run the same command again to retry"
 t "the share branch is not a task" "$(. "$LIB/kit-config.sh" && load_kit_config && . "$LIB/worktree-issue.sh" && wt_protected_reason "$SB" o/r)" ""
@@ -277,7 +282,7 @@ has "…and names the command that starts the task" "$want" "start: cckit task s
 t "cckit next --llm is the light task object" "$(KIT_TASK_FETCH=0 "$CCKIT" next --llm 2>/dev/null | jq -r 'has("start")')" "true"
 : > "$GH_LOG"
 KIT_TASK_FETCH=0 "$CCKIT" next >/dev/null 2>&1
-t "the light next makes no gh call" "$(grep -c . "$GH_LOG" | tr -d ' ')" "0"
+t "the light next makes no forge request" "$(grep -c . "$GH_LOG" | tr -d ' ')" "0"
 jq '.tasks.default = "sometimes"' cckit.config.json > c.tmp && mv c.tmp cckit.config.json
 out="$("$CCKIT" task default 2>"$tmp/default.err")"
 t "an unknown tasks.default reads as issues" "$out" "issues"

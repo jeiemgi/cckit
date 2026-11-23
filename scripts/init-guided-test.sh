@@ -8,9 +8,10 @@
 # nothing, --no-github, an idempotent re-run, a refused branch protection, a failed step that does
 # not hide the later ones, and --upgrade staying out of the flow.
 #
-# Hermetic: HOME is a temp dir, `gh` and `pnpm` are stubs on PATH, "GitHub" is a directory of bare
-# repositories plus a log of every write the stub was asked to make, and the recipe is a fixture
-# whose commands are plain shell. Nothing here reaches the network or a real repository.
+# Hermetic: HOME is a temp dir, `pnpm` is a stub on PATH, GitHub is the forge shim
+# (scripts/lib/test-forge-shim.sh) answering from a fixture — a directory of bare repositories plus
+# a log of every write it was asked to make — and the recipe is a fixture whose commands are plain
+# shell. No `gh` is installed. Nothing here reaches the network or a real repository.
 # Run:  bash scripts/init-guided-test.sh
 # errors: strict — a test runner: rc 1 on any failed assertion
 set -u
@@ -34,85 +35,76 @@ export HOME="$tmp/home"; mkdir -p "$HOME"
 printf '[user]\n\tname = Test Person\n\temail = test@example.com\n[init]\n\tdefaultBranch = trunk\n' > "$HOME/.gitconfig"
 export GHS="$tmp/github"; mkdir -p "$GHS/git" "$GHS/repos"; : > "$GHS/writes.log"
 
-# ── stubs ────────────────────────────────────────────────────────────────────────────────────────
+# ── the forge (E537) ─────────────────────────────────────────────────────────────────────────────
+# GitHub is REST over curl with a token. The shim's `curl` answers every request from the fixture
+# below — a GitHub made of files: $GHS/repos/<owner>__<name>/ holds one repository's state,
+# $GHS/git/ the bare repositories git pushes to, $GHS/writes.log one line per write the caller asked
+# for. The shim's `gh` answers only `gh auth token` and FAILS on any other subcommand, so a gh call
+# left in init is a red step here. The repository URL init adds as origin is the real one
+# (https://github.com/<owner>/<name>.git); a git URL rewrite in the test HOME sends every push to
+# the bare repository of the same name under $GHS/git/.
+printf '[url "%s/git/"]\n\tinsteadOf = https://github.com/\n' "$GHS" >> "$HOME/.gitconfig"
 mkdir -p "$tmp/stubs"
-cat > "$tmp/stubs/gh" <<'STUB'
-#!/usr/bin/env bash
-# A GitHub made of files: $GHS/repos/<owner>__<name>/ holds one repository's state, $GHS/git/ the
-# bare repositories git pushes to, $GHS/writes.log one line per write the caller asked for.
-set -u
+# shellcheck source=/dev/null
+. "$ROOT/scripts/lib/test-forge-shim.sh"
+forge_shim_install "$tmp/stubs"
+export GH_TOKEN=test-token CCKIT_FORGE=github GH_FIXTURE="$tmp/fixture.sh" GH_LOG="$tmp/forge.log"
+: > "$GH_LOG"
+# gh is not installed on the reader's machine: the git protocol comes from this variable, not from
+# gh's config file (see section 7b for the run with neither).
+export CCKIT_GIT_PROTOCOL=https
+cat > "$GH_FIXTURE" <<'FIX'
+# Sourced by the shim's curl with $method $ep (the path, no query) $body set; sets out and code.
 log() { printf '%s\n' "$*" >> "$GHS/writes.log"; }
-rdir() { printf '%s/repos/%s\n' "$GHS" "$(printf '%s' "$1" | tr '/' '_' | sed 's/_/__/')"; }
-here_repo() {  # the repository the cwd's origin points at, when it is one of ours
-  local u; u="$(git remote get-url origin 2>/dev/null)" || return 1
-  case "$u" in "$GHS/git/"*) u="${u#"$GHS/git/"}"; printf '%s\n' "${u%.git}" ;; *) return 1 ;; esac
-}
-case "${1:-} ${2:-}" in
-  "auth status") exit 0 ;;
-  "config get") echo https; exit 0 ;;
-  "api user") echo tester; exit 0 ;;
-  "repo view")
-    shift 2; repo=""; fields=""
-    while [ $# -gt 0 ]; do case "$1" in --json) fields="$2"; shift 2 ;; -q|--jq) shift 2 ;; *) repo="$1"; shift ;; esac; done
-    [ -n "$repo" ] || repo="$(here_repo)" || exit 1
-    d="$(rdir "$repo")"; [ -d "$d" ] || { echo "GraphQL: Could not resolve to a Repository" >&2; exit 1; }
-    case "$fields" in
-      nameWithOwner) echo "$repo" ;;
-      defaultBranchRef) cat "$d/default" 2>/dev/null || echo main ;;
-      url,sshUrl) printf '%s\t%s\n' "$GHS/git/$repo" "" ;;
-    esac
-    exit 0 ;;
-  "repo create")
-    shift 2; repo="$1"; shift; vis=""; src=""
-    while [ $# -gt 0 ]; do case "$1" in --private|--public) vis="$1"; shift ;; --source) src="$2"; shift 2 ;; --remote) shift 2 ;; *) shift ;; esac; done
-    [ -f "$GHS/fail-create" ] && { echo "gh: could not create the repository (HTTP 500)" >&2; exit 1; }
-    log "repo create $repo $vis"
-    d="$(rdir "$repo")"; mkdir -p "$d" "$GHS/git/$(dirname "$repo")"
-    git init -q --bare "$GHS/git/$repo.git"
-    git -C "$src" remote add origin "$GHS/git/$repo.git"
-    exit 0 ;;
-  "repo edit")
-    repo="$3"; log "repo edit $*"; printf '%s\n' "$5" > "$(rdir "$repo")/default"; exit 0 ;;
-  "label list")
-    shift 2; while [ $# -gt 0 ]; do case "$1" in --repo) repo="$2"; shift 2 ;; *) shift ;; esac; done
-    cat "$(rdir "$repo")/labels" 2>/dev/null; exit 0 ;;
-  "label create")
-    name="$3"; shift 3; while [ $# -gt 0 ]; do case "$1" in --repo) repo="$2"; shift 2 ;; *) shift ;; esac; done
-    [ -f "$GHS/fail-labels" ] && { echo "gh: label could not be created (HTTP 500)" >&2; exit 1; }
-    log "label create $repo $name"; printf '%s\n' "$name" >> "$(rdir "$repo")/labels"; exit 0 ;;
-  "api graphql") exit 1 ;;
+rdir() { printf '%s/repos/%s\n' "$GHS" "$(printf '%s' "$1" | sed 's#/#__#')"; }
+refuse() { out="{\"message\":\"$1\"}"; code="$2"; }
+field() { printf '%s' "$body" | jq -r --arg k "$1" 'if has($k) then .[$k] | tostring else empty end'; }
+repo=""; rest=""
+case "$ep" in repos/*/*) repo="$(printf '%s' "$ep" | cut -d/ -f2-3)"; rest="$(printf '%s' "$ep" | cut -d/ -f4-)" ;; esac
+d="$(rdir "${repo:-none/none}")"
+case "$method $ep" in
+  "GET user") out='{"login":"tester","type":"User"}' ;;
+  "POST user/repos"|"POST orgs/"*"/repos")
+    owner=tester; case "$ep" in orgs/*) owner="$(printf '%s' "$ep" | cut -d/ -f2)" ;; esac
+    repo="$owner/$(field name)"; d="$(rdir "$repo")"
+    if [ -f "$GHS/fail-create" ]; then refuse "could not create the repository" 500
+    else
+      vis=--private; [ "$(field private)" = false ] && vis=--public
+      log "repo create $repo $vis"
+      mkdir -p "$d" "$GHS/git/$owner"; git init -q --bare "$GHS/git/$repo.git"
+      out="{\"full_name\":\"$repo\",\"html_url\":\"https://github.com/$repo\",\"ssh_url\":\"git@github.com:$repo.git\",\"default_branch\":\"main\",\"private\":true}"
+    fi ;;
+  "POST graphql") refuse "GraphQL is off in this fixture" 500 ;;
+  "GET repos/"*)
+    if [ ! -d "$d" ]; then refuse "Not Found" 404
+    else
+      case "$rest" in
+        "") out="{\"full_name\":\"$repo\",\"html_url\":\"https://github.com/$repo\",\"ssh_url\":\"git@github.com:$repo.git\",\"default_branch\":\"$(cat "$d/default" 2>/dev/null || echo main)\",\"delete_branch_on_merge\":$(cat "$d/delete-on-merge" 2>/dev/null || echo false)}" ;;
+        labels)     out="$( { cat "$d/labels" 2>/dev/null || true; } | jq -R '{name: .}' | jq -s .)" ;;
+        milestones) out="$( { cat "$d/milestones" 2>/dev/null || true; } | jq -R '{title: .}' | jq -s .)" ;;
+        branches/*/protection)
+          br="$(printf '%s' "$rest" | cut -d/ -f2)"
+          if [ -f "$GHS/plan-refuses" ]; then refuse "Upgrade to GitHub Pro or make this repository public to enable this feature." 403
+          elif [ -f "$d/protected-$br" ]; then out='{}'
+          else refuse "Branch not protected" 404; fi ;;
+      esac
+    fi ;;
+  "PATCH repos/"*)
+    db="$(field default_branch)"
+    [ -n "$db" ] && { log "repo edit $repo --default-branch $db"; printf '%s\n' "$db" > "$d/default"; }
+    [ "$(field delete_branch_on_merge)" = true ] && { log "repo patch $repo delete_branch_on_merge"; echo true > "$d/delete-on-merge"; }
+    out='{}' ;;
+  "POST repos/"*"/labels")
+    if [ -f "$GHS/fail-labels" ]; then refuse "label could not be created" 500
+    else name="$(field name)"; log "label create $repo $name"; printf '%s\n' "$name" >> "$d/labels"; out='{}'; fi ;;
+  "POST repos/"*"/milestones")
+    title="$(field title)"; log "milestone create $repo $title"; printf '%s\n' "$title" >> "$d/milestones"; out='{"number":1}' ;;
+  "PUT repos/"*"/branches/"*"/protection")
+    br="$(printf '%s' "$rest" | cut -d/ -f2)"
+    if [ -f "$GHS/plan-refuses" ]; then refuse "Upgrade to GitHub Pro or make this repository public to enable this feature." 403
+    else log "protect $repo $br"; : > "$d/protected-$br"; out='{}'; fi ;;
 esac
-if [ "${1:-}" = "api" ]; then
-  shift; method=GET; ep=""; title=""
-  while [ $# -gt 0 ]; do
-    case "$1" in
-      -X) method="$2"; shift 2 ;;
-      -f) case "$2" in title=*) title="${2#title=}"; method=POST ;; esac; shift 2 ;;
-      -F|--jq|-q|--input) shift 2 ;;
-      *) ep="$1"; shift ;;
-    esac
-  done
-  case "$ep" in
-    repos/*/*/milestones*)
-      repo="$(printf '%s' "$ep" | cut -d/ -f2-3)"; d="$(rdir "$repo")"
-      if [ "$method" = POST ]; then log "milestone create $repo $title"; printf '%s\n' "$title" >> "$d/milestones"; else cat "$d/milestones" 2>/dev/null; fi
-      exit 0 ;;
-    repos/*/*/branches/*/protection)
-      repo="$(printf '%s' "$ep" | cut -d/ -f2-3)"; d="$(rdir "$repo")"; br="$(printf '%s' "$ep" | cut -d/ -f5)"
-      if [ -f "$GHS/plan-refuses" ]; then echo "gh: Upgrade to GitHub Pro or make this repository public to enable this feature. (HTTP 403)" >&2; exit 1; fi
-      if [ "$method" = PUT ]; then cat >/dev/null; log "protect $repo $br"; : > "$d/protected-$br"; echo '{}'; exit 0; fi
-      [ -f "$d/protected-$br" ] && { echo '{}'; exit 0; }
-      echo "gh: Branch not protected (HTTP 404)" >&2; exit 1 ;;
-    repos/*/*)
-      repo="$(printf '%s' "$ep" | cut -d/ -f2-3)"; d="$(rdir "$repo")"
-      if [ "$method" = PATCH ]; then log "repo patch $repo delete_branch_on_merge"; echo true > "$d/delete-on-merge"; exit 0; fi
-      cat "$d/delete-on-merge" 2>/dev/null || echo false
-      exit 0 ;;
-  esac
-fi
-echo "stub gh: unhandled: $*" >&2
-exit 1
-STUB
+FIX
 # pnpm: the database option's install command. Adds each named package to package.json.
 cat > "$tmp/stubs/pnpm" <<'STUB'
 #!/usr/bin/env bash
@@ -171,6 +163,13 @@ t "detect: project marker, no git"    "$(init_detect_class "$tmp/d/proj")"      
 t "detect: git, no remote"            "$(init_detect_class "$tmp/d/gitno")"     "git-noremote"
 t "detect: git with a remote"         "$(init_detect_class "$tmp/d/gitre")"     "project-remote"
 t "abs path of a missing nested folder" "$(init_abs_path "$tmp/d/a/b")"         "$tmp/d/a/b"
+# The repository init resolves from an existing origin is the one the remote names, whatever the
+# folder is called. (Read with a HOME that has no URL rewrite: the test's own rewrite turns the
+# remote into a local path, which no forge can name.)
+mkdir -p "$tmp/plainhome" "$tmp/d/renamed"
+git -C "$tmp/d/renamed" init -q; git -C "$tmp/d/renamed" remote add origin "git@github.com:tester/the-real-name.git"
+t "the repository name comes from the origin remote (https)" "$(HOME="$tmp/plainhome" bash -c '. "$1/scripts/lib/forge.sh"; forge_repo_from_git "$2"' _ "$ROOT" "$tmp/d/gitre")" "tester/gitre"
+t "the repository name comes from the origin remote (ssh), not the folder" "$(HOME="$tmp/plainhome" bash -c '. "$1/scripts/lib/forge.sh"; forge_repo_from_git "$2"' _ "$ROOT" "$tmp/d/renamed")" "tester/the-real-name"
 
 # ── 2. home directory ───────────────────────────────────────────────────────────────────────────
 run "$HOME" --profile minimal
@@ -310,13 +309,26 @@ run "$tmp/p/local" --yes
 t   "git, no remote, re-run: rc 0, no new commit, no GitHub write" "$RC:$(git -C "$tmp/p/local" rev-parse HEAD):$(writes)" "0:$h7:$w7"
 has "git, no remote, re-run: the commit step is skipped" "$OUT" "[skipped] cckit files commit — already committed"
 yes_if "git, no remote: develop is on GitHub" 'git -C "$GHS/git/tester/local.git" show-ref --verify -q refs/heads/develop'
+t   "git, no remote: origin is the repository's real URL, not a local path" "$(git -C "$tmp/p/local" config remote.origin.url)" "https://github.com/tester/local.git"
+has "git, no remote: the repository was created over REST, for the signed-in user" "$(cat "$GH_LOG")" 'POST user/repos {"name":"local","private":true}'
+t   "git, no remote: no gh subcommand was run" "$(grep -c '^GH-SUBCOMMAND' "$GH_LOG")" "0"
+
+# ── 7b. the reader has no gh at all: no gh config file and no CCKIT_GIT_PROTOCOL ────────────────
+# The git protocol defaults to https. The setup must run; it must not stop silently before its
+# first step because the file it reads the protocol from is not there.
+mkdir -p "$tmp/p/nogh"; git -C "$tmp/p/nogh" init -q
+echo hi > "$tmp/p/nogh/README.md"; git -C "$tmp/p/nogh" add -A; git -C "$tmp/p/nogh" commit -q -m first
+OUT="$(cd "$tmp/p/nogh" && env -u CCKIT_GIT_PROTOCOL CLAUDE_PLUGIN_ROOT="$ROOT" bash "$INIT" --profile minimal --yes 2>&1)"; RC=$?
+t   "no gh config, no protocol variable: rc 0" "$RC" "0"
+has "no gh config, no protocol variable: the setup ran" "$OUT" "Project setup"
+t   "no gh config, no protocol variable: https is the default" "$(git -C "$tmp/p/nogh" config remote.origin.url 2>/dev/null)" "https://github.com/tester/nogh.git"
 
 # ── 8. repository that already has a GitHub remote ──────────────────────────────────────────────
 mkdir -p "$GHS/repos/tester__adopted" "$GHS/git/tester" "$tmp/p/adopted"
 git init -q --bare "$GHS/git/tester/adopted.git"
 git -C "$tmp/p/adopted" init -q; git -C "$tmp/p/adopted" symbolic-ref HEAD refs/heads/main
 echo hi > "$tmp/p/adopted/README.md"; git -C "$tmp/p/adopted" add -A; git -C "$tmp/p/adopted" commit -q -m first
-git -C "$tmp/p/adopted" remote add origin "$GHS/git/tester/adopted.git"; git -C "$tmp/p/adopted" push -q -u origin main
+git -C "$tmp/p/adopted" remote add origin "https://github.com/tester/adopted.git"; git -C "$tmp/p/adopted" push -q -u origin main
 : > "$GHS/writes.log"
 run "$tmp/p/adopted" --profile minimal --yes
 t   "existing remote: rc 0" "$RC" "0"
@@ -337,7 +349,7 @@ mkdir -p "$GHS/repos/tester__mixed" "$tmp/p/mixed/scripts"
 git init -q --bare "$GHS/git/tester/mixed.git"
 git -C "$tmp/p/mixed" init -q; git -C "$tmp/p/mixed" symbolic-ref HEAD refs/heads/main
 echo hi > "$tmp/p/mixed/README.md"; git -C "$tmp/p/mixed" add -A; git -C "$tmp/p/mixed" commit -q -m first
-git -C "$tmp/p/mixed" remote add origin "$GHS/git/tester/mixed.git"; git -C "$tmp/p/mixed" push -q -u origin main
+git -C "$tmp/p/mixed" remote add origin "https://github.com/tester/mixed.git"; git -C "$tmp/p/mixed" push -q -u origin main
 echo "SECRET=1" > "$tmp/p/mixed/.env"; echo "SECRET=2" > "$tmp/p/mixed/scripts/.env.local"
 echo "mine" > "$tmp/p/mixed/scripts/my-own.sh"; echo "notes" > "$tmp/p/mixed/notes.txt"
 echo "staged" > "$tmp/p/mixed/staged.txt"; git -C "$tmp/p/mixed" add staged.txt
@@ -357,7 +369,7 @@ mkdir -p "$GHS/repos/tester__parked" "$tmp/p/parked"
 git init -q --bare "$GHS/git/tester/parked.git"
 git -C "$tmp/p/parked" init -q; git -C "$tmp/p/parked" symbolic-ref HEAD refs/heads/main
 echo hi > "$tmp/p/parked/README.md"; git -C "$tmp/p/parked" add -A; git -C "$tmp/p/parked" commit -q -m first
-git -C "$tmp/p/parked" remote add origin "$GHS/git/tester/parked.git"; git -C "$tmp/p/parked" push -q -u origin main
+git -C "$tmp/p/parked" remote add origin "https://github.com/tester/parked.git"; git -C "$tmp/p/parked" push -q -u origin main
 git -C "$tmp/p/parked" checkout -q -b side
 run "$tmp/p/parked" --profile minimal --yes
 t   "parked on another branch: rc 1" "$RC" "1"

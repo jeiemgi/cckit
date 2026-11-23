@@ -21,6 +21,12 @@
 # `effort.planSource` feeds `effort_plan` only.
 # errors: strict — refuses to plan from GitHub without gh + jq
 
+# The forge port (E537): every GitHub call goes through forge_* / gh_rest_* (scripts/lib/gh-rest.sh).
+if ! command -v gh_rest_issue_json >/dev/null 2>&1; then
+  # shellcheck source=/dev/null
+  . "$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)/gh-rest.sh"
+fi
+
 EFFORT_REPO="${EFFORT_REPO:-${KIT_REPO:-}}"
 
 # _ep_weight <ctx> [issue] — session weight of a ctx: value. Anything outside S|M|L|XL weighs
@@ -52,9 +58,10 @@ _ep_weight() {
 effort_open_rows() {
   local repo="${1:-${EFFORT_REPO:-${KIT_REPO:-}}}" raw n f c p t b tab
   tab="$(printf '\t')"
-  command -v gh >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 || return 1
+  forge_available && command -v jq >/dev/null 2>&1 || return 1
   [ -n "$repo" ] || return 1
-  raw="$(gh issue list --repo "$repo" --label effort --state open --limit 100 --json number,title,labels 2>/dev/null)" || return 1
+  raw="$(forge_rest "repos/$repo/issues" -X GET -f state=open -f labels=effort -f per_page=100 \
+    --jq '[.[] | select(.pull_request | not) | {number, title, labels: [.labels[] | {name}]}]' 2>/dev/null)" || return 1
   raw="$(printf '%s' "$raw" | jq -r '.[] | [ (.number|tostring),
                   ([.labels[].name|select(startswith("flow:"))|ltrimstr("flow:")]|first // "—"),
                   ([.labels[].name|select(startswith("ctx:"))|ltrimstr("ctx:")]|first // "?"),
@@ -63,7 +70,7 @@ effort_open_rows() {
   [ -n "$raw" ] || return 0
   while IFS="$tab" read -r n f c p t; do
     [ -n "$n" ] || continue
-    b="$(gh api "repos/$repo/issues/$n/dependencies/blocked_by" 2>/dev/null \
+    b="$(forge_rest "repos/$repo/issues/$n/dependencies/blocked_by" 2>/dev/null \
       | jq -r '[ ([.[].number|tostring]|join(",")),
                  ([.[]|select((.state // "open")|ascii_downcase == "open")|.number|tostring]|join(",")) ]
                | map(if . == "" then "-" else . end) | @tsv' 2>/dev/null)"
@@ -203,7 +210,7 @@ effort_plan() {
     [[ -n "$fellback" ]] && echo "effort plan: $fellback — falling back to GitHub" >&2
   fi
   if [[ -z "$srcline" ]]; then
-    command -v gh >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 || { echo "effort plan: needs gh + jq" >&2; return 1; }
+    forge_need "effort plan" || return 1; command -v jq >/dev/null 2>&1 || { echo "effort plan: needs jq" >&2; return 1; }
     srcline="GitHub ($repo)"
     [[ -n "$fellback" ]] && srcline="$srcline — $fellback, fell back"
     rows="$(_ep_rows_github "$repo")" \

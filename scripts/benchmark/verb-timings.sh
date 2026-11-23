@@ -2,7 +2,8 @@
 # benchmark/verb-timings.sh — wall time and GitHub call count of cckit's read-only verbs (#452).
 #
 # Each verb runs --runs times (default 3) from one checkout. Per verb it records the fastest and the
-# median wall time in milliseconds, and how many times the verb ran `gh`.
+# median wall time in milliseconds, and how many GitHub requests the verb made (`gh_calls`: API
+# requests over curl, plus any `gh` run — the key name is kept for the checkpoint format).
 #
 # Usage:
 #   verb-timings.sh [--runs <N>] [--checkout <dir>] [--cckit <path>] [--verb "<verb> [args]"]… [--json]
@@ -18,8 +19,10 @@
 # Three of them still touch the shared git directory: `status`, `gc` and `task list` refresh the
 # remote-tracking refs (`git fetch --prune`), and `sync` appends two lines to kit-events.jsonl.
 #
-# How `gh` is counted: a shim named `gh` in a temp dir is put first on PATH of each measured verb,
-# and only there. It appends one line to a log and execs the real `gh` with the same arguments, so
+# How requests are counted: shims named `curl` and `gh` in a temp dir are put first on PATH of each
+# measured verb, and only there. The curl shim counts a call whose arguments name the GitHub API
+# host and execs the real curl; the gh shim counts every call. Each appends one line to a log and
+# execs the real binary with the same arguments, so
 # the verb's behaviour and output are unchanged. The temp dir is removed when the script exits; the
 # shell that called this script keeps its PATH. `gh_calls` is the median count across the runs.
 #
@@ -98,6 +101,14 @@ printf '%s\n' "${1:-}" >> "$GH_SHIM_LOG"
 exec "$GH_SHIM_REAL" "$@"
 SHIM
 chmod +x "$tmp/shim/gh"
+real_curl="$(command -v curl 2>/dev/null || true)"
+cat > "$tmp/shim/curl" <<'SHIM'
+#!/usr/bin/env bash
+case " $* " in *api.github.com*|*"${CCKIT_FORGE_API:-//none//}"*) echo "curl $*" >> "${GH_SHIM_LOG:-/dev/null}" ;; esac
+[ -n "${CURL_SHIM_REAL:-}" ] || { echo "curl: command not found" >&2; exit 127; }
+exec "$CURL_SHIM_REAL" "$@"
+SHIM
+chmod +x "$tmp/shim/curl"
 
 # One run: perl takes the clock on both sides of the verb, so the only process start inside the
 # measured interval is the verb's own. Writes "<ms> <exit>" to the file named first; the verb's
@@ -115,7 +126,7 @@ while IFS= read -r verb; do
     log="$tmp/gh.log"; : > "$log"
     : > "$tmp/t"
     # shellcheck disable=SC2086  # the verb string is split into words on purpose: "effort plan"
-    ( cd "$checkout" && env PATH="$tmp/shim:$PATH" GH_SHIM_LOG="$log" GH_SHIM_REAL="$real_gh" \
+    ( cd "$checkout" && env PATH="$tmp/shim:$PATH" GH_SHIM_LOG="$log" GH_SHIM_REAL="$real_gh" CURL_SHIM_REAL="$real_curl" \
         perl -MTime::HiRes=time -e "$TIMER" "$tmp/t" bash "$cckit" $verb </dev/null >/dev/null 2>&1 )
     res="$(cat "$tmp/t")"
     grep -Eq '^[0-9]+ [0-9]+$' <<<"$res" || { echo "verb-timings: could not time 'cckit $verb'" >&2; exit 2; }
@@ -126,7 +137,7 @@ while IFS= read -r verb; do
     calls="${calls}${n}
 "
     [ "$rc" -gt "$worst" ] && worst="$rc"
-    [ "$json" -eq 1 ] || printf '  %-12s run %s/%s  %s ms  %s gh call(s)  exit %s\n' "$verb" "$i" "$runs" "$ms" "$n" "$rc" >&2
+    [ "$json" -eq 1 ] || printf '  %-12s run %s/%s  %s ms  %s GitHub request(s)  exit %s\n' "$verb" "$i" "$runs" "$ms" "$n" "$rc" >&2
   done
   jq -n -c --arg verb "$verb" --argjson runs "$runs" --argjson exit "$worst" \
         --arg times "$times" --arg calls "$calls" '

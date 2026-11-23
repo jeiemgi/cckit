@@ -46,6 +46,12 @@
 # contract); rp_pass in page mode returns the tool's own status; rp_answer is strict: rc 2 on a
 # usage error, rc 1 when the comment or the file could not be written.
 
+# The forge port (E537): every GitHub call goes through forge_* / gh_rest_* (scripts/lib/gh-rest.sh).
+if ! command -v gh_rest_issue_json >/dev/null 2>&1; then
+  # shellcheck source=/dev/null
+  . "$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)/gh-rest.sh"
+fi
+
 _rp_dir="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
 # shellcheck source=/dev/null
 . "$_rp_dir/kit-cli.sh"       # kit_is_main, kit_say, kit_warn
@@ -258,8 +264,8 @@ rp_answer() {
     { printf '%s\n### %s answer: %s\n\n' "$marker" "$label" "$title"; cat "$tmp"
       printf '\n\n_Recorded from a review page with `cckit page answer`, %s._\n' "$today"; } > "$body"
     repo="$(_rp_cfg_get '.github.repo')"
-    if [ -n "$repo" ]; then out="$(gh issue view "$issue" --repo "$repo" --json comments -q '.comments[].body' 2>/dev/null || true)"
-    else out="$(gh issue view "$issue" --json comments -q '.comments[].body' 2>/dev/null || true)"; fi
+    [ -n "$repo" ] || repo="$(forge_repo_from_git 2>/dev/null || true)"
+    out="$(gh_rest_issue_comments "$repo" "$issue" 2>/dev/null || true)"
     case "$out" in *"$marker"*)
       rm -f "$tmp" "$body"
       kit_say "page answer: already recorded on #$issue — nothing written"
@@ -267,8 +273,8 @@ rp_answer() {
       else printf 'issue #%s (already recorded)\n' "$issue"; fi
       return 0 ;;
     esac
-    if [ -n "$repo" ]; then out="$(gh issue comment "$issue" --repo "$repo" --body-file "$body" 2>&1)"; n=$?
-    else out="$(gh issue comment "$issue" --body-file "$body" 2>&1)"; n=$?; fi
+    [ -n "$repo" ] || repo="$(forge_repo_from_git 2>/dev/null || true)"
+    out="$(gh_rest_issue_comment "$repo" "$issue" "@$body" 2>&1)"; n=$?
     rm -f "$tmp" "$body"
     if [ "$n" -ne 0 ]; then
       kit_warn "page answer: could not comment on #$issue — $out"

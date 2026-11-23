@@ -32,6 +32,12 @@
 # effort sub whose commits were merged into a pushed effort branch has no upstream of its own, yet
 # its work is safely on the remote and is not undone. A branch that merely trails its upstream is
 # not undone work either, and is deliberately absent. best-effort: without git, no rows.
+# The forge port (E537): every GitHub call goes through forge_* / gh_rest_* (scripts/lib/gh-rest.sh).
+if ! command -v gh_rest_issue_json >/dev/null 2>&1; then
+  # shellcheck source=/dev/null
+  . "$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)/gh-rest.sh"
+fi
+
 status_local_rows() {
   local base="${1:-${KIT_BASE_BRANCH:-main}}" wtpath ref b up ahead n effort
   command -v git >/dev/null 2>&1 || return 0
@@ -179,20 +185,20 @@ status_prs_classify() {
 }
 
 # status_prs_fetch — echo the shaped JSON array status_prs_classify expects, for the repo in
-# $KIT_REPO. ONE `gh api graphql` call: open PRs with their reviews, review threads and the head
+# $KIT_REPO. ONE `forge_rest graphql` call: open PRs with their reviews, review threads and the head
 # commit's check rollup, collapsed to the four scalars the classifier reads.
 #
 # It always PRINTS a valid JSON array, but the rc distinguishes the two cases a caller must not
 # conflate: rc 0 means the query ran (`[]` = genuinely no open PRs), rc 1 means it could not run
-# (no gh, no jq, no auth, no network) and `[]` means "unknown", not "none". Reporting an empty
+# (no forge, no jq, no auth, no network) and `[]` means "unknown", not "none". Reporting an empty
 # bucket for an unreachable API is the failure this whole report exists to avoid.
 status_prs_fetch() {
   local repo="${1:-${KIT_REPO:-}}" owner name raw
-  command -v gh >/dev/null 2>&1 || { echo '[]'; return 1; }
+  forge_available || { echo '[]'; return 1; }
   command -v jq >/dev/null 2>&1 || { echo '[]'; return 1; }
   case "$repo" in */*) owner="${repo%%/*}"; name="${repo##*/}" ;; *) echo '[]'; return 1 ;; esac
 
-  raw="$(gh api graphql -f owner="$owner" -f name="$name" -f query='
+  raw="$(forge_rest graphql -f owner="$owner" -f name="$name" -f query='
     query($owner:String!,$name:String!){
       repository(owner:$owner,name:$name){
         pullRequests(states:OPEN, first:30, orderBy:{field:UPDATED_AT,direction:DESC}){
@@ -280,7 +286,7 @@ status_cleanup_counts() {
     prot="$(printf '%s\n'   "$out" | grep -c -- '> PROTECTED:' || true)"
     unknown="$(printf '%s\n' "$out" | grep -c -- '> UNKNOWN '  || true)"
   fi
-  if command -v git >/dev/null 2>&1 && command -v gh >/dev/null 2>&1; then
+  if command -v git >/dev/null 2>&1 && forge_available; then
     local base="${KIT_BASE_BRANCH:-main}" idx
     # ONE PR query, reusing gc's index (#124) instead of a `gh pr list --head` per branch — an N+1
     # that scales badly exactly when this count matters, i.e. with many stale branches. And
@@ -290,9 +296,8 @@ status_cleanup_counts() {
       # 2>/dev/null: a failed read already shows as `unknown` rows from kit_gc_analyze above.
       idx="$(_kit_gc_pr_index "${KIT_GC_REPO:-${KIT_REPO:-}}" 2>/dev/null || true)"
     else
-      idx="$(gh pr list --repo "${KIT_REPO:-}" --state all --limit 200 \
-               --json number,state,headRefName \
-               --jq '.[] | "\(.headRefName)\tPR#\(.number) \(.state)"' 2>/dev/null || true)"
+      idx="$(forge_rest "repos/${KIT_REPO:-}/pulls" -X GET -f state=all -f per_page=100 --paginate \
+               --jq '.[] | "\(.head.ref)\tPR#\(.number) \(if .merged_at then "MERGED" else (.state | ascii_upcase) end)"' 2>/dev/null || true)"
     fi
     while IFS= read -r r; do
       [ -n "$r" ] || continue
@@ -346,7 +351,7 @@ status_next_efforts_md() {
   echo ""
   rows="$(status_next_efforts_rows "${1:-}")" || ne_rc=$?
   if [ "$ne_rc" -ne 0 ]; then
-    echo "_Could not read the open efforts (gh or jq absent, unauthenticated, or offline). This is NOT"
+    echo "_Could not read the open efforts (no forge or jq, unauthenticated, or offline). This is NOT"
     echo "the same as having none._"
   elif [ -z "$rows" ]; then
     echo "_No open issue carries the \`effort\` label, so there is no effort to order."
@@ -500,14 +505,14 @@ EOF
   echo ""
   echo "## 2 · PRs waiting on a human"
   echo ""
-  if command -v gh >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
+  if forge_available && command -v jq >/dev/null 2>&1; then
     local pr_rc=0
     prs="$(status_prs_fetch)" || pr_rc=$?
     ai="$(status_ai_expected "$root" "$prs")"
     prrows="$(printf '%s' "$prs" | status_prs_classify "$ai")"
     if [ "$pr_rc" -ne 0 ]; then
-      echo "_Could not read the open PRs (gh unavailable, unauthenticated, or offline). This is NOT"
-      echo "the same as having none — re-run once \`gh auth status\` is clean._"
+      echo "_Could not read the open PRs (the forge is unreachable, the token invalid, or offline). This is NOT"
+      echo "the same as having none — re-run once \`cckit doctor\` shows the forge signed in._"
     elif [ -n "$prrows" ]; then
       echo "| PR | what it needs | title |"
       echo "| --- | --- | --- |"
@@ -570,7 +575,7 @@ status_buckets_json() {
   command -v jq >/dev/null 2>&1 || {
     printf '%s\n' '{"error":"jq is required for --llm output","deps":{"jq":false}}'; return 1; }
   local pr_rc=0 has_gh=false has_git=false
-  command -v gh  >/dev/null 2>&1 && has_gh=true
+  forge_available && has_gh=true   # deps.gh: a forge is available (the key name is kept for readers)
   command -v git >/dev/null 2>&1 && has_git=true
   rows="$(status_local_rows "$base")"
   local wt_rows; wt_rows="$(status_worktree_rows)"

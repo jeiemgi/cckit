@@ -87,6 +87,12 @@
 
 # `${BASH_SOURCE[0]:-$0}`: BASH_SOURCE is empty under zsh, and `dirname ""` is "." — the sibling
 # sources below would silently miss. Same fix as stage-receipt.sh and kit-gc.sh (#219).
+# The forge port (E537): every GitHub call goes through forge_* / gh_rest_* (scripts/lib/gh-rest.sh).
+if ! command -v gh_rest_issue_json >/dev/null 2>&1; then
+  # shellcheck source=/dev/null
+  . "$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)/gh-rest.sh"
+fi
+
 _qa_dir="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" >/dev/null 2>&1 && pwd)"
 # shellcheck source=/dev/null
 command -v kit_state_dir   >/dev/null 2>&1 || . "$_qa_dir/kit-state.sh"
@@ -436,8 +442,8 @@ qa_route() {
   tab="$(printf '\t')"
   ref="$pr"
   [ -n "$ref" ] || ref="$(_qa_lane_branch "$lane")"
-  if [ -n "$ref" ] && command -v gh >/dev/null 2>&1; then
-    body="$(gh pr view "$ref" --json body --jq '.body // ""' 2>/dev/null)" || body=""
+  if [ -n "$ref" ] && forge_available; then
+    body="$(forge_pr_view "$(_qa_repo)" "$ref" 2>/dev/null | jq -r '.body // ""')" || body=""
     if [ -n "$body" ] && route="$(printf '%s\n' "$body" | qa_route_declared)"; then
       printf 'declared%s%s\n' "$tab" "$route"
       return 0
@@ -609,6 +615,9 @@ qa_port_tool() {
 # qa_port_pids <port> [<tool>] — the pids LISTENING on TCP <port>, one per line, deduplicated.
 # Empty output is "no listener this user can see": ss names a pid only for the caller's own
 # processes, and so does lsof without root.
+# _qa_repo — the repository the lane's PRs live in: KIT_REPO, else the origin remote.
+_qa_repo() { if [ -n "${KIT_REPO:-}" ]; then printf '%s' "$KIT_REPO"; else forge_repo_from_git 2>/dev/null; fi; }
+
 qa_port_pids() {
   local port="$1" tool="${2:-}"
   case "$port" in ''|*[!0-9]*) return 0 ;; esac
@@ -860,9 +869,8 @@ EOF
 _qa_pr_meta() {
   local out=""
   [ -n "${1:-}" ] || return 1
-  command -v gh >/dev/null 2>&1 || return 1
-  out="$(gh pr view "$1" --json number,url,headRefOid,headRefName \
-           --jq '(.number | tostring), .url, .headRefOid, .headRefName' 2>/dev/null)" || return 1
+  forge_available || return 1
+  out="$(forge_pr_view "$(_qa_repo)" "$1" 2>/dev/null | jq -r '(.number | tostring), .url, .head_sha, .head')" || return 1
   case "$(printf '%s\n' "$out" | sed -n 1p)" in ''|*[!0-9]*) return 1 ;; esac
   printf '%s\n' "$out"
 }

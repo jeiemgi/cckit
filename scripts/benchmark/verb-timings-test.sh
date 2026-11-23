@@ -27,6 +27,7 @@ echo "stub-out:$1"
 exit 0
 STUB
 chmod +x "$FIX/bin/gh"
+printf '#!/usr/bin/env bash\necho "curl $*"\n' > "$FIX/bin/curl"; chmod +x "$FIX/bin/curl"
 
 # The fake CLI. Every call appends "<cwd>|<args>" to FAKE_LOG.
 cat > "$FIX/fake-cckit" <<'FAKE'
@@ -34,6 +35,7 @@ cat > "$FIX/fake-cckit" <<'FAKE'
 printf '%s|%s\n' "$PWD" "$*" >> "$FAKE_LOG"
 case "$*" in
   alpha)       gh api "repos/o/r/issues" -f "q=a b" > "$FAKE_OUT"; gh issue list >> "$FAKE_OUT"; echo "noise on stdout" ;;
+  rest)        curl -sS https://api.github.com/repos/o/r/issues >/dev/null; curl -sS https://example.invalid/x >/dev/null ;;
   "two words") gh pr list >/dev/null ;;
   beta)        exit 3 ;;
   ghfail)      gh fail > "$FAKE_OUT"; echo "rc=$?" >> "$FAKE_OUT" ;;
@@ -57,6 +59,8 @@ t "one JSON object of kind verb-timings" "$(jq -r '"\(.kind) \(.runs) \(.verbs |
 t "alpha: 2 gh calls per run" "$(jq -c '.verbs[0] | [.verb, .runs, .gh_calls, .exit]' <<<"$out")" '["alpha",3,2,0]'
 t "a two-word verb is one row and is split into arguments" "$(jq -c '.verbs[1] | [.verb, .gh_calls]' <<<"$out")" '["two words",1]'
 t "beta: no gh call, exit code kept" "$(jq -c '.verbs[2] | [.verb, .gh_calls, .exit]' <<<"$out")" '["beta",0,3]'
+out_rest="$(vt --json --verb rest 2>/dev/null)"
+t "rest: a curl to the GitHub API counts as a request, another host does not" "$(jq -c '.verbs[0] | [.verb, .gh_calls]' <<<"$out_rest")" '["rest",1]'
 t "every row has integer timings, min <= median" "$(jq -c '[.verbs[] | (.min_ms | type) == "number" and .min_ms == (.min_ms | floor) and .min_ms <= .median_ms] | all' <<<"$out")" "true"
 t "each verb ran --runs times" "$(grep -c '|alpha$' "$FAKE_LOG")" "3"
 t "the verbs ran in the checkout" "$(sed -n 1p "$FAKE_LOG")" "$FIX/co|alpha"

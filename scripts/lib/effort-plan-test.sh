@@ -9,8 +9,9 @@
 #      `effort.planSource`, the fallback to GitHub when that source fails or prints nothing, and
 #      the `source:` line that says which one the plan was built from.
 #   4. `effort_plan` end to end on the weights: an XL effort fills a session, `?` is legend-explained.
-# Hermetic: every part stubs gh (the effort list as the JSON `gh issue list --json` returns, each
-# effort's blocked_by as the JSON the dependency API returns), so no network is touched.
+# Hermetic: every part runs over the forge shim (test-forge-shim.sh) — the effort list as the JSON
+# `GET repos/<r>/issues` returns, each effort's blocked_by as the JSON the dependency API returns — so
+# no network is touched and no gh subcommand may run.
 # Run:  bash scripts/lib/effort-plan-test.sh
 # errors: strict — a test runner: rc 1 on any failed assertion
 
@@ -46,22 +47,23 @@ if [ -n "${EP_TEST_INNER:-}" ]; then
 
   # ── 2. the open-effort read and the next-per-flow pick ──────────────────────────────────────
   tmp="$(mktemp -d)"
-  stub="$tmp/bin"; mkdir -p "$stub" "$tmp/deps"
-  # Stub gh: `issue list` -> $GH_EFFORTS (a JSON array file); `api …/issues/<N>/dependencies/blocked_by`
-  # -> $GH_DEPS/<N>.json, or [] when the effort has no fixture. GH_FAIL=1 fails every call.
-  cat > "$stub/gh" <<'SH'
-#!/bin/sh
-[ -z "${GH_FAIL:-}" ] || exit 1
-case "$1 $2" in
-  "issue list") cat "$GH_EFFORTS" ;;
-  "api repos/"*)
-    n="${2%/dependencies/blocked_by}"; n="${n##*/}"
-    if [ -f "$GH_DEPS/$n.json" ]; then cat "$GH_DEPS/$n.json"; else echo '[]'; fi ;;
-  *) echo '[]' ;;
+  stub="$tmp/bin"; mkdir -p "$tmp/deps"
+  # The forge shim, with a fixture: `GET repos/o/r/issues` -> $GH_EFFORTS (a JSON array file);
+  # `GET …/issues/<N>/dependencies/blocked_by` -> $GH_DEPS/<N>.json, or [] when the effort has no
+  # fixture. GH_FAIL=1 fails every call (HTTP 500).
+  # shellcheck source=/dev/null
+  . "$dir/test-forge-shim.sh"; forge_shim_install "$stub"
+  GH_EFFORTS="$tmp/efforts.json"; GH_DEPS="$tmp/deps"; GH_FIXTURE="$tmp/fixture.sh"; GH_LOG="$tmp/gh.log"
+  export GH_EFFORTS GH_DEPS GH_FIXTURE GH_LOG GH_TOKEN=test-token CCKIT_FORGE=github
+  cat > "$GH_FIXTURE" <<'SH'
+[ -z "${GH_FAIL:-}" ] || code=500
+case "$method $ep" in
+  "GET repos/o/r/issues") out="$(cat "$GH_EFFORTS")" ;;
+  "GET repos/o/r/issues/"*"/dependencies/blocked_by")
+    n="${ep%/dependencies/blocked_by}"; n="${n##*/}"
+    if [ -f "$GH_DEPS/$n.json" ]; then out="$(cat "$GH_DEPS/$n.json")"; else out='[]'; fi ;;
 esac
 SH
-  chmod +x "$stub/gh"
-  GH_EFFORTS="$tmp/efforts.json"; GH_DEPS="$tmp/deps"; export GH_EFFORTS GH_DEPS
   PATH="$stub:$PATH"; export PATH
 
   col() { awk -F'\t' -v f="$1" -v c="$2" '$1==f{print $c}'; }   # col <flow> <column> < next rows
@@ -138,8 +140,14 @@ JSON
   eq "no open effort: rc 0"            "$rc" "0"
   eq "no open effort: no rows"         "$rows" ""
   rows="$(GH_FAIL=1 effort_next_rows o/r)"; rc=$?
-  eq "gh fails: rc is non-zero"        "$([ "$rc" -ne 0 ] && echo yes || echo no)" "yes"
-  eq "gh fails: no rows"               "$rows" ""
+  eq "the forge fails: rc is non-zero" "$([ "$rc" -ne 0 ] && echo yes || echo no)" "yes"
+  eq "the forge fails: no rows"        "$rows" ""
+  : > "$GH_LOG"
+  rows="$(CCKIT_FORGE=none effort_next_rows o/r 2>/dev/null)"; rc=$?
+  eq "no forge: rc is non-zero"        "$([ "$rc" -ne 0 ] && echo yes || echo no)" "yes"
+  eq "no forge: no rows"               "$rows" ""
+  eq "no forge: no request was made"   "$(wc -l < "$GH_LOG" | tr -d ' ')" "0"
+  eq "no gh subcommand ran"            "$(grep -c '^GH-SUBCOMMAND' "$GH_LOG")" "0"
   effort_next_rows "" >/dev/null 2>&1; rc=$?
   eq "no repo: rc is non-zero"         "$([ "$rc" -ne 0 ] && echo yes || echo no)" "yes"
 
@@ -166,6 +174,12 @@ JSON
     plan="$(GH_FAIL=1 EFFORT_REPO=o/r effort_plan 2>&1)"; rc=$?
     eq  "plan: a failed query is rc 1"       "$rc" "1"
     has "plan: a failed query says so"       "$plan" "gh query failed"
+    # no forge configured: the refusal names the verb (forge_need), rc 1, and nothing is requested
+    : > "$GH_LOG"
+    plan="$(unset _FORGE_LOADED; CCKIT_FORGE=none EFFORT_REPO=o/r effort_plan 2>&1)"; rc=$?
+    eq  "plan: no forge is rc 1"             "$rc" "1"
+    has "plan: no forge names the verb"      "$plan" "cckit effort plan: needs a forge (GitHub) and none is configured"
+    eq  "plan: no forge makes no request"    "$(wc -l < "$GH_LOG" | tr -d ' ')" "0"
   fi
 
   rm -rf "$tmp"
@@ -190,21 +204,15 @@ tmp="$(mktemp -d)"; tmp2=""; trap 'rm -rf "$tmp" "$tmp2"' EXIT
 mkdir -p "$tmp/bin" "$tmp/proj/tools"
 GH_LOG="$tmp/gh.log"
 
-# Stub gh: the listing prints the JSON `gh issue list --json number,title,labels` returns; blocked_by
-# answers per issue with the JSON the dependency API returns. Every call is logged.
-cat > "$tmp/bin/gh" <<'STUB'
-#!/usr/bin/env bash
-echo "gh $*" >> "$GH_LOG"
-case "$1 $2" in
-  "issue list") cat <<'JSON'
-[ {"number":11,"title":"[Effort] 11 · [Core] gh root","labels":[{"name":"effort"},{"name":"flow:Core"},{"name":"ctx:S"}]},
-  {"number":12,"title":"[Effort] 12 · [Core] gh leaf","labels":[{"name":"effort"},{"name":"flow:Core"},{"name":"ctx:M"}]} ]
-JSON
-    ;;
-  "api "*)      case "$2" in */issues/12/dependencies/blocked_by) echo '[{"number":11,"state":"open"}]' ;; *) echo '[]' ;; esac ;;
-esac
-STUB
-chmod +x "$tmp/bin/gh"
+# The forge shim, with a fixture: the listing answers with two efforts; blocked_by answers per
+# issue with the JSON the dependency API returns. Every request is one line in $GH_LOG.
+# shellcheck source=/dev/null
+. "$LIB/test-forge-shim.sh"; forge_shim_install "$tmp/bin"
+GH_ISSUES='[ {"number":11,"title":"[Effort] 11 · [Core] gh root","labels":[{"name":"effort"},{"name":"flow:Core"},{"name":"ctx:S"}]},
+  {"number":12,"title":"[Effort] 12 · [Core] gh leaf","labels":[{"name":"effort"},{"name":"flow:Core"},{"name":"ctx:M"}]} ]'
+cat > "$tmp/fixture.sh" <<'SH'
+case "$ep" in repos/o/r/issues/12/dependencies/blocked_by) out='[{"number":11,"state":"open"}]' ;; esac
+SH
 
 mk() { printf '%s\n' "$2" > "$tmp/proj/tools/$1"; chmod +x "$tmp/proj/tools/$1"; }
 mk good.sh '#!/usr/bin/env bash
@@ -228,11 +236,12 @@ printf '{"github":{"repo":"o/r"},"effort":{"planSource":"tools/good.sh"}}' > "$t
 plan() {
   : > "$GH_LOG"
   ( cd "$tmp/proj" && env -u KIT_CONFIG -u EFFORT_PLAN_SOURCE -u KIT_EFFORT_PLAN_SOURCE \
-      PATH="$tmp/bin:$PATH" GH_LOG="$GH_LOG" EFFORT_REPO="o/r" "$@" \
+      PATH="$tmp/bin:$PATH" GH_LOG="$GH_LOG" GH_ISSUES="$GH_ISSUES" GH_FIXTURE="$tmp/fixture.sh" \
+      GH_TOKEN=test-token CCKIT_FORGE=github EFFORT_REPO="o/r" "$@" \
       bash -c "source '$LIB/config-path.sh'; source '$LIB/effort-plan.sh'; effort_plan" 2>&1 )
 }
-# Count calls (one logged line each).
-gh_calls() { grep -c '^gh ' "$GH_LOG" | tr -d ' '; }
+# Count forge requests (one logged line each).
+gh_calls() { grep -c . "$GH_LOG" | tr -d ' '; }
 
 # ── 1. a working local source: its rows, its blockers, no gh, source + age named ───────────────
 out="$(plan KIT_EFFORT_PLAN_SOURCE=tools/good.sh)"
@@ -240,7 +249,7 @@ has   "stub rows are planned"            "$out" "#21 "
 has   "stub second row is planned"       "$out" "stub leaf"
 has   "stub blockers are honored"        "$out" "(after #21)"
 lacks "GitHub rows are absent"           "$out" "gh root"
-t     "gh is never called"               "$(gh_calls)" "0"
+t     "the forge is never called"        "$(gh_calls)" "0"
 has   "output names the stub as source"  "$out" "source: planSource tools/good.sh"
 has   "output carries the reported age"  "$out" "age 2h"
 # the blocker forces a second session even though L(4)+S(1) alone would already overflow budget 4;
@@ -286,36 +295,29 @@ has   "unset: GitHub rows planned"            "$out" "gh leaf"
 has   "unset: GitHub named"                   "$out" "source: GitHub (o/r)"
 lacks "unset: no fallback note"               "$out" "planSource"
 t     "unset: one listing + one blocked_by call per effort" "$(gh_calls)" "3"
+t     "unset: the listing is one REST read of the open effort issues" "$(grep -c '^GET repos/o/r/issues?state=open&labels=effort&per_page=100 $' "$GH_LOG")" "1"
+t     "unset: no gh subcommand ran"       "$(grep -c '^GH-SUBCOMMAND' "$GH_LOG")" "0"
 
 # ── 4. load_kit_config exports the key; the exported value drives the plan end to end ──────────
 if command -v jq >/dev/null 2>&1; then
   out="$( : > "$GH_LOG"; cd "$tmp/proj" && env -u KIT_CONFIG -u EFFORT_PLAN_SOURCE -u KIT_EFFORT_PLAN_SOURCE -u EFFORT_REPO \
-      PATH="$tmp/bin:$PATH" GH_LOG="$GH_LOG" \
+      PATH="$tmp/bin:$PATH" GH_LOG="$GH_LOG" GH_ISSUES="$GH_ISSUES" GH_FIXTURE="$tmp/fixture.sh" GH_TOKEN=test-token CCKIT_FORGE=github \
       bash -c "source '$LIB/kit-config.sh'; load_kit_config >/dev/null 2>&1; source '$LIB/effort-plan.sh'; effort_plan" 2>&1 )"
   has "config key effort.planSource reaches the plan" "$out" "source: planSource tools/good.sh"
-  t   "config-driven local plan calls no gh"          "$(gh_calls)" "0"
+  t   "config-driven local plan calls no forge"       "$(gh_calls)" "0"
 fi
 
 # ── 4. effort_plan end to end on the weights (#277) ───────────────────────────────────────────
-# effort_plan end to end against a stub gh: an XL effort fills a session of its own (weight 8, not
+# effort_plan end to end over the forge shim: an XL effort fills a session of its own (weight 8, not
 # 2), and an effort with no ctx: label shows as `?` with the header saying what `?` weighs.
 if command -v jq >/dev/null 2>&1 && command -v bash >/dev/null 2>&1; then
   tmp2="$(mktemp -d)"
-  mkdir -p "$tmp2/bin"
-  cat > "$tmp2/bin/gh" <<'SH'
-#!/bin/sh
-case "$1 $2" in
-  "issue list") cat <<'JSON'
-[ {"number":1,"title":"[Effort] 1 · big one","labels":[{"name":"effort"},{"name":"flow:core"},{"name":"ctx:XL"}]},
+  # shellcheck source=/dev/null
+  . "$LIB/test-forge-shim.sh"; forge_shim_install "$tmp2/bin"
+  out="$(PATH="$tmp2/bin:$PATH" KIT_REPO=o/r EFFORT_REPO=o/r KIT_SESSION_BUDGET=4 GH_TOKEN=test-token CCKIT_FORGE=github GH_FIXTURE="" \
+    GH_ISSUES='[ {"number":1,"title":"[Effort] 1 · big one","labels":[{"name":"effort"},{"name":"flow:core"},{"name":"ctx:XL"}]},
   {"number":2,"title":"[Effort] 2 · unsized one","labels":[{"name":"effort"},{"name":"flow:core"}]},
-  {"number":3,"title":"[Effort] 3 · small one","labels":[{"name":"effort"},{"name":"flow:core"},{"name":"ctx:S"}]} ]
-JSON
-    ;;
-  *) echo '[]' ;;
-esac
-SH
-  chmod +x "$tmp2/bin/gh"
-  out="$(PATH="$tmp2/bin:$PATH" KIT_REPO=o/r EFFORT_REPO=o/r KIT_SESSION_BUDGET=4 \
+  {"number":3,"title":"[Effort] 3 · small one","labels":[{"name":"effort"},{"name":"flow:core"},{"name":"ctx:S"}]} ]' \
     bash -c ". '$dir/effort-plan.sh'; effort_plan" 2>&1)"
   chk() { if [ -n "$(printf '%s\n' "$out" | grep -E "$2")" ]; then echo "ok: $1"; else echo "FAIL: $1 (no /$2/ in plan output)"; fail=1; fi; }
   chk "the header explains the unlabeled weight" '\? = no ctx: label, weighed 2'

@@ -13,7 +13,7 @@ implements it.
 
 ## How the install works
 
-cckit is bash scripts over `git`, `gh` and `jq`. There is no build step: installing it puts the
+cckit is bash scripts over `git`, `jq` and `curl`. There is no build step: installing it puts the
 `cckit` dispatcher on your PATH, the list of folders your terminal searches when you type a
 command.
 
@@ -27,7 +27,7 @@ That also means such an install is as old as the branch its clone is parked on. 
 
 | Required | Why |
 | --- | --- |
-| `git`, `gh`, `jq` | the work itself: worktrees, GitHub, JSON |
+| `git`, `jq`, `curl` | the work itself: worktrees, JSON, every GitHub call (REST over curl with a token from `GH_TOKEN` or a signed-in `gh`) |
 | `perl` | `cckit init` stops without it; `cckit doctor` lists it with the hard dependencies |
 | `bash` 3.2+ | the dispatcher and its libraries |
 
@@ -35,6 +35,7 @@ Optional, auto-detected, never required:
 
 | Optional | Enables |
 | --- | --- |
+| `gh` | an interactive GitHub sign-in; cckit reads its token when `GH_TOKEN` is unset |
 | `tmux` | the default `cckit orchestrate` runtime |
 | `herdr` | persistent, state-aware orchestration with `--runtime herdr` |
 | `glow` / `fzf` / `gum` | nicer terminal output and pickers |

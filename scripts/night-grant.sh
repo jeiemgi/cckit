@@ -45,15 +45,21 @@
 #
 # bash 3.2 / zsh safe; needs jq.
 
+# The forge port (E537): every GitHub call goes through forge_* / gh_rest_* (scripts/lib/gh-rest.sh).
+if ! command -v gh_rest_issue_json >/dev/null 2>&1; then
+  # shellcheck source=/dev/null
+  . "$(cd "$(dirname "$0")" && pwd)/lib/gh-rest.sh"
+fi
+
 NIGHT_GRANT_MARKER='<!-- night-grant -->'
 NIGHT_GRANT_BASE_FLOORS='lockfile auth security-code security-prose workflows cost secret'
 NIGHT_GRANT_BASE_NEVER='workflows cost secret'
-NIGHT_GRANT_REQUIRED_ALLOW='Bash(gh pr merge:*)
+NIGHT_GRANT_REQUIRED_ALLOW='Bash(cckit merge:*)
 Bash(git push:*)
-Bash(gh issue comment:*)
-Bash(gh issue edit:*)
-Bash(gh issue close:*)
-Bash(gh api:*)'
+Bash(cckit close:*)
+Bash(cckit effort close:*)
+Bash(cckit receipt:*)
+Bash(curl:*)'
 
 _ng_err() { printf 'night-grant: %s\n' "$*" >&2; }
 
@@ -209,7 +215,7 @@ night_grant_pick() {
 night_grant_read() {
   local issue="${1:-}" comments picked
   case "$issue" in ''|*[!0-9]*) _ng_err 'usage: night_grant_read <issue-number>'; return 2 ;; esac
-  if ! comments="$(gh api --paginate "repos/{owner}/{repo}/issues/$issue/comments" \
+  if ! comments="$(forge_rest --paginate "repos/{owner}/{repo}/issues/$issue/comments" \
       --jq '.[] | {body, login: .user.login, association: .author_association} | @json' < /dev/null)"; then
     _ng_err "could not read the comments of #$issue"; return 1
   fi
@@ -412,11 +418,11 @@ by-grantor"; } | jq -s . | NIGHT_GRANT_CONFIG="$cfg" night_grant_pick 2>/dev/nul
 
   # preflight — against fixture settings files
   tmp="${TMPDIR:-/tmp}/night-grant-selftest-$$.json"
-  printf '%s' '{"permissions":{"allow":["Bash(gh pr merge:*)"]}}' >"$tmp"
+  printf '%s' '{"permissions":{"allow":["Bash(cckit merge:*)"]}}' >"$tmp"
   out="$(night_grant_preflight "$tmp" 2>/dev/null)"; st=$?
   _t "preflight: a thin allowlist exits 1" 1 "$st"
   _t "preflight: it reports each missing entry" 5 "$(printf '%s\n' "$out" | grep -c '^  MISSING')"
-  printf '%s' '{"permissions":{"allow":["Bash(gh:*)","Bash(git push:*)"]}}' >"$tmp"
+  printf '%s' '{"permissions":{"allow":["Bash(cckit:*)","Bash(git push:*)","Bash(curl:*)"]}}' >"$tmp"
   night_grant_preflight "$tmp" >/dev/null 2>&1; st=$?
   _t "preflight: a broader prefix covers its commands" 0 "$st"
   printf '%s' '{"permissions":{"allow":["Bash(ghx:*)","Bash(git:*)"]}}' >"$tmp"

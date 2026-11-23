@@ -5,6 +5,76 @@ All notable changes to cckit are documented here. New entries below are generate
 [Conventional Commits](https://www.conventionalcommits.org/) and land when the Release PR is
 merged to `main`. Earlier entries follow [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.10.0](https://github.com/jeiemgi/cckit/compare/v0.9.0...v0.10.0) (2026-11-21)
+
+
+### Features
+
+* **adapters:** Claude and Codex install, hooks, waves and headless runs [[#257](https://github.com/jeiemgi/cckit/issues/257)] ([#442](https://github.com/jeiemgi/cckit/issues/442)) ([38981dc](https://github.com/jeiemgi/cckit/commit/38981dc26e64d724b14c2d2aa4ef84e39b028594))
+* **bench:** benchmark checkpoints per release, and the release refuses a lower score [[#452](https://github.com/jeiemgi/cckit/issues/452)] ([#472](https://github.com/jeiemgi/cckit/issues/472)) ([6d656ff](https://github.com/jeiemgi/cckit/commit/6d656ff9c1771792f7f87ff04f282093c94bead8))
+* **bench:** compare checkpoints over shared questions, add verb timings [[#452](https://github.com/jeiemgi/cckit/issues/452)] ([#488](https://github.com/jeiemgi/cckit/issues/488)) ([0f328df](https://github.com/jeiemgi/cckit/commit/0f328dfff0bb61c3fd8e0ba31145985502bceabe))
+* **bench:** harder retrieval questions and the quality tier's question set [[#253](https://github.com/jeiemgi/cckit/issues/253)] ([#475](https://github.com/jeiemgi/cckit/issues/475)) ([7f7625d](https://github.com/jeiemgi/cckit/commit/7f7625d54cfab9e6947b5f050cf8a0541e992f81))
+* cckit task run delegates one task end to end ([#505](https://github.com/jeiemgi/cckit/issues/505)) ([a884400](https://github.com/jeiemgi/cckit/commit/a884400db5cfdd0358e943d401937e996298250a))
+* Consent banner buttons cannot be clicked ([#436](https://github.com/jeiemgi/cckit/issues/436)) ([a622892](https://github.com/jeiemgi/cckit/commit/a622892d70fd05ecaa5cab39d67814540d5068ab))
+* **core:** marketing profile for content teams [[#415](https://github.com/jeiemgi/cckit/issues/415)] ([#486](https://github.com/jeiemgi/cckit/issues/486)) ([38ca3c3](https://github.com/jeiemgi/cckit/commit/38ca3c314fe3fb7ca13b60813f43de7691d985c3))
+* Docs deploys are skipped on every commit ([#434](https://github.com/jeiemgi/cckit/issues/434)) ([b3dab78](https://github.com/jeiemgi/cckit/commit/b3dab787c90f46b2dbd062ba28f668230a58a84d))
+* **docs:** Apple System Colors palette, Geist, stacked guide header [[#510](https://github.com/jeiemgi/cckit/issues/510)] ([#511](https://github.com/jeiemgi/cckit/issues/511)) ([28d4f60](https://github.com/jeiemgi/cckit/commit/28d4f602c6babbb4de52f792ef3e87eba33aff3e))
+* **effort:** effort close runs a project pre-close hook [[#380](https://github.com/jeiemgi/cckit/issues/380)] ([f82a8a9](https://github.com/jeiemgi/cckit/commit/f82a8a990c469c61c75408f966a775e10af5f019))
+* **effort:** effort plan takes a local rows source [[#382](https://github.com/jeiemgi/cckit/issues/382)] ([0502cba](https://github.com/jeiemgi/cckit/commit/0502cba9cd272c5987fd9be948eb4e258a2ebef8))
+* **gc:** detached worktrees get a verdict [[#390](https://github.com/jeiemgi/cckit/issues/390)] ([3dae1bb](https://github.com/jeiemgi/cckit/commit/3dae1bbabb3060eb479eb01bc59d23e6971cb13d))
+* **init:** one verb sets up a new project end to end, GitHub included [[#456](https://github.com/jeiemgi/cckit/issues/456)] ([#474](https://github.com/jeiemgi/cckit/issues/474)) ([ae70eaf](https://github.com/jeiemgi/cckit/commit/ae70eaf3b929ce97ee0f94623cda819f02258bd1))
+* **integrations:** the kit installs optional tools [[#303](https://github.com/jeiemgi/cckit/issues/303)] ([#440](https://github.com/jeiemgi/cckit/issues/440)) ([4b95b8e](https://github.com/jeiemgi/cckit/commit/4b95b8ee236d617e4da12f73ed840edced5304fe))
+* **lint:** instruction-file budget ratchet and path-scoped rules ([71a3016](https://github.com/jeiemgi/cckit/commit/71a301603940dee5a10759052e583015384ef964)), closes [#357](https://github.com/jeiemgi/cckit/issues/357)
+* **page:** plans, decisions and grills open as a review page [[#451](https://github.com/jeiemgi/cckit/issues/451)] ([#476](https://github.com/jeiemgi/cckit/issues/476)) ([7300011](https://github.com/jeiemgi/cckit/commit/7300011fa64a8b73b506be3c0f8c2c3c14d7289d))
+* pages are built with named design skills ([#506](https://github.com/jeiemgi/cckit/issues/506)) ([4b44443](https://github.com/jeiemgi/cckit/commit/4b444434cd6f1b0862b20f06dec69f2f122b033c))
+* **pr:** hotfix PRs to the release branch [[#360](https://github.com/jeiemgi/cckit/issues/360)] ([d757a70](https://github.com/jeiemgi/cckit/commit/d757a70c76efde6a16fdf2808ac338c5bb9f6541))
+* **pr:** pr takes a base branch for releases [[#391](https://github.com/jeiemgi/cckit/issues/391)] ([bb28d36](https://github.com/jeiemgi/cckit/commit/bb28d36027d7175251b2ad2cc369f530e254c092))
+* **qa:** cckit qa lanes lists every lane [[#301](https://github.com/jeiemgi/cckit/issues/301)] ([#460](https://github.com/jeiemgi/cckit/issues/460)) ([d71587b](https://github.com/jeiemgi/cckit/commit/d71587bd2c4a0d7a3933eed96a637406fea84a39))
+* **qa:** one QA stack per wave [[#293](https://github.com/jeiemgi/cckit/issues/293)] ([#439](https://github.com/jeiemgi/cckit/issues/439)) ([9e6e6c8](https://github.com/jeiemgi/cckit/commit/9e6e6c8d705e2e2839917ec91d8a2074305e3d90))
+* **rules:** ship five rules from cross-project experience [[#231](https://github.com/jeiemgi/cckit/issues/231)] ([#437](https://github.com/jeiemgi/cckit/issues/437)) ([666679c](https://github.com/jeiemgi/cckit/commit/666679c841c9147d79f0f99ec47799aeef934424))
+* **start:** refuse a start on an issue a live session claims [[#384](https://github.com/jeiemgi/cckit/issues/384)] ([f9465e3](https://github.com/jeiemgi/cckit/commit/f9465e3d05eeae723c6439bc5d522fed1438a720))
+* **status:** next effort per flow and the weekly cadence [[#241](https://github.com/jeiemgi/cckit/issues/241)] ([#433](https://github.com/jeiemgi/cckit/issues/433)) ([d75fb0a](https://github.com/jeiemgi/cckit/commit/d75fb0a949bd96e3101e7de7ed07f32763370cc3))
+* **sync:** cached JSON board document and watch mode [[#383](https://github.com/jeiemgi/cckit/issues/383)] ([cc8a197](https://github.com/jeiemgi/cckit/commit/cc8a19735b2b9cf4377e84d72f49407e19b9284e))
+* **task:** light tasks tracked in the project without GitHub issues [[#450](https://github.com/jeiemgi/cckit/issues/450)] ([#477](https://github.com/jeiemgi/cckit/issues/477)) ([19dfe12](https://github.com/jeiemgi/cckit/commit/19dfe120f1e2f27edea80ede85ae6a885df96243))
+* **update:** the update path is measured, documented and tested end to end [[#448](https://github.com/jeiemgi/cckit/issues/448)] ([#464](https://github.com/jeiemgi/cckit/issues/464)) ([c462add](https://github.com/jeiemgi/cckit/commit/c462addd1dafeecf330a3df059a4a7e47f1125fa))
+
+
+### Bug Fixes
+
+* **autopilot:** night engine holds wave order, WIP width and the gate ([b4fdc78](https://github.com/jeiemgi/cckit/commit/b4fdc78343f566a420c5491b8a03e7d1300ca870))
+* **autopilot:** read the night grant only from the owner ([c4ef2df](https://github.com/jeiemgi/cckit/commit/c4ef2dfa9aa356de85ba4de8122df69edbc4b471))
+* **bench:** report keeps each number on one line [[#252](https://github.com/jeiemgi/cckit/issues/252)] ([#401](https://github.com/jeiemgi/cckit/issues/401)) ([fcb86c6](https://github.com/jeiemgi/cckit/commit/fcb86c67cac62999acbf8f2c504d11a0aa1b293d))
+* **bench:** the runner scores every record, and cckit has its own questions [[#253](https://github.com/jeiemgi/cckit/issues/253)] ([#454](https://github.com/jeiemgi/cckit/issues/454)) ([7e41916](https://github.com/jeiemgi/cckit/commit/7e41916024297e30b928f1e547b4eb73c8700726))
+* **board:** role lookup resolves any Role option the board has [[#378](https://github.com/jeiemgi/cckit/issues/378)] ([1d210c7](https://github.com/jeiemgi/cckit/commit/1d210c742650c1327b5d46d3ae3f123ebb81e96e))
+* **check:** the leak fence reads a local word list and a CI secret, hits print file:line only ([#531](https://github.com/jeiemgi/cckit/issues/531)) ([747e3cd](https://github.com/jeiemgi/cckit/commit/747e3cd3c460e2571738a4003ac1b30bf759c113))
+* **config:** KIT_BASE_BRANCH from the environment overrides the config [[#352](https://github.com/jeiemgi/cckit/issues/352)] ([#405](https://github.com/jeiemgi/cckit/issues/405)) ([937e9d5](https://github.com/jeiemgi/cckit/commit/937e9d5ff012a2a2965d919099d19046a984a85c))
+* **core:** drift check skips project rules, agent skills resolve [[#238](https://github.com/jeiemgi/cckit/issues/238)] ([#432](https://github.com/jeiemgi/cckit/issues/432)) ([e24a742](https://github.com/jeiemgi/cckit/commit/e24a742a68d32e3e2c1e0ca050aeeb88e0fd9cac))
+* **core:** read a file's mtime with GNU stat first ([#463](https://github.com/jeiemgi/cckit/issues/463)) ([709ab6f](https://github.com/jeiemgi/cckit/commit/709ab6f5e44b089aec735be5587802310bd54279)), closes [#461](https://github.com/jeiemgi/cckit/issues/461)
+* **docs:** the footer is one short line and the disclaimer says where Cookie settings is [[#515](https://github.com/jeiemgi/cckit/issues/515)] ([#516](https://github.com/jeiemgi/cckit/issues/516)) ([b220390](https://github.com/jeiemgi/cckit/commit/b22039057e9eec30294a2b53224b61e98889ed28))
+* **docs:** the header keeps its layout across pages and search controls are visible in light [[#513](https://github.com/jeiemgi/cckit/issues/513)] ([#514](https://github.com/jeiemgi/cckit/issues/514)) ([a89f21e](https://github.com/jeiemgi/cckit/commit/a89f21e401a257283a269e2d9d1655ba156f6958))
+* **docs:** wide tables render as record cards [[#494](https://github.com/jeiemgi/cckit/issues/494)] ([#495](https://github.com/jeiemgi/cckit/issues/495)) ([1022e43](https://github.com/jeiemgi/cckit/commit/1022e4389481ba47910ed76ac4f1973fd0bc7587))
+* Effort close skips the post-close hook ([#519](https://github.com/jeiemgi/cckit/issues/519)) ([39ae6fd](https://github.com/jeiemgi/cckit/commit/39ae6fd4c060a9ab51bc027f36fb969c823b7613))
+* **effort:** close re-targets PRs based on the effort branch [[#358](https://github.com/jeiemgi/cckit/issues/358)] ([806b739](https://github.com/jeiemgi/cckit/commit/806b739d1285c1467f86e4a6a240317ac32eb6b6))
+* **effort:** effort close over REST refuses a failed PR read [[#330](https://github.com/jeiemgi/cckit/issues/330)] ([1836c2b](https://github.com/jeiemgi/cckit/commit/1836c2b8b101911cc69568865a04b5a5f36a7c4e))
+* **effort:** effort metrics find their helpers under zsh [[#381](https://github.com/jeiemgi/cckit/issues/381)] ([#403](https://github.com/jeiemgi/cckit/issues/403)) ([8e0bb08](https://github.com/jeiemgi/cckit/commit/8e0bb0865a6f6c6326fa7669b10b09170daaced0))
+* **effort:** effort pr composes a title its commitlint gate accepts [[#237](https://github.com/jeiemgi/cckit/issues/237)] ([20a9250](https://github.com/jeiemgi/cckit/commit/20a9250b90c9cd1c0ce02e41bf45c5db06126024))
+* **effort:** record build time and tokens in the effort metrics [[#453](https://github.com/jeiemgi/cckit/issues/453)] ([#462](https://github.com/jeiemgi/cckit/issues/462)) ([5eaccdf](https://github.com/jeiemgi/cckit/commit/5eaccdfcce29c2a25bd0b675873a00bbf354afd7))
+* **effort:** the kit-managed rule list names the five new rules [[#444](https://github.com/jeiemgi/cckit/issues/444)] ([#445](https://github.com/jeiemgi/cckit/issues/445)) ([030673c](https://github.com/jeiemgi/cckit/commit/030673cdf29853b206a40c07d7e6e242daab76cd))
+* **gc:** a failed gh read is reported, not treated as an empty answer [[#330](https://github.com/jeiemgi/cckit/issues/330)] ([da4b172](https://github.com/jeiemgi/cckit/commit/da4b1725abad9b4279620664c7514f142f7a01a8))
+* **init:** marketing setup defects found by a cold reader [[#487](https://github.com/jeiemgi/cckit/issues/487)] ([#489](https://github.com/jeiemgi/cckit/issues/489)) ([b08c132](https://github.com/jeiemgi/cckit/commit/b08c132069c4bc46bad9927b994d06d90bcc5f63))
+* **init:** the project config no longer records an absolute machine path ([#491](https://github.com/jeiemgi/cckit/issues/491)) ([9b86339](https://github.com/jeiemgi/cckit/commit/9b86339899da15215a6a7ab142e1c76bad0b2175)), closes [#490](https://github.com/jeiemgi/cckit/issues/490)
+* **labels:** drop the par: writer, close the kind: set, name the ctx fallback [[#277](https://github.com/jeiemgi/cckit/issues/277)] ([1fd0ebe](https://github.com/jeiemgi/cckit/commit/1fd0ebe4b2dcd7fee5d177e5c31aac0f1bee8ff6))
+* **merge:** refuse an effort branch [[#379](https://github.com/jeiemgi/cckit/issues/379)] ([#402](https://github.com/jeiemgi/cckit/issues/402)) ([79b004f](https://github.com/jeiemgi/cckit/commit/79b004f630dca031e282df8799b8e4681fa3ba09))
+* **new:** create the issue when a label is missing [[#387](https://github.com/jeiemgi/cckit/issues/387)] ([9629089](https://github.com/jeiemgi/cckit/commit/9629089e519d5d9ead6806c8372e08969927f365))
+* **pr:** hotfix carries a rebase-merged PR whole and reports --llm refusals [[#360](https://github.com/jeiemgi/cckit/issues/360)] ([0898155](https://github.com/jeiemgi/cckit/commit/089815536f9c893a14c8dc9fae684c962a54f8ab))
+* **test:** intermittent CI failures traced to a non-exclusive mkdir lock and early pipe readers [[#449](https://github.com/jeiemgi/cckit/issues/449)] ([#484](https://github.com/jeiemgi/cckit/issues/484)) ([e82d42f](https://github.com/jeiemgi/cckit/commit/e82d42fece9cbc78a07a5efbd50245de96658c8a))
+* **wave:** cckit wave prints its brief without --effort [[#316](https://github.com/jeiemgi/cckit/issues/316)] ([#400](https://github.com/jeiemgi/cckit/issues/400)) ([378a7fe](https://github.com/jeiemgi/cckit/commit/378a7fe32345f160e237a59796c9a1daf63ac3a7))
+
+
+### Performance Improvements
+
+* **test:** run test files in parallel and stop signing fixture commits [[#455](https://github.com/jeiemgi/cckit/issues/455)] ([#457](https://github.com/jeiemgi/cckit/issues/457)) ([1787916](https://github.com/jeiemgi/cckit/commit/178791656f968eb39f3e9b5530f7f8e18a8c5f70))
+
 ## [0.9.0](https://github.com/jeiemgi/cckit/compare/v0.8.0...v0.9.0) (2026-11-05)
 
 

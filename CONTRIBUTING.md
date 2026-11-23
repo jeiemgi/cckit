@@ -19,6 +19,9 @@ cckit pr <issue> "<summary>" # open the PR
 
 - Branch from `develop` (the integration branch); one issue = one branch = one PR. `main` is
   releases-only. `cckit start` already branches from the configured base.
+- **Scope after v0.10.** The landing-site rebranding and the docs rewrite are paused: cckit changes
+  only for what the projects built with it need, through weekly contributions. The paused issues
+  stay open and resume by decision, not by default.
 - Use [Conventional Commits](https://www.conventionalcommits.org/) — releases are cut from them.
   PRs are squash-merged, so **the PR title must be a Conventional Commit subject** (`type(scope): summary`).
   **`cckit pr` builds one for you** (derived from the issue's `kind:` label, `[Effort …]` prefix
@@ -26,7 +29,7 @@ cckit pr <issue> "<summary>" # open the PR
   to set the type yourself. CI (`commitlint`) fails the PR until the title is valid; check one locally
   with `scripts/lib/commitlint.sh "feat: your summary"`.
 - Run the local gate before opening a PR: `bash scripts/check.sh` (shell syntax, valid manifests,
-  the leak fence, the commitlint rules, the skill-listing and instruction-file budgets). A green gate is the bar.
+  the leak fence, the forge fence, the commitlint rules, the skill-listing and instruction-file budgets). A green gate is the bar.
 - **The leak fence.** cckit is public and is developed next to private repositories, so gate step 3
   fails on any tracked line that contains a private word: a product or client name, a person's name,
   a private path. The built-in word is always on; your own patterns live in `.cckit/leak-words`

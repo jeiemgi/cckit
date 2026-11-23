@@ -40,8 +40,9 @@ run a shell can drive every operation.
 - **Scales from one issue to a wave.** The same verbs that take one issue to a merged PR also plan
   and run a whole wave of parallel agents — with a captain that gates and merges behind policy
   floors.
-- **Zero hard dependencies.** Pure bash with fallbacks; it auto-detects optional tools
-  (`gh`, `jq`, `fzf`, `gum`) and degrades instead of failing.
+- **Git is the one hard dependency.** Pure bash over `git`; GitHub is an optional forge behind a
+  token, and optional tools (`gh`, `fzf`, `gum`, `glow`) are auto-detected. A missing forge degrades
+  with one line saying so, never silently.
 - **Portable.** No company, framework, or repo is baked in — everything is driven from
   `cckit.config.json`.
 
@@ -80,7 +81,7 @@ cd cckit && ./scripts/install.sh    # symlinks bin/cckit onto your PATH
 | Linux | ✅ native |
 | Windows | ✅ via WSL or Git Bash (not native cmd/PowerShell) |
 
-Requirements: `bash` 3.2+, `git`, `gh` (GitHub CLI) authenticated, `jq` and `perl`. `cckit doctor` checks each one.
+Requirements: `bash` 3.2+, `git`, `jq`, `perl` and `curl`; a GitHub token (`GH_TOKEN`, or a signed-in `gh`) for the verbs that write issues and pull requests. `gh` itself is optional. `cckit doctor` checks each one.
 
 ## Quick start
 
@@ -644,19 +645,21 @@ through one renderer (`cckit_render`, `scripts/lib/render.sh`), so board tables,
 status dashboard read the same in all three and print no escape codes into a pipe (`cckit render` exposes
 it for any script).
 
-### Cloud sessions
+### The forge, and cloud sessions
 
-Claude Code cloud sessions reach GitHub through a proxy that refuses GraphQL, and `gh pr` /
-`gh issue` use GraphQL. There cckit switches to REST (`gh api repos/<owner>/<repo>/…`):
+Every GitHub call is REST over `curl` with a token, through one port (`scripts/lib/forge.sh`;
+`forge.provider` in the config, `github` when a token resolves from `GH_TOKEN`, `GITHUB_TOKEN` or a
+signed-in `gh`, else `none`). No verb runs a `gh` subcommand; `gh` is the optional way to sign in.
+With no forge the git core stands alone: `start`, `pr` (commit + push, the compare page printed),
+`merge` (the branch lands on the base through git), `hotfix <sha>` and `gc` run and say, once, what
+they skipped; a verb that only exists on the forge refuses with one line naming itself.
 
-- **Works:** `cckit pr`, `merge`, `close`, `new`, `effort new`, `effort pr`, `effort close`, plus
-  the issue reads behind `start` and `effort start`.
-- **Skipped:** board (Projects v2) steps, with one line on stderr: `cckit: board step skipped …`.
-  Turn on the board's built-in workflows (item closed → Done, PR merged → Done, auto-add) and the
-  card still moves. Remote branch deletion is skipped too: the proxy rejects it. Delete merged
-  branches on GitHub.
-- **Switch:** `CCKIT_GH_TRANSPORT=rest|graphql` forces a transport. Unset, it is `rest` when
-  `CLAUDE_CODE_REMOTE=true` and the `gh` subcommands otherwise.
+Claude Code cloud sessions reach GitHub through a proxy that refuses GraphQL. REST works there, so
+every lifecycle verb does; two things are skipped, each with one line on stderr:
+
+- **Board (Projects v2) steps**, GraphQL-only: `cckit: board step skipped …`. Turn on the board's
+  built-in workflows (item closed → Done, PR merged → Done, auto-add) and the card still moves.
+- **Remote branch deletion** after a merge: the proxy rejects it. Delete merged branches on GitHub.
 
 ## cckit builds cckit
 
@@ -704,6 +707,11 @@ cckit/
   bin/cckit              # the CLI dispatcher
   scripts/lib/*.sh       # the git-mechanics bundle (effort, worktree, gh, gc, …)
                          #   each declares `# errors:` — see CONTRIBUTING.md
+  scripts/lib/forge*.sh  # the forge port: forge.sh selects github (REST over curl) or none (refuses,
+                         #   naming the verb); forge.provider in the config, CCKIT_FORGE for one command
+  scripts/forge-report.sh # where cckit needs a forge (gh) and where git alone: per file, per verb,
+                         #   and the ratchet (files outside the forge layer that call gh)
+  scripts/forge-fence.sh  # the gate step that fails when a file outside the layer calls gh or the API
   scripts/benchmark/     # doc-retrieval benchmark harness (cckit bench)
   benchmarks/runs/       # recorded benchmark checkpoints, one file per release (format: its README.md)
   .claude-plugin/        # the Claude Code plugin manifest
@@ -745,7 +753,8 @@ cckit's own sets are in `benchmarks/`: 55 retrieval, adversarial and abstain que
 quality claims over `docs-site/src/content/docs`. Recorded runs of the first three tiers are under
 `benchmarks/runs/`.
 
-cckit records its own benchmark per release: `cckit bench checkpoint <X.Y.Z>` appends a scored run to
+cckit records its own benchmark per release (paused while the current arc of work lands: no new
+checkpoint, `cckit release` is run with `--skip-bench-check`): `cckit bench checkpoint <X.Y.Z>` appends a scored run to
 `benchmarks/runs/<X.Y.Z>.json`, a version can hold several checkpoints, and `cckit release <X.Y.Z>`
 refuses when the version has none or its last one scores lower than the checkpoint before it
 (`--skip-bench-check` overrides and says so). The two are compared over the questions both asked,

@@ -3,7 +3,8 @@
 # status-test.sh — regression for #142: `cckit status` board counters must be clean integers and
 # never throw "integer expression expected". The bug: status fed `task-sync --llm` (TOON, not JSON)
 # into `jq 'length'`, so the count became a concatenated value like "1\n0" that broke `[ … -gt 8 ]`.
-# Hermetic: a fixture repo + a stubbed gh returning a known issue list. Run: bash scripts/status-test.sh
+# Hermetic: a fixture repo + the forge shim (scripts/lib/test-forge-shim.sh) answering a known issue
+# list over REST. Run: bash scripts/status-test.sh
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 fail=0
@@ -17,30 +18,31 @@ tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 fix="$tmp/proj"; mkdir -p "$fix"; ( cd "$fix" && git init -q )
 printf '{"kitVersion":"9.9.9","project":{"name":"fix"},"github":{"repo":"octo/fixture","owner":"octo","baseBranch":"main"}}' > "$fix/cckit.config.json"
 
-# Stub gh: `issue list` returns $GH_ISSUES (a JSON array file) — or, when the call filters on
-# `--label effort`, $GH_EFFORTS (the open efforts; [] when unset, i.e. "no issue carries the label").
-# `api …/issues/<N>/dependencies/blocked_by` returns $GH_DEPS/<N>.json when present. Everything
-# else returns [].
-stub="$tmp/bin"; mkdir -p "$stub"
-cat > "$stub/gh" <<'SH'
-#!/usr/bin/env bash
-case "$1 $2" in
-  "issue list")
-    case " $* " in
-      *" --label effort "*) [ -z "${GH_EFFORTS_FAIL:-}" ] || exit 1
-                            cat "${GH_EFFORTS:-/nonexistent}" 2>/dev/null || echo '[]' ;;
-      *) cat "$GH_ISSUES" 2>/dev/null || echo '[]' ;;
+# The shim's fixture: the open issue list of any octo/* repo answers $GH_ISSUES (a JSON array file)
+# — or, when the query filters on `labels=effort`, $GH_EFFORTS (the open efforts; [] when unset, i.e.
+# "no issue carries the label"; GH_EFFORTS_FAIL=1 makes that read an HTTP 500). `…/issues/<N>/
+# dependencies/blocked_by` answers $GH_DEPS/<N>.json when present. The PR list is empty.
+stub="$tmp/bin"
+# shellcheck source=/dev/null
+. "$ROOT/scripts/lib/test-forge-shim.sh"; forge_shim_install "$stub"
+export GH_FIXTURE="$tmp/fixture.sh" GH_TOKEN=test-token CCKIT_FORGE=github
+cat > "$GH_FIXTURE" <<'SH'
+case "$method $ep" in
+  "GET repos/octo/"*"/issues")
+    case "$path" in
+      *labels=effort*) [ -z "${GH_EFFORTS_FAIL:-}" ] || code=500
+                       out="$(cat "${GH_EFFORTS:-/nonexistent}" 2>/dev/null || echo '[]')" ;;
+      *) out="$(cat "$GH_ISSUES" 2>/dev/null || echo '[]')" ;;
     esac ;;
-  "api repos/"*)
-    n="${2%/dependencies/blocked_by}"; n="${n##*/}"
-    cat "${GH_DEPS:-/nonexistent}/$n.json" 2>/dev/null || echo '[]' ;;
-  *) echo "[]" ;;
+  "GET repos/octo/"*"/issues/"*"/dependencies/blocked_by")
+    n="${ep%/dependencies/blocked_by}"; n="${n##*/}"
+    out="$(cat "${GH_DEPS:-/nonexistent}/$n.json" 2>/dev/null || echo '[]')" ;;
+  "GET repos/octo/"*"/pulls") out='[]' ;;
 esac
 SH
-chmod +x "$stub/gh"
 
-run_status() {  # stdout+stderr of `status.sh` against the fixture with the stub gh
-  ( cd "$fix" && KIT_CONFIG="$fix/cckit.config.json" PATH="$stub:$PATH" GH_ISSUES="$1" \
+run_status() {  # stdout+stderr of `status.sh` against the fixture over the shim
+  ( cd "$fix" && KIT_CONFIG="$fix/cckit.config.json" PATH="$stub:$PATH" GH_ISSUES="$1" GH_LOG="$tmp/status.log" \
       bash "$ROOT/scripts/status.sh" 2>&1 )
 }
 
@@ -54,6 +56,8 @@ out3="$(run_status "$tmp/issues3.json")"
 has "counts open + blocked correctly" "$out3" "open issues: 3   blocked: 1"
 no  "no integer-expression error"      "$out3" "integer expression"
 no  "count is not the concatenated 1\\n0 bug" "$out3" "open issues: 1"
+has "the board is one REST read of the open issues" "$(cat "$tmp/status.log")" "GET repos/octo/fixture/issues?state=open&per_page=100 "
+t   "status ran no gh subcommand"      "$(grep -c '^GH-SUBCOMMAND' "$tmp/status.log")" "0"
 
 # 10 open issues -> the ">8 more" line must render (the integer test path that used to crash).
 printf '[' > "$tmp/issues10.json"
@@ -106,9 +110,16 @@ outf="$(GH_EFFORTS_FAIL=1 run_status "$tmp/issues3.json")"
 has "unreadable efforts say so"             "$outf" "Could not read the open efforts"
 no  "unreadable is not reported as empty"   "$outf" "No open issue carries"
 
+# No forge configured: the section says it could not read, never "no efforts", and nothing is requested.
+: > "$tmp/status.log"
+outn="$(CCKIT_FORGE=none run_status "$tmp/issues3.json")"
+has "no forge: unreadable efforts say so"   "$outn" "Could not read the open efforts"
+no  "no forge: not reported as empty"       "$outn" "No open issue carries"
+t   "no forge: no request was made"         "$(wc -l < "$tmp/status.log" | tr -d ' ')" "0"
+
 # --llm: the same rows under ONE new key, next_efforts.
 run_status_llm() {
-  ( cd "$fix" && KIT_CONFIG="$fix/cckit.config.json" PATH="$stub:$PATH" GH_ISSUES="$tmp/issues3.json" \
+  ( cd "$fix" && KIT_CONFIG="$fix/cckit.config.json" PATH="$stub:$PATH" GH_ISSUES="$tmp/issues3.json" GH_LOG="$tmp/status.log" \
       bash "$ROOT/scripts/status.sh" --llm 2>/dev/null )
 }
 jse="$(GH_EFFORTS="$tmp/efforts.json" GH_DEPS="$tmp/deps" run_status_llm)"
@@ -144,13 +155,7 @@ for i in ta01 ta02 ta03 tb01 tb02; do task_file "$i" "Piece $i" todo; done
   git checkout -q main )
 task_file tc01 "Local only" todo
 : > "$tmp/gh.log"
-cat > "$stub/gh-logged" <<SH
-#!/usr/bin/env bash
-printf '%s\\n' "\$*" >> "$tmp/gh.log"
-exec "$stub/gh" "\$@"
-SH
-chmod +x "$stub/gh-logged"; mkdir -p "$tmp/logbin"; ln -s "$stub/gh-logged" "$tmp/logbin/gh"
-lt_status() { ( cd "$lt" && KIT_CONFIG="$lt/cckit.config.json" PATH="$tmp/logbin:$PATH" GH_ISSUES="$tmp/empty.json" bash "$ROOT/scripts/status.sh" "$@" 2>&1 ); }
+lt_status() { ( cd "$lt" && KIT_CONFIG="$lt/cckit.config.json" PATH="$stub:$PATH" GH_LOG="$tmp/gh.log" GH_ISSUES="$tmp/empty.json" bash "$ROOT/scripts/status.sh" "$@" 2>&1 ); }
 out_lt="$(lt_status)"
 has "light tasks: the section is there" "$out_lt" "## Light tasks"
 has "light tasks: counts by state" "$out_lt" "review: 3   doing: 0   todo: 2   draft: 1   shared: 0   done: 0"
@@ -163,12 +168,13 @@ t "light tasks llm: counts" "$(printf '%s' "$js_lt" | jq -c '.light_tasks.counts
   '{"draft":1,"todo":2,"shared":0,"doing":0,"review":3,"done":0,"dropped":0}'
 t "light tasks llm: attention rows, review first" "$(printf '%s' "$js_lt" | jq -r '[.light_tasks.attention[] | .id + ":" + .state] | join(" ")')" \
   "ta01:review ta02:review ta03:review tc01:draft"
-# No GitHub call is made FOR the tasks: every gh call of the run is one the other sections make.
-t "light tasks: no gh call names a task" "$(grep -cE 'light/|tasks|ta0|tb0|tc0' "$tmp/gh.log" | tr -d ' ')" "0"
+# No GitHub call is made FOR the tasks: every forge request of the run is one the other sections make.
+# (the repo is octo/light, so its REST path carries `light/`; the task ids and branches must not)
+t "light tasks: no forge request names a task" "$(grep -cE 'light/t[abc]0|/tasks|ta0|tb0|tc0' "$tmp/gh.log" | tr -d ' ')" "0"
 calls_with="$(grep -c . "$tmp/gh.log" | tr -d ' ')"
 rm -rf "$lt/tasks"; ( cd "$lt" && git checkout -q -- . 2>/dev/null; rm -rf tasks; git branch -q -D light/ta01-piece light/ta02-piece light/ta03-piece; git rm -q -r tasks; git -c user.name=t -c user.email=t@t commit -q -m "no tasks" )
 : > "$tmp/gh.log"; lt_status >/dev/null; lt_status --llm >/dev/null 2>&1
-t "light tasks: the same number of gh calls with and without tasks" "$(grep -c . "$tmp/gh.log" | tr -d ' ')" "$calls_with"
+t "light tasks: the same number of forge requests with and without tasks" "$(grep -c . "$tmp/gh.log" | tr -d ' ')" "$calls_with"
 
 [ "$fail" -eq 0 ] && echo "ALL OK (status)" || echo "status: FAILURES"
 exit "$fail"

@@ -7,7 +7,9 @@
 #   version-bump.sh --emit            echo `bump=<level>` + `next=<version>` (for $GITHUB_OUTPUT)
 #   version-bump.sh --write <version> set the version in cckit.config.json + plugin.json + package.json
 #
-# Bump rules (Conventional Commits): a `feat!:`/`type!:` or a `BREAKING CHANGE` footer -> major;
+# Bump rules (Conventional Commits): a `feat!:`/`type!:` or a `BREAKING CHANGE` footer -> major,
+# or MINOR while the major is 0 (the same rule as `bump-minor-pre-major: true` in
+# release-please-config.json: cckit stays below 1.0 until the maintainer decides otherwise);
 # `feat:` -> minor; `fix|perf|refactor|revert:` -> patch; non-functional types
 # (`docs|chore|style|test|ci|build`) and anything else -> none (no release).
 # no commits -> none (no release).
@@ -32,7 +34,7 @@ vb_next() {
   local cur="${1:-0.0.0}" level="$2" M m p rest
   M="${cur%%.*}"; rest="${cur#*.}"; m="${rest%%.*}"; p="${rest#*.}"
   case "$level" in
-    major) echo "$((M+1)).0.0" ;;
+    major) if [ "$M" -eq 0 ]; then echo "0.$((m+1)).0"; else echo "$((M+1)).0.0"; fi ;;
     minor) echo "$M.$((m+1)).0" ;;
     patch) echo "$M.$m.$((p+1))" ;;
     *)     echo "$cur" ;;

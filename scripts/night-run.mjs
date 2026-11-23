@@ -114,7 +114,7 @@ const BRIEF =
   'prints to the terminal). Return only the schema.'
 
 const preflightPrompt = (n) =>
-  `${BRIEF}\nRead effort #${n}: \`gh issue view ${n} --json labels,state\`. ok=false when it ` +
+  `${BRIEF}\nRead effort #${n}: \`cckit brief ${n}\`. ok=false when it ` +
   'is closed or lacks the `effort` label. Return every label name verbatim; reason names what ' +
   'is missing.'
 

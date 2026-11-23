@@ -4,7 +4,7 @@
 # board can live under a USER login or an ORGANIZATION login, and each needs a different GraphQL root
 # (user(login:) vs organization(login:)). A user-only query silently returns null for an org board.
 # Covered: _ghp_owner_root resolution, kit-config exporting KIT_PROJECT_OWNER_TYPE, and
-# capture-project-ids.sh selecting the matching root end-to-end (stubbed gh — no network).
+# capture-project-ids.sh selecting the matching root end-to-end (over the forge shim — no network).
 # Run:  bash scripts/lib/gh-project-test.sh
 # errors: strict — a test runner: rc 1 on any failed assertion
 set -u
@@ -34,63 +34,68 @@ printf '%s' '{"github":{}}' > "$tmp/none.json"
 got="$(KIT_CONFIG="$tmp/none.json" bash -c "source '$LIB/kit-config.sh'; load_kit_config >/dev/null 2>&1; printf '%s' \"\$KIT_PROJECT_OWNER_TYPE\"")"
 t "kit-config defaults owner type to user" "$got" "user"
 
-# ── capture-project-ids.sh selects the matching GraphQL root (stubbed gh) ───────────────────────
+# ── capture-project-ids.sh selects the matching GraphQL root (over the forge shim) ──────────────
 # Isolated scripts dir: a copy of the script + a symlink to the real lib, so $0-relative sourcing +
-# OUT path stay inside tmp. A stub gh detects the query root and returns matching-shaped JSON.
+# OUT path stay inside tmp. The shim's curl logs every request — a GraphQL call is ONE
+# `POST graphql {"query":…,"variables":{…}}` line — and a fixture reads the query root out of the
+# body and answers JSON under that same root.
 mkdir -p "$tmp/scripts" "$tmp/bin"
 cp "$ROOT/scripts/capture-project-ids.sh" "$tmp/scripts/"
 ln -s "$LIB" "$tmp/scripts/lib"
-cat > "$tmp/bin/gh" <<'SH'
-#!/usr/bin/env bash
-# Record the query, then emit JSON under whichever root the query selected.
-q=""; for a in "$@"; do case "$a" in query=*) q="${a#query=}" ;; esac; done
-printf '%s\n' "$q" >> "$GH_QUERY_LOG"
-if grep -q 'organization(login' <<<"$q"; then root=organization; else root=user; fi
-cat <<JSON
-{"data":{"$root":{"projectV2":{"id":"PVT_org123","fields":{"nodes":[
-  {"__typename":"ProjectV2SingleSelectField","id":"F_status","name":"Status","options":[{"id":"O_todo","name":"Todo"}]},
-  {"__typename":"ProjectV2FieldCommon","id":"F_plan","name":"Plan Link"}
-]}}}}}
-JSON
+# shellcheck source=/dev/null
+. "$LIB/test-forge-shim.sh"; forge_shim_install "$tmp/bin"
+export GH_TOKEN=test-token CCKIT_FORGE=github GH_LOG="$tmp/gh.log"
+cat > "$tmp/root-fixture.sh" <<'SH'
+case "$method $ep" in "POST graphql")
+  q="$(printf '%s' "$body" | jq -r '.query // ""')"
+  case "$q" in *"organization(login"*) root=organization ;; *) root=user ;; esac
+  out="{\"data\":{\"$root\":{\"projectV2\":{\"id\":\"PVT_org123\",\"fields\":{\"nodes\":[
+  {\"__typename\":\"ProjectV2SingleSelectField\",\"id\":\"F_status\",\"name\":\"Status\",\"options\":[{\"id\":\"O_todo\",\"name\":\"Todo\"}]},
+  {\"__typename\":\"ProjectV2FieldCommon\",\"id\":\"F_plan\",\"name\":\"Plan Link\"}
+]}}}}}" ;;
+esac
 SH
-chmod +x "$tmp/bin/gh"
 
 run_capture() {  # <owner-type>
   printf '%s' "{\"github\":{\"projectsV2\":true,\"owner\":\"acme\",\"projectNumber\":3,\"projectOwnerType\":\"$1\"}}" > "$tmp/cfg.json"
-  : > "$tmp/qlog"
-  GH_QUERY_LOG="$tmp/qlog" KIT_CONFIG="$tmp/cfg.json" PATH="$tmp/bin:$PATH" \
+  : > "$GH_LOG"
+  GH_FIXTURE="$tmp/root-fixture.sh" KIT_CONFIG="$tmp/cfg.json" PATH="$tmp/bin:$PATH" \
     bash "$tmp/scripts/capture-project-ids.sh" >/dev/null 2>&1
 }
 
 run_capture organization
 rc=$?
 t "capture rc 0 (org board)" "$rc" "0"
-has "capture uses organization root for an org board" "$(cat "$tmp/qlog")" "organization(login"
+has "capture uses organization root for an org board" "$(cat "$GH_LOG")" "organization(login"
+t   "capture is one GraphQL POST, no gh subcommand" "$(grep -c '^POST graphql ' "$GH_LOG"):$(grep -c '^GH-SUBCOMMAND' "$GH_LOG")" "1:0"
+has "capture sends the login and the number as variables" "$(cat "$GH_LOG")" '"variables":{"login":"acme","number":3}'
 [ -f "$tmp/scripts/.project-ids.env" ] && has "org capture wrote PROJECT_ID" "$(cat "$tmp/scripts/.project-ids.env")" "PROJECT_ID=PVT_org123" || { echo "FAIL: no env written (org)"; fail=1; }
 has "org capture wrote a field id" "$(cat "$tmp/scripts/.project-ids.env" 2>/dev/null)" "STATUS_FIELD_ID=F_status"
 rm -f "$tmp/scripts/.project-ids.env"
 
 run_capture user
-has "capture uses user root for a user board" "$(cat "$tmp/qlog")" "user(login"
+has "capture uses user root for a user board" "$(cat "$GH_LOG")" "user(login"
 
 # ── project_issue_status: read an issue's board Status via the cheap issue.projectItems query (#124) ─
-mkdir -p "$tmp/bin2"
-cat > "$tmp/bin2/gh" <<'SH'
-#!/usr/bin/env bash
 # The issue.projectItems Status query: issue is "In Progress" on project #3 (and Todo on some other).
-cat <<'JSON'
-{"data":{"repository":{"issue":{"projectItems":{"nodes":[
+# GH_GRAPHQL is what the shim answers to every POST graphql.
+export GH_GRAPHQL='{"data":{"repository":{"issue":{"projectItems":{"nodes":[
   {"project":{"number":7},"fieldValueByName":{"name":"Todo"}},
   {"project":{"number":3},"fieldValueByName":{"name":"In Progress"}}
-]}}}}}
-JSON
-SH
-chmod +x "$tmp/bin2/gh"
-st="$(PATH="$tmp/bin2:$PATH" KIT_REPO="acme/app" KIT_PROJECT_NUMBER=3 bash -c "source '$LIB/gh-project.sh'; project_issue_status 42")"
+]}}}}}'
+: > "$GH_LOG"
+st="$(PATH="$tmp/bin:$PATH" KIT_REPO="acme/app" KIT_PROJECT_NUMBER=3 bash -c "source '$LIB/gh-project.sh'; project_issue_status 42")"
 t "project_issue_status returns the board Status for our project" "$st" "In Progress"
+has "project_issue_status asks for issue 42 of acme/app" "$(cat "$GH_LOG")" '"variables":{"o":"acme","r":"app","n":42}'
 # unresolved repo/number -> non-zero, no guess.
-PATH="$tmp/bin2:$PATH" KIT_REPO="" KIT_PROJECT_NUMBER="" bash -c "source '$LIB/gh-project.sh'; project_issue_status 42" >/dev/null 2>&1
+PATH="$tmp/bin:$PATH" KIT_REPO="" KIT_PROJECT_NUMBER="" bash -c "source '$LIB/gh-project.sh'; project_issue_status 42" >/dev/null 2>&1
 t "project_issue_status fails (rc 1) with unresolved repo/number" "$?" "1"
+# no forge: every board step is skipped with the one notice, rc 0, and nothing is requested (#396)
+: > "$GH_LOG"
+out="$(PATH="$tmp/bin:$PATH" CCKIT_FORGE=none KIT_REPO="acme/app" KIT_PROJECT_NUMBER=3 bash -c "source '$LIB/gh-project.sh'; project_issue_status 42; echo rc=\$?" 2>"$tmp/noforge.err")"
+t   "no forge: project_issue_status is a quiet rc 0" "$out" "rc=0"
+has "no forge: the board notice names the cause" "$(cat "$tmp/noforge.err")" "board step skipped (no forge is configured; see forge.provider)"
+t   "no forge: no request was made" "$(wc -l < "$GH_LOG" | tr -d ' ')" "0"
 
 # ── role_option_id: any board Role option resolves, not a fixed list (#378) ─────────────────────
 # capture-project-ids.sh writes ROLE_OPT_<NAME> for every option the board has; the lookup reads
