@@ -40,7 +40,7 @@ package on npm and the Homebrew formula updated.
 
 3. **Merge the Release PR.** That merge is the release: release-please tags `vX.Y.Z` and cuts the GitHub Release, then the `publish` job pushes to npm and bumps the Homebrew tap automatically.
 
-4. **Merge the back-merge PR.** The same run opens a PR `main` → `develop` titled `chore(release): back-merge vX.Y.Z into develop` (it opens the PR and merges nothing). Merge it with a **merge commit**, never squash: the release commit bumps the version surfaces on `main` only, and cckit.dev builds `develop`, so until this merge the badge shows the previous version.
+4. **The back-merge is automatic.** `.github/workflows/backmerge.yml` runs on every push to `main` and merges `main` into `develop` with a merge commit (`chore: back-merge main into develop`), so `develop` reads the released version and cckit.dev, built from `develop`, shows it. On a conflict that job fails instead of guessing: merge `main` into `develop` by hand, with a merge commit, never a squash.
 
 </Steps>
 
