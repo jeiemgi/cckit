@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 # effort-metrics.sh — local-first effort telemetry capture (#796).
 #
-# Writes ONE record per effort to <git-common-dir>/effort-metrics/records.jsonl. Engine-independent:
-# the Plan Engine is off by default (kit-engine-boundary.md), so metrics buffer LOCALLY here; a later
-# sync (#811) flushes the buffer to the Postgres graph (schema #810) when the engine is connected.
-# The record shape below IS that schema.
+# Writes ONE record per effort to <git-common-dir>/effort-metrics/records.jsonl. The file is the
+# whole store: nothing pushes it anywhere (the engine sync was retired in #561). `synced_to_graph`
+# stays in the record shape so older rows and newer rows read the same; nothing sets it true.
 #
 #   record_effort_start <num>            — stamp start epoch + write the pre-build estimate (#808).
 #                                          Called by effort_start when it creates the branch (#453).
@@ -35,7 +34,7 @@
 # This file's own directory, resolved ONCE at load time (#381) — the only point where both shells
 # agree. `BASH_SOURCE` is bash-only; inside a zsh *function* it is unset and `$0` is the function
 # name, so a per-call `dirname "${BASH_SOURCE[0]:-$0}"` resolved to the CALLER's directory:
-# engine-adapter.sh and kit-local.sh were never found and the sync buffered without saying why. At
+# kit-local.sh was never found and the judge's local fallback was skipped without saying why. At
 # FILE scope zsh sets `$0` to the sourced file's path, so one expansion covers both shells. Same
 # resolution as kit-gc.sh's `_KIT_GC_LIB_DIR`, whose comment explains why zsh prompt expansion
 # (`${(%):-%x}`) is avoided and why `cd`'s stdout is discarded.
@@ -333,8 +332,8 @@ capture_effort_metrics() {
 # rubric → STRICT JSON {difficulty_judge:1..5, score_judge:0..1, rationale}. Falls back to the LOCAL
 # model (kit_local_chat) when the hosted endpoint is unreachable/empty. If NEITHER is available the
 # fields stay null and close is NEVER blocked (logs "skipped (no model)", returns 0). Idempotent:
-# re-running overwrites the row's *_judge fields + model_id and re-marks it unsynced so the new
-# fields reach the graph on the next sync. Requires: jq, git, curl (for the hosted path).
+# re-running overwrites the row's *_judge fields + model_id. Requires: jq, git, curl (for the
+# hosted path).
 
 # Truncate budget for the diff handed to the model (keep the prompt under the context window).
 _EM_JUDGE_MAX_CHARS="${EM_JUDGE_MAX_CHARS:-12000}"
@@ -509,8 +508,7 @@ ${diff}${truncated_note}"
   fi
 
   # Update the effort's row: the one with .effort==num that still has a null judge (idempotent — if
-  # all rows are already judged, re-judge the most recent one). Re-mark it unsynced so the new fields
-  # reach the graph on the next sync.
+  # all rows are already judged, re-judge the most recent one).
   local tmp rec; tmp="$f.judge.$$"; : > "$tmp"
   local applied=0
   # Line-wise so we touch exactly ONE row (jq has no cross-line "first match only" state). First
@@ -547,39 +545,7 @@ ${diff}${truncated_note}"
     return 0
   fi
   mv "$tmp" "$f"
-  echo "[#$num] judge: difficulty_judge=$dj score_judge=$sj model=$model → records.jsonl (re-marked unsynced)" >&2
-}
-
-# sync_effort_metrics [num] — push unsynced records.jsonl rows into the Plan Engine graph (#832).
-# No-op when the engine is off (engine.mode:"off" → rows stay in the local buffer). Flips
-# synced_to_graph=true ONLY on a successful POST, so a re-run retries failures without duplicating
-# the successes. Sources the engine adapter itself if the caller didn't. [num] is only for the log.
-sync_effort_metrics() {
-  command -v jq >/dev/null 2>&1 || return 0
-  if ! declare -f engine_call >/dev/null 2>&1; then
-    # shellcheck source=/dev/null
-    [[ -f "$_EM_LIB_DIR/engine-adapter.sh" ]] && source "$_EM_LIB_DIR/engine-adapter.sh"
-  fi
-  declare -f engine_enabled >/dev/null 2>&1 || { echo "effort-metrics: engine adapter unavailable — buffered locally" >&2; return 0; }
-  engine_enabled || { echo "effort-metrics: engine off — metrics stay in the local buffer" >&2; return 0; }
-  local d f tmp rec n=0 fail=0
-  d="$(_em_dir)" || return 0; f="$d/records.jsonl"; [[ -f "$f" ]] || return 0
-  tmp="$f.sync.$$"; : > "$tmp"
-  while IFS= read -r rec; do
-    [[ -n "$rec" ]] || continue
-    if [[ "$(jq -r '.synced_to_graph' <<<"$rec" 2>/dev/null)" == "false" ]]; then
-      if engine_call POST /plan/effort-metrics "$rec" >/dev/null 2>&1; then
-        rec="$(jq -c '.synced_to_graph=true' <<<"$rec")"; n=$((n+1))
-      else
-        fail=$((fail+1))
-      fi
-    fi
-    printf '%s\n' "$rec" >> "$tmp"
-  done < "$f"
-  mv "$tmp" "$f"
-  local msg="effort-metrics: synced $n row(s) to the engine"
-  (( fail > 0 )) && msg="$msg ($fail failed, kept for retry)"
-  echo "$msg" >&2
+  echo "[#$num] judge: difficulty_judge=$dj score_judge=$sj model=$model → records.jsonl" >&2
 }
 
 # recalibrate_estimator [stamp] — recompute estimator.json from the real captured dataset

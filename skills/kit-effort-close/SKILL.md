@@ -1,7 +1,7 @@
 ---
 name: kit-effort-close
 terms: Effort
-description: Close an effort in ONE op — snapshot each sub-issue's diff BEFORE squash (work record), capture/judge/sync effort metrics, squash-merge the effort PR, close the parent + ALL native sub-issues, set the board Status=Done for each, garbage-collect the worktree/branch, run the optional knowledge-ingest hook, and finish with the kit-sync drift check.
+description: Close an effort in ONE op — snapshot each sub-issue's diff BEFORE squash (work record), capture and judge effort metrics, squash-merge the effort PR, close the parent + ALL native sub-issues, set the board Status=Done for each, garbage-collect the worktree/branch, run the optional knowledge-ingest hook, and finish with the kit-sync drift check.
 when_to_use: When the effort PR has been reviewed and is ready to land. This is the single close op for the effort lifecycle (effort-model.md) — board + record state are correct by construction. Replaces the separate merge / close / mark-done / gc steps.
 ---
 
@@ -34,7 +34,7 @@ The effort lifecycle's terminal op. Board state, issue state, and the work recor
    (`gh pr edit <n> --base <base>`, one `↻ PR <n> re-targeted to <base>` line). If an edit fails,
    or the list cannot be read, the close **refuses**, names the PR, and merges nothing; this runs
    before step 2, so a refusal writes no metrics row. Skipped over REST, where the branch is kept.
-4. **Judge + sync** the metrics (reads the durable trace dir; no-ops when the engine is off).
+4. **Judge** the metrics (reads the durable trace dir; the record stays in the local buffer).
 5. **Close the parent + ALL native sub-issues** and set the **board Status=Done** for each
    (guarded — a no-op when Projects v2 is off).
 6. **GC**: base branch checked out + pulled in the main checkout; then the effort's **`sub/<N>…`

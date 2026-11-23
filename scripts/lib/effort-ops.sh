@@ -1010,7 +1010,7 @@ EOF_SUBS
 # effort_close <N> — the SINGLE close implementation (#148): the /kit-effort-close skill is a thin
 # caller of this function, never a second close. Snapshot per-sub diffs + capture metrics BEFORE the
 # squash (the squash erases the per-sub history), REFUSE to squash if no work trace was captured
-# (KIT_FORCE=1 overrides), squash-merge, judge + sync the metrics, close parent + subs, set the board
+# (KIT_FORCE=1 overrides), squash-merge, judge the metrics, close parent + subs, set the board
 # Status=Done for each (guarded), GC the worktree/branch, run the optional knowledge-ingest hook,
 # and finish with the advisory kit-sync drift check. Destructive: it merges, closes, and prunes.
 effort_close() {
@@ -1104,9 +1104,8 @@ effort_close() {
       || echo "  (remote branch $branch not deleted — delete it on GitHub)" >&2
   fi
 
-  # (d) judge + sync the metrics (judge reads the durable trace dir; sync no-ops when the engine is off).
+  # (d) judge the metrics (reads the durable trace dir; the record stays in the local buffer).
   command -v judge_effort_metrics >/dev/null 2>&1 && judge_effort_metrics "$num" "origin/$base" || true
-  command -v sync_effort_metrics  >/dev/null 2>&1 && sync_effort_metrics  "$num" || true
 
   # (e) close every native sub-issue, then the parent — and set the board Status=Done for each
   # (guarded: a no-op when Projects v2 is off or the board helpers/ids are unavailable). Board +
@@ -1170,7 +1169,7 @@ _eo_kit_sync_warn() {
 # its own task PR squash-merged straight to base (`cckit wave` → fan-out → `cckit watch --merge`),
 # so no effort/<N> integration branch ever existed. Verifies every sub is CLOSED with a merged
 # closing PR (refuses and lists the stragglers otherwise), snapshots the work trace from the merged
-# sub PR diffs, then runs the SAME close tail as the branch path: judge + sync metrics, close the
+# sub PR diffs, then runs the SAME close tail as the branch path: judge the metrics, close the
 # parent, board Status=Done for parent + subs, knowledge-ingest hook, kit-sync drift check.
 # capture_effort_metrics is intentionally skipped — there is no live branch diff to measure; the
 # merged PR diffs in the trace are the work record.
@@ -1221,9 +1220,8 @@ _eo_close_wave() {
     fi
   fi
 
-  # (d) judge + sync the metrics off the trace (guarded, best-effort — same as the branch path).
+  # (d) judge the metrics off the trace (guarded, best-effort — same as the branch path).
   command -v judge_effort_metrics >/dev/null 2>&1 && judge_effort_metrics "$num" "origin/$base" || true
-  command -v sync_effort_metrics  >/dev/null 2>&1 && sync_effort_metrics  "$num" || true
 
   # (e) kit-sync drift source: the union of files across the merged sub PR diffs.
   kit_touched="$(awk '/^diff --git /{print $3}' "$trace_dir"/*.diff 2>/dev/null | sed 's#^a/##' \
