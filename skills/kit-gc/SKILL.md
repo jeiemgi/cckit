@@ -1,5 +1,6 @@
 ---
 name: kit-gc
+terms: Worktree
 description: Garbage-collect the repo — prune worktrees whose PR already merged, delete merged local + remote branches, surface orphan/unpushed commits and stale stashes, and flag issues whose PR merged but stayed open. Dry-run by default; destructive steps require explicit confirmation.
 when_to_use: When the repo has accumulated stale branches, orphan worktrees, or stashes (the SessionStart hygiene hook flags this), or on demand to tidy before/after a chapter of work. Replaces the manual cleanup sweep.
 ---

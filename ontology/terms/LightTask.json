@@ -1,0 +1,16 @@
+{
+  "id": "LightTask",
+  "label": ["light task"],
+  "definition": "Work tracked in the project as a file, tasks/<id>.md, with no GitHub issue. cckit task new writes it, cckit task start cuts light/<id>-<slug>, cckit task finish opens the PR that marks it done; its state (draft, todo, shared, doing, review, done) is read from git.",
+  "is_not": [
+    "A task: a task is a GitHub issue; a light task never has one and its id starts with a letter.",
+    "A draft PR: the task file is the record, the PR is how it reaches the base branch.",
+    "A note or a reminder: a light task has a kind, a priority and a state."
+  ],
+  "avoid": ["ticket", "todo", "mini-issue", "file task"],
+  "home": {
+    "cli": "task",
+    "rule": ".claude/rules/branch-naming.md"
+  },
+  "status": "tree"
+}

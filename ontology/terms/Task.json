@@ -1,0 +1,17 @@
+{
+  "id": "Task",
+  "label": ["task", "issue"],
+  "definition": "One self-contained change tracked as one GitHub issue: one branch <kind>/<N>-<slug>, one worktree, one PR that says Closes #N. cckit start opens it, cckit pr opens its PR, cckit merge or cckit close ends it.",
+  "is_not": [
+    "An effort: an effort decomposes into sub-issues and ships as one PR for all of them.",
+    "A light task: a light task is tracked in a file under tasks/ and has no GitHub issue.",
+    "A sub-issue: a sub-issue has no PR of its own."
+  ],
+  "avoid": ["ticket", "story", "card", "todo"],
+  "home": {
+    "cli": "start",
+    "skill": "kit-task-new",
+    "rule": ".claude/rules/branch-naming.md"
+  },
+  "status": "tree"
+}

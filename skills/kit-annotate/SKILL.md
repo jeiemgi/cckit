@@ -1,5 +1,6 @@
 ---
 name: kit-annotate
+terms: Check
 description: Set up and run in-app visual UI annotation for a React project, wired to Claude via Agentation. Use AUTOMATICALLY when the user asks to set up / install visual annotation or an annotation toolbar, "annotate the UI / a component", click-to-annotate, give the agent visual UI feedback, review or triage UI annotations, or run "watch mode" for UI feedback. Targets a React app (Next.js, Vite, or React Router); installs the third-party `agentation` dev dependency + its MCP. Other agents are out of scope — this wires Claude Code only.
 argument-hint: "[setup | watch | review | status] [--dry-run]"
 allowed-tools: Bash, Read, Edit, Glob, Grep, AskUserQuestion, mcp__agentation__agentation_get_all_pending, mcp__agentation__agentation_watch_annotations, mcp__agentation__agentation_acknowledge, mcp__agentation__agentation_resolve, mcp__agentation__agentation_dismiss, mcp__agentation__agentation_reply, mcp__agentation__agentation_list_sessions, mcp__agentation__agentation_get_session, mcp__agentation__agentation_get_pending

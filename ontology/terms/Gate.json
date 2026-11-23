@@ -1,0 +1,17 @@
+{
+  "id": "Gate",
+  "label": ["gate"],
+  "definition": "The bar a change must pass before it lands: the project's check command run on the branch's tree with the current base in it. Here it is bash scripts/check.sh; in a scaffolded project it is tasks.check. A red gate is never merged; the captain fixes the cause or reports it.",
+  "is_not": [
+    "One check: the gate is the set of checks, run together, with one pass or fail.",
+    "CI: CI is the gate's second run, after the PR is up; the first run is local, before the PR opens.",
+    "MERGEABLE on GitHub: that says the branch combines without a textual conflict, not that the gate passed on the combined tree."
+  ],
+  "avoid": ["CI (for the local run)", "the build", "quality gate", "checks (plural, for the gate)"],
+  "home": {
+    "cli": "watch",
+    "skill": "kit-task-pr-merge",
+    "rule": ".claude/rules/merge-safety.md"
+  },
+  "status": "sapling"
+}

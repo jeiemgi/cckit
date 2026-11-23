@@ -1,5 +1,6 @@
 ---
 name: kit-task-pr-auto
+terms: Task
 description: Same as kit-task-pr (commit, push, open PR) then immediately attempts to merge via kit-task-pr-merge. One command to land a branch end-to-end.
 when_to_use: When work is ready to ship without a separate review step.
 ---

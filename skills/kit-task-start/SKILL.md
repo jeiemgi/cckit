@@ -1,5 +1,6 @@
 ---
 name: kit-task-start
+terms: Worktree
 description: Start work on a GitHub issue — thin caller of `cckit start <N>`. Creates an isolated, bootstrapped worktree + `<kind>/<N>-<slug>` branch from the base branch and marks the issue In Progress on the board (if enabled). Worktree-first — there is no in-place mode.
 when_to_use: When beginning work on a tracked issue. Always run before editing files. Replaces ad-hoc `git checkout -b` and hand-rolled `git worktree add`.
 ---

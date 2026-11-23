@@ -1,5 +1,6 @@
 ---
 name: kit-task-close
+terms: Task
 description: Close a GitHub issue after its PR merged. Sets the board Status to Done (if enabled). If the issue is a plan parent, flips the plan status to Complete once all deliverables are merged (no archive folder — completed plans stay visible).
 when_to_use: After a PR merges, to finalize the issue ledger. Most issues auto-close from PR `Closes #N` — use this for issues without a PR or to backfill the plan status.
 ---

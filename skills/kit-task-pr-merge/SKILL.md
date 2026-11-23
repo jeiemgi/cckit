@@ -1,5 +1,6 @@
 ---
 name: kit-task-pr-merge
+terms: Gate
 description: Squash-merge the open PR for the current branch, switch to the base branch, and pull. Auto-rebases onto the base if conflicts are detected.
 when_to_use: When work on an issue branch is ready to land. Always run after `/kit-task-pr`.
 ---

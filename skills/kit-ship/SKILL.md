@@ -1,5 +1,6 @@
 ---
 name: kit-ship
+terms: Task
 description: End-to-end delivery for a user request — fix the issue, then run the full kit cycle (start → PR → CI → merge → close → update kit) using the kit-task commands. One command takes an open issue from code to merged-on-base with the board kept in sync.
 when_to_use: When the user says "fix #N and ship it", "do the full cycle on #N", "fix this and merge it", or hands you a tracked issue to take all the way to the base branch. For just opening a PR use /kit-task-pr; for PR+merge with no implementation use /kit-task-pr-auto.
 ---

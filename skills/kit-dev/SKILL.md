@@ -1,5 +1,6 @@
 ---
 name: kit-dev
+terms: none
 description: >
   Fast local dev loop for claude-kit itself (the plugin source). start: worktree +
   launch instructions for `claude --plugin-dir` (plugin loads live from disk, no cache, no

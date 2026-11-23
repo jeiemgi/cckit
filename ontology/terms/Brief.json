@@ -1,0 +1,16 @@
+{
+  "id": "Brief",
+  "label": ["brief"],
+  "definition": "What a builder gets up front, from real state: the issue, the worktree and its seed freshness, the files it owns and the helpers they sit on, the standing gotchas, the gate commands and the durable-prose rule. cckit brief <issue> prints it; it is the only context the builder has.",
+  "is_not": [
+    "The issue body: the issue says what; the brief adds where the code is and how the environment behaves.",
+    "A prompt template: the brief is generated from the repository's state, not pasted.",
+    "A report: the report is what comes back; the brief is what goes out."
+  ],
+  "avoid": ["prompt (for the brief)", "spec", "handoff (that is the resume note)", "context dump"],
+  "home": {
+    "cli": "brief",
+    "rule": ".claude/rules/delegation-brief.md"
+  },
+  "status": "sapling"
+}

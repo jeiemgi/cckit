@@ -1,5 +1,6 @@
 ---
 name: kit-add
+terms: none
 description: Add an optional tool or a module to this project through `cckit add` — list what can be added, ask the one question its descriptor defines, and set only that key in the project config.
 when_to_use: When the user wants to add, enable, set up or try an integration or a module ("add the code graph", "what can I add", "make this a software project"). SKIP when they want a package dependency (pnpm add), a new skill or agent (/kit-customize), or first-time setup (/kit-onboard).
 ---

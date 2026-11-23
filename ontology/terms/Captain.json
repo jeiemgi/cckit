@@ -1,0 +1,17 @@
+{
+  "id": "Captain",
+  "label": ["captain"],
+  "definition": "Whoever drives an approved plan: cckit watch --merge, /kit-autopilot, or an orchestrating session. It gates the open PRs, squash-merges the CLEAN ones, closes their issues, advances the wave, and pings a person only on a genuine blocker.",
+  "is_not": [
+    "A builder: a builder implements one issue in its worktree and never merges.",
+    "A reviewer: the captain reads the gate and the review verdicts, it does not review the code.",
+    "The owner: the owner approves the plan; the captain executes it."
+  ],
+  "avoid": ["orchestrator (for the role)", "manager", "supervisor", "first mate"],
+  "home": {
+    "cli": "watch",
+    "skill": "kit-autopilot",
+    "rule": ".claude/rules/issue-lifecycle.md"
+  },
+  "status": "sapling"
+}

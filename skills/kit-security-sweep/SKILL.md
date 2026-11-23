@@ -1,5 +1,6 @@
 ---
 name: kit-security-sweep
+terms: Check
 description: Full security audit of the project's apps. A security expert scans for AI/prompt injection, auth/session weaknesses, CORS/CSP issues, and dependency CVEs; findings are filed as GitHub issues and roadmapped. Named kit-security-sweep (not security-review) so it doesn't shadow the Claude Code builtin /security-review (diff audit).
 when_to_use: When you want a project security sweep with filed issues + roadmap entries — before a release, after a significant feature, or on demand. For a quick diff/code audit without issue filing, use the builtin /security-review instead.
 ---

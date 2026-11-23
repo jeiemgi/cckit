@@ -1,0 +1,17 @@
+{
+  "id": "SubIssue",
+  "label": ["sub-issue", "sub"],
+  "definition": "One deliverable of an effort, tracked as a native GitHub sub-issue of the parent and titled [Effort <parent>] <N> · <Title>. Sequential subs commit straight onto the effort branch, one commit each; parallel subs get a sub/<N><letter> worktree and merge in.",
+  "is_not": [
+    "A checkbox in the parent's body: a checkbox has no state outside the body and leaves the board when the parent closes.",
+    "A task: a task has its own PR; a sub-issue lands inside the effort's one PR.",
+    "A step of a plan file: the sub-issue is the tracker, a plan table is an index of it."
+  ],
+  "avoid": ["subtask", "child ticket", "checklist item", "deliverable (as a tracked unit)"],
+  "home": {
+    "cli": "effort",
+    "skill": "kit-effort-new",
+    "rule": ".claude/rules/issue-lifecycle.md"
+  },
+  "status": "sapling"
+}
