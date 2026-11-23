@@ -4,7 +4,7 @@ description: Every activation tag, how you trigger it, and where it appears — 
 ---
 
 import { CardGrid, LinkCard } from '@astrojs/starlight/components';
-import TriggerSurfaces from '../../components/diagrams/TriggerSurfaces';
+import TriggerSurfaces from '../../components/figures/TriggerSurfaces.astro';
 import Tag from '../../components/Tag.astro';
 import TagLegend from '../../components/TagLegend.astro';
 
@@ -28,7 +28,7 @@ there.
 
 ## The directory
 
-<TriggerSurfaces client:only="react" />
+<TriggerSurfaces />
 
 One question sorts every tag: **who pulls the trigger?** You act, the system fires on its own, an
 agent reads the machine surface — or nothing triggers it and it's a term worth knowing.

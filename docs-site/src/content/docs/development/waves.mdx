@@ -4,7 +4,7 @@ description: What cckit wave proposes, how the work is dispatched to parallel ag
 ---
 
 import { Aside } from '@astrojs/starlight/components';
-import CopilotFanout from '../../../components/diagrams/CopilotFanout';
+import CopilotFanout from '../../../components/figures/CopilotFanout.astro';
 import Chat from '../../../components/Chat.astro';
 import Outcomes from '../../../components/Outcomes.astro';
 
@@ -16,7 +16,7 @@ The risk in doing them together is collision: two agents in one folder, or two a
 one branch. A wave is how cckit runs the ready work at the same time and keeps every agent in its
 own copy of the code.
 
-<CopilotFanout client:only="react" />
+<CopilotFanout />
 
 ## What a wave is
 
