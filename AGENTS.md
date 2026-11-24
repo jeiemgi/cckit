@@ -45,6 +45,7 @@ copy; `bash scripts/terms-check.sh` names a drift between the two). A term is a 
 | pick up the next unblocked issue · fan the unblocked wave out to builders | `kit-next` | Task, Wave |
 | decide what to build next from what the kit already does | `kit-plan-next` | Effort |
 | run an approved plan unattended, waves merged as they go | `kit-autopilot` | Captain |
+| create or plan an effort: grill, plan, orchestrate, review, close | `kit-advisor` | Advisor |
 | track a new piece of work as an issue | `kit-task-new` | Task |
 | start work on an issue in its own worktree | `kit-task-start` | Worktree |
 | open the PR for an issue | `kit-task-pr` | Task |

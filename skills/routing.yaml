@@ -33,6 +33,11 @@
   skill: kit-autopilot
   term: Captain
 
+# ── the advisor: decide the work, then keep it honest ──────────────────────
+- task: "create or plan an effort: grill, plan, orchestrate, review, close"
+  skill: kit-advisor
+  term: Advisor
+
 # ── one issue ────────────────────────────────────────────────────────────────
 - task: "track a new piece of work as an issue"
   skill: kit-task-new
