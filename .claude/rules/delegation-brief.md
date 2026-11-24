@@ -42,6 +42,10 @@ when an agent rediscovers something it should have been handed, add it here.
   `.github.owner` / `.github.projectNumber` / `.github.baseBranch` out of whatever it prints, or let
   `load_kit_config` (`scripts/lib/kit-config.sh`) export `KIT_REPO` / `KIT_OWNER` /
   `KIT_BASE_BRANCH` / `KIT_PROJECT_NUMBER` for you.
+- **Read the board from the local snapshot.** After `cckit sync`, grep `.cckit/board.md` (the
+  primary checkout's, shared by every worktree; sync prints its absolute path) with
+  `rg '#572' <path>`: one line per open issue — status, kind, effort token, labels, title. `.cckit/`
+  is gitignored, so give `rg` the path.
 - **Project IDs are worktree-durable.** `source scripts/lib/gh-project.sh; load_project_ids` reads
   the captured IDs from the shared git-common-dir, so worktrees see them too.
 

@@ -222,6 +222,7 @@ One issue becomes one branch, one worktree, one PR. These verbs walk that path.
 | `cckit merge [<pr>] [--merge\|--rebase]` | Merge the PR (squash by default), close its linked issues, clean the branch and worktree, and update the PR's base, which may be an `effort/<N>` branch. Refuses a PR whose **head** is `effort/*` and names `cckit effort close <N>`; `KIT_FORCE=1` merges anyway, with a warning. Without a forge, run from the branch's worktree with no PR number: the branch lands on the base through git (a squash commit titled after its last commit; `--merge` keeps the commits under a merge commit; `--rebase` replays them first), the base is pushed, the branch and worktree are cleaned up, and one line says no pull request was merged and no issue closed. |
 | `cckit sync` | Board state: issues by role with Project Status, a merge-ordered open-PR queue, and blocked / not-on-board / stale (>14d) flags. |
 | `cckit sync --json \| --write \| --cached [TTL] \| --watch [SECS] \| --plan` | The same board as one cached JSON document for a TUI or statusline — see [Board cache and watch mode](#board-cache-and-watch-mode). |
+| `cckit sync --no-snapshot` | Skip the local board snapshot `.cckit/board.md` — see [Local board snapshot](#local-board-snapshot). |
 | `cckit status` | "Where are we?" in three buckets — local undone work, open PRs waiting on a human, cleanup available (local + remote) — plus the board, the light tasks when the project has any (counts by state and the tasks somebody has to act on), the next effort that can start in each flow, and the resume handoff, and one line with the resident instruction-file total. Read-only. |
 | `cckit handoff "<note>"` | Save a resume-here note for the next session. |
 
@@ -462,6 +463,30 @@ cckit brief <issue>       # the brief for that issue
 ```
 
 Reading the issue is the verb's one hard dependency: a failed GitHub read propagates rather than yielding a brief with an empty issue in it.
+
+## Local board snapshot
+
+Every board read also writes `.cckit/board.md`, so an agent can grep the board instead of asking GitHub again. It is the primary checkout's `.cckit/`, shared by every worktree; `cckit sync` prints the absolute path on stderr. `.cckit/` is gitignored, so a bare `rg` skips the file: give it the path.
+
+```bash
+cckit sync --llm                      # reads the board, writes the snapshot
+rg '#575' /path/to/repo/.cckit/board.md
+rg -F 'E546.' /path/to/repo/.cckit/board.md   # every sub-issue of effort 546
+```
+
+One tab-separated line per open issue, grouped under `## Efforts`, `## Sub-issues` and `## Standalone`:
+
+```text
+#575	open	sub	E546.9	priority:p1,role:tech-lead,kind:feat	[Effort 546] 9 · Local board snapshot
+```
+
+| Column | Value |
+| --- | --- |
+| status | The Projects v2 Status when the board is on and was read (the human board, `--json`, `--write`); otherwise the issue state, `open`. |
+| kind | `effort`, `sub` or `issue`, from the title prefix (`[E<n>]`, `[E<n>.<s>]`, legacy `[Effort] N · ` and `[Effort N] M · `) or the `effort` label. |
+| token | `E<n>` for an effort, `E<n>.<s>` for a sub, `-` for a standalone issue. |
+
+The header records the time, the repository, the command and how to read the file. The write goes to a temp file renamed over the snapshot, and a failed read leaves the previous snapshot as it was. `--raw-json` and a `--cached` hit write nothing; neither does a project with no forge, which says so on stderr. `--no-snapshot` skips the write; `CCKIT_BOARD_SNAPSHOT=<path>` writes it elsewhere.
 
 ## Board cache and watch mode
 
