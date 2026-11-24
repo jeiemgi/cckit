@@ -117,6 +117,15 @@ Old names that still work: `cckit copilot` runs `cckit wave` · `cckit ui` runs 
 
 {/* verbs:end */}
 
+### Renaming a verb
+
+The top level only shrinks. `bash scripts/check.sh` fails when `scripts/lib/verbs.tsv` holds more
+top-level verbs than `scripts/verbs.baseline` (46 today), and fails when it holds fewer until the
+baseline is lowered to match. A renamed verb keeps its old name as an `alias` row: the old name still
+works and prints one line on stderr, for example
+`cckit: 'copilot' is an old name for 'wave'; it still works. Use 'cckit wave'.` An alias does not
+count toward the baseline and is not removed while the rename settles.
+
 ## Set up and install
 
 | Verb | Purpose |

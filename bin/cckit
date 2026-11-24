@@ -68,6 +68,14 @@ cmd="${1:-resume}"; shift || true
 # The verb name, for a forge refusal that names it (scripts/lib/forge.sh forge_need).
 export CCKIT_VERB="$cmd"
 
+# An old verb name (a `kind=alias` row of scripts/lib/verbs.tsv) still works (#557): it prints a
+# one-line notice on stderr and runs the verb it was renamed to. CCKIT_VERB keeps the typed name, so
+# a refusal names what the user ran. Aliases are never removed in the rename arc.
+if _alias_target="$(verbs_alias_target "$cmd")"; then
+  verbs_alias_notice "$cmd" "$_alias_target" >&2
+  cmd="$_alias_target"
+fi
+
 # `cckit <verb> --help` (#556): the dispatcher answers from the verb table before the verb runs, so
 # every verb has help and none sees a --help it does not parse. A verb whose table row says
 # ownhelp=yes then runs with that --help too, in a child, and its own text follows under "Details:".
@@ -355,9 +363,9 @@ case "$cmd" in
     # shellcheck source=/dev/null
     source "$LIB/next.sh"; next_issue "$@"
     ;;
-  wave|copilot)
+  wave)
     # Read the open efforts and propose the incoming waves of work: emit the wave-0 Task-subagent
-    # fan-out + the between-waves captain drive. (`copilot` is a hidden back-compat alias for `wave`.)
+    # fan-out + the between-waves captain drive. (`copilot`, its old name, reaches here through the alias path above.)
     # Runs in the invoking project; needs config so KIT_REPO is set before it reads it.
     # shellcheck source=/dev/null
     source "$LIB/kit-config.sh" && load_kit_config
@@ -441,7 +449,7 @@ cckit bench verbs [--runs N] [--checkout <dir>] [--verb "<verb>"] [--json]   (at
     croot="$(contribute_root "$PWD" "$ROOT")"
     [ "$croot" = "$ROOT" ] || echo "contribute: using the checkout at $croot" >&2
     cd "$croot"; exec "$croot/scripts/contribute.sh" "$@" ;;
-  status|ui)   exec "$ROOT/scripts/status.sh" "$@" ;;
+  status)   exec "$ROOT/scripts/status.sh" "$@" ;;
   claims)
     # Live session claims (#384) — which session is working which issue. Read-only: a dead claim is
     # skipped here and reaped by the next `cckit start` on that issue, never by this verb.

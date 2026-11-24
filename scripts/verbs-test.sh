@@ -45,11 +45,13 @@ t "git mechanics come first in the help" "$first" "git"
 bad="$(verbs_rows | awk -F'\t' '$4 == "git" && $1 !~ /^(start|pr|merge|close|hotfix|task)$/ { print $1 }')"
 t "the git group holds the branch-to-merged verbs" "$bad" ""
 
-# ── 2. the dispatcher's case labels are the table's verbs ───────────────────────────────────────
+# ── 2. the dispatcher's case labels are the table's verbs, not its old names ───────────────────────────────────────
 labels="$(grep -oE '^  [a-z][a-z|-]*\)' "$CCKIT" | sed 's/[) ]//g' | tr '|' '\n' | grep -vE '^(-|$)' | sort -u)"
-table="$(verbs_names | sort -u)"
+table="$(verbs_names verb default | sort -u)"
 t "every case label of bin/cckit is a name in the table" "$(comm -23 <(printf '%s\n' "$labels") <(printf '%s\n' "$table") | tr '\n' ' ')" ""
-t "every name in the table has a case label" "$(comm -13 <(printf '%s\n' "$labels") <(printf '%s\n' "$table") | tr '\n' ' ')" ""
+t "every verb in the table has a case label" "$(comm -13 <(printf '%s\n' "$labels") <(printf '%s\n' "$table") | tr '\n' ' ')" ""
+bad=""; for a in $(verbs_names alias); do grep -qx "$a" <<<"$labels" && bad="$bad $a"; done
+t "no old name has a case label: aliases go through the alias path" "$bad" ""
 
 # ── 3. help, commands and completions read the table ────────────────────────────────────────────
 help="$("$CCKIT" help 2>&1)"

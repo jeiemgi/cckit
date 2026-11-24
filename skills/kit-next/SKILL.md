@@ -4,7 +4,7 @@ terms: Task, Wave
 description: >
   The everyday cckit loop: find the next unblocked issue and pick it up, or fan the whole unblocked
   wave out to subagents. Wraps `cckit next` (what can I work on now?), `cckit start <N>` (isolated
-  worktree + branch), `cckit copilot` (parallel fan-out), and `cckit watch` (gate + merge PRs).
+  worktree + branch), `cckit wave` (parallel fan-out), and `cckit watch` (gate + merge PRs).
 when_to_use: >
   When you sit down to work and want the next thing to do, when you finish an issue and need the
   next one, or when you want to parallelize the unblocked wave. Not for planning an effort
@@ -54,7 +54,7 @@ When the unblocked issues are file-disjoint and independent, drive them in paral
 at a time:
 
 ```
-cckit copilot          # emits the wave-0 fan-out brief (dispatch wording per adapter)
+cckit wave             # emits the wave-0 fan-out brief (dispatch wording per adapter)
 cckit watch --merge    # gate every open PR; squash-merge the CLEAN ones; advance the next wave
 ```
 

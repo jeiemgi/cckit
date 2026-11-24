@@ -79,6 +79,12 @@ bash scripts/instruction-budget-lint.sh || fail=1
 note "==> codified review findings"
 bash scripts/review-lint.sh || fail=1
 
+# 6b. Top-level verb count. scripts/lib/verbs.tsv may hold no more `verb` rows than
+# scripts/verbs.baseline says, and a drop must lower the baseline in the same change. A rename keeps
+# the old name as an alias row, which does not count (#557).
+note "==> top-level verb ratchet"
+bash scripts/verbs-ratchet.sh || fail=1
+
 # 7. Agent skill references. Every `skills:` entry in templates/agents/*.md must resolve to a skill
 # the kit ships or scaffolds, a `plugin:skill` reference, or a name declared third-party in
 # scripts/agent-skills-external.txt. An unresolved entry fails silently at runtime: the agent loads
