@@ -91,6 +91,10 @@ the name of the work and its outcome.** Two parts:
   line; a command listed to show what the agent ran is decoration.
 - **Scope:** text a person reads. Output an agent parses, a brief handed to a sub-agent, and the
   machine-read lines `naming-and-ids.md` lists (`- Depends on #N`, `Closes #N`) are not summaries.
+- **A step report also goes on its issue.** A report saved under `.cckit/reports/` uses the
+  sections Status · Done · Waiting for a yes · Numbers · Failing or risky · Open questions · Next
+  step. `cckit receipt <issue> --report <file>` posts its short trail comment on the issue, so other
+  agents read the trail there; the full report stays local.
 
 **Precedence — `naming-and-ids.md`.** That rule writes an effort as `E241`, a pull request as
 `PR 268` and a standalone issue as `#209`, and forbids a bare `#241` for an effort. Where it is
