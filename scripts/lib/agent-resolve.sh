@@ -63,9 +63,10 @@ EOF
 }
 
 # ap_parent_effort_num <title> — echo the parent effort number from a sub-issue title
-# (`[Effort 318] 3 · thing` -> 318). Empty for a standalone issue. Pure.
+# (`[E318.3] thing` or the legacy `[Effort 318] 3 · thing` -> 318). Empty for a standalone issue
+# and for an effort's own title. Pure.
 ap_parent_effort_num() {
-  printf '%s' "${1:-}" | sed -n 's/^\[Effort \([0-9][0-9]*\)\].*/\1/p'
+  printf '%s' "${1:-}" | sed -n -e 's/^\[E\([0-9][0-9]*\)\.[0-9][0-9]*\] .*/\1/p' -e 's/^\[Effort \([0-9][0-9]*\)\].*/\1/p'
 }
 
 # ap_labels_fetch <repo> <issue> — echo an issue's labels, comma-separated. Best-effort: any gh

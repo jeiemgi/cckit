@@ -63,14 +63,14 @@ tn "$GH_LOG" '<!--'                                  "no template placeholder le
 # Label set on the parent: effort + ctx + kind + priority + role + flow (flow lowercased).
 # `effort` leads: it is the one `effort_plan` queries, and it was read by that verb while nothing
 # wrote it — so `cckit effort plan` answered "no open efforts found" on every repo.
-tc "$GH_LOG" '^POST repos/o/r/issues \{"title":"\[Effort\] · .*"labels":\["effort","ctx:[SMLX]+","kind:task","priority:p2","role:tech-lead","flow:core"\]' \
+tc "$GH_LOG" '^POST repos/o/r/issues \{"title":"[^[].*"labels":\["effort","ctx:[SMLX]+","kind:task","priority:p2","role:tech-lead","flow:core"\]' \
    "parent carries effort/ctx/kind/priority/role/flow labels"
 # Flow tag on the composed title.
-tc "$GH_LOG" '^PATCH repos/o/r/issues/1 \{"title":"\[Effort\] 1 · \[Core\] demo parity effort"\}$' \
+tc "$GH_LOG" '^PATCH repos/o/r/issues/1 \{"title":"\[E1\] demo parity effort"\}$' \
    "parent title carries the [Core] flow tag + injected number"
 # Sub labels: kind/priority/role (no ctx/flow on subs — those are parent-level).
-tc "$GH_LOG" '^POST repos/o/r/issues \{"title":"\[Effort 1\] 1 · share core".*"labels":\["kind:task","priority:p2","role:tech-lead"\]' \
-   "sub #1 carries kind/priority/role labels + a proper [Effort N] M title"
+tc "$GH_LOG" '^POST repos/o/r/issues \{"title":"\[E1\.1\] share core".*"labels":\["kind:task","priority:p2","role:tech-lead"\]' \
+   "sub #1 carries kind/priority/role labels + a proper [E<n>.<step>] title"
 
 # ── A bad sub title aborts the whole op BEFORE anything is created (parity contract) ─────────────
 : > "$GH_LOG"; printf '0' > "$GH_N"
@@ -92,19 +92,19 @@ tc "$GH_LOG" '<!--'            "bare call leaves the template placeholders (noth
 # shellcheck source=/dev/null
 source "$LIB/commitlint.sh"
 unset KIT_PR_TITLE_STYLE
-t  "effort_pr_title composes type: name [#N]"  "$(effort_pr_title 115 'adoption hardening')"             "feat: adoption hardening [#115]"
-t  "effort_pr_title takes the scope from flow:" "$(effort_pr_title 115 'adoption hardening' 'role:tech-lead,kind:task,flow:core')" "feat(core): adoption hardening [#115]"
-t  "effort_pr_title peels [Effort] + uses [Flow] as scope" "$(effort_pr_title 115 '[Effort] 115 · [Core] adoption hardening')" "feat(core): adoption hardening [#115]"
-t  "effort_pr_title flow: label wins over the [Flow] tag" "$(effort_pr_title 115 '[Effort] 115 · [Core] adoption hardening' 'flow:docs')" "feat(docs): adoption hardening [#115]"
-t  "effort_pr_title drops a tag that is no valid scope" "$(effort_pr_title 115 '[¡Hola!] adoption hardening')" "feat: adoption hardening [#115]"
-t  "effort_pr_title tolerates a #-prefixed num" "$(effort_pr_title '#42' 'x')"                           "feat: x [#42]"
-t  "effort_pr_title derives the type from kind:" "$(effort_pr_title 115 'x' 'kind:chore,flow:core')"     "chore(core): x [#115]"
-t  "effort_pr_title maps a bug label to fix"   "$(effort_pr_title 115 'x' 'bug,kind:task')"              "fix: x [#115]"
-t  "effort_pr_title explicit type wins"        "$(effort_pr_title 115 'x' 'kind:chore' fix)"             "fix: x [#115]"
+t  "effort_pr_title composes type: name [#N]"  "$(effort_pr_title 115 'adoption hardening')"             "feat: adoption hardening [E115]"
+t  "effort_pr_title takes the scope from flow:" "$(effort_pr_title 115 'adoption hardening' 'role:tech-lead,kind:task,flow:core')" "feat(core): adoption hardening [E115]"
+t  "effort_pr_title peels [Effort] + uses [Flow] as scope" "$(effort_pr_title 115 '[Effort] 115 · [Core] adoption hardening')" "feat(core): adoption hardening [E115]"
+t  "effort_pr_title flow: label wins over the [Flow] tag" "$(effort_pr_title 115 '[Effort] 115 · [Core] adoption hardening' 'flow:docs')" "feat(docs): adoption hardening [E115]"
+t  "effort_pr_title drops a tag that is no valid scope" "$(effort_pr_title 115 '[¡Hola!] adoption hardening')" "feat: adoption hardening [E115]"
+t  "effort_pr_title tolerates a #-prefixed num" "$(effort_pr_title '#42' 'x')"                           "feat: x [E42]"
+t  "effort_pr_title derives the type from kind:" "$(effort_pr_title 115 'x' 'kind:chore,flow:core')"     "chore(core): x [E115]"
+t  "effort_pr_title maps a bug label to fix"   "$(effort_pr_title 115 'x' 'bug,kind:task')"              "fix: x [E115]"
+t  "effort_pr_title explicit type wins"        "$(effort_pr_title 115 'x' 'kind:chore' fix)"             "fix: x [E115]"
 t  "effort_pr_title issue-title style keeps [Role] [#N] name" "$(KIT_PR_TITLE_STYLE=issue-title effort_pr_title 115 '[Effort] 115 · [Core] adoption hardening' 'flow:core' '' 'Tech Lead')" "[Tech Lead] [#115] [Core] adoption hardening"
 t  "effort_pr_title issue-title style without a role" "$(KIT_PR_TITLE_STYLE=issue-title effort_pr_title 115 'adoption hardening')" "[#115] adoption hardening"
 _t237="$(effort_pr_title 220 '[Effort] 220 · [Core] agents cannot see what cckit provides' 'flow:core,kind:task,role:tech-lead')"
-t  "the #237 reproduction composes the conventional form" "$_t237" "feat(core): agents cannot see what cckit provides [#220]"
+t  "the #237 reproduction composes the conventional form" "$_t237" "feat(core): agents cannot see what cckit provides [E220]"
 commitlint_check "$_t237" 2>/dev/null; t "the generated title passes commitlint_check" "$?" "0"
 effort_pr_title_check "$_t237" 220 2>/dev/null; t "the generated title carries the [#N] id" "$?" "0"
 effort_pr_title_check "[Tech Lead] [#115] adoption hardening" 115; t "check accepts a title carrying [#N]" "$?" "0"
@@ -114,8 +114,8 @@ effort_pr_title_check "[#7] anything" 2>/dev/null; t "check accepts any [#N] whe
 # ── #277: --kind picks the kind: label (parent + subs) from the closed set; --par is gone ──────────
 : > "$GH_LOG"; printf '0' > "$GH_N"
 effort_new --flow Core --kind fix "kind fix effort" "a :: x" >/dev/null 2>&1
-tc "$GH_LOG" '^POST repos/o/r/issues \{"title":"\[Effort\] · .*"labels":\["effort","ctx:[SMLX]+","kind:fix",' "--kind fix labels the parent kind:fix"
-tc "$GH_LOG" '^POST repos/o/r/issues \{"title":"\[Effort 1\] 1 · a".*"labels":\["kind:fix",'              "--kind fix labels every sub kind:fix"
+tc "$GH_LOG" '^POST repos/o/r/issues \{"title":"[^[].*"labels":\["effort","ctx:[SMLX]+","kind:fix",' "--kind fix labels the parent kind:fix"
+tc "$GH_LOG" '^POST repos/o/r/issues \{"title":"\[E1\.1\] a".*"labels":\["kind:fix",'              "--kind fix labels every sub kind:fix"
 tc "$GH_LOG" '^POST repos/o/r/labels \{"name":"kind:fix"'                                                   "--kind ensures the kind label exists"
 tn "$GH_LOG" 'kind:task'                                                                  "--kind fix leaves no kind:task behind"
 : > "$GH_LOG"; printf '0' > "$GH_N"
@@ -132,7 +132,7 @@ for k in $KIT_CONTENT_KINDS; do
   t "--kind $k (content kind) is accepted" "$rc" "0"
   tc "$GH_LOG" "^POST repos/o/r/issues \\{.*\"labels\":\\[\"effort\",\"ctx:[SMLX]+\",\"kind:$k\"," "--kind $k labels the parent kind:$k"
 done
-t  "effort_pr_title: a content kind titles as docs" "$(effort_pr_title 115 'spring launch' 'kind:campaign')" "docs: spring launch [#115]"
+t  "effort_pr_title: a content kind titles as docs" "$(effort_pr_title 115 'spring launch' 'kind:campaign')" "docs: spring launch [E115]"
 : > "$GH_LOG"; printf '0' > "$GH_N"
 err="$(effort_new --kind bug "bad kind effort" 2>&1 >/dev/null)" && rc=0 || rc=1
 t  "--kind rejects a value outside the closed set"   "$rc" "1"
@@ -149,8 +149,8 @@ t  "nothing in effort-ops.sh writes a par: label"    "$(grep -c 'par:' "$LIB/eff
 effort_new "flags after title effort" "real sub :: desc" --flow Docs --role docs >/dev/null 2>&1
 t  "trailing flags do NOT create junk subs (parent + 1 real sub)" "$(grep -cE "$CREATE_RE" "$GH_LOG")" "2"
 tc "$GH_LOG" '^POST repos/o/r/issues \{.*"labels":\[[^]]*"flow:docs"\]'  "trailing --flow is honored (flow:docs label)"
-tc "$GH_LOG" '^POST repos/o/r/issues \{"title":"\[Effort 1\] 1 · real sub"' "the one real sub is created from the positional"
-tn "$GH_LOG" '^POST repos/o/r/issues \{"title":"\[Effort 1\] [0-9]+ · --flow' "no '--flow' junk sub-issue created"
+tc "$GH_LOG" '^POST repos/o/r/issues \{"title":"\[E1\.1\] real sub"' "the one real sub is created from the positional"
+tn "$GH_LOG" '^POST repos/o/r/issues \{"title":"\[E1\.[0-9]+\] --flow' "no '--flow' junk sub-issue created"
 
 [ "$fail" -eq 0 ] && echo "ALL OK (effort-parity)" || echo "effort-parity: FAILURES"
 exit "$fail"

@@ -111,7 +111,7 @@ copilot_brief() {
     json="$(printf '%s\n' "$wave0" | awk -F'\t' '{print $3"\t"$4"\t"$6}' \
       | while IFS="$(printf '\t')" read -r num ctx title; do
           [ -n "$num" ] || continue
-          disp="$(printf '%s' "$title" | sed -E 's/^\[Effort( [0-9]+)?\] [0-9]+ · ?//; s/^\[[A-Za-z]+\] //')"
+          disp="$(printf '%s' "$title" | sed -E 's/^\[E[0-9]+(\.[0-9]+)?\] +//; s/^\[Effort( [0-9]+)?\] [0-9]+ · ?//; s/^\[[A-Za-z]+\] //')"
           printf '%s\t%s\t%s\n' "$num" "$ctx" "$(_copilot_seed "$num" "$disp")"
         done \
       | jq -R -s '[ split("\n")[] | select(length>0) | split("\t")
@@ -142,7 +142,7 @@ copilot_brief() {
     printf '%s\n' "$wave0" | awk -F'\t' '{print $3"\t"$4"\t"$6}' \
       | while IFS="$(printf '\t')" read -r num ctx title; do
           [ -n "$num" ] || continue
-          disp="$(printf '%s' "$title" | sed -E 's/^\[Effort( [0-9]+)?\] [0-9]+ · ?//; s/^\[[A-Za-z]+\] //')"
+          disp="$(printf '%s' "$title" | sed -E 's/^\[E[0-9]+(\.[0-9]+)?\] +//; s/^\[Effort( [0-9]+)?\] [0-9]+ · ?//; s/^\[[A-Za-z]+\] //')"
           printf '### #%s · [%s] · %s\n\n' "$num" "$ctx" "$disp"
           printf '> %s\n\n' "$(_copilot_seed "$num" "$disp")"
         done

@@ -54,6 +54,10 @@ if ! type cckit_gh_rest >/dev/null 2>&1; then
   [ -f "$_LT_LIB_DIR/gh-rest.sh" ] && . "$_LT_LIB_DIR/gh-rest.sh"
 fi
 type cckit_gh_rest >/dev/null 2>&1 || cckit_gh_rest() { return 1; }
+if ! type naming_title_lint >/dev/null 2>&1; then
+  # shellcheck source=naming.sh
+  [ -f "$_LT_LIB_DIR/naming.sh" ] && . "$_LT_LIB_DIR/naming.sh"
+fi
 type cckit_is_json >/dev/null 2>&1 || cckit_is_json() { [ "${CCKIT_OUTPUT:-human}" = "json" ]; }
 
 _LT_TAB="$(printf '\t')"
@@ -605,6 +609,11 @@ _lt_share_body() {
     "$(printf '%s\n' "$1" | sed 's/^/- `/; s/$/`/')" "$2"
 }
 
+# _lt_share_title <count> <stamp> — the share pull request's title.
+_lt_share_title() {
+  printf 'chore(tasks): add %s task%s [share-%s]' "$1" "$([ "$1" -eq 1 ] || echo s)" "$2"
+}
+
 lt_share() {
   local summary="" a root from base base_ref stamp branch wt ids n pr_title body rows
   for a in "$@"; do
@@ -642,6 +651,12 @@ lt_share() {
   if git -C "$root" show-ref --verify --quiet "refs/remotes/origin/$base"; then base_ref="origin/$base"
   else echo "✗ task share: origin has no branch '$base'" >&2; return 1; fi
   stamp="$(date +%Y%m%d%H%M%S)"
+  # The naming rule (E546.1), before the worktree, the commit and the PR: the share title is the one
+  # documented exception to the token rule, `[share-<stamp>]` in place of an issue's token.
+  pr_title="$(_lt_share_title "$n" "$stamp")"
+  if type naming_title_lint >/dev/null 2>&1; then
+    naming_title_lint pr "$pr_title" || { echo "✗ task share: the title '$pr_title' breaks the naming rule — nothing was written" >&2; return 1; }
+  fi
   branch="light/share-$stamp"
   wt="$root/.claude/worktrees/light+share-$stamp"
   git -C "$root" worktree add --no-track -b "$branch" "$wt" "$base_ref" >/dev/null 2>&1 \
@@ -653,7 +668,7 @@ lt_share() {
     git -C "$root" branch -D "$branch" >/dev/null 2>&1 || true
     echo "(no drafts to share: the task files here are already tracked by git)"; return 0
   fi
-  pr_title="chore(tasks): add $n task$([ "$n" -eq 1 ] || echo s) [share-$stamp]"
+  pr_title="$(_lt_share_title "$n" "$stamp")"
   git -C "$wt" commit -q -m "$pr_title" >&2 || { echo "✗ task share: the commit failed in $wt" >&2; return 1; }
   body="$(_lt_share_body "$ids" "${summary:-Adds $n task(s) to the list.}")"
   echo "[task] moved $n draft(s) onto $branch — 'cckit task list' shows them as shared until the pull request merges" >&2

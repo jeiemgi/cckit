@@ -59,12 +59,14 @@ source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/effort.sh"
 source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/effort-metrics.sh"   # effort_ctx_bucket
 source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/effort-ops.sh"       # effort_new — the shared creation core
 
-# TITLE = the human NAME only (no "[Effort]"/number prefix). The core composes the board title
-# "[Effort] <N> · [<FLOW>] <TITLE>", fills the four sections, applies labels, and lints the parent +
-# every sub title up front (a bad name aborts before anything is created — no half-effort).
+# TITLE = the human NAME only (no "[E<n>]" prefix). The core files the parent under TITLE, renames it
+# "[E<N>] <TITLE>" once it has a number, fills the four sections, applies labels (the flow goes in the
+# flow: label, never the title), and lints the parent + every sub title up front (a bad name aborts
+# before anything is created — no half-effort). Rule: rules/naming-and-ids.md.
 
 # SUBS is a newline-delimited list of "name :: one-line description"; pass each line as a positional
-# sub spec. The core numbers them 1..k and composes the "[Effort <parent>] <M> · <name>" title.
+# sub spec. The core numbers them 1..k and composes the "[E<parent>.<M>] <name>" title. Add a sub to
+# an existing effort later with: cckit effort sub <N> "<name>".
 SUB_ARGS=()
 while IFS= read -r line; do [[ -n "$line" ]] && SUB_ARGS+=("$line"); done <<< "$SUBS"
 

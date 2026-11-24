@@ -16,6 +16,26 @@ order. This page is the detail behind each one. The flags are also listed in the
 lints every title. The `/kit-effort-new` skill produces the identical effort: both call one shared
 core, so there is no drift between the verb and the skill.
 
+## Titles
+
+The parent is titled `[E<n>] <name>` and each sub `[E<n>.<step>] <name>`, where `<n>` is the
+parent's issue number and `<step>` the sub's 1-based position. A standalone issue from
+`cckit new` is a plain name with no prefix. The name is a short outcome: at most 6 words, no
+parentheses, glyphs, code identifiers or jargon. The flow goes in the `flow:` label, not the title.
+Every creating verb lints the title before it writes anything, and refuses with the reasons on
+stderr. The full rule is `rules/naming-and-ids.md`.
+
+```bash
+cckit effort sub 42 "Rate limit the sign-in"   # adds [E42.<count+1>] Rate limit the sign-in
+cckit start E42.3                              # starts the sub titled [E42.3]
+cckit effort retitle 42                        # lists legacy [Effort] titles and their new form
+cckit effort retitle 42 --apply                # renames them
+```
+
+Titles in the older `[Effort] N · <name>` and `[Effort N] M · <name>` forms still parse and lint.
+`cckit effort retitle` is a dry run until you pass `--apply`; without a number it covers every open
+effort.
+
 ## Slug handles
 
 The GitHub issue **number** is the canonical key for an effort — the sub-issue links, PRs, labels,
@@ -51,8 +71,8 @@ The slug is a *derived* convenience, not a second source of truth. `--slug` only
   is titled `docs:`.
   That is the closed set `cckit start` uses as the branch prefix (`<kind>/<N>-<slug>`), so a value
   outside it is refused before anything is created; an issue that already carries such a label
-  starts on a `task/` branch, with a warning. The `--flow` values (the `[Flow]`
-  title tags) come from a controlled vocabulary your project sets once as `effort.flows` in
+  starts on a `task/` branch, with a warning. The `--flow` values (the `flow:`
+  label) come from a controlled vocabulary your project sets once as `effort.flows` in
   the project config (`.claude/kit.config.json`, or a root `cckit.config.json`) — e.g. `"effort": { "flows": ["Growth", "Checkout"] }`.
   Unset, it defaults to `Core UI API Docs Infra Auth Data Web App`; an explicit `EFFORT_FLOWS` env
   var still overrides both for one invocation.
@@ -66,11 +86,11 @@ The slug is a *derived* convenience, not a second source of truth. `--slug` only
   name `cckit gc` recognizes so it is never pruned while the effort issue is open. It is also
   **WIP-limited** — see [Only so many efforts at once](#the-wip-limit) below.
 - **`cckit effort pr`** and the `/kit-effort-pr` skill compose the PR title from **one shared
-  composer**, and both refuse to open a PR whose title lacks the mandatory `[#N]` effort id.
-  The composed title is a Conventional Commit subject carrying that id —
-  `feat(core): adoption hardening [#115]` — because the PR is squash-merged and the title becomes
+  composer**, and both refuse, before the commit or the push, a title the naming lint rejects.
+  The composed title is a Conventional Commit subject ending in the effort token —
+  `feat(core): adoption hardening [E115]` — because the PR is squash-merged and the title becomes
   the commit release-please and the commitlint gate read. The scope is the effort's `flow:` label
-  (else the `[Flow]` tag in its title); the type is `--type <type>` when you pass it, else the
+  (else the `[Flow]` tag of a legacy title); the type is `--type <type>` when you pass it, else the
   `kind:` label (`kind:task` → `feat`, a `bug` label → `fix`). A title that fails the commitlint
   check — a bad `--type`, or a non-conventional `--title` — is refused before any PR is opened.
   With [`pr.titleStyle: issue-title`](/config-and-permissions/) the title is `[Role] [#N] <name>`

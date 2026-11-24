@@ -22,7 +22,7 @@
 #   kto_closing_issue_numbers <pr-num>                echo the issue #s a merged PR closes
 #   kto_task_pr   <num> <summary> [commit-msg] [--base <branch>]   commit+push+open PR (board → In Review)
 #   kto_task_pr_merge [pr-num] [--squash|--merge|--rebase]   merge (squash default) + close issues + GC + update the PR base; refuses an effort/* head
-#   kto_task_new  <title> <role> <kind> <prio> [ms] [plan] [blocked] <body>   create issue + board fields (ms may be empty)
+#   kto_task_new  <title> <role> <kind> <prio> [ms] [plan] [blocked] <body>   lint the title, create issue + board fields (ms may be empty)
 #   kto_task_close <num> <summary> [pr-num] [--reason R] [--duplicate-of N] [--superseded-by N]   close + reason + board → Done
 # errors: mixed — git/gh ops propagate; board + label side effects are best-effort
 
@@ -68,6 +68,18 @@ if ! type kit_kind_commit_type >/dev/null 2>&1; then
 fi
 type cckit_board_skipped >/dev/null 2>&1 || cckit_board_skipped() { return 1; }
 
+# The one title convention (naming.sh, E546.1): kto_task_new lints the issue title and kto_task_pr
+# the PR title before any forge write; kto_pr_title strips issue prefixes and appends the token.
+if ! type naming_title_lint >/dev/null 2>&1; then
+  if [ -n "${BASH_SOURCE:-}" ]; then _kto_self="${BASH_SOURCE[0]}"
+  elif [ -n "${ZSH_VERSION:-}" ]; then eval '_kto_self="${(%):-%x}"'
+  else _kto_self="$0"; fi
+  _kto_self="$(cd "$(dirname "$_kto_self")" 2>/dev/null && pwd)/naming.sh"
+  # shellcheck source=naming.sh
+  [ -f "$_kto_self" ] && . "$_kto_self"
+  unset _kto_self
+fi
+
 kto_repo() {
   printf '%s' "${KIT_TASK_REPO:-${KIT_REPO:-}}"
 }
@@ -109,13 +121,34 @@ kto_labels_kind() {
 # Compose the PR title as a Conventional Commit subject. Because PRs are squash-merged, this title
 # becomes the single commit release-please reads to pick the next version — a non-conventional title
 # under-bumps silently, and the commitlint gate (.github/workflows/commitlint.yml) now rejects it.
-# Args: <raw-issue-title> <summary> <labels-csv>
+# Args: <raw-issue-title> <summary> <labels-csv> [<issue-num>]
 #   1. An author <summary> that is ALREADY a conventional subject wins — the author knows the change's
 #      true type (e.g. a kind:task that is really a fix). Validated by the shared commitlint.sh.
 #   2. Otherwise derive the type from the kind:/bug label (kind:task, the default, → feat) and strip
-#      the "[Effort N] M · " / leading "[Tag] " noise from the issue title.
+#      the issue title's prefix, new ([E<n>.<s>] ) or legacy ([Effort N] M · ), and a leading [Tag].
+#   3. With <issue-num>, the title ends in the work's token (rules/naming-and-ids.md) unless it
+#      already does: [E<n>.<s>] when the issue is a sub, [E<n>] when it is an effort, else [#<num>].
 # Network-free (covered by the self-test). Output always passes commitlint_check.
 kto_pr_title() {
+  local raw="${1:-}" summary="${2:-}" labels="${3:-}" num="${4:-}" t
+  t="$(_kto_pr_title_subject "$raw" "$summary" "$labels")" || return 1
+  if [ -n "$num" ] && [ "${KIT_PR_TITLE_STYLE:-conventional}" != "issue-title" ]; then
+    t="$(_kto_pr_title_token "$t" "$raw" "$num")"
+  fi
+  printf '%s' "$t"
+}
+
+# _kto_pr_title_token <title> <raw-issue-title> <num> — <title> with the work's trailing token.
+_kto_pr_title_token() {
+  local t="$1" raw="$2" num="${3#\#}" tok=""
+  if grep -qE '\[(E[0-9]+(\.[0-9]+)?|#[0-9]+|share-[0-9]+)\][[:space:]]*$' <<<"$t"; then printf '%s' "$t"; return 0; fi
+  if type naming_title_token >/dev/null 2>&1; then tok="$(naming_title_token "$raw" 2>/dev/null || true)"; fi
+  [ -n "$tok" ] || tok="#$num"
+  printf '%s [%s]' "$t" "$tok"
+}
+
+# _kto_pr_title_subject <raw-issue-title> <summary> <labels-csv> — steps 1 and 2 of kto_pr_title.
+_kto_pr_title_subject() {
   local raw="${1:-}" summary="${2:-}" labels="${3:-}" kind ctype desc
   # pr.titleStyle = issue-title (KIT_PR_TITLE_STYLE): the PR title IS the issue title, verbatim — for
   # repos whose convention is "PR title = exact issue title" and that run no commitlint gate.
@@ -152,10 +185,12 @@ kto_pr_title() {
     esac
   fi
   case ",$labels," in *,bug,*) ctype=fix ;; esac   # a plain `bug` label → fix
-  # 3) Strip "[Effort N] M · " (the "· " consumed here as a literal — byte-wise match is portable
-  #    across BSD/GNU sed + locales; a negated class over the multibyte middot is not) and then a
-  #    leading "[Tag] " (e.g. [Core]). Order matters: eat the separator before the next tag's "[".
+  # 3) Strip "[E<n>.<s>] " / "[E<n>] " and the legacy "[Effort N] M · " (the "· " consumed here as
+  #    a literal — byte-wise match is portable across BSD/GNU sed + locales; a negated class over the
+  #    multibyte middot is not), then a leading "[Tag] " (e.g. [Core]). Order matters: eat the
+  #    separator before the next tag's "[".
   desc="$(printf '%s' "$raw" | sed -E \
+    -e 's/^\[E[0-9]+(\.[0-9]+)?\] +//' \
     -e 's/^\[Effort[^]]*\] +[0-9]+ +· +//' \
     -e 's/^\[[^]]+\] +//' \
     -e 's/^[[:space:]]+//')"
@@ -346,7 +381,12 @@ kto_task_pr() {
   fi
   role="$(kto_labels_role "$labels")"
   # Conventional Commit PR title (squash-merge commit release-please reads + the commitlint gate).
-  local pr_title; pr_title="$(kto_pr_title "$title" "$summary" "$labels")"
+  local pr_title; pr_title="$(kto_pr_title "$title" "$summary" "$labels" "$num")"
+  # The naming rule (E546.1) before the commit, the push or the PR: a Conventional Commit subject
+  # ending in the work's token. Refused here, nothing is written.
+  if type naming_title_lint >/dev/null 2>&1; then
+    naming_title_lint pr "$pr_title" || { echo "✗ kto_task_pr: the PR title breaks the naming rule — pass a summary of the form 'type(scope): subject'" >&2; return 1; }
+  fi
   [[ -z "$commit_msg" ]] && commit_msg="$pr_title"
 
   # TRACKED changes only: `git add -A` would sweep an untracked .env.local (copied into every worktree)
@@ -634,6 +674,12 @@ kto_task_new() {
   # issue through the verb, or agents fall back to raw `gh issue create` and the board drops it.
   [[ -n "$title" && -n "$role" && -n "$kind" && -n "$prio" ]] || {
     echo "✗ kto_task_new: title, role, kind, priority are required" >&2; return 1; }
+
+  # The naming rule (E546.1): a standalone issue is a plain outcome of at most six words, no prefix.
+  # Checked before any forge read or write; multi-part work is `cckit effort new`.
+  if type naming_title_lint >/dev/null 2>&1; then
+    naming_title_lint issue "$title" || { echo "✗ kto_task_new: fix the title and retry — nothing was filed" >&2; return 1; }
+  fi
 
   role_slug="$(printf '%s' "$role" | tr 'A-Z ' 'a-z-')"
   labels="kind:${kind},priority:${prio},role:${role_slug}"

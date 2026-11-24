@@ -48,6 +48,8 @@ rc "two different agent labels are ambiguous" "$?" "2"
 
 # ── parent effort number ───────────────────────────────────────────────────────────────────────
 t "parent number from a sub title"  "$(ap_parent_effort_num '[Effort 318] 3 · resolve profiles')" "318"
+t "parent number from a [E318.3] title" "$(ap_parent_effort_num '[E318.3] resolve profiles')" "318"
+t "an [E318] umbrella is not a sub" "$(ap_parent_effort_num '[E318] agents by profile')" ""
 t "standalone issue has no parent"  "$(ap_parent_effort_num 'fix: a plain bug')" ""
 t "an umbrella title is not a sub"  "$(ap_parent_effort_num '[Effort] 318 · agents by profile')" ""
 

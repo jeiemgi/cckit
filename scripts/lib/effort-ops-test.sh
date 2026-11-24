@@ -62,7 +62,9 @@ parent="$(effort_new --flow Core "demo effort" "first sub" "second sub" 2>/dev/n
 t  "effort_new returns the parent number"          "$parent" "1"
 t  "effort_new creates parent + 2 subs (3 issues)" "$(grep -cE "$CREATE_RE" "$GH_LOG")" "3"
 t  "effort_new links 2 native sub-issues"          "$(grep -c '^POST repos/o/r/issues/1/sub_issues ' "$GH_LOG")" "2"
-tc "$GH_LOG" '^POST repos/o/r/issues \{"title":"\[Effort\] · \[Core\] demo effort"' "effort_new titles the parent"
+tc "$GH_LOG" '^POST repos/o/r/issues \{"title":"demo effort"' "effort_new files the parent under its name"
+tc "$GH_LOG" '^PATCH repos/o/r/issues/1 \{"title":"\[E1\] demo effort"\}$' "effort_new renames the parent [E<n>] <name>, no [Flow] tag"
+tc "$GH_LOG" '^POST repos/o/r/issues \{"title":"\[E1\.2\] second sub"' "effort_new titles a sub [E<n>.<step>] <name>"
 # every kit-defined label is ensured (created idempotently) BEFORE the issue create uses it (#153)
 tc "$GH_LOG" '^POST repos/o/r/labels \{"name":"ctx:'         "effort_new ensures the ctx:* label exists"
 tc "$GH_LOG" '^POST repos/o/r/labels \{"name":"kind:task"'   "effort_new ensures the kind label exists"
@@ -108,7 +110,7 @@ cd "$tmp/work/.claude/worktrees/effort+99-demo"
 effort_pr 99 --summary "SUMMARY-MARKER" --for-agents "AGENTS-MARKER" >/dev/null 2>&1
 tc "$GH_LOG" '^POST repos/o/r/pulls \{"title":"[^"]*","head":"effort/99-demo","base":"main"' "effort_pr opens effort/99 → main"
 # #363: parity with the kit-effort-pr skill — the verb is the one implementation.
-tc "$GH_LOG" '^POST repos/o/r/pulls \{"title":"feat: demo effort \[#99\]"' "effort_pr titles with a conventional subject + the [#N] id"
+tc "$GH_LOG" '^POST repos/o/r/pulls \{"title":"feat: demo effort \[E99\]"' "effort_pr titles with a conventional subject + the [#N] id"
 # labels, milestone (M1 is milestone 3 in the shim) and the author land in ONE PATCH on the PR
 tc "$GH_LOG" '^PATCH repos/o/r/issues/7 \{"labels":\["role:tech-lead","kind:task"\]' "effort_pr inherits the parent's labels"
 tc "$GH_LOG" '^PATCH repos/o/r/issues/7 \{.*"milestone":3\}$' "effort_pr inherits the parent's milestone"
@@ -143,7 +145,7 @@ t  "effort_pr refuses a non-conventional --title"   "$rc" "1"
 t  "effort_pr opened nothing on a non-conventional --title" "$(grep -cE "$PR_RE" "$GH_LOG")" "0"
 : > "$GH_LOG"
 effort_pr 99 --type fix >/dev/null 2>&1
-tc "$GH_LOG" '^POST repos/o/r/pulls \{"title":"fix: demo effort \[#99\]"' "effort_pr --type sets the conventional type"
+tc "$GH_LOG" '^POST repos/o/r/pulls \{"title":"fix: demo effort \[E99\]"' "effort_pr --type sets the conventional type"
 : > "$GH_LOG"
 KIT_PR_TITLE_STYLE=issue-title effort_pr 99 >/dev/null 2>&1
 tc "$GH_LOG" '^POST repos/o/r/pulls \{"title":"(\[Tech Lead\] )?\[#99\] demo effort"' "effort_pr issue-title style keeps the [#N] name form, no commitlint refusal"

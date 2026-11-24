@@ -5,6 +5,8 @@
 # in effort.sh (linking, snapshots, title lint) plus gh + git. bash 3.2 compatible. Requires: gh, jq, git.
 #
 #   effort_new [flags] "<name>" [<sub spec> …]   parent (4-section body + labels) + native sub-issues
+#   effort_sub <slug|N> "<name>" [--kind K]      add one sub-issue, titled [E<N>.<step>] <name>
+#   effort_retitle [<slug|N>] [--apply]          rename legacy [Effort] titles (dry run by default)
 #   effort_chain <a> <b> [<c> …]          wire N issues into a linear blocked_by chain (#243)
 #   effort_start [--force] <slug|N> [<slug>]  effort/<N> branch + worktree from base, WIP-limited (#244)
 #   effort_pr [<slug|N>]                  open the ONE PR effort/<N> → base branch
@@ -31,6 +33,15 @@ if ! command -v effort_slug_resolve >/dev/null 2>&1; then
   _eo_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
   # shellcheck source=/dev/null
   [ -f "$_eo_dir/effort-slug.sh" ] && . "$_eo_dir/effort-slug.sh"
+  unset _eo_dir
+fi
+
+# The one title convention (naming.sh, E546.1): every title effort_new / effort_sub / effort_pr
+# writes is linted there first, and every title read back is stripped there.
+if ! command -v naming_title_lint >/dev/null 2>&1; then
+  _eo_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+  # shellcheck source=/dev/null
+  [ -f "$_eo_dir/naming.sh" ] && . "$_eo_dir/naming.sh"
   unset _eo_dir
 fi
 
@@ -200,21 +211,19 @@ effort_new() {
   local name="${1:-}"; shift || true
   [ -n "$name" ] || { echo 'effort_new: usage: effort_new [flags] "<name>" [<sub spec> …]' >&2; return 1; }
 
-  # Optional leading [Flow] tag on the board title (validated by effort_title_lint).
-  local flow_tag=""; [ -n "$flow" ] && flow_tag="[$flow] "
+  # The title is `[E<n>] <name>` (rules/naming-and-ids.md, E546.1): the flow lives in the flow:
+  # label, so no [Flow] tag is written into the title any more. Lint the parent name BEFORE creating
+  # anything (synthetic number 0: the rule is about the NAME, not the not-yet-assigned N).
+  naming_title_lint effort "$(naming_effort_title 0 "$name")" || { echo "effort_new: fix the name and retry" >&2; return 1; }
 
-  # Guard the parent name against the title rule BEFORE creating anything (synthetic number — the
-  # rule is about the NAME, not the not-yet-assigned N).
-  effort_title_lint "[Effort] 0 · ${flow_tag}${name}" || { echo "effort_new: fix the name and retry" >&2; return 1; }
-
-  # Lint EVERY sub title up front too (parity with the skill's intent) so a bad sub name fails the
-  # whole op before a half-effort exists. Synthetic parent number 0 for the lint.
+  # Lint EVERY sub title up front too, so a bad sub name fails the whole op before a half-effort
+  # exists. Synthetic parent number 0 for the lint.
   local i=0 spec sub_name sub_title
   for spec in "$@"; do
     i=$((i + 1))
     sub_name="${spec%% :: *}"
-    sub_title="[Effort 0] $i · $sub_name"
-    effort_title_lint "$sub_title" \
+    sub_title="$(naming_sub_title 0 "$i" "$sub_name")"
+    naming_title_lint sub "$sub_title" \
       || { echo "effort_new: fix sub title #$i and retry: $sub_name" >&2; return 1; }
   done
 
@@ -256,18 +265,21 @@ effort_new() {
   fi
 
   local url num slug
-  url="$(gh_rest_issue_create "$repo" "[Effort] · ${flow_tag}${name}" "$body" "$labels" "$milestone" 0)" \
+  # The number is assigned by the create, so the parent is filed under its plain name and renamed
+  # to `[E<n>] <name>` at once. The `effort` label marks it as an effort in between.
+  url="$(gh_rest_issue_create "$repo" "$name" "$body" "$labels" "$milestone" 0)" \
     || { echo "effort_new: failed to create the parent issue" >&2; return 1; }
   num="${url##*/}"
-  gh_rest_issue_edit_title "$repo" "$num" "[Effort] $num · ${flow_tag}${name}" >/dev/null 2>&1
-  # The human handle (#93): explicit --slug if given, else derived from the title (number/flow peeled).
+  gh_rest_issue_edit_title "$repo" "$num" "$(naming_effort_title "$num" "$name")" >/dev/null 2>&1 \
+    || echo "effort_new: #$num was created but not renamed to $(naming_effort_title "$num" "$name") — run: cckit effort retitle $num --apply" >&2
+  # The human handle (#93): explicit --slug if given, else derived from the name.
   if [ -n "$explicit_slug" ]; then slug="$(_eff_slug "$explicit_slug")"
-  else slug="$(_eff_title_slug "[Effort] $num · ${flow_tag}${name}")"; fi
+  else slug="$(_eff_title_slug "$(naming_effort_title "$num" "$name")")"; fi
   if [ -n "$slug" ]; then
     gh_rest_label_create "$repo" "slug:$slug" ededed "effort slug handle"
     gh_rest_issue_add_labels "$repo" "$num" "slug:$slug" >/dev/null 2>&1 || true
   fi
-  echo "  ✓ effort $(effort_display "$num" "$slug") · ${flow_tag}${name}" >&2
+  echo "  ✓ effort $(effort_display "$num" "$slug") · ${name}" >&2
 
   # Native dependency edges (the visible board chain) — guarded on the helper being available.
   if [ -n "$depends_on" ] && command -v effort_set_blocked_by >/dev/null 2>&1; then
@@ -286,7 +298,7 @@ effort_new() {
     i=$((i + 1))
     sub_name="${spec%% :: *}"
     sub_desc="${spec#* :: }"; [ "$sub_desc" = "$spec" ] && sub_desc=""
-    sub_title="[Effort $num] $i · $sub_name"
+    sub_title="$(naming_sub_title "$num" "$i" "$sub_name")"
     local sub_labels="kind:$kind,priority:$priority"
     [ -n "$role" ] && sub_labels="$sub_labels,role:$role"
     child="$(gh_rest_issue_create "$repo" "$sub_title" \
@@ -297,6 +309,136 @@ effort_new() {
     echo "  ✓ sub #$child_num · $sub_name" >&2
   done
   printf '%s\n' "$num"
+}
+
+# effort_sub <slug|N> "<name>" [--kind K] [--body B] — add ONE sub-issue to an existing effort
+# (E546.1). The title is `[E<N>.<step>] <name>`, step = the effort's current native sub count + 1; it
+# is linted before any forge write. The sub takes the parent's priority, role and milestone, and
+# the kind:<k> label (--kind, else the parent's kind, else task), as effort_new's subs do; it is
+# linked natively under the parent and added to the board. Echoes the new sub's number.
+effort_sub() {
+  _eff_forge || return 1; _eff_need jq || return 1
+  local raw="" name="" kind="" body_in="" pos=()
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --kind)   kind="${2:-}"; shift 2 ;;
+      --kind=*) kind="${1#*=}"; shift ;;
+      --body)   body_in="${2:-}"; shift 2 ;;
+      --body=*) body_in="${1#*=}"; shift ;;
+      --)       shift; while [ $# -gt 0 ]; do pos+=("$1"); shift; done ;;
+      -*)       echo "effort_sub: unknown flag $1" >&2; return 2 ;;
+      *)        pos+=("$1"); shift ;;
+    esac
+  done
+  set -- "${pos[@]+"${pos[@]}"}"
+  raw="${1:-}"; name="${2:-}"
+  [ -n "$raw" ] && [ -n "$name" ] || { echo 'effort_sub: usage: cckit effort sub <N> "<name>" [--kind K] [--body B]' >&2; return 2; }
+  # The rule is about the NAME: lint it first, with a synthetic token, before any forge read or write.
+  naming_title_lint sub "$(naming_sub_title 0 1 "$name")" || { echo "effort_sub: fix the name and retry" >&2; return 1; }
+  if [ -n "$kind" ] && command -v kit_kind_label_valid >/dev/null 2>&1 && ! kit_kind_label_valid "$kind"; then
+    echo "effort_sub: --kind must be one of: $KIT_KINDS $KIT_CONTENT_KINDS (got '$kind')" >&2; return 1
+  fi
+  local repo num meta labels milestone priority role count step title child child_num sub_labels
+  repo="$(_eff_repo)"
+  [ -n "$repo" ] || { echo "effort_sub: no repo (KIT_REPO/EFFORT_REPO unset — run in a kit project)" >&2; return 1; }
+  num="$(effort_slug_resolve "$raw")" || { echo "effort_sub: could not resolve '$raw' to an effort" >&2; return 1; }
+  meta="$(gh_rest_issue_json "$repo" "$num" 2>/dev/null)" || { echo "effort_sub: effort #$num not found" >&2; return 1; }
+  labels="$(printf '%s' "$meta" | jq -r '[.labels[]?.name] | join(",")' 2>/dev/null)"
+  case ",$labels," in *,effort,*) : ;; *)
+    echo "effort_sub: #$num is not an effort (no 'effort' label) — file a standalone issue with cckit new" >&2; return 1 ;;
+  esac
+  milestone="$(printf '%s' "$meta" | jq -r '.milestone.title // ""' 2>/dev/null)"
+  priority="$(printf '%s' "$labels" | tr ',' '\n' | sed -n 's/^priority://p' | sed -n 1p)"; priority="${priority:-p1}"
+  role="$(printf '%s' "$labels" | tr ',' '\n' | sed -n 's/^role://p' | sed -n 1p)"
+  [ -n "$kind" ] || kind="$(printf '%s' "$labels" | tr ',' '\n' | sed -n 's/^kind://p' | sed -n 1p)"
+  kind="${kind:-task}"
+  count="$(forge_rest "repos/$repo/issues/$num/sub_issues" -X GET -f per_page=100 --jq 'length' 2>/dev/null)" \
+    || { echo "effort_sub: could not read the sub-issues of #$num" >&2; return 1; }
+  step=$(( ${count:-0} + 1 ))
+  title="$(naming_sub_title "$num" "$step" "$name")"
+  naming_title_lint sub "$title" || return 1
+  _eff_ensure_label "kind:$kind" d4c5f9 "kit issue kind"
+  _eff_ensure_label "priority:$priority" e99695 "kit priority"
+  sub_labels="kind:$kind,priority:$priority"
+  [ -n "$role" ] && sub_labels="$sub_labels,role:$role"
+  child="$(gh_rest_issue_create "$repo" "$title" \
+    "$(printf '%s\n\nSub-issue of #%s (effort).' "$body_in" "$num")" "$sub_labels" "$milestone" 0)" \
+    || { echo "effort_sub: failed to create the sub-issue" >&2; return 1; }
+  child_num="${child##*/}"
+  effort_link_sub "$num" "$child_num" || true
+  _eff_board_add "$child_num" "$role" || true
+  echo "  ✓ sub #$child_num · $title" >&2
+  printf '%s\n' "$child_num"
+}
+
+# _eff_retitle_rows <N> — the legacy titles of effort N and its open subs, one "num<TAB>old<TAB>new"
+# row each. A title already in the new form, or one with no prefix at all, gives no row.
+_eff_retitle_rows() {
+  local repo num title new tab subs s_num s_title tok
+  repo="$(_eff_repo)"; num="$1"; tab="$(printf '\t')"
+  title="$(forge_rest "repos/$repo/issues/$num" --jq '.title // ""' 2>/dev/null)" || return 1
+  case "$title" in
+    "[Effort] "*)
+      new="$(naming_effort_title "$num" "$(naming_strip_prefix "$title")")"
+      printf '%s\t%s\t%s\n' "$num" "$title" "$new" ;;
+  esac
+  subs="$(forge_rest "repos/$repo/issues/$num/sub_issues" -X GET -f per_page=100 \
+    --jq '.[] | select((.state // "open") == "open") | "\(.number)\t\(.title // "")"' 2>/dev/null)" || return 0
+  while IFS="$tab" read -r s_num s_title; do
+    [ -n "$s_num" ] || continue
+    case "$s_title" in "[Effort "[0-9]*) : ;; *) continue ;; esac
+    tok="$(naming_title_token "$s_title")" || continue
+    new="$(naming_sub_title "$num" "${tok#*.}" "$(naming_strip_prefix "$s_title")")"
+    printf '%s\t%s\t%s\n' "$s_num" "$s_title" "$new"
+  done <<EOF_SUBS
+$subs
+EOF_SUBS
+}
+
+# effort_retitle [<slug|N>] [--apply] — rename legacy `[Effort] N · ` / `[Effort N] M · ` titles to
+# `[E<n>] ` / `[E<n>.<step>] ` (E546.1). Without <N>: every open effort (label `effort`) and its open
+# subs. A dry run by default: it lists each old title and the new one and writes nothing. --apply
+# edits the titles through the forge. A [Flow] tag is dropped: the flow lives in the flow: label.
+effort_retitle() {
+  _eff_forge || return 1; _eff_need jq || return 1
+  local raw="" apply=0 a repo nums n rows="" tab line r_num r_old r_new count=0 failed=0
+  for a in "$@"; do
+    case "$a" in
+      --apply) apply=1 ;;
+      -*) echo "effort_retitle: unknown flag $a — usage: cckit effort retitle [<N>] [--apply]" >&2; return 2 ;;
+      *) [ -z "$raw" ] && raw="$a" ;;
+    esac
+  done
+  repo="$(_eff_repo)"; tab="$(printf '\t')"
+  [ -n "$repo" ] || { echo "effort_retitle: no repo (KIT_REPO/EFFORT_REPO unset — run in a kit project)" >&2; return 1; }
+  if [ -n "$raw" ]; then
+    nums="$(effort_slug_resolve "$raw")" || { echo "effort_retitle: could not resolve '$raw' to an effort" >&2; return 1; }
+  else
+    nums="$(gh_rest_issue_numbers_by_label "$repo" effort)" || { echo "effort_retitle: could not list the open efforts" >&2; return 1; }
+  fi
+  while IFS= read -r n; do
+    [ -n "$n" ] || continue
+    line="$(_eff_retitle_rows "$n")" || { echo "effort_retitle: could not read #$n" >&2; failed=1; continue; }
+    [ -n "$line" ] && rows="${rows:+$rows
+}$line"
+  done <<EOF_NUMS
+$nums
+EOF_NUMS
+  if [ -z "$rows" ]; then echo "(no legacy titles: every effort and sub already reads [E<n>] / [E<n>.<step>])"; return "$failed"; fi
+  while IFS="$tab" read -r r_num r_old r_new; do
+    [ -n "$r_num" ] || continue
+    count=$((count + 1))
+    printf '#%s  %s\n   -> %s\n' "$r_num" "$r_old" "$r_new"
+    if [ "$apply" = 1 ]; then
+      gh_rest_issue_edit_title "$repo" "$r_num" "$r_new" >/dev/null 2>&1 \
+        || { echo "  ✗ #$r_num not renamed" >&2; failed=1; }
+    fi
+  done <<EOF_ROWS
+$rows
+EOF_ROWS
+  if [ "$apply" = 1 ]; then echo "renamed $count title(s)"
+  else echo "dry run: $count title(s) would change — run again with --apply to rename them"; fi
+  return "$failed"
 }
 
 # _eo_source_effort — lazily source the git-mechanics lib (effort.sh) so the ops that need
@@ -736,7 +878,18 @@ effort_pr() {
   if [ -n "$role" ] && command -v role_display >/dev/null 2>&1; then
     role_disp="$(role_display "$role" 2>/dev/null || true)"
   fi
-  name="$(printf '%s' "$title" | sed -E 's/^\[Effort\] [0-9]+ · ?//')"
+  name="$(naming_strip_structural "$title")"
+
+  # ONE shared composer (effort.sh) so every surface titles identically, then the naming rule and
+  # the effort-token check before the commit, the push or any forge write — refuse rather than open
+  # an id-less PR (#121).
+  # --title replaces the composed title; it must still carry the effort's token, checked below.
+  pr_title="${title_override:-$(effort_pr_title "$num" "${name:-effort}" "$labels" "$ctype" "$role_disp")}"
+  effort_pr_title_check "$pr_title" "$num" || { echo "effort_pr: refusing to open a PR without the [E$num] effort token" >&2; return 1; }
+  # #237 + E546.1: under pr.titleStyle = conventional (the default) the title becomes the squash
+  # commit the commitlint gate checks, so naming_title_lint pr holds it to the Conventional Commit
+  # form with a trailing token. issue-title repos run no such gate; the lint passes them through.
+  naming_title_lint pr "$pr_title" || { echo "effort_pr: refusing to open a PR whose title breaks the naming rule (pass --type <type> or --title, or set pr.titleStyle to issue-title)" >&2; return 1; }
 
   # Commit pending changes. Role identity is a Co-authored-by TRAILER, never the git author (some
   # deploy providers refuse commits whose author email matches no account). TRACKED changes only:
@@ -760,26 +913,6 @@ effort_pr() {
   fi
   git push -u origin "$branch" >/dev/null 2>&1 || echo "effort_pr: push of $branch failed — continuing (the PR may already be current)" >&2
 
-  # ONE shared composer (effort.sh) so every surface titles identically, then the mandatory-[#N]
-  # check before we ever call gh — refuse rather than open an id-less PR (#121).
-  # --title replaces the composed title; it must still carry the [#N] id, checked below.
-  pr_title="${title_override:-$(effort_pr_title "$num" "${name:-effort}" "$labels" "$ctype" "$role_disp")}"
-  effort_pr_title_check "$pr_title" "$num" || { echo "effort_pr: refusing to open a PR without the [#$num] effort id" >&2; return 1; }
-  # #237: under pr.titleStyle = conventional (the default) the title becomes the squash commit the
-  # commitlint gate checks, so a title that gate rejects — composed (a bad --type) or passed with
-  # --title — is refused here, before gh. issue-title repos run no such gate and skip the check.
-  if [ "${KIT_PR_TITLE_STYLE:-conventional}" != "issue-title" ]; then
-    if ! command -v commitlint_check >/dev/null 2>&1; then
-      local _cl_dir; _cl_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)"
-      # shellcheck source=/dev/null
-      [ -f "$_cl_dir/commitlint.sh" ] && . "$_cl_dir/commitlint.sh"
-    fi
-    if command -v commitlint_check >/dev/null 2>&1; then
-      commitlint_check "$pr_title" || { echo "effort_pr: refusing to open a PR whose title is not a Conventional Commit subject (pass --type <type> or --title, or set pr.titleStyle to issue-title)" >&2; return 1; }
-    else
-      echo "effort_pr: commitlint.sh not found — the PR title was not checked against Conventional Commits" >&2
-    fi
-  fi
   body="$(_eff_pr_body "$num" "$summary" "$for_agents" "$role")"
 
   url="$(gh_rest_pr_create "$repo" "$base" "$branch" "$pr_title" "$body" "$labels" "$milestone")" || return 1

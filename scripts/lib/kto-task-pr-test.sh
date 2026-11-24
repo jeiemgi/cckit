@@ -48,7 +48,7 @@ t  "no gh subcommand ran"                   "$(grep -c '^GH-SUBCOMMAND' "$GH_LOG
 
 : > "$GH_LOG"; git checkout -q -b fix/43-other
 KIT_PR_TITLE_STYLE=conventional kto_task_pr 43 "Other." >/dev/null 2>&1
-tc "$GH_LOG" "${PR_POST}\"title\":\"fix: Fix the thing\"," "conventional (default): a Conventional Commits title"
+tc "$GH_LOG" "${PR_POST}\"title\":\"fix: Fix the thing \\[#43\\]\"," "conventional (default): a Conventional Commits title + the [#N] token"
 grep -q 'For the orchestrator' "$GH_LOG" && { echo "FAIL: section present with the switch off"; fail=1; } || echo "ok: no section with the switch off"
 
 # --base (#391): an explicit base wins over the configured one; the flag is never a positional.
@@ -57,7 +57,7 @@ echo three > tracked.txt
 kto_task_pr 44 "Release." --base release >/dev/null 2>&1
 t  "--base: rc 0"                            "$?" "0"
 tc "$GH_LOG" "${PR_POST}.*\"head\":\"task/44-release\",\"base\":\"release\"," "--base: the PR targets the given base"
-t  "--base is not taken as the commit message" "$(git log -1 --format=%s)" "fix: Fix the thing"
+t  "--base is not taken as the commit message" "$(git log -1 --format=%s)" "fix: Fix the thing [#44]"
 : > "$GH_LOG"
 kto_task_pr 44 "Release." >/dev/null 2>&1
 tc "$GH_LOG" "${PR_POST}.*\"head\":\"task/44-release\",\"base\":\"main\"," "no --base: the PR targets the configured base"
@@ -102,7 +102,7 @@ kto_task_pr 44 "Hot." --base main >/dev/null 2>&1
 t  "--base: kto_task_pr succeeds"            "$?" "0"
 tc "$GH_LOG" "${PR_POST}.*\"base\":\"main\"," "--base main: the PR targets main, not the configured develop"
 t  "--base main: the pre-push hook sees it"  "$(cat "$tmp/prepush.log")" "KIT_PR_BASE=main"
-t  "--base is not taken as the commit msg"   "$(git log -1 --format=%s)" "fix: Fix the thing"
+t  "--base is not taken as the commit msg"   "$(git log -1 --format=%s)" "fix: Fix the thing [#44]"
 
 : > "$GH_LOG"; : > "$tmp/prepush.log"; git checkout -q -b fix/45-eq
 echo four > tracked.txt

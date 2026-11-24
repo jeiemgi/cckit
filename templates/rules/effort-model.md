@@ -46,15 +46,14 @@ How we know it's done (commands, checks, acceptance).
 
 **Effort + sub-issue titles must be recognizable on the board:**
 
-- **Umbrella / parent issue:** **`[Effort] <number> · <Name>`** — the literal `[Effort]` tag, the
-  issue's own number, then the human name. e.g. `[Effort] 42 · Auth hardening`.
-- **Sub-issue:** **`[Effort <parent>] <N> · <Title>`** — the parent's number in the tag, then a
-  **numeric** sequence index `N` (1, 2, 3 — **never letters** like A/B/C), then the title.
-  e.g. `[Effort 42] 1 · Add rate limiting to /login`.
+- **Umbrella / parent issue:** **`[E<n>] <Name>`** — its own number, then the name: `[E42] Auth hardening`.
+- **Sub-issue:** **`[E<parent>.<step>] <Title>`** — the parent's number, then a **numeric**
+  1-based step (1, 2, 3 — **never letters** like A/B/C), then the title.
+  e.g. `[E42.1] Rate limit the sign-in`.
 
-The parent ref is mandatory; `N` is a plain number so subs sort and read predictably. `effort-new`
-applies both formats when it creates the parent + native sub-issues, so a sub is identifiable by
-name alone in any flat list.
+`effort-new` applies both (the parent is renamed once it has a number); `cckit effort sub <N>
+"<name>"` adds step count+1. Legacy `[Effort] N · ` / `[Effort N] M · ` titles still parse;
+`cckit effort retitle [<N>] [--apply]` renames them. Full rule: `rules/naming-and-ids.md`.
 
 **One creation core (no drift).** Both ways to create an effort — the `cckit effort new` verb and
 the `/kit-effort-new` skill — call the **same** shared function `effort_new` (`scripts/lib/effort-ops.sh`).
@@ -70,19 +69,20 @@ The board should be **legible at a glance** — a title says *what* an effort de
 flow* it belongs to; the *chain* (who blocks whom) and the *session weight* are machine-readable.
 
 **Concise, jargon-free titles (lint-enforced).** The `<Name>` part of an effort/sub title is a short
-plain-language **outcome** with an optional leading `[Flow]` tag:
+plain-language **outcome**:
 
-- **Format:** `[Effort] N · [Flow] short name` (parent) · `[Effort N] M · short name` (sub).
+- **Format:** `[E<n>] short name` (parent) · `[E<n>.<step>] short name` (sub); no `[Flow]` tag.
 - **Banned in the name:** glyphs (`— ▾ ▸ → ✓ ✗ … •`), parentheses, ` — ` / ` · ` / ` / ` sub-clauses,
   code identifiers (file names, paths, `snake_case`), internal jargon (`chrome`, `seam`, `contract`,
   `rescue stash`, `refactor`, `wiring`, …), and **> 6 words**. Detail goes in the body.
-- **`effort_title_lint`** (`scripts/lib/effort.sh`) is the check; `effort-new` lints the parent **and
-  every sub** title up front and refuses to create anything if one fails. Bad→good:
-  `operator chrome — Settings ▾ dropdown + fixes` → **`[UI] operator navigation`**.
+- **`naming_title_lint`** (`scripts/lib/naming.sh`; `effort_title_lint` in `effort.sh` wraps it) is
+  the check; `effort-new` lints the parent **and every sub** title up front and refuses to create
+  anything if one fails. Bad→good: `operator chrome — Settings ▾ dropdown + fixes` →
+  **`[E12] operator navigation`** with the `flow:ui` label.
 
-**Flow tag (`[Flow]` + `flow:<flow>` label).** A **flow** is a named thread of efforts toward one
-outcome. Controlled vocabulary (`EFFORT_FLOWS` in `effort.sh`; a project overrides it). The title
-carries `[Flow]` so membership reads off the board; the `flow:<flow>` label makes it filterable.
+**Flow (`flow:<flow>` label).** A **flow** is a named thread of efforts toward one outcome.
+Controlled vocabulary (`EFFORT_FLOWS` in `effort.sh`; a project overrides it). The `flow:<flow>`
+label carries membership and makes it filterable; the title no longer carries a `[Flow]` tag.
 
 **Relations (the chain) — native edge + `## Relations` mirror.** Cross-effort dependencies are
 **both** a native GitHub dependency (`blocked_by` — the edge GitHub renders on the issue/board, set
@@ -189,7 +189,7 @@ parallel ID space. `effort-start`/`pr`/`close` accept `<slug|N>`: a pure-digits 
 anything else is resolved to the canonical number by matching `effort/*` branches (local + remote),
 then the `slug:<slug>` label, then open effort titles. Unknown/ambiguous → structured error, no
 guess. `effort-new --slug <s>` stores the handle as a `slug:<slug>` label; without it the slug is
-derived from the title (with the `[Effort] N ·` prefix and `[Flow]` tag peeled, so the number is not
+derived from the title (with the `[E<n>]` / `[Effort] N ·` prefix and any `[Flow]` tag peeled, so the number is not
 doubled into the slug). Efforts render as `slug #N`.
 
 ## Plans are issues, not files
