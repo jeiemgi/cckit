@@ -1,0 +1,16 @@
+{
+  "id": "Backlog",
+  "label": ["backlog"],
+  "definition": "The ordered list of work the project may do next, kept on GitHub: every open issue whose board Status is Backlog. A standalone open issue that is neither an effort nor a sub-issue belongs here until a sprint takes it. The owner orders it; cckit sync reads it.",
+  "is_not": [
+    "The sprint backlog: the backlog is everything not yet taken; the sprint backlog is what one sprint took from it.",
+    "The board: the board shows every status; the backlog is the Backlog column of it.",
+    "A plan: a plan is the ordered waves of work already chosen; the backlog is what waits to be chosen."
+  ],
+  "avoid": ["icebox", "wishlist", "todo list", "queue (for the backlog)"],
+  "home": {
+    "cli": "sync",
+    "skill": "kit-task-sync"
+  },
+  "status": "seed"
+}

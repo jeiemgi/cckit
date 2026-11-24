@@ -1,0 +1,15 @@
+{
+  "id": "SprintReview",
+  "label": ["sprint review"],
+  "definition": "The meeting at the end of a sprint, on Monday, where the owner inspects the increments against the sprint goal and the backlog is adjusted for what comes next. It closes the sprint's milestone.",
+  "is_not": [
+    "The retrospective: the review inspects the product; the retrospective inspects how the team worked.",
+    "A code review: a code review reads one PR before it merges; the sprint review looks at what already merged.",
+    "A status report: cckit status reads the repository now; the sprint review is a decision about the next sprint."
+  ],
+  "avoid": ["demo", "showcase", "sprint demo"],
+  "home": {
+    "cli": "sprint"
+  },
+  "status": "seed"
+}
