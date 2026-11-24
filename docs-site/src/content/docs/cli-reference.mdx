@@ -457,8 +457,14 @@ A hand-written delegation brief drops whatever its author forgot, and what gets 
 Every section that cannot be filled says so on its own line. A brief that silently omits a section is the failure this verb exists to remove, so an empty file list reads "the issue names no paths — ask before starting" rather than nothing at all.
 
 ```bash
-cckit brief <issue>       # the brief for that issue
+cckit brief <issue>                                          # the brief for that issue
+cckit brief <issue> --skills kit-ship --verbs 'effort start,brief'   # plus the worker's toolset
 ```
+
+`--skills` and `--verbs` add a `## Your toolset` section listing exactly the names given, in that
+order. Each name is checked first: a skill must have a `SKILL.md` in the project or the kit, a verb
+must be a row of the verb table (an `effort` sub-verb must be one the dispatcher routes). An
+unknown name exits 2 before the issue is read, so a worker is never handed a tool that is not there.
 
 Reading the issue is the verb's one hard dependency: a failed GitHub read propagates rather than yielding a brief with an empty issue in it.
 
