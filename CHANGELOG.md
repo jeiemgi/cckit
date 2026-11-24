@@ -5,6 +5,21 @@ All notable changes to cckit are documented here. New entries below are generate
 [Conventional Commits](https://www.conventionalcommits.org/) and land when the Release PR is
 merged to `main`. Earlier entries follow [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.12.0](https://github.com/jeiemgi/cckit/compare/v0.11.0...v0.12.0) (2026-11-24)
+
+
+### Features
+
+* **cli:** fold sync into status, plumbing under agent [[#588](https://github.com/jeiemgi/cckit/issues/588)] ([#589](https://github.com/jeiemgi/cckit/issues/589)) ([9404ece](https://github.com/jeiemgi/cckit/commit/9404ece74791869a19fd3275b931d3ba623408ec))
+* **core:** the advisor [E547] ([#591](https://github.com/jeiemgi/cckit/issues/591)) ([4090460](https://github.com/jeiemgi/cckit/commit/409046095a51c03635aa537780da05e79007a8eb))
+* **core:** Traceable work on GitHub [[#546](https://github.com/jeiemgi/cckit/issues/546)] ([#587](https://github.com/jeiemgi/cckit/issues/587)) ([ab7a2d5](https://github.com/jeiemgi/cckit/commit/ab7a2d5a98cd61203fa60171761badbd57ae8c61))
+
+
+### Bug Fixes
+
+* **board:** read back the card when the REST add finds it already there ([#593](https://github.com/jeiemgi/cckit/issues/593)) ([d119601](https://github.com/jeiemgi/cckit/commit/d11960156a88975fbd534b3f406b907b9c9f771b)), closes [#590](https://github.com/jeiemgi/cckit/issues/590)
+* **effort:** close keeps unfinished subs open [[#565](https://github.com/jeiemgi/cckit/issues/565)] ([#594](https://github.com/jeiemgi/cckit/issues/594)) ([994ad6e](https://github.com/jeiemgi/cckit/commit/994ad6ed1e7f4ecc7bd3fa13d929283ef4b1d3ed)), closes [#578](https://github.com/jeiemgi/cckit/issues/578)
+
 ## [0.11.0](https://github.com/jeiemgi/cckit/compare/v0.10.0...v0.11.0) (2026-11-24)
 
 
