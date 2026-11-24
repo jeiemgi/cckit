@@ -3,7 +3,7 @@
 # effort-parity-test.sh — effort #98: the verb (`cckit effort new`) and the skill (/kit-effort-new)
 # create structurally IDENTICAL efforts because both call the one shared core `effort_new`. This test
 # drives that core with the full skill-shaped inputs and asserts the parity contract:
-#   - the four body sections are FILLED (no `<!--` template placeholder left)
+#   - the five body sections are FILLED (no `<!--` template placeholder left)
 #   - the ctx/kind/priority/role/flow label set is applied to the parent
 #   - sub-issues carry kind/priority/role labels and are native-linked
 #   - every sub title is linted UP FRONT (a bad sub name aborts before anything is created)
@@ -46,6 +46,7 @@ parent="$(effort_new \
   --scope "1. share core | 2. verb fills body | 3. skill delegates" \
   --for-agents "scripts/lib/effort-ops.sh and skills/kit-effort-new/SKILL.md" \
   --verification "the verb and skill produce identical issues" \
+  --spec "the verb and the skill file the same body" \
   "demo parity effort" "share core :: factor the logic" "fill the body :: verb wiring")"
 
 t  "core returns the parent number"               "$parent" "1"
@@ -58,6 +59,7 @@ tc "$GH_LOG" 'Close the parity gap between the verb' "body fills ## Goal"
 tc "$GH_LOG" '1\. share core \| 2\. verb fills body' "body fills ## Scope"
 tc "$GH_LOG" 'scripts/lib/effort-ops\.sh and skills' "body fills ## For agents"
 tc "$GH_LOG" 'the verb and skill produce identical'  "body fills ## Verification"
+tc "$GH_LOG" '## Spec\\n- the verb and the skill file' "body fills ## Spec, a plain line made a bullet"
 tn "$GH_LOG" '<!--'                                  "no template placeholder left in a filled body"
 
 # Label set on the parent: effort + ctx + kind + priority + role + flow (flow lowercased).
@@ -74,17 +76,21 @@ tc "$GH_LOG" '^POST repos/o/r/issues \{"title":"\[E1\.1\] share core".*"labels":
 
 # ── A bad sub title aborts the whole op BEFORE anything is created (parity contract) ─────────────
 : > "$GH_LOG"; printf '0' > "$GH_N"
-effort_new --role tech-lead --goal G --scope S --for-agents A --verification V \
+effort_new --role tech-lead --goal G --scope S --for-agents A --verification V --spec "it ships" \
   "clean parent name" "refactor the whole wiring layer thing now" >/dev/null 2>&1 && rc=0 || rc=1
 t  "core rejects a bad sub title"                 "$rc" "1"
 t  "core creates nothing on a bad sub title"      "$(grep -cE "$CREATE_RE" "$GH_LOG")" "0"
 
-# ── A bare verb-style call (no body flags) still yields the 4-section scaffold ───────────────────
+# ── A call with only --spec still yields the 5-section scaffold; with no Spec it refuses (E546.5) ─
 : > "$GH_LOG"; printf '0' > "$GH_N"
-effort_new "minimal effort name" >/dev/null 2>&1
-tc "$GH_LOG" '## Goal'         "bare call still emits ## Goal"
-tc "$GH_LOG" '## Verification' "bare call still emits ## Verification"
-tc "$GH_LOG" '<!--'            "bare call leaves the template placeholders (nothing to fill)"
+effort_new --spec "it ships" "minimal effort name" >/dev/null 2>&1
+tc "$GH_LOG" '## Goal'         "spec-only call still emits ## Goal"
+tc "$GH_LOG" '## Verification' "spec-only call still emits ## Verification"
+tc "$GH_LOG" '<!--'            "spec-only call leaves the template placeholders (nothing to fill)"
+: > "$GH_LOG"; printf '0' > "$GH_N"
+effort_new "minimal effort name" >/dev/null 2>&1 && rc=0 || rc=1
+t  "a bare call with no Spec refuses"             "$rc" "1"
+t  "a bare call with no Spec writes nothing"      "$(grep -c . "$GH_LOG")" "0"
 
 # ── #121: the ONE shared effort-PR title composer + the mandatory-[#N] check ─────────────────────
 # #237: the composed title is a Conventional Commit subject carrying [#N] — the form the
@@ -113,22 +119,22 @@ effort_pr_title_check "[#7] anything" 2>/dev/null; t "check accepts any [#N] whe
 
 # ── #277: --kind picks the kind: label (parent + subs) from the closed set; --par is gone ──────────
 : > "$GH_LOG"; printf '0' > "$GH_N"
-effort_new --flow Core --kind fix "kind fix effort" "a :: x" >/dev/null 2>&1
+effort_new --spec "it ships" --flow Core --kind fix "kind fix effort" "a :: x" >/dev/null 2>&1
 tc "$GH_LOG" '^POST repos/o/r/issues \{"title":"[^[].*"labels":\["effort","ctx:[SMLX]+","kind:fix",' "--kind fix labels the parent kind:fix"
 tc "$GH_LOG" '^POST repos/o/r/issues \{"title":"\[E1\.1\] a".*"labels":\["kind:fix",'              "--kind fix labels every sub kind:fix"
 tc "$GH_LOG" '^POST repos/o/r/labels \{"name":"kind:fix"'                                                   "--kind ensures the kind label exists"
 tn "$GH_LOG" 'kind:task'                                                                  "--kind fix leaves no kind:task behind"
 : > "$GH_LOG"; printf '0' > "$GH_N"
-effort_new --kind=chore "kind chore effort" >/dev/null 2>&1
+effort_new --spec "it ships" --kind=chore "kind chore effort" >/dev/null 2>&1
 tc "$GH_LOG" '^POST repos/o/r/issues \{.*"labels":\["effort","ctx:[SMLX]+","kind:chore",' "--kind=chore (equals form) is accepted"
 for k in $KIT_KINDS; do
   : > "$GH_LOG"; printf '0' > "$GH_N"
-  effort_new --kind "$k" "kind vocabulary effort" >/dev/null 2>&1 && rc=0 || rc=1
+  effort_new --spec "it ships" --kind "$k" "kind vocabulary effort" >/dev/null 2>&1 && rc=0 || rc=1
   t "--kind $k is accepted" "$rc" "0"
 done
 for k in $KIT_CONTENT_KINDS; do
   : > "$GH_LOG"; printf '0' > "$GH_N"
-  effort_new --kind "$k" "content kind effort" >/dev/null 2>&1 && rc=0 || rc=1
+  effort_new --spec "it ships" --kind "$k" "content kind effort" >/dev/null 2>&1 && rc=0 || rc=1
   t "--kind $k (content kind) is accepted" "$rc" "0"
   tc "$GH_LOG" "^POST repos/o/r/issues \\{.*\"labels\":\\[\"effort\",\"ctx:[SMLX]+\",\"kind:$k\"," "--kind $k labels the parent kind:$k"
 done
@@ -146,7 +152,7 @@ t  "nothing in effort-ops.sh writes a par: label"    "$(grep -c 'par:' "$LIB/eff
 
 # ── #121: flags are position-INDEPENDENT — trailing --flow/--role no longer become junk sub-issues ─
 : > "$GH_LOG"; printf '0' > "$GH_N"
-effort_new "flags after title effort" "real sub :: desc" --flow Docs --role docs >/dev/null 2>&1
+effort_new "flags after title effort" "real sub :: desc" --flow Docs --role docs --spec "it ships" >/dev/null 2>&1
 t  "trailing flags do NOT create junk subs (parent + 1 real sub)" "$(grep -cE "$CREATE_RE" "$GH_LOG")" "2"
 tc "$GH_LOG" '^POST repos/o/r/issues \{.*"labels":\[[^]]*"flow:docs"\]'  "trailing --flow is honored (flow:docs label)"
 tc "$GH_LOG" '^POST repos/o/r/issues \{"title":"\[E1\.1\] real sub"' "the one real sub is created from the positional"

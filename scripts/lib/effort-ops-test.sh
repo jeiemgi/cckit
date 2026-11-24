@@ -29,6 +29,10 @@ stub="$tmp/bin"
 export PATH="$stub:$PATH" GH_TOKEN=test-token CCKIT_FORGE=github
 export GH_TITLE="[Effort] 99 · demo effort" GH_LABELS='[{"name":"role:tech-lead"},{"name":"kind:task"}]'
 export GH_HEAD="effort/99-demo" GH_BASE="main" GH_MERGEABLE=true
+# The parent body every GET issues/<n> answers (JSON-escaped): it carries a Spec, so effort_close
+# goes past its Spec check (E546.5). The Spec cases below override it.
+SPEC_BODY='## Goal\nship it\n\n## Spec\n- it ships'
+export GH_BODY="$SPEC_BODY"
 # What the shim does not know, answered by request (GH_FIXTURE is sourced after the shim's own case):
 #   GH_DEP_PRS     the open PRs based on the effort branch (REST shape), to GET pulls?base=… (#358)
 #   GH_DEP_PRS_RC  an HTTP status that makes that read fail · GH_PR_EDIT_RC=1 fails the re-target PATCH
@@ -58,7 +62,7 @@ source "$LIB/effort-ops.sh"
 
 # ── effort_new ────────────────────────────────────────────────────────────────────────────────
 : > "$GH_LOG"
-parent="$(effort_new --flow Core "demo effort" "first sub" "second sub" 2>/dev/null)"
+parent="$(effort_new --flow Core --spec "it ships" "demo effort" "first sub" "second sub" 2>/dev/null)"
 t  "effort_new returns the parent number"          "$parent" "1"
 t  "effort_new creates parent + 2 subs (3 issues)" "$(grep -cE "$CREATE_RE" "$GH_LOG")" "3"
 t  "effort_new links 2 native sub-issues"          "$(grep -c '^POST repos/o/r/issues/1/sub_issues ' "$GH_LOG")" "2"
@@ -76,6 +80,35 @@ no_gh "effort_new"
 effort_new "refactor the whole scripts/kit wiring layer" >/dev/null 2>&1 && rc=0 || rc=1
 t  "effort_new rejects a bad title"                "$rc" "1"
 t  "effort_new creates nothing on a bad title"     "$(grep -cE "$CREATE_RE" "$GH_LOG")" "0"
+
+# ── E546.5: the ## Spec section — checked before any forge write ──────────────────────────────
+: > "$GH_LOG"
+err="$(effort_new "demo effort" "first sub" 2>&1 >/dev/null)" && rc=0 || rc=1
+t  "effort_new refuses a body without a Spec"      "$rc" "1"
+t  "effort_new writes nothing without a Spec"      "$(grep -c . "$GH_LOG")" "0"
+case "$err" in *"no list item"*"--spec"*) echo "ok: the refusal gives the reason and the flag" ;; *) echo "FAIL: no-Spec refusal: $err"; fail=1 ;; esac
+: > "$GH_LOG"
+effort_new --spec "TBD" "demo effort" >/dev/null 2>&1 && rc=0 || rc=1
+t  "effort_new refuses a placeholder-only Spec"    "$rc" "1"
+t  "effort_new writes nothing on a placeholder"    "$(grep -c . "$GH_LOG")" "0"
+: > "$GH_LOG"
+effort_new --spec-file "$tmp/no-such-spec" "demo effort" >/dev/null 2>&1 && rc=0 || rc=1
+t  "effort_new refuses an unreadable --spec-file"  "$rc" "1"
+t  "effort_new writes nothing on that refusal"     "$(grep -c . "$GH_LOG")" "0"
+printf '1. new refuses without it\n2. close re-checks it\n' > "$tmp/spec.md"
+: > "$GH_LOG"
+effort_new --spec-file "$tmp/spec.md" "demo effort" >/dev/null 2>&1 && rc=0 || rc=1
+t  "effort_new takes the Spec from --spec-file"    "$rc" "0"
+tc "$GH_LOG" '^POST repos/o/r/issues \{"title":"demo effort","body":"## Goal\\n[^"]*\\n\\n## Spec\\n1\. new refuses without it\\n2\. close re-checks it\\n\\n## Scope' \
+   "the Spec section sits after Goal, the list kept as written"
+: > "$GH_LOG"
+effort_sub 99 "third step" --spec "TODO" >/dev/null 2>&1 && rc=0 || rc=1
+t  "effort_sub refuses a placeholder --spec"       "$rc" "1"
+t  "effort_sub writes nothing on that refusal"     "$(grep -c . "$GH_LOG")" "0"
+: > "$GH_LOG"
+GH_LABELS='[{"name":"effort"},{"name":"kind:task"}]' effort_sub 99 "third step" --body "one line" --spec "the step lands" >/dev/null 2>&1
+tc "$GH_LOG" '^POST repos/o/r/issues \{"title":"\[E99\.3\] third step","body":"one line\\n\\n## Spec\\n- the step lands\\n\\nSub-issue of #99' \
+   "effort_sub --spec adds a one-line Spec to the sub body"
 
 # ── effort_start / effort_pr / effort_close (real git + bare remote) ───────────────────────────
 ( cd "$tmp" && git init -q --bare remote.git )
@@ -149,6 +182,29 @@ tc "$GH_LOG" '^POST repos/o/r/pulls \{"title":"fix: demo effort \[E99\]"' "effor
 : > "$GH_LOG"
 KIT_PR_TITLE_STYLE=issue-title effort_pr 99 >/dev/null 2>&1
 tc "$GH_LOG" '^POST repos/o/r/pulls \{"title":"(\[Tech Lead\] )?\[#99\] demo effort"' "effort_pr issue-title style keeps the [#N] name form, no commitlint refusal"
+
+# ── effort_close E546.5: the parent's Spec is re-read and checked before anything else ─────────
+: > "$GH_LOG"
+close_out="$(GH_BODY='## Goal\nship it' effort_close 99 2>&1)"; rc=$?
+t  "effort_close refuses a parent without a Spec (rc 1)" "$rc" "1"
+case "$close_out" in *"no '## Spec' section"*"--no-spec-check"*) echo "ok: the Spec refusal gives the reason and the escape" ;; *) echo "FAIL: Spec refusal message: $close_out"; fail=1 ;; esac
+t  "effort_close merged nothing on a missing Spec" "$(grep -cE "$MERGE_RE" "$GH_LOG")" "0"
+t  "effort_close only read the parent on a missing Spec" "$(grep -vc '^GET repos/o/r/issues/99 ' "$GH_LOG")" "0"
+: > "$GH_LOG"
+close_out="$(GH_BODY='## Spec\n- TODO' effort_close 99 2>&1)"; rc=$?
+t  "effort_close refuses a placeholder-only Spec (rc 1)" "$rc" "1"
+: > "$GH_LOG"
+close_out="$(GH_FAIL_EP="repos/o/r/issues/99" effort_close 99 2>&1)"; rc=$?
+t  "effort_close refuses when the body cannot be read (rc 1)" "$rc" "1"
+case "$close_out" in *"could not read #99"*) echo "ok: an unread body is not a checked one" ;; *) echo "FAIL: unread-body message: $close_out"; fail=1 ;; esac
+# --no-spec-check skips the check, says so in one line, and the close goes on to its next gate
+# (here the trace backstop below, since the branch has no commits yet).
+: > "$GH_LOG"
+close_out="$(GH_BODY='## Goal\nship it' effort_close 99 --no-spec-check 2>&1)"; rc=$?
+t  "effort_close --no-spec-check prints one skip notice" "$(printf '%s\n' "$close_out" | grep -c 'Spec check skipped for #99 (--no-spec-check)')" "1"
+case "$close_out" in *"refusing to squash"*) echo "ok: --no-spec-check passes the Spec check" ;; *) echo "FAIL: --no-spec-check did not pass: $close_out"; fail=1 ;; esac
+t  "effort_close --no-spec-check does not read the body" "$(grep -c '^GET repos/o/r/issues/99 ' "$GH_LOG")" "0"
+effort_close 99 --bogus >/dev/null 2>&1; t "effort_close refuses an unknown flag (rc 2)" "$?" "2"
 
 # ── effort_close #120: refuse-squash-without-trace backstop ────────────────────────────────────
 # With NO commits on the effort branch, effort_snapshot_subs captures no trace → close must refuse
@@ -419,7 +475,7 @@ t "relations_add respects a mid-body section" \
 # It used to be built inline with `$( … )`, which eats trailing newlines — the section shipped as the
 # single mangled line `## Relations- Depends on #4- Depends on #9`. Both now go through the formatter.
 : > "$GH_LOG"; printf '0' > "$GH_N"
-effort_new --depends-on "#4,9" "depends on effort" >/dev/null 2>&1
+effort_new --spec "it ships" --depends-on "#4,9" "depends on effort" >/dev/null 2>&1
 # the body travels as a JSON string in the POST issues line, so a line break is a literal \n there
 tc "$GH_LOG" '^POST repos/o/r/issues \{.*\\n## Relations\\n'    "--depends-on writes ## Relations on its own line"
 tc "$GH_LOG" '^POST repos/o/r/issues \{.*\\n- Depends on #4\\n' "--depends-on writes the first dep on its own line"
@@ -784,10 +840,11 @@ t "#330: a re-start with the forge failing cuts no fallback branch" \
   "$(git show-ref --verify --quiet refs/heads/effort/802-effort && echo yes || echo no)" "no"
 # effort_close: a failed PR read (GET pulls?head=…) refuses by name instead of dying on the bare
 # assignment — and before the capture writes a records.jsonl row and consumes the start marker (the
-# write-then-fail #394 exists to prevent).
+# write-then-fail #394 exists to prevent). --no-spec-check: the chain fixture answers 404 for #801's
+# body, and the read under test here is the PR's.
 : > "$CH_LOG"
 out="$( set -e; cd "$(git worktree list --porcelain | awk -v b=refs/heads/effort/801-effort '/^worktree /{w=$2} $2==b{print w}')" \
-        && GH_FAIL_EP="repos/o/r/pulls" KIT_FORCE=1 effort_close 801 2>&1 )"; rc=$?
+        && GH_FAIL_EP="repos/o/r/pulls" KIT_FORCE=1 effort_close 801 --no-spec-check 2>&1 )"; rc=$?
 t "#330: effort_close refuses when the PR cannot be read (rc 1)" "$rc" "1"
 case "$out" in *"could not read the PR for effort/801-effort"*) echo "ok: #330: effort_close names the failed PR read" ;;
   *) echo "FAIL: #330: effort_close gave no reason -> '$out'"; fail=1 ;; esac
@@ -795,7 +852,7 @@ t "#330: nothing was merged on the failed read" "$(grep -cE "$MERGE_RE" "$CH_LOG
 out="$( set -e; cd "$(git worktree list --porcelain | awk -v b=refs/heads/effort/801-effort '/^worktree /{w=$2} $2==b{print w}')" \
         && echo work > rest-twin.txt && git add rest-twin.txt \
         && git -c user.email=t@t -c user.name=t commit -q -m "feat: work (#801)" \
-        && GH_FAIL_EP="repos/o/r/pulls" KIT_FORCE=1 effort_close 801 2>&1 )"; rc=$?
+        && GH_FAIL_EP="repos/o/r/pulls" KIT_FORCE=1 effort_close 801 --no-spec-check 2>&1 )"; rc=$?
 t "#330: with a trace, effort_close still refuses the failed PR read (rc 1)" "$rc" "1"
 case "$out" in
   *"metrics:"*) echo "FAIL: #330: metrics captured before the failed PR read was refused -> '$out'"; fail=1 ;;

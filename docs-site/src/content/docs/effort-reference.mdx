@@ -11,9 +11,12 @@ order. This page is the detail behind each one. The flags are also listed in the
 
 ## Creating an effort
 
-`cckit effort new` creates the effort and its subs: it fills the parent's four-section plan body
-(Goal / Scope / For agents / Verification), applies the `ctx/kind/priority/role/flow` labels, and
-lints every title. The `/kit-effort-new` skill produces the identical effort: both call one shared
+`cckit effort new` creates the effort and its subs: it fills the parent's five-section plan body
+(Goal / Spec / Scope / For agents / Verification), applies the `ctx/kind/priority/role/flow` labels, and
+lints every title and the Spec. The `## Spec` says what done means as a list (`--spec "<text>"` or
+`--spec-file F`; plain lines become `- ` bullets). A missing Spec, an empty one or one holding only
+TODO / TBD is refused before anything is written, and `cckit effort close` re-reads the parent and
+refuses the same way; `--no-spec-check` skips that check and prints one line saying so. The `/kit-effort-new` skill produces the identical effort: both call one shared
 core, so there is no drift between the verb and the skill.
 
 ## Titles
@@ -45,7 +48,7 @@ and dependencies all reference it. But a bare number is hard to remember, so eve
 `cckit effort start`, `pr`, and `close` accept the slug *or* the number interchangeably:
 
 ```bash
-cckit effort new "Slug handles for efforts" --slug slug-handles   # optional explicit handle
+cckit effort new "Slug handles for efforts" --slug slug-handles --spec "start takes the slug"
 cckit effort start slug-handles                                   # identical to: cckit effort start <N>
 cckit effort pr slug-handles
 cckit effort close slug-handles

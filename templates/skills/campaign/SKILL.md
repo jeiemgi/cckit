@@ -96,7 +96,7 @@ list as not started; `cckit task next` names the first one.
 One effort, one sub-issue per piece:
 
 ```bash
-cckit effort new "<name>" "<piece title> :: <channel · the one action>" "<piece title> :: <…>" --kind campaign --goal "<the goal line>" --scope "<the Pieces table, one line each>" --verification "<the number and its date>"
+cckit effort new "<name>" "<piece title> :: <channel · the one action>" "<piece title> :: <…>" --kind campaign --goal "<the goal line>" --spec "<the number and its date>" --scope "<the Pieces table, one line each>" --verification "<the number and its date>"
 cckit effort start <effort>
 ```
 

@@ -230,8 +230,9 @@ run says so. `--upgrade` is unchanged and never enters this flow.
 
 ## Efforts and slug handles
 
-A big piece of work is an **effort** — a parent issue with sub-issues. `cckit effort new "<name>" "sub :: desc" …`
-creates the parent issue (the four-section plan body), applies the `ctx/kind/priority/role/flow` labels, and lints
+A big piece of work is an **effort** — a parent issue with sub-issues. `cckit effort new --spec "<done means>" "<name>" "sub :: desc" …`
+creates the parent issue (the five-section plan body; its `## Spec` says what done means, and both
+`effort new` and `effort close` refuse an effort without one — `close --no-spec-check` skips it, saying so), applies the `ctx/kind/priority/role/flow` labels, and lints
 every sub-issue title — the same effort `/kit-effort-new` produces, since both call one shared core. `--kind` sets
 the `kind:` label on the parent and every sub: one of `feat fix task chore security scaffold ci adr spike plan`
 (default `task`), the same closed set `cckit start` uses as the branch prefix, or a content kind — `post`,
@@ -273,7 +274,7 @@ The GitHub issue **number** stays the canonical key, but every effort also has a
 already in its `effort/<N>-<slug>` branch). Effort commands take the slug *or* the number interchangeably:
 
 ```bash
-cckit effort new "Slug handles for efforts" --slug slug-handles   # optional explicit handle
+cckit effort new "Slug handles for efforts" --slug slug-handles --spec "start takes the slug"
 cckit effort start slug-handles                                   # same as: cckit effort start 93
 cckit effort pr slug-handles
 cckit effort close slug-handles

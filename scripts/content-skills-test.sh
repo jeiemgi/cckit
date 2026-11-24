@@ -96,7 +96,7 @@ t "campaign: no task finish line without --all" "$(grep -c 'cckit task finish' "
 has "cckit task has the default verb" "$help" "cckit task default"
 # The effort lane's flags are ones `effort new` parses.
 eo="$(cat "$ROOT/scripts/lib/effort-ops.sh")"
-for fl in --kind --goal --scope --verification; do
+for fl in --kind --goal --spec --scope --verification; do
   has "effort new parses $fl" "$eo" "      $fl)"
 done
 # ── page-design names its three skills and never claims a missing one (#504) ────────────────────

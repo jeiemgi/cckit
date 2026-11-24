@@ -191,10 +191,13 @@ t "no gh subcommand ran in the task verbs"          "$(grep -c '^GH-SUBCOMMAND' 
 . "$LIB/effort-ops.sh"
 GH_TITLE="[Effort] 99 · demo effort"; GH_LABELS='[{"name":"role:tech-lead"},{"name":"kind:task"}]'
 export KIT_BASE_BRANCH="main"
+# The parent body effort close re-reads (E546.5): a Spec, so the close goes past its check. JSON-escaped.
+export GH_BODY='## Goal\nship it\n\n## Spec\n- it ships'
+
 
 # cckit effort new
 : > "$GH_LOG"
-unset _CCKIT_BOARD_NOTICE_DONE; parent="$(effort_new --flow Core "demo effort" "first sub" "second sub" 2>"$tmp/err")"; rc=$?
+unset _CCKIT_BOARD_NOTICE_DONE; parent="$(effort_new --flow Core --spec "it ships" "demo effort" "first sub" "second sub" 2>"$tmp/err")"; rc=$?
 t  "effort new: rc 0 over REST"                     "$rc" "0"
 rest_only "$GH_LOG" "effort new: only REST calls"
 tc "$GH_LOG" '^POST repos/o/r/labels \{"name":"effort",'            "effort new: ensures labels over REST"

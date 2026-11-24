@@ -4,13 +4,13 @@
 # from any shell or agent (not only via the effort-* skills). Thin: composes the git-mechanics helpers
 # in effort.sh (linking, snapshots, title lint) plus gh + git. bash 3.2 compatible. Requires: gh, jq, git.
 #
-#   effort_new [flags] "<name>" [<sub spec> …]   parent (4-section body + labels) + native sub-issues
+#   effort_new [flags] "<name>" [<sub spec> …]   parent (5-section body + labels) + native sub-issues
 #   effort_sub <slug|N> "<name>" [--kind K]      add one sub-issue, titled [E<N>.<step>] <name>
 #   effort_retitle [<slug|N>] [--apply]          rename legacy [Effort] titles (dry run by default)
 #   effort_chain <a> <b> [<c> …]          wire N issues into a linear blocked_by chain (#243)
 #   effort_start [--force] <slug|N> [<slug>]  effort/<N> branch + worktree from base, WIP-limited (#244)
 #   effort_pr [<slug|N>]                  open the ONE PR effort/<N> → base branch
-#   effort_close <slug|N>                 snapshot sub-diffs, squash-merge the PR, close parent + subs
+#   effort_close <slug|N> [--no-spec-check]  check the Spec, snapshot sub-diffs, squash-merge, close all
 #
 # effort_new is the SHARED creation core (effort #98): both `cckit effort new` (the verb) and
 # /kit-effort-new (the skill) call it, so they produce structurally identical efforts — one source of
@@ -45,6 +45,15 @@ if ! command -v naming_title_lint >/dev/null 2>&1; then
   unset _eo_dir
 fi
 
+# The `## Spec` check (spec-lint.sh, E546.5): effort_new lints the body it composed, effort_close
+# the body it reads back.
+if ! command -v spec_lint >/dev/null 2>&1; then
+  _eo_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+  # shellcheck source=/dev/null
+  [ -f "$_eo_dir/spec-lint.sh" ] && . "$_eo_dir/spec-lint.sh"
+  unset _eo_dir
+fi
+
 # The closed kind: vocabulary (KIT_KINDS / kit_kind_valid) — what `effort new --kind` accepts.
 if ! command -v kit_kind_valid >/dev/null 2>&1; then
   _eo_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
@@ -69,15 +78,20 @@ _eff_need()  { command -v "$1" >/dev/null 2>&1 || { echo "effort: $1 is required
 # _eff_forge — rc 0 with a forge; without one, forge_need's one line (naming the verb), rc 1.
 _eff_forge() { forge_need; }
 
-# Compose the four-section parent body (rules/effort-model.md): the sections double as the work
+# Compose the five-section parent body (rules/effort-model.md): the sections double as the work
 # record. An empty section falls back to its template placeholder so a bare call still yields the
-# full four-heading scaffold; passing content fills it. The `## Relations` chain is NOT composed
-# here — it is layered on afterwards by _eff_relations_add (one formatter, #243).
+# full scaffold; passing content fills it. The Spec is built by spec_section (plain lines become
+# bullets); an empty one keeps only its hint, which spec_lint refuses. The `## Relations` chain is
+# NOT composed here — it is layered on afterwards by _eff_relations_add (one formatter, #243).
 _eff_compose_body() {
-  local goal="$1" scope="$2" for_agents="$3" verification="$4"
+  local goal="$1" scope="$2" for_agents="$3" verification="$4" spec="${5:-}" spec_md
+  if [ -n "$spec" ]; then spec_md="$(spec_section "$spec")"
+  else spec_md="$(printf '## Spec\n<!-- what done means: a checkable list, one item per line -->')"; fi
   cat <<EOF
 ## Goal
 ${goal:-<!-- problem statement: what outcome, in one or two lines -->}
+
+${spec_md}
 
 ## Scope
 ${scope:-<!-- the sub-issue plan; mark each parallel | sequential / dependsOn -->}
@@ -159,9 +173,10 @@ _eff_board_add() {
 }
 
 # effort_new [flags] "<name>" [<sub spec> …] — the shared creation core (effort #98).
-# Flags (all optional): --flow F --role R --priority p1 --goal G --scope S --for-agents A
+# Flags: --spec T | --spec-file F (required: what done means, checked by spec_lint before any forge
+#   write); optional --flow F --role R --priority p1 --goal G --scope S --for-agents A
 #   --verification V --depends-on "#1,#2" --milestone M --slug S.  A <sub spec> is "name :: one-line
-#   desc" (the desc is optional → just "name"). Fills the four body sections, applies the
+#   desc" (the desc is optional → just "name"). Fills the five body sections, applies the
 #   ctx/kind/priority/role/flow label set, lints the parent + EVERY sub title up front (so a bad sub
 #   name aborts before anything is created), links native sub-issues, sets blocked_by edges, adds
 #   everything to the board (guarded), and records the human slug handle (#93) as a slug:<slug> label.
@@ -171,7 +186,7 @@ effort_new() {
   local repo; repo="$(_eff_repo)"
   [ -n "$repo" ] || { echo "effort_new: no repo (KIT_REPO/EFFORT_REPO unset — run in a kit project)" >&2; return 1; }
 
-  local flow="" role="" priority="p1" goal="" scope="" for_agents="" verification="" depends_on="" milestone="" explicit_slug="" kind="task"
+  local flow="" role="" priority="p1" goal="" scope="" for_agents="" verification="" depends_on="" milestone="" explicit_slug="" kind="task" spec_text=""
   # Flags are position-INDEPENDENT: recognized --flag [value] pairs are consumed wherever they occur
   # (before the title, between subs, or after them) and the remaining positionals are collected as the
   # title (first) + sub specs (rest). Previously the parser broke at the first positional, so any flag
@@ -187,6 +202,11 @@ effort_new() {
       --scope)        scope="${2:-}"; shift 2 ;;
       --for-agents)   for_agents="${2:-}"; shift 2 ;;
       --verification) verification="${2:-}"; shift 2 ;;
+      --spec)         spec_text="${2:-}"; shift 2 ;;
+      --spec=*)       spec_text="${1#*=}"; shift ;;
+      --spec-file)
+        [ -r "${2:-}" ] || { echo "effort_new: --spec-file: cannot read '${2:-}'" >&2; return 1; }
+        spec_text="$(cat "$2")"; shift 2 ;;
       --depends-on)   depends_on="${2:-}"; shift 2 ;;
       --milestone)    milestone="${2:-}"; shift 2 ;;
       --slug)         explicit_slug="${2:-}"; shift 2 ;;
@@ -227,11 +247,13 @@ effort_new() {
       || { echo "effort_new: fix sub title #$i and retry: $sub_name" >&2; return 1; }
   done
 
-  # Compose the four-section body, then layer the ## Relations chain from --depends-on through the
+  # Compose the five-section body, then layer the ## Relations chain from --depends-on through the
   # ONE formatter (#243) — the same one `effort_chain` uses, so both write identical lines. (It was
   # built inline here before, and `$( … )` ate every newline: the section shipped as the single
   # mangled line `## Relations- Depends on #1- Depends on #2`.)
-  local body d; body="$(_eff_compose_body "$goal" "$scope" "$for_agents" "$verification")"
+  local body d; body="$(_eff_compose_body "$goal" "$scope" "$for_agents" "$verification" "$spec_text")"
+  # The Spec (E546.5): checked on the composed body, before any label or issue is written.
+  spec_lint "$body" || { echo 'effort_new: say what done means with --spec "<item>" or --spec-file F, and retry' >&2; return 1; }
   if [ -n "$depends_on" ]; then
     for d in $(printf '%s' "$depends_on" | tr ',' ' '); do
       d="${d#\#}"; [ -n "$d" ] && body="$(_eff_relations_add "$body" "$d")"
@@ -311,20 +333,23 @@ effort_new() {
   printf '%s\n' "$num"
 }
 
-# effort_sub <slug|N> "<name>" [--kind K] [--body B] — add ONE sub-issue to an existing effort
+# effort_sub <slug|N> "<name>" [--kind K] [--body B] [--spec T] — add ONE sub-issue to an effort
 # (E546.1). The title is `[E<N>.<step>] <name>`, step = the effort's current native sub count + 1; it
 # is linted before any forge write. The sub takes the parent's priority, role and milestone, and
 # the kind:<k> label (--kind, else the parent's kind, else task), as effort_new's subs do; it is
-# linked natively under the parent and added to the board. Echoes the new sub's number.
+# linked natively under the parent and added to the board. --spec adds an optional `## Spec` section
+# (E546.5), linted like the parent's when given; a sub needs none. Echoes the new sub's number.
 effort_sub() {
   _eff_forge || return 1; _eff_need jq || return 1
-  local raw="" name="" kind="" body_in="" pos=()
+  local raw="" name="" kind="" body_in="" spec="" pos=()
   while [ $# -gt 0 ]; do
     case "$1" in
       --kind)   kind="${2:-}"; shift 2 ;;
       --kind=*) kind="${1#*=}"; shift ;;
       --body)   body_in="${2:-}"; shift 2 ;;
       --body=*) body_in="${1#*=}"; shift ;;
+      --spec)   spec="${2:-}"; shift 2 ;;
+      --spec=*) spec="${1#*=}"; shift ;;
       --)       shift; while [ $# -gt 0 ]; do pos+=("$1"); shift; done ;;
       -*)       echo "effort_sub: unknown flag $1" >&2; return 2 ;;
       *)        pos+=("$1"); shift ;;
@@ -332,9 +357,14 @@ effort_sub() {
   done
   set -- "${pos[@]+"${pos[@]}"}"
   raw="${1:-}"; name="${2:-}"
-  [ -n "$raw" ] && [ -n "$name" ] || { echo 'effort_sub: usage: cckit effort sub <N> "<name>" [--kind K] [--body B]' >&2; return 2; }
+  [ -n "$raw" ] && [ -n "$name" ] || { echo 'effort_sub: usage: cckit effort sub <N> "<name>" [--kind K] [--body B] [--spec T]' >&2; return 2; }
   # The rule is about the NAME: lint it first, with a synthetic token, before any forge read or write.
   naming_title_lint sub "$(naming_sub_title 0 1 "$name")" || { echo "effort_sub: fix the name and retry" >&2; return 1; }
+  if [ -n "$spec" ]; then
+    if [ -n "$body_in" ]; then body_in="$(printf '%s\n\n%s' "$body_in" "$(spec_section "$spec")")"
+    else body_in="$(spec_section "$spec")"; fi
+    spec_lint "$body_in" || { echo "effort_sub: fix the --spec and retry" >&2; return 1; }
+  fi
   if [ -n "$kind" ] && command -v kit_kind_label_valid >/dev/null 2>&1 && ! kit_kind_label_valid "$kind"; then
     echo "effort_sub: --kind must be one of: $KIT_KINDS $KIT_CONTENT_KINDS (got '$kind')" >&2; return 1
   fi
@@ -1146,12 +1176,22 @@ EOF_SUBS
 # (KIT_FORCE=1 overrides), squash-merge, judge the metrics, close parent + subs, set the board
 # Status=Done for each (guarded), GC the worktree/branch, run the optional knowledge-ingest hook,
 # and finish with the advisory kit-sync drift check. Destructive: it merges, closes, and prunes.
+# First of all it re-reads the parent body and refuses an effort whose `## Spec` fails spec_lint
+# (E546.5); --no-spec-check skips that one check and says so on stderr.
 effort_close() {
   _eff_forge || return 1; _eff_need jq || return 1
-  local raw="${1:-}" num repo base branch root self_wt trace_dir kit_touched
+  local raw="" spec_check=1 num repo base branch root self_wt trace_dir kit_touched
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --no-spec-check) spec_check=0; shift ;;
+      -*) echo "effort_close: unknown flag $1" >&2; return 2 ;;
+      *)  [ -z "$raw" ] && raw="$1"; shift ;;
+    esac
+  done
   [ -n "$raw" ] || { echo "effort_close: <slug|effort issue #> required" >&2; return 1; }
   num="$(effort_slug_resolve "$raw")" || { echo "effort_close: could not resolve '$raw' to an effort" >&2; return 1; }
   repo="$(_eff_repo)"; base="$(_eff_base)"
+  _eo_spec_check "$repo" "$num" "$spec_check" || return 1
   branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)"
   case "$branch" in
     effort/"$num"-*) : ;;
@@ -1283,6 +1323,25 @@ effort_close() {
 
   # (h) kit-sync drift check — kit ⇄ project stay in sync (#148, moved here from the skill).
   _eo_kit_sync_warn "$kit_touched"
+}
+
+# _eo_spec_check <repo> <num> <1|0> — the close-time Spec check (E546.5), shared by both close
+# styles because it runs before they split. 1: read the parent body and refuse, with spec_lint's
+# reasons, when it has no checkable `## Spec`; a failed read refuses too, since an unread body is not
+# a checked one. 0 (--no-spec-check): skip, and print one line recording that the check was skipped.
+_eo_spec_check() {
+  local repo="$1" num="$2" body
+  if [ "${3:-1}" = 0 ]; then
+    echo "effort_close: Spec check skipped for #$num (--no-spec-check) — the close does not confirm what done means" >&2
+    return 0
+  fi
+  body="$(_eff_issue_body "$repo" "$num" 2>/dev/null)" || {
+    echo "effort_close: could not read #$num's body to check its Spec — rerun when GitHub answers, or pass --no-spec-check (nothing was written)" >&2
+    return 1
+  }
+  spec_lint "$body" && return 0
+  echo "effort_close: refusing to close #$num — add a '## Spec' list to its body (what done means), or pass --no-spec-check (nothing was written)" >&2
+  return 1
 }
 
 # _eo_kit_sync_warn <files> — the advisory kit-sync drift warning, shared by both close styles
