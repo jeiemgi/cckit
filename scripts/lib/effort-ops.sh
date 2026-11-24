@@ -4,7 +4,8 @@
 # from any shell or agent (not only via the effort-* skills). Thin: composes the git-mechanics helpers
 # in effort.sh (linking, snapshots, title lint) plus gh + git. bash 3.2 compatible. Requires: gh, jq, git.
 #
-#   effort_new [flags] "<name>" [<sub spec> …]   parent (5-section body + labels) + native sub-issues
+#   effort_new [flags] "<name>" [<sub spec> …]   parent (5-section body + labels) + native sub-issues;
+#                                         --grilling[-file] appends a linted `## Grilling` record
 #   effort_sub <slug|N> "<name>" [--kind K]      add one sub-issue, titled [E<N>.<step>] <name>
 #   effort_retitle [<slug|N>] [--apply]          rename legacy [Effort] titles (dry run by default)
 #   effort_chain <a> <b> [<c> …]          wire N issues into a linear blocked_by chain (#243)
@@ -51,6 +52,14 @@ if ! command -v spec_lint >/dev/null 2>&1; then
   _eo_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
   # shellcheck source=/dev/null
   [ -f "$_eo_dir/spec-lint.sh" ] && . "$_eo_dir/spec-lint.sh"
+  unset _eo_dir
+fi
+
+# The `## Grilling` record check (grill-record.sh, E547.2): effort_new lints --grilling before writing.
+if ! command -v grill_record_lint >/dev/null 2>&1; then
+  _eo_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+  # shellcheck source=/dev/null
+  [ -f "$_eo_dir/grill-record.sh" ] && . "$_eo_dir/grill-record.sh"
   unset _eo_dir
 fi
 
@@ -186,7 +195,7 @@ effort_new() {
   local repo; repo="$(_eff_repo)"
   [ -n "$repo" ] || { echo "effort_new: no repo (KIT_REPO/EFFORT_REPO unset — run in a kit project)" >&2; return 1; }
 
-  local flow="" role="" priority="p1" goal="" scope="" for_agents="" verification="" depends_on="" milestone="" explicit_slug="" kind="task" spec_text=""
+  local flow="" role="" priority="p1" goal="" scope="" for_agents="" verification="" depends_on="" milestone="" explicit_slug="" kind="task" spec_text="" grilling=""
   # Flags are position-INDEPENDENT: recognized --flag [value] pairs are consumed wherever they occur
   # (before the title, between subs, or after them) and the remaining positionals are collected as the
   # title (first) + sub specs (rest). Previously the parser broke at the first positional, so any flag
@@ -207,6 +216,10 @@ effort_new() {
       --spec-file)
         [ -r "${2:-}" ] || { echo "effort_new: --spec-file: cannot read '${2:-}'" >&2; return 1; }
         spec_text="$(cat "$2")"; shift 2 ;;
+      --grilling)     grilling="${2:-}"; shift 2 ;;
+      --grilling-file)
+        [ -r "${2:-}" ] || { echo "effort_new: --grilling-file: cannot read '${2:-}'" >&2; return 1; }
+        grilling="$(cat "$2")"; shift 2 ;;
       --depends-on)   depends_on="${2:-}"; shift 2 ;;
       --milestone)    milestone="${2:-}"; shift 2 ;;
       --slug)         explicit_slug="${2:-}"; shift 2 ;;
@@ -254,6 +267,12 @@ effort_new() {
   local body d; body="$(_eff_compose_body "$goal" "$scope" "$for_agents" "$verification" "$spec_text")"
   # The Spec (E546.5): checked on the composed body, before any label or issue is written.
   spec_lint "$body" || { echo 'effort_new: say what done means with --spec "<item>" or --spec-file F, and retry' >&2; return 1; }
+  # The Grilling record (E547.2): optional, but a record that is passed must be one — linted here,
+  # before any forge write, then appended as the body's `## Grilling` section.
+  if [ -n "$grilling" ]; then
+    grill_record_lint "$grilling" || { echo 'effort_new: fix the --grilling record and retry' >&2; return 1; }
+    body="$body"$'\n\n'"$(grill_record_section "$grilling")"
+  fi
   if [ -n "$depends_on" ]; then
     for d in $(printf '%s' "$depends_on" | tr ',' ' '); do
       d="${d#\#}"; [ -n "$d" ] && body="$(_eff_relations_add "$body" "$d")"

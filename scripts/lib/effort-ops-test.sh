@@ -110,6 +110,22 @@ GH_LABELS='[{"name":"effort"},{"name":"kind:task"}]' effort_sub 99 "third step" 
 tc "$GH_LOG" '^POST repos/o/r/issues \{"title":"\[E99\.3\] third step","body":"one line\\n\\n## Spec\\n- the step lands\\n\\nSub-issue of #99' \
    "effort_sub --spec adds a one-line Spec to the sub body"
 
+# ── E547.2: the ## Grilling record — linted before any forge write, appended last ───────────────
+: > "$GH_LOG"
+err="$(effort_new --spec "it ships" --grilling "1. only one decision" "demo effort" 2>&1 >/dev/null)" && rc=0 || rc=1
+t  "effort_new refuses a Grilling record that is not one" "$rc" "1"
+t  "effort_new writes nothing on a bad Grilling record"  "$(grep -c . "$GH_LOG")" "0"
+case "$err" in *"Grilled:"*"--grilling"*) echo "ok: the Grilling refusal names the missing line and the flag" ;; *) echo "FAIL: Grilling refusal: $err"; fail=1 ;; esac
+printf 'Grilled: the owner, 2026-11-24, in session.\n1. a sprint is one week\n2. waves run inside it\n3. the advisor writes no code\n' > "$tmp/grill.md"
+: > "$GH_LOG"
+effort_new --spec "it ships" --grilling-file "$tmp/grill.md" "demo effort" >/dev/null 2>&1 && rc=0 || rc=1
+t  "effort_new accepts the grill stage's record"         "$rc" "0"
+tc "$GH_LOG" '^POST repos/o/r/issues \{"title":"demo effort","body":"## Goal[^"]*## Verification\\n[^"]*\\n\\n## Grilling\\n\\nGrilled: the owner, 2026-11-24, in session\.\\n1\. a sprint is one week' \
+   "the Grilling section closes the body, the record kept as written"
+: > "$GH_LOG"
+effort_new --spec "it ships" --grilling-file "$tmp/no-such-grill" "demo effort" >/dev/null 2>&1 && rc=0 || rc=1
+t  "effort_new refuses an unreadable --grilling-file"    "$rc" "1"
+
 # ── effort_start / effort_pr / effort_close (real git + bare remote) ───────────────────────────
 ( cd "$tmp" && git init -q --bare remote.git )
 ( cd "$tmp" && git clone -q remote.git work \
