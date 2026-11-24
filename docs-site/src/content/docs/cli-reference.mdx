@@ -126,6 +126,73 @@ works and prints one line on stderr, for example
 `cckit: 'copilot' is an old name for 'wave'; it still works. Use 'cckit wave'.` An alias does not
 count toward the baseline and is not removed while the rename settles.
 
+## Ask cckit about its own verbs
+
+Four questions a reader has about the verbs themselves. Each one lists the prompt to paste, the
+command the agent runs, and what comes back. None of them changes a file or calls the forge.
+
+### What can cckit do?
+
+- **Paste:** "List the cckit verbs by the question each one answers."
+- **The agent runs:** `cckit help` (or `cckit --help`).
+- **You see:** every verb under the question its group answers, git mechanics first, then the old
+names that still work:
+
+```text
+cckit — every verb answers a question.
+  cckit <verb> --help    one verb: its usage, its question and a prompt to paste
+  cckit commands --json  every verb as data: question, prompt to paste, usage, needs
+
+How do I take one change from a branch to merged?
+  start           How do I start work on an issue without touching my main checkout?
+  pr              How do I open the pull request for this issue?
+  merge           Can this pull request land, and what does landing clean up?
+  …
+```
+
+### What does this one verb do?
+
+- **Paste:** "What does `cckit start` do, and what should I ask you to run it?"
+- **The agent runs:** `cckit start --help` (the same as `cckit help start`).
+- **You see:** the usage, the question, a prompt to paste and what the verb needs. The verb itself
+does not run:
+
+```text
+cckit start [--force] <issue> [slug]
+
+  Answers: How do I start work on an issue without touching my main checkout?
+  Paste:   "Start the issue I pick in its own worktree."
+  Needs:   git; reads or writes the forge (GitHub) when one is configured
+  Skill:   kit-task-start
+```
+
+A verb with its own longer help, such as `cckit orchestrate` or `cckit doctor`, prints it after
+this block under **Details:**.
+
+### Which verbs exist, as data?
+
+- **Paste:** "Read the cckit verb catalog and tell me which verbs work without GitHub."
+- **The agent runs:** `cckit commands --json`.
+- **You see:** an answer built from a JSON array with one object per name (49 today: 46 verbs, the
+bare `cckit`, two old names). One object:
+
+```json
+{"name":"merge","kind":"verb","target":null,"group":"git","needs":"forge","skill":"kit-task-pr-merge",
+ "question":"Can this pull request land, and what does landing clean up?",
+ "prompt":"Merge this branch's pull request once its gate is green, and clean up the branch.",
+ "usage":["cckit merge [<pr>] [--squash|--merge|--rebase]"]}
+```
+
+### I typed an old name. Does it still work?
+
+- **Paste:** nothing; this is what happens when you, or a script, use a verb's old name.
+- **The agent runs:** for example `cckit copilot`.
+- **You see:** one line on stderr, then the new verb's normal output:
+
+```text
+cckit: 'copilot' is an old name for 'wave'; it still works. Use 'cckit wave'.
+```
+
 ## Set up and install
 
 | Verb | Purpose |

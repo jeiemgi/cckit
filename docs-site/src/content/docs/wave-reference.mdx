@@ -6,6 +6,12 @@ description: "The detail behind a wave: how each runtime starts its workers, the
 [Run work in parallel waves](/development/waves/) is the loop. This page is the detail behind
 three parts of it.
 
+- **Question:** which waves of work can start from the open efforts?
+- **Paste:** "Read the open efforts and propose the next wave of work."
+- **The agent runs:** `cckit wave` (`cckit copilot`, the old name, still works and says so on stderr).
+- **You see:** the wave-0 issues with one prompt each, and the dispatch wording for your runtime,
+described below. `cckit wave --help` prints the usage without running it.
+
 ## Dispatch per runtime
 
 A brief has two layers. The **wave data** — which issues are in wave 0, their `ctx` size, and one
