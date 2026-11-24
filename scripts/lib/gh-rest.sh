@@ -50,7 +50,8 @@
 #   gh_rest_board_project <base>          {id,node_id,number,title}
 #   gh_rest_board_fields <base>           [{id,node_id,name,data_type,options[{id,name}],iterations[{id,title,start_date}]}]
 #   gh_rest_board_ids_env <base>          the scripts/.project-ids.env lines, read over REST
-#   gh_rest_board_find_issue_item <base> <repo> <n>        "<item id>:<item node id>", empty when not on the board
+#   gh_rest_board_find_item <base> <Issue|PullRequest> <repo> <n>  "<item id>:<item node id>", empty when not on the board
+#   gh_rest_board_find_issue_item <base> <repo> <n>        the same, for an issue
 #   gh_rest_board_add_item <base> <Issue|PullRequest> <repo> <n>   "<item id>:<item node id>"
 #   gh_rest_board_set_field <base> <item id> <field id|node id> <single_select|iteration|text> <value>
 #   (board rc: 0 ok · 3 REST cannot serve it, the caller may fall back to GraphQL · 1 any other error)
@@ -457,32 +458,52 @@ gh_rest_board_ids_env() {
       (.iterations[] | (.title | n) as $t | select($t != "") | "\($f)_ITER_\($t)=\(.id)")'
 }
 
-# gh_rest_board_find_issue_item <base> <repo> <n> — the issue's card on the board, as
-# "<id>:<node_id>"; empty (rc 0) when the issue is not on it. REST has no issue-side lookup, so this
-# reads the board's items, 100 a page.
-gh_rest_board_find_issue_item() {
-  local base="$1" repo="$2" n="$3" out
+# gh_rest_board_find_item <base> <Issue|PullRequest> <repo> <n> — the issue's or PR's card on the
+# board, as "<id>:<node_id>"; empty (rc 0) when it is not on it. REST has no content-side lookup, so
+# this reads the board's items, 100 a page.
+gh_rest_board_find_item() {
+  local base="$1" type="$2" repo="$3" n="$4" out
+  case "$type" in Issue|PullRequest) ;; *) return 3 ;; esac
   case "$n" in ''|*[!0-9]*) return 3 ;; esac
   case "$repo" in */*) ;; *) return 3 ;; esac
   case "$repo" in *[!A-Za-z0-9._/-]*) return 3 ;; esac
   out="$(_ghr_board "$base/items" -X GET -f per_page=100 --paginate --jq "
     if type != \"array\" then error(\"not an item list\") else .[] end
-    | select(.content_type == \"Issue\")
+    | select(.content_type == \"$type\")
     | select((.content.number // -1) == $n)
     | select(((.content.repository.full_name // \"$repo\") | ascii_downcase) == (\"$repo\" | ascii_downcase))
     | \"\(.id):\(.node_id // \"\")\"")" || return $?
   printf '%s\n' "$out" | sed '/^$/d' | sed -n 1p
 }
 
+# gh_rest_board_find_issue_item <base> <repo> <n> — gh_rest_board_find_item for an issue.
+gh_rest_board_find_issue_item() { gh_rest_board_find_item "$1" Issue "$2" "$3"; }
+
 # gh_rest_board_add_item <base> <Issue|PullRequest> <repo> <n> — add an issue or PR; prints
-# "<id>:<node_id>" of the new (or existing) item.
+# "<id>:<node_id>" of the new (or existing) item. REST answers 422 "Content already exists in this
+# project" when the item is already on the board, where GraphQL's addProjectV2ItemById returned the
+# existing item. A board with GitHub's auto-add workflow puts every new issue and PR on the board
+# within seconds, so the 422 is the common case there (#590): the existing card is read back instead.
+# rc 3 when it cannot be read, so the GraphQL fallback (idempotent) decides.
 gh_rest_board_add_item() {
-  local base="$1" type="$2" repo="$3" n="$4"
+  local base="$1" type="$2" repo="$3" n="$4" err out rc=0
   case "$type" in Issue|PullRequest) ;; *) return 3 ;; esac
   case "$n" in ''|*[!0-9]*) return 3 ;; esac
   case "$repo" in */*) ;; *) return 3 ;; esac
-  _ghr_board "$base/items" -X POST -f "type=$type" -f "owner=${repo%%/*}" -f "repo=${repo##*/}" -F "number=$n" \
-    --jq 'if (.id | type) == "number" then "\(.id):\(.node_id // "")" else error("no item id") end'
+  err="$(mktemp)" || return 1
+  out="$(_ghr_board "$base/items" -X POST -f "type=$type" -f "owner=${repo%%/*}" -f "repo=${repo##*/}" -F "number=$n" \
+    --jq 'if (.id | type) == "number" then "\(.id):\(.node_id // "")" else error("no item id") end' 2>"$err")" || rc=$?
+  if [ "$rc" = 1 ] && grep -q 'GitHub answered 422 .*already exists' "$err"; then
+    rm -f "$err"
+    out="$(gh_rest_board_find_item "$base" "$type" "$repo" "$n" 2>/dev/null)" || return 3
+    [ -n "$out" ] || return 3
+    printf '%s\n' "$out"
+    return 0
+  fi
+  cat "$err" >&2; rm -f "$err"
+  [ "$rc" = 0 ] || return "$rc"
+  [ -n "$out" ] && printf '%s\n' "$out"
+  return 0
 }
 
 # gh_rest_board_set_field <base> <item id> <field> <kind> <value> — set one field of one item.
