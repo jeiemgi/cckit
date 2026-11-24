@@ -112,7 +112,7 @@ cckit gc --prune --yes           # remove merged branches and their worktrees
 <Chat
   title="checking that the menu page issue is gone and nothing is left over"
   say="Is the menu page issue closed, and is anything left over from it?"
-  ran={['cckit sync', 'cckit gc']}
+  ran={['cckit status --board', 'cckit gc']}
   means="The issue is no longer in the open list, and the cleanup report names no branch or worktree for it."
 >
   The menu page issue is no longer open, and the cleanup report lists nothing left over for it.

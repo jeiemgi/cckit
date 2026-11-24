@@ -23,7 +23,7 @@ and the Editor do, one piece at a time, after the plan is approved.
   there. If the file does not exist, say so and offer the `brand-voice` skill first; a campaign
   planned without it is planned on a guess.
 - `{{PLANS_DIR}}` — an existing plan for the same goal is continued, not duplicated.
-- The open work: `cckit task list`, and `cckit sync` when the project uses GitHub issues.
+- The open work: `cckit task list`, and `cckit status --board` when the project uses GitHub issues.
 
 ## 2 · The brief
 

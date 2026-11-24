@@ -180,7 +180,7 @@ plan_machine() {
   local repo="$PLAN_REPO" budget="${KIT_SESSION_BUDGET:-4}" out="${CCKIT_OUTPUT:-human}" effort="" ms=""
   while [ "$#" -gt 0 ]; do
     case "$1" in
-      --llm|--output=json) out="json"; shift ;;
+      --json|--llm|--output=json) out="json"; shift ;;
       --effort)    effort="$2"; shift 2 ;;
       --effort=*)  effort="${1#*=}"; shift ;;
       --milestone) ms="$2"; shift 2 ;;

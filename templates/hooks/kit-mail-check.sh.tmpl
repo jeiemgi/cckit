@@ -7,7 +7,7 @@
 #   Stop              → blocks the stop ONLY for unread `--steer` mail (redirects a finishing
 #                       session); mail is consumed on delivery so it can never block twice
 # Silent (no output) when there is no mail — zero noise on the hot path.
-# Send with:  cckit msg send <branch|project:branch|all> [--steer] "<text>"
+# Send with:  cckit agent msg send <branch|project:branch|all> [--steer] "<text>"
 set -u
 input="$(cat 2>/dev/null || true)"
 event="$(printf '%s' "$input" | jq -r '.hook_event_name // empty' 2>/dev/null || true)"

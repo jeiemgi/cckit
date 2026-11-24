@@ -32,7 +32,7 @@ command. `--effort <N>` scopes it to one effort's sub-issues.
 
 The human output ends with the weekly cadence this verb is the daily step of: Monday `cckit plan`
 orders the week, `cckit next` daily picks up one issue, Friday `cckit gc` reports what can be
-pruned. `cckit next --llm` does not carry that line — its TOON rows stay `{number,ctx,title}`.
+pruned. `cckit next --json` does not carry that line — its TOON rows stay `{number,ctx,title}`.
 
 The unblocked set is ordered by the `priority:pN` label — **p0 → p1 → p2 → p3**, unlabeled last —
 so the recommended issue is the most urgent thing that is actually startable. Ties keep their

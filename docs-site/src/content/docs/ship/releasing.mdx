@@ -143,7 +143,7 @@ the branch is reported instead of re-created. If the pick conflicts, nothing is 
 in the worktree, run `git cherry-pick --continue` there, and run the same `cckit hotfix` again. A
 change `origin/<base>` already carries is refused, and the worktree it made is removed.
 
-With `--llm` the result is one JSON object (`ok`, `url`, `worktree`, `detail`). A refusal or a
+With `--json` the result is one JSON object (`ok`, `url`, `worktree`, `detail`). A refusal or a
 conflict exits non-zero with `ok: false` and the reason in `detail`.
 
 For a hotfix that is new work, not a cherry-pick, branch from the release branch by hand and open the

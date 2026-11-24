@@ -140,7 +140,7 @@ plan_next() {
   local out="${CCKIT_OUTPUT:-human}" root=""
   while [ "$#" -gt 0 ]; do
     case "$1" in
-      --llm|--output=json) out="json"; shift ;;
+      --json|--llm|--output=json) out="json"; shift ;;
       --root)   root="$2"; shift 2 ;;
       --root=*) root="${1#*=}"; shift ;;
       -h|--help) sed -n '8,11p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; return 0 ;;

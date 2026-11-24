@@ -23,7 +23,7 @@ This cookbook is written for **AI agents** (Claude Code and any coding agent) dr
 - **What cckit does** — the commands cckit runs under the hood, shown so you can see what happened. You rarely type these yourself.
 - **Configure** — any one-time setup the recipe assumes.
 
-cckit is built to be agent-operable: every verb has a machine-readable mode (`cckit <verb> --llm`) and the repo ships an [`AGENTS.md`](/agents/) contract, so an agent reasons over structured data instead of scraping human output. Point your agent at `AGENTS.md` once and it knows the grammar.
+cckit is built to be agent-operable: every verb has a machine-readable mode (`cckit <verb> --json`) and the repo ships an [`AGENTS.md`](/agents/) contract, so an agent reasons over structured data instead of scraping human output. Point your agent at `AGENTS.md` once and it knows the grammar.
 
 **Prime your agent once (copy-paste):**
 
@@ -63,7 +63,7 @@ Then show me what it detected about the stack so I can verify it looks right.
 ```bash
 cckit init        # scaffold cckit.config.json + .claude/
 cckit doctor      # preflight: deps + the forge (the GitHub token)
-cckit scan --llm  # verify detected stack + kit state (JSON)
+cckit scan --json  # verify detected stack + kit state (JSON)
 ```
 
 ## Ship one issue end-to-end
@@ -96,15 +96,15 @@ cckit close <issue> "<summary>"  # close the issue, board → Done
 cckit gc --prune --yes           # remove the merged branch + worktree
 ```
 
-`cckit sync --llm` at any point gives the agent the board state and what's unblocked.
+`cckit status --board --json` at any point gives the agent the board state and what's unblocked.
 
 ### Feed a statusline or TUI from the board cache
 
 Poll the cache, not GitHub. `--cached` makes no GitHub call while the cache is inside its TTL:
 
 ```bash
-cckit sync --watch 30 &                                   # one refresher: rewrites the cache every 30s
-cckit sync --cached 60 | jq -r '"\(.open) open · \(.mergeQueue | length) PRs · \(.stale.issues | length) stale"'
+cckit status --board --watch 30 &                                   # one refresher: rewrites the cache every 30s
+cckit status --board --cached 60 | jq -r '"\(.open) open · \(.mergeQueue | length) PRs · \(.stale.issues | length) stale"'
 ```
 
 A failed fetch never replaces the cache, so the reader keeps the last good board; `generatedAt` says
@@ -133,7 +133,7 @@ the whole effort once they're all done.
 **What cckit does:**
 
 ```bash
-cckit effort plan --llm        # session-fit plan over open efforts (data)
+cckit effort plan --json        # session-fit plan over open efforts (data)
 cckit effort new "Auth rework" # parent issue + native sub-issues, all on the board
 cckit effort start <N>         # integration branch effort/<N> + worktree
 # …build sub-issues on the effort branch (sequential) or in worktrees (parallel)…
@@ -174,18 +174,18 @@ cckit watch --merge    # gate open PRs, squash-merge the clean ones, advance the
 ## Steer a parallel session
 
 When several sessions work on the same machine — a captain and its wave agents in one repo, or a
-session in a *different project* — `cckit msg` gives them a mailbox. In a project with the kit's
+session in a *different project* — `cckit agent msg` gives them a mailbox. In a project with the kit's
 mail hook wired, delivery reaches a **live** session between its tool calls, not just at its next
 start. A session is addressed by what it's on: its branch (same project) or `project:branch`.
 
 ```bash
-cckit msg send docs/site "main moved — rebase before continuing"    # same project, by branch
-cckit msg send acme/api:main "your schema change breaks our build"  # another project on this machine
-cckit msg send all "v0.4.0 released"                                # broadcast: every session here
-cckit msg send task/9-fix --steer "stop: wrong base branch"         # steer: also blocks its next
+cckit agent msg send docs/site "main moved — rebase before continuing"    # same project, by branch
+cckit agent msg send acme/api:main "your schema change breaks our build"  # another project on this machine
+cckit agent msg send all "v0.4.0 released"                                # broadcast: every session here
+cckit agent msg send task/9-fix --steer "stop: wrong base branch"         # steer: also blocks its next
                                                                     # stop and redirects it
-cckit msg read                                                      # read your own mail manually
-cckit msg list                                                      # machine-wide unread counts
+cckit agent msg read                                                      # read your own mail manually
+cckit agent msg list                                                      # machine-wide unread counts
 ```
 
 Direct messages are read-once; broadcasts are project-scoped, reach each session exactly once,
@@ -303,7 +303,7 @@ The full adoption sequence is on the [adoption page](/getting-started/existing-r
 
 ## Drive cckit as pure data (headless agents)
 
-For a non-interactive agent (CI bot, scheduled run), skip human output entirely and consume JSON. Every verb that reports state takes `--llm`.
+For a non-interactive agent (CI bot, scheduled run), skip human output entirely and consume JSON. Every verb that reports state takes `--json`.
 
 **Prompt:**
 
@@ -323,8 +323,8 @@ Keep token use lean when you hand context to sub-agents.
 **What cckit does:**
 
 ```bash
-cckit sync --llm          # board state + what's unblocked, as TOON
-cckit scan --llm          # repo stack + kit state, as JSON
-cckit plan --llm          # the session-fit wave plan, as TOON
-echo "$json" | cckit encode-context   # compact uniform arrays into TOON for sub-agents
+cckit status --board --json          # board state + what's unblocked, as one JSON document
+cckit scan --json          # repo stack + kit state, as JSON
+cckit plan --json          # the session-fit wave plan, as TOON
+echo "$json" | cckit agent encode-context   # compact uniform arrays into TOON for sub-agents
 ```

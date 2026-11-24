@@ -49,7 +49,7 @@ If no change is needed, close the issue yourself with the reason:
 
 Then RECORD your receipt — this is the only durable record of the run, and your pane is not one:
 
-    cckit receipt $num --stage <your stage> <<'RECEIPT'
+    cckit agent receipt $num --stage <your stage> <<'RECEIPT'
     outcome:    merged | pr-open | closed-no-op | blocked
     url:        <PR or issue URL>
     gate:       pass | fail — <the failing check, if any>

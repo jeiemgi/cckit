@@ -33,7 +33,7 @@ These are scaffolded for every project.
 | `SessionStart` | `kit_version_check.sh` | A quiet notice if this project is behind the installed cckit — the prompt to run `cckit update`. |
 | `PreToolUse` (Bash) | `guard-base-branch-commit.sh` | Blocks a commit made straight to the base branch, so work always goes through a branch and a PR. |
 | `PreToolUse` (Bash) | `guard-raw-git-ops.sh` | Blocks a raw `gh issue create`, `gh pr create`, `gh pr merge`, `gh issue close`, or a branch cut from the base branch, and prints the cckit verb to run instead. The verb adds the item to the board; the raw command does not. `KIT_ALLOW_RAW=1` lets one command through and records it in `<git-common-dir>/cckit/raw-bypass.log`. |
-| `PostToolUse` · `UserPromptSubmit` · `SessionStart` · `Stop` | `kit-mail-check.sh` | Delivers [session mail](/cookbook/) (`cckit msg send`): unread mail is injected between tool calls, on the next prompt and at session start. `Stop` is blocked only by `--steer` mail, and a message is consumed when delivered, so it cannot block a second time. Silent when there is no mail. |
+| `PostToolUse` · `UserPromptSubmit` · `SessionStart` · `Stop` | `kit-mail-check.sh` | Delivers [session mail](/cookbook/) (`cckit agent msg send`): unread mail is injected between tool calls, on the next prompt and at session start. `Stop` is blocked only by `--steer` mail, and a message is consumed when delivered, so it cannot block a second time. Silent when there is no mail. |
 
 </div>
 

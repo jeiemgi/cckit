@@ -317,7 +317,7 @@ _cap_load_policy_config() {
   # reviewer on every mergeable PR and then merges the ones the reviewer never got to has gained
   # nothing. requireReview:false turns that implication off without giving up the reviewer, and an
   # explicit requireReview:true requires a verdict with no review.command (a reviewer run by hand
-  # or by CI, recorded through `cckit receipt`).
+  # or by CI, recorded through `cckit agent receipt`).
   if [ -z "${KIT_CAPTAIN_REQUIRE_REVIEW:-}" ]; then
     case "$(_cap_cfg_bool "$cfg" requireReview)" in
       true)  KIT_CAPTAIN_REQUIRE_REVIEW=1 ;;

@@ -33,7 +33,7 @@ KIT_GC_REPO="$KIT_REPO" source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/kit-gc.sh"
 kit_gc_cleanup          # plan only — deletes no branch, worktree, remote ref or stash
 ```
 
-Or through the CLI: `cckit cleanup` (add `--llm` for JSON counts: `safe`, `landed`, `worktrees`,
+Or through the CLI: `cckit cleanup` (add `--json` for JSON counts: `safe`, `landed`, `worktrees`,
 `zombie`, `orphan`, `protected`, `stash`, `remote_failed`, `applied`). A LANDED detached worktree
 counts under `worktrees`, an ORPHAN one under `orphan`.
 
@@ -64,7 +64,7 @@ to compare. It requires **exact equality in both directions**: `origin/<b>..<b>`
 local ⊆ remote, so a remote-ahead branch would otherwise lose remote-only history. A local delete is
 likewise skipped when the branch is ahead of its remote (`git branch -D` is a force delete). A remote
 delete that fails (protected ref, already gone) is reported, counted on the `remote deletes failed`
-line (`remote_failed` in `--llm`), and makes the verb exit non-zero — a partial sweep is never
+line (`remote_failed` in `--json`), and makes the verb exit non-zero — a partial sweep is never
 reported as a complete one. It is never retried blindly.
 
 The plan-only path does perform one write: `kit_gc_analyze` refreshes remote-tracking refs

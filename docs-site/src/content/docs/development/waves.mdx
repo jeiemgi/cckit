@@ -135,13 +135,13 @@ first wave.
 - **An agent reviewer.** If you have configured
   [a review stage](/config-and-permissions/#the-agent-review-stage), a pull request the captain
   would merge goes to a reviewer first and waits for its verdict: one extra turn of the loop, not
-  a separate command. `cckit receipt show <issue> review` prints what the reviewer decided.
+  a separate command. `cckit agent receipt show <issue> review` prints what the reviewer decided.
 - **A person looking at the running app.** The [QA lane](/review/qa-lane/) starts one copy of the
   app per change (a lane): `cckit qa up`, then `cckit qa open`, then
   `cckit qa verdict <pass|fail>`. With `captain.mergePolicy.requireQa` set, the captain holds a
   pull request until `cckit qa verdict pass` is recorded against its latest commit.
   `cckit qa lanes` shows every lane's ports and verdicts.
-- **The plan as data.** `cckit plan --llm` prints the wave plan in a form a program reads.
+- **The plan as data.** `cckit plan --json` prints the wave plan in a form a program reads.
 
 ## Guides and related pages
 

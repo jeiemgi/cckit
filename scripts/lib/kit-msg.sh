@@ -56,7 +56,7 @@ msg_send() {
   local steer=0
   [ "${1:-}" = "--steer" ] && { steer=1; shift; }
   local text="$*"
-  [ -n "$target" ] && [ -n "$text" ] || { echo 'msg_send: usage: cckit msg send <branch|all|project:branch|project:all> [--steer] "<text>"' >&2; return 1; }
+  [ -n "$target" ] && [ -n "$text" ] || { echo 'msg_send: usage: cckit agent msg send <branch|all|project:branch|project:all> [--steer] "<text>"' >&2; return 1; }
   _msg_parse "$target" || { echo "msg_send: bad target '$target'" >&2; return 1; }
   local from_proj from_branch
   from_proj="$(_msg_proj)"; from_branch="$(_msg_branch)"; from_branch="${from_branch:-unknown}"
@@ -64,7 +64,7 @@ msg_send() {
   # A typo'd target would silently create a dead mailbox (hcom hard-fails here; we warn) — flag a
   # first-time mailbox so a misaddressed steer doesn't just vanish.
   [ -d "$(dirname "$box")" ] || [ "$_MSG_BOX" = "all" ] \
-    || echo "  ⚠ new mailbox $_MSG_PROJ:$_MSG_BOX — no session has mail here yet; check the target if you expected one (cckit msg list)" >&2
+    || echo "  ⚠ new mailbox $_MSG_PROJ:$_MSG_BOX — no session has mail here yet; check the target if you expected one (cckit agent msg list)" >&2
   mkdir -p "$box" || return 1
   local kind="note"; [ "$steer" = 1 ] && kind="steer"
   # epoch-$$ alone collides for two sends in the same second from one shell — the second message
@@ -204,7 +204,7 @@ EOF_UNREAD
   fi
   [ "$count" -gt 0 ] || return 0
 
-  local msg="SESSION MAIL (cckit msg): a parallel session sent you the message(s) below. If one is kind: steer, act on it BEFORE continuing your current plan.
+  local msg="SESSION MAIL (cckit agent msg): a parallel session sent you the message(s) below. If one is kind: steer, act on it BEFORE continuing your current plan.
 $body"
   local esc; esc="$(printf '%s' "$msg" | _msg_json_escape)"
   if [ "$event" = "Stop" ]; then

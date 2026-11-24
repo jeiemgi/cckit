@@ -108,7 +108,7 @@ gitignored, so it never leaves your machine.
 cckit detects the project it is pointed at from the filesystem, not from baked-in knowledge. Run it yourself to see what cckit sees:
 
 ```bash
-cckit scan --llm
+cckit scan --json
 ```
 
 It reads three things:
@@ -719,7 +719,7 @@ What runs on git alone, with one line saying what was skipped: `cckit start` (th
 no pull request is opened), `cckit merge` (the branch lands on the base through git and is pushed;
 no issue is closed), `cckit hotfix <sha>` (cherry-pick and push, no pull request), `cckit gc` (every
 issue branch is UNKNOWN and kept). The verbs that only read or write the forge — `new`, `close`,
-`sync`, `plan`, `next`, `status`'s board section, the effort verbs, `watch` — refuse by name. The
+`status --board`, `plan`, `next`, `status`'s board section, the effort verbs, `watch` — refuse by name. The
 note for a skipped step is printed once per verb and process: `cckit <verb>: no forge — <what>`.
 
 `scripts/forge-report.sh` prints which files and which verbs need a forge today.
@@ -791,7 +791,7 @@ also hold `integration.schema.json`. Walkthrough:
 
 `cckit add` with no name lists every descriptor in `integrations/`, each marked `on` or `off` for
 this project and flagged when it does not apply here, followed by the modules. It exits 0
-when the registry is empty. `cckit add --llm` prints the same list as one JSON object:
+when the registry is empty. `cckit add --json` prints the same list as one JSON object:
 `{"integrations":[{id,label,summary,key,enabled,applies}],"modules":[{id,label}]}`.
 
 `cckit add <id>` asks one question, derived from the descriptor, and on `yes` sets the
@@ -1245,7 +1245,7 @@ hold secrets, so cckit must never depend on it.
 So the worker records its own receipt, through a verb:
 
 ```bash
-cckit receipt <issue> --stage build <<'RECEIPT'
+cckit agent receipt <issue> --stage build <<'RECEIPT'
 outcome:    pr-open
 url:        https://github.com/jeiemgi/cckit/pull/999
 gate:       pass
@@ -1262,10 +1262,10 @@ directory resolves from the repo's shared git dir, so a receipt a worker writes 
 isolation worktree is readable by a captain standing anywhere else.
 
 ```bash
-cckit receipt list <issue>      # <issue>  build   1  blocked
+cckit agent receipt list <issue>      # <issue>  build   1  blocked
                                 # <issue>  build   2  pr-open
                                 # <issue>  review  1  merged
-cckit receipt show <issue> build    # the latest attempt's JSON
+cckit agent receipt show <issue> build    # the latest attempt's JSON
 ```
 
 **Every receipt is also posted as a comment on its issue.** `.cckit/` is gitignored and
@@ -1279,7 +1279,7 @@ The comment carries an invisible marker keyed to the same `<issue>-<stage>-<atte
 file gives. A new attempt gets its own comment.
 
 ```bash
-cckit receipt <issue> --stage build --no-remote <<'RECEIPT'   # write the file, post nothing
+cckit agent receipt <issue> --stage build --no-remote <<'RECEIPT'   # write the file, post nothing
 ```
 
 The mirror is best-effort, and the local write has already succeeded before it runs: a failure

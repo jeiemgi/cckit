@@ -48,7 +48,7 @@ rather than naming numbers up front.
 <Chat
   title="reading the Bakery site board before an unattended run"
   say="Read the board and show me what's unblocked right now. I'll tell you which of those to run in parallel. Show me the launch plan before anything is created, then run them a few at a time."
-  ran="cckit sync --llm"
+  ran="cckit status --board --json"
   means="Decide from what is actually ready, not from numbers you remember."
 >
   Three issues are unblocked: the opening hours, the contact form and the footer links. Tell me which
@@ -95,7 +95,7 @@ a whole backlog with nobody watching → `cckit autopilot`.
 <Chat
   title="checking how the unattended workers ended"
   say="How did each worker end, and what is still open?"
-  ran={['cckit orchestrate --results', 'cckit sync']}
+  ran={['cckit orchestrate --results', 'cckit status --board']}
   means="Each worker ends as success, failure or interrupted."
 >
   I read the recorded results of the workers and the board. The merged issues are gone from the open
@@ -156,7 +156,7 @@ rather than guessing. Resolve it, then re-run; the merged work isn't repeated.
 fewer merge conflicts on a busy repo.
 
 **A queued issue never started.** It was skipped because an issue it is `blocked_by` is still open, or
-it was queued past `--cap`. `orchestrate` prints both lists and starts neither later: `cckit sync`
+it was queued past `--cap`. `orchestrate` prints both lists and starts neither later: `cckit status --board`
 shows what's gating it, and you run it again once the blocker has merged or a slot is free.
 
 ## Related guides
@@ -176,6 +176,6 @@ shows what's gating it, and you run it again once the blocker has merged or a sl
   faqs={[
     { q: 'It stopped on a blocker', a: 'By design, unattended runs ping you only on a genuine blocker rather than guessing. Resolve it and re-run; merged work is not repeated.' },
     { q: 'Too many worktrees at once', a: 'Lower --cap. A smaller cap trades wall-clock for less load and fewer merge conflicts on a busy repo.' },
-    { q: 'A queued issue never started', a: 'It was skipped because an issue it is blocked_by is still open, or it was queued past --cap. orchestrate starts neither later: cckit sync shows what is gating it, and you run it again once the blocker has merged or a slot is free.' },
+    { q: 'A queued issue never started', a: 'It was skipped because an issue it is blocked_by is still open, or it was queued past --cap. orchestrate starts neither later: cckit status --board shows what is gating it, and you run it again once the blocker has merged or a slot is free.' },
   ]}
 />

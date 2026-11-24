@@ -31,11 +31,11 @@ run a shell can drive every operation.
   a PR, merge, and clean up — each step is one command. The board is both the plan and the proof.
 - **Sessions that pick up where you left off.** `cckit handoff "<note>"` saves a resume-here note;
   bare `cckit` prints it at the start of the next session.
-- **Sessions that talk to each other.** `cckit msg send <branch|project:branch|all> [--steer]
+- **Sessions that talk to each other.** `cckit agent msg send <branch|project:branch|all> [--steer]
   "<text>"` mails any parallel session on the machine — same project or another; the kit's mail
   hook delivers it to a *live* session between tool calls, and a `--steer` message redirects a
   session that is about to stop.
-- **Agent-operable.** Every verb has a machine-readable mode (`cckit <verb> --llm`) and an
+- **Agent-operable.** Every verb has a machine-readable mode (`cckit <verb> --json`) and an
   [`AGENTS.md`](AGENTS.md) contract, so agents drive the kit without scraping human output.
 - **Scales from one issue to a wave.** The same verbs that take one issue to a merged PR also plan
   and run a whole wave of parallel agents — with a captain that gates and merges behind policy
@@ -118,7 +118,7 @@ cckit start 42                # isolated worktree + branch for issue #42, bootst
                               #   `cckit start --force 42` (or KIT_FORCE=1) starts anyway
 cckit claims                  # which live session is working which issue (read-only)
 cckit brief 42                # the delegation brief for #42, read out of the repo not memory
-cckit lib                     # every scripts/lib helper: functions, purpose, error contract
+cckit agent lib                     # every scripts/lib helper: functions, purpose, error contract
 cckit pr 42 "what changed"    # commit, push, open the PR
 cckit pr 42 "what changed" --base main   # target main, not the integration branch; the push
                               #   exports the target as KIT_PR_BASE for a git pre-push hook
@@ -130,8 +130,8 @@ cckit task new "<title>"      # light tasks: work tracked in tasks/, no GitHub i
                               #   task list · task next · task start <id> · task finish <id> "<summary>"
 cckit task run <id>           # hand one light task to a headless agent: start, one round, the gate
                               #   (--check, else tasks.check), finish, the review link. Never merges
-cckit sync                    # board state, what's unblocked
-cckit sync --cached 60        # the board as one JSON document, from a cache at most 60s old
+cckit status --board                    # board state, what's unblocked
+cckit status --board --cached 60        # the board as one JSON document, from a cache at most 60s old
                               #   (--json / --write / --watch [secs] / --plan — for a TUI or statusline)
 cckit handoff "resume note"   # save a handoff — bare `cckit` prints it next session
 cckit gc                      # report prunable branches + worktrees, detached worktrees included (deletes nothing); a failed GitHub read shows as UNKNOWN, kept
@@ -362,9 +362,9 @@ from one shared function, so the line cannot differ between the two verbs:
 Priority never overrides a dependency: a p3 issue that blocks a p0 issue sits in an earlier wave and
 still runs first. For efforts, `cckit status` opens with a **Next effort per flow** table — per
 flow, the effort with no open blocker, p0 → p3 then lowest number, plus how many are still waiting.
-`cckit status --llm` carries those rows as `next_efforts` (and a project's light tasks as
+`cckit status --json` carries those rows as `next_efforts` (and a project's light tasks as
 `light_tasks`: counts by state plus the tasks that need someone to act, read from local git); the cadence line is human output only,
-so `cckit next --llm` rows stay `{number,ctx,title}`.
+so `cckit next --json` rows stay `{number,ctx,title}`.
 
 **`cckit effort plan` can read a local snapshot instead of GitHub.** By default it makes one
 listing call plus one `blocked_by` call per open effort. Set `effort.planSource` in
@@ -631,20 +631,20 @@ its current head. Off by default. → [the QA lane](https://cckit.dev/review/qa-
 ## Driven by agents
 
 cckit is meant to be operated by an agent loop, not only a human. See [`AGENTS.md`](AGENTS.md) for
-the contract. Every verb accepts `--llm` for structured output — uniform payloads come back as
+the contract. Every verb accepts `--json` for structured output — uniform payloads come back as
 **TOON**, so the plan, board, and fan-out cost the model fewer tokens than the same rows as JSON:
 
 ```bash
-cckit sync --llm           # board state for an agent to reason over
-cckit plan --llm           # the wave plan as TOON rows
-cckit wave --llm           # the fan-out (one worker prompt per issue) as TOON
-cckit orchestrate --results --llm # each worker's collected result as JSON
+cckit status --board --json           # board state for an agent to reason over
+cckit plan --json           # the wave plan as TOON rows
+cckit wave --json           # the fan-out (one worker prompt per issue) as TOON
+cckit orchestrate --results --json # each worker's collected result as JSON
 ```
 
 Human output renders as markdown — rich via `glow` in a terminal, native in the Claude Code
-transcript, verbatim when piped. Every human-facing verb (`sync`, `plan`, `next`, `status`) goes
+transcript, verbatim when piped. Every human-facing verb (`status`, `status --board`, `plan`, `next`) goes
 through one renderer (`cckit_render`, `scripts/lib/render.sh`), so board tables, wave plans, and the
-status dashboard read the same in all three and print no escape codes into a pipe (`cckit render` exposes
+status dashboard read the same in all three and print no escape codes into a pipe (`cckit agent render` exposes
 it for any script).
 
 ### The forge, and cloud sessions

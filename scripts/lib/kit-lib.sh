@@ -10,11 +10,11 @@
 #   functions its PUBLIC functions (`_`-prefixed names are private by convention, so they are cut)
 #   purpose   the file's own header sentence — derived, never invented
 #
-#   cckit lib                      the helper catalog as a markdown table
-#   cckit lib --llm                TOON rows {file,errors,functions,purpose} (JSON fallback)
-#   cckit lib --all                include the *-test.sh runners (excluded by default)
-#   cckit lib --reasons            every file's failure reason, not only the `mixed` ones
-#   cckit lib --root <dir>         catalog <dir>'s library instead of the resolved one
+#   cckit agent lib                 the helper catalog as a markdown table
+#   cckit agent lib --json          TOON rows {file,errors,functions,purpose} (JSON fallback)
+#   cckit agent lib --all           include the *-test.sh runners (excluded by default)
+#   cckit agent lib --reasons       every file's failure reason, not only the `mixed` ones
+#   cckit agent lib --root <dir>    catalog <dir>'s library instead of the resolved one
 #
 # Filesystem-only — no network, no gh; jq only for --llm (TOON/JSON). Runs in any project cckit is
 # installed in: it catalogs that project's own scripts/lib when it has one, otherwise the cckit
@@ -216,7 +216,7 @@ kit_lib_dir() {
 # ── the verb ──────────────────────────────────────────────────────────────────────────────────
 
 # _kl_usage — the usage block, read back from this file's own header (one source of truth).
-_kl_usage() { sed -n 's/^#   \(cckit lib.*\)$/\1/p' "${BASH_SOURCE[0]:-$0}"; }
+_kl_usage() { sed -n 's/^#   \(cckit agent lib.*\)$/\1/p' "${BASH_SOURCE[0]:-$0}"; }
 
 # _kl_err — structured error for --llm mode (mirrors the other verbs' failure shape).
 _kl_err() { printf '{"error":"lib: %s"}\n' "$1"; }
@@ -226,7 +226,7 @@ kit_lib() {
   local out="${CCKIT_OUTPUT:-human}" root="" all=0 reasons=0
   while [ "$#" -gt 0 ]; do
     case "$1" in
-      --llm|--output=json) out="json"; shift ;;
+      --json|--llm|--output=json) out="json"; shift ;;
       --all)     all=1; shift ;;
       --reasons) reasons=1; shift ;;
       --root)    # Validate BEFORE shifting: `shift 2` on a single remaining argument aborts bash

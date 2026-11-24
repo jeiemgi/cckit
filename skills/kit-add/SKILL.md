@@ -22,7 +22,7 @@ separate step.
 
 ## Steps
 
-1. **List.** `cckit add --llm` returns
+1. **List.** `cckit add --json` returns
    `{"integrations":[{id,label,summary,key,enabled,applies}],"modules":[{id,label}]}`.
    If the user named nothing, show the list and let them pick. Do not offer an integration whose
    `applies` is `false` — the tool cannot work on this repo — and say which one was left out.
