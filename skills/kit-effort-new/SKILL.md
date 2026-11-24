@@ -1,7 +1,7 @@
 ---
 name: kit-effort-new
 terms: Effort, SubIssue
-description: Create an effort — a parent GitHub issue using the effort-model template (Goal / Scope / For agents / Verification) plus N native GitHub sub-issues linked via the sub-issues REST API, all added to the project board. The parent issue IS the plan.
+description: Create an effort — a parent GitHub issue using the effort-model template (Goal / Spec / Scope / For agents / Verification) plus N native GitHub sub-issues, all added to the project board. The parent issue IS the plan.
 when_to_use: When starting a new unit of work (a "plan"/effort) that decomposes into several sub-tasks. Replaces ad-hoc `gh issue create` for multi-part work. The effort splits into native sub-issues at scoping time; sequential subs commit on the effort branch, parallel subs use file-disjoint worktrees and merge in. See rules/effort-model.md.
 ---
 
@@ -34,6 +34,7 @@ gate: `cckit effort start` checks nothing.
 | Role         | ✓        | `tech-lead` / `frontend` / … → `role:<role>` label + board Role field                       |
 | Flow         | optional | Controlled-vocab flow (`effort.flows` in the project config; `EFFORT_FLOWS` env overrides) → `[Flow]` title tag + `flow:<flow>` label |
 | Goal         | ✓        | 1–2 lines — `## Goal`                                                                       |
+| Spec         | ✓        | What done means, one checkable item per line — `## Spec` (`--spec` or `--spec-file`; plain lines become `- ` bullets). A missing, empty or TODO/TBD-only Spec is refused before anything is created, and `cckit effort close` checks it again |
 | Scope        | ✓        | The sub-issue DAG — `## Scope` (mark each parallel \| sequential)                           |
 | For agents   | ✓        | Exact file paths / entry points — `## For agents`                                           |
 | Verification | ✓        | How we know it's done — `## Verification`                                                   |
@@ -60,7 +61,7 @@ source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/effort-metrics.sh"   # effort_ctx_buck
 source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/effort-ops.sh"       # effort_new — the shared creation core
 
 # TITLE = the human NAME only (no "[E<n>]" prefix). The core files the parent under TITLE, renames it
-# "[E<N>] <TITLE>" once it has a number, fills the four sections, applies labels (the flow goes in the
+# "[E<N>] <TITLE>" once it has a number, fills the five sections, applies labels (the flow goes in the
 # flow: label, never the title), and lints the parent + every sub title up front (a bad name aborts
 # before anything is created — no half-effort). Rule: rules/naming-and-ids.md.
 
@@ -75,7 +76,7 @@ PARENT_NUM=$(effort_new \
   ${FLOW:+--flow "$FLOW"} \
   --role "$ROLE" \
   --priority "${PRIORITY:-p1}" \
-  --goal "$GOAL" --scope "$SCOPE" --for-agents "$FOR_AGENTS" --verification "$VERIFICATION" \
+  --goal "$GOAL" --spec "$SPEC" --scope "$SCOPE" --for-agents "$FOR_AGENTS" --verification "$VERIFICATION" \
   ${DEPENDS_ON:+--depends-on "$DEPENDS_ON"} \
   ${MILESTONE:+--milestone "$MILESTONE"} \
   "$TITLE" "${SUB_ARGS[@]}")
@@ -108,8 +109,8 @@ echo "✓ effort #$PARENT_NUM created — next: /kit-effort-start $PARENT_NUM"
   non-numeric argument, an issue that does not exist, a repeated number, or an edge that would
   close a cycle. Use it when the sub-issues already exist and only their ORDER is missing;
   `--depends-on` covers the dependencies known at creation time.
-- The parent body MUST carry all four template sections (Goal / Scope / For agents / Verification) —
-  a missing section is a review blocker.
+- The parent body MUST carry all five template sections (Goal / Spec / Scope / For agents /
+  Verification) — a missing section is a review blocker; a Spec without a real list item is refused.
 - Sub-issues are **native** GitHub sub-issues (`POST …/issues/{parent}/sub_issues` with the child's
   **database id**, resolved via `gh api repos/$KIT_REPO/issues/$N --jq .id`) — not just a checklist.
 - Sub-issue bodies stay short (one line) — the parent holds the narrative.

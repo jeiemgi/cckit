@@ -17,7 +17,10 @@ close logic is re-authored inline (kit-engine-boundary #1/#2). Respects `KIT_BAS
 The effort lifecycle's terminal op. Board state, issue state, and the work record are correct
 **by construction** — the core op owns them, in this order:
 
-0. **Pre-close hook** (optional, config-gated via `effort.preCloseHook`) — a project gate called as
+0. **Spec check** — the parent body is re-read and its `## Spec` must hold at least one real list
+   item (not empty, not TODO/TBD only); otherwise the close refuses with the reasons and writes
+   nothing. `--no-spec-check` skips it and prints one line saying it was skipped.
+   **Pre-close hook** (optional, config-gated via `effort.preCloseHook`) — a project gate called as
    `<hook> <effort#> <sub#…>` from the effort worktree before anything is written. A non-zero exit
    refuses the close and its output is printed; `KIT_FORCE=1` skips it and says so.
 1. **Snapshot sub-diffs BEFORE squash** (squash destroys the per-sub-issue commit pairs that ARE
