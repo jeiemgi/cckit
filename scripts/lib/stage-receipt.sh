@@ -242,7 +242,7 @@ _sr_same_as_latest() {
     >/dev/null 2>&1
 }
 
-# sr_cli <args> — the `cckit receipt` verb.
+# sr_cli <args> — `cckit agent receipt` (old name `cckit receipt`).
 #
 # The WORKER records its own receipt. Nothing else can: cckit does not read pane output, and #326
 # is explicit that pane history is off by default, may hold secrets, and must never be required.
@@ -262,18 +262,18 @@ sr_cli() {
     list) shift; sr_list "${1:-}"; return $? ;;
     show)
       shift
-      [ -n "${1:-}" ] && [ -n "${2:-}" ] || { echo "cckit receipt show <issue> <stage> [<attempt>]" >&2; return 2; }
+      [ -n "${1:-}" ] && [ -n "${2:-}" ] || { echo "cckit agent receipt show <issue> <stage> [<attempt>]" >&2; return 2; }
       if [ -n "${3:-}" ]; then sr_read "$1" "$2" "$3"; else sr_latest "$1" "$2"; fi
       return $?
       ;;
     ''|-h|--help)
       cat >&2 <<'EOF'
-cckit receipt <issue> --stage <stage> [--attempt <n>] [--profile <p>] [--tier <t>]
+cckit agent receipt <issue> --stage <stage> [--attempt <n>] [--profile <p>] [--tier <t>]
                       [--source <where>] [--permissions <policy>] [--no-remote]
                       < the report on stdin
-cckit receipt <issue> --report <file> [--dry-run]
-cckit receipt list [<issue>]
-cckit receipt show <issue> <stage> [<attempt>]
+cckit agent receipt <issue> --report <file> [--dry-run]
+cckit agent receipt list [<issue>]
+cckit agent receipt show <issue> <stage> [<attempt>]
 
 Stages:   build review design docs qa none
 Outcomes: merged pr-open closed-no-op blocked

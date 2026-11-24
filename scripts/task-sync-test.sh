@@ -170,7 +170,7 @@ t "a standalone line has no token" "$(grep '^#600' "$SNAP" | cut -f3-5)" "$(prin
 t "rg on one number hits one line" "$(grep -c '#575' "$SNAP")" "1"
 t "issues are grouped effort, sub, standalone" "$(grep -E '^(## |#[0-9])' "$SNAP" | cut -f1 | tr '\n' ' ')" "## Efforts #546 ## Sub-issues #575 ## Standalone #600 "
 has "the header names the repo" "$(cat "$SNAP")" "# Board snapshot — octo/fixture"
-has "the header names the command" "$(cat "$SNAP")" "made by: cckit sync --llm"
+has "the header names the command" "$(cat "$SNAP")" "made by: cckit status --board --llm"
 has "the header says rg needs the path" "$(cat "$SNAP")" "gitignored"
 t "the atomic write leaves no temp file" "$(find "$tmp/snap" -name 'board.md.*' | wc -l | tr -d ' ')" "0"
 ENVV="GH_ISSUES=$tmp/issues-efforts.json"; sync >/dev/null 2>&1

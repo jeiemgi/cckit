@@ -34,7 +34,7 @@ visible until its own work is done.
 <Chat
   title="asking what is ready on the Bakery site's board"
   say="Sync the board and show me what is ready, and I will pick."
-  ran={["cckit sync", "cckit next"]}
+  ran={["cckit status --board", "cckit next"]}
   means="Both only read. The board is the open issues, or a GitHub Projects board if you use one."
 >
   Here is what nothing blocks. Tell me which one to start.
@@ -49,7 +49,7 @@ looking for them.
 
 | Scrum | In cckit | How close |
 | --- | --- | --- |
-| Backlog | The open issues on the board, read with `cckit sync` and `cckit next` | Close |
+| Backlog | The open issues on the board, read with `cckit status --board` and `cckit next` | Close |
 | Story | One issue, or one sub-issue of an effort | Close |
 | Epic | An effort: a parent issue with sub-issues | Loose |
 | Sprint | Nothing. A wave is the nearest unit | No counterpart |
@@ -97,7 +97,7 @@ looking for them.
 
 | What you say | What runs |
 | --- | --- |
-| "Show me the board and what is unblocked." | `cckit sync` |
+| "Show me the board and what is unblocked." | `cckit status --board` |
 | "What should I work on next?" | `cckit next` |
 | "File an issue: …" | `cckit new --role <role> "<title>"` |
 | "Order the open issues into waves." | `cckit plan` |

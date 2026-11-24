@@ -119,7 +119,7 @@ Bakery site, and the command your agent runs for each.
 | "Start the Bakery site for this change, open the screen it touched, and I will tell you pass or fail." Then, when you have looked: "Pass." or "Fail, the button stays disabled." Then: "Stop it, I am done." (starts the project for one change, opens the changed screen, records pass or fail, frees the ports) | `cckit qa up` · `open` · `verdict` · `stop` |
 | "Which changes have a running stack or a verdict?" | `cckit qa lanes` |
 | "Check the open pull requests and send the ready ones to the reviewer." (one captain pass: reads every open pull request) | `cckit watch` |
-| "What did the reviewer say about this change?" or "Did QA pass it?" (reads back what a reviewer or a QA pass recorded) | `cckit receipt list <issue>` · `cckit receipt show <issue> review` |
+| "What did the reviewer say about this change?" or "Did QA pass it?" (reads back what a reviewer or a QA pass recorded) | `cckit agent receipt list <issue>` · `cckit agent receipt show <issue> review` |
 | "Which pull requests are waiting on me?" (open pull requests waiting on a person, with their unresolved review threads) | `cckit status` |
 
 </div>

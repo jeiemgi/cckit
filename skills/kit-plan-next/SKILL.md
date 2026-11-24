@@ -39,7 +39,7 @@ cckit plan-next
 
 Prints the current capabilities (skills / commands / rules / docs counts + samples) and a ranked,
 grounded set of proposals. Rank 1 is **always** the mandatory docs + README step (docs-always rule —
-it is never dropped, even for a tiny change). Append `--llm` for TOON rows `{rank,area,proposal,next}`
+it is never dropped, even for a tiny change). Append `--json` for TOON rows `{rank,area,proposal,next}`
 if you need to reason over the proposals structurally — but keep that output out of any monitored
 context.
 

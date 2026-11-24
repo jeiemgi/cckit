@@ -54,9 +54,9 @@ _status_md() {
     echo "open issues: $open   blocked: $blocked"
     echo ""
     printf '%s' "$board" | jq -r '.[:8][] | "- #\(.number)  \(.title[0:56])"' 2>/dev/null || true
-    [ "$open" -gt 8 ] && echo "- … and $((open - 8)) more (\`cckit sync\`)"
+    [ "$open" -gt 8 ] && echo "- … and $((open - 8)) more (\`cckit status --board\`)"
   else
-    echo "_(jq/gh absent — run \`cckit sync\`)_"
+    echo "_(jq/gh absent — run \`cckit status --board\`)_"
   fi
   echo ""
 
@@ -82,11 +82,11 @@ _status_md() {
   echo '```'
 }
 
-# `--llm` (or CCKIT_OUTPUT=json, set by the dispatcher) emits the buckets as JSON for an agent —
+# `--json` (or `--llm`, or CCKIT_OUTPUT=json, set by the dispatcher) emits the buckets as JSON for an agent —
 # same classifiers as the markdown path, so the two cannot disagree about a verdict.
 for a in "$@"; do
   case "$a" in
-    --llm|--output=json) CCKIT_OUTPUT=json ;;
+    --json|--llm|--output=json) CCKIT_OUTPUT=json ;;
   esac
 done
 if [ "${CCKIT_OUTPUT:-}" = "json" ]; then

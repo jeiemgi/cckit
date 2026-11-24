@@ -38,7 +38,7 @@ The core is pure bash plus the standard toolchain (`git`, `gh`, `jq`, `tmux`). I
 | `scripts/*.sh` | The runnable ops (publish, migrate, doctor, digest, ...) |
 | `cckit.config.json` | The only source of repo / owner / base-branch — nothing is hardcoded |
 
-The contract the core exposes to agents lives in [`AGENTS.md`](https://github.com/jeiemgi/cckit/blob/main/AGENTS.md): every verb, its arguments, and its `--llm` output. An agent that can run a shell and parse the output can drive the whole lifecycle through this contract alone.
+The contract the core exposes to agents lives in [`AGENTS.md`](https://github.com/jeiemgi/cckit/blob/main/AGENTS.md): every verb, its arguments, and its `--json` output. An agent that can run a shell and parse the output can drive the whole lifecycle through this contract alone.
 
 ## Adapter one — Claude Code
 
@@ -112,7 +112,7 @@ Limits of the Codex adapter today:
 
 ## Other adapters
 
-Any other agent (Copilot, Antigravity, a custom model) is a future adapter over the same core. An adapter is whatever that agent needs to discover and call the verbs — at minimum, the agent reads `AGENTS.md` and shells out with `--llm`.
+Any other agent (Copilot, Antigravity, a custom model) is a future adapter over the same core. An adapter is whatever that agent needs to discover and call the verbs — at minimum, the agent reads `AGENTS.md` and shells out with `--json`.
 
 Deeper per-agent adapters (native command palettes, richer prompts) are follow-ups.
 

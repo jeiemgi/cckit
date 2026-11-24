@@ -26,7 +26,7 @@ next_issue() {
   local repo="$NEXT_REPO" out="${CCKIT_OUTPUT:-human}" effort="" planargs=()
   while [ "$#" -gt 0 ]; do
     case "$1" in
-      --llm|--output=json) out="json"; shift ;;
+      --json|--llm|--output=json) out="json"; shift ;;
       --effort)    effort="$2"; planargs+=(--effort "$2"); shift 2 ;;
       --effort=*)  effort="${1#*=}"; planargs+=(--effort "${1#*=}"); shift ;;
       -h|--help)   sed -n '8,11p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; return 0 ;;

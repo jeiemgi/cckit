@@ -10,7 +10,7 @@
 #   verbs_count                the number of `verb` rows (the ratchet in scripts/verbs.baseline)
 #   verbs_help                 the grouped help: one line per verb under each group's question
 #   verbs_entry <name>         usage, question, prompt, needs and skill of one verb; rc 1 if none
-#   verbs_alias_target <name>  the verb an old name runs; rc 1 when <name> is not an alias
+#   verbs_alias_target <name>  the verb an old name runs, with any words after it; rc 1 when not an alias
 #   verbs_alias_notice <old> <new>  the one-line notice an old name prints on stderr (#557)
 #   verbs_json                 every non-group row as a JSON array of objects (no jq needed)
 #   verbs_reference_md         the CLI reference page's generated block: one table per group

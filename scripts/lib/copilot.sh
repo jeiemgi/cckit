@@ -74,7 +74,7 @@ copilot_brief() {
   local repo="$COPILOT_REPO" out="${CCKIT_OUTPUT:-human}" effort="" cap="" adapter_arg="" adapters planargs=()
   while [ "$#" -gt 0 ]; do
     case "$1" in
-      --llm|--output=json) out="json"; shift ;;
+      --json|--llm|--output=json) out="json"; shift ;;
       --effort)    effort="$2"; planargs+=(--effort "$2"); shift 2 ;;
       --effort=*)  effort="${1#*=}"; planargs+=(--effort "${1#*=}"); shift ;;
       --cap)       cap="$2"; planargs+=(--cap "$2"); shift 2 ;;

@@ -5,6 +5,6 @@
     { "name": "scan",           "group": "At a glance",   "title": "Detect this repo's stack + kit state",       "cmd": "cckit scan" },
     { "name": "status",         "group": "At a glance",   "title": "Thin dashboard — board, worktrees, handoff", "cmd": "cckit status" },
     { "name": "orchestrate",    "group": "At a glance",   "title": "Plan N parallel flows (dry-run)",            "cmd": "cckit orchestrate --dry-run 46 47 48" },
-    { "name": "encode-context", "group": "At a glance",   "title": "Compact uniform JSON into TOON",             "cmd": "printf '[{\"issue\":46,\"title\":\"test runner\",\"state\":\"open\"},{\"issue\":47,\"title\":\"lifecycle verbs\",\"state\":\"open\"}]' | cckit encode-context", "show": "echo '[…uniform array…]' | cckit encode-context" }
+    { "name": "encode-context", "group": "At a glance",   "title": "Compact uniform JSON into TOON",             "cmd": "printf '[{\"issue\":46,\"title\":\"test runner\",\"state\":\"open\"},{\"issue\":47,\"title\":\"lifecycle verbs\",\"state\":\"open\"}]' | cckit agent encode-context", "show": "echo '[…uniform array…]' | cckit encode-context" }
   ]
 }

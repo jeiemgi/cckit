@@ -47,6 +47,6 @@ a real skill and a real term or `none`, each skill's `terms:` line equal to its 
 
 ```bash
 bash scripts/terms-check.sh            # validate every term; print the counts
-bash scripts/terms-check.sh --llm      # the same counts as one JSON object
+bash scripts/terms-check.sh --json      # the same counts as one JSON object
 jq -r '.definition' ontology/terms/Effort.json
 ```

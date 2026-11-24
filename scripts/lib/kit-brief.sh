@@ -371,15 +371,15 @@ EOF
       echo "| --- | --- | --- |"
       printf '%s\n' "$shown_owned" | grep . || true
       printf '%s\n' "$shown_src" | grep . || true
-      [ "$n_over" -gt 0 ] && printf -- '\n_+%s more helper(s) these files source — `cckit lib` lists them._\n' "$n_over"
+      [ "$n_over" -gt 0 ] && printf -- '\n_+%s more helper(s) these files source — `cckit agent lib` lists them._\n' "$n_over"
     else
       echo "_None of the issue's files are helpers or source one._"
     fi
     echo
-    printf -- '_Full catalog: `cckit lib` (%s helpers). Do not reimplement what it already lists._\n' \
+    printf -- '_Full catalog: `cckit agent lib` (%s helpers). Do not reimplement what it already lists._\n' \
       "$(kit_lib_files "$libdir" | grep -c . || true)"
   else
-    echo "_No helper catalog here — `cckit lib` is unavailable in this project._"
+    echo "_No helper catalog here — `cckit agent lib` is unavailable in this project._"
   fi
 
   # ── standing gotchas, from the project's own rule

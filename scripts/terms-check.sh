@@ -27,7 +27,7 @@ OUT=human
 while [ $# -gt 0 ]; do
   case "$1" in
     --root) ROOT="$(cd "${2:?--root needs a directory}" && pwd)"; shift 2 ;;
-    --llm|--output=json) OUT=json; shift ;;
+    --json|--llm|--output=json) OUT=json; shift ;;
     -h|--help) sed -n '2,13p' "$0"; exit 0 ;;
     *) echo "terms-check: unknown argument '$1'" >&2; exit 2 ;;
   esac

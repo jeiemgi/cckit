@@ -25,10 +25,10 @@ Agent definitions: `.claude/agents/<name>/AGENT.md`.
 ## How this project is driven
 
 This project runs on [cckit](https://cckit.dev). Every operation is a `cckit` verb you run in the
-shell — read state with `cckit sync --llm` before acting, and append `--llm` to any verb for
+shell — read state with `cckit status --board --json` before acting, and append `--json` to any verb for
 machine-readable output. `cckit init` registers hooks in `.codex/hooks.json`: a guard that blocks a
 commit to the base branch, a guard that blocks raw `gh`/`git` operations a `cckit` verb owns, session
-mail (`cckit msg`), and two session-start checks. Codex runs them only after they are trusted
+mail (`cckit agent msg`), and two session-start checks. Codex runs them only after they are trusted
 (`/hooks`), and a hook is fast feedback, not enforcement — the rules below apply whether or not one
 fires.
 <!-- IF:MEMORY -->
@@ -128,7 +128,7 @@ Create a GitHub issue only when {{OWNER_NAME}} asks for one.
 | 6. Close          | `/kit-task-close <N>`  | Close issue (auto on `Closes #N`) + archive plan        |
 <!-- /IF:ADAPTER_CLAUDE --><!-- IF:ADAPTER_CODEX -->| Step              | Command                         | What it does                                            |
 | ----------------- | ------------------------------- | ------------------------------------------------------- |
-| 1. Pick an issue  | `cckit sync --llm`              | See the open board, choose what's unblocked             |
+| 1. Pick an issue  | `cckit status --board --json`              | See the open board, choose what's unblocked             |
 | 2. Start work     | `cckit start <N>`               | Isolated worktree + branch `<kind>/<N>-<slug>` from the base |
 | 3. Do the work    | —                               | Work inside the worktree `cckit start` printed          |
 | 4. Open PR        | `cckit pr <N> "<summary>"`      | Commit + push + open PR                                 |

@@ -57,8 +57,13 @@ for a in $(verbs_names alias); do
   target="$(verbs_alias_target "$a")"
   err="$("$CCKIT" "$a" --help 2>&1 >/dev/null)"
   t "cckit $a: one notice line on stderr" "$err" "$(verbs_alias_notice "$a" "$target")"
-  t "cckit $a --help is cckit $target --help on stdout" "$("$CCKIT" "$a" --help 2>/dev/null)" "$("$CCKIT" "$target" --help 2>/dev/null)"
+  # A target may carry words after its verb (`status --board`); help answers for the verb.
+  tverb="${target%% *}"
+  t "cckit $a --help is cckit $tverb --help on stdout" "$("$CCKIT" "$a" --help 2>/dev/null)" "$("$CCKIT" "$tverb" --help 2>/dev/null)"
 done
+# An alias with words in front: they reach the verb ahead of the typed arguments.
+t "cckit lib runs cckit agent lib" "$("$CCKIT" lib --root "$ROOT" 2>/dev/null | sed -n 1p)" "$("$CCKIT" agent lib --root "$ROOT" 2>/dev/null | sed -n 1p)"
+t "cckit agent with no subcommand: rc 2" "$("$CCKIT" agent >/dev/null 2>&1; echo $?)" "2"
 
 [ "$fail" -eq 0 ] && echo "ALL OK (verbs-ratchet)" || echo "verbs-ratchet: FAILURES"
 exit "$fail"

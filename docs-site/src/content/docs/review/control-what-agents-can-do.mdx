@@ -41,7 +41,7 @@ project, and you will know where the one recorded yes is stored and how to withd
 <Chat
   title="looking at the Bakery site without granting anything"
   say="Look at the Bakery site and tell me what you find. Change nothing."
-  ran="cckit scan --llm"
+  ran="cckit scan --json"
   means="The scan detects the repo root, stack hints and kit state. It only reads."
 >
   I looked at the project and wrote nothing. The scan found the repository root, the stack and the
@@ -138,7 +138,7 @@ guard — that always runs. See [Stop agents committing secrets](/review/stop-co
 
 <TutorialSchema
   steps={[
-    { name: 'Start read-only', text: 'cckit scan --llm detects repo root, stack hints, and kit state without granting anything.' },
+    { name: 'Start read-only', text: 'cckit scan --json detects repo root, stack hints, and kit state without granting anything.' },
     { name: 'A config file is proposed before it is written', text: 'cckit add <module> and cckit migrate show what they would change and ask before writing. KIT_DRY_RUN=1 previews and writes nothing. That yes is not stored.' },
     { name: 'An install is the one yes cckit records', text: 'A third-party tool installs only after your yes to cckit doctor (its prompt, or --fix). That yes is written as one install:<id> line in .cckit/consent (gitignored) — explicit, local, and never committed.' },
     { name: 'Destructive operations still ask every time', text: 'Force-push, repo creation, and history rewrites always require a separate explicit confirmation; recorded install consent does not cover them.' },

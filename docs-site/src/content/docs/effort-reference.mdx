@@ -312,15 +312,15 @@ A chained set therefore lands one issue per wave, in the order you gave.
 plain issues, not just efforts.
 </Aside>
 
-### What `cckit status` and `--llm` carry
+### What `cckit status` and `--json` carry
 
 `cckit status` also opens with **Next effort per flow**: for each flow, the effort that has no open
 blocker — p0 → p3, then the lowest issue number — and a count of the efforts still waiting. That
 table reads the `effort` label, which `cckit effort new` applies; with no labelled effort open it
 says so instead of printing an empty table.
 
-The line is for people. `cckit next --llm` rows stay `{number,ctx,title}` and carry no cadence text;
-`cckit status --llm` carries the per-flow rows under `next_efforts`
+The line is for people. `cckit next --json` rows stay `{number,ctx,title}` and carry no cadence text;
+`cckit status --json` carries the per-flow rows under `next_efforts`
 ([CLI reference](/cli-reference/)).
 
 <Aside type="note" title="Why digest is not a Friday step">

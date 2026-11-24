@@ -140,7 +140,7 @@ Start Codex in the repo and hand it the loop:
 <Chat
   title="working one Bakery site issue in Codex"
   say="Read AGENTS.md. Sync the board with cckit and show me what is unblocked. I will pick one issue; start it with cckit, work in the worktree it prints, and open the pull request with cckit when the project's gate passes. Do not merge."
-  ran={["cckit sync", "cckit start <issue>", 'cckit pr <issue> "<summary>"']}
+  ran={["cckit status --board", "cckit start <issue>", 'cckit pr <issue> "<summary>"']}
   means="You pick the issue and Codex does not merge. Merging stays a decision for a person."
 >
   I synced the board and listed what is unblocked. Once you pick one, I start it, work in its

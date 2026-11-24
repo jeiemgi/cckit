@@ -50,7 +50,7 @@ handoff_read() {
     cat "$f"
   else
     echo "cckit: no resume-here handoff saved."
-    echo "Run 'cckit sync' for the board, or save one with:"
+    echo "Run 'cckit status --board' for the board, or save one with:"
     echo "  cckit handoff \"<what's pending, the next step, any PR/issue refs>\""
   fi
 }

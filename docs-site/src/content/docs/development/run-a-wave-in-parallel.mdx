@@ -72,14 +72,14 @@ wave. The agent then runs `cckit wave` and `cckit watch --merge` again for that 
 <Chat
   title="checking what the wave left on the Bakery site board"
   say="What is still open, and is there another wave?"
-  ran={['cckit sync', 'cckit wave']}
+  ran={['cckit status --board', 'cckit wave']}
   means="A wave is done when each of its pull requests is merged or named in the captain's output with the reason it was held."
 >
   I read the board and asked for the next wave. Either the merges unblocked more issues, or there is
   nothing left to propose.
 </Chat>
 
-`cckit watch --merge` merges and does not close issues. If `cckit sync` still lists the issue of a
+`cckit watch --merge` merges and does not close issues. If `cckit status --board` still lists the issue of a
 merged pull request, your base branch is not the repository's default branch on GitHub, so GitHub
 did not close it: run `cckit close <issue> "<summary>"`.
 
@@ -103,7 +103,7 @@ PR, fix the finding, and re-run `cckit watch --merge` — the rest of the wave i
 **Two subagents edited the same file.** Those issues shouldn't be in the same wave. Add a *blocked-by*
 link so the dependent one lands in a later wave, then re-run.
 
-**The wave brief is empty.** Nothing is unblocked. Run `cckit sync` to see what's blocking the
+**The wave brief is empty.** Nothing is unblocked. Run `cckit status --board` to see what's blocking the
 remaining issues, or start an [effort](/project-management/break-a-feature-into-an-effort/) to create some.
 
 ## Related guides
@@ -123,6 +123,6 @@ remaining issues, or start an [effort](/project-management/break-a-feature-into-
   faqs={[
     { q: "A PR didn't merge", a: 'The captain merges only PRs that pass the gate. Read the gate output on that PR, fix the finding, and re-run cckit watch --merge; the rest of the wave is not held up.' },
     { q: 'Two subagents edited the same file', a: 'Those issues should not share a wave. Add a blocked-by link so the dependent one lands in a later wave, then re-run.' },
-    { q: 'The wave brief is empty', a: 'Nothing is unblocked. Run cckit sync to see what is blocking the remaining issues, or start an effort to create some.' },
+    { q: 'The wave brief is empty', a: 'Nothing is unblocked. Run cckit status --board to see what is blocking the remaining issues, or start an effort to create some.' },
   ]}
 />

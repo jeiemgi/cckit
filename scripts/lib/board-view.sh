@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# board-view.sh — pure helpers for the read-only board view (`cckit sync`). Each takes JSON and
+# board-view.sh — pure helpers for the read-only board view (`cckit status --board`). Each takes JSON and
 # emits markdown/text, or JSON for the two `_data` forms; none call gh, so they are unit-testable with canned fixtures (#122).
 # Ported from the host project's board view: a merge-ordered open-PR queue, a stale-issue flag, a
 # not-on-board flag, and Project Status per issue. bash 3.2 + zsh safe. Requires jq.
@@ -13,7 +13,7 @@
 # (size is "" when unlabeled); a `blocked` label marks blocked. An agent branch (agent|claude|auto/*)
 # or an agent:auto label sets `agent`, so a human checks the row before starting overlapping work.
 # `state` is one of blocked | draft | conflict | ready | needs-review. This is the ONE place the
-# order is computed: board_merge_queue renders these rows, and `cckit sync --json` emits them.
+# order is computed: board_merge_queue renders these rows, and `cckit status --board --json` emits them.
 board_merge_queue_data() {
   printf '%s' "${1:-[]}" | jq -c '
     def lbl($p): (($p.labels // []) | map(.name));
@@ -64,7 +64,7 @@ EOF
 
 # board_stale_data <issues-json> [days] — JSON array [{number, days}] of open issues untouched for
 # more than [days] (default 14), most-stale first; [] when none. <issues-json> is
-# `gh issue list --json number,updatedAt`. The data form of the stale flag (`cckit sync --json`).
+# `gh issue list --json number,updatedAt`. The data form of the stale flag (`cckit status --board --json`).
 board_stale_data() {
   local issues="${1:-[]}" days="${2:-14}" now
   now="$(date -u +%s 2>/dev/null || echo 0)"

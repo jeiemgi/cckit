@@ -160,7 +160,7 @@ sync_snapshot() {
   local dest tmpf body
   dest="$(sync_snapshot_path)" || return 0
   body="$(printf '%s' "$ISSUES" | jq -r --argjson st "$STATUS_MAP" --arg repo "$KIT_REPO" \
-      --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg cmd "cckit sync${SYNC_ARGS:+ $SYNC_ARGS}" \
+      --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg cmd "cckit status --board${SYNC_ARGS:+ $SYNC_ARGS}" \
       --arg path "$dest" '
     def tok: (.title // "") as $t
       | if   ($t | test("^\\[E[0-9]+\\.[0-9]+\\] ")) then ($t | capture("^\\[E(?<e>[0-9]+)\\.(?<s>[0-9]+)\\]") | "E\(.e).\(.s)")

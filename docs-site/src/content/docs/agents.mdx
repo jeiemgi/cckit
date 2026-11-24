@@ -15,11 +15,11 @@ cckit is agent-agnostic. Claude Code is first-class (skills and slash commands),
 
 ## The one rule that makes it agent-friendly
 
-Every verb takes `--llm`. Append it to any command and the verb switches from pretty human output to machine-readable output an agent can parse.
+Every verb takes `--json`. Append it to any command and the verb switches from pretty human output to machine-readable output an agent can parse.
 
 - **Uniform results come back as TOON.** TOON is a compact text format for uniform lists — the board, the wave plan, the next-issue set. It is smaller than JSON, so it costs fewer tokens in an agent's context.
 - **Single-result verbs come back as one JSON object** on stdout (the pretty text goes to stderr).
-- **Human output is markdown**, rendered through `cckit render` — `glow` on a terminal, verbatim text when piped.
+- **Human output is markdown**, rendered through `cckit agent render` — `glow` on a terminal, verbatim text when piped.
 
 <Aside type="note" title="New here? What an agent is">
 An agent is a program that runs commands on your behalf — Claude Code is one. cckit does not contain a model. It hands the agent commands to run, and the agent runs them. That is why cckit works with any agent: it only ever speaks shell.
@@ -27,9 +27,9 @@ An agent is a program that runs commands on your behalf — Claude Code is one. 
 
 ## Ground rules
 
-- **Read state before acting.** `cckit sync --llm` returns the board. Decide from the data, never guess.
+- **Read state before acting.** `cckit status --board --json` returns the board. Decide from the data, never guess.
 - **One issue = one branch = one worktree = one PR.** `cckit start <issue>` creates the isolated worktree; do all the work there; `cckit pr <issue>` opens the pull request. Never commit to the base branch.
-- **Structured output.** Append `--llm` to any verb for machine-readable output.
+- **Structured output.** Append `--json` to any verb for machine-readable output.
 - **Idempotent and safe.** Re-running a verb on an already-done step is a no-op, not an error.
 - **Never invent paths or config.** Everything resolves from `cckit.config.json`.
 
@@ -37,7 +37,7 @@ An agent is a program that runs commands on your behalf — Claude Code is one. 
 
 <Steps>
 
-1. **Read the board** — `cckit sync --llm` returns the board; pick an unblocked issue.
+1. **Read the board** — `cckit status --board --json` returns the board; pick an unblocked issue.
 
 2. **Start the issue** — `cckit start <issue>` prints a worktree path; `cd` into it.
 
@@ -56,17 +56,17 @@ token-cheap. The board, the next-issue set, the wave plan, and the fan-out brief
 lists, so they encode as TOON. The single-result *action* verbs (start / pr / close) return one JSON
 object — there's nothing to tabulate.
 
-| Do this | Command | `--llm` output |
+| Do this | Command | `--json` output |
 | --- | --- | --- |
-| Read the board | `cckit sync --llm` | **TOON** |
-| Find the next unblocked issue | `cckit next --llm` | **TOON** |
-| Get the wave plan | `cckit plan --llm` | **TOON** |
-| Get the fan-out brief | `cckit wave --llm` | **TOON** |
-| Collect a wave's results | `cckit orchestrate --results --llm` | JSON (one array) |
+| Read the board | `cckit status --board --json` | **JSON** (one document) |
+| Find the next unblocked issue | `cckit next --json` | **TOON** |
+| Get the wave plan | `cckit plan --json` | **TOON** |
+| Get the fan-out brief | `cckit wave --json` | **TOON** |
+| Collect a wave's results | `cckit orchestrate --results --json` | JSON (one array) |
 | Start an issue | `cckit start <issue>` | JSON (one object) |
 | Open the PR | `cckit pr <issue> "<summary>" [--base <branch>]` | JSON (one object) |
 | Close the issue | `cckit close <issue> "<summary>"` | JSON (one object) |
-| Render markdown to a terminal | `cckit render` | — |
+| Render markdown to a terminal | `cckit agent render` | — |
 
 So the loop is **read in TOON, act in JSON**.
 
@@ -136,13 +136,13 @@ Drop this verbatim into your agent's system prompt (or the first message of a se
 You operate this repository through cckit, a CLI that runs the full GitHub work lifecycle.
 
 Operating rules:
-1. Read state before acting. Run `cckit sync --llm` and decide from the TOON board it returns
+1. Read state before acting. Run `cckit status --board --json` and decide from the board document it returns
    (TOON is a compact table format — parse it, don't guess the board).
 2. One issue = one branch = one worktree = one PR. Begin every task with `cckit start <issue>`,
    then cd into the worktree path it prints. Never commit on main or develop.
-3. Append `--llm` to any verb for machine-readable output — TOON for lists (board, plan, next,
-   wave), one JSON object for single-result action verbs (start, pr, close).
-4. Follow this loop: sync -> start <issue> -> implement (commit early and often) ->
+3. Append `--json` to any verb for machine-readable output — TOON for lists (plan, next, wave),
+   one JSON document for the board (`status --board`), one JSON object for single-result action verbs (start, pr, close).
+4. Follow this loop: status --board -> start <issue> -> implement (commit early and often) ->
    `cckit pr <issue> "<one-line summary>"` -> report the PR URL -> stop.
 5. Merging is a human decision. Do not merge unless an approved plan explicitly says you may.
 6. Re-running an already-done step is a no-op, not an error. Never invent paths or config:

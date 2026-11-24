@@ -15,6 +15,8 @@ Runs `${CLAUDE_PLUGIN_ROOT}/scripts/task-sync.sh` — pure bash over `gh` CLI + 
 `.claude/kit.config.json` (from the working directory) for the repo and board. Read-only on
 GitHub — it never mutates the board.
 
+From a shell the same view is `cckit status --board`; `cckit sync`, its old name, still works.
+
 ## Execution
 
 ```bash
