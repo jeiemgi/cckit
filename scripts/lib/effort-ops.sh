@@ -12,7 +12,8 @@
 #   effort_chain <a> <b> [<c> …]          wire N issues into a linear blocked_by chain (#243)
 #   effort_start [--force] <slug|N> [<slug>]  effort/<N> branch + worktree from base, WIP-limited (#244)
 #   effort_pr [<slug|N>]                  open the ONE PR effort/<N> → base branch
-#   effort_close <slug|N> [--no-spec-check]  check the Spec, snapshot sub-diffs, squash-merge, close all
+#   effort_close <slug|N> [--no-spec-check]  check the Spec, snapshot sub-diffs, squash-merge, close the
+#                                         parent + finished subs (unfinished stay open, listed)
 #
 # effort_new is the SHARED creation core (effort #98): both `cckit effort new` (the verb) and
 # /kit-effort-new (the skill) call it, so they produce structurally identical efforts — one source of
@@ -916,12 +917,14 @@ effort_start() {
 }
 
 # effort_pr [<slug|N>] — open the single PR effort/<N> → base. Defaults to the current effort branch.
+_EO_PR_USAGE='cckit effort pr [<slug|N>] [--summary S|--summary-file F] [--for-agents A|--for-agents-file F] [--message M] [--title T] [--type T]   open the ONE PR effort/<N> → base'
 effort_pr() {
   # The ONE effort-PR implementation (#363). The kit-effort-pr skill calls this; before, the skill
   # carried its own inline copy, so agents hand-copied the script and the copy drifted (a PR missing
   # from the board, a mangled body). Args: [<slug|N>] [--summary S|--summary-file F]
   # [--for-agents A|--for-agents-file F] [--message M] [--title T]. SUMMARY / FOR_AGENTS / COMMIT_MSG env are
   # honoured as fallbacks.
+  case "${1:-}" in -h|--help) echo "$_EO_PR_USAGE"; return 0 ;; esac
   _eff_forge || return 1
   local raw="" summary="${SUMMARY:-}" for_agents="${FOR_AGENTS:-}" msg="${COMMIT_MSG:-}" title_override="" ctype=""
   while [ $# -gt 0 ]; do
@@ -933,6 +936,7 @@ effort_pr() {
       --message|-m)       msg="${2:-}"; shift 2 ;;
       --title)            title_override="${2:-}"; shift 2 ;;
       --type)             ctype="${2:-}"; shift 2 ;;
+      -h|--help)          echo "$_EO_PR_USAGE"; return 0 ;;
       *)                  [ -z "$raw" ] && raw="$1"; shift ;;
     esac
   done
@@ -1222,16 +1226,19 @@ EOF_SUBS
 # effort_close <N> — the SINGLE close implementation (#148): the /kit-effort-close skill is a thin
 # caller of this function, never a second close. Snapshot per-sub diffs + capture metrics BEFORE the
 # squash (the squash erases the per-sub history), REFUSE to squash if no work trace was captured
-# (KIT_FORCE=1 overrides), squash-merge, judge the metrics, close parent + subs, set the board
+# (KIT_FORCE=1 overrides), squash-merge, judge the metrics, close parent + finished subs, set the board
 # Status=Done for each (guarded), GC the worktree/branch, run the optional knowledge-ingest hook,
 # and finish with the advisory kit-sync drift check. Destructive: it merges, closes, and prunes.
 # First of all it re-reads the parent body and refuses an effort whose `## Spec` fails spec_lint
 # (E546.5); --no-spec-check skips that one check and says so on stderr.
+_EO_CLOSE_USAGE='cckit effort close <slug|N> [--no-spec-check]   squash-merge the effort PR, close the parent and its finished subs (unfinished subs stay open, linked, and are listed), GC'
 effort_close() {
+  case "${1:-}" in -h|--help) echo "$_EO_CLOSE_USAGE"; return 0 ;; esac
   _eff_forge || return 1; _eff_need jq || return 1
   local raw="" spec_check=1 num repo base branch root self_wt trace_dir kit_touched
   while [ $# -gt 0 ]; do
     case "$1" in
+      -h|--help) echo "$_EO_CLOSE_USAGE"; return 0 ;;
       --no-spec-check) spec_check=0; shift ;;
       -*) echo "effort_close: unknown flag $1" >&2; return 2 ;;
       *)  [ -z "$raw" ] && raw="$1"; shift ;;
@@ -1314,6 +1321,19 @@ effort_close() {
   kit_touched="$(git diff --name-only "origin/$base"...HEAD 2>/dev/null \
     | grep -E "$_EO_KIT_MANAGED_RE" | sort -u || true)"
 
+  # (b3) which subs are finished (#565, decision 52), read PRE-squash while the effort branch's
+  # commits still exist. A sub is finished when it is already closed, or a commit on this branch
+  # delivers it (_eo_delivered_refs). Unfinished subs are NOT closed and NOT detached: they stay
+  # open under the parent and are listed in the close comment and in this command's output.
+  local sub_rows delivered sub_split done_subs="" open_subs="" open_lines=""
+  sub_rows="$(forge_rest "repos/$repo/issues/$num/sub_issues" \
+    --jq '.[] | "\(.number)|\(.state)|\(.title // "")"' 2>/dev/null)" || sub_rows=""
+  delivered="$(_eo_delivered_refs "origin/$base")"
+  sub_split="$(printf '%s\n' "$sub_rows" | _eo_partition_subs "$num" "$delivered")"
+  done_subs="$(printf '%s\n' "$sub_split" | awk -F'|' '$1 == "done" {print $2 "|" $3}')"
+  open_subs="$(printf '%s\n' "$sub_split" | awk -F'|' '$1 == "open" {print $2}')"
+  open_lines="$(printf '%s\n' "$sub_split" | awk -F'|' '$1 == "open" {t=$0; sub(/^[^|]*\|[^|]*\|/, "", t); print "- #" $2 (t == "" ? "" : " " t)}')"
+
   # (c) squash-merge the effort PR, then delete the remote branch (git, not the API). In a cloud
   # session the proxy rejects the deletion (#396): the branch is kept and the close says so.
   { [ -n "$rest_pr" ] && gh_rest_pr_merge "$repo" "$rest_pr" squash >/dev/null 2>&1; } \
@@ -1329,17 +1349,32 @@ effort_close() {
   # (d) judge the metrics (reads the durable trace dir; the record stays in the local buffer).
   command -v judge_effort_metrics >/dev/null 2>&1 && judge_effort_metrics "$num" "origin/$base" || true
 
-  # (e) close every native sub-issue, then the parent — and set the board Status=Done for each
-  # (guarded: a no-op when Projects v2 is off or the board helpers/ids are unavailable). Board +
-  # issue + record state are owned by this ONE op (effort-model.md) — never a separate "mark done".
+  # (e) close the FINISHED sub-issues (#565), then the parent — and set the board Status=Done for
+  # each (guarded: a no-op when Projects v2 is off or the board helpers/ids are unavailable). A sub
+  # already closed keeps its own close reason (no second PATCH). An unfinished sub stays open and
+  # linked; the close comment on the parent lists it. Board + issue + record state are owned by
+  # this ONE op (effort-model.md) — never a separate "mark done".
   _eo_source_board
-  local sub
-  while IFS= read -r sub; do
+  local sub sstate done_list="" comment
+  while IFS='|' read -r sub sstate; do
     [ -n "$sub" ] || continue
-    _eo_issue_close_completed "$repo" "$sub" && echo "  ✓ closed sub #$sub" >&2
+    if [ "$sstate" = closed ]; then
+      echo "  ✓ sub #$sub already closed" >&2
+    else
+      _eo_issue_close_completed "$repo" "$sub" && echo "  ✓ closed sub #$sub" >&2
+    fi
     _eo_board_done "$sub"
-  done < <(forge_rest "repos/$repo/issues/$num/sub_issues" --jq '.[].number' 2>/dev/null)
-  _eo_issue_close_completed "$repo" "$num" && echo "  ✓ closed effort #$num" >&2
+    done_list="${done_list:+$done_list, }#$sub"
+  done <<EOF_DONE
+$done_subs
+EOF_DONE
+  while IFS= read -r sub; do
+    [ -n "$sub" ] && echo "  ⚠ left open: sub #$sub — unfinished, still linked under #$num" >&2
+  done <<EOF_OPEN
+$open_subs
+EOF_OPEN
+  comment="$(_eo_close_comment "$branch" "$done_list" "$open_lines")"
+  gh_rest_issue_close "$repo" "$num" completed "$comment" >/dev/null 2>&1 && echo "  ✓ closed effort #$num" >&2
   _eo_board_done "$num"
 
   # (f) GC: switch the main checkout to base, remove the effort worktree, delete the local branch,
@@ -1372,6 +1407,57 @@ effort_close() {
 
   # (h) kit-sync drift check — kit ⇄ project stay in sync (#148, moved here from the skill).
   _eo_kit_sync_warn "$kit_touched"
+
+  # (i) the report's last word: the subs this close left open (#565).
+  if [ -n "$open_lines" ]; then
+    echo "" >&2
+    echo "  ⚠ #$num closed with unfinished sub-issues still open (linked under it):" >&2
+    printf '%s\n' "$open_lines" | sed 's/^/     /' >&2
+  fi
+  return 0
+}
+
+# _eo_delivered_refs <base_ref> — what the commits in <base_ref>..HEAD deliver, one token per line:
+# `#N` for an issue number, `E<n>.<k>` for a sub step id. A commit delivers (1) the LAST `#N` it
+# mentions — the same commit→sub pairing effort_snapshot_subs writes to the trace, (2) every `#N`
+# after a closing keyword (close/fix/resolve and their forms), and (3) every `[E<n>.<k>]` step tag.
+# Pure git; prints nothing when there are no commits.
+_eo_delivered_refs() {
+  local sha msg
+  git rev-list "$1..HEAD" 2>/dev/null | while IFS= read -r sha; do
+    [ -n "$sha" ] || continue
+    msg="$(git log -1 --format='%s%n%b' "$sha" 2>/dev/null)"
+    printf '%s\n' "$msg" | grep -oE '#[0-9]+' | tail -1
+    printf '%s\n' "$msg" | grep -oiE '(close[sd]?|fix(e[sd])?|resolve[sd]?):?[[:space:]]+#[0-9]+' | grep -oE '#[0-9]+'
+    printf '%s\n' "$msg" | grep -oE '\[E[0-9]+\.[0-9]+\]' | tr -d '[]'
+  done | sort -u
+}
+
+# _eo_partition_subs <effort#> <delivered-refs> — stdin: "<sub#>|<state>|<title>" rows (state as the
+# REST API spells it). stdout: "done|<sub#>|<state>" or "open|<sub#>|<title>", one per sub. A sub is
+# done when it is already closed, its `#N` is in <delivered-refs>, or its title carries a step id
+# `[E<effort>.<k>]` that a commit tagged. Pure: no forge, no git.
+_eo_partition_subs() {
+  local eff="$1" refs="$2" n st title step
+  while IFS='|' read -r n st title; do
+    [ -n "$n" ] || continue
+    st="$(printf '%s' "$st" | tr '[:upper:]' '[:lower:]')"
+    if [ "$st" = closed ]; then echo "done|$n|closed"; continue; fi
+    if grep -qxF "#$n" <<<"$refs"; then echo "done|$n|$st"; continue; fi
+    step="$(grep -oE "\[E$eff\.[0-9]+\]" <<<"$title" | sed -n 1p | tr -d '[]')"
+    if [ -n "$step" ] && grep -qxF "$step" <<<"$refs"; then echo "done|$n|$st"; continue; fi
+    echo "open|$n|$title"
+  done
+}
+
+# _eo_close_comment <branch> <done-list> <open-lines> — the comment effort_close posts on the parent
+# as it closes it: which subs closed with it and which stay open, linked (#565).
+_eo_close_comment() {
+  printf 'Closed by `cckit effort close` (merged `%s`).\n\n' "$1"
+  printf 'Finished sub-issues: %s\n' "${2:-none}"
+  if [ -n "${3:-}" ]; then
+    printf '\nLeft open, still linked under this effort (no commit on the effort branch delivers them):\n%s\n' "$3"
+  fi
 }
 
 # _eo_spec_check <repo> <num> <1|0> — the close-time Spec check (E546.5), shared by both close

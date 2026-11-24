@@ -228,7 +228,8 @@ cd "$tmp/work" || exit 1
 t  "effort close: rc 0 over REST"                   "$rc" "0"
 rest_only "$GH_LOG" "effort close: only REST calls"
 tc "$GH_LOG" '^PUT repos/o/r/pulls/9/merge \{"merge_method":"squash"\}$' "effort close: squash-merges over REST"
-tc "$GH_LOG" '^PATCH repos/o/r/issues/101 \{"state":"closed","state_reason":"completed"\}$' "effort close: closes sub #101"
+# #565: the shim's subs are already closed, so close keeps their close reason (no second PATCH)
+t  "effort close: does not re-close an already-closed sub" "$(grep -c '^PATCH repos/o/r/issues/101 ' "$GH_LOG")" "0"
 tc "$GH_LOG" '^PATCH repos/o/r/issues/99 \{"state":"closed","state_reason":"completed"\}$'  "effort close: closes the parent"
 case "$close_out" in *"remote branch effort/99-demo kept"*) echo "ok: effort close: says why the remote branch stays" ;; *) echo "FAIL: effort close: no remote-branch notice: $close_out"; fail=1 ;; esac
 t  "effort close: the board notice is printed once" "$(printf '%s\n' "$close_out" | grep -c 'board step skipped')" "1"
