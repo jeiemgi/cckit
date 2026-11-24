@@ -105,7 +105,7 @@ cckit add                     # list the optional integrations + modules; `cckit
                               #   `cckit add graft`: code-graph retrieval + the code-retrieval rule
                               #   `cckit add lavish --set enable=no`: turn review pages off (on by default)
 cckit page mode               # `page`, or `terminal: <why>` — can this session show a review page?
-cckit plan-next               # propose what to build next, grounded in current capabilities
+cckit effort plan --next               # propose what to build next, grounded in current capabilities
 cckit status                  # where are we: light tasks, next effort per flow, local undone work, PRs to attend, cleanup available
 cckit next                    # the next unblocked issue + how to start it + the weekly cadence
 cckit start 42                # isolated worktree + branch for issue #42, bootstrapped:
@@ -237,7 +237,7 @@ every sub-issue title — the same effort `/kit-effort-new` produces, since both
 the `kind:` label on the parent and every sub: one of `feat fix task chore security scaffold ci adr spike plan`
 (default `task`), the same closed set `cckit start` uses as the branch prefix, or a content kind — `post`,
 `campaign`, `brand`, `research` — which is a label only: it starts on `task/`, `plan/`, `task/` and `spike/`
-respectively and titles its PR `docs:`. Any other value is refused before anything is created. In `cckit plan` and `cckit effort plan` an issue with no `ctx:` label shows `?` and weighs 2;
+respectively and titles its PR `docs:`. Any other value is refused before anything is created. In `cckit effort plan --issues` and `cckit effort plan` an issue with no `ctx:` label shows `?` and weighs 2;
 a `ctx:` value outside `S|M|L|XL` also weighs 2 and warns on stderr. The `--flow`
 vocabulary (the `[Flow]` title tags) reads from `effort.flows` in the project config, so `cckit effort new --flow X`
 works in any configured repo (an explicit `EFFORT_FLOWS` env var still wins per invocation).
@@ -299,7 +299,7 @@ cckit effort chain 241 242 243     # 242 blocked_by 241 · 243 blocked_by 242
 Each issue after the first gets a native GitHub `blocked_by` edge on its predecessor **and** a
 `- Depends on #<predecessor>` line in its `## Relations` section — the same line
 `cckit effort new --depends-on` writes, from the same formatter. Those `blocked_by` edges are
-exactly what `cckit plan` reads, so a chained set lands one issue per wave, in the order you gave.
+exactly what `cckit effort plan --issues` reads, so a chained set lands one issue per wave, in the order you gave.
 
 It is **idempotent**: an edge or a `Depends on` line that is already there is reported and skipped,
 so re-running changes nothing. It only ever **adds** — an issue already blocked by something else
@@ -307,7 +307,7 @@ keeps that blocker and ends up with both. And it validates the whole chain befor
 so a refusal leaves the board untouched: fewer than two numbers, an argument that is not an issue
 number, an issue that does not exist, a number repeated in the list (`chain 1 2 1`), or an edge that
 would close a cycle through dependencies GitHub already holds are all refused whole. A cycle is
-refused rather than written because `cckit plan` cannot layer a cyclic graph into waves.
+refused rather than written because `cckit effort plan --issues` cannot layer a cyclic graph into waves.
 
 ### One at a time — the effort WIP limit
 
@@ -355,7 +355,7 @@ from one shared function, so the line cannot differ between the two verbs:
 
 | When | Run | What it gives you |
 | --- | --- | --- |
-| Monday | `cckit plan` | the week's order: waves layered from the `blocked_by` edges, and **inside a wave the issues sorted `priority:p0` → `p1` → `p2` → `p3`**, unlabeled last |
+| Monday | `cckit effort plan --issues` | the week's order: waves layered from the `blocked_by` edges, and **inside a wave the issues sorted `priority:p0` → `p1` → `p2` → `p3`**, unlabeled last |
 | Daily | `cckit next` | the unblocked set and the one command that starts the top issue |
 | Friday | `cckit gc` | the branches and worktrees that can be pruned — a report, it deletes nothing (`cckit cleanup` acts on it) |
 
@@ -541,12 +541,12 @@ browser and compare it with the brief.
 
 ## Waves — parallel agentic development
 
-`cckit wave` reads your open efforts and proposes the incoming waves of work — parallel agent tasks
+`cckit effort plan --wave` reads your open efforts and proposes the incoming waves of work — parallel agent tasks
 that gate and merge themselves:
 
 ```bash
-cckit plan                 # the wave plan: deps-ordered, p0-first inside a wave, file-disjoint
-cckit wave                 # the wave-0 fan-out brief the driving agent enacts: same wave data for
+cckit effort plan --issues                 # the wave plan: deps-ordered, p0-first inside a wave, file-disjoint
+cckit effort plan --wave                 # the wave-0 fan-out brief the driving agent enacts: same wave data for
                            #   every runtime, dispatch wording per adapter (--adapter claude|codex|both)
 cckit orchestrate 12 14 17 # run N flows in parallel worktrees (tmux by default)
 cckit orchestrate --results --wait 600 # how each worker ended: success · failure · interrupted
@@ -636,8 +636,8 @@ the contract. Every verb accepts `--json` for structured output — uniform payl
 
 ```bash
 cckit status --board --json           # board state for an agent to reason over
-cckit plan --json           # the wave plan as TOON rows
-cckit wave --json           # the fan-out (one worker prompt per issue) as TOON
+cckit effort plan --issues --json           # the wave plan as TOON rows
+cckit effort plan --wave --json           # the fan-out (one worker prompt per issue) as TOON
 cckit orchestrate --results --json # each worker's collected result as JSON
 ```
 

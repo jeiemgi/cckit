@@ -4,7 +4,9 @@
 # from any shell or agent (not only via the effort-* skills). Thin: composes the git-mechanics helpers
 # in effort.sh (linking, snapshots, title lint) plus gh + git. bash 3.2 compatible. Requires: gh, jq, git.
 #
-#   effort_new [flags] "<name>" [<sub spec> …]   parent (5-section body + labels) + native sub-issues
+#   effort_new [flags] "<name>" [<sub spec> …]   parent (5-section body + labels) + native sub-issues;
+#                                         --grilling[-file] appends a linted `## Grilling` record;
+#                                         --sprint[=YYYY-MM-DD] files it into that week's sprint
 #   effort_sub <slug|N> "<name>" [--kind K]      add one sub-issue, titled [E<N>.<step>] <name>
 #   effort_retitle [<slug|N>] [--apply]          rename legacy [Effort] titles (dry run by default)
 #   effort_chain <a> <b> [<c> …]          wire N issues into a linear blocked_by chain (#243)
@@ -51,6 +53,22 @@ if ! command -v spec_lint >/dev/null 2>&1; then
   _eo_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
   # shellcheck source=/dev/null
   [ -f "$_eo_dir/spec-lint.sh" ] && . "$_eo_dir/spec-lint.sh"
+  unset _eo_dir
+fi
+
+# The `## Grilling` record check (grill-record.sh, E547.2): effort_new lints --grilling before writing.
+if ! command -v grill_record_lint >/dev/null 2>&1; then
+  _eo_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+  # shellcheck source=/dev/null
+  [ -f "$_eo_dir/grill-record.sh" ] && . "$_eo_dir/grill-record.sh"
+  unset _eo_dir
+fi
+
+# The sprint (sprint.sh, #570): effort_new --sprint files the effort into the current week's sprint.
+if ! command -v sprint_name >/dev/null 2>&1; then
+  _eo_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+  # shellcheck source=/dev/null
+  [ -f "$_eo_dir/sprint.sh" ] && . "$_eo_dir/sprint.sh"
   unset _eo_dir
 fi
 
@@ -186,7 +204,7 @@ effort_new() {
   local repo; repo="$(_eff_repo)"
   [ -n "$repo" ] || { echo "effort_new: no repo (KIT_REPO/EFFORT_REPO unset — run in a kit project)" >&2; return 1; }
 
-  local flow="" role="" priority="p1" goal="" scope="" for_agents="" verification="" depends_on="" milestone="" explicit_slug="" kind="task" spec_text=""
+  local flow="" role="" priority="p1" goal="" scope="" for_agents="" verification="" depends_on="" milestone="" explicit_slug="" kind="task" spec_text="" grilling="" sprint_day=""
   # Flags are position-INDEPENDENT: recognized --flag [value] pairs are consumed wherever they occur
   # (before the title, between subs, or after them) and the remaining positionals are collected as the
   # title (first) + sub specs (rest). Previously the parser broke at the first positional, so any flag
@@ -207,6 +225,12 @@ effort_new() {
       --spec-file)
         [ -r "${2:-}" ] || { echo "effort_new: --spec-file: cannot read '${2:-}'" >&2; return 1; }
         spec_text="$(cat "$2")"; shift 2 ;;
+      --grilling)     grilling="${2:-}"; shift 2 ;;
+      --grilling-file)
+        [ -r "${2:-}" ] || { echo "effort_new: --grilling-file: cannot read '${2:-}'" >&2; return 1; }
+        grilling="$(cat "$2")"; shift 2 ;;
+      --sprint)       sprint_day="today"; shift ;;
+      --sprint=*)     sprint_day="${1#*=}"; shift ;;
       --depends-on)   depends_on="${2:-}"; shift 2 ;;
       --milestone)    milestone="${2:-}"; shift 2 ;;
       --slug)         explicit_slug="${2:-}"; shift 2 ;;
@@ -254,6 +278,26 @@ effort_new() {
   local body d; body="$(_eff_compose_body "$goal" "$scope" "$for_agents" "$verification" "$spec_text")"
   # The Spec (E546.5): checked on the composed body, before any label or issue is written.
   spec_lint "$body" || { echo 'effort_new: say what done means with --spec "<item>" or --spec-file F, and retry' >&2; return 1; }
+  # The Grilling record (E547.2): optional, but a record that is passed must be one — linted here,
+  # before any forge write, then appended as the body's `## Grilling` section.
+  if [ -n "$grilling" ]; then
+    grill_record_lint "$grilling" || { echo 'effort_new: fix the --grilling record and retry' >&2; return 1; }
+    body="$body"$'\n\n'"$(grill_record_section "$grilling")"
+  fi
+  # The sprint (#570): --sprint names the week the effort is planned into, in the body and as the
+  # milestone of the parent and every sub. The milestone is opened when it does not exist yet.
+  local sprint="" sprint_start="" sprint_end=""
+  if [ -n "$sprint_day" ]; then
+    [ "$sprint_day" = today ] && sprint_day="$(_sprint_today)"
+    sprint="$(sprint_name "$sprint_day")" || { echo "effort_new: --sprint=YYYY-MM-DD names a day of the sprint" >&2; return 1; }
+    IFS="$(printf '\t')" read -r sprint_start sprint_end <<EOF_SB
+$(sprint_bounds "$sprint_day")
+EOF_SB
+    [ -z "$milestone" ] || [ "$milestone" = "$sprint" ] \
+      || { echo "effort_new: --sprint and --milestone name different milestones ($sprint, $milestone)" >&2; return 1; }
+    milestone="$sprint"
+    body="$body"$'\n\n'"$(printf '## Sprint\n%s · Monday %s to Monday %s' "$sprint" "$sprint_start" "$sprint_end")"
+  fi
   if [ -n "$depends_on" ]; then
     for d in $(printf '%s' "$depends_on" | tr ',' ' '); do
       d="${d#\#}"; [ -n "$d" ] && body="$(_eff_relations_add "$body" "$d")"
@@ -284,6 +328,11 @@ effort_new() {
     local flow_lc; flow_lc="$(printf '%s' "$flow" | tr '[:upper:]' '[:lower:]')"
     _eff_ensure_label "flow:$flow_lc" 1d76db "kit flow lane"
     labels="$labels,flow:$flow_lc"
+  fi
+
+  if [ -n "$sprint" ]; then
+    sprint_open --date "$sprint_day" >/dev/null 2>&1 \
+      || echo "effort_new: could not open the sprint milestone $sprint — the effort is filed without it" >&2
   fi
 
   local url num slug
@@ -516,7 +565,7 @@ _eff_chain_reaches() {
 
 # effort_chain <a> <b> [<c> …] — wire N issues into a LINEAR dependency chain (#243): B becomes
 # blocked_by A, C blocked_by B, and so on, and each issue after the first gets a `- Depends on #<its
-# predecessor>` line in its `## Relations` section. This is the verb that FEEDS `cckit plan` — the
+# predecessor>` line in its `## Relations` section. This is the verb that FEEDS `cckit effort plan --issues` — the
 # wave layering in plan-machine.sh reads exactly these `blocked_by` edges, so a chained set lands
 # one issue per wave, in the order given.
 #
@@ -530,7 +579,7 @@ _eff_chain_reaches() {
 #                chain. Nothing is written.
 #   cycles       a repeated number (`chain 1 2 1`) is refused — the chain would revisit a node. So
 #                is a chain whose new edge closes a loop through edges GitHub ALREADY holds (the
-#                pre-flight walks the combined graph). `cckit plan` cannot layer a cyclic graph into
+#                pre-flight walks the combined graph). `cckit effort plan --issues` cannot layer a cyclic graph into
 #                waves, so a cycle is refused rather than written. Nothing is written.
 #   pre-existing an issue already blocked by something else KEEPS that blocker: blocked_by is a set,
 #     blockers  and this only ever ADDS its edge. The issue ends up with both.
@@ -1358,7 +1407,7 @@ _eo_kit_sync_warn() {
 }
 
 # _eo_close_wave <num> <repo> <base> — close a WAVE-style effort (#164): every sub was delivered as
-# its own task PR squash-merged straight to base (`cckit wave` → fan-out → `cckit watch --merge`),
+# its own task PR squash-merged straight to base (`cckit effort plan --wave` → fan-out → `cckit watch --merge`),
 # so no effort/<N> integration branch ever existed. Verifies every sub is CLOSED with a merged
 # closing PR (refuses and lists the stragglers otherwise), snapshots the work trace from the merged
 # sub PR diffs, then runs the SAME close tail as the branch path: judge the metrics, close the

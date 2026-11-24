@@ -9,7 +9,7 @@
   ],
   "avoid": ["sprint scope", "commitment", "todo list"],
   "home": {
-    "cli": "sprint"
+    "cli": "effort sprint"
   },
   "status": "seed"
 }

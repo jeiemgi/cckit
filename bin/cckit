@@ -156,8 +156,35 @@ case "$cmd" in
         source "$LIB/role-identity.sh" 2>/dev/null || true
         effort_pr "$@" ;;
       close) effort_close "$@" ;;
-      plan)  source "$LIB/effort-plan.sh"; effort_plan "$@" ;;
-      *) echo "cckit effort <new|sub|retitle|chain|start|pr|close|plan>" >&2; exit 2 ;;
+      plan)
+        # One planning verb (#585). Bare: the session-fit view of the open efforts. `--issues`: the
+        # open issues in dependency waves (was `cckit plan`). `--wave`: the next wave as a fan-out
+        # brief plus the captain drive (was `cckit wave` / `copilot`). `--next`: what to build next,
+        # from what the kit already does (was `cckit plan-next`). The old names are alias rows.
+        case "${1:-}" in
+          --issues) shift
+            # shellcheck source=/dev/null
+            source "$LIB/plan-machine.sh"; plan_machine "$@" ;;
+          --wave) shift
+            # shellcheck source=/dev/null
+            source "$LIB/copilot.sh"; copilot_brief "$@" ;;
+          --next) shift
+            # shellcheck source=/dev/null
+            source "$LIB/plan-next.sh"; plan_next "$@" ;;
+          *)
+            # shellcheck source=/dev/null
+            source "$LIB/effort-plan.sh"; effort_plan "$@" ;;
+        esac ;;
+      sprint)
+        # One week, Monday to Monday, as a forge milestone (#570). A sub-verb, so the top-level verb
+        # count does not grow; `name` and `bounds` run on git alone.
+        # shellcheck source=/dev/null
+        source "$LIB/sprint.sh"; sprint_cli "$@" ;;
+      review)
+        # Each sub against its own `## Spec`, one verdict line per sub (#583). A read.
+        # shellcheck source=/dev/null
+        source "$LIB/effort-review.sh"; effort_review "$@" ;;
+      *) echo "cckit effort <new|sub|retitle|chain|start|pr|close|plan|sprint|review>" >&2; exit 2 ;;
     esac
     ;;
   start)
@@ -288,24 +315,6 @@ case "$cmd" in
     case "${1:-}" in -h|--help) echo 'cckit merge [<pr>] [--squash|--merge|--rebase]   merge (squash by default; rebases on conflict), close linked issues, GC branch + worktree, update the PR base'; exit 0 ;; esac
     kto_task_pr_merge "$@"
     ;;
-  plan)
-    # Wave plan over the board (deps-ordered, file-disjoint, session-fit). Runs in the invoking
-    # project; needs config so KIT_REPO is set before plan-machine reads it.
-    # shellcheck source=/dev/null
-    source "$LIB/kit-config.sh" && load_kit_config
-    # shellcheck source=/dev/null
-    source "$LIB/plan-machine.sh"; plan_machine "$@"
-    ;;
-  plan-next)
-    # Forward planner: introspect the CURRENT capability surface (skills/verbs/rules/docs) and
-    # propose what to build next, grounded in what the kit can already do. Filesystem-only — config
-    # is loaded for the project-root inference (KIT_CONFIG), then plan-next scans that root. Output
-    # is HUMAN / orchestrator-facing only — never wired into a monitored model's context (#86).
-    # shellcheck source=/dev/null
-    source "$LIB/kit-config.sh" && load_kit_config 2>/dev/null || true
-    # shellcheck source=/dev/null
-    source "$LIB/plan-next.sh"; plan_next "$@"
-    ;;
   cleanup)
     # ONE guided destructive sweep over the gc analysis: plan first, delete only the SAFE rows, and
     # only with --yes. Orphans, protected branches and stashes are surfaced and left alone.
@@ -387,15 +396,6 @@ case "$cmd" in
     fi
     # shellcheck source=/dev/null
     source "$LIB/next.sh"; next_issue "$@"
-    ;;
-  wave)
-    # Read the open efforts and propose the incoming waves of work: emit the wave-0 Task-subagent
-    # fan-out + the between-waves captain drive. (`copilot`, its old name, reaches here through the alias path above.)
-    # Runs in the invoking project; needs config so KIT_REPO is set before it reads it.
-    # shellcheck source=/dev/null
-    source "$LIB/kit-config.sh" && load_kit_config
-    # shellcheck source=/dev/null
-    source "$LIB/copilot.sh"; copilot_brief "$@"
     ;;
   watch)
     # Captain: gate open PRs, squash-merge the CLEAN ones, advance to the next wave. Runs in the

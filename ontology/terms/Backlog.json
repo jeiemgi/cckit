@@ -9,7 +9,7 @@
   ],
   "avoid": ["icebox", "wishlist", "todo list", "queue (for the backlog)"],
   "home": {
-    "cli": "sync",
+    "cli": "status --board",
     "skill": "kit-task-sync"
   },
   "status": "seed"

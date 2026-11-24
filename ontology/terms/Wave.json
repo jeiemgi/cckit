@@ -1,7 +1,7 @@
 {
   "id": "Wave",
   "label": ["wave"],
-  "definition": "A parallel batch inside a sprint: the issues that can run at once, with no open blocker among them, file-disjoint, within the session budget. cckit plan lays the open work into waves by its blocked_by edges; cckit orchestrate runs one wave in parallel worktrees; cckit watch merges it and advances to the next. A sprint usually runs several waves.",
+  "definition": "A parallel batch inside a sprint: the issues that can run at once, with no open blocker among them, file-disjoint, within the session budget. cckit effort plan --issues lays the open work into waves by its blocked_by edges; cckit orchestrate runs one wave in parallel worktrees; cckit watch merges it and advances to the next. A sprint usually runs several waves.",
   "is_not": [
     "An effort: an effort is one goal; a wave is a layer of the dependency graph and may hold issues from several efforts.",
     "A sprint: a sprint is one week, Monday to Monday, with a goal; a wave lives inside it and ends when its PRs merge.",

@@ -9,7 +9,7 @@
   ],
   "avoid": ["post-mortem (for the retrospective)", "lessons learned", "debrief"],
   "home": {
-    "cli": "sprint"
+    "cli": "effort sprint"
   },
   "status": "seed"
 }

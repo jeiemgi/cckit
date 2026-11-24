@@ -63,7 +63,7 @@ has "human: lists the unblocked p2 issue"      "$human" "| #5 | S | tidy the par
 no  "human: the blocked issue is not offered"  "$human" "ship the report"
 has "human: recommends the most urgent"        "$human" "cckit start 6"
 has "human: names the cadence"                 "$human" "Weekly cadence"
-has "human: plan on Monday"                    "$human" 'Monday: `cckit plan`'
+has "human: plan on Monday"                    "$human" 'Monday: `cckit effort plan --issues`'
 has "human: next daily"                        "$human" 'daily: `cckit next`'
 has "human: gc on Friday"                      "$human" 'Friday: `cckit gc`'
 no  "human: digest is not in the cadence"      "$human" "digest"

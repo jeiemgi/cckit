@@ -19,6 +19,19 @@ TODO / TBD is refused before anything is written, and `cckit effort close` re-re
 refuses the same way; `--no-spec-check` skips that check and prints one line saying so. The `/kit-effort-new` skill produces the identical effort: both call one shared
 core, so there is no drift between the verb and the skill.
 
+Two optional flags add a section each, after Verification:
+
+- `--grilling "<record>"` or `--grilling-file F` adds the `## Grilling` record: a first line
+  `Grilled: <who>`, a `YYYY-MM-DD` date, and at least 3 decisions as column-0 `1.` items or a link
+  to the issue comment that holds them; or the single line `waived: <reason>`. A record that is
+  not one is refused before anything is written.
+- `--sprint` (this week) or `--sprint=YYYY-MM-DD` (the week of that day) adds a `## Sprint`
+  section naming the sprint and its two Mondays, opens the sprint's milestone when it is missing,
+  and puts the parent and its subs on it. `cckit effort sprint` opens, lists and closes sprints.
+
+`cckit effort review <N>` checks each sub against its own `## Spec` before the close: a sub is done
+when it is closed and a commit on the effort branch names it. It exits 1 while any sub is not done.
+
 ## Titles
 
 The parent is titled `[E<n>] <name>` and each sub `[E<n>.<step>] <name>`, where `<n>` is the
@@ -271,7 +284,7 @@ The row format and the override are in
 
 ### Inside a wave, the most urgent work comes first
 
-Within one wave `cckit plan` orders the issues by their `priority:pN` label —
+Within one wave `cckit effort plan --issues` orders the issues by their `priority:pN` label —
 **p0 → p1 → p2 → p3**, with unlabeled issues last. Issues that
 share a priority keep the order they already had, and the batch packing follows that order, so the
 p0 work lands in the first batch rather than wherever it happened to fall.
@@ -291,7 +304,7 @@ cckit effort chain <a> <b> <c>     # <b> blocked_by <a> · <c> blocked_by <b>
 ```
 
 Every issue after the first gets two things: the native GitHub **`blocked_by`** edge on its
-predecessor — the edge `cckit plan` reads to layer the waves — and a `- Depends on #<predecessor>`
+predecessor — the edge `cckit effort plan --issues` reads to layer the waves — and a `- Depends on #<predecessor>`
 line in its **`## Relations`** section, the human-readable mirror. It is the same line
 `cckit effort new --depends-on` writes, produced by the same formatter, so the two never drift.
 A chained set therefore lands one issue per wave, in the order you gave.

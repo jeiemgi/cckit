@@ -143,9 +143,9 @@ cckit effort close <N>         # squash-merge, close parent + all subs, garbage-
 
 See [Efforts, waves & worktrees](/project-management/efforts-and-waves/) for how an effort breaks into waves.
 
-## Fan out a wave with `cckit wave`
+## Fan out a wave with `cckit effort plan --wave`
 
-For a whole wave of unblocked issues at once, **`cckit wave`** writes the brief and the agent fans it out into one subagent per issue. The **captain** (`cckit watch`) gates the resulting PRs and merges the clean ones.
+For a whole wave of unblocked issues at once, **`cckit effort plan --wave`** writes the brief and the agent fans it out into one subagent per issue. The **captain** (`cckit watch`) gates the resulting PRs and merges the clean ones.
 
 **Prompt:**
 
@@ -165,7 +165,7 @@ Advance to the next wave and keep going until the board is drained.
 **What cckit does:**
 
 ```bash
-cckit wave             # emit the wave-0 subagent fan-out brief
+cckit effort plan --wave             # emit the wave-0 subagent fan-out brief
 # …the agent spawns one subagent per issue, each opens a PR…
 cckit watch --merge    # gate open PRs, squash-merge the clean ones, advance the wave
 ```
@@ -262,7 +262,7 @@ nothing until I confirm.
 **What cckit does:**
 
 ```bash
-cckit plan      # Monday: the waves, p0 → p3 inside each wave
+cckit effort plan --issues      # Monday: the waves, p0 → p3 inside each wave
 cckit next      # daily: the unblocked set + how to start the top issue
 cckit gc        # Friday: prunable branches + worktrees (a report; deletes nothing)
 cckit status    # any day: next effort per flow, local undone work, PRs to attend, cleanup available
@@ -325,6 +325,6 @@ Keep token use lean when you hand context to sub-agents.
 ```bash
 cckit status --board --json          # board state + what's unblocked, as one JSON document
 cckit scan --json          # repo stack + kit state, as JSON
-cckit plan --json          # the session-fit wave plan, as TOON
+cckit effort plan --issues --json          # the session-fit wave plan, as TOON
 echo "$json" | cckit agent encode-context   # compact uniform arrays into TOON for sub-agents
 ```

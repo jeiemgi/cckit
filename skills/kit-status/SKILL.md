@@ -86,7 +86,7 @@ nothing can start keeps its row and says so. In `--json` output these rows are `
 `null` when the efforts could not be read).
 
 The line under the table is the weekly cadence, the same line `cckit next` prints: Monday
-`cckit plan`, daily `cckit next`, Friday `cckit gc`. Relay it when the owner asks what to do next.
+`cckit effort plan --issues`, daily `cckit next`, Friday `cckit gc`. Relay it when the owner asks what to do next.
 
 ## Reading bucket 2
 

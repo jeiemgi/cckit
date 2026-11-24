@@ -2,4 +2,4 @@
 # The number of `verb` rows in scripts/lib/verbs.tsv may only go down. A rename keeps the old name
 # as an `alias` row, which does not count. When a verb is retired or folded under another, lower
 # this number in the same change; the gate fails until you do.
-41
+38

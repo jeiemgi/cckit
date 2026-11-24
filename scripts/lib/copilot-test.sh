@@ -75,7 +75,7 @@ STUB
 
   brief="$(brief_run)"; brc=$?
   [ "$brc" -eq 0 ] || { echo "FAIL($CP_TEST_INNER): brief without --effort rc=$brc (want 0)"; fail=1; }
-  has   "brief has heading"          "$brief" '# cckit wave — o/r'
+  has   "brief has heading"          "$brief" '# cckit effort plan --wave — o/r'
   has   "brief lists wave-0 issue"   "$brief" '### #7 · [S] · first thing'
   has   "brief has watch line"       "$brief" 'cckit watch --merge'
   has   "brief carries the default adapter dispatch" "$brief" '### Claude Code — spawn 1 parallel Task subagent(s)'
@@ -84,14 +84,14 @@ STUB
 
   brief="$(brief_run --effort 5)"; brc=$?
   [ "$brc" -eq 0 ] || { echo "FAIL($CP_TEST_INNER): brief with --effort rc=$brc (want 0)"; fail=1; }
-  has   "effort brief heading"       "$brief" '# cckit wave — o/r · effort #5'
+  has   "effort brief heading"       "$brief" '# cckit effort plan --wave — o/r · effort #5'
   has   "effort brief watch suffix"  "$brief" 'cckit watch --merge --effort 5'
-  has   "effort brief wave suffix"   "$brief" 'cckit wave --effort 5'
+  has   "effort brief wave suffix"   "$brief" 'cckit effort plan --wave --effort 5'
   eq    "the brief ran no gh subcommand" "$(c="$(grep -c '^GH-SUBCOMMAND' "$box/gh.log" 2>/dev/null)"; echo "${c:-0}")" "0"
   # no forge configured: the verb refuses with the one line naming it (forge_need), rc 1.
   brief="$(CCKIT_FORGE=none brief_run 2>&1)"; brc=$?
   eq    "no forge: rc 1"             "$brc" "1"
-  has   "no forge: the refusal names the verb" "$brief" 'cckit copilot: needs a forge (GitHub) and none is configured'
+  has   "no forge: the refusal names the verb" "$brief" 'cckit effort plan --wave: needs a forge (GitHub) and none is configured'
   rm -rf "$box"
 
   if [ "$fail" -eq 0 ]; then echo "PASS($CP_TEST_INNER): copilot seed composer + adapter dispatch + brief under set -e"; fi

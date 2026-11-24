@@ -2,15 +2,14 @@
 name: kit-plan-next
 terms: Effort
 description: >
-  Forward planning from the current state: run `cckit plan-next` to inventory what the kit can
-  already do (skills, verbs, rules, docs) and propose what to build next — grounded in that
-  inventory — then hand a chosen item off into `/kit-effort-new`. The proposed plan always carries a
-  mandatory docs + README step.
+  Forward planning from the current state: run `cckit effort plan --next` to inventory what the kit
+  already does (skills, verbs, rules, docs) and propose what to build next from that inventory,
+  then hand a chosen item to `/kit-effort-new`. The plan always carries a docs + README step.
 when_to_use: >
   When you ask "given where we are, what should we build next?" — at the start of a chapter of work,
   after closing an effort, or when triaging a backlog against the kit's current capabilities. Not
-  for ordering issues that already exist (that is `/kit-next` / `cckit plan`), and not for scoping an
-  effort you have already chosen (go straight to `/kit-effort-new`).
+  for ordering issues that already exist (`/kit-next`, `cckit effort plan --issues`), nor for
+  scoping an effort you already chose (go straight to `/kit-effort-new`).
 metadata:
   version: 1.0.0
 ---
@@ -18,7 +17,7 @@ metadata:
 # kit-plan-next — what to build next, grounded in current state
 
 Answer one question: **given everything the kit can already do, what is the highest-value next
-effort?** This wraps the `cckit plan-next` verb (the engine — never re-author its logic here;
+effort?** This wraps the `cckit effort plan --next` verb (the engine — never re-author its logic here;
 kit-engine-boundary) and turns its proposals into a scoped effort via `/kit-effort-new`.
 
 The verb reads the CURRENT skills, commands, rules and docs at runtime, so the plan reflects what
@@ -26,7 +25,7 @@ ships today.
 
 ## CRITICAL — context-anxiety rule
 
-The plan `cckit plan-next` emits is **human / orchestrator-facing only**. NEVER paste it (or the
+The plan `cckit effort plan --next` emits is **human / orchestrator-facing only**. NEVER paste it (or the
 inventory) into a monitored model's prompt or context, and never wire it into an agent's context
 automatically. Read it yourself, decide with the human, and hand only the CHOSEN item to
 `/kit-effort-new`. See `rules/plan-next.md`.
@@ -34,7 +33,7 @@ automatically. Read it yourself, decide with the human, and hand only the CHOSEN
 ## 1. Get the forward plan
 
 ```
-cckit plan-next
+cckit effort plan --next
 ```
 
 Prints the current capabilities (skills / commands / rules / docs counts + samples) and a ranked,
@@ -82,6 +81,6 @@ Carry the chosen proposal into the effort's **Goal**, decompose it into sub-issu
 - **Docs are mandatory** — every plan carries a docs + README step; the effort you scope must keep it.
 - **Context-anxiety** — planner output never enters a monitored model's context; it informs the
   human/orchestrator's decision only.
-- **Don't plan what exists** — for ordering already-created issues use `/kit-next` or `cckit plan`;
+- **Don't plan what exists** — for ordering already-created issues use `/kit-next` or `cckit effort plan --issues`;
   for scoping an item you've already chosen go straight to `/kit-effort-new`.
 - Scrub secrets from anything pasted into the resulting effort body (trace hygiene).

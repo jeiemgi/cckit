@@ -281,6 +281,23 @@ EOF
     eq  "a failed issue read is rc 1" "$rc" "1"
     has "a failed issue read names the issue" "$missing" "could not read issue #404 from o/r"
 
+    # ── --skills / --verbs: the worker's toolset, exactly as named (#582) ──────────────────────
+    : > "$GH_LOG"
+    tool_out="$(cd "$repo" && export PATH="$ghstub:$PATH" && ( set -eu; kit_brief 5 --skills kit-advisor --verbs 'effort start, cckit brief' ) 2>&1)"
+    has "toolset: the section is there"        "$tool_out" "## Your toolset"
+    has "toolset: the skill is listed"         "$tool_out" '- skill `kit-advisor`'
+    has "toolset: a two-word verb is listed"   "$tool_out" '- verb `cckit effort start`'
+    has "toolset: a leading cckit is dropped"  "$tool_out" '- verb `cckit brief`'
+    eq  "toolset: lists exactly what was named" "$(printf '%s\n' "$tool_out" | grep -c '^- \(skill\|verb\) `')" "3"
+    has "toolset: the brief still renders"     "$tool_out" "## Standing gotchas"
+    : > "$GH_LOG"
+    bad_out="$(cd "$repo" && export PATH="$ghstub:$PATH" && ( kit_brief 5 --skills kit-advisor,no-such-skill --verbs 'effort fly,frobnicate' ) 2>&1)"; rc=$?
+    eq  "toolset: an unknown name is rc 2"     "$rc" "2"
+    has "toolset: names the unknown skill"     "$bad_out" "unknown skill 'no-such-skill'"
+    has "toolset: names the unknown sub-verb"  "$bad_out" "unknown verb 'cckit effort fly'"
+    has "toolset: names the unknown verb"      "$bad_out" "unknown verb 'cckit frobnicate'"
+    eq  "toolset: refused before any forge read" "$(wc -l < "$GH_LOG" | tr -d ' ')" "0"
+
     # ── the QA route ask appears only when a `qa` block is configured (#297) ───────────────────
     # `cckit qa open` reads a `QA route:` line out of the PR body; the brief is where the builder
     # is told to write it. With no review stack nothing reads the line, so the brief stays silent.
@@ -309,6 +326,18 @@ EOF
   has "no argument prints usage" "$out" "usage: cckit brief"
   out="$(kit_brief --llm 2>&1)"; rc=$?
   eq  "a flag without an issue is rc 2" "$rc" "2"
+  out="$(kit_brief 5 --skills 2>&1)"; rc=$?
+  eq  "--skills with no list is rc 2" "$rc" "2"
+  out="$(kit_brief 5 --bogus 2>&1)"; rc=$?
+  eq  "an unknown flag is rc 2" "$rc" "2"
+  eq  "verb_ok: an alias row counts" "$(kit_brief_verb_ok status && echo y)" "y"
+  eq  "verb_ok: effort with no sub counts" "$(kit_brief_verb_ok effort && echo y)" "y"
+  eq  "skill_ok: a path is never a skill" "$(kit_brief_skill_ok ../x || echo n)" "n"
+  # The sub-verbs a brief accepts are the ones the dispatcher routes.
+  usage_line="$(grep -o 'cckit effort <[a-z|]*>' "$dir/../../bin/cckit" | sed -n 1p)"
+  for s in $(printf '%s' "$KB_EFFORT_SUBS" | tr ' ' '\n'); do
+    has "effort sub-verb '$s' is in the dispatcher" "$usage_line" "$s"
+  done
 
   rm -rf "$tmp"
   if [ "$fail" -eq 0 ]; then echo "PASS($KB_TEST_INNER): kit-brief parsers + real-state lookups"; fi

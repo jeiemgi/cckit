@@ -2,9 +2,9 @@
 name: kit-next
 terms: Task, Wave
 description: >
-  The everyday cckit loop: find the next unblocked issue and pick it up, or fan the whole unblocked
-  wave out to subagents. Wraps `cckit next` (what can I work on now?), `cckit start <N>` (isolated
-  worktree + branch), `cckit wave` (parallel fan-out), and `cckit watch` (gate + merge PRs).
+  The everyday cckit loop: pick up the next unblocked issue, or fan the unblocked wave out to
+  subagents. Wraps `cckit next` (what can I work on now?), `cckit start <N>` (isolated
+  worktree + branch), `cckit effort plan --wave` (fan-out), and `cckit watch` (gate + merge PRs).
 when_to_use: >
   When you sit down to work and want the next thing to do, when you finish an issue and need the
   next one, or when you want to parallelize the unblocked wave. Not for planning an effort
@@ -18,7 +18,7 @@ metadata:
 Answer one question fast: **what should I work on right now, and how do I start it?**
 
 > Planning the work that doesn't exist yet is a different question. For "given where we are, what
-> should we build next?" use `/kit-plan-next` (`cckit plan-next`) — it inventories the kit's current
+> should we build next?" use `/kit-plan-next` (`cckit effort plan --next`) — it inventories the kit's current
 > capabilities and proposes next efforts. `kit-next` orders the issues that already exist.
 
 ## Pick up the next issue
@@ -30,7 +30,7 @@ cckit next
 Prints the unblocked set (wave 0 of the plan) and the single recommended next issue with its start
 command. `--effort <N>` scopes it to one effort's sub-issues.
 
-The human output ends with the weekly cadence this verb is the daily step of: Monday `cckit plan`
+The human output ends with the weekly cadence this verb is the daily step of: Monday `cckit effort plan --issues`
 orders the week, `cckit next` daily picks up one issue, Friday `cckit gc` reports what can be
 pruned. `cckit next --json` does not carry that line — its TOON rows stay `{number,ctx,title}`.
 
@@ -54,7 +54,7 @@ When the unblocked issues are file-disjoint and independent, drive them in paral
 at a time:
 
 ```
-cckit wave             # emits the wave-0 fan-out brief (dispatch wording per adapter)
+cckit effort plan --wave             # emits the wave-0 fan-out brief (dispatch wording per adapter)
 cckit watch --merge    # gate every open PR; squash-merge the CLEAN ones; advance the next wave
 ```
 
