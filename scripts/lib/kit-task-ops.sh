@@ -422,7 +422,7 @@ kto_task_pr() {
     pr_num="$(basename "$url")"
     pr_node=$(forge_rest "repos/$repo/pulls/$pr_num" --jq .node_id 2>/dev/null)
     if [[ -n "$pr_node" ]]; then
-      item=$(project_add_item "$pr_node" 2>/dev/null || true)
+      item=$(project_add_item "$pr_node" "$repo" "$pr_num" PullRequest 2>/dev/null || true)
       if [[ -n "$item" ]]; then
         role_opt="$(_kto_role_option_for_slug "$role")"
         [[ -n "$role_opt" ]] && project_set_single_select "$item" "$ROLE_FIELD_ID" "$role_opt" 2>/dev/null || true
@@ -693,7 +693,7 @@ kto_task_new() {
   if kto_board_enabled && type load_project_ids >/dev/null 2>&1 && load_project_ids 2>/dev/null; then
     node=$(forge_rest "repos/$repo/issues/$num" --jq .node_id 2>/dev/null)
     item=""
-    [[ -n "$node" ]] && item=$(project_add_item "$node" 2>/dev/null || true)
+    [[ -n "$node" ]] && item=$(project_add_item "$node" "$repo" "$num" Issue 2>/dev/null || true)
     # Loud, not silent: an issue missing from the board is the failure this verb exists to prevent.
     [[ -z "$item" ]] && echo "⚠ #$num was created but NOT added to the board — add it by hand" >&2
     if [[ -n "$node" ]]; then

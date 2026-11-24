@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Helpers for GitHub Projects v2 via gh CLI + GraphQL.
+# Helpers for GitHub Projects v2: REST first, GraphQL as the fallback (E546.7).
 # Source after kit-config.sh:  source scripts/lib/gh-project.sh; load_project_ids
 # Requires scripts/.project-ids.env — populate via scripts/capture-project-ids.sh.
 # errors: strict — a failed GraphQL call propagates; the board is not guessed
@@ -30,13 +30,65 @@ if [ -f "$SCRIPT_DIR/lib/gh-log.sh" ]; then
 fi
 type gh_log >/dev/null 2>&1 || gh_log() { :; }
 
-# The transport switch (#396): Projects v2 is GraphQL-only, so in rest mode (a cloud session) every
-# board function below prints the one skip notice and returns 0 with no output.
+# The board moves over REST first (E546.7): load_project_ids, project_add_item, project_find_item_by_issue,
+# project_set_single_select, project_set_iteration and project_set_text call the Projects v2 REST
+# endpoints (gh_rest_board_*, scripts/lib/gh-rest.sh) and fall back to GraphQL only when REST cannot
+# serve the call (404, 410, 415, 501, a transport failure, an unexpected answer), with one stderr note.
+# Where GraphQL is unavailable too (a cloud session, CCKIT_GRAPHQL=0) such a step prints the one skip
+# notice and returns 0. With no forge every board function returns 0 at once (cckit_board_skipped).
+# project_issue_status is GraphQL-only.
+#
+# Item ids: a REST item is "<id>:<node_id>" (the integer REST id, then the GraphQL node id); a GraphQL
+# item is its node id. Every setter takes either: REST with the integer, GraphQL with the node id.
 if ! type cckit_board_skipped >/dev/null 2>&1 && [ -f "$SCRIPT_DIR/lib/gh-rest.sh" ]; then
   # shellcheck source=gh-rest.sh
   . "$SCRIPT_DIR/lib/gh-rest.sh"
 fi
 type cckit_board_skipped >/dev/null 2>&1 || cckit_board_skipped() { return 1; }
+type cckit_graphql_off >/dev/null 2>&1 || cckit_graphql_off() { return 1; }
+type cckit_board_graphql_notice >/dev/null 2>&1 || cckit_board_graphql_notice() { :; }
+
+# _ghp_fallback <step> — REST could not serve <step>. rc 0: go on with GraphQL (one note printed);
+# rc 1: GraphQL is unavailable here, the skip notice is printed once, the caller returns 0.
+_ghp_fallback() {
+  if cckit_graphql_off; then cckit_board_graphql_notice; return 1; fi
+  printf 'cckit: board %s: REST could not serve it, falling back to GraphQL\n' "$1" >&2
+  return 0
+}
+
+# The REST endpoint prefix of our board, or rc 3 when the owner or number is unresolved.
+_ghp_rest_base() {
+  command -v gh_rest_board_base >/dev/null 2>&1 || return 3
+  gh_rest_board_base "$(_ghp_resolve_owner_type)" "$(_ghp_resolve_owner)" "$(_ghp_resolve_pnum)"
+}
+
+# An item handle's REST id ("<id>:<node>" or "<id>"), or rc 1; and its GraphQL node id, or empty.
+_ghp_item_num() {
+  local n="${1%%:*}"
+  case "$n" in ''|*[!0-9]*) return 1 ;; esac
+  printf '%s' "$n"
+}
+_ghp_item_node() {
+  case "$1" in
+    *:*)        printf '%s' "${1#*:}" ;;
+    *[!0-9]*)   printf '%s' "$1" ;;
+    *)          : ;;
+  esac
+}
+
+# _ghp_rest_set <kind> <item> <field> <value> — the REST half of a setter. rc 0 set · 1 a hard error
+# · 3 go on with GraphQL (note printed) · 4 GraphQL unavailable (notice printed; return 0).
+_ghp_rest_set() {
+  local kind="$1" item="$2" field="$3" value="$4" inum base rc=3
+  if inum="$(_ghp_item_num "$item")" && base="$(_ghp_rest_base)"; then
+    gh_log rest mutation "project_set_$kind" "gh-project"
+    rc=0; gh_rest_board_set_field "$base" "$inum" "$field" "$kind" "$value" || rc=$?
+  fi
+  case "$rc" in 0) return 0 ;; 3) ;; *) return 1 ;; esac
+  _ghp_fallback "set $kind" || return 4
+  [ -n "$(_ghp_item_node "$item")" ] || { echo "cckit: board item '$item' has no GraphQL node id" >&2; return 1; }
+  return 3
+}
 
 # Worktree-durable location for the captured project IDs (#532). The legacy
 # scripts/.project-ids.env is gitignored + untracked, so it is ABSENT in every worktree —
@@ -59,6 +111,9 @@ load_project_ids() {
     cp "$PROJECT_ENV_LEGACY" "$PROJECT_ENV" 2>/dev/null || PROJECT_ENV="$PROJECT_ENV_LEGACY"
   fi
   if [[ ! -f "$PROJECT_ENV" ]]; then
+    # No captured file (a fresh clone, a cloud session): read the ids over REST into this shell.
+    _ghp_load_ids_rest && return 0
+    if cckit_graphql_off; then cckit_board_graphql_notice; return 0; fi
     echo "✗ project IDs not found ($PROJECT_ENV). Run: ./scripts/capture-project-ids.sh first." >&2
     return 1
   fi
@@ -66,9 +121,42 @@ load_project_ids() {
   source "$PROJECT_ENV"
 }
 
-# Add an issue/PR (by node ID) to the project. Echoes the new item ID.
+# _ghp_load_ids_rest — export the ids gh_rest_board_ids_env reads. Each line must be NAME=value with
+# NAME in [A-Z0-9_] and an id-shaped value; nothing is evaluated. rc 1 when REST cannot read them.
+_ghp_load_ids_rest() {
+  local base lines line k v
+  command -v gh_rest_board_ids_env >/dev/null 2>&1 || return 1
+  base="$(_ghp_rest_base)" || return 1
+  gh_log rest query "load_project_ids" "gh-project"
+  lines="$(gh_rest_board_ids_env "$base" 2>/dev/null)" || return 1
+  case "$lines" in PROJECT_ID=?*) ;; *) return 1 ;; esac
+  while IFS= read -r line; do
+    k="${line%%=*}"; v="${line#*=}"
+    case "$k" in ''|*[!A-Z0-9_]*) continue ;; esac
+    case "$v" in *[!A-Za-z0-9_=+/-]*) continue ;; esac
+    export "$k=$v"
+  done <<EOF
+$lines
+EOF
+  echo "cckit: board ids read over REST (no captured file; scripts/capture-project-ids.sh writes one)" >&2
+  return 0
+}
+
+# Add an issue/PR to the project. Echoes the new item ID.
+# Args: <content node id> [<repo> <number> [Issue|PullRequest]]. REST adds by repo + number, so it
+# runs when those are given (the type defaults from the node id: PR_… is a pull request); GraphQL
+# adds by the node id.
 project_add_item() {
   cckit_board_skipped && return 0
+  local node="${1:-}" repo="${2:-}" num="${3:-}" type="${4:-}" base out rc=3
+  if [ -z "$type" ]; then case "$node" in PR_*) type=PullRequest ;; *) type=Issue ;; esac; fi
+  if [ -n "$repo" ] && [ -n "$num" ] && base="$(_ghp_rest_base)"; then
+    gh_log rest mutation "project_add_item" "gh-project"
+    rc=0; out="$(gh_rest_board_add_item "$base" "$type" "$repo" "$num")" || rc=$?
+  fi
+  case "$rc" in 0) printf '%s\n' "$out"; return 0 ;; 3) ;; *) return 1 ;; esac
+  _ghp_fallback "add item" || return 0
+  [ -n "$node" ] || { echo "cckit: project_add_item: no content node id for the GraphQL fallback" >&2; return 1; }
   gh_log graphql mutation "project_add_item" "gh-project"
   forge_rest graphql \
     -f query='mutation($project:ID!, $content:ID!) {
@@ -81,6 +169,9 @@ project_add_item() {
 # Set a single-select field. Args: <item_id> <field_id> <option_id>
 project_set_single_select() {
   cckit_board_skipped && return 0
+  local _rs=0
+  _ghp_rest_set single_select "$1" "$2" "$3" || _rs=$?
+  case "$_rs" in 0|4) return 0 ;; 1) return 1 ;; esac
   gh_log graphql mutation "project_set_single_select" "gh-project"
   forge_rest graphql \
     -f query='mutation($project:ID!, $item:ID!, $field:ID!, $option:String!) {
@@ -89,12 +180,32 @@ project_set_single_select() {
         value:{ singleSelectOptionId:$option }
       }){ projectV2Item { id } }
     }' \
-    -f project="$PROJECT_ID" -f item="$1" -f field="$2" -f option="$3" >/dev/null
+    -f project="$PROJECT_ID" -f item="$(_ghp_item_node "$1")" -f field="$2" -f option="$3" >/dev/null
+}
+
+# Set an iteration field. Args: <item_id> <field_id> <iteration_id>
+project_set_iteration() {
+  cckit_board_skipped && return 0
+  local _rs=0
+  _ghp_rest_set iteration "$1" "$2" "$3" || _rs=$?
+  case "$_rs" in 0|4) return 0 ;; 1) return 1 ;; esac
+  gh_log graphql mutation "project_set_iteration" "gh-project"
+  forge_rest graphql \
+    -f query='mutation($project:ID!, $item:ID!, $field:ID!, $iteration:String!) {
+      updateProjectV2ItemFieldValue(input:{
+        projectId:$project, itemId:$item, fieldId:$field,
+        value:{ iterationId:$iteration }
+      }){ projectV2Item { id } }
+    }' \
+    -f project="$PROJECT_ID" -f item="$(_ghp_item_node "$1")" -f field="$2" -f iteration="$3" >/dev/null
 }
 
 # Set a text field. Args: <item_id> <field_id> <text>
 project_set_text() {
   cckit_board_skipped && return 0
+  local _rs=0
+  _ghp_rest_set text "$1" "$2" "$3" || _rs=$?
+  case "$_rs" in 0|4) return 0 ;; 1) return 1 ;; esac
   gh_log graphql mutation "project_set_text" "gh-project"
   forge_rest graphql \
     -f query='mutation($project:ID!, $item:ID!, $field:ID!, $text:String!) {
@@ -102,7 +213,7 @@ project_set_text() {
         projectId:$project, itemId:$item, fieldId:$field, value:{ text:$text }
       }){ projectV2Item { id } }
     }' \
-    -f project="$PROJECT_ID" -f item="$1" -f field="$2" -f text="$3" >/dev/null
+    -f project="$PROJECT_ID" -f item="$(_ghp_item_node "$1")" -f field="$2" -f text="$3" >/dev/null
 }
 
 # Resolve an option ID from a human name.
@@ -215,9 +326,18 @@ project_find_item_by_issue() {
   name="${repo##*/}"
   # Guard: an empty repo/number is the silent-failure trap — surface it, don't no-op.
   if [[ -z "$owner" || -z "$name" || -z "$pnum" ]]; then
+    if cckit_graphql_off; then cckit_board_graphql_notice; return 0; fi
     echo "✗ project_find_item_by_issue: repo/project-number unresolved (KIT_REPO='${KIT_REPO:-}' repo='$repo' KIT_PROJECT_NUMBER='${KIT_PROJECT_NUMBER:-}'). Set .github.repo + .github.projectNumber in kit.config.json, or pass the number as arg 2." >&2
     return 1
   fi
+  # REST first: the board's items, read for this issue's card ("<id>:<node_id>").
+  local base rc=3
+  if base="$(gh_rest_board_base "$(_ghp_resolve_owner_type)" "$(_ghp_resolve_owner)" "$pnum" 2>/dev/null)"; then
+    gh_log rest query "project_find_item_by_issue" "gh-project"
+    rc=0; item_id="$(gh_rest_board_find_issue_item "$base" "$repo" "$issue_num")" || rc=$?
+  fi
+  case "$rc" in 0) [ -n "$item_id" ] && printf '%s\n' "$item_id"; return 0 ;; 3) ;; *) return 1 ;; esac
+  _ghp_fallback "find item" || return 0
   gh_log graphql query "project_find_item_by_issue:cheap" "gh-project"
   # The cheap query: issue.projectItems(first:20), each node carrying its project number.
   # No pagination, no board scan — O(1) per issue.
@@ -243,6 +363,7 @@ project_find_item_by_issue() {
 # before starting an issue so it can warn on a collision (another session already In Progress). #124.
 project_issue_status() {
   cckit_board_skipped && return 0
+  if cckit_graphql_off; then cckit_board_graphql_notice; return 0; fi
   local issue_num="$1" pnum="${2:-$(_ghp_resolve_pnum)}" repo owner name resp
   repo="$(_ghp_resolve_repo)"; owner="${repo%%/*}"; name="${repo##*/}"
   [ -n "$owner" ] && [ -n "$name" ] && [ -n "$pnum" ] || return 1

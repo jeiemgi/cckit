@@ -160,7 +160,7 @@ _eff_board_add() {
   command -v project_add_item >/dev/null 2>&1 || return 0
   repo="$(_eff_repo)"
   node="$(forge_rest "repos/$repo/issues/$n" --jq .node_id 2>/dev/null)" || return 0
-  item="$(project_add_item "$node" 2>/dev/null)" || return 0
+  item="$(project_add_item "$node" "$repo" "$n" Issue 2>/dev/null)" || return 0
   [ -n "$item" ] || return 0
   [ -n "${STATUS_FIELD_ID:-}" ] && [ -n "${STATUS_OPT_TODO:-}" ] \
     && project_set_single_select "$item" "$STATUS_FIELD_ID" "$STATUS_OPT_TODO" 2>/dev/null || true
@@ -987,7 +987,7 @@ _eff_pr_board() {
   repo="$(_eff_repo)"; pr_num="${url##*/}"
   node="$(forge_rest "repos/$repo/pulls/$pr_num" --jq .node_id 2>/dev/null)" || node=""
   item=""
-  [ -n "$node" ] && item="$(project_add_item "$node" 2>/dev/null || true)"
+  [ -n "$node" ] && item="$(project_add_item "$node" "$repo" "$pr_num" PullRequest 2>/dev/null || true)"
   if [ -z "$item" ]; then
     echo "⚠ PR #$pr_num was opened but NOT added to the board — add it by hand" >&2
   else

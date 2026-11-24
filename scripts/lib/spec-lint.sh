@@ -87,7 +87,7 @@ EOF_SCAN
 spec_section() {
   local text="${1:-}"
   echo "## Spec"
-  if printf '%s\n' "$text" | grep -qE '^[[:space:]]*([-*+]|[0-9]+[.)])([[:space:]]|$)'; then
+  if grep -qE '^[[:space:]]*([-*+]|[0-9]+[.)])([[:space:]]|$)' <<<"$text"; then
     printf '%s\n' "$text" | grep -v '^[[:space:]]*$' || true
   else
     printf '%s\n' "$text" | grep -v '^[[:space:]]*$' | sed 's/^[[:space:]]*/- /' || true

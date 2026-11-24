@@ -2,8 +2,8 @@
 # shellcheck shell=bash
 # gh-rest-test.sh — the lifecycle verbs over the forge (E537.3; #396 before it). cckit pr, merge,
 # close, new, effort new, effort pr and effort close send only REST requests on repos/… endpoints —
-# never a gh subcommand, never GraphQL — and in a cloud session every board step is skipped with
-# one notice. Hermetic: the shared forge shim (test-forge-shim.sh) answers like the REST API over a
+# never a gh subcommand, never GraphQL — and in a cloud session with no board named (KIT_OWNER,
+# KIT_PROJECT_NUMBER) every board step is skipped with one notice. Hermetic: the shared forge shim (test-forge-shim.sh) answers like the REST API over a
 # curl stand-in and logs `METHOD path {json}`; a throwaway repo and a bare remote.
 # Run: bash scripts/lib/gh-rest-test.sh
 # errors: strict — a test runner: rc 1 on any failed assertion
