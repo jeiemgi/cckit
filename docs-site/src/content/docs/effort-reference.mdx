@@ -124,7 +124,7 @@ The slug is a *derived* convenience, not a second source of truth. `--slug` only
   close <N>` detects that (no such branch locally or on origin) and closes **wave-style**: it
   verifies every sub is closed with a merged PR (refusing and listing the stragglers otherwise),
   snapshots the work trace from the merged sub PR diffs instead of branch commits, and then runs
-  the same close tail — metrics judge/sync, parent close, board **Status=Done** for parent and
+  the same close tail — metrics judge, parent close, board **Status=Done** for parent and
   subs, the knowledge-ingest hook, and the kit-sync drift check. If the integration branch does
   exist, the close still asks you to run from it.
 

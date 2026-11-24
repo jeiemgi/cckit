@@ -5,7 +5,7 @@ description: >
   Write and edit end-user documentation in the house voice: kind but robust, ADHD-oriented and
   scannable, ZERO analogies, beginner-inclusive but expert-skippable. Encodes the page template
   (title → one-line description → self-explanatory left-to-right diagram → body → next-section
-  buttons) and the diagram discipline (interactive, left-to-right, self-explanatory, never
+  buttons) and the diagram discipline (static, left-to-right, self-explanatory, never
   repetitive). Use it to keep every docs page readable by people with low software knowledge
   without watering down the substance.
 when_to_use: >
@@ -86,8 +86,8 @@ Every page follows this order, top to bottom:
 
 ## Diagram discipline
 
-- **Interactive, left-to-right.** Diagrams are interactive (React Flow / SVG) and flow left to
-  right, following how the reader reads.
+- **Static, left-to-right.** Diagrams are static figures (inline SVG or a Mermaid block, no
+  client-side diagram library) and flow left to right, following how the reader reads.
 - **Self-explanatory.** A diagram must make sense from the page title alone — labels are plain
   words, the arrows tell the story, no legend required to grasp the shape.
 - **Diagram the flow, not the prose.** Draw a flow when seeing it is faster than reading it:

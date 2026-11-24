@@ -28,9 +28,6 @@
     "enabled": false,
     "wing": "cckit"
   },
-  "engine": {
-    "mode": "off"
-  },
   "captain": {
     "mergePolicy": {
       "requireChecks": true

@@ -6,7 +6,7 @@ description: The six commands that create, order, start and close an effort, the
 import { Aside } from '@astrojs/starlight/components';
 import Chat from '../../../components/Chat.astro';
 import Outcomes from '../../../components/Outcomes.astro';
-import EffortWaves from '../../../components/diagrams/EffortWaves';
+import EffortWaves from '../../../components/figures/EffortWaves.astro';
 
 Some goals do not fit in one issue. A feature with a schema change, an API and a screen is three or
 four changes, and if four agents start on them with no plan, two things go wrong: they edit the
@@ -17,7 +17,7 @@ running at the same time only the steps that are independent. cckit's units for 
 **effort** and the **wave**, defined in [How work is written down](/project-management/). This page
 is the commands, in the order you use them.
 
-<EffortWaves client:only="react" />
+<EffortWaves />
 
 For a first run, follow
 [Break a feature into an effort](/project-management/break-a-feature-into-an-effort/): it is these

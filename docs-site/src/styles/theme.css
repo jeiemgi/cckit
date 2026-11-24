@@ -634,32 +634,38 @@ h1 .cckit-tag, h2 .cckit-tag, h3 .cckit-tag { font-size: 0.65em; }
 	z-index: 2;
 }
 
-/* ── React Flow diagrams — make the library chrome theme-aware ─────────── */
-/* @xyflow/react ships light defaults (white controls, light attribution). Repaint its chrome with
-   the Starlight tokens so the diagrams match the page in BOTH dark and light; node/edge colours are
-   set inline in FlowBase via the same tokens, so the whole surface follows the theme. */
-.cckit-flow .react-flow__controls { box-shadow: var(--sl-shadow-sm); border-radius: 8px; overflow: hidden; }
-.cckit-flow .react-flow__controls-button {
-	background: var(--sl-color-gray-6);
-	border-bottom: 1px solid var(--sl-color-hairline);
-	color: var(--sl-color-white);
+/* ── Figures — static SVG diagrams (src/components/figures/*.astro) ───── */
+/* One hue per kind of step; the border carries the colour, the tint sits over the panel, the text
+   stays high-contrast, so each figure reads the same in dark and light. Figures are the heaviest
+   objects on a page, so they get more vertical air than the block token. */
+.cckit-figure { margin-block: 2.25rem; overflow-x: auto; }
+.cckit-figure svg { display: block; width: 100%; min-width: 36rem; height: auto; margin-inline: auto; }
+.cckit-figure .k-start   { --k: #0a84ff; }
+.cckit-figure .k-work    { --k: #d99a2b; }
+.cckit-figure .k-propose { --k: #8b7cf6; }
+.cckit-figure .k-review  { --k: #38a8c6; }
+.cckit-figure .k-success { --k: #2faa6a; }
+.cckit-figure .k-warn    { --k: #e0617a; }
+.cckit-figure .k-neutral { --k: #7c8a91; }
+.cckit-figure .k-accent  { --k: var(--sl-color-text-accent); }
+.cckit-figure .node rect {
+	fill: color-mix(in srgb, var(--k) 16%, var(--sl-color-gray-6));
+	stroke: var(--k);
+	stroke-width: 1.5;
 }
-.cckit-flow .react-flow__controls-button:hover { background: var(--sl-color-gray-5); }
-.cckit-flow .react-flow__controls-button svg { fill: currentColor; }
-.cckit-flow .react-flow__attribution { background: transparent; color: var(--sl-color-gray-4); }
-.cckit-flow .react-flow__attribution a { color: var(--sl-color-gray-3); }
-.cckit-flow .react-flow__edge-text { fill: var(--sl-color-white); }
-/* Hero diagrams are the heaviest objects on a page — give them the most vertical air (more than the
-   block token), set here in theme.css rather than inline in FlowBase.tsx so all block rhythm lives
-   in one file. */
-.cckit-flow { margin-block: 2.25rem; }
-/* Readability: the diagrams are wide (left→right flows), but the prose column is narrow, so fitView
-   shrinks the node text. On wide screens let the diagram break out past the prose measure (centered,
-   symmetric negative margins) so the graph renders larger. Lowered the gate to ~1248px so typical
-   laptops actually get the breakout (it was clamped at 1400px, which most screens never hit), while
-   still clearing the right-hand table of contents. */
+.cckit-figure text { fill: var(--sl-color-white); text-anchor: middle; dominant-baseline: middle; }
+.cckit-figure .t { font-size: 18px; font-weight: 600; }
+.cckit-figure .d { font-size: 14.5px; opacity: 0.85; }
+.cckit-figure .edge { fill: none; stroke: var(--k, var(--sl-color-text-accent)); stroke-width: 1.5; }
+.cckit-figure .arrow { fill: var(--k, var(--sl-color-text-accent)); }
+.cckit-figure .label rect { fill: var(--sl-color-black); }
+.cckit-figure .label text { font-size: 13px; }
+/* Readability: the figures are wide (left→right flows), but the prose column is narrow, so the SVG
+   scales its text down. On wide screens let a figure break out past the prose measure (centered,
+   symmetric negative margins) so it renders larger, while still clearing the right-hand table of
+   contents. Each SVG caps itself at its natural width, so a small figure is never scaled up. */
 @media (min-width: 78rem) {
-	.cckit-flow {
+	.cckit-figure {
 		width: min(58rem, 92vw);
 		max-width: none;
 		margin-inline: calc((100% - min(58rem, 92vw)) / 2);

@@ -1,0 +1,32 @@
+---
+// The full GitHub work cycle, left to right: an issue becomes a branch, the work becomes a pull
+// request, review either merges it or sends it back for changes.
+// Static SVG, no client JavaScript. Colours come from the .cckit-figure rules in
+// src/styles/theme.css, so the figure follows the light and dark themes.
+---
+<figure class="cckit-figure not-content">
+  <svg viewBox="0 0 1164 300" style="max-width: 1164px" role="img" aria-labelledby="github-cycle-title">
+    <title id="github-cycle-title">The GitHub work cycle: issue, branch, work, pull request, review; review merges the change or sends it back to work.</title>
+    <defs>
+      <marker id="github-cycle-arrow-none" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow" d="M0,0 L10,5 L0,10 z" /></marker>
+      <marker id="github-cycle-arrow-success" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow k-success" d="M0,0 L10,5 L0,10 z" /></marker>
+      <marker id="github-cycle-arrow-warn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow k-warn" d="M0,0 L10,5 L0,10 z" /></marker>
+    </defs>
+    <path class="edge" d="M172,133 C190,133 190,133 208,133" marker-end="url(#github-cycle-arrow-none)" />
+    <path class="edge" d="M368,133 C386,133 386,133 404,133" marker-end="url(#github-cycle-arrow-none)" />
+    <path class="edge" d="M564,133 C582,133 582,133 600,133" marker-end="url(#github-cycle-arrow-none)" />
+    <path class="edge" d="M760,133 C778,133 778,133 796,133" marker-end="url(#github-cycle-arrow-none)" />
+    <path class="edge k-success" d="M956,133 C974,133 974,43 992,43" marker-end="url(#github-cycle-arrow-success)" />
+    <path class="edge k-warn" d="M956,133 C974,133 974,223 992,223" marker-end="url(#github-cycle-arrow-warn)" />
+    <path class="edge" d="M1072,254 V274 H484 V164" marker-end="url(#github-cycle-arrow-none)" />
+    <g class="label"><rect x="935" y="77" width="78" height="22" rx="4" /><text x="974" y="88">approved</text></g>
+    <g class="label"><rect x="927" y="167" width="94" height="22" rx="4" /><text x="974" y="178">needs work</text></g>
+    <g class="node k-start"><rect x="12" y="102" width="160" height="62" rx="10" /><text x="92" y="125" class="t">Issue</text><text x="92" y="146" class="d">what to do</text></g>
+    <g class="node k-start"><rect x="208" y="102" width="160" height="62" rx="10" /><text x="288" y="125" class="t">Branch</text><text x="288" y="146" class="d">isolated worktree</text></g>
+    <g class="node k-work"><rect x="404" y="102" width="160" height="62" rx="10" /><text x="484" y="125" class="t">Work</text><text x="484" y="146" class="d">implement + test</text></g>
+    <g class="node k-propose"><rect x="600" y="102" width="160" height="62" rx="10" /><text x="680" y="125" class="t">Pull request</text><text x="680" y="146" class="d">propose the change</text></g>
+    <g class="node k-review"><rect x="796" y="102" width="160" height="62" rx="10" /><text x="876" y="125" class="t">Review</text><text x="876" y="146" class="d">checks + a look</text></g>
+    <g class="node k-success"><rect x="992" y="12" width="160" height="62" rx="10" /><text x="1072" y="35" class="t">Merge</text><text x="1072" y="56" class="d">into main</text></g>
+    <g class="node k-warn"><rect x="992" y="192" width="160" height="62" rx="10" /><text x="1072" y="215" class="t">Changes</text><text x="1072" y="236" class="d">sent back</text></g>
+  </svg>
+</figure>
