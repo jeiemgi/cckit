@@ -31,14 +31,14 @@ report="$ROOT/scripts/forge-report.sh"
 baseline="$ROOT/scripts/forge-fence.baseline"
 [ -f "$report" ] || { echo "forge-fence: $report is missing" >&2; exit 1; }
 
-is_layer() { case "$1" in scripts/lib/forge.sh|scripts/lib/forge-*.sh|scripts/lib/gh-rest.sh) return 0 ;; *) return 1 ;; esac; }
+is_layer() { case "$1" in scripts/lib/forge.sh|scripts/lib/forge-*.sh|scripts/lib/gh-rest.sh|lib/forge/*.sh) return 0 ;; *) return 1 ;; esac; }
 
 # gh: the report's own file table (its GH_RE), minus the layer.
 gh_files="$(bash "$report" --root "$ROOT" --files | awk 'NR > 1 && $2 > 0 {print $1}' | while IFS= read -r f; do is_layer "$f" || printf '%s\n' "$f"; done)"
 gh_n="$(printf '%s\n' "$gh_files" | sed '/^$/d' | wc -l | tr -d ' ')"
 
 # api: a non-comment line naming the API host, outside the layer.
-api_files="$(cd "$ROOT" && { for f in bin/*; do [ -f "$f" ] && echo "$f"; done; for f in scripts/*.sh scripts/lib/*.sh; do [ -f "$f" ] && echo "$f"; done; } \
+api_files="$(cd "$ROOT" && { for f in bin/*; do [ -f "$f" ] && echo "$f"; done; for f in scripts/*.sh scripts/lib/*.sh lib/*/*.sh; do [ -f "$f" ] && echo "$f"; done; } \
   | grep -vE -- '-test\.sh$|^scripts/lib/test-[a-z-]+\.sh$' | sort -u | while IFS= read -r f; do
       is_layer "$f" && continue
       case "$f" in scripts/forge-fence.sh|scripts/forge-report.sh) continue ;; esac
