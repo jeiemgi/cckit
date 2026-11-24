@@ -22,10 +22,12 @@ lib_ln="$(printf '%s\n' "$blk" | grep -n 'source "\$LIB/effort\.sh"' | sed -n 1p
 t "effort) loads the project config"          "$([ -n "$cfg_ln" ] && echo yes)" "yes"
 t "config load precedes the effort libs"      "$([ -n "$cfg_ln" ] && [ -n "$lib_ln" ] && [ "$cfg_ln" -lt "$lib_ln" ] && echo yes)" "yes"
 
-# #243: every effort subcommand the usage header advertises must actually dispatch, `chain` included
+# #243: every effort subcommand the usage advertises must actually dispatch, `chain` included
 # — a docs/code drift guard (a subcommand documented but not wired falls through to the usage line).
-usage_subs="$(grep -oE '^#   cckit effort <[a-z|]+>' "$BIN" | sed -n 1p | sed -E 's/.*<//; s/>//; s/\|/ /g')"
-t "usage header lists the effort subcommands" "$usage_subs" "new chain start pr close plan"
+# The usage lives in the verb table (#555): one `cckit effort <sub>` line per subcommand.
+usage_subs="$(awk -F'\t' '$1 == "effort" && $2 == "verb" { print $10 }' "$(dirname "$BIN")/../scripts/lib/verbs.tsv" \
+  | sed 's/\\n/\n/g' | awk '$1 == "cckit" && $2 == "effort" { printf "%s%s", sep, $3; sep = " " }')"
+t "the verb table's usage lists the effort subcommands" "$usage_subs" "new chain start pr close plan"
 for s in $usage_subs; do
   t "effort) dispatches '$s'" \
     "$(printf '%s\n' "$blk" | grep -cE "^      ${s}\)" | tr -d ' ')" "1"

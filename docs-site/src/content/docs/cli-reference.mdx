@@ -20,6 +20,103 @@ cckit is a thin bash dispatcher over a git-mechanics bundle. Every verb reads fr
 The tables are grouped by job: setup, the daily lifecycle, planning a wave, running flows in parallel, and housekeeping. Copy any command straight from the table. Run `cckit <verb> --help` for the details of one verb.
 </Aside>
 
+## Every verb, by the question it answers
+
+Each verb answers one question, and the tables below list them grouped the way `cckit help` prints
+them, git mechanics first. **Paste** is a prompt to give an agent; **Needs** says whether the verb
+runs on git alone or also uses the forge (GitHub) when one is configured; **Skill** names the skill
+that drives the verb in Claude Code, and a dash means the verb is CLI-only. The block is generated
+from `scripts/lib/verbs.tsv`, the one source for every verb, and `scripts/verbs-test.sh` fails when
+it drifts.
+
+{/* verbs:begin — generated from scripts/lib/verbs.tsv by scripts/verbs-gen.sh; do not edit by hand */}
+
+### How do I take one change from a branch to merged?
+
+| Verb | Answers | Paste | Needs | Skill |
+| --- | --- | --- | --- | --- |
+| `cckit start` | How do I start work on an issue without touching my main checkout? | Start the issue I pick in its own worktree. | git + forge | `kit-task-start` |
+| `cckit pr` | How do I open the pull request for this issue? | Commit this work and open its pull request. | git + forge | `kit-task-pr` |
+| `cckit merge` | Can this pull request land, and what does landing clean up? | Merge this branch's pull request once its gate is green, and clean up the branch. | git + forge | `kit-task-pr-merge` |
+| `cckit close` | How do I close an issue that no pull request closed? | Close the issue I name, with a one-line summary of why. | git + forge | `kit-task-close` |
+| `cckit hotfix` | How do I carry one merged fix to the release branch? | Cherry-pick the merged fix I name onto the release branch and open its pull request. | git + forge | — |
+| `cckit task` | How do I track work in the project itself, without a GitHub issue? | Record this as a light task, then show me the task list. | git + forge | — |
+
+### Where are we, and what comes next?
+
+| Verb | Answers | Paste | Needs | Skill |
+| --- | --- | --- | --- | --- |
+| `cckit status` | Where are we? | Where are we? Show me what is undone, what waits on me and what can be cleaned up. | git + forge | `kit-status` |
+| `cckit sync` | What is on the board, by role, and what is blocked? | Sync the board and show me what is ready. | git + forge | `kit-task-sync` |
+| `cckit next` | What should I pick up next? | Show me what is unblocked and how to start the top item; I will pick. | git + forge | `kit-next` |
+| `cckit plan` | In what order can the open issues run? | Plan the open issues into waves and show me the first wave. | git + forge | — |
+| `cckit plan-next` | Given what the kit already does, what should we build next? | Inventory what the kit can do and propose what to build next. | git | `kit-plan-next` |
+| `cckit wave` | Which waves of work can start from the open efforts? | Read the open efforts and propose the next wave of work. | git + forge | `kit-next` |
+| `cckit claims` | Which session is working on which issue? | Show me which live session holds which issue. | git | — |
+| `cckit handoff` | How do I leave the next session a note? | Save a handoff note: what is pending, the next step, the references. | git | — |
+| `cckit` (no verb) | Where did the last session stop? | Read the last handoff and pick up where it stopped. | git | — |
+
+### How do I plan the work and run it?
+
+| Verb | Answers | Paste | Needs | Skill |
+| --- | --- | --- | --- | --- |
+| `cckit new` | How do I track a new piece of work as an issue? | File an issue for this, with its labels, and put it on the board. | git + forge | `kit-task-new` |
+| `cckit effort` | How do I scope, start, open and close a piece of work with several parts? | Scope this goal as an effort with sub-issues, show it to me, then start it. | git + forge | `kit-effort-new` |
+| `cckit orchestrate` | How do I run several issues at once, each in its own worktree? | Run the issues I pick in parallel worktrees; show me the dry run first. | git + forge | — |
+| `cckit autopilot` | How do I run approved work unattended, under a cap? | Run the unblocked work unattended under a cap of two; show me the dry run first. | git + forge | `kit-autopilot` |
+| `cckit watch` | Which open pull requests can merge now, and what is the next wave? | Gate the open pull requests and tell me which are clean to merge. | git + forge | — |
+| `cckit brief` | What does an agent need to know before it works an issue? | Write the delegation brief for the issue I pick. | git + forge | — |
+| `cckit receipt` | How does a worker record what one stage did? | Record this stage's receipt on its issue. | git + forge | — |
+| `cckit msg` | How do I tell another live session something? | Send the other live session a message about what I just changed. | git | — |
+
+### What can be cleaned up?
+
+| Verb | Answers | Paste | Needs | Skill |
+| --- | --- | --- | --- | --- |
+| `cckit gc` | Which branches and worktrees can go? | Show me which branches and worktrees can be deleted, and why. | git + forge | `kit-gc` |
+| `cckit cleanup` | How do I delete the merged branches and worktrees in one pass? | Clean up the merged branches and worktrees; show me the plan before deleting. | git + forge | `kit-cleanup` |
+
+### How do I check and review the work?
+
+| Verb | Answers | Paste | Needs | Skill |
+| --- | --- | --- | --- | --- |
+| `cckit qa` | Does the change work in the running app? | Bring up the review stack for this branch and open the screen the change touched. | git + forge | — |
+| `cckit page` | How do I review a plan or a decision as a page? | Open this plan as a review page and record my answer. | git + forge | `kit-page` |
+| `cckit debug` | What is the browser doing on this page? | Debug this page in the browser and tell me what fails. | git | — |
+| `cckit bench` | How well are this project's docs found and used? | Run the docs benchmark and report the score. | git + forge | — |
+| `cckit digest` | What does this file or page say, in short? | Summarize this file with the local model. | git | `kit-digest` |
+
+### How do I set up, update or ship cckit?
+
+| Verb | Answers | Paste | Needs | Skill |
+| --- | --- | --- | --- | --- |
+| `cckit install` | How do I put cckit on my PATH? | Install cckit on this machine. | git | — |
+| `cckit init` | How do I set cckit up in a project? | Set cckit up in this folder; ask me what you need. | git + forge | — |
+| `cckit doctor` | Is this machine ready to run cckit? | Check that this machine has everything cckit needs, and tell me what is missing. | git + forge | `kit-onboard` |
+| `cckit add` | What can I switch on in this project? | List what I can add to this project, and add the one I pick. | git + forge | `kit-add` |
+| `cckit update` | Is this project behind the installed cckit? | Check whether this project is behind the installed cckit. | git | — |
+| `cckit migrate` | How do I move an old kit layout to the current one? | Migrate this project's kit layout; show me the dry run first. | git | — |
+| `cckit adopt` | Which kit-shaped files does this repo already have? | Record the kit files this repo already has. | git | — |
+| `cckit completions` | How do I get tab completion for cckit? | Set up cckit tab completion in my shell. | git | — |
+| `cckit release` | How do I cut a cckit release? | Dry-run the next cckit release and show me what it would publish. | git + forge | — |
+| `cckit contribute` | How do I send a change back to cckit? | Contribute this change to cckit as a pull request. | git | `kit-contribute` |
+| `cckit version` | Which cckit is installed? | Which cckit version is installed? | git | — |
+
+### What does cckit offer, and what is it built from?
+
+| Verb | Answers | Paste | Needs | Skill |
+| --- | --- | --- | --- | --- |
+| `cckit help` | What can cckit do? | List the cckit verbs by the question each one answers. | git | — |
+| `cckit commands` | Which verbs exist? | List every cckit verb with the question it answers. | git | — |
+| `cckit lib` | Which helper already does this? | Find the cckit helper that already does this before writing one. | git | — |
+| `cckit scan` | What stack is this repo, and what kit state does it have? | Scan this repo's stack and kit state. | git | — |
+| `cckit encode-context` | How do I hand a subagent JSON in fewer tokens? | Encode this JSON as TOON before you hand it to the subagent. | git | — |
+| `cckit render` | How do I read markdown rendered in the terminal? | Render this markdown in the terminal. | git | — |
+
+Old names that still work: `cckit copilot` runs `cckit wave` · `cckit ui` runs `cckit status`.
+
+{/* verbs:end */}
+
 ## Set up and install
 
 | Verb | Purpose |
@@ -152,30 +249,6 @@ Exit codes: 0 done · 1 refused or a failed step · 2 usage; `task run` adds the
 `false`) is the page-task switch the `task run` row describes; its definition is in
 `kit.config.schema.json`.
 
-## Verb ↔ skill map
-
-Every verb below is drivable from the CLI. The ones with a skill are also reachable as a slash command in Claude Code; the ones without are CLI-only, which means an agent that only reads the skills list cannot see them. Kept here so that gap stays visible rather than being rediscovered.
-
-| Verb | Skill | |
-| --- | --- | --- |
-| `status` | `kit-status` | |
-| `sync` | `kit-task-sync` | |
-| `next` | `kit-next` | |
-| `plan-next` | `kit-plan-next` | |
-| `start` · `pr` · `close` | `kit-task-start` · `kit-task-pr` · `kit-task-close` | |
-| `gc` | `kit-gc` | (`kit-cleanup` acts on its report) |
-| `autopilot` | `kit-autopilot` | |
-| `contribute` | `kit-contribute` | |
-| `digest` | `kit-digest` | |
-| `doctor` · `init` · `update` | `kit-doctor` · `kit-init` · `kit-update` | plugin commands |
-| `add` | `kit-add` | lists, asks the descriptor's one question, then runs the verb |
-| `effort` | `kit-effort-new` · `-start` · `-pr` · `-close` | one skill per phase |
-| `brief` | — | CLI-only |
-| `plan` · `wave` · `watch` · `orchestrate` | — | CLI-only |
-| `msg` · `handoff` | — | CLI-only |
-| `adopt` · `migrate` · `scan` | — | CLI-only |
-| `lib` · `commands` · `version` · `render` · `encode-context` · `bench` · `release` · `install` · `completions` · `debug` | — | plumbing; no skill intended |
-
 ## Plan and drive a wave
 
 A **wave** is a set of issues with no blockers between them, so they can run at once. These verbs plan a wave and drive the agents through it.
@@ -263,7 +336,7 @@ A test greps the shipped `scripts/lib` and `bin` for any vendor model id and req
 | `cckit bench checkpoint <X.Y.Z> [--passes N] [--from <run.json>] [--model <name>] [--note <text>] [--verbs <timings.json>]` | Record a benchmark run as a checkpoint of release `<X.Y.Z>` in `benchmarks/runs/<X.Y.Z>.json`. `cckit bench checkpoints [--json]` lists every checkpoint, `cckit bench check <X.Y.Z>` gives the release verdict (exit 0 · 1 · 2), `cckit bench page [--out <file>] [--check]` prints or verifies the [results page](/benchmark-results/). See [Checkpoints per release](/benchmark/#checkpoints-per-release). |
 | `cckit bench verbs [--runs N] [--checkout <dir>] [--verb "<verb>"] [--json]` | Wall time (fastest and median, in milliseconds) and GitHub request count (`gh_calls`: API requests over `curl`, plus any `gh` run) of nine read-only verbs, each run N times (default 3). `cckit bench checkpoint <X.Y.Z> --verbs <file>` attaches the `--json` output to a checkpoint. See [Verb timings](/benchmark/#verb-timings). |
 | `cckit version` | The installed cckit version. |
-| `cckit commands` | List every verb (the command catalog). |
+| `cckit commands [--json]` | List every verb, default and old name (the command catalog), read from `scripts/lib/verbs.tsv`. `--json` returns one object per name: `name`, `kind` (`verb`, `default` or `alias`), `target`, `group`, `needs` (`git` or `forge`), `skill`, `question`, `prompt`, `usage` (an array of lines). `--llm` keeps the older shape, an array of names. |
 | `cckit lib [--all] [--reasons]` | List every `scripts/lib` helper: its public functions, its one-line purpose, and its declared error behaviour. The companion to `commands` — that lists the verbs, this lists the library they are built from. |
 | `cckit brief <issue>` | Generate an issue's delegation brief from real repo state: its worktree and branch, whether that branch's seed is stale, the files it owns, the helpers those files sit on, and the project's standing gotchas. |
 | `cckit update` | Report whether this project is behind the installed cckit: `up to date` (exit 0), or `update available` with the command to run, `cckit init --upgrade` (exit 10). Changes nothing. See [Update a project](/getting-started/update/). |
