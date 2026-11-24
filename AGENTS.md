@@ -1,10 +1,8 @@
 # AGENTS.md — driving cckit from an agent
 
 cckit is agent-agnostic. Claude Code is first-class (skills + slash commands), but any agent that
-can run a shell can drive the full lifecycle. This file is the contract.
-
-The two-layer split — an agnostic core (this contract) and per-agent adapters (Claude Code is
-adapter one) — is described in [the Adapters page](docs-site/src/content/docs/adapters.md).
+can run a shell can drive the full lifecycle. This file is the contract: the agnostic core. The
+per-agent adapters are described in [the Adapters page](docs-site/src/content/docs/adapters.md).
 
 ## Ground rules
 
@@ -34,24 +32,55 @@ adapter one) — is described in [the Adapters page](docs-site/src/content/docs/
   decision are fixed at the gap, not reworded. `cckit brief <issue>` emits this instruction in its
   `## Durable prose` section, so a delegated agent gets it without being told twice.
 
-## What cckit installs for itself
+## Which skill does what
 
-`templates/` is what `cckit init` writes into a consuming project. `.claude/skills/` and
-`.claude/rules/` in this repo are the subset cckit applies to its **own** work — `concrete`,
-`karpathy-guidelines`, and the rules for branches, efforts, PR titles, delegation, communication
-style and issue lifecycle (`issue-lifecycle.md`: sub-issues not checkboxes, approved-plan autonomy,
-explicit closes) and merge safety (`merge-safety.md`: current base before merging, a coupled chain as
-one PR, the gate re-run on the integration branch) and authoring (`authoring.md`: docs in the same change,
-no issue numbers in pasted prompts, summaries without machine flags) and the shared checkout
-(`shared-checkout.md`: never move the primary checkout by hand, work in a worktree, call a freshly merged verb from a
-current worktree's `bin/cckit`) and review pages (`review-pages.md`: a plan, a decision or a grilling round opens as a
-page, terminal output where there is no browser, the answer written back). No agents are installed: this file plus `cckit brief` is the delegation contract here.
+One row per skill; its tasks and terms are its entries in `skills/routing.yaml` (the machine-readable
+copy; `bash scripts/terms-check.sh` names a drift between the two). A term is a file under
+`ontology/terms/`; `none` says the skill serves the kit's own setup and no process term yet.
 
-The manifest and the reason for every skipped template are in `scripts/self-install-test.sh`, which
-also fails if an installed copy drifts from its template. Edit a template and its installed copy in
-the same commit.
+| What you want | Skill | Term |
+| --- | --- | --- |
+| know where we are: local undone work, PRs waiting, cleanup | `kit-status` | Report |
+| read the board by role, see what is blocked | `kit-task-sync` | Sync |
+| pick up the next unblocked issue · fan the unblocked wave out to builders | `kit-next` | Task, Wave |
+| decide what to build next from what the kit already does | `kit-plan-next` | Effort |
+| run an approved plan unattended, waves merged as they go | `kit-autopilot` | Captain |
+| track a new piece of work as an issue | `kit-task-new` | Task |
+| start work on an issue in its own worktree | `kit-task-start` | Worktree |
+| open the PR for an issue | `kit-task-pr` | Task |
+| land an issue's PR once the gate is green | `kit-task-pr-merge` | Gate |
+| open and land the PR in one step | `kit-task-pr-auto` | Task |
+| close an issue whose PR merged | `kit-task-close` | Task |
+| take one issue from code to merged | `kit-ship` | Task |
+| scope a goal into an effort · record the deliverables as sub-issues | `kit-effort-new` | Effort, SubIssue |
+| start building an effort | `kit-effort-start` | Effort |
+| open the one PR of an effort | `kit-effort-pr` | Effort |
+| land and close an effort | `kit-effort-close` | Effort |
+| see which branches and worktrees can go | `kit-gc` | Worktree |
+| delete the merged branches and worktrees | `kit-cleanup` | Worktree |
+| audit the project for security findings | `kit-security-sweep` | Check |
+| audit the UI's flows, consistency and accessibility | `kit-ux-audit` | Check |
+| give visual feedback on a running UI and triage it | `kit-annotate` | Check |
+| set cckit up on a new machine | `kit-onboard` | none |
+| add an integration or a module to the project | `kit-add` | none |
+| add or edit an agent or a skill in a project | `kit-customize` | none |
+| send a change upstream to cckit | `kit-contribute` | none |
+| change cckit itself and test it live | `kit-dev` | none |
+| write a docs page in the house voice | `kit-docs-writer` | none |
+| shorten a long input before reading it | `kit-digest` | none |
+| show a plan, a decision or a grilling round as a page | `kit-page` | none |
+
+`.claude/skills/` and `.claude/rules/` here are the subset of `templates/` cckit applies to its own
+work (`concrete`, `karpathy-guidelines`, and the rules). No agents are installed: this file plus
+`cckit brief` is the delegation contract. `scripts/self-install-test.sh` holds the manifest and every
+skip reason, and fails when an installed copy drifts; edit template and copy in the same commit.
 
 ## Core verbs
+
+Every verb, the question it answers, one prompt to paste, its usage and whether it uses the forge
+live in one table, `scripts/lib/verbs.tsv`. `cckit help` prints it grouped by question, git
+mechanics first; `cckit commands --json` returns it as data, one object per verb. The table below
+carries the flags and behaviour of each verb.
 
 | Verb | Purpose | LLM mode |
 | --- | --- | --- |
@@ -110,7 +139,7 @@ Every operation an unattended run needs is reachable through the one CLI:
 | Verb | Purpose |
 | --- | --- |
 | `cckit scan` | detect the repo's stack + kit state (emits JSON) |
-| `cckit doctor [--fix]` | onboarding preflight (deps, gh auth); asks before installing on a TTY, `--fix` skips the prompt. With no TTY and no `--fix` it is report-only: no package install, no `pnpm install`, no seeded or refreshed file, no server start. With `tasks.design: true` it prints one `page-design skill` row per selected adapter: a failing row naming `cckit add page-design` when the skill folder is absent. The row of an integration it has just installed names the files the installer wrote besides the one detected (the descriptor's `alsoWrites`; for `impeccable`, `.claude/agents/impeccable-*.md`). Reports the CLI of each selected adapter (`claude`, `codex`) present or absent; `cckit doctor --agents` prints only those rows, makes no network call, and exits 1 when one is absent. With `codex` selected it also reports whether the hooks are registered in `.codex/hooks.json` (a warning when not; whether Codex trusts them is not readable). One row per `integrations/` descriptor that is on — its config key, or a descriptor with `config.default: true` whose key is absent (`lavish`) — installed by the shared runner; a missing default-on tool the project never set a key for is a skip row: not installed, not a failure; an integration installs only after `--fix` or a yes at the prompt (recorded as `install:<id>` in `.cckit/consent`) — a run with no TTY and no `--fix` reports it missing, installs nothing and exits 1. Also prints the resident instruction-file line `cckit status` prints, and warns when it is over the 150k limit |
+| `cckit doctor [--fix]` | onboarding preflight (deps, the forge: a GitHub token, `gh` optional); asks before installing on a TTY, `--fix` skips the prompt. With no TTY and no `--fix` it is report-only: no package install, no `pnpm install`, no seeded or refreshed file, no server start. With `tasks.design: true` it prints one `page-design skill` row per selected adapter: a failing row naming `cckit add page-design` when the skill folder is absent. The row of an integration it has just installed names the files the installer wrote besides the one detected (the descriptor's `alsoWrites`; for `impeccable`, `.claude/agents/impeccable-*.md`). Reports the CLI of each selected adapter (`claude`, `codex`) present or absent; `cckit doctor --agents` prints only those rows, makes no network call, and exits 1 when one is absent. With `codex` selected it also reports whether the hooks are registered in `.codex/hooks.json` (a warning when not; whether Codex trusts them is not readable). One row per `integrations/` descriptor that is on — its config key, or a descriptor with `config.default: true` whose key is absent (`lavish`) — installed by the shared runner; a missing default-on tool the project never set a key for is a skip row: not installed, not a failure; an integration installs only after `--fix` or a yes at the prompt (recorded as `install:<id>` in `.cckit/consent`) — a run with no TTY and no `--fix` reports it missing, installs nothing and exits 1. Also prints the resident instruction-file line `cckit status` prints, and warns when it is over the 150k limit |
 | `cckit add [<name>] [--set k=v] [--answers FILE] [--dir DIR]` | no name: list every integration descriptor in `integrations/`, the modules and the kit skills that can be added, exit 0 (`--llm` → one JSON object with `enabled` and `applies` per integration, and `enabled` and `installed` per skill). With an integration: set the one config key its descriptor names, in the config `kit_config_path` resolves — no other key changes, and nothing is installed. For a descriptor that is on by default (`lavish`), `--set enable=no` writes the off value (`reviewPages.enabled: false`) and no rule. The three design skills the `page-design` skill coordinates are integrations too: `impeccable` (`designDirection.provider`), `emil-design-eng` (`designMotion.provider`) and `web-design-guidelines` (`designAudit.provider`); each is detected by its skill file in `.claude/skills/<id>/` or `~/.claude/skills/<id>/`, and installed for Claude Code, into the project, by one `npx` command. A descriptor that lists `rules` (`graft` → `code-retrieval`, `lavish` → `review-pages`) also gets each one copied into `.claude/rules/`; an existing rule file is kept. Declines (exit 0, nothing written) on a repo with no file the integration can work on; exits 1 with no project config or an invalid descriptor. With a module (`software`): write this directory's `.claude/kit.config.json`. With a kit skill (`page-design`, the one that ships an `add.json`): set its config key (`tasks.design: true`) and copy `SKILL.md` and `references/` into the skills folder of each adapter in the config (`.claude/skills/page-design/`, `.agents/skills/page-design/`); it asks nothing, needs no version bump, keeps a copy already there, and a second run changes nothing; exit 1 with no project config. `KIT_DRY_RUN=1` writes nothing, and for an integration prints the install candidates in order plus the wire command. The tools, the consent line and the install order: [Integrations](https://cckit.dev/integrations/) |
 | `cckit update` | report whether the project is behind the installed cckit: `up to date` (exit 0), or `update available · <have> -> <latest>` naming `cckit init --upgrade` (exit 10). Changes nothing |
 | `cckit migrate [--dry-run]` | reshuffle an old kit layout to the current one; `--dry-run` writes nothing |
@@ -145,9 +174,9 @@ a `cckit` run in another project reads its own config.
 
 ### Night mode (no verb: `/kit-autopilot` + two scripts)
 
-Night mode has no `cckit` verb. The `kit-autopilot` skill reads the owner's night grant with
-`scripts/night-grant.sh read <parent>` and launches the Workflow script `scripts/night-run.mjs`
-with the args that prints. In a consuming project both live under `${CLAUDE_PLUGIN_ROOT}/scripts/`.
+The `kit-autopilot` skill reads the owner's night grant with `scripts/night-grant.sh read <parent>`
+and launches the Workflow script `scripts/night-run.mjs` with the args that prints. In a consuming
+project both live under `${CLAUDE_PLUGIN_ROOT}/scripts/`.
 
 | Rule | What the scripts enforce |
 | --- | --- |
@@ -161,30 +190,13 @@ with the args that prints. In a consuming project both live under `${CLAUDE_PLUG
 Config: `night.floors`, `night.neverWaivable`, `night.gate`, `night.grantors`, `night.refuseLabels`
 — see [Night mode](https://cckit.dev/config-and-permissions/#night-mode).
 
-## The agent loop (reference)
-
-1. `cckit sync --llm` → pick an unblocked issue.
-2. `cckit start <issue>` → enter the worktree it prints.
-3. Implement; commit early and often.
-4. `cckit pr <issue> "<summary>"` → open the PR; report the URL.
-5. Stop. Merging is a human/captain decision unless an approved plan says otherwise.
-
 ## Model endpoint
 
-cckit shells out to whatever agent invokes it; it does not embed a model. For verbs that synthesize
-text (digests, ingest), the model endpoint is configurable via environment — see the docs site,
-[cckit.dev](https://cckit.dev).
+cckit shells out to whatever agent invokes it; it does not embed a model. The endpoint the verbs
+that synthesize text read is configured by environment variable names, never values:
 
-`cckit effort close` appends one record per effort to `<git-common-dir>/effort-metrics/records.jsonl`.
-`build_seconds` is close time minus the stamp `cckit effort start` wrote when it created the branch
-(`build_source: "effort-start"`), or, with no stamp, minus the author time of the oldest commit on
-the effort branch (`"first-commit"`). `tokens_real` comes from Claude transcripts of the sessions in
-`<git-common-dir>/kit-usage.jsonl` when a project keeps that log (`tokens_source: "transcripts"`;
-cckit ships no writer for it), else from the `cckit autopilot run` state files of the effort branch
-and its `sub/<N><letter>` branches (`"autopilot-run"`, headless rounds only). With neither it is
-`null` and `tokens_null_reason` is `no-usage-source`, `no-session-matched` or
-`autopilot-usage-unknown`. No figure is estimated. The field table is in the README under *The
-effort metrics record*.
+`cckit effort close` appends one record per effort to `<git-common-dir>/effort-metrics/records.jsonl`;
+its fields, their sources and when each is `null` are in the README under *The effort metrics record*.
 
 The effort-close judge reads an OpenAI-compatible endpoint from `CCKIT_MODEL_URL` (base URL; it
 POSTs to `<value>/chat/completions`), `CCKIT_MODEL` (model name) and `CCKIT_MODEL_TOKEN` (bearer
@@ -208,48 +220,49 @@ Marketing; every other page is Software. The track sets the sidebar, the marker 
 current entry of the top-bar switch (`docs-site/src/lib/tracks.ts`, `docs-site/src/routeData.ts`).
 
 - **Software pages live under their area.** The areas, in sidebar order: `getting-started/`,
-  `project-management/`, `design/`, `development/`, `review/`, `ship/`, then the optional
-  `memory/`. `software.mdx`
-  is the track's entry page and `philosophy/` holds the team page beside `philosophy.mdx`.
-  Reference pages (`cli-reference`, `config-and-permissions`, `integrations`, `skills`, `rules`,
-  `hooks`, …) stay at the root so links to their anchors keep working. Inside an area the order is:
-  why it exists, who does it, which tools plug in, the verbs, the guides. There is no separate
-  tutorials section: a step-by-step page is a guide in its area.
-- **The look lives in one file.** `docs-site/src/styles/theme.css` holds the palette (the Apple System
-  Colors terminal scheme, dark and light), the type scale and the measured contrast ratios. Both
-  tracks share one action colour; a track differs by its marker colour, `--cckit-track`. The
+  `project-management/`, `design/`, `development/`, `review/`, `ship/`, then the optional `memory/`.
+  `software.mdx` is the track's entry page and `philosophy/` holds the team page beside
+  `philosophy.mdx`. Reference pages (`cli-reference`, `config-and-permissions`, `integrations`,
+  `skills`, `rules`, `hooks`, …) stay at the root so links to their anchors keep working. Inside an
+  area the order is: why it exists, who does it, which tools plug in, the verbs, the guides. There
+  is no separate tutorials section: a step-by-step page is a guide in its area.
+- **The look lives in one file.** `docs-site/src/styles/theme.css` holds the palette (the Apple
+  System Colors terminal scheme, dark and light), the type scale and the measured contrast ratios.
+  Both tracks share one action colour; a track differs by its marker colour, `--cckit-track`. The
   typeface is Geist and Geist Mono, self-hosted through `@fontsource-variable/geist` and
   `@fontsource-variable/geist-mono`. A page opens dark when the reader has stored no choice
   (`docs-site/src/components/ThemeProvider.astro`).
-- **The header never moves.** `docs-site/src/components/Header.astro` is a three-column grid: the
-  wordmark, the search centred on the page, then the right group. Items that exist on one track
-  only (version, GitHub icon, language picker) come before the theme picker, and the Software /
-  Marketing switch is last, at the right edge. Search controls take their surface and edge from
-  `--cckit-field-bg` and `--cckit-field-border`, which hold 3:1 against the page in both themes.
+- **The header is one component and never moves.** `docs-site/src/components/Header.astro` is a
+  three-column grid: the wordmark, the search centred on the page, then the right group: version
+  text and GitHub icon (Software only, `SocialIcons.astro`), language picker (Marketing only),
+  theme picker, and the Software / Marketing switch (`TrackSwitch.astro`) last, at the right edge;
+  the switch is not in `SiteTitle`. On a phone the switch, the search icon and the menu button
+  share one row. Search controls take their surface and edge from `--cckit-field-bg` and
+  `--cckit-field-border`, which hold 3:1 against the page in both themes.
 - **The guide header is two stacked blocks** (`docs-site/src/components/TutorialMeta.astro`): the
   "Copy the prompt" banner, then "Before you start". Keep each to one line of text per item.
-- **The sidebar is curated.** `sidebar` in `docs-site/astro.config.mjs` lists 43 Software pages:
-  one "Start here" link, eight area groups and a Reference group, every group collapsed except the
-  one holding the current page. The Marketing list is 15 pages in six groups (How it works, Get set up,
+- **The sidebar is curated.** `sidebar` in `docs-site/astro.config.mjs` lists 43 Software pages: one
+  "Start here" link, eight area groups and a Reference group, every group collapsed except the one
+  holding the current page. The Marketing list is 15 pages in six groups (How it works, Get set up,
   Make a piece, Review and approve, Plan, Look things up) after a "Start here" link, nested in the
   `Marketing` entry; `src/routeData.ts` unwraps it and opens every group. Each Marketing page ends
   with a `Next:` link to the following sidebar entry; move a page and its neighbours' links move
-  with it, in both languages. The sidebar group icons in
-  `theme.css` apply to Software only. The site has 87 English pages (72 Software, 15 Marketing). A new
-  Software page is not added to the sidebar by default: link a guide from its area's
-  `more-guides.mdx` (`development/`, `review/`) and a reference page from `reference.mdx`.
-- **A guide step leads with a conversation window.** `<Chat>` (`docs-site/src/components/Chat.astro`)
-  shows what a person says in the agent's chat, the command it runs (`ran`, Software only), the
-  real output and the agent's reply, on one running example, the "Bakery site". `<Outcomes>`
-  (`Outcomes.astro`) is the collapsed block under it for outcome tables and exit codes. The prose
-  says "your agent" on Software pages and "your assistant" (Spanish "tu asistente") on Marketing
-  pages, and "in the chat" for the place; it names Claude Code or Codex only where a step is true
-  for that product alone. Truth rule: `ran` is a real command with real flags, with no literal
-  issue or task number; `output` is real (a Bakery run, a read-only verb run there, or a string a
-  test in `scripts/` asserts), trimmed only with a line `…` and `<project>` for a path, and is
-  omitted when none of those exists; the reply claims nothing the command did not do. A Marketing
-  window carries no `ran` and no `output` (the build fails if it does). Reference pages stay
-  command-first. Authoring notes: `docs-site/src/components/README-chat.md`.
+  with it, in both languages. The sidebar group icons in `theme.css` apply to Software only. The
+  site has 87 English pages (72 Software, 15 Marketing). A new Software page is not added to the
+  sidebar by default: link a guide from its area's `more-guides.mdx` (`development/`, `review/`) and
+  a reference page from `reference.mdx`.
+- **A guide step leads with a conversation window.** `<Chat>`
+  (`docs-site/src/components/Chat.astro`) shows what a person says in the agent's chat, the command
+  it runs (`ran`, Software only), the real output and the agent's reply, on one running example, the
+  "Bakery site". `<Outcomes>` (`Outcomes.astro`) is the collapsed block under it for outcome tables
+  and exit codes. The prose says "your agent" on Software pages and "your assistant" (Spanish "tu
+  asistente") on Marketing pages, and "in the chat" for the place; it names Claude Code or Codex
+  only where a step is true for that product alone. Truth rule: `ran` is a real command with real
+  flags, with no literal issue or task number; `output` is real (a Bakery run, a read-only verb run
+  there, or a string a test in `scripts/` asserts), trimmed only with a line `…` and `<project>` for
+  a path, and is omitted when none of those exists; the reply claims nothing the command did not do.
+  A Marketing window carries no `ran` and no `output` (the build fails if it does). Reference pages
+  stay command-first. Authoring notes: `docs-site/src/components/README-chat.md`.
 - **A Marketing page has a Spanish twin** with the same file name under
   `src/content/docs/es/marketing/`. Change both in one commit. Links from a Spanish page into a
   Software page say the target is in English.
@@ -263,11 +276,6 @@ current entry of the top-bar switch (`docs-site/src/lib/tracks.ts`, `docs-site/s
   heading). Smaller tables stay tables. To keep a grid, wrap the table in
   `<div data-table="grid">` (`docs-site/src/lib/rehype-record-tables.mjs`, tested by
   `scripts/docs-record-tables-test.sh`).
-- **The header is one component.** `docs-site/src/components/Header.astro` lays out the top bar:
-  wordmark, centred search, then the Software / Marketing switch (`TrackSwitch.astro`), version text
-  and GitHub icon (Software only, `SocialIcons.astro`), theme picker, language picker (Marketing
-  only). The switch lives there, not in `SiteTitle` (no override of that remains). On a phone the
-  switch, the search icon and the menu button share one row.
 - **`SearchStart.astro` is the search entry** on the home page and on `software.mdx`,
   `marketing/index.mdx` and `es/marketing/index.mdx`. Its chips are defined in that file, one list
   per track and language; every chip is a real link, and a script upgrades the click to open search
@@ -281,7 +289,7 @@ current entry of the top-bar switch (`docs-site/src/lib/tracks.ts`, `docs-site/s
 ## Paste-ready agent prompt
 
 Drop this verbatim into your agent's system prompt (or the first message of a session) to make it
-operate the repo through cckit. It is self-contained.
+operate the repo through cckit. It is self-contained and names nothing repo-specific.
 
 ```text
 You operate this repository through cckit, a CLI that runs the full GitHub work lifecycle.
@@ -299,6 +307,3 @@ Operating rules:
    everything resolves from cckit.config.json.
 7. If a command fails, read its stderr and fix the cause. Do not work around the kit.
 ```
-
-Copy the fenced block above. Nothing in it is repo-specific, so it works for any project that has
-run `cckit init`.

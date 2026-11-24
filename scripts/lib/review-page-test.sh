@@ -2,7 +2,7 @@
 # review-page-test.sh — a page opens only where a reader can see it, the fallback never fails, and
 # an answer is written to the issue or to a file (#451).
 #
-# Hermetic: `lavish-axi`, `npx`, `gh` and `uname` are stubs on a sealed PATH that log their
+# Hermetic: `lavish-axi`, `npx`, `uname` and the forge shim's `curl` are stubs on a sealed PATH that log their
 # arguments; no browser starts and no network is touched. Every file lands under one mktemp dir.
 # Each case names the whole session environment it runs in, because the host's own (CI on the
 # runner, CLAUDECODE in an agent's shell) would otherwise decide the outcome.
@@ -33,7 +33,7 @@ for tool in sh bash jq git grep sed awk sort cat mkdir rm dirname basename chmod
   src="$(command -v "$tool" 2>/dev/null)" || continue
   case "$src" in /*) ln -s "$src" "$SEALED/$tool" ;; esac
 done
-STUB="$TMP/stub"; mkdir -p "$STUB"       # lavish-axi + gh + uname
+STUB="$TMP/stub"; mkdir -p "$STUB"       # lavish-axi + uname + the forge shim (curl, gh)
 NPXONLY="$TMP/npxonly"; mkdir -p "$NPXONLY"
 LOG="$TMP/calls.log"; : > "$LOG"
 printf '0\n' > "$TMP/lavish-rc"
@@ -60,22 +60,27 @@ cat > "$NPXONLY/uname" <<EOF
 #!/bin/sh
 cat "$TMP/os"
 EOF
-# gh: `issue view` answers the comment bodies recorded so far; `issue comment` records the body
-# file and prints a URL, or fails with the code in gh-rc.
-cat > "$STUB/gh" <<EOF
-#!/bin/sh
-echo "gh \$*" >> "$LOG"
-case "\$1 \$2" in
-  "issue view") cat "$TMP/gh-comments" ;;
-  "issue comment")
+# The forge: test-forge-shim.sh installs a `curl` that answers like the REST API (and a `gh` that
+# fails on any subcommand) into the stub dir. A fixture keeps the comment store: the listing
+# (GET …/issues/<n>/comments) answers the bodies recorded so far in gh-comments (one JSON string
+# per line); a comment (POST …/issues/<n>/comments) records the body, keeps it in gh-last-body and
+# prints a URL, or fails with 502 when gh-rc is not 0. Every request is logged to $LOG beside the
+# page tool's calls, as `METHOD path {json}`.
+# shellcheck source=/dev/null
+. "$ROOT/scripts/lib/test-forge-shim.sh"; forge_shim_install "$STUB"
+cat > "$TMP/fixture" <<EOF
+case "\$method \$ep" in
+  "GET repos/o/r/issues/"*"/comments")
+    out="\$(jq -sc 'to_entries | map({id: (.key + 1), body: .value})' "$TMP/gh-comments")" ;;
+  "POST repos/o/r/issues/"*"/comments")
     rc="\$(cat "$TMP/gh-rc")"
-    [ "\$rc" = 0 ] || { echo "stub gh: refused" >&2; exit "\$rc"; }
-    bf=""; prev=""
-    for a in "\$@"; do [ "\$prev" = "--body-file" ] && bf="\$a"; prev="\$a"; done
-    cat "\$bf" >> "$TMP/gh-comments"; cp "\$bf" "$TMP/gh-last-body"
-    echo "https://example.invalid/o/r/issues/\$3#issuecomment-1" ;;
+    if [ "\$rc" = 0 ]; then
+      n="\${ep#repos/o/r/issues/}"; n="\${n%%/*}"
+      printf '%s' "\$body" | jq -c .body >> "$TMP/gh-comments"
+      printf '%s' "\$body" | jq -r .body > "$TMP/gh-last-body"
+      out="{\"html_url\":\"https://example.invalid/o/r/issues/\$n#issuecomment-1\"}"
+    else code=502; out='{"message":"refused"}'; fi ;;
 esac
-exit 0
 EOF
 chmod +x "$STUB"/* "$NPXONLY"/*
 
@@ -102,6 +107,7 @@ page() {
   while [ $# -gt 0 ] && [ "$1" != "--" ]; do envs+=("$1"); shift; done
   shift
   ( cd "$proj" && env -i HOME="$TMP/home" PATH="$STUB:$SEALED" KIT_CONFIG="$proj/.claude/kit.config.json" \
+      GH_LOG="$LOG" GH_FIXTURE="$TMP/fixture" GH_TOKEN=test-token CCKIT_FORGE=github \
       CLAUDECODE=1 CLAUDE_CODE_ENTRYPOINT=cli CLAUDE_CODE_SESSION_ATTENDED=1 DISPLAY=:0 \
       ${envs[@]+"${envs[@]}"} bash "$LIBF" "$@" </dev/null 2> "$TMP/err" )
 }
@@ -205,7 +211,8 @@ reset
 printf 'Chose option B: one PR.\n' > "$TMP/answer.md"
 out="$(page "$GH" -- answer --kind decision --title "Ship as one PR" --issue 42 --body-file "$TMP/answer.md")"; rc=$?
 t "answer rc" "$rc" "0"
-yes "answer commented on the issue, in the configured repo" "$(calls)" "gh issue comment 42 --repo o/r --body-file "
+yes "answer read the issue's comments first" "$(calls)" "GET repos/o/r/issues/42/comments?per_page=100 |"
+yes "answer commented on the issue, in the configured repo" "$(calls)" "POST repos/o/r/issues/42/comments {\"body\":"
 yes "answer prints where it went" "$out" "issue #42 https://example.invalid/o/r/issues/42#issuecomment-1"
 body="$(cat "$TMP/gh-last-body")"
 yes "comment: kind and title in the heading" "$body" "### Decision answer: Ship as one PR"
@@ -215,16 +222,16 @@ t "answer wrote no file in a GitHub project" "$([ -e "$GH/docs/answers" ] && ech
 : > "$LOG"
 out="$(page "$GH" -- answer --kind decision --title "Ship as one PR" --issue 42 --body-file "$TMP/answer.md")"; rc=$?
 t "same answer again: rc 0" "$rc" "0"
-no  "same answer again: no second comment" "$(calls)" "issue comment"
+no  "same answer again: no second comment" "$(calls)" "POST repos/o/r/issues"
 yes "same answer again: says so" "$out" "issue #42 (already recorded)"
 : > "$LOG"
 # page() feeds /dev/null on stdin, so an answer with no --body-file has an empty body.
 page "$GH" -- answer --kind decision --title "Ship as one PR" --issue '#42' >/dev/null
 t "an empty body is refused" "$?" "2"
-no "an empty body posts nothing" "$(calls)" "issue comment"
+no "an empty body posts nothing" "$(calls)" "POST repos/o/r/issues"
 printf 'Chose option A instead.\n' > "$TMP/answer2.md"
 page "$GH" -- answer --kind decision --title "Ship as one PR" --issue '#42' --body-file "$TMP/answer2.md" >/dev/null
-yes "a different answer on the same issue is a new comment" "$(calls)" "gh issue comment 42"
+yes "a different answer on the same issue is a new comment" "$(calls)" "POST repos/o/r/issues/42/comments"
 out="$(page "$GH" CCKIT_OUTPUT=json -- answer --kind grill --title "Round 1" --issue 42 --body-file "$TMP/answer.md")"
 t "--llm answer is one JSON object" "$(printf '%s' "$out" | jq -c '[.ok, .where, .issue, .written]')" '[true,"issue",42,true]'
 reset; printf '1\n' > "$TMP/gh-rc"
@@ -233,7 +240,8 @@ t "a refused comment -> rc 1" "$rc" "1"
 yes "a refused comment names the cause" "$(cat "$TMP/err")" "could not comment on #42"
 reset
 page "$GH" CI=true -- answer --kind plan --title "Approved in the terminal" --issue 7 --body-file "$TMP/answer.md" >/dev/null
-yes "terminal mode writes the answer back too" "$(calls)" "gh issue comment 7 --repo o/r"
+yes "terminal mode writes the answer back too" "$(calls)" "POST repos/o/r/issues/7/comments"
+no  "no gh subcommand ran" "$(cat "$LOG")" "GH-SUBCOMMAND"
 
 # ── 9. answer: no GitHub (or no issue) writes a versioned file ─────────────────────────────────
 reset
@@ -242,7 +250,7 @@ out="$(page "$NOGH" -- answer --kind decision --title "Launch: week 12, not 14!"
 want="$NOGH/docs/answers/$today-decision-launch-week-12-not-14.md"
 t "file answer rc" "$rc" "0"
 t "file answer prints the path" "$out" "file $want"
-t "file answer made no gh call" "$(calls)" ""
+t "file answer made no forge call" "$(calls)" ""
 f="$(cat "$want" 2>/dev/null)"
 yes "file: heading" "$f" "# Decision answer: Launch: week 12, not 14!"
 yes "file: date" "$f" "- Recorded: $today"
@@ -264,14 +272,14 @@ yes "no GitHub repo in the config: an --issue still goes to a file" "$out" "file
 yes "…and the file records the issue" "$(cat "$NOGH/docs/answers/$today-plan-q3-plan.md")" "- Issue: #9"
 out="$(page "$GH" -- answer --kind plan --title "Before the issue exists" --body-file "$TMP/answer.md")"
 yes "a GitHub project with no --issue writes a file" "$out" "file $GH/docs/answers/$today-plan-before-the-issue-exists.md"
-t "…and makes no gh call" "$(calls)" ""
+t "…and makes no forge call" "$(calls)" ""
 
 # ── 10. answer: reviewPages.answers / answersDir decide when they are set ──────────────────────
 FORCEF="$(project forcef '{"github":{"repo":"o/r"},"reviewPages":{"answers":"file","answersDir":"knowledge/decisions"}}')"
 reset
 out="$(page "$FORCEF" -- answer --kind decision --title "Pick" --issue 5 --body-file "$TMP/answer.md")"
 yes "answers=file wins over a GitHub issue, in answersDir" "$out" "file $FORCEF/knowledge/decisions/$today-decision-pick.md"
-t "answers=file makes no gh call" "$(calls)" ""
+t "answers=file makes no forge call" "$(calls)" ""
 FORCEI="$(project forcei '{"reviewPages":{"answers":"issue"}}')"
 page "$FORCEI" -- answer --kind decision --title "Pick" --body-file "$TMP/answer.md" >/dev/null
 t "answers=issue with no --issue -> rc 2" "$?" "2"
@@ -303,9 +311,10 @@ if command -v zsh >/dev/null 2>&1; then
   yes "zsh: CI -> terminal" "$(zmode CI=true)" "terminal	CI is set"
   reset
   ( cd "$GH" && env -i HOME="$TMP/home" PATH="$STUB:$SEALED" KIT_CONFIG="$GH/.claude/kit.config.json" \
+      GH_LOG="$LOG" GH_FIXTURE="$TMP/fixture" GH_TOKEN=test-token CCKIT_FORGE=github \
       CLAUDECODE=1 CLAUDE_CODE_ENTRYPOINT=cli DISPLAY=:0 "$ZSH" -c ". '$LIBF'; rp_open .lavish/plan.html; rp_answer --kind plan --title 'Z plan' --issue 3 --body-file '$TMP/answer.md'" </dev/null >/dev/null 2>&1 )
   yes "zsh: open runs the tool" "$(calls)" "lavish-axi .lavish/plan.html|"
-  yes "zsh: answer comments on the issue" "$(calls)" "gh issue comment 3 --repo o/r"
+  yes "zsh: answer comments on the issue" "$(calls)" "POST repos/o/r/issues/3/comments"
   zerr="$( cd "$NOGH" && env -i HOME="$TMP/home" PATH="$STUB:$SEALED" KIT_CONFIG="$NOGH/.claude/kit.config.json" \
       "$ZSH" -c ". '$LIBF'; rp_answer --kind grill --title 'Z round' --body-file '$TMP/answer.md'; rp_answer --title x --kind" </dev/null 2>&1 >/dev/null )"
   t "zsh: a file answer is written" "$([ -f "$NOGH/docs/answers/$today-grill-z-round.md" ] && echo yes || echo no)" "yes"

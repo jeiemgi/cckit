@@ -25,6 +25,12 @@
 #   Local   mlx_lm.server auto-start (when .local.enabled)
 #   Auth    gh auth status + scope:project, git config name/email
 #   SSH     optional guided flow (ed25519, pbcopy, link to github settings)
+# The forge port (E537): every GitHub call goes through forge_* / gh_rest_* (scripts/lib/gh-rest.sh).
+if ! command -v gh_rest_issue_json >/dev/null 2>&1; then
+  # shellcheck source=/dev/null
+  . "$(cd "$(dirname "$0")" && pwd)/lib/gh-rest.sh"
+fi
+
 set -euo pipefail
 
 # Own directory — so we can find sibling scripts (kit-export-project.sh) regardless of cwd.
@@ -270,36 +276,15 @@ else
   ACTIONS_NEEDED+=("Install git: brew install git")
 fi
 
-# ---- gh (min version 2.29 for Projects v2) ----------------------------------
+# ---- gh (OPTIONAL: the interactive way to get a token; the forge itself is REST over curl) ----
 GH_OK=0
-if has_cmd gh; then
-  _ghver="$(gh --version 2>/dev/null | sed -n 1p | awk '{print $3}')"
-  # Check for Projects v2 support (gh >= 2.29.0)
-  _ghmaj="${_ghver%%.*}"
-  _ghmin="${_ghver#*.}"; _ghmin="${_ghmin%%.*}"
-  if [[ "${_ghmaj:-0}" -gt 2 ]] || \
-     [[ "${_ghmaj:-0}" -eq 2 && "${_ghmin:-0}" -ge 29 ]]; then
-    row "$MARK_OK" "gh" "$_ghver (Projects v2 ok)"
-    CHECKS_OK=$((CHECKS_OK + 1))
-    GH_OK=1
-  else
-    row "$MARK_WARN" "gh" "$_ghver — upgrade needed (>=2.29 for Projects v2)"
-    CHECKS_WARN=$((CHECKS_WARN + 1))
-    if [[ $MAY_INSTALL -eq 1 ]] && has_cmd brew; then
-      brew upgrade gh >/dev/null 2>&1 && GH_OK=1 && ACTIONS_TAKEN+=("Upgraded gh")
-    fi
-    [[ $GH_OK -eq 0 ]] && ACTIONS_NEEDED+=("Upgrade gh: brew upgrade gh")
-  fi
-elif brew_install gh; then
-  _ghver="$(gh --version 2>/dev/null | sed -n 1p | awk '{print $3}')"
-  row "$MARK_OK" "gh" "installed $\_ghver"
+if forge_cli_present; then
+  _ghver="$(forge_cli_version)"
+  row "$MARK_OK" "gh (optional)" "${_ghver:-present} — its token is used when GH_TOKEN is unset"
   CHECKS_OK=$((CHECKS_OK + 1))
   GH_OK=1
-  ACTIONS_TAKEN+=("Installed gh via brew")
 else
-  row "$MARK_FAIL" "gh" "missing — brew install gh"
-  CHECKS_FAIL=$((CHECKS_FAIL + 1))
-  ACTIONS_NEEDED+=("Install gh: brew install gh")
+  row "$MARK_SKIP" "gh (optional)" "not installed — a GH_TOKEN works without it; install it for an interactive sign-in"
 fi
 
 # ---- jq -------------------------------------------------------------------
@@ -314,6 +299,20 @@ else
   row "$MARK_FAIL" "jq" "missing — brew install jq"
   CHECKS_FAIL=$((CHECKS_FAIL + 1))
   ACTIONS_NEEDED+=("Install jq: brew install jq")
+fi
+
+# ---- curl (the forge is REST over curl) -------------------------------------
+if has_cmd curl; then
+  row "$MARK_OK" "curl" "$(curl --version 2>/dev/null | sed -n 1p | awk '{print $2}')"
+  CHECKS_OK=$((CHECKS_OK + 1))
+elif brew_install curl; then
+  row "$MARK_OK" "curl" "installed"
+  CHECKS_OK=$((CHECKS_OK + 1))
+  ACTIONS_TAKEN+=("Installed curl via brew")
+else
+  row "$MARK_FAIL" "curl" "missing — brew install curl (every GitHub call is REST over curl)"
+  CHECKS_FAIL=$((CHECKS_FAIL + 1))
+  ACTIONS_NEEDED+=("Install curl: brew install curl")
 fi
 
 # ---- perl -----------------------------------------------------------------
@@ -738,67 +737,67 @@ fi
 # ============================================================================
 printf '  %s%sAuth + config%s\n' "$C_BOLD" "" "$C_RESET"
 
-# ---- gh auth status ---------------------------------------------------------
+# ---- the forge (GitHub through a token) --------------------------------------
+# forge.provider: github when a token resolves (GH_TOKEN, GITHUB_TOKEN, or gh's), else none. With
+# none every verb that needs GitHub refuses by name and the git steps still run (scripts/lib/forge.sh).
 GH_AUTHED=0
-if ! has_cmd gh; then
-  row "$MARK_SKIP" "gh auth" "gh not found — install first"
-else
-  if gh auth status >/dev/null 2>&1; then
-    _ghuser="$(gh api user --jq .login 2>/dev/null || echo "unknown")"
-    row "$MARK_OK" "gh auth" "logged in as @$_ghuser"
-    CHECKS_OK=$((CHECKS_OK + 1))
-    GH_AUTHED=1
-  else
-    if [[ $DRY_RUN -eq 1 ]]; then
-      row "$MARK_FAIL" "gh auth" "not authenticated — gh auth login"
-      CHECKS_FAIL=$((CHECKS_FAIL + 1))
-      ACTIONS_NEEDED+=("Authenticate: gh auth login")
-    else
-      printf '\n  %s gh not authenticated — launching gh auth login (device flow)...\n\n' "$MARK_WARN"
-      if gh auth login --git-credential-helper; then
-        _ghuser="$(gh api user --jq .login 2>/dev/null || echo "unknown")"
-        row "$MARK_OK" "gh auth" "logged in as @$_ghuser"
-        CHECKS_OK=$((CHECKS_OK + 1))
-        GH_AUTHED=1
-        ACTIONS_TAKEN+=("Authenticated gh (device flow)")
-      else
-        row "$MARK_FAIL" "gh auth" "login failed — run: gh auth login"
-        CHECKS_FAIL=$((CHECKS_FAIL + 1))
-        ACTIONS_NEEDED+=("Authenticate: gh auth login")
-      fi
+_fprov="$(forge_provider 2>/dev/null || echo none)"
+if [[ "$_fprov" == "none" ]]; then
+  if [[ $DRY_RUN -eq 0 && $MAY_INSTALL -eq 1 ]] && forge_cli_present; then
+    printf '\n  %s no GitHub token — launching gh auth login (device flow)...\n\n' "$MARK_WARN"
+    if forge_login; then
+      unset _FORGE_LOADED; _fprov="$(forge_provider 2>/dev/null || echo none)"
+      ACTIONS_TAKEN+=("Signed in to GitHub through gh auth login")
     fi
   fi
 fi
+if [[ "$_fprov" == "none" ]]; then
+  row "$MARK_WARN" "forge" "none — git-only. Issues, pull requests and labels are unavailable until a token is set: export GH_TOKEN=<token>, or gh auth login"
+  CHECKS_WARN=$((CHECKS_WARN + 1))
+  ACTIONS_NEEDED+=("Sign in to GitHub: export GH_TOKEN=<token> (or: gh auth login)")
+else
+  _ghuser="$(gh_rest_user_login 2>/dev/null || true)"
+  if [[ -n "$_ghuser" ]]; then
+    row "$MARK_OK" "forge" "github — signed in as @$_ghuser"
+    CHECKS_OK=$((CHECKS_OK + 1))
+    GH_AUTHED=1
+  else
+    row "$MARK_FAIL" "forge" "github — the token does not work (GH_TOKEN, GITHUB_TOKEN, or gh's). Re-issue it, or gh auth login"
+    CHECKS_FAIL=$((CHECKS_FAIL + 1))
+    ACTIONS_NEEDED+=("Fix the GitHub token: export GH_TOKEN=<token>, or gh auth login")
+  fi
+fi
 
-# ---- gh scope: project (Projects v2 silently fails without it) --------------
+# ---- token scope: project (Projects v2 silently fails without it) ------------
 GH_SCOPE_PROJECT=0
-if [[ $GH_AUTHED -eq 1 ]] && has_cmd gh; then
-  _token_scopes="$(gh auth status 2>&1 | grep -i 'token scopes\|scopes:' | sed -n 1p || true)"
+_pv2="false"; [[ -f "$_kitcfg" ]] && _pv2="$(jq -r '.github.projectsV2 // false' "$_kitcfg" 2>/dev/null || echo false)"
+if [[ $GH_AUTHED -eq 1 && "$_pv2" == "true" ]]; then
+  _token_scopes="$(forge_token_scopes 2>/dev/null || true)"
   if grep -qi 'project' <<<"$_token_scopes"; then
-    row "$MARK_OK" "gh scope:project" "present"
+    row "$MARK_OK" "token scope:project" "present"
     CHECKS_OK=$((CHECKS_OK + 1))
     GH_SCOPE_PROJECT=1
+  elif [[ -z "$_token_scopes" ]]; then
+    row "$MARK_SKIP" "token scope:project" "a fine-grained token lists no scopes — give it Projects access if the board stays empty"
+  elif [[ $DRY_RUN -eq 1 || $MAY_INSTALL -eq 0 ]] || ! forge_cli_present; then
+    row "$MARK_FAIL" "token scope:project" "missing — gh auth refresh -s project (or re-issue the token with it)"
+    CHECKS_FAIL=$((CHECKS_FAIL + 1))
+    ACTIONS_NEEDED+=("Add scope: gh auth refresh -s project")
   else
-    if [[ $DRY_RUN -eq 1 ]]; then
-      row "$MARK_FAIL" "gh scope:project" "missing — gh auth refresh -s project"
+    printf '\n  %s scope "project" missing — running gh auth refresh (will open browser)...\n\n' "$MARK_WARN"
+    if forge_login_scope project; then
+      row "$MARK_OK" "token scope:project" "added"
+      CHECKS_OK=$((CHECKS_OK + 1))
+      GH_SCOPE_PROJECT=1
+      ACTIONS_TAKEN+=("Added the project scope through gh auth refresh")
+    else
+      row "$MARK_FAIL" "token scope:project" "refresh failed — gh auth refresh -s project"
       CHECKS_FAIL=$((CHECKS_FAIL + 1))
       ACTIONS_NEEDED+=("Add scope: gh auth refresh -s project")
-    else
-      printf '\n  %s scope \"project\" missing — running gh auth refresh (will open browser)...\n\n' "$MARK_WARN"
-      if gh auth refresh -s project; then
-        row "$MARK_OK" "gh scope:project" "added"
-        CHECKS_OK=$((CHECKS_OK + 1))
-        GH_SCOPE_PROJECT=1
-        ACTIONS_TAKEN+=("Added gh scope:project via auth refresh")
-      else
-        row "$MARK_FAIL" "gh scope:project" "refresh failed — gh auth refresh -s project"
-        CHECKS_FAIL=$((CHECKS_FAIL + 1))
-        ACTIONS_NEEDED+=("Add scope: gh auth refresh -s project")
-      fi
     fi
   fi
-elif [[ $GH_AUTHED -eq 0 ]]; then
-  row "$MARK_SKIP" "gh scope:project" "gh not authed — re-run after login"
+elif [[ $GH_AUTHED -eq 1 ]]; then
+  row "$MARK_SKIP" "token scope:project" "Projects v2 is off — not needed"
 fi
 
 # ---- git config user.name + user.email -------------------------------------
@@ -827,13 +826,13 @@ fi
 # project integrates on a non-default branch (github.baseBranch, e.g. develop) that mismatch
 # silently leaves issues open on native/UI merges. cckit's own `pr-merge` closes them explicitly,
 # but the misalignment still bites anyone who merges from the GitHub UI — so surface it.
-if [[ $GH_AUTHED -eq 1 ]] && has_cmd gh && [[ -f "$_kitcfg" ]]; then
+if [[ $GH_AUTHED -eq 1 ]] && [[ -f "$_kitcfg" ]]; then
   _cfg_repo="$(jq -r '.github.repo // empty' "$_kitcfg" 2>/dev/null || true)"
   # Same fallback chain as load_kit_config (#117) so the warning judges the branch cckit actually
   # integrates on: baseBranch -> integrationBranch -> flow -> "main".
   _cfg_base="$(jq -r '.github.baseBranch // .github.integrationBranch // .github.flow // "main"' "$_kitcfg" 2>/dev/null || echo main)"
   if [[ -n "$_cfg_repo" ]]; then
-    _gh_default="$(gh repo view "$_cfg_repo" --json defaultBranchRef --jq '.defaultBranchRef.name' 2>/dev/null || true)"
+    _gh_default="$(gh_rest_repo_default_branch "$_cfg_repo" 2>/dev/null || true)"
     if [[ -z "$_gh_default" ]]; then
       row "$MARK_SKIP" "base branch" "couldn't read GitHub default for $_cfg_repo — skipped"
     elif [[ "$_cfg_base" == "$_gh_default" ]]; then
@@ -842,7 +841,7 @@ if [[ $GH_AUTHED -eq 1 ]] && has_cmd gh && [[ -f "$_kitcfg" ]]; then
     else
       row "$MARK_WARN" "base branch" "baseBranch '$_cfg_base' ≠ GitHub default '$_gh_default' — 'Closes #N' won't auto-close on GitHub-UI merges"
       CHECKS_WARN=$((CHECKS_WARN + 1))
-      ACTIONS_NEEDED+=("Align base branch: 'gh repo edit $_cfg_repo --default-branch $_cfg_base' (or set github.baseBranch to '$_gh_default'). Note: 'cckit pr-merge' already closes linked issues explicitly.")
+      ACTIONS_NEEDED+=("Align base branch: make '$_cfg_base' the default branch of $_cfg_repo on GitHub (or set github.baseBranch to '$_gh_default'). Note: 'cckit merge' already closes linked issues explicitly.")
     fi
   fi
 fi
@@ -851,7 +850,7 @@ printf '\n'
 # ============================================================================
 # SSH (optional guided flow)
 # ============================================================================
-printf '  %s%sSSH (optional — GitHub HTTPS auth already configured by gh)%s\n' "$C_BOLD" "" "$C_RESET"
+printf '  %s%sSSH (optional — HTTPS with the token is the default)%s\n' "$C_BOLD" "" "$C_RESET"
 
 _ssh_result=0
 grep -q "successfully authenticated" <<<"$(ssh -T git@github.com -o ConnectTimeout=5 -o BatchMode=yes 2>&1)" && _ssh_result=1 || true
@@ -860,7 +859,7 @@ if [[ $_ssh_result -eq 1 ]]; then
   row "$MARK_OK" "SSH to github.com" "key already accepted"
   CHECKS_OK=$((CHECKS_OK + 1))
 else
-  row "$MARK_SKIP" "SSH to github.com" "no key — HTTPS is used by default (gh auth sets it up)"
+  row "$MARK_SKIP" "SSH to github.com" "no key — HTTPS with the token is used by default"
 
   # Show guided SSH setup only if user explicitly wants SSH
   if [[ "${KIT_DOCTOR_SSH:-}" == "1" && $DRY_RUN -eq 0 ]]; then

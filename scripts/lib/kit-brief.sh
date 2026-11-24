@@ -15,6 +15,12 @@
 # Depends on: kit-lib.sh (the helper catalog), and for the verb body: gh, git, the project config.
 
 # `${BASH_SOURCE[0]:-$0}`: BASH_SOURCE is empty under zsh (same fix as qa-lane.sh, #219).
+# The forge port (E537): every GitHub call goes through forge_* / gh_rest_* (scripts/lib/gh-rest.sh).
+if ! command -v gh_rest_issue_json >/dev/null 2>&1; then
+  # shellcheck source=/dev/null
+  . "$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)/gh-rest.sh"
+fi
+
 _kb_dir="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" >/dev/null 2>&1 && pwd)"
 # shellcheck source=/dev/null
 command -v kit_config_path >/dev/null 2>&1 || . "$_kb_dir/config-path.sh"
@@ -221,7 +227,7 @@ kit_brief() {
     ''|--*) echo "usage: cckit brief <issue>" >&2; return 2 ;;
   esac
   n="${n#\#}"
-  command -v gh >/dev/null 2>&1 || { echo "cckit brief: gh is required" >&2; return 1; }
+  forge_need brief || return 1
   command -v jq >/dev/null 2>&1 || { echo "cckit brief: jq is required" >&2; return 1; }
 
   root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
@@ -230,17 +236,11 @@ kit_brief() {
 
   # The one strict dependency. Fetch title/state/labels/body in a single call.
   local issue_json
-  if [ -n "$repo" ]; then
-    issue_json="$(gh issue view "$n" --repo "$repo" --json title,state,labels,body 2>&1)" || {
-      printf 'cckit brief: could not read issue #%s from %s\n%s\n' "$n" "$repo" "$issue_json" >&2
-      return 1
-    }
-  else
-    issue_json="$(gh issue view "$n" --json title,state,labels,body 2>&1)" || {
-      printf 'cckit brief: could not read issue #%s\n%s\n' "$n" "$issue_json" >&2
-      return 1
-    }
-  fi
+  [ -n "$repo" ] || repo="$(forge_repo_from_git 2>/dev/null)" || { echo "cckit brief: no repository (github.repo unset and no origin remote)" >&2; return 1; }
+  issue_json="$(forge_rest "repos/$repo/issues/$n" --jq '{title, state: (.state | ascii_upcase), labels: [.labels[]? | {name}], body: (.body // "")}' 2>&1)" || {
+    printf 'cckit brief: could not read issue #%s from %s\n%s\n' "$n" "$repo" "$issue_json" >&2
+    return 1
+  }
   title="$(printf '%s' "$issue_json"  | jq -r '.title // ""')"
   state="$(printf '%s' "$issue_json"  | jq -r '.state // ""' | tr 'A-Z' 'a-z')"
   labels="$(printf '%s' "$issue_json" | jq -r '[.labels[]?.name] | join(" · ")')"

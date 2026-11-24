@@ -53,6 +53,12 @@
 #
 # Not here, on purpose: merging. A run never merges and never closes an issue.
 # errors: strict — every stop is a state-file write plus the exit code above
+# The forge port (E537): every GitHub call goes through forge_* / gh_rest_* (scripts/lib/gh-rest.sh).
+if ! command -v gh_rest_issue_json >/dev/null 2>&1; then
+  # shellcheck source=/dev/null
+  . "$(cd "$(dirname "$0")" && pwd)/lib/gh-rest.sh"
+fi
+
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -360,7 +366,9 @@ publish() {
   if [ -n "$PR_URL" ]; then echo "autopilot run: PR already recorded - $PR_URL"; return 0; fi
   local existing
   # A read, so a run killed between `gh pr create` and the state write still finds its PR.
-  existing="$(gh pr list --head "$BRANCH" --state open --json url --jq '.[0].url // ""' 2>/dev/null)" || existing=""
+  local repo; repo="$(forge_repo_from_git 2>/dev/null || true)"
+  [ -n "$repo" ] || repo="${KIT_REPO:-$(jq -r '.github.repo // empty' "${CFG:-/dev/null}" 2>/dev/null)}"
+  existing="$(gh_rest_pr_url_for_head "$repo" "$BRANCH" 2>/dev/null)" || existing=""
   if [ -n "$existing" ]; then
     PR_URL="$existing"; echo "autopilot run: the branch already has an open PR - $PR_URL"; return 0
   fi

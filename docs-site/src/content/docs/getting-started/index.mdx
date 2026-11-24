@@ -51,8 +51,10 @@ Start with the first two, in order. The other three are for when you need them.
 cckit runs on tools you may already have and builds none of them. It is itself a set of bash
 scripts.
 
-- **`git`, `gh`, `jq` and `perl`** are required. `gh` is GitHub's command-line tool; `jq` reads
-  JSON; `cckit init` stops without `perl`.
+- **`git`, `jq`, `perl` and `curl`** are required; `jq` reads JSON, `curl` carries every GitHub call,
+  and `cckit init` stops without `perl`. A **GitHub token** (`GH_TOKEN`, or a signed-in `gh`) is
+  needed by the verbs that write issues and pull requests; the git verbs run without one. `gh`,
+  GitHub's command-line tool, is optional.
 - **Claude Code or Codex** is the agent. You choose one or both at setup.
 - **MemPalace**, for memory between sessions, is optional and off by default. It has its own area:
   [Memory](/memory/).
@@ -65,7 +67,7 @@ scripts.
 
 | What you say | What runs |
 | --- | --- |
-| "Check that this computer has what cckit needs." | `cckit doctor`: the required tools and the GitHub sign-in |
+| "Check that this computer has what cckit needs." | `cckit doctor`: the required tools and the GitHub token |
 | "Set up the Bakery site." | `cckit init`: the config, the profile, and the git and GitHub steps |
 
 </div>

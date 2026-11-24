@@ -1,0 +1,17 @@
+{
+  "id": "Builder",
+  "label": ["builder"],
+  "definition": "The agent that implements one issue in its own worktree from a brief: it commits, pushes, opens the PR and reports the PR URL, a short summary and the risks. It never merges. cckit orchestrate launches one builder per pane; a Task subagent with worktree isolation is one too.",
+  "is_not": [
+    "The captain: the captain merges and advances the wave; the builder stops at the PR.",
+    "A reviewer: a reviewer reads the PR; a builder writes it.",
+    "A profile: an agent profile is the CLI, tier and args a builder runs with."
+  ],
+  "avoid": ["worker (for the agent)", "sub-agent (as the role name)", "pane", "executor"],
+  "home": {
+    "cli": "orchestrate",
+    "skill": "kit-task-start",
+    "rule": ".claude/rules/delegation-brief.md"
+  },
+  "status": "sapling"
+}

@@ -3,8 +3,9 @@
 # launch kinds, stopped by a failing check, a no-progress round, a kill mid-run (TERM and KILL) and
 # each configured limit, then resumed without a second PR or a second agent (E257.7, #264).
 #
-# Hermetic. `claude` and `codex` are stub scripts on PATH whose behaviour STUB_MODE selects, `gh` is
-# a stub that records every `pr create`, and origin is a bare repo in the temp dir. This proves what
+# Hermetic. `claude` and `codex` are stub scripts on PATH whose behaviour STUB_MODE selects, the forge
+# is the shared shim that records every REST request (a PR opens as `POST repos/…/pulls`), and origin
+# is a bare repo in the temp dir. This proves what
 # cckit's code decides around an agent process; it does not prove either real agent behaves.
 # errors: strict — a test runner: rc 1 on any failed assertion
 # shellcheck shell=bash
@@ -75,24 +76,30 @@ STUB
 chmod +x "$TMP/bin/agent-stub"
 cp "$TMP/bin/agent-stub" "$TMP/bin/claude"; cp "$TMP/bin/agent-stub" "$TMP/bin/codex"
 
-cat > "$TMP/bin/gh" <<'STUB'
-#!/usr/bin/env bash
-case "$1 $2" in
-  'pr list')    [ -f "$FX/pr.url" ] && cat "$FX/pr.url"; exit 0 ;;
-  'pr create')  echo "create $*" >> "$FX/gh.log"
-                echo "https://github.com/fixture/project/pull/41" | tee "$FX/pr.url" ;;
-  'issue view') echo '{"title":"thing","labels":[{"name":"kind:task"}],"milestone":null}' ;;
-  *)            echo "other $*" >> "$FX/gh.log"; exit 0 ;;
+# The forge: the shared shim (test-forge-shim.sh) answers the REST API over a curl stand-in and logs
+# every request to GH_LOG. The PR this run opens (#41) and the open-PR lookup that finds it again
+# (`GET pulls?head=…`, answered from $FX/pr.url once a PR was opened) come from this fixture; the
+# issue read (`GET issues/7`) is the shim's own, shaped by GH_TITLE and GH_LABELS.
+# shellcheck source=/dev/null
+. "$ROOT/scripts/lib/test-forge-shim.sh"; forge_shim_install "$TMP/bin"
+export GH_LOG="$TMP/gh.log" GH_FIXTURE="$TMP/fixture.sh" GH_TOKEN=test-token CCKIT_FORGE=github
+export GH_TITLE="thing" GH_LABELS='[{"name":"kind:task"}]'
+# The lookup names the repo: autopilot-run.sh reads it from the origin URL and, when that is not a
+# GitHub form (a local path here), from github.repo in the project config — never an empty repo.
+cat > "$GH_FIXTURE" <<'STUB'
+case "$method $ep" in
+  "GET repos/fixture/project/pulls")  case "$path" in *head=*) if [ -f "$FX/pr.url" ]; then out="[{\"number\":41,\"html_url\":\"$(cat "$FX/pr.url")\"}]"; else out="[]"; fi ;; esac ;;
+  "POST repos/fixture/project/pulls") echo "https://github.com/fixture/project/pull/41" > "$FX/pr.url"
+                          out='{"number":41,"html_url":"https://github.com/fixture/project/pull/41","user":{"login":"me"}}' ;;
 esac
 STUB
-chmod +x "$TMP/bin/gh"
 export PATH="$TMP/bin:$PATH"
 
 cd "$P" || exit 1
 run()     { bash "$ROOT/scripts/autopilot.sh" run "$@" > "$TMP/out" 2>&1; }
 reason()  { jq -r .reason "$STATE" 2>/dev/null; }
 field()   { jq -r "$1" "$STATE" 2>/dev/null; }
-creates() { if [ -f "$TMP/gh.log" ]; then grep -c '^create ' "$TMP/gh.log"; else echo 0; fi; }
+creates() { if [ -f "$TMP/gh.log" ]; then grep -c '^POST repos/fixture/project/pulls ' "$TMP/gh.log"; else echo 0; fi; }
 reset()   { rm -rf "$TMP/state" "$TMP/rounds" "$TMP/done.flag" "$TMP/agent.pid" "$TMP/gh.log" "$TMP/pr.url"; }
 UNTIL="test -f '$TMP/done.flag'"
 
@@ -311,6 +318,7 @@ for agent in claude codex; do
   t "[$agent] a run with lost state still finishes" "$(reason)" "done"
   t "[$agent] and still opens no second PR"         "$(creates)" "1"
   t "[$agent] it records the PR it found"           "$(field .pr_url)" "https://github.com/fixture/project/pull/41"
+  t "[$agent] no gh subcommand ran"                 "$(grep -c '^GH-SUBCOMMAND' "$TMP/gh.log")" "0"
 done
 
 # ── --record-skills: the skills each round loaded, from the CLI's events (#504) ─────────────────

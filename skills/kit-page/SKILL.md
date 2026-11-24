@@ -1,5 +1,6 @@
 ---
 name: kit-page
+terms: none
 description: >
   Open a plan, a decision with options, or a grilling round as a review page the reader answers
   (`cckit page`); print to the terminal where there is no browser; write the answer back to the

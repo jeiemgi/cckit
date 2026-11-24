@@ -36,6 +36,12 @@
 # "." and the sibling source below silently missed. Same defect and same fix as kit-gc.sh:38 (#219):
 # `${BASH_SOURCE[0]:-$0}` covers zsh, CDPATH='' and the redirect stop an interactive zsh echoing the
 # directory into the substitution.
+# The forge port (E537): every GitHub call goes through forge_* / gh_rest_* (scripts/lib/gh-rest.sh).
+if ! command -v gh_rest_issue_json >/dev/null 2>&1; then
+  # shellcheck source=/dev/null
+  . "$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)/gh-rest.sh"
+fi
+
 _sr_dir="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" >/dev/null 2>&1 && pwd)"
 # shellcheck source=/dev/null
 command -v kit_state_dir >/dev/null 2>&1 || . "$_sr_dir/kit-state.sh"
@@ -378,7 +384,7 @@ _sr_mirror_body() {
 # _sr_mirror_list <repo> <issue> — `<id><TAB><json-escaped body>` per comment. @json keeps each
 # body on ONE line so a multi-line receipt can never be mistaken for another comment's row.
 _sr_mirror_list() {
-  gh api --paginate "$(_sr_api_path "$1" "issues/$2/comments")" --jq '.[] | "\(.id)\t\(.body | @json)"' 2>/dev/null
+  forge_rest --paginate "$(_sr_api_path "$1" "issues/$2/comments")" --jq '.[] | "\(.id)\t\(.body | @json)"' 2>/dev/null
 }
 
 # _sr_mirror_match_id <marker> — ids of every comment carrying the marker, oldest first. Pure:
@@ -394,10 +400,10 @@ _sr_mirror_match_id() {
   return "$found"
 }
 
-_sr_mirror_edit()   { gh api --method PATCH "$(_sr_api_path "$1" "issues/comments/$2")" -F "body=@$3" >/dev/null 2>&1; }
+_sr_mirror_edit()   { forge_rest --method PATCH "$(_sr_api_path "$1" "issues/comments/$2")" -F "body=@$3" >/dev/null 2>&1; }
 _sr_mirror_create() {
-  if [ -n "$1" ]; then gh issue comment "$2" --repo "$1" --body-file "$3" >/dev/null 2>&1
-  else gh issue comment "$2" --body-file "$3" >/dev/null 2>&1; fi
+  local repo="$1"; [ -n "$repo" ] || repo="$(forge_repo_from_git 2>/dev/null)" || return 1
+  gh_rest_issue_comment "$repo" "$2" "@$3" >/dev/null 2>&1
 }
 
 _sr_mirror_warn() { SR_MIRROR_LAST_RESULT="$1"; echo "sr_mirror: $2" >&2; return 0; }
@@ -412,7 +418,7 @@ sr_mirror() {
   case "${CCKIT_RECEIPT_REMOTE:-1}" in
     0|false|no|off|FALSE|NO|OFF) _sr_mirror_warn no-remote "CCKIT_RECEIPT_REMOTE is off — receipt written locally only"; return 0 ;;
   esac
-  command -v gh >/dev/null 2>&1 || { _sr_mirror_warn no-gh "gh is not installed — receipt written locally only"; return 0; }
+  forge_available || { _sr_mirror_warn no-forge "no forge is configured — receipt written locally only"; return 0; }
   [ -f "$file" ] || { _sr_mirror_warn no-file "no receipt at $file"; return 0; }
 
   repo="$(_sr_repo)"

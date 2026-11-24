@@ -44,36 +44,41 @@ if [ -n "${WT_TEST_INNER:-}" ]; then
   # willing to delete a misnamed live branch — the failure mode this whole lib exists to prevent.
   check "feat/1604a-parser"                        "1604"  # non-sub kind, suffix still protects
   check "feat+1604a-parser"                        "1604"  # same, worktree dirname form
-  # wt_issue_state (#330): failed is not empty. A gh that exits non-zero answers `unknown`; a gh
-  # that says "no such issue" answers empty; only open/closed pass through.
+  # wt_issue_state (#330): failed is not empty. The forge (test-forge-shim.sh) answers the REST read
+  # of repos/<r>/issues/<n>: an HTTP error answers `unknown`; a 404 ("no such issue") answers empty;
+  # only open/closed pass through. With no forge configured the state is `unknown`.
   tmp=$(mktemp -d)
-  mkdir "$tmp/bin" "$tmp/nogh"
-  for c in tr grep head; do p_=$(command -v "$c"); [ -n "$p_" ] && ln -sf "$p_" "$tmp/nogh/$c"; done
-  state() {   # state <label> <want> <gh script body> [transport]
-    printf '#!/bin/sh\n%s\n' "$3" > "$tmp/bin/gh"; chmod +x "$tmp/bin/gh"
-    got=$(PATH="$tmp/bin:$PATH" CCKIT_GH_TRANSPORT="${4:-graphql}" KIT_REPO=o/r wt_issue_state 41 o/r)
+  . "$dir/test-forge-shim.sh"; forge_shim_install "$tmp/bin"
+  GH_LOG="$tmp/gh.log"; export GH_LOG; : > "$GH_LOG"
+  export GH_TOKEN=test-token CCKIT_FORGE=github
+  state() {   # state <label> <want> <fixture snippet: sets out/code for the shim> [GH_CLOSED] [GH_FAIL_EP]
+    printf '%s\n' "$3" > "$tmp/fixture"
+    got=$(PATH="$tmp/bin:$PATH" GH_FIXTURE="$tmp/fixture" GH_CLOSED="${4:-}" GH_FAIL_EP="${5:-}" KIT_REPO=o/r wt_issue_state 41 o/r)
     if [ "$got" != "$2" ]; then
       echo "FAIL($WT_TEST_INNER): wt_issue_state $1 -> '[$got]', want '[$2]'"
       fail=1
     fi
   }
-  state "open (graphql)"        "open"    'echo OPEN'
-  state "closed (rest)"         "closed"  'echo closed' rest
-  state "gh fails (graphql)"    "unknown" 'echo "GraphQL: API rate limit exceeded" >&2; exit 1'
-  state "gh fails (rest)"       "unknown" 'echo "gh: Server Error (HTTP 502)" >&2; exit 1' rest
-  state "no such issue (gql)"   ""        'echo "GraphQL: Could not resolve to an Issue with the number of 41." >&2; exit 1'
-  state "no such issue (rest)"  ""        'echo "gh: Not Found (HTTP 404)" >&2; exit 1' rest
-  state "empty success"         ""        'exit 0'
-  got=$(PATH="$tmp/nogh" wt_issue_state 41 o/r)
-  [ "$got" = "unknown" ] || { echo "FAIL($WT_TEST_INNER): wt_issue_state with no gh -> '[$got]', want '[unknown]'"; fail=1; }
+  state "open"                  "open"    ':'
+  state "closed"                "closed"  ':' 41
+  state "rate limit (403)"      "unknown" 'out='"'"'{"message":"API rate limit exceeded"}'"'"'; code=403'
+  state "server error (502)"    "unknown" 'out='"'"'{"message":"Server Error"}'"'"'; code=502'
+  state "no such issue (404)"   ""        ':' "" "repos/o/r/issues/41"
+  state "empty success"         ""        'out=""'
+  t_=$(grep -c '^GET repos/o/r/issues/41 ' "$GH_LOG")
+  [ "$t_" = "6" ] || { echo "FAIL($WT_TEST_INNER): every state read is GET repos/o/r/issues/41 -> '[$t_]', want '[6]'"; fail=1; }
+  t_=$(grep -c '^GH-SUBCOMMAND' "$GH_LOG")
+  [ "$t_" = "0" ] || { echo "FAIL($WT_TEST_INNER): no gh subcommand ran -> '[$t_]', want '[0]'"; fail=1; }
+  got=$(PATH="$tmp/bin:$PATH" CCKIT_FORGE=none wt_issue_state 41 o/r)
+  [ "$got" = "unknown" ] || { echo "FAIL($WT_TEST_INNER): wt_issue_state with no forge -> '[$got]', want '[unknown]'"; fail=1; }
   got=$(PATH="$tmp/bin:$PATH" wt_issue_state "" o/r)
   [ -z "$got" ] || { echo "FAIL($WT_TEST_INNER): wt_issue_state with no number -> '[$got]', want '[]'"; fail=1; }
   # An unknown state is not a protection claim — gc reports it as UNKNOWN itself.
-  printf '#!/bin/sh\nexit 1\n' > "$tmp/bin/gh"
-  got=$(PATH="$tmp/bin:$PATH" CCKIT_GH_TRANSPORT=graphql wt_protected_reason task/41-x o/r)
+  printf '%s\n' 'out='"'"'{"message":"Server Error"}'"'"'; code=502' > "$tmp/fixture"
+  got=$(PATH="$tmp/bin:$PATH" GH_FIXTURE="$tmp/fixture" wt_protected_reason task/41-x o/r)
   [ -z "$got" ] || { echo "FAIL($WT_TEST_INNER): wt_protected_reason on a failed read -> '[$got]', want '[]'"; fail=1; }
   rm -rf "$tmp"
-  [ "$fail" -eq 0 ] && echo "OK($WT_TEST_INNER): 31 cases"
+  [ "$fail" -eq 0 ] && echo "OK($WT_TEST_INNER): 33 cases"
   exit "$fail"
 fi
 

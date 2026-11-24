@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # copilot-loop-test.sh — headless end-to-end of the copilot loop on a FIXTURE board (#80).
-# Hermetic: a stateful `gh` stub serves fixture issues/PRs/deps and reuses the scripts' OWN --jq
-# expressions, so it mimics real gh without the network. Asserts the full cycle:
+# Hermetic: the forge shim (scripts/lib/test-forge-shim.sh) with a stateful fixture serves issues,
+# PRs, deps and check runs as the REST API would, so the scripts' OWN --jq programs run unmodified
+# and no gh subcommand may run; a throwaway repo with a bare origin takes the branch deletion.
+# Asserts the full cycle:
 #   wave  — plan layers blocked issues into later waves
 #   merge — the captain merges only the CLEAN PR, never the failing one
 #   advance — merging a blocker unblocks its dependent into the next wave
@@ -35,88 +37,65 @@ JSON
 cat > "$FX/deps.json" <<'JSON'
 {"101":[],"102":[101],"103":[]}
 JSON
-# PRs: 201 head fix/101-a CLEAN+SUCCESS · 202 head fix/103-b UNSTABLE+FAILURE
+# PRs (REST shape): 201 head fix/101-a clean, its head commit's check run SUCCESS · 202 head fix/103-b
+# unstable, check run FAILURE
 cat > "$FX/prs.json" <<'JSON'
 [
-  {"number":201,"title":"root A","headRefName":"fix/101-a","mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","statusCheckRollup":[{"conclusion":"SUCCESS"}]},
-  {"number":202,"title":"root B","headRefName":"fix/103-b","mergeable":"MERGEABLE","mergeStateStatus":"UNSTABLE","statusCheckRollup":[{"conclusion":"FAILURE"}]}
+  {"number":201,"title":"root A","head":{"ref":"fix/101-a","sha":"aaa201"},"base":{"ref":"main"},"mergeable":true,"mergeable_state":"clean","draft":false,"labels":[],"state":"open"},
+  {"number":202,"title":"root B","head":{"ref":"fix/103-b","sha":"bbb202"},"base":{"ref":"main"},"mergeable":true,"mergeable_state":"unstable","draft":false,"labels":[],"state":"open"}
 ]
 JSON
 
-# --- gh stub -----------------------------------------------------------------
-BIN="$TMP/bin"; mkdir -p "$BIN"
-cat > "$BIN/gh" <<STUB
-#!/usr/bin/env bash
-# stateful gh fixture: reuses the caller's own --jq; reflects closed/merged state.
-set -u
-FX="$FX"; CLOSED="$CLOSED"; MERGEDPR="$MERGEDPR"
-is_closed() { grep -qx "\$1" "\$CLOSED" 2>/dev/null; }
-# open issues = fixture issues whose number is not in the closed set
-open_issues() {
-  jq -c --argjson cl "\$(jq -R . "\$CLOSED" 2>/dev/null | jq -s 'map(select(length>0)|tonumber)')" \
-    '[ .[] | select(.number as \$num | (\$cl|index(\$num))|not) ]' "\$FX/issues.json"
-}
-# open PRs = fixture PRs not yet merged
-open_prs() {
-  jq -c --argjson mg "\$(jq -R . "\$MERGEDPR" 2>/dev/null | jq -s 'map(select(length>0)|tonumber)')" \
-    '[ .[] | select(.number as \$num | (\$mg|index(\$num))|not) ]' "\$FX/prs.json"
-}
-# pull a --jq EXPR and a --repo out of the args; collect positionals
-JQ=""; POS=()
-while [ "\$#" -gt 0 ]; do
-  case "\$1" in
-    --jq) JQ="\$2"; shift 2 ;;
-    --repo|--state|--limit|--json) shift 2 ;;
-    --squash|--delete-branch) shift ;;
-    --*) shift ;;
-    *) POS+=("\$1"); shift ;;
-  esac
-done
-sub="\${POS[0]:-}"; sub2="\${POS[1]:-}"; arg="\${POS[2]:-}"
-run_jq() { if [ -n "\$JQ" ]; then jq -r "\$JQ"; else cat; fi; }
-case "\$sub \$sub2" in
-  "issue list") open_issues | run_jq ;;
-  "issue view")
-    # gh issue view N --json labels --jq E  -> feed {labels:[...]} for issue N
-    n="\$sub2"; [ "\$n" = "view" ] && n="\$arg"
-    jq -c --argjson n "\$arg" '[.[]|select(.number==\$n)][0] // {labels:[]} | {labels}' "\$FX/issues.json" | run_jq ;;
-  "pr list") open_prs | run_jq ;;
-  "pr view")
-    # gh pr view PR --json ...   (caller applies its own jq) -> emit the PR object
-    jq -c --argjson n "\$arg" '[.[]|select(.number==\$n)][0]' "\$FX/prs.json" ;;
-  "pr merge")
-    # record the merge + close the PR's issue (advance state)
-    echo "\$arg" >> "\$MERGEDPR"
-    br="\$(jq -r --argjson n "\$arg" '[.[]|select(.number==\$n)][0].headRefName' "\$FX/prs.json")"
-    iss="\$(printf '%s' "\$br" | sed -nE 's#^[a-z]+/([0-9]+)-.*#\1#p')"
-    [ -n "\$iss" ] && echo "\$iss" >> "\$CLOSED"
-    exit 0 ;;
-  "api "*) : ;;  # fall through below
+# --- the forge shim + its stateful fixture ------------------------------------
+# The fixture answers from $FX and reflects the closed/merged state: the open issue list, one issue
+# (its labels), blocked_by with each blocker's state, the open PR list, one PR, its files, the head
+# commit's check runs, and PUT …/merge, which records the merge and closes the branch's issue.
+BIN="$TMP/bin"
+# shellcheck source=/dev/null
+. "$ROOT/scripts/lib/test-forge-shim.sh"; forge_shim_install "$BIN"
+export FX CLOSED MERGEDPR GH_LOG="$TMP/gh.log" GH_FIXTURE="$FX/fixture.sh" GH_TOKEN=test-token CCKIT_FORGE=github
+cat > "$GH_FIXTURE" <<'SH'
+closed_list() { jq -R . "$CLOSED" 2>/dev/null | jq -s 'map(select(length>0)|tonumber)'; }
+merged_list() { jq -R . "$MERGEDPR" 2>/dev/null | jq -s 'map(select(length>0)|tonumber)'; }
+case "$method $ep" in
+  "GET repos/fixture/board/issues")
+    out="$(jq -c --argjson cl "$(closed_list)" '[ .[] | select(.number as $n | ($cl|index($n))|not) ]' "$FX/issues.json")" ;;
+  "GET repos/fixture/board/issues/"*"/dependencies/blocked_by")
+    n="${ep%/dependencies/blocked_by}"; n="${n##*/}"
+    out="$(jq -c --arg n "$n" --argjson cl "$(closed_list)" \
+      '[ (.[$n] // [])[] | {number: ., state: (if ($cl|index(.)) then "closed" else "open" end)} ]' "$FX/deps.json")" ;;
+  "GET repos/fixture/board/issues/"*)
+    out="$(jq -c --argjson n "${ep##*/}" '[.[]|select(.number==$n)][0] // {labels:[]}' "$FX/issues.json")" ;;
+  "GET repos/fixture/board/pulls")
+    out="$(jq -c --argjson mg "$(merged_list)" '[ .[] | select(.number as $n | ($mg|index($n))|not) ]' "$FX/prs.json")" ;;
+  "GET repos/fixture/board/pulls/"*"/files") out='[]' ;;
+  "PUT repos/fixture/board/pulls/"*"/merge")
+    n="${ep%/merge}"; n="${n##*/}"; echo "$n" >> "$MERGEDPR"
+    br="$(jq -r --argjson n "$n" '[.[]|select(.number==$n)][0].head.ref' "$FX/prs.json")"
+    iss="$(printf '%s' "$br" | sed -nE 's#^[a-z]+/([0-9]+)-.*#\1#p')"
+    [ -n "$iss" ] && echo "$iss" >> "$CLOSED"
+    out='{"merged":true,"sha":"deadbeef"}' ;;
+  "GET repos/fixture/board/pulls/"*)
+    out="$(jq -c --argjson n "${ep##*/}" '[.[]|select(.number==$n)][0]' "$FX/prs.json")" ;;
+  "GET repos/fixture/board/commits/aaa201/check-runs") out='{"check_runs":[{"name":"ci","status":"completed","conclusion":"success"}]}' ;;
+  "GET repos/fixture/board/commits/bbb202/check-runs") out='{"check_runs":[{"name":"ci","status":"completed","conclusion":"failure"}]}' ;;
 esac
-# gh api repos/.../issues/N/dependencies/blocked_by  -> [{number,state}] reflecting closed set
-if [ "\$sub" = "api" ]; then
-  path="\$sub2"
-  case "\$path" in
-    *dependencies/blocked_by)
-      n="\$(printf '%s' "\$path" | sed -nE 's#.*/issues/([0-9]+)/dependencies.*#\1#p')"
-      blockers="\$(jq -c --arg n "\$n" '.[\$n] // []' "\$FX/deps.json")"
-      cl="\$(jq -R . "\$CLOSED" 2>/dev/null | jq -c -s 'map(select(length>0)|tonumber)')"
-      printf '%s' "\$blockers" | jq -c --argjson cl "\$cl" \
-        '[ .[] | . as \$b | {number:\$b, state: (if (\$cl|index(\$b)) then "closed" else "open" end)} ]' | run_jq ;;
-    *sub_issues)
-      # effort sub_issues not used by this fixture; return empty
-      echo "[]" | run_jq ;;
-    *) echo "" ;;
-  esac
-fi
-STUB
-chmod +x "$BIN/gh"
+SH
+
+# --- a throwaway repo with a bare origin: the captain deletes a merged PR's branch through git -------
+git init -q --bare "$TMP/remote.git"
+git clone -q "$TMP/remote.git" "$TMP/repo" 2>/dev/null
+( cd "$TMP/repo" && git config user.email t@t && git config user.name t \
+  && git checkout -q -b main && git commit -q --allow-empty -m init && git push -q origin main \
+  && git branch fix/101-a && git branch fix/103-b && git push -q origin fix/101-a fix/103-b )
+printf '%s' '{"kitVersion":"9.9.9","project":{"name":"fx"},"github":{"repo":"fixture/board","owner":"fixture","baseBranch":"main","projectsV2":false}}' \
+  > "$TMP/repo/cckit.config.json"
 
 export PATH="$BIN:$PATH"
 export KIT_REPO="fixture/board" PLAN_REPO="fixture/board" CAPTAIN_REPO="fixture/board"
 export CCKIT_NO_GLOW=1 CCKIT_OUTPUT=human
 export CAPTAIN_STATE="$TMP/captain.state"
-cckit() { bash "$ROOT/bin/cckit" "$@"; }
+cckit() { ( cd "$TMP/repo" && bash "$ROOT/bin/cckit" "$@" ); }
 
 echo "== wave: plan layers the dependent into wave 1 =="
 PLAN="$(CCKIT_OUTPUT=human cckit plan --cap 8 2>&1)"
@@ -167,6 +146,12 @@ has "$PASS1" "PR #201" "captain: gated PR #201"
 has "$PASS1" "MERGED" "captain: merged the CLEAN PR"
 # 202 is CHECKS_FAILING -> action fix, never merged
 no "$(printf '%s' "$PASS1" | grep 202)" "MERGED" "captain: did NOT merge failing PR #202"
+# the merge is ONE squash PUT over REST; the branch goes through git and is gone from origin
+has "$(cat "$GH_LOG")" 'PUT repos/fixture/board/pulls/201/merge {"merge_method":"squash"}' "captain: squash-merged PR #201 over REST"
+no  "$(cat "$GH_LOG")" 'pulls/202/merge' "captain: never called merge on PR #202"
+ok "$(git -C "$TMP/repo" ls-remote --heads origin fix/101-a | wc -l | tr -d ' ')" "0" "captain: deleted the merged PR's remote branch"
+ok "$(git -C "$TMP/repo" ls-remote --heads origin fix/103-b | wc -l | tr -d ' ')" "1" "captain: kept the unmerged PR's remote branch"
+ok "$(grep -c '^GH-SUBCOMMAND' "$GH_LOG")" "0" "the whole cycle so far ran no gh subcommand"
 
 echo "== advance: merging #101 unblocks #102 into wave 0 =="
 PLAN2="$(CCKIT_OUTPUT=human cckit plan --cap 8 2>&1)"

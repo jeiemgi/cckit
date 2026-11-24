@@ -1,5 +1,6 @@
 ---
 name: kit-status
+terms: Report
 description: Answer "where are we?" in three buckets — local undone work (dirty worktrees, commits on no remote, effort subs not merged in), open PRs waiting on a human (no approval, no AI-reviewer pass, unresolved threads, red checks, conflicts), and cleanup available local + remote. Read-only, so it is always safe to run first.
 when_to_use: |
   Whenever the owner asks, in ANY wording, how things stand overall — this is the default answer to

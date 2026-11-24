@@ -7,6 +7,12 @@
 # for each (user(login:) vs organization(login:)), so this branches on github.projectOwnerType
 # ("user" | "organization", default "user") — a user-only query silently returned null for an
 # org-owned board (#118).
+# The forge port (E537): every GitHub call goes through forge_* / gh_rest_* (scripts/lib/gh-rest.sh).
+if ! command -v gh_rest_issue_json >/dev/null 2>&1; then
+  # shellcheck source=/dev/null
+  . "$(cd "$(dirname "$0")" && pwd)/lib/gh-rest.sh"
+fi
+
 set -euo pipefail
 source "$(dirname "$0")/lib/kit-config.sh" && load_kit_config
 
@@ -22,7 +28,7 @@ esac
 
 # Build the query with the resolved root; the response is read under the SAME root below so the
 # selector and the jq path stay in lockstep regardless of user- vs org-owned board.
-DATA=$(gh api graphql -f query="
+DATA=$(forge_rest graphql -f query="
   query(\$login:String!, \$number:Int!){
     $OWNER_ROOT(login:\$login){
       projectV2(number:\$number){

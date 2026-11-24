@@ -1,0 +1,32 @@
+---
+// The wave loop: the plan fans a wave out to one subagent per issue (each in its own worktree),
+// the captain gates + merges the PRs, and the loop advances to the next wave.
+// Static SVG, no client JavaScript. Colours come from the .cckit-figure rules in
+// src/styles/theme.css, so the figure follows the light and dark themes.
+---
+<figure class="cckit-figure not-content">
+  <svg viewBox="0 0 772 300" style="max-width: 772px" role="img" aria-labelledby="copilot-fanout-title">
+    <title id="copilot-fanout-title">One turn of the wave loop: the plan hands a wave to three subagents, each on an issue in its own worktree; the captain gates and merges their pull requests, and the loop advances to the next wave.</title>
+    <defs>
+      <marker id="copilot-fanout-arrow-none" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow" d="M0,0 L10,5 L0,10 z" /></marker>
+      <marker id="copilot-fanout-arrow-start" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow k-start" d="M0,0 L10,5 L0,10 z" /></marker>
+      <marker id="copilot-fanout-arrow-success" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow k-success" d="M0,0 L10,5 L0,10 z" /></marker>
+    </defs>
+    <path class="edge" d="M172,133 C190,133 190,43 208,43" marker-end="url(#copilot-fanout-arrow-none)" />
+    <path class="edge" d="M172,133 C190,133 190,133 208,133" marker-end="url(#copilot-fanout-arrow-none)" />
+    <path class="edge" d="M172,133 C190,133 190,223 208,223" marker-end="url(#copilot-fanout-arrow-none)" />
+    <path class="edge" d="M368,43 C386,43 386,133 404,133" marker-end="url(#copilot-fanout-arrow-none)" />
+    <path class="edge" d="M368,133 C386,133 386,133 404,133" marker-end="url(#copilot-fanout-arrow-none)" />
+    <path class="edge" d="M368,223 C386,223 386,133 404,133" marker-end="url(#copilot-fanout-arrow-none)" />
+    <path class="edge k-success" d="M564,133 C582,133 582,133 600,133" marker-end="url(#copilot-fanout-arrow-success)" />
+    <path class="edge k-start" d="M680,164 V274 H92 V164" marker-end="url(#copilot-fanout-arrow-start)" />
+    <g class="label"><rect x="551" y="122" width="62" height="22" rx="4" /><text x="582" y="133">merged</text></g>
+    <g class="label"><rect x="355" y="263" width="62" height="22" rx="4" /><text x="386" y="274">repeat</text></g>
+    <g class="node k-start"><rect x="12" y="102" width="160" height="62" rx="10" /><text x="92" y="125" class="t">Plan</text><text x="92" y="146" class="d">the next wave</text></g>
+    <g class="node k-work"><rect x="208" y="12" width="160" height="62" rx="10" /><text x="288" y="35" class="t">Subagent</text><text x="288" y="56" class="d">issue · worktree</text></g>
+    <g class="node k-work"><rect x="208" y="102" width="160" height="62" rx="10" /><text x="288" y="125" class="t">Subagent</text><text x="288" y="146" class="d">issue · worktree</text></g>
+    <g class="node k-work"><rect x="208" y="192" width="160" height="62" rx="10" /><text x="288" y="215" class="t">Subagent</text><text x="288" y="236" class="d">issue · worktree</text></g>
+    <g class="node k-review"><rect x="404" y="102" width="160" height="62" rx="10" /><text x="484" y="125" class="t">Captain</text><text x="484" y="146" class="d">gate + merge PRs</text></g>
+    <g class="node k-success"><rect x="600" y="102" width="160" height="62" rx="10" /><text x="680" y="125" class="t">Advance</text><text x="680" y="146" class="d">next wave</text></g>
+  </svg>
+</figure>

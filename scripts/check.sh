@@ -42,6 +42,12 @@ note "==> leak fence (tracked files)"
 leak_fence_check || fail=1
 
 # 4. Secret + privacy guard - no secrets, keys, env, or private data in anything publishable.
+# 3b. The forge fence (E537.5). Every GitHub call goes through scripts/lib/forge*.sh and gh-rest.sh;
+# a file outside that layer calling gh or naming api.github.com fails here, against the ratchet in
+# scripts/forge-fence.baseline (0 and 0).
+note "==> forge fence"
+bash scripts/forge-fence.sh || fail=1
+
 note "==> secret + privacy guard"
 if [ -f scripts/lib/secret-guard.sh ]; then
   . scripts/lib/secret-guard.sh
@@ -73,12 +79,25 @@ bash scripts/instruction-budget-lint.sh || fail=1
 note "==> codified review findings"
 bash scripts/review-lint.sh || fail=1
 
+# 6b. Top-level verb count. scripts/lib/verbs.tsv may hold no more `verb` rows than
+# scripts/verbs.baseline says, and a drop must lower the baseline in the same change. A rename keeps
+# the old name as an alias row, which does not count (#557).
+note "==> top-level verb ratchet"
+bash scripts/verbs-ratchet.sh || fail=1
+
 # 7. Agent skill references. Every `skills:` entry in templates/agents/*.md must resolve to a skill
 # the kit ships or scaffolds, a `plugin:skill` reference, or a name declared third-party in
 # scripts/agent-skills-external.txt. An unresolved entry fails silently at runtime: the agent loads
 # with fewer skills than its frontmatter lists.
 note "==> agent skill references"
 bash scripts/agent-skills-lint.sh || fail=1
+
+# 7b. Terms and skill routing — WARN mode. Every term under ontology/terms/ validates, every home
+# resolves, every skill is routed and AGENTS.md's table mirrors skills/routing.yaml. It prints its
+# defects and counts and never fails the gate: the terms are new and a word under discussion must
+# not block an unrelated PR. scripts/terms-check-test.sh (step 8) is what fails on a broken checker.
+note "==> terms and skill routing (warn mode)"
+bash scripts/terms-check.sh || note "  (warning: terms-check found defects; the gate does not fail on them)"
 
 # 8. Behavioral tests - run every *-test.sh through the test runner (several files at a time;
 # TEST_JOBS=1 for one at a time).

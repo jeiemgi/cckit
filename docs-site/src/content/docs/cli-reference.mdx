@@ -17,8 +17,181 @@ To learn when and why to use a verb, start from its area: each area page in the
 cckit is a thin bash dispatcher over a git-mechanics bundle. Every verb reads from `cckit.config.json` — no org or repo is hardcoded. Append `--llm` to any verb for machine-readable output an agent can parse.
 
 <Aside type="tip" title="How to read this page">
-The tables are grouped by job: setup, the daily lifecycle, planning a wave, running flows in parallel, and housekeeping. Copy any command straight from the table. Run `cckit <verb> --help` for the details of one verb.
+The tables are grouped by job: setup, the daily lifecycle, planning a wave, running flows in parallel, and housekeeping. Copy any command straight from the table. `cckit <verb> --help` (or `cckit help <verb>`) prints one verb's usage, the question it answers, a prompt to paste and what it needs. The dispatcher answers it from the verb table before the verb runs, so it works for every verb and changes nothing; a verb with more to say adds its own text under **Details**.
 </Aside>
+
+## Every verb, by the question it answers
+
+Each verb answers one question, and the tables below list them grouped the way `cckit help` prints
+them, git mechanics first. **Paste** is a prompt to give an agent; **Needs** says whether the verb
+runs on git alone or also uses the forge (GitHub) when one is configured; **Skill** names the skill
+that drives the verb in Claude Code, and a dash means the verb is CLI-only. The block is generated
+from `scripts/lib/verbs.tsv`, the one source for every verb, and `scripts/verbs-test.sh` fails when
+it drifts.
+
+{/* verbs:begin — generated from scripts/lib/verbs.tsv by scripts/verbs-gen.sh; do not edit by hand */}
+
+### How do I take one change from a branch to merged?
+
+| Verb | Answers | Paste | Needs | Skill |
+| --- | --- | --- | --- | --- |
+| `cckit start` | How do I start work on an issue without touching my main checkout? | Start the issue I pick in its own worktree. | git + forge | `kit-task-start` |
+| `cckit pr` | How do I open the pull request for this issue? | Commit this work and open its pull request. | git + forge | `kit-task-pr` |
+| `cckit merge` | Can this pull request land, and what does landing clean up? | Merge this branch's pull request once its gate is green, and clean up the branch. | git + forge | `kit-task-pr-merge` |
+| `cckit close` | How do I close an issue that no pull request closed? | Close the issue I name, with a one-line summary of why. | git + forge | `kit-task-close` |
+| `cckit hotfix` | How do I carry one merged fix to the release branch? | Cherry-pick the merged fix I name onto the release branch and open its pull request. | git + forge | — |
+| `cckit task` | How do I track work in the project itself, without a GitHub issue? | Record this as a light task, then show me the task list. | git + forge | — |
+
+### Where are we, and what comes next?
+
+| Verb | Answers | Paste | Needs | Skill |
+| --- | --- | --- | --- | --- |
+| `cckit status` | Where are we? | Where are we? Show me what is undone, what waits on me and what can be cleaned up. | git + forge | `kit-status` |
+| `cckit sync` | What is on the board, by role, and what is blocked? | Sync the board and show me what is ready. | git + forge | `kit-task-sync` |
+| `cckit next` | What should I pick up next? | Show me what is unblocked and how to start the top item; I will pick. | git + forge | `kit-next` |
+| `cckit plan` | In what order can the open issues run? | Plan the open issues into waves and show me the first wave. | git + forge | — |
+| `cckit plan-next` | Given what the kit already does, what should we build next? | Inventory what the kit can do and propose what to build next. | git | `kit-plan-next` |
+| `cckit wave` | Which waves of work can start from the open efforts? | Read the open efforts and propose the next wave of work. | git + forge | `kit-next` |
+| `cckit claims` | Which session is working on which issue? | Show me which live session holds which issue. | git | — |
+| `cckit handoff` | How do I leave the next session a note? | Save a handoff note: what is pending, the next step, the references. | git | — |
+| `cckit` (no verb) | Where did the last session stop? | Read the last handoff and pick up where it stopped. | git | — |
+
+### How do I plan the work and run it?
+
+| Verb | Answers | Paste | Needs | Skill |
+| --- | --- | --- | --- | --- |
+| `cckit new` | How do I track a new piece of work as an issue? | File an issue for this, with its labels, and put it on the board. | git + forge | `kit-task-new` |
+| `cckit effort` | How do I scope, start, open and close a piece of work with several parts? | Scope this goal as an effort with sub-issues, show it to me, then start it. | git + forge | `kit-effort-new` |
+| `cckit orchestrate` | How do I run several issues at once, each in its own worktree? | Run the issues I pick in parallel worktrees; show me the dry run first. | git + forge | — |
+| `cckit autopilot` | How do I run approved work unattended, under a cap? | Run the unblocked work unattended under a cap of two; show me the dry run first. | git + forge | `kit-autopilot` |
+| `cckit watch` | Which open pull requests can merge now, and what is the next wave? | Gate the open pull requests and tell me which are clean to merge. | git + forge | — |
+| `cckit brief` | What does an agent need to know before it works an issue? | Write the delegation brief for the issue I pick. | git + forge | — |
+| `cckit receipt` | How does a worker record what one stage did? | Record this stage's receipt on its issue. | git + forge | — |
+| `cckit msg` | How do I tell another live session something? | Send the other live session a message about what I just changed. | git | — |
+
+### What can be cleaned up?
+
+| Verb | Answers | Paste | Needs | Skill |
+| --- | --- | --- | --- | --- |
+| `cckit gc` | Which branches and worktrees can go? | Show me which branches and worktrees can be deleted, and why. | git + forge | `kit-gc` |
+| `cckit cleanup` | How do I delete the merged branches and worktrees in one pass? | Clean up the merged branches and worktrees; show me the plan before deleting. | git + forge | `kit-cleanup` |
+
+### How do I check and review the work?
+
+| Verb | Answers | Paste | Needs | Skill |
+| --- | --- | --- | --- | --- |
+| `cckit qa` | Does the change work in the running app? | Bring up the review stack for this branch and open the screen the change touched. | git + forge | — |
+| `cckit page` | How do I review a plan or a decision as a page? | Open this plan as a review page and record my answer. | git + forge | `kit-page` |
+| `cckit debug` | What is the browser doing on this page? | Debug this page in the browser and tell me what fails. | git | — |
+| `cckit bench` | How well are this project's docs found and used? | Run the docs benchmark and report the score. | git + forge | — |
+| `cckit digest` | What does this file or page say, in short? | Summarize this file with the local model. | git | `kit-digest` |
+
+### How do I set up, update or ship cckit?
+
+| Verb | Answers | Paste | Needs | Skill |
+| --- | --- | --- | --- | --- |
+| `cckit install` | How do I put cckit on my PATH? | Install cckit on this machine. | git | — |
+| `cckit init` | How do I set cckit up in a project? | Set cckit up in this folder; ask me what you need. | git + forge | — |
+| `cckit doctor` | Is this machine ready to run cckit? | Check that this machine has everything cckit needs, and tell me what is missing. | git + forge | `kit-onboard` |
+| `cckit add` | What can I switch on in this project? | List what I can add to this project, and add the one I pick. | git + forge | `kit-add` |
+| `cckit update` | Is this project behind the installed cckit? | Check whether this project is behind the installed cckit. | git | — |
+| `cckit migrate` | How do I move an old kit layout to the current one? | Migrate this project's kit layout; show me the dry run first. | git | — |
+| `cckit adopt` | Which kit-shaped files does this repo already have? | Record the kit files this repo already has. | git | — |
+| `cckit completions` | How do I get tab completion for cckit? | Set up cckit tab completion in my shell. | git | — |
+| `cckit release` | How do I cut a cckit release? | Dry-run the next cckit release and show me what it would publish. | git + forge | — |
+| `cckit contribute` | How do I send a change back to cckit? | Contribute this change to cckit as a pull request. | git | `kit-contribute` |
+| `cckit version` | Which cckit is installed? | Which cckit version is installed? | git | — |
+
+### What does cckit offer, and what is it built from?
+
+| Verb | Answers | Paste | Needs | Skill |
+| --- | --- | --- | --- | --- |
+| `cckit help` | What can cckit do? | List the cckit verbs by the question each one answers. | git | — |
+| `cckit commands` | Which verbs exist? | List every cckit verb with the question it answers. | git | — |
+| `cckit lib` | Which helper already does this? | Find the cckit helper that already does this before writing one. | git | — |
+| `cckit scan` | What stack is this repo, and what kit state does it have? | Scan this repo's stack and kit state. | git | — |
+| `cckit encode-context` | How do I hand a subagent JSON in fewer tokens? | Encode this JSON as TOON before you hand it to the subagent. | git | — |
+| `cckit render` | How do I read markdown rendered in the terminal? | Render this markdown in the terminal. | git | — |
+
+Old names that still work: `cckit copilot` runs `cckit wave` · `cckit ui` runs `cckit status`.
+
+{/* verbs:end */}
+
+### Renaming a verb
+
+The top level only shrinks. `bash scripts/check.sh` fails when `scripts/lib/verbs.tsv` holds more
+top-level verbs than `scripts/verbs.baseline` (46 today), and fails when it holds fewer until the
+baseline is lowered to match. A renamed verb keeps its old name as an `alias` row: the old name still
+works and prints one line on stderr, for example
+`cckit: 'copilot' is an old name for 'wave'; it still works. Use 'cckit wave'.` An alias does not
+count toward the baseline and is not removed while the rename settles.
+
+## Ask cckit about its own verbs
+
+Four questions a reader has about the verbs themselves. Each one lists the prompt to paste, the
+command the agent runs, and what comes back. None of them changes a file or calls the forge.
+
+### What can cckit do?
+
+- **Paste:** "List the cckit verbs by the question each one answers."
+- **The agent runs:** `cckit help` (or `cckit --help`).
+- **You see:** every verb under the question its group answers, git mechanics first, then the old
+names that still work:
+
+```text
+cckit — every verb answers a question.
+  cckit <verb> --help    one verb: its usage, its question and a prompt to paste
+  cckit commands --json  every verb as data: question, prompt to paste, usage, needs
+
+How do I take one change from a branch to merged?
+  start           How do I start work on an issue without touching my main checkout?
+  pr              How do I open the pull request for this issue?
+  merge           Can this pull request land, and what does landing clean up?
+  …
+```
+
+### What does this one verb do?
+
+- **Paste:** "What does `cckit start` do, and what should I ask you to run it?"
+- **The agent runs:** `cckit start --help` (the same as `cckit help start`).
+- **You see:** the usage, the question, a prompt to paste and what the verb needs. The verb itself
+does not run:
+
+```text
+cckit start [--force] <issue> [slug]
+
+  Answers: How do I start work on an issue without touching my main checkout?
+  Paste:   "Start the issue I pick in its own worktree."
+  Needs:   git; reads or writes the forge (GitHub) when one is configured
+  Skill:   kit-task-start
+```
+
+A verb with its own longer help, such as `cckit orchestrate` or `cckit doctor`, prints it after
+this block under **Details:**.
+
+### Which verbs exist, as data?
+
+- **Paste:** "Read the cckit verb catalog and tell me which verbs work without GitHub."
+- **The agent runs:** `cckit commands --json`.
+- **You see:** an answer built from a JSON array with one object per name (49 today: 46 verbs, the
+bare `cckit`, two old names). One object:
+
+```json
+{"name":"merge","kind":"verb","target":null,"group":"git","needs":"forge","skill":"kit-task-pr-merge",
+ "question":"Can this pull request land, and what does landing clean up?",
+ "prompt":"Merge this branch's pull request once its gate is green, and clean up the branch.",
+ "usage":["cckit merge [<pr>] [--squash|--merge|--rebase]"]}
+```
+
+### I typed an old name. Does it still work?
+
+- **Paste:** nothing; this is what happens when you, or a script, use a verb's old name.
+- **The agent runs:** for example `cckit copilot`.
+- **You see:** one line on stderr, then the new verb's normal output:
+
+```text
+cckit: 'copilot' is an old name for 'wave'; it still works. Use 'cckit wave'.
+```
 
 ## Set up and install
 
@@ -28,7 +201,7 @@ The tables are grouped by job: setup, the daily lifecycle, planning a wave, runn
 | `cckit init [<folder>]` | Guided project setup ([Initialize](/getting-started/initialize/)): classifies the folder before writing anything, asks what is missing (each question has one recommended answer; `--answers <file>` answers them without a terminal), starts a new project from a recipe (`--recipe nextjs-shadcn`), optionally adds a database option (`--database supabase`), scaffolds the kit, then runs the git + GitHub steps after one confirmation (`--yes` with no terminal): `git init` + first commit, `gh repo create` (private; `--public`), `develop` created and pushed, labels, milestones, delete-head-branches, base-branch protection, Projects v2 ids, the doctor report. Each step prints `done`, `skipped` or `failed`; a re-run skips finished steps. `--no-github` scaffolds only. `--dry-run` prints every step and writes nothing. Exit 0 · 1 a step failed · 2 refused before any write. A home or system folder is never scaffolded into. |
 | `cckit init --profile <p> --no-github` | Scaffold the project config (`.claude/kit.config.json`; the root `cckit.config.json` for a Codex-only project) and the adapter files for this repo, and nothing else. `--adapter <claude\|codex\|both>` selects the agent (default `claude`): `codex` writes `AGENTS.md` + `.agents/{skills,rules}` and, alone, no `.claude/` tree. `--upgrade` brings an existing project to the installed version ([Update a project](/getting-started/update/)): it adds missing files, keeps existing ones, and prints the files it added or modified as `Changed on disk`; `--upgrade --dry-run` runs the same upgrade on a temporary copy and prints that list as `Would change`, writing nothing. `--upgrade` keeps the stored selection; `--upgrade --adapter <name>` adds one. Both adapters get the guard and session-mail hooks; for Codex they are merged into `.codex/hooks.json` and run once trusted (`/hooks`). Each profile role is installed for both from one source: `.claude/agents/<role>/AGENT.md` and `.codex/agents/<role>.toml`. See [Adapters](/adapters/#choosing-adapters-at-install) and [Hooks](/hooks/#codex). |
 | `cckit scan` | Detect this repo's stack + kit state (JSON). |
-| `cckit doctor` | Onboarding preflight: deps present, `gh` authenticated, one row per [integration](/integrations/) the config switches on, each installed from its descriptor by the shared runner, one `page-design skill` row per adapter when `tasks.design` is on (failing, and naming `cckit add page-design`, when the skill folder is absent), and (when memory is on) the per-wing wake-up header. Asks before installing; `--fix` installs and seeds without the prompt. With no terminal and no `--fix` the run is report-only: no package is installed, `pnpm install` is not run, no file is seeded or refreshed and no server is started. An integration installs only after a yes or `--fix`; otherwise it is reported missing and the exit code is 1. Also reports the CLI of each selected adapter present or absent; `--agents` prints only those rows, offline, and exits 1 when one is absent. With `codex` selected it adds a row for the hooks registered in `.codex/hooks.json`. Also prints the resident instruction-file total against the 150k limit. |
+| `cckit doctor` | Onboarding preflight: deps present, the forge signed in (a GitHub token; `gh` is optional), one row per [integration](/integrations/) the config switches on, each installed from its descriptor by the shared runner, one `page-design skill` row per adapter when `tasks.design` is on (failing, and naming `cckit add page-design`, when the skill folder is absent), and (when memory is on) the per-wing wake-up header. Asks before installing; `--fix` installs and seeds without the prompt. With no terminal and no `--fix` the run is report-only: no package is installed, `pnpm install` is not run, no file is seeded or refreshed and no server is started. An integration installs only after a yes or `--fix`; otherwise it is reported missing and the exit code is 1. Also reports the CLI of each selected adapter present or absent; `--agents` prints only those rows, offline, and exits 1 when one is absent. With `codex` selected it adds a row for the hooks registered in `.codex/hooks.json`. Also prints the resident instruction-file total against the 150k limit. |
 | `cckit add [<name>]` | No name: list the integrations described in `integrations/`, the modules and the kit skills that can be added. With an integration: set the one config key its descriptor names and copy the rules it lists into `.claude/rules/`; nothing is installed. Seven ship: `mempalace`, `mlx-lm`, `graft`, `lavish`, and the three design skills `impeccable`, `emil-design-eng` and `web-design-guidelines`. With a module (`software`): write this directory's `.claude/kit.config.json`. With `page-design`: set `tasks.design: true` and copy the [`page-design`](/skills/#page-design) skill into the skills folder of each adapter in the config; it asks nothing, needs no version bump, and keeps a copy already there. `KIT_DRY_RUN=1` previews, and for an integration also prints the install and wire plan. See [Integrations](/integrations/). |
 | `cckit adopt` | Record kit-shaped files a repo already has. |
 | `cckit migrate` | Reshuffle an old kit layout to the current one. `--dry-run` previews. Step 2 of [Update a project](/getting-started/update/). |
@@ -40,13 +213,13 @@ One issue becomes one branch, one worktree, one PR. These verbs walk that path.
 | Verb | Purpose |
 | --- | --- |
 | `cckit next [--effort N]` | The unblocked set + how to start the top issue. In a project whose `tasks.default` is `light`, a bare `cckit next` prints what `cckit task next` prints (with `--llm`, one JSON object or `null`); with `--effort N` it asks about issues as before. Human output ends with the weekly cadence line: Monday `cckit plan`, daily `cckit next`, Friday `cckit gc`. `--llm` rows stay `{number,ctx,title}`. |
-| `cckit start <issue> [slug]` | Create an isolated worktree + branch for an issue, [bootstrapped](/config-and-permissions/#worktree-bootstrap) — env files copied, dev port assigned, deps installed at the selected targets (`worktree.installPaths` if set — those dirs regardless of their manifests — else a root that declares dependencies or is a workspace root with members, else nothing). [Claim-checked](#session-claims): refused when another live session already holds the issue, unless `--force` / `KIT_FORCE=1`. |
+| `cckit start <issue> [slug]` | Create an isolated worktree + branch for an issue, [bootstrapped](/config-and-permissions/#worktree-bootstrap) — env files copied, dev port assigned, deps installed at the selected targets (`worktree.installPaths` if set — those dirs regardless of their manifests — else a root that declares dependencies or is a workspace root with members, else nothing). [Claim-checked](#session-claims): refused when another live session already holds the issue, unless `--force` / `KIT_FORCE=1`. Without a [forge](/config-and-permissions/#the-forge) the issue is not read: the branch is `task/<N>-<slug>` with the slug given, else `issue-<N>`, and one line says so. |
 | `cckit claims` | List the live [session claims](#session-claims) — issue, session pid, start time, branch, worktree. Read-only. `--llm` returns a JSON array. |
-| `cckit pr <issue> <summary> [--base <branch>]` | Commit, push, and open the PR. `--base <branch>` opens it against a branch other than the configured base — a release PR from `develop` to `main`, or a hotfix to the release branch — with the same labels, milestone and board steps. The push exports the target as `KIT_PR_BASE`, so a git pre-push hook can compare against the branch the PR targets. |
-| `cckit hotfix <pr\|sha> [--base <branch>]` | Cherry-pick one merged PR or commit onto the release branch (`main` by default): a worktree from `origin/<base>`, `git cherry-pick -x`, push, and a PR titled after the source with `Cherry-pick of #N` in its body. See [Hotfix to the release branch](/ship/releasing/#hotfix-to-the-release-branch). |
+| `cckit pr <issue> <summary> [--base <branch>]` | Commit, push, and open the PR. `--base <branch>` opens it against a branch other than the configured base — a release PR from `develop` to `main`, or a hotfix to the release branch — with the same labels, milestone and board steps. The push exports the target as `KIT_PR_BASE`, so a git pre-push hook can compare against the branch the PR targets. Without a forge it commits and pushes, prints the GitHub compare page when origin is on GitHub, and says in one line that the pull request was not opened. |
+| `cckit hotfix <pr\|sha> [--base <branch>]` | Cherry-pick one merged PR or commit onto the release branch (`main` by default): a worktree from `origin/<base>`, `git cherry-pick -x`, push, and a PR titled after the source with `Cherry-pick of #N` in its body. Without a forge the source must be a commit sha (a PR number cannot be read), the branch is pushed and the compare page printed, and no PR is opened. See [Hotfix to the release branch](/ship/releasing/#hotfix-to-the-release-branch). |
 | `cckit close <issue> <summary> [--reason R] [--duplicate-of N] [--superseded-by N]` | Close the issue with a summary comment and a reason (`completed`, `not-planned`, `duplicate`; superseded closes as not planned with a "Superseded by #N" comment), and mark it done on the board. |
 | `cckit new --role R "<title>"` | File one issue: labels, board add, Role and Status fields. Milestone optional. A label the repo does not have is left off with a warning that names it; the issue is still created, and the verb exits non-zero only when the issue itself is not. `R` matches any option of the board's Role field by name, ignoring case and treating spaces and hyphens alike (`backend`, `Tech Lead`, `tech-lead`); a role the board has no option for leaves Role unset and prints a warning on stderr naming the missing `ROLE_OPT_<NAME>`. |
-| `cckit merge [<pr>] [--merge\|--rebase]` | Merge the PR (squash by default), close its linked issues, clean the branch and worktree, and update the PR's base, which may be an `effort/<N>` branch. Refuses a PR whose **head** is `effort/*` and names `cckit effort close <N>`; `KIT_FORCE=1` merges anyway, with a warning. |
+| `cckit merge [<pr>] [--merge\|--rebase]` | Merge the PR (squash by default), close its linked issues, clean the branch and worktree, and update the PR's base, which may be an `effort/<N>` branch. Refuses a PR whose **head** is `effort/*` and names `cckit effort close <N>`; `KIT_FORCE=1` merges anyway, with a warning. Without a forge, run from the branch's worktree with no PR number: the branch lands on the base through git (a squash commit titled after its last commit; `--merge` keeps the commits under a merge commit; `--rebase` replays them first), the base is pushed, the branch and worktree are cleaned up, and one line says no pull request was merged and no issue closed. |
 | `cckit sync` | Board state: issues by role with Project Status, a merge-ordered open-PR queue, and blocked / not-on-board / stale (>14d) flags. |
 | `cckit sync --json \| --write \| --cached [TTL] \| --watch [SECS] \| --plan` | The same board as one cached JSON document for a TUI or statusline — see [Board cache and watch mode](#board-cache-and-watch-mode). |
 | `cckit status` | "Where are we?" in three buckets — local undone work, open PRs waiting on a human, cleanup available (local + remote) — plus the board, the light tasks when the project has any (counts by state and the tasks somebody has to act on), the next effort that can start in each flow, and the resume handoff, and one line with the resident instruction-file total. Read-only. |
@@ -103,7 +276,7 @@ review: 3   doing: 0   todo: 2   draft: 1   shared: 0   done: 0
 
 The first line counts every task by state. The table lists the tasks somebody has to act on, in
 this order: `review`, `doing`, `draft`, `shared`. A `todo` task is counted and not listed. The
-states are the ones `cckit task list` prints, read from local git: this section makes no `gh` call
+states are the ones `cckit task list` prints, read from local git: this section makes no GitHub call
 and does not fetch, so a teammate's change shows after the next `git fetch` or `cckit task list`.
 
 `cckit status --llm` carries the same data as `light_tasks`:
@@ -117,7 +290,7 @@ Between the board and the three buckets, `cckit status` prints one row per flow 
 1. only efforts with **no open blocker** — any open `blocked_by` issue blocks, whether it is an effort in the same flow, an effort in another flow, or a plain issue. A closed blocker does not.
 2. among those, the most urgent `priority:pN` (p0 → p3, unlabelled last), then the lowest issue number.
 
-The last column counts the flow's efforts still waiting on an open blocker. A flow where every effort is blocked keeps its row and says none can start. The section also states its own emptiness: when no open issue carries the `effort` label it says so, and when the efforts could not be read (gh or jq absent, unauthenticated, offline) it says that instead — the two never look alike. The read costs one `gh issue list` plus one `gh api` call per open effort.
+The last column counts the flow's efforts still waiting on an open blocker. A flow where every effort is blocked keeps its row and says none can start. The section also states its own emptiness: when no open issue carries the `effort` label it says so, and when the efforts could not be read (no forge or jq, unauthenticated, offline) it says that instead — the two never look alike. The read costs one issue list plus one REST call per open effort.
 
 In `--llm` output the same rows are the `next_efforts` array:
 
@@ -151,30 +324,6 @@ Exit codes: 0 done · 1 refused or a failed step · 2 usage; `task run` adds the
 [Config & permissions](/config-and-permissions/#light-tasks). `tasks.design` (boolean, default
 `false`) is the page-task switch the `task run` row describes; its definition is in
 `kit.config.schema.json`.
-
-## Verb ↔ skill map
-
-Every verb below is drivable from the CLI. The ones with a skill are also reachable as a slash command in Claude Code; the ones without are CLI-only, which means an agent that only reads the skills list cannot see them. Kept here so that gap stays visible rather than being rediscovered.
-
-| Verb | Skill | |
-| --- | --- | --- |
-| `status` | `kit-status` | |
-| `sync` | `kit-task-sync` | |
-| `next` | `kit-next` | |
-| `plan-next` | `kit-plan-next` | |
-| `start` · `pr` · `close` | `kit-task-start` · `kit-task-pr` · `kit-task-close` | |
-| `gc` | `kit-gc` | (`kit-cleanup` acts on its report) |
-| `autopilot` | `kit-autopilot` | |
-| `contribute` | `kit-contribute` | |
-| `digest` | `kit-digest` | |
-| `doctor` · `init` · `update` | `kit-doctor` · `kit-init` · `kit-update` | plugin commands |
-| `add` | `kit-add` | lists, asks the descriptor's one question, then runs the verb |
-| `effort` | `kit-effort-new` · `-start` · `-pr` · `-close` | one skill per phase |
-| `brief` | — | CLI-only |
-| `plan` · `wave` · `watch` · `orchestrate` | — | CLI-only |
-| `msg` · `handoff` | — | CLI-only |
-| `adopt` · `migrate` · `scan` | — | CLI-only |
-| `lib` · `commands` · `version` · `render` · `encode-context` · `bench` · `release` · `install` · `completions` · `debug` | — | plumbing; no skill intended |
 
 ## Plan and drive a wave
 
@@ -254,16 +403,16 @@ A test greps the shipped `scripts/lib` and `bin` for any vendor model id and req
 
 | Verb | Purpose |
 | --- | --- |
-| `cckit gc [--prune [--yes]]` | Report (default) or prune merged branches + worktrees. Never touches a branch/worktree whose issue is still open — including an effort sub (`sub/<N><letter>-…`) of an open effort — and aborts rather than classify anything if that protection helper cannot load. A worktree with a **detached HEAD** has no branch, so it gets its own row: **LANDED** when its tree is clean and its HEAD is an ancestor of the base branch or of `main` (`--prune --yes` removes it), **ORPHAN** otherwise — uncommitted changes, or a HEAD on neither ref, where the worktree is the only handle on those commits. A failed `gh` read is not an empty answer: when the PR list or a branch's issue state cannot be read (rate limit, outage, no `gh`), the branch is reported `UNKNOWN (could not determine …)` — never `ORPHAN (no PR …)` and never LANDED — and no prune deletes it. `gh` answering "no such issue" is a definite answer and classifies as before. `--llm` counts those rows as `unknown`. |
+| `cckit gc [--prune [--yes]]` | Report (default) or prune merged branches + worktrees. Never touches a branch/worktree whose issue is still open — including an effort sub (`sub/<N><letter>-…`) of an open effort — and aborts rather than classify anything if that protection helper cannot load. A worktree with a **detached HEAD** has no branch, so it gets its own row: **LANDED** when its tree is clean and its HEAD is an ancestor of the base branch or of `main` (`--prune --yes` removes it), **ORPHAN** otherwise — uncommitted changes, or a HEAD on neither ref, where the worktree is the only handle on those commits. A failed GitHub read is not an empty answer: when the PR list or a branch's issue state cannot be read (rate limit, outage, no forge), the branch is reported `UNKNOWN (could not determine …)` — never `ORPHAN (no PR …)` and never LANDED — and no prune deletes it. GitHub answering "no such issue" is a definite answer and classifies as before. `--llm` counts those rows as `unknown`. |
 | `cckit cleanup [--yes]` | The guided destructive sweep over the `gc` classification: prints the plan (SAFE branches + worktrees, ZOMBIE worktrees, LANDED branches, ORPHAN, PROTECTED, UNKNOWN, stashes) and deletes nothing without `--yes`. A **LANDED** branch has no PR of its own but its work is already on base — by content (every file it changed since its merge base matches `origin/<base>`) or by lineage (`sub/<N>…`, `effort/<N>…`, or a `[#N]` commit subject names an issue closed with a merged PR): an effort's subs, an `effort/<N>` whose remote is gone, a Claude Code Agent-tool `worktree-agent-<hash>` isolation worktree. `--yes` deletes LANDED rows exactly like SAFE rows, under the same guards; a branch failing both checks stays ORPHAN. `effort close` runs the same LANDED prune over its `sub/<N>…` worktrees and branches, so an effort closes with no residue. Both verbs refresh remote-tracking refs (`git fetch --prune`) so the classification is not made against a stale view of the remote — that is the only write a plan-only run performs, and it touches no branch, worktree, stash, or commit of yours. `--yes` deletes the SAFE local branches, the **clean** SAFE worktrees (a dirty one is skipped with a warning, never destroyed), and the remote refs of branches proven exactly level with theirs. It also prunes the admin metadata of the **ZOMBIE** worktrees the plan listed — a worktree whose directory is gone but whose metadata lingers — after committing any staged work it still holds to its branch (recover-before-prune), so no blob is orphaned by the prune. An ORPHAN branch, a branch whose issue is still open, an UNKNOWN branch (a GitHub read failed, so its verdict could not be determined) and a stash are never deletable — they are surfaced and left alone. Detached worktrees follow the `gc` verdict: a LANDED one is listed with the worktrees `--yes` removes, an ORPHAN one is listed by path under ORPHAN and kept. A detached ZOMBIE is compared to its own HEAD's tree: with no staged delta its metadata is pruned; with one there is no branch to recover onto, so `--yes` locks that entry (git's `locked` file) and the prune leaves it for recovery by hand. |
 | `cckit render` | stdin markdown → rich output (glow on a TTY, verbatim when piped). |
 | `cckit encode-context` | stdin JSON → compact TOON (token-saving for subagents). |
 | `cckit digest <path\|url>` | Summarize a file or URL with the local model. |
 | `cckit bench [run\|report\|…]` | [Documentation benchmark](/benchmark/): score how well this project finds + uses its own canonical docs. |
 | `cckit bench checkpoint <X.Y.Z> [--passes N] [--from <run.json>] [--model <name>] [--note <text>] [--verbs <timings.json>]` | Record a benchmark run as a checkpoint of release `<X.Y.Z>` in `benchmarks/runs/<X.Y.Z>.json`. `cckit bench checkpoints [--json]` lists every checkpoint, `cckit bench check <X.Y.Z>` gives the release verdict (exit 0 · 1 · 2), `cckit bench page [--out <file>] [--check]` prints or verifies the [results page](/benchmark-results/). See [Checkpoints per release](/benchmark/#checkpoints-per-release). |
-| `cckit bench verbs [--runs N] [--checkout <dir>] [--verb "<verb>"] [--json]` | Wall time (fastest and median, in milliseconds) and `gh` call count of nine read-only verbs, each run N times (default 3). `cckit bench checkpoint <X.Y.Z> --verbs <file>` attaches the `--json` output to a checkpoint. See [Verb timings](/benchmark/#verb-timings). |
+| `cckit bench verbs [--runs N] [--checkout <dir>] [--verb "<verb>"] [--json]` | Wall time (fastest and median, in milliseconds) and GitHub request count (`gh_calls`: API requests over `curl`, plus any `gh` run) of nine read-only verbs, each run N times (default 3). `cckit bench checkpoint <X.Y.Z> --verbs <file>` attaches the `--json` output to a checkpoint. See [Verb timings](/benchmark/#verb-timings). |
 | `cckit version` | The installed cckit version. |
-| `cckit commands` | List every verb (the command catalog). |
+| `cckit commands [--json]` | List every verb, default and old name (the command catalog), read from `scripts/lib/verbs.tsv`. `--json` returns one object per name: `name`, `kind` (`verb`, `default` or `alias`), `target`, `group`, `needs` (`git` or `forge`), `skill`, `question`, `prompt`, `usage` (an array of lines). `--llm` keeps the older shape, an array of names. |
 | `cckit lib [--all] [--reasons]` | List every `scripts/lib` helper: its public functions, its one-line purpose, and its declared error behaviour. The companion to `commands` — that lists the verbs, this lists the library they are built from. |
 | `cckit brief <issue>` | Generate an issue's delegation brief from real repo state: its worktree and branch, whether that branch's seed is stale, the files it owns, the helpers those files sit on, and the project's standing gotchas. |
 | `cckit update` | Report whether this project is behind the installed cckit: `up to date` (exit 0), or `update available` with the command to run, `cckit init --upgrade` (exit 10). Changes nothing. See [Update a project](/getting-started/update/). |
@@ -312,16 +461,16 @@ Every section that cannot be filled says so on its own line. A brief that silent
 cckit brief <issue>       # the brief for that issue
 ```
 
-Reading the issue is the verb's one hard dependency: a `gh` failure propagates rather than yielding a brief with an empty issue in it.
+Reading the issue is the verb's one hard dependency: a failed GitHub read propagates rather than yielding a brief with an empty issue in it.
 
 ## Board cache and watch mode
 
-A dashboard that polls the board — a TUI, a statusline — reads one JSON document instead of running its own `gh` queries:
+A dashboard that polls the board — a TUI, a statusline — reads one JSON document instead of running its own GitHub queries:
 
 ```bash
 cckit sync --json          # print the document (one JSON object)
 cckit sync --write         # fetch, then write it to <git-common-dir>/kit-sync-cache.json
-cckit sync --cached 60     # print the cache if it is under 60s old (no gh call), else refresh it
+cckit sync --cached 60     # print the cache if it is under 60s old (no GitHub call), else refresh it
 cckit sync --watch 30      # refresh the cache every 30s until interrupted
 cckit sync --plan          # the human board plus an inline `effort plan`
 ```
@@ -330,7 +479,7 @@ cckit sync --plan          # the human board plus an inline `effort plan`
 | --- | --- |
 | `--json` | One JSON object on stdout. `--llm` and `--output=json` are unchanged: they still return the issue list as TOON. |
 | `--write` | Writes the document to `<git-common-dir>/kit-sync-cache.json` — one file shared by every worktree. The write goes to a temp file that is validated and then renamed, so a reader sees the old document or the new one. A failed or partial fetch (issues, the PR list, or the Projects v2 board when it is on) exits `1` and leaves the file untouched. Prints nothing on stdout unless `--json` is also given. |
-| `--cached [TTL]` | Prints the cache with no `gh` call when it is younger than `TTL` seconds (default `60`); otherwise refreshes, writes and prints it. A failed refresh exits `1` and leaves the cache as it was. |
+| `--cached [TTL]` | Prints the cache with no GitHub call when it is younger than `TTL` seconds (default `60`); otherwise refreshes, writes and prints it. A failed refresh exits `1` and leaves the cache as it was. |
 | `--watch [SECS]` | Refreshes and writes every `SECS` seconds (default `30`). A failed refresh logs `kept the last good cache` on stderr and the loop continues. `KIT_SYNC_WATCH_MAX=<n>` stops after `n` refreshes, exiting `1` if the last one failed. With `--json` each refreshed document is also printed, one per line. |
 | `--plan` | Adds `effort plan` output: an `### Effort plan` section on the human board, a `plan` string in the document. |
 

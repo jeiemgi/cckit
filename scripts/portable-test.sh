@@ -4,8 +4,8 @@
 # no verb may ever resolve cckit's OWN repo (that was the bug where `cckit sync` elsewhere read
 # cckit's config and reported an empty board). This harness enforces that BY CONSTRUCTION: it
 # iterates `cckit commands`, exercises every read-only verb against a foreign fixture with a stubbed
-# gh, and fails if any new verb is left unclassified — so coverage can't silently rot.
-# Hermetic: stubs `gh` (no network/auth). Run: bash scripts/portable-test.sh
+# forge, and fails if any new verb is left unclassified — so coverage can't silently rot.
+# Hermetic: the forge shim stands in for GitHub (no network, no auth). Run: bash scripts/portable-test.sh
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # Sealed from the caller's KIT_*/CCKIT_*/EFFORT_* (#369): this suite builds its own fixture.
@@ -22,23 +22,19 @@ command -v jq >/dev/null 2>&1 || { echo "portable-test: jq required" >&2; exit 1
 OWN_REPO="$(jq -r '.github.repo' "$ROOT/cckit.config.json")"     # cckit's own repo — must NEVER leak
 FIX_REPO="octo/fixture-repo"
 
-# Stub gh: log EVERY --repo it is asked about to $GH_REPO_LOG (a file, so it survives a verb that
-# redirects gh's stderr), and return empty results. Also echoes REPO= to stderr for the legacy checks.
+# The forge shim (E537): its `curl` logs EVERY REST request to $GH_LOG as `METHOD path body` (a
+# file, so it survives a verb that redirects stderr) and answers like the API; its `gh` fails on
+# any subcommand. The repository a verb addressed is read back from the request paths
+# (`repos/<owner>/<name>/…`) and from a GraphQL body's owner/name variables.
 stub="$(mktemp -d)"
-cat > "$stub/gh" <<'SH'
-#!/usr/bin/env bash
-prev=""
-for a in "$@"; do
-  if [ "$prev" = "--repo" ]; then
-    [ -n "${GH_REPO_LOG:-}" ] && printf '%s\n' "$a" >> "$GH_REPO_LOG"
-    printf 'REPO=%s\n' "$a" >&2
-  fi
-  prev="$a"
-done
-# GraphQL calls read stdin/args; a bare object keeps jq consumers happy. List calls want an array.
-case "$*" in *graphql*) echo '{"data":{}}' ;; *) echo "[]" ;; esac
-SH
-chmod +x "$stub/gh"
+# shellcheck source=/dev/null
+. "$ROOT/scripts/lib/test-forge-shim.sh"
+forge_shim_install "$stub"
+export GH_TOKEN=test-token CCKIT_FORGE=github
+repos_asked() {  # the owner/name of every request in $GH_LOG, one per line
+  sed -nE 's#^[A-Z]+ repos/([^/]+/[^/? ]+).*#\1#p' "$GH_LOG"
+  sed -nE 's#.*"owner":"([^"]+)","name":"([^"]+)".*#\1/\2#p' "$GH_LOG"
+}
 
 # A foreign project whose config points at a DISTINCT repo, a non-default base branch, and an
 # org-owned board — so we verify repo + base branch + owner type all resolve to the INVOKING project.
@@ -59,14 +55,18 @@ t "config resolves the invoking owner"       "$O" "octo"
 t "config resolves the org owner type"       "$T" "organization"
 
 # ── legacy targeted checks (kept) ────────────────────────────────────────────────────────────────
-export GH_REPO_LOG="$fix/gh.repos"; : > "$GH_REPO_LOG"
-got_repo="$(cd "$fix" && PATH="$stub:$PATH" "$CCKIT" sync --llm 2>&1 >/dev/null | sed -n 's/^REPO=//p' | tail -1)"
-t "sync targets the invoking project's repo" "$got_repo" "$FIX_REPO"
+export GH_LOG="$fix/forge.log"; : > "$GH_LOG"
+( cd "$fix" && PATH="$stub:$PATH" "$CCKIT" sync --llm >/dev/null 2>&1 )
+got_repo="$(repos_asked | sort -u | tr '\n' ' ')"
+t "sync targets the invoking project's repo" "$got_repo" "$FIX_REPO "
+t "sync ran no gh subcommand" "$(grep -c '^GH-SUBCOMMAND' "$GH_LOG")" "0"
 got_root="$(cd "$fix" && "$CCKIT" scan --llm 2>/dev/null | jq -r .root)"
 t "scan root is the invoking dir" "$got_root" "$(cd "$fix" && pwd -P)"
 own_repo="$(jq -r '.github.repo' "$ROOT/cckit.config.json")"
-got_own="$(cd "$ROOT" && PATH="$stub:$PATH" "$CCKIT" sync --llm 2>&1 >/dev/null | sed -n 's/^REPO=//p' | tail -1)"
-t "self-host sync targets cckit's repo" "$got_own" "$own_repo"
+: > "$GH_LOG"
+( cd "$ROOT" && PATH="$stub:$PATH" "$CCKIT" sync --llm >/dev/null 2>&1 )
+got_own="$(repos_asked | sort -u | tr '\n' ' ')"
+t "self-host sync targets cckit's repo" "$got_own" "$own_repo "
 got_ver="$(cd "$fix" && "$CCKIT" version | awk '{print $2}')"
 t "version is the install version, not the project's" "$got_ver" "$(jq -r '.kitVersion' "$ROOT/cckit.config.json")"
 
@@ -81,21 +81,22 @@ t "version is the install version, not the project's" "$got_ver" "$(jq -r '.kitV
 # covered by scripts/kit-add-test.sh.
 EXERCISE="sync status next plan plan-next wave gc cleanup scan doctor lib add claims"
 for v in $EXERCISE; do
-  : > "$GH_REPO_LOG"
-  ( cd "$fix" && PATH="$stub:$PATH" GH_REPO_LOG="$GH_REPO_LOG" "$CCKIT" "$v" --llm >/dev/null 2>&1 )
-  no "verb '$v' never resolves cckit's own repo from a foreign checkout" "$(cat "$GH_REPO_LOG")" "$OWN_REPO"
+  : > "$GH_LOG"
+  ( cd "$fix" && PATH="$stub:$PATH" "$CCKIT" "$v" --llm >/dev/null 2>&1 )
+  no "verb '$v' never resolves cckit's own repo from a foreign checkout" "$(repos_asked)" "$OWN_REPO"
+  no "verb '$v' runs no gh subcommand" "$(cat "$GH_LOG")" "GH-SUBCOMMAND"
 done
-# The board verbs that DO call gh with --repo must have hit the FIXTURE repo (proves real resolution).
-: > "$GH_REPO_LOG"; ( cd "$fix" && PATH="$stub:$PATH" GH_REPO_LOG="$GH_REPO_LOG" "$CCKIT" gc --llm >/dev/null 2>&1 )
-yes "gc resolves the invoking repo" "$(cat "$GH_REPO_LOG")" "$FIX_REPO"
+# The board verbs that DO address a repository must have hit the FIXTURE repo (proves real resolution).
+: > "$GH_LOG"; ( cd "$fix" && PATH="$stub:$PATH" "$CCKIT" gc --llm >/dev/null 2>&1 )
+yes "gc resolves the invoking repo" "$(repos_asked)" "$FIX_REPO"
 
 # `brief` takes an issue argument, so the generic --llm loop above cannot drive it — but it reads an
-# issue through gh, which is exactly the call that must never resolve cckit's own repo from someone
-# else's checkout. Drive it explicitly with an issue number.
-: > "$GH_REPO_LOG"
-( cd "$fix" && PATH="$stub:$PATH" GH_REPO_LOG="$GH_REPO_LOG" "$CCKIT" brief 1 >/dev/null 2>&1 )
-no  "brief never resolves cckit's own repo from a foreign checkout" "$(cat "$GH_REPO_LOG")" "$OWN_REPO"
-yes "brief resolves the invoking repo"                              "$(cat "$GH_REPO_LOG")" "$FIX_REPO"
+# issue over the forge, which is exactly the call that must never resolve cckit's own repo from
+# someone else's checkout. Drive it explicitly with an issue number.
+: > "$GH_LOG"
+( cd "$fix" && PATH="$stub:$PATH" "$CCKIT" brief 1 >/dev/null 2>&1 )
+no  "brief never resolves cckit's own repo from a foreign checkout" "$(repos_asked)" "$OWN_REPO"
+yes "brief resolves the invoking repo"                              "$(repos_asked)" "$FIX_REPO"
 
 # `receipt` makes no gh call, so the --repo log cannot judge it — but it WRITES, and writing into
 # cckit's own .cckit/ from someone else's checkout is the same leak in a different resource. The

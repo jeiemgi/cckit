@@ -16,6 +16,12 @@
 # errors: strict — git mechanics: a failed link, snapshot or lint propagates
 
 # The GitHub transport switch (#396): rest mode routes the gh calls below through gh-rest.sh.
+# The forge port (E537): every GitHub call goes through forge_* / gh_rest_* (scripts/lib/gh-rest.sh).
+if ! command -v gh_rest_issue_json >/dev/null 2>&1; then
+  # shellcheck source=/dev/null
+  . "$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)/gh-rest.sh"
+fi
+
 if ! command -v cckit_gh_rest >/dev/null 2>&1; then
   _ghr_lib="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)/gh-rest.sh"
   # shellcheck source=/dev/null
@@ -49,9 +55,9 @@ EFFORT_REPO="${EFFORT_REPO:-${KIT_REPO:-}}"
 effort_link_sub() {
   local parent="$1" child="$2" child_id
   [[ -n "$parent" && -n "$child" ]] || { echo "effort_link_sub: parent + child issue numbers required" >&2; return 1; }
-  child_id="$(gh api "repos/$EFFORT_REPO/issues/$child" --jq .id 2>/dev/null)" \
+  child_id="$(forge_rest "repos/$EFFORT_REPO/issues/$child" --jq .id 2>/dev/null)" \
     || { echo "effort_link_sub: could not resolve db id for #$child" >&2; return 1; }
-  gh api --method POST "repos/$EFFORT_REPO/issues/$parent/sub_issues" \
+  forge_rest --method POST "repos/$EFFORT_REPO/issues/$parent/sub_issues" \
     -F sub_issue_id="$child_id" >/dev/null 2>&1 \
     && { echo "  ✓ linked #$child as sub-issue of #$parent" >&2; return 0; } \
     || { echo "  ✗ failed to link #$child under #$parent (already linked? API unavailable?)" >&2; return 1; }
@@ -167,8 +173,7 @@ effort_snapshot_merged_subs() {
     seq=$((seq + 1))
     short="$(printf '%.7s' "$oid")"; [[ -n "$short" ]] || short="pr$pr"
     stub="$(printf '%02d-%s' "$seq" "$short")"
-    if cckit_gh_rest; then gh_rest_pr_diff "$EFFORT_REPO" "$pr" > "$dir/$stub.diff" 2>/dev/null || rm -f "$dir/$stub.diff"
-    else gh pr diff "$pr" --repo "$EFFORT_REPO" > "$dir/$stub.diff" 2>/dev/null || rm -f "$dir/$stub.diff"; fi
+    gh_rest_pr_diff "$EFFORT_REPO" "$pr" > "$dir/$stub.diff" 2>/dev/null || rm -f "$dir/$stub.diff"
     [[ -s "$dir/$stub.diff" ]] || { rm -f "$dir/$stub.diff"; seq=$((seq - 1)); continue; }
     jq -c -n --arg parent "$parent" --arg sub "${sub:-}" --arg sha "${oid:-}" \
           --arg subject "$title" --arg pr "$pr" --arg file "$stub.diff" \
@@ -338,9 +343,9 @@ effort_title_lint() {
 effort_set_blocked_by() {
   local issue="$1" blocker="$2" bid
   [[ -n "$issue" && -n "$blocker" ]] || { echo "effort_set_blocked_by: <issue> <blocker> required" >&2; return 1; }
-  bid="$(gh api "repos/$EFFORT_REPO/issues/$blocker" --jq .id 2>/dev/null)" \
+  bid="$(forge_rest "repos/$EFFORT_REPO/issues/$blocker" --jq .id 2>/dev/null)" \
     || { echo "effort_set_blocked_by: could not resolve db id for #$blocker" >&2; return 1; }
-  gh api --method POST "repos/$EFFORT_REPO/issues/$issue/dependencies/blocked_by" -F issue_id="$bid" >/dev/null 2>&1 \
+  forge_rest --method POST "repos/$EFFORT_REPO/issues/$issue/dependencies/blocked_by" -F issue_id="$bid" >/dev/null 2>&1 \
     && { echo "  ✓ #$issue blocked_by #$blocker" >&2; return 0; } \
     || { echo "  ✗ failed to set #$issue blocked_by #$blocker (already set? API unavailable?)" >&2; return 1; }
 }

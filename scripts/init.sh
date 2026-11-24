@@ -21,7 +21,7 @@
 #   --name <str>              human project name                  (default: target basename)
 #   --slug <str>             short slug / mempalace wing          (default: lowercased basename)
 #   --repo <owner/repo>       GitHub repo                          (default: <owner>/<slug>)
-#   --owner-login <login>     GitHub user/org login                (default: gh api user)
+#   --owner-login <login>     GitHub user/org login                (default: forge_rest user)
 #   --owner-name <str>        human owner name                     (default: owner-login)
 #   --project-number <int>    Projects v2 number (enables board)   (default: none -> board off)
 #   --plans <mdx|markdown|none>  plan file format                  (default: profile default)
@@ -40,6 +40,12 @@
 #   --upgrade                 merge new kit features into an existing .claude/ (preserves your edits)
 #   --dry-run                 print the scaffold plan and exit, writing nothing
 #   --force                   overwrite without prompting
+# The forge port (E537): every GitHub call goes through forge_* / gh_rest_* (scripts/lib/gh-rest.sh).
+if ! command -v gh_rest_issue_json >/dev/null 2>&1; then
+  # shellcheck source=/dev/null
+  . "$(cd "$(dirname "$0")" && pwd)/lib/gh-rest.sh"
+fi
+
 set -euo pipefail
 
 # ============================================================================
@@ -445,14 +451,14 @@ BASENAME="$(basename "$TARGET")"
 NAME_SRC="$(git_remote_repo_name "$TARGET" 2>/dev/null || true)"; NAME_SRC="${NAME_SRC:-$BASENAME}"
 [[ -z "$NAME" ]] && NAME="$NAME_SRC"
 [[ -z "$SLUG" ]] && SLUG="$(echo "$NAME_SRC" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed -E 's/^-|-$//g')"
-if [[ -z "$GH_OWNER" ]]; then GH_OWNER="$(gh api user --jq .login 2>/dev/null || echo "")"; fi
+if [[ -z "$GH_OWNER" ]]; then GH_OWNER="$(forge_rest user --jq .login 2>/dev/null || echo "")"; fi
 [[ -z "$OWNER_NAME" ]] && OWNER_NAME="${GH_OWNER:-owner}"
 # Prefer the project's ACTUAL GitHub remote over an <owner>/<dir-basename> guess — the local
 # directory name often differs from the repo name (would target a non-existent repo otherwise).
 if [[ -z "$REPO" && $INIT_ALREADY -eq 1 ]]; then
   REPO="$(jq -r '.github.repo // empty' "$(adapter_config_existing "$TARGET")" 2>/dev/null || true)"
 fi
-[[ -z "$REPO" ]] && REPO="$(cd "$TARGET" 2>/dev/null && gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || true)"
+[[ -z "$REPO" ]] && REPO="$(forge_repo_from_git "$TARGET" 2>/dev/null || true)"
 [[ -z "$REPO" && -n "$GH_OWNER" ]] && REPO="$GH_OWNER/$SLUG"
 [[ -z "$REPO" ]] && REPO="$SLUG"
 
@@ -480,7 +486,7 @@ if [[ -z "$BASE_BRANCH" ]]; then
     BASE_BRANCH="$(jq -r '.github.baseBranch // .github.integrationBranch // .github.flow // empty' "$_bb_cfg" 2>/dev/null || true)"
   fi
 fi
-[[ -z "$BASE_BRANCH" ]] && BASE_BRANCH="$(cd "$TARGET" 2>/dev/null && gh repo view --json defaultBranchRef -q .defaultBranchRef.name 2>/dev/null || true)"
+[[ -z "$BASE_BRANCH" && "$REPO" == */* ]] && BASE_BRANCH="$(gh_rest_repo_default_branch "$REPO" 2>/dev/null || true)"
 # The git + GitHub setup (#456) runs when it is wanted AND confirmed: --yes, or a terminal to ask
 # on. A dry run plans as if it were confirmed. A project with no `origin` remote that the setup is
 # about to give a repository integrates on `develop` (main stays the release branch).
@@ -1243,7 +1249,6 @@ safe_copy "$KIT_ROOT/scripts/lib/gh-project.sh"     "$TARGET/scripts/lib/gh-proj
 safe_copy "$KIT_ROOT/scripts/lib/worktree-issue.sh" "$TARGET/scripts/lib/worktree-issue.sh"
 safe_copy "$KIT_ROOT/scripts/lib/role-identity.sh"  "$TARGET/scripts/lib/role-identity.sh"
 safe_copy "$KIT_ROOT/scripts/lib/kit-local.sh"      "$TARGET/scripts/lib/kit-local.sh"
-safe_copy "$KIT_ROOT/scripts/lib/engine-adapter.sh" "$TARGET/scripts/lib/engine-adapter.sh"
 safe_copy "$KIT_ROOT/scripts/lib/effort-metrics.sh" "$TARGET/scripts/lib/effort-metrics.sh"
 safe_copy "$KIT_ROOT/scripts/lib/gh-log.sh"         "$TARGET/scripts/lib/gh-log.sh"
 safe_copy "$KIT_ROOT/scripts/lib/kit-events.sh"     "$TARGET/scripts/lib/kit-events.sh"

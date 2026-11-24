@@ -7,6 +7,12 @@
 # Locate scripts/ portably when sourced (#313): BASH_SOURCE is bash-only — empty in
 # zsh, where dirname "" resolved to CWD and the env was sought in the wrong dir.
 # zsh exposes the sourced file via the %x prompt escape; eval keeps bash from parsing it.
+# The forge port (E537): every GitHub call goes through forge_* / gh_rest_* (scripts/lib/gh-rest.sh).
+if ! command -v gh_rest_issue_json >/dev/null 2>&1; then
+  # shellcheck source=/dev/null
+  . "$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)/gh-rest.sh"
+fi
+
 if [ -n "${BASH_SOURCE:-}" ]; then
   _ghp_self="$BASH_SOURCE"
 elif [ -n "${ZSH_VERSION:-}" ]; then
@@ -64,7 +70,7 @@ load_project_ids() {
 project_add_item() {
   cckit_board_skipped && return 0
   gh_log graphql mutation "project_add_item" "gh-project"
-  gh api graphql \
+  forge_rest graphql \
     -f query='mutation($project:ID!, $content:ID!) {
       addProjectV2ItemById(input:{projectId:$project, contentId:$content}){ item { id } }
     }' \
@@ -76,7 +82,7 @@ project_add_item() {
 project_set_single_select() {
   cckit_board_skipped && return 0
   gh_log graphql mutation "project_set_single_select" "gh-project"
-  gh api graphql \
+  forge_rest graphql \
     -f query='mutation($project:ID!, $item:ID!, $field:ID!, $option:String!) {
       updateProjectV2ItemFieldValue(input:{
         projectId:$project, itemId:$item, fieldId:$field,
@@ -90,7 +96,7 @@ project_set_single_select() {
 project_set_text() {
   cckit_board_skipped && return 0
   gh_log graphql mutation "project_set_text" "gh-project"
-  gh api graphql \
+  forge_rest graphql \
     -f query='mutation($project:ID!, $item:ID!, $field:ID!, $text:String!) {
       updateProjectV2ItemFieldValue(input:{
         projectId:$project, itemId:$item, fieldId:$field, value:{ text:$text }
@@ -215,7 +221,7 @@ project_find_item_by_issue() {
   gh_log graphql query "project_find_item_by_issue:cheap" "gh-project"
   # The cheap query: issue.projectItems(first:20), each node carrying its project number.
   # No pagination, no board scan — O(1) per issue.
-  resp=$(gh api graphql \
+  resp=$(forge_rest graphql \
     -f query='query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){issue(number:$n){projectItems(first:20){nodes{id project{number}}}}}}' \
     -F o="$owner" -F r="$name" -F n="$issue_num" 2>&1)
   # A GraphQL/transport error (or a null issue) must abort LOUDLY — never let it read as
@@ -240,7 +246,7 @@ project_issue_status() {
   local issue_num="$1" pnum="${2:-$(_ghp_resolve_pnum)}" repo owner name resp
   repo="$(_ghp_resolve_repo)"; owner="${repo%%/*}"; name="${repo##*/}"
   [ -n "$owner" ] && [ -n "$name" ] && [ -n "$pnum" ] || return 1
-  resp="$(gh api graphql \
+  resp="$(forge_rest graphql \
     -f query='query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){issue(number:$n){projectItems(first:20){nodes{project{number} fieldValueByName(name:"Status"){...on ProjectV2ItemFieldSingleSelectValue{name}}}}}}}' \
     -F o="$owner" -F r="$name" -F n="$issue_num" 2>/dev/null)" || return 1
   printf '%s' "$resp" | jq -r --argjson n "$pnum" \

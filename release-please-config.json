@@ -6,10 +6,23 @@
   "packages": {
     ".": {
       "package-name": "cckit",
+      "bump-minor-pre-major": true,
       "extra-files": [
-        { "type": "json", "path": "cckit.config.json", "jsonpath": "$.kitVersion" },
-        { "type": "json", "path": ".claude-plugin/plugin.json", "jsonpath": "$.version" },
-        { "type": "json", "path": "docs-site/package.json", "jsonpath": "$.version" },
+        {
+          "type": "json",
+          "path": "cckit.config.json",
+          "jsonpath": "$.kitVersion"
+        },
+        {
+          "type": "json",
+          "path": ".claude-plugin/plugin.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": "docs-site/package.json",
+          "jsonpath": "$.version"
+        },
         "Formula/cckit.rb"
       ]
     }

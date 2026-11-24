@@ -1,0 +1,33 @@
+---
+// One effort becomes sub-issues layered into waves by their blocked-by edges. Wave 0 runs in
+// parallel; wave 1 starts once its blockers merge. Left to right = time.
+// Static SVG, no client JavaScript. Colours come from the .cckit-figure rules in
+// src/styles/theme.css, so the figure follows the light and dark themes.
+---
+<figure class="cckit-figure not-content">
+  <svg viewBox="0 0 772 266" style="max-width: 772px" role="img" aria-labelledby="effort-waves-title">
+    <title id="effort-waves-title">An effort splits into sub-issues 1 to 3 in wave 0; sub 1 unblocks sub 4 and sub 3 unblocks sub 5 in wave 1; the effort is done when all are merged.</title>
+    <defs>
+      <marker id="effort-waves-arrow-none" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow" d="M0,0 L10,5 L0,10 z" /></marker>
+      <marker id="effort-waves-arrow-review" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow k-review" d="M0,0 L10,5 L0,10 z" /></marker>
+      <marker id="effort-waves-arrow-success" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow k-success" d="M0,0 L10,5 L0,10 z" /></marker>
+    </defs>
+    <path class="edge" d="M172,133 C190,133 190,43 208,43" marker-end="url(#effort-waves-arrow-none)" />
+    <path class="edge" d="M172,133 C190,133 190,133 208,133" marker-end="url(#effort-waves-arrow-none)" />
+    <path class="edge" d="M172,133 C190,133 190,223 208,223" marker-end="url(#effort-waves-arrow-none)" />
+    <path class="edge k-review" d="M368,43 C386,43 386,43 404,43" marker-end="url(#effort-waves-arrow-review)" />
+    <path class="edge k-review" d="M368,223 C386,223 386,223 404,223" marker-end="url(#effort-waves-arrow-review)" />
+    <path class="edge k-success" d="M564,43 C582,43 582,133 600,133" marker-end="url(#effort-waves-arrow-success)" />
+    <path class="edge k-success" d="M564,223 C582,223 582,133 600,133" marker-end="url(#effort-waves-arrow-success)" />
+    <path class="edge k-success" d="M368,133 C484,133 484,133 600,133" marker-end="url(#effort-waves-arrow-success)" />
+    <g class="label"><rect x="347" y="32" width="78" height="22" rx="4" /><text x="386" y="43">unblocks</text></g>
+    <g class="label"><rect x="347" y="212" width="78" height="22" rx="4" /><text x="386" y="223">unblocks</text></g>
+    <g class="node k-start"><rect x="12" y="102" width="160" height="62" rx="10" /><text x="92" y="125" class="t">Effort</text><text x="92" y="146" class="d">one goal</text></g>
+    <g class="node k-work"><rect x="208" y="12" width="160" height="62" rx="10" /><text x="288" y="35" class="t">Sub #1</text><text x="288" y="56" class="d">wave 0</text></g>
+    <g class="node k-work"><rect x="208" y="102" width="160" height="62" rx="10" /><text x="288" y="125" class="t">Sub #2</text><text x="288" y="146" class="d">wave 0</text></g>
+    <g class="node k-work"><rect x="208" y="192" width="160" height="62" rx="10" /><text x="288" y="215" class="t">Sub #3</text><text x="288" y="236" class="d">wave 0</text></g>
+    <g class="node k-review"><rect x="404" y="12" width="160" height="62" rx="10" /><text x="484" y="35" class="t">Sub #4</text><text x="484" y="56" class="d">wave 1</text></g>
+    <g class="node k-review"><rect x="404" y="192" width="160" height="62" rx="10" /><text x="484" y="215" class="t">Sub #5</text><text x="484" y="236" class="d">wave 1</text></g>
+    <g class="node k-success"><rect x="600" y="102" width="160" height="62" rx="10" /><text x="680" y="125" class="t">Effort done</text><text x="680" y="146" class="d">all merged</text></g>
+  </svg>
+</figure>

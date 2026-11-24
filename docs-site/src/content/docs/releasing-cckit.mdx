@@ -15,6 +15,10 @@ cckit follows [Semantic Versioning](https://semver.org/) driven by
 commit messages since the last tag ([How the version is decided](/ship/releasing/#how-the-version-is-decided));
 the local `cckit release` fallback applies the same rules via `scripts/lib/version-bump.sh`.
 
+cckit stays below 1.0: while the major is 0, a breaking change bumps the minor (`bump-minor-pre-major`
+in `release-please-config.json`, and the same rule in `version-bump.sh`), so versions go 0.11, 0.12, …
+Releasing 1.0 is a maintainer's decision, not a commit's.
+
 Check what the next version would be at any time:
 
 ```bash
@@ -36,10 +40,12 @@ package on npm and the Homebrew formula updated.
 
 3. **Merge the Release PR.** That merge is the release: release-please tags `vX.Y.Z` and cuts the GitHub Release, then the `publish` job pushes to npm and bumps the Homebrew tap automatically.
 
+4. **The back-merge is automatic.** `.github/workflows/backmerge.yml` runs on every push to `main` and merges `main` into `develop` with a merge commit (`chore: back-merge main into develop`), so `develop` reads the released version and cckit.dev, built from `develop`, shows it. On a conflict that job fails instead of guessing: merge `main` into `develop` by hand, with a merge commit, never a squash.
+
 </Steps>
 
 **How to check it worked:** the tag `vX.Y.Z` exists, `cckit version` on a freshly updated install
-prints the new number, and the badge on cckit.dev shows it
+prints the new number, `git show origin/develop:package.json` reads it after the back-merge, and the badge on cckit.dev shows it
 ([The docs site follows the release](#the-docs-site-follows-the-release)).
 
 A batch with only `chore`/`docs` noise produces no Release PR (`bump=none` → nothing to release). Because the release is a single PR merge, two feature PRs merging at once can no longer race each other into a corrupted tag.
@@ -50,13 +56,20 @@ Changes to the release workflow are always reviewed by a person — the CI token
 
 ## The benchmark check
 
+<Aside type="note" title="Paused">
+The checkpoint steps below are paused while the current arc of work (git apart from GitHub, work in
+files, the advisor) lands: no checkpoint is recorded on `develop` and none is checked before the
+promotion. `cckit release` still refuses a version with no checkpoint; pass `--skip-bench-check`, which
+prints that the check was overridden. The release-please path never ran the check.
+</Aside>
+
 Every release records the [documentation benchmark](/benchmark/) for its version, and the score is
 published on the [Benchmark results](/benchmark-results/) page. The run is a checkpoint: run, fix
 what it showed, run again. A version can hold several.
 
 <Steps>
 
-1. **Record a checkpoint on `develop`** while the version is being built, from a worktree:
+1. **Record a checkpoint on `develop`** while the version is being built, from a worktree (paused: no new checkpoint under `benchmarks/runs/` until the arc ends):
 
    ```bash
    cckit release --next                 # the version the commits imply
@@ -75,7 +88,7 @@ what it showed, run again. A version can hold several.
 
 2. **Fix what the checkpoint shows as missed, then record another.** Repeat until the score holds.
 
-3. **Check the verdict** before the `develop` → `main` promotion: `cckit bench check X.Y.Z`.
+3. **Check the verdict** before the `develop` → `main` promotion: `cckit bench check X.Y.Z` (paused with step 1: the promotion goes ahead without it).
 
 </Steps>
 

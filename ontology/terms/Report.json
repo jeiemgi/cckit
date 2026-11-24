@@ -1,0 +1,17 @@
+{
+  "id": "Report",
+  "label": ["report"],
+  "definition": "What comes back when delegated work stops: the name of the work and its outcome first, then what is done, what waits for a yes, the numbers before and after, what failed or is risky, the open questions and the next step. A builder's report carries the PR URL; cckit orchestrate --results collects a wave's.",
+  "is_not": [
+    "A brief: the brief goes out to the builder; the report comes back.",
+    "A status: cckit status reads the repository now; a report records one run.",
+    "A PR body: the PR body is for the reviewer; the report is for the person who delegated."
+  ],
+  "avoid": ["summary (as the artifact's name)", "recap", "update", "handoff"],
+  "home": {
+    "cli": "orchestrate",
+    "skill": "kit-status",
+    "rule": ".claude/rules/authoring.md"
+  },
+  "status": "sapling"
+}

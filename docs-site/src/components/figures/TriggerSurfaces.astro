@@ -1,0 +1,30 @@
+---
+// Every tag answers one question: who pulls the trigger? Left = the initiator, right = the tag
+// that marks it.
+// Static SVG, no client JavaScript. Colours come from the .cckit-figure rules in
+// src/styles/theme.css, so the figure follows the light and dark themes.
+---
+<figure class="cckit-figure not-content">
+  <svg viewBox="0 0 380 536" style="max-width: 380px" role="img" aria-labelledby="trigger-surfaces-title">
+    <title id="trigger-surfaces-title">Who pulls the trigger: you act (conversational, command, skill), it fires itself (hook), an agent reads the machine surface (agent), or there is no trigger (flow, concept).</title>
+    <defs>
+      <marker id="trigger-surfaces-arrow-none" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow" d="M0,0 L10,5 L0,10 z" /></marker>
+    </defs>
+    <path class="edge" d="M172,133 C190,133 190,43 208,43" marker-end="url(#trigger-surfaces-arrow-none)" />
+    <path class="edge" d="M172,133 C190,133 190,133 208,133" marker-end="url(#trigger-surfaces-arrow-none)" />
+    <path class="edge" d="M172,133 C190,133 190,223 208,223" marker-end="url(#trigger-surfaces-arrow-none)" />
+    <path class="edge" d="M172,313 C190,313 190,313 208,313" marker-end="url(#trigger-surfaces-arrow-none)" />
+    <path class="edge" d="M172,403 C190,403 190,403 208,403" marker-end="url(#trigger-surfaces-arrow-none)" />
+    <path class="edge" d="M172,493 C190,493 190,493 208,493" marker-end="url(#trigger-surfaces-arrow-none)" />
+    <g class="node k-start"><rect x="12" y="102" width="160" height="62" rx="10" /><text x="92" y="125" class="t">You act</text><text x="92" y="146" class="d">a person, on purpose</text></g>
+    <g class="node k-neutral"><rect x="12" y="282" width="160" height="62" rx="10" /><text x="92" y="305" class="t">It fires itself</text><text x="92" y="326" class="d">on an event</text></g>
+    <g class="node k-work"><rect x="12" y="372" width="160" height="62" rx="10" /><text x="92" y="395" class="t">An agent reads</text><text x="92" y="416" class="d">the machine surface</text></g>
+    <g class="node k-neutral"><rect x="12" y="462" width="160" height="62" rx="10" /><text x="92" y="485" class="t">No trigger</text><text x="92" y="506" class="d">nothing to fire</text></g>
+    <g class="node k-propose"><rect x="208" y="12" width="160" height="62" rx="10" /><text x="288" y="35" class="t">Conversational</text><text x="288" y="56" class="d">say it in plain words</text></g>
+    <g class="node k-propose"><rect x="208" y="102" width="160" height="62" rx="10" /><text x="288" y="125" class="t">Command</text><text x="288" y="146" class="d">type cckit &lt;verb&gt;</text></g>
+    <g class="node k-propose"><rect x="208" y="192" width="160" height="62" rx="10" /><text x="288" y="215" class="t">Skill</text><text x="288" y="236" class="d">type /kit-*</text></g>
+    <g class="node k-review"><rect x="208" y="282" width="160" height="62" rx="10" /><text x="288" y="305" class="t">Hook</text><text x="288" y="326" class="d">runs automatically</text></g>
+    <g class="node k-work"><rect x="208" y="372" width="160" height="62" rx="10" /><text x="288" y="395" class="t">Agent</text><text x="288" y="416" class="d">reads --llm output</text></g>
+    <g class="node k-neutral"><rect x="208" y="462" width="160" height="62" rx="10" /><text x="288" y="485" class="t">Flow · Concept</text><text x="288" y="506" class="d">a term worth knowing</text></g>
+  </svg>
+</figure>

@@ -1,5 +1,6 @@
 ---
 name: kit-plan-next
+terms: Effort
 description: >
   Forward planning from the current state: run `cckit plan-next` to inventory what the kit can
   already do (skills, verbs, rules, docs) and propose what to build next — grounded in that

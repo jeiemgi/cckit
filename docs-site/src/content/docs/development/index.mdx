@@ -4,8 +4,8 @@ description: The path of one piece of work from issue to merged code, why each p
 ---
 
 import { CardGrid, LinkCard, Steps, Aside } from '@astrojs/starlight/components';
-import GitHubCycle from '../../../components/diagrams/GitHubCycle';
-import WorktreeIsolation from '../../../components/diagrams/WorktreeIsolation';
+import GitHubCycle from '../../../components/figures/GitHubCycle.astro';
+import WorktreeIsolation from '../../../components/figures/WorktreeIsolation.astro';
 
 Building is the part of the process where several agents touch the same repository at the same
 time. Two of them editing one folder overwrite each other's files, and git has no lock that stops
@@ -18,7 +18,7 @@ colliding.
 
 ## The path of one change
 
-<GitHubCycle client:only="react" />
+<GitHubCycle />
 
 Read it left to right. An **issue** says what to do. A **branch** gives the work a private place
 to happen. The work becomes a **pull request**, and **review** either merges it or sends it back.
@@ -53,7 +53,7 @@ Your agent runs each step when you ask in the chat. Read this page to know what 
 
 One issue, one branch, one worktree, one pull request.
 
-<WorktreeIsolation client:only="react" />
+<WorktreeIsolation />
 
 The changes only meet again when their pull requests merge. The rule buys three things:
 

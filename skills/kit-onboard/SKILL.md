@@ -1,5 +1,6 @@
 ---
 name: kit-onboard
+terms: none
 description: Run the claude-kit two-tier onboarding interview — the wide-range GLOBAL profile (asked once in a lifetime, writes ~/.claude/kit.profile.<user>.json) and the per-PROJECT interview (one batched round, pre-filled from your profile + what's detected in this directory). Use AUTOMATICALLY when the user asks to onboard, set up the kit for the first time, "interview me", create my kit profile, configure a new project, or when /kit-init runs against a project with no kit profile yet. Pairs with /kit-add to stack modules (e.g. software) later.
 when_to_use: First contact with the kit on a machine (no global profile yet), or starting a new project. Portable (Tier A) — runs in Claude Code, Cowork, and claude.ai Projects via AskUserQuestion.
 allowed-tools: Bash, Read, AskUserQuestion

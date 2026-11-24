@@ -38,6 +38,12 @@
 #   cckit orchestrate --session=sweep 1 2    # custom tmux session name
 #   cckit orchestrate --detach 6 7           # build the session, don't attach (testing/headless)
 #   cckit orchestrate --results --wait 600   # collect the wave's results (add --llm for JSON)
+# The forge port (E537): every GitHub call goes through forge_* / gh_rest_* (scripts/lib/gh-rest.sh).
+if ! command -v gh_rest_issue_json >/dev/null 2>&1; then
+  # shellcheck source=/dev/null
+  . "$(cd "$(dirname "$0")" && pwd)/lib/gh-rest.sh"
+fi
+
 set -euo pipefail
 
 SESSION="orchestrate"
@@ -177,11 +183,11 @@ REPO="$KIT_REPO"
 # blocked_by gate: echo the OPEN blocker numbers of an issue (native GitHub dependency edge).
 open_blockers() {
   local n="$1" b st blk
-  blk="$(gh api "repos/$REPO/issues/$n/dependencies/blocked_by" --jq '.[].number')" || {
+  blk="$(forge_rest "repos/$REPO/issues/$n/dependencies/blocked_by" --jq '.[].number')" || {
     echo "orchestrate: could not read blockers for #$n" >&2; return 1;
   }
   for b in $blk; do
-    st="$(gh issue view "$b" --repo "$REPO" --json state --jq .state 2>/dev/null || echo OPEN)"
+    st="$(forge_rest "repos/$REPO/issues/$b" --jq '.state | ascii_upcase' 2>/dev/null || echo OPEN)"
     [ "$st" = "OPEN" ] && printf '%s ' "$b"
   done
   return 0
@@ -241,7 +247,7 @@ seed_for() {
   if [ -z "$brief" ]; then
     # Nested single quotes would terminate the format string and make printf recycle it over the
     # stray words as arguments, so the fallback names the command without quoting it.
-    brief="$(printf 'The generated cckit brief was unavailable. Read only issue #%s with: gh issue view %s\n' "$num" "$num")"
+    brief="$(printf 'The generated cckit brief was unavailable. Read only issue #%s with: cckit brief %s\n' "$num" "$num")"
   fi
   printf '%s\n' "$brief" | wb_compose "$num" "$branch" "$SEED_BUDGET" || true
 }

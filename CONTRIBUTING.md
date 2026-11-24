@@ -19,6 +19,9 @@ cckit pr <issue> "<summary>" # open the PR
 
 - Branch from `develop` (the integration branch); one issue = one branch = one PR. `main` is
   releases-only. `cckit start` already branches from the configured base.
+- **Scope after v0.10.** The landing-site rebranding and the docs rewrite are paused: cckit changes
+  only for what the projects built with it need, through weekly contributions. The paused issues
+  stay open and resume by decision, not by default.
 - Use [Conventional Commits](https://www.conventionalcommits.org/) — releases are cut from them.
   PRs are squash-merged, so **the PR title must be a Conventional Commit subject** (`type(scope): summary`).
   **`cckit pr` builds one for you** (derived from the issue's `kind:` label, `[Effort …]` prefix
@@ -26,7 +29,7 @@ cckit pr <issue> "<summary>" # open the PR
   to set the type yourself. CI (`commitlint`) fails the PR until the title is valid; check one locally
   with `scripts/lib/commitlint.sh "feat: your summary"`.
 - Run the local gate before opening a PR: `bash scripts/check.sh` (shell syntax, valid manifests,
-  the leak fence, the commitlint rules, the skill-listing and instruction-file budgets). A green gate is the bar.
+  the leak fence, the forge fence, the commitlint rules, the skill-listing and instruction-file budgets). A green gate is the bar.
 - **The leak fence.** cckit is public and is developed next to private repositories, so gate step 3
   fails on any tracked line that contains a private word: a product or client name, a person's name,
   a private path. The built-in word is always on; your own patterns live in `.cckit/leak-words`
@@ -129,7 +132,16 @@ half regresses.
 
 ## Scope of changes
 
-- **bash CLI + lib** → `bin/cckit`, `scripts/lib/*.sh`.
+- **bash CLI + lib** → `bin/cckit`, `scripts/lib/*.sh`. A new verb is a row in
+  `scripts/lib/verbs.tsv` (name, question, prompt, usage, needs) plus its `case` label in
+  `bin/cckit`; run `bash scripts/verbs-gen.sh` to refresh the CLI reference block.
+  `scripts/verbs-test.sh` fails when the dispatcher, the help, the catalog, the CLI reference,
+  `skills/routing.yaml` or `scripts/forge-report.sh` disagree with the table.
+  The top level only shrinks: `scripts/verbs-ratchet.sh` fails the gate when the table holds more
+  `verb` rows than `scripts/verbs.baseline`, so a new command is a subcommand of a verb that exists.
+  To rename a verb, change its row's name and add an `alias` row for the old name
+  (`old<TAB>alias<TAB>new`, the other columns `-`): the old name keeps working and prints a one-line
+  notice. To retire one, fold it under another verb and lower the baseline in the same change.
 - **Claude Code plugin** → `skills/`, `commands/`, `.claude-plugin/`.
 - **Docs** → `docs-site/` (published to [cckit.dev](https://cckit.dev)).
 - **What cckit installs for itself** → `.claude/skills/`, `.claude/rules/`, and the manifest in
