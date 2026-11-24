@@ -9,7 +9,7 @@
   ],
   "avoid": ["refresh", "fetch", "board update"],
   "home": {
-    "cli": "sync",
+    "cli": "status --board",
     "skill": "kit-task-sync"
   },
   "status": "tree"

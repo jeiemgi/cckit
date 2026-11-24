@@ -48,7 +48,7 @@ Tell it there is no human and to consume data, not prose.
 <Chat
   title="priming the nightly Bakery site job"
   say="You're running headless: no human watching. Work the board through to merged on your own: read state as structured data, pick the highest-priority unblocked issue, and drive it start to finish. Keep token use lean when you hand context to sub-agents."
-  ran={['cckit status --board --json', 'cckit scan --json', 'cckit plan --json']}
+  ran={['cckit status --board --json', 'cckit scan --json', 'cckit effort plan --issues --json']}
   means="`status --board` returns the board and what is unblocked as one JSON document, `scan` the stack and kit state as JSON, `plan` the session-fit wave plan as TOON."
 >
   I read the board, the stack and the plan as data. The highest-priority unblocked issue is the one I

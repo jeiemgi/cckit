@@ -60,8 +60,8 @@ object — there's nothing to tabulate.
 | --- | --- | --- |
 | Read the board | `cckit status --board --json` | **JSON** (one document) |
 | Find the next unblocked issue | `cckit next --json` | **TOON** |
-| Get the wave plan | `cckit plan --json` | **TOON** |
-| Get the fan-out brief | `cckit wave --json` | **TOON** |
+| Get the wave plan | `cckit effort plan --issues --json` | **TOON** |
+| Get the fan-out brief | `cckit effort plan --wave --json` | **TOON** |
 | Collect a wave's results | `cckit orchestrate --results --json` | JSON (one array) |
 | Start an issue | `cckit start <issue>` | JSON (one object) |
 | Open the PR | `cckit pr <issue> "<summary>" [--base <branch>]` | JSON (one object) |

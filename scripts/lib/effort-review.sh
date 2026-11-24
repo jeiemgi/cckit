@@ -29,7 +29,7 @@ fi
 
 # _er_branch <N> — the effort branch: a local `effort/<N>-*`, else origin's. Empty when neither.
 _er_branch() {
-  git for-each-ref --format='%(refname:short)' "refs/heads/effort/$1-*" "refs/remotes/origin/effort/$1-*" 2>/dev/null | head -1
+  git for-each-ref --format='%(refname:short)' "refs/heads/effort/$1-*" "refs/remotes/origin/effort/$1-*" 2>/dev/null | sed -n 1p
 }
 
 # effort_review_verdict <state> <spec ok|none> <landed yes|no|-> — the verdict for one sub. Pure.
@@ -81,7 +81,7 @@ effort_review() {
     body="$(printf '%s' "$subs" | jq -r ".[$i].body")"
     if spec_lint "$body" 2>/dev/null; then spec=ok; else spec=none; fi
     if [ -z "$branch" ]; then landed="-"
-    elif printf '%s\n' "$log" | grep -qE "(^|[^0-9A-Za-z])#$sub([^0-9]|$)"; then landed=yes
+    elif grep -qE "(^|[^0-9A-Za-z])#$sub([^0-9]|$)" <<<"$log"; then landed=yes
     else landed=no; fi
     verdict="$(effort_review_verdict "$state" "$spec" "$landed")"
     [ "$verdict" = done ] && done_n=$((done_n + 1))

@@ -48,9 +48,6 @@ it drifts.
 | --- | --- | --- | --- | --- |
 | `cckit status` | Where are we, and what is on the board? | Where are we? Show me what is undone, what waits on me and what can be cleaned up. | git + forge | `kit-status` |
 | `cckit next` | What should I pick up next? | Show me what is unblocked and how to start the top item; I will pick. | git + forge | `kit-next` |
-| `cckit plan` | In what order can the open issues run? | Plan the open issues into waves and show me the first wave. | git + forge | — |
-| `cckit plan-next` | Given what the kit already does, what should we build next? | Inventory what the kit can do and propose what to build next. | git | `kit-plan-next` |
-| `cckit wave` | Which waves of work can start from the open efforts? | Read the open efforts and propose the next wave of work. | git + forge | `kit-next` |
 | `cckit claims` | Which session is working on which issue? | Show me which live session holds which issue. | git | — |
 | `cckit handoff` | How do I leave the next session a note? | Save a handoff note: what is pending, the next step, the references. | git | — |
 | `cckit` (no verb) | Where did the last session stop? | Read the last handoff and pick up where it stopped. | git | — |
@@ -108,17 +105,17 @@ it drifts.
 | `cckit agent` | Which plumbing does an agent call: helpers, receipts, session mail, TOON, rendering? | Find the cckit helper that already does this before writing one. | git + forge | — |
 | `cckit scan` | What stack is this repo, and what kit state does it have? | Scan this repo's stack and kit state. | git | — |
 
-Old names that still work: `cckit copilot` runs `cckit wave` · `cckit ui` runs `cckit status` · `cckit sync` runs `cckit status --board` · `cckit lib` runs `cckit agent lib` · `cckit encode-context` runs `cckit agent encode-context` · `cckit render` runs `cckit agent render` · `cckit receipt` runs `cckit agent receipt` · `cckit msg` runs `cckit agent msg`.
+Old names that still work: `cckit copilot` runs `cckit effort plan --wave` · `cckit plan` runs `cckit effort plan --issues` · `cckit plan-next` runs `cckit effort plan --next` · `cckit wave` runs `cckit effort plan --wave` · `cckit ui` runs `cckit status` · `cckit sync` runs `cckit status --board` · `cckit lib` runs `cckit agent lib` · `cckit encode-context` runs `cckit agent encode-context` · `cckit render` runs `cckit agent render` · `cckit receipt` runs `cckit agent receipt` · `cckit msg` runs `cckit agent msg`.
 
 {/* verbs:end */}
 
 ### Renaming a verb
 
 The top level only shrinks. `bash scripts/check.sh` fails when `scripts/lib/verbs.tsv` holds more
-top-level verbs than `scripts/verbs.baseline` (41 today), and fails when it holds fewer until the
+top-level verbs than `scripts/verbs.baseline` (38 today), and fails when it holds fewer until the
 baseline is lowered to match. A renamed verb keeps its old name as an `alias` row: the old name still
 works and prints one line on stderr, for example
-`cckit: 'copilot' is an old name for 'wave'; it still works. Use 'cckit wave'.` An alias does not
+`cckit: 'plan' is an old name for 'effort plan --issues'; it still works. Use 'cckit effort plan --issues'.` An alias does not
 count toward the baseline and is not removed before 1.0. An alias may name a verb and its first
 words: `cckit sync` runs `cckit status --board`, and `cckit lib` runs `cckit agent lib`; the words you
 typed follow them.
@@ -170,8 +167,8 @@ this block under **Details:**.
 
 - **Paste:** "Read the cckit verb catalog and tell me which verbs work without GitHub."
 - **The agent runs:** `cckit commands --json`.
-- **You see:** an answer built from a JSON array with one object per name (50 today: 41 verbs, the
-bare `cckit`, eight old names). One object:
+- **You see:** an answer built from a JSON array with one object per name (50 today: 38 verbs, the
+bare `cckit`, eleven old names). One object:
 
 ```json
 {"name":"merge","kind":"verb","target":null,"group":"git","needs":"forge","skill":"kit-task-pr-merge",
@@ -183,11 +180,11 @@ bare `cckit`, eight old names). One object:
 ### I typed an old name. Does it still work?
 
 - **Paste:** nothing; this is what happens when you, or a script, use a verb's old name.
-- **The agent runs:** for example `cckit copilot`.
+- **The agent runs:** for example `cckit plan`.
 - **You see:** one line on stderr, then the new verb's normal output:
 
 ```text
-cckit: 'copilot' is an old name for 'wave'; it still works. Use 'cckit wave'.
+cckit: 'plan' is an old name for 'effort plan --issues'; it still works. Use 'cckit effort plan --issues'.
 ```
 
 ## Set up and install
@@ -209,7 +206,7 @@ One issue becomes one branch, one worktree, one PR. These verbs walk that path.
 
 | Verb | Purpose |
 | --- | --- |
-| `cckit next [--effort N]` | The unblocked set + how to start the top issue. In a project whose `tasks.default` is `light`, a bare `cckit next` prints what `cckit task next` prints (with `--json`, one JSON object or `null`); with `--effort N` it asks about issues as before. Human output ends with the weekly cadence line: Monday `cckit plan`, daily `cckit next`, Friday `cckit gc`. `--json` rows stay `{number,ctx,title}`. |
+| `cckit next [--effort N]` | The unblocked set + how to start the top issue. In a project whose `tasks.default` is `light`, a bare `cckit next` prints what `cckit task next` prints (with `--json`, one JSON object or `null`); with `--effort N` it asks about issues as before. Human output ends with the weekly cadence line: Monday `cckit effort plan --issues`, daily `cckit next`, Friday `cckit gc`. `--json` rows stay `{number,ctx,title}`. |
 | `cckit start <issue> [slug]` | Create an isolated worktree + branch for an issue, [bootstrapped](/config-and-permissions/#worktree-bootstrap) — env files copied, dev port assigned, deps installed at the selected targets (`worktree.installPaths` if set — those dirs regardless of their manifests — else a root that declares dependencies or is a workspace root with members, else nothing). [Claim-checked](#session-claims): refused when another live session already holds the issue, unless `--force` / `KIT_FORCE=1`. Without a [forge](/config-and-permissions/#the-forge) the issue is not read: the branch is `task/<N>-<slug>` with the slug given, else `issue-<N>`, and one line says so. |
 | `cckit claims` | List the live [session claims](#session-claims) — issue, session pid, start time, branch, worktree. Read-only. `--json` returns a JSON array. |
 | `cckit pr <issue> <summary> [--base <branch>]` | Commit, push, and open the PR. `--base <branch>` opens it against a branch other than the configured base — a release PR from `develop` to `main`, or a hotfix to the release branch — with the same labels, milestone and board steps. The push exports the target as `KIT_PR_BASE`, so a git pre-push hook can compare against the branch the PR targets. Without a forge it commits and pushes, prints the GitHub compare page when origin is on GitHub, and says in one line that the pull request was not opened. |
@@ -298,7 +295,7 @@ In `--json` output the same rows are the `next_efforts` array:
 
 `number`, `ctx` and `title` are `null` for a flow where nothing can start. `next_efforts` itself is `null` — not `[]` — when the efforts could not be read. That alone does not change the exit status, which still follows `prs_read`.
 
-Below the table both `cckit status` and `cckit next` print the same weekly cadence line: Monday `cckit plan` orders the week, `cckit next` daily picks up one issue, Friday `cckit gc` reports what can be pruned.
+Below the table both `cckit status` and `cckit next` print the same weekly cadence line: Monday `cckit effort plan --issues` orders the week, `cckit next` daily picks up one issue, Friday `cckit gc` reports what can be pruned.
 
 ## Light tasks
 
@@ -329,16 +326,16 @@ A **wave** is a set of issues with no blockers between them, so they can run at 
 
 | Verb | Purpose |
 | --- | --- |
-| `cckit plan [--effort N]` | Wave plan: deps-ordered, file-disjoint, session-fit (`ctx:` weights S=1 M=2 L=4 XL=8; an issue with no `ctx:` label shows `?` and weighs 2, and a value outside the scale weighs 2 with a warning on stderr). Inside a wave, issues are ordered by their `priority:pN` label — p0 → p1 → p2 → p3, unlabeled last — with ties keeping the dependency-derived order. Dependencies always win: a blocker sits in an earlier wave than what it blocks, so priority never pulls a dependent ahead of its blocker. |
-| `cckit plan-next` | Forward plan: inventory the kit's own skills/verbs/rules/docs, propose what to build next. |
-| `cckit wave [--effort N] [--adapter <claude\|codex\|both>]` | Read open efforts, propose incoming waves: worker fan-out + captain drive. The wave data is the same for every runtime; `--adapter` picks the dispatch wording (default: the project's stored `adapters`). `--json` emits the wave data only. |
+| `cckit effort plan --issues [--effort N]` | Wave plan: deps-ordered, file-disjoint, session-fit (`ctx:` weights S=1 M=2 L=4 XL=8; an issue with no `ctx:` label shows `?` and weighs 2, and a value outside the scale weighs 2 with a warning on stderr). Inside a wave, issues are ordered by their `priority:pN` label — p0 → p1 → p2 → p3, unlabeled last — with ties keeping the dependency-derived order. Dependencies always win: a blocker sits in an earlier wave than what it blocks, so priority never pulls a dependent ahead of its blocker. |
+| `cckit effort plan --next` | Forward plan: inventory the kit's own skills/verbs/rules/docs, propose what to build next. |
+| `cckit effort plan --wave [--effort N] [--adapter <claude\|codex\|both>]` | Read open efforts, propose incoming waves: worker fan-out + captain drive. The wave data is the same for every runtime; `--adapter` picks the dispatch wording (default: the project's stored `adapters`). `--json` emits the wave data only. |
 | `cckit watch [--merge] [--loop]` | Captain: gate open PRs, squash-merge clean ones, advance. Policy floors (default on) hold PRs touching CI workflows, lockfiles, or security paths — and any `hold`-labelled or draft PR — for human review. |
 | `cckit effort <new\|chain\|start\|pr\|close\|plan>` | The effort lifecycle (a parent issue + sub-issues). `new` takes `--slug` and `--kind` (one of `feat fix task chore security scaffold ci adr spike plan`, default `task`, or a content kind `post campaign brand research`; sets the `kind:` label on the parent and every sub. A content kind is a label only: its branch starts on `task/`, `plan/`, `task/` or `spike/` and its PR is titled `docs:`); `start`/`pr`/`close` accept a `<slug>` or the effort `<N>`. |
 | `cckit effort start [--force] <slug\|N> [slug]` | Create the effort's `effort/<N>-<slug>` branch + bootstrapped worktree. **WIP-limited:** refuses a *new* effort once `effort.wipLimit` (default 2) are already in progress — in progress meaning an `effort/<N>-<slug>` branch exists as a local head **or** on origin, read with `git ls-remote` rather than the cached `refs/remotes`. At the limit refuses; only strictly under it starts. Re-starting an effort that is already in progress is never gated. The check runs before anything is written, so a refusal makes no branch, no worktree and no board change. `--force` (or `KIT_FORCE=1`) starts anyway; `0` refuses every ordinary start but not a forced one. `EFFORT_WIP_REMOTE=0`, or an unreachable origin, counts the cached refs instead and the start still proceeds. With no `[slug]` the slug comes from the issue title; if that read fails, the verb says so on stderr and continues with the effort's existing branch slug, or `effort`, instead of exiting 1 with no output. Does not affect `cckit start <issue>`. Creating the branch writes the start time to `<git-common-dir>/effort-metrics/<N>.start`; `cckit effort close` subtracts it for the record's `build_seconds`, and a re-start keeps the stamp already there (see [the metrics record](/project-management/efforts-and-waves/)). |
 | `cckit effort plan` | Session-fit plan over the open efforts: grouped by flow, ordered by `blocked_by`, packed into sessions under `KIT_SESSION_BUDGET` (default 4). Rows come from GitHub, or from the executable named by [`effort.planSource`](/config-and-permissions/#effort-plan-source) (`EFFORT_PLAN_SOURCE` overrides); a source that is not executable, exits non-zero or prints no rows falls back to GitHub. A `source:` line under the header names the source used, its age when reported, and any fallback. |
 | `cckit effort review <N> [--branch B]` | Check each sub of an effort against its own `## Spec`: one line per sub with its state, whether its Spec is checkable, whether a commit on the effort branch (`effort/<N>-*`, local or origin, or `--branch`) names it, and a verdict — `done`, `open`, `landed, still open`, `closed, not on the branch`, or `no spec`. Ends with `review #N: D of M done`. A read: exits 0 when every sub is done and 1 otherwise, so a script can gate on it. |
 | `cckit effort sprint <name\|bounds\|open\|list\|close>` | One week, Monday to Monday, as a forge milestone named after its ISO week (`2026-W48`). `name [YYYY-MM-DD]` and `bounds [YYYY-MM-DD]` print the sprint a day falls in and its two Mondays, on git alone. `open [--goal G] [--date D]` creates the milestone with the goal as its description and the closing Monday as its due date; an existing one is kept, and `--goal` updates its goal. `list [--all]` prints the sprint milestones with their open and closed counts. `close [<YYYY-Www>] [--review T\|--review-file F] [--retro T\|--retro-file F] [--out F] [--dry-run]` writes the sprint review and the retrospective to a page (default `.cckit/reports/<date>-sprint-<name>.md`: the goal, the issues done, the issues carried over), then closes the milestone with a one-line review in its description; `--dry-run` prints the page and writes nothing. `cckit effort new --sprint[=YYYY-MM-DD]` files an effort into a sprint: a `## Sprint` section in the body and the sprint's milestone on the parent and its subs. |
-| `cckit effort chain <a> <b> [<c> …]` | Declare a linear order over 2+ issues: `b` `blocked_by` `a`, `c` `blocked_by` `b`, plus a `- Depends on #<predecessor>` line in each successor's `## Relations` section. These are the edges `cckit plan` layers into waves. Idempotent, and additive — an issue already blocked by something else keeps that blocker. Refuses (and writes nothing) on fewer than two numbers, a non-numeric argument, an issue that does not exist, a repeated number, or an edge that would close a cycle. |
+| `cckit effort chain <a> <b> [<c> …]` | Declare a linear order over 2+ issues: `b` `blocked_by` `a`, `c` `blocked_by` `b`, plus a `- Depends on #<predecessor>` line in each successor's `## Relations` section. These are the edges `cckit effort plan --issues` layers into waves. Idempotent, and additive — an issue already blocked by something else keeps that blocker. Refuses (and writes nothing) on fewer than two numbers, a non-numeric argument, an issue that does not exist, a repeated number, or an edge that would close a cycle. |
 
 
 ## Run flows in parallel
@@ -550,8 +547,8 @@ Append `--json` (older spellings: `--llm`, `--output=json`) to any verb for pars
 
 ```bash
 cckit status --board --json
-cckit plan --json
-cckit plan-next --json   # the forward plan as TOON rows {rank,area,proposal,next}
+cckit effort plan --issues --json
+cckit effort plan --next --json   # the forward plan as TOON rows {rank,area,proposal,next}
 cckit agent lib --json         # the helper catalog as TOON rows {file,errors,functions,purpose}
 cckit effort plan --json
 ```

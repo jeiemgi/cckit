@@ -35,16 +35,13 @@ task	verb	-	git	forge	-	yes	How do I track work in the project itself, without a
 where	group	-	-	-	-	-	Where are we, and what comes next?	-	-
 status	verb	-	where	forge	kit-status	no	Where are we, and what is on the board?	Where are we? Show me what is undone, what waits on me and what can be cleaned up.	cckit status [--json]\ncckit status --board [--role <name>] [--milestone <label>] [--plan]\ncckit status --board --json | --write | --cached [TTL] | --watch [SECS]
 next	verb	-	where	forge	kit-next	no	What should I pick up next?	Show me what is unblocked and how to start the top item; I will pick.	cckit next [--effort N]
-plan	verb	-	where	forge	-	no	In what order can the open issues run?	Plan the open issues into waves and show me the first wave.	cckit plan [--effort N]
-plan-next	verb	-	where	git	kit-plan-next	yes	Given what the kit already does, what should we build next?	Inventory what the kit can do and propose what to build next.	cckit plan-next
-wave	verb	-	where	forge	kit-next	no	Which waves of work can start from the open efforts?	Read the open efforts and propose the next wave of work.	cckit wave [--effort N] [--adapter <claude|codex|both>]
 claims	verb	-	where	git	-	no	Which session is working on which issue?	Show me which live session holds which issue.	cckit claims
 handoff	verb	-	where	git	-	no	How do I leave the next session a note?	Save a handoff note: what is pending, the next step, the references.	cckit handoff "<note>"
 resume	default	-	where	git	-	no	Where did the last session stop?	Read the last handoff and pick up where it stopped.	cckit
 
 work	group	-	-	-	-	-	How do I plan the work and run it?	-	-
 new	verb	-	work	forge	kit-task-new	no	How do I track a new piece of work as an issue?	File an issue for this, with its labels, and put it on the board.	cckit new [--role R --kind K --priority P --milestone M --plan L --blocked-by "#1" --body B|--body-file F] "<title>"
-effort	verb	-	work	forge	kit-effort-new	no	How do I scope, start, open and close a piece of work with several parts?	Scope this goal as an effort with sub-issues, show it to me, then start it.	cckit effort new --spec T|--spec-file F [--grilling T|--grilling-file F] [--sprint[=YYYY-MM-DD]] [--flow F --role R --kind K --priority P --goal G --scope S --for-agents A --verification V --depends-on "#1,#2" --milestone M] "<name>" ["sub :: desc" …]\ncckit effort sub <N> "<name>" [--kind K] [--body B] [--spec T]\ncckit effort retitle [<N>] [--apply]\ncckit effort chain <a> <b> [<c> …]\ncckit effort start [--force] <slug|N> [slug]\ncckit effort pr [<N>] [--summary S|--summary-file F] [--for-agents A|--for-agents-file F] [--title T] [--type T]\ncckit effort close <N> [--no-spec-check]\ncckit effort plan\ncckit effort sprint <name|bounds|open|list|close> [--goal G] [--date D]\ncckit effort review <N> [--branch B]
+effort	verb	-	work	forge	kit-effort-new	no	How do I scope, start, open and close a piece of work with several parts?	Scope this goal as an effort with sub-issues, show it to me, then start it.	cckit effort new --spec T|--spec-file F [--grilling T|--grilling-file F] [--sprint[=YYYY-MM-DD]] [--flow F --role R --kind K --priority P --goal G --scope S --for-agents A --verification V --depends-on "#1,#2" --milestone M] "<name>" ["sub :: desc" …]\ncckit effort sub <N> "<name>" [--kind K] [--body B] [--spec T]\ncckit effort retitle [<N>] [--apply]\ncckit effort chain <a> <b> [<c> …]\ncckit effort start [--force] <slug|N> [slug]\ncckit effort pr [<N>] [--summary S|--summary-file F] [--for-agents A|--for-agents-file F] [--title T] [--type T]\ncckit effort close <N> [--no-spec-check]\ncckit effort plan\ncckit effort plan --issues [--effort N] [--cap N]\ncckit effort plan --wave [--effort N] [--adapter <claude|codex|both>]\ncckit effort plan --next\ncckit effort sprint <name|bounds|open|list|close> [--goal G] [--date D]\ncckit effort review <N> [--branch B]
 orchestrate	verb	-	work	forge	-	yes	How do I run several issues at once, each in its own worktree?	Run the issues I pick in parallel worktrees; show me the dry run first.	cckit orchestrate <issues…> [--dry-run] [--cap N] [--agent A|--profile P] [--runtime tmux|herdr]\ncckit orchestrate --results [--session=<s>] [--wait <secs>]
 autopilot	verb	-	work	forge	kit-autopilot	yes	How do I run approved work unattended, under a cap?	Run the unblocked work unattended under a cap of two; show me the dry run first.	cckit autopilot [<issues…>] [--cap N] [--dry-run]\ncckit autopilot run [<issue>] --objective "<text>" [--until "<cmd>"] [--check "<cmd>"]
 watch	verb	-	work	forge	-	no	Which open pull requests can merge now, and what is the next wave?	Gate the open pull requests and tell me which are clean to merge.	cckit watch [--merge] [--loop]
@@ -82,7 +79,10 @@ scan	verb	-	catalog	git	-	no	What stack is this repo, and what kit state does it
 
 # Old names. Each runs its target after a one-line notice on stderr; none is removed before 1.0.
 # A target may carry words after the verb; they go in front of the typed arguments (#588).
-copilot	alias	wave	-	forge	-	-	-	-	-
+copilot	alias	effort plan --wave	-	forge	-	-	-	-	-
+plan	alias	effort plan --issues	-	forge	-	-	-	-	-
+plan-next	alias	effort plan --next	-	git	-	-	-	-	-
+wave	alias	effort plan --wave	-	forge	-	-	-	-	-
 ui	alias	status	-	forge	-	-	-	-	-
 sync	alias	status --board	-	forge	-	-	-	-	-
 lib	alias	agent lib	-	git	-	-	-	-	-

@@ -9,7 +9,7 @@ tutorial:
     - { text: "cckit is installed and set up in this project", link: "Set it up", href: "/getting-started/initialize/" }
     - "There are several unblocked issues to run at once"
   ogTag: Parallel work
-  keywords: [run claude code in parallel, parallel ai agents github, cckit wave]
+  keywords: [run claude code in parallel, parallel ai agents github, cckit effort plan --wave]
   related: [project-management/break-a-feature-into-an-effort, development/run-unattended, development/issue-to-merged-pr]
 ---
 
@@ -24,7 +24,7 @@ import Outcomes from '../../../components/Outcomes.astro';
 Once a plan is split into issues, several of them are ready at the same moment. Taking them one
 at a time leaves the rest of the plan waiting on a queue that did not need to exist.
 
-In this guide every ready issue gets its own agent, in its own copy of the code. The example is the Bakery site, where the opening hours and the contact form are ready at once. `cckit wave`
+In this guide every ready issue gets its own agent, in its own copy of the code. The example is the Bakery site, where the opening hours and the contact form are ready at once. `cckit effort plan --wave`
 works out which issues nothing is blocking and writes the instructions for the agents. Each agent
 opens a pull request. The captain, here the command `cckit watch`, then checks those pull requests
 and merges the ones that pass. Merging frees the issues that were waiting, and the next wave starts.
@@ -36,7 +36,7 @@ fix, and the next wave proposed.
 
 ### 1. Ask your agent to clear the next wave
 
-You name no issue numbers; the board decides. `cckit wave` writes the instructions for the first
+You name no issue numbers; the board decides. `cckit effort plan --wave` writes the instructions for the first
 wave, one task per issue. The agent spawns one subagent per issue, and each opens a pull request.
 `cckit watch --merge` is one pass that gates the open pull requests, squash-merges the clean ones and
 shows the next wave.
@@ -44,7 +44,7 @@ shows the next wave.
 <Chat
   title="clearing the next wave of the Bakery site"
   say="Clear the next wave of ready work. Fan the unblocked issues out so they're worked in parallel, then gate the resulting PRs and merge the ones that pass. Advance to the next wave and keep going until the board is drained."
-  ran={['cckit wave', 'cckit watch --merge']}
+  ran={['cckit effort plan --wave', 'cckit watch --merge']}
   means="Nothing waits in a queue that did not need to exist: the two issues run at the same time, and only clean pull requests merge."
 >
   The wave had two issues, the opening hours and the contact form. I started one subagent for each and
@@ -55,8 +55,8 @@ shows the next wave.
 ### 2. Let it advance
 
 Each `cckit watch --merge` is one pass: it merges every PR that passes its gate and prints the next
-wave. The agent then runs `cckit wave` and `cckit watch --merge` again for that wave, and stops when
-`cckit wave` has nothing left to propose.
+wave. The agent then runs `cckit effort plan --wave` and `cckit watch --merge` again for that wave, and stops when
+`cckit effort plan --wave` has nothing left to propose.
 
 <Chat
   title="waiting for the workers of the wave to finish"
@@ -72,7 +72,7 @@ wave. The agent then runs `cckit wave` and `cckit watch --merge` again for that 
 <Chat
   title="checking what the wave left on the Bakery site board"
   say="What is still open, and is there another wave?"
-  ran={['cckit status --board', 'cckit wave']}
+  ran={['cckit status --board', 'cckit effort plan --wave']}
   means="A wave is done when each of its pull requests is merged or named in the captain's output with the reason it was held."
 >
   I read the board and asked for the next wave. Either the merges unblocked more issues, or there is
@@ -117,8 +117,8 @@ remaining issues, or start an [effort](/project-management/break-a-feature-into-
 <TutorialSchema
   steps={[
     { name: 'Ask the agent to clear the next wave', text: 'Ask to fan the unblocked issues out in parallel, gate the resulting PRs, merge the ones that pass, and keep advancing until the board is drained.' },
-    { name: 'cckit fans out the wave and gates the PRs', text: 'cckit wave emits the subagent fan-out brief; the agent spawns one subagent per issue, each opening a PR; cckit watch --merge gates open PRs and squash-merges the clean ones.' },
-    { name: 'Let it advance', text: 'Each cckit watch --merge is one pass: it merges every PR that passes its gate and prints the next wave. The agent runs cckit wave and cckit watch --merge again for each wave, and stops when cckit wave has nothing left to propose.' },
+    { name: 'cckit fans out the wave and gates the PRs', text: 'cckit effort plan --wave emits the subagent fan-out brief; the agent spawns one subagent per issue, each opening a PR; cckit watch --merge gates open PRs and squash-merges the clean ones.' },
+    { name: 'Let it advance', text: 'Each cckit watch --merge is one pass: it merges every PR that passes its gate and prints the next wave. The agent runs cckit effort plan --wave and cckit watch --merge again for each wave, and stops when cckit effort plan --wave has nothing left to propose.' },
   ]}
   faqs={[
     { q: "A PR didn't merge", a: 'The captain merges only PRs that pass the gate. Read the gate output on that PR, fix the finding, and re-run cckit watch --merge; the rest of the wave is not held up.' },

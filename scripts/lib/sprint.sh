@@ -136,7 +136,7 @@ sprint_close() {
     esac
   done
   name="${name:-$(sprint_name)}"
-  printf '%s' "$name" | grep -qE "$SPRINT_TITLE_RE" || { echo "effort sprint close: '$name' is not a sprint name (YYYY-Www)" >&2; return 2; }
+  grep -qE "$SPRINT_TITLE_RE" <<<"$name" || { echo "effort sprint close: '$name' is not a sprint name (YYYY-Www)" >&2; return 2; }
   _sprint_need || return 1
   local ms num desc goal issues done_rows open_rows n_done n_open
   ms="$(_sprint_milestone "$name")" || { echo "effort sprint: could not read the milestones" >&2; return 1; }

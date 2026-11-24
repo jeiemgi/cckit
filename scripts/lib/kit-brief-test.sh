@@ -334,7 +334,7 @@ EOF
   eq  "verb_ok: effort with no sub counts" "$(kit_brief_verb_ok effort && echo y)" "y"
   eq  "skill_ok: a path is never a skill" "$(kit_brief_skill_ok ../x || echo n)" "n"
   # The sub-verbs a brief accepts are the ones the dispatcher routes.
-  usage_line="$(grep -o 'cckit effort <[a-z|]*>' "$dir/../../bin/cckit" | head -1)"
+  usage_line="$(grep -o 'cckit effort <[a-z|]*>' "$dir/../../bin/cckit" | sed -n 1p)"
   for s in $(printf '%s' "$KB_EFFORT_SUBS" | tr ' ' '\n'); do
     has "effort sub-verb '$s' is in the dispatcher" "$usage_line" "$s"
   done

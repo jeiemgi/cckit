@@ -1,21 +1,21 @@
 # Plan-next — forward planning from the current state
 
-cckit plans **forward from what already ships**. `cckit plan-next` (and the `/kit-plan-next` skill)
+cckit plans **forward from what already ships**. `cckit effort plan --next` (and the `/kit-plan-next` skill)
 inventory what the kit CURRENTLY ships at runtime — skills, verbs/commands, rules, docs —
 and propose what to build next, grounded in that inventory.
 
-> Two planners coexist, and they answer different questions. `cckit plan` / `/kit-next` order the
-> issues that **already exist** (deps-ordered, file-disjoint waves). `cckit plan-next` proposes the
+> Two planners coexist, and they answer different questions. `cckit effort plan --issues` / `/kit-next` order the
+> issues that **already exist** (deps-ordered, file-disjoint waves). `cckit effort plan --next` proposes the
 > issues that **don't exist yet**, derived from gaps in the current inventory. Use plan-next
 > to decide *what* to create; use plan / next to decide *in what order* to do the created work.
 
 ## Where it sits in the workflow
 
 ```
-cckit plan-next        →  propose next efforts (grounded in current skills/verbs/rules/docs)
+cckit effort plan --next        →  propose next efforts (grounded in current skills/verbs/rules/docs)
    └─ /kit-plan-next   →  choose one with the human, hand off to:
         └─ /kit-effort-new  →  scope it into a parent issue + sub-issues (effort-model.md)
-             └─ cckit plan / cckit next  →  order + drive the now-existing work
+             └─ cckit effort plan --issues / cckit next  →  order + drive the now-existing work
 ```
 
 It feeds [`/kit-effort-new`](effort-model.md), which produces the

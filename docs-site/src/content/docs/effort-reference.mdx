@@ -284,7 +284,7 @@ The row format and the override are in
 
 ### Inside a wave, the most urgent work comes first
 
-Within one wave `cckit plan` orders the issues by their `priority:pN` label —
+Within one wave `cckit effort plan --issues` orders the issues by their `priority:pN` label —
 **p0 → p1 → p2 → p3**, with unlabeled issues last. Issues that
 share a priority keep the order they already had, and the batch packing follows that order, so the
 p0 work lands in the first batch rather than wherever it happened to fall.
@@ -304,7 +304,7 @@ cckit effort chain <a> <b> <c>     # <b> blocked_by <a> · <c> blocked_by <b>
 ```
 
 Every issue after the first gets two things: the native GitHub **`blocked_by`** edge on its
-predecessor — the edge `cckit plan` reads to layer the waves — and a `- Depends on #<predecessor>`
+predecessor — the edge `cckit effort plan --issues` reads to layer the waves — and a `- Depends on #<predecessor>`
 line in its **`## Relations`** section, the human-readable mirror. It is the same line
 `cckit effort new --depends-on` writes, produced by the same formatter, so the two never drift.
 A chained set therefore lands one issue per wave, in the order you gave.

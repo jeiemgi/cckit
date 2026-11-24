@@ -565,7 +565,7 @@ _eff_chain_reaches() {
 
 # effort_chain <a> <b> [<c> …] — wire N issues into a LINEAR dependency chain (#243): B becomes
 # blocked_by A, C blocked_by B, and so on, and each issue after the first gets a `- Depends on #<its
-# predecessor>` line in its `## Relations` section. This is the verb that FEEDS `cckit plan` — the
+# predecessor>` line in its `## Relations` section. This is the verb that FEEDS `cckit effort plan --issues` — the
 # wave layering in plan-machine.sh reads exactly these `blocked_by` edges, so a chained set lands
 # one issue per wave, in the order given.
 #
@@ -579,7 +579,7 @@ _eff_chain_reaches() {
 #                chain. Nothing is written.
 #   cycles       a repeated number (`chain 1 2 1`) is refused — the chain would revisit a node. So
 #                is a chain whose new edge closes a loop through edges GitHub ALREADY holds (the
-#                pre-flight walks the combined graph). `cckit plan` cannot layer a cyclic graph into
+#                pre-flight walks the combined graph). `cckit effort plan --issues` cannot layer a cyclic graph into
 #                waves, so a cycle is refused rather than written. Nothing is written.
 #   pre-existing an issue already blocked by something else KEEPS that blocker: blocked_by is a set,
 #     blockers  and this only ever ADDS its edge. The issue ends up with both.
@@ -1407,7 +1407,7 @@ _eo_kit_sync_warn() {
 }
 
 # _eo_close_wave <num> <repo> <base> — close a WAVE-style effort (#164): every sub was delivered as
-# its own task PR squash-merged straight to base (`cckit wave` → fan-out → `cckit watch --merge`),
+# its own task PR squash-merged straight to base (`cckit effort plan --wave` → fan-out → `cckit watch --merge`),
 # so no effort/<N> integration branch ever existed. Verifies every sub is CLOSED with a merged
 # closing PR (refuses and lists the stragglers otherwise), snapshots the work trace from the merged
 # sub PR diffs, then runs the SAME close tail as the branch path: judge the metrics, close the

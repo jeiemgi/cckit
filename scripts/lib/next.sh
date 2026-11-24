@@ -2,7 +2,7 @@
 # next.sh — "what can I pick up right now?" The everyday-dev helper (Effort 75 · #79).
 #
 # Surfaces the unblocked set (wave 0 of the plan machine) and the single recommended next issue with
-# the one command to start it. This is the daily-loop counterpart to `cckit wave`: wave fans a whole
+# the one command to start it. This is the daily-loop counterpart to `cckit effort plan --wave`: wave fans a whole
 # wave out to subagents; `cckit next` is for a human (or agent) picking up one issue by hand.
 #
 #   cckit next                  the unblocked issues + the top one's start command + the weekly
@@ -78,7 +78,7 @@ next_issue() {
     printf '\n## Pick up #%s — %s\n\n' "$topnum" "$toptitle"
     printf 'Start it in an isolated worktree + branch:\n\n'
     printf '```\ncckit start %s\n```\n\n' "$topnum"
-    printf 'Or fan the whole unblocked wave out to subagents with `cckit wave%s`.\n' "$([ -n "$effort" ] && echo " --effort $effort")"
+    printf 'Or fan the whole unblocked wave out to subagents with `cckit effort plan --wave%s`.\n' "$([ -n "$effort" ] && echo " --effort $effort")"
     # the weekly cadence this verb is the daily step of — human output only; the TOON rows above
     # stay {number,ctx,title}.
     # shellcheck source=/dev/null

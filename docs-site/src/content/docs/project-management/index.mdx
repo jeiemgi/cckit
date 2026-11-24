@@ -69,7 +69,7 @@ for them.
   `ctx:XL` measures something else: how much of one agent session an effort uses. A session can
   only hold so much text at once, and a large effort fills it. `cckit effort plan` uses it to pack efforts into session-sized
   batches.
-- **The only cadence is a weekly one**, and it is a reminder, not a ceremony: `cckit plan` on
+- **The only cadence is a weekly one**, and it is a reminder, not a ceremony: `cckit effort plan --issues` on
   Monday, `cckit next` each day, `cckit gc` on Friday. `cckit next` and `cckit status` print that
   line at the end of their output.
 
@@ -102,7 +102,7 @@ for them.
 | "Show me the board and what is unblocked." | `cckit status --board` |
 | "What should I work on next?" | `cckit next` |
 | "File an issue: …" | `cckit new --role <role> "<title>"` |
-| "Order the open issues into waves." | `cckit plan` |
+| "Order the open issues into waves." | `cckit effort plan --issues` |
 | "Make this an effort with these steps." | `cckit effort new "<name>" "<sub> :: <description>" …` |
 | "Step B comes after step A." | `cckit effort chain <a> <b> …` |
 | "Pack the open efforts into sessions." | `cckit effort plan` |

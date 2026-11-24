@@ -98,7 +98,7 @@ export CAPTAIN_STATE="$TMP/captain.state"
 cckit() { ( cd "$TMP/repo" && bash "$ROOT/bin/cckit" "$@" ); }
 
 echo "== wave: plan layers the dependent into wave 1 =="
-PLAN="$(CCKIT_OUTPUT=human cckit plan --cap 8 2>&1)"
+PLAN="$(CCKIT_OUTPUT=human cckit effort plan --issues --cap 8 2>&1)"
 # wave 0 holds the two roots; #102 (blocked by #101) must be in wave 1.
 # anchor on the row's first column (| #N |) so an "after #N" cell never false-matches.
 w101="$(printf '%s' "$PLAN" | awk '/^## Wave/{w=$3} /^\| #101 \|/{print w}')"
@@ -109,9 +109,9 @@ ok "$w103" "0" "plan: #103 root in wave 0"
 ok "$w102" "1" "plan: #102 dependent in wave 1"
 
 echo "== wave brief: one set of wave data, dispatch wording per adapter (E257.6) =="
-W_CL="$(CCKIT_OUTPUT=human cckit wave --adapter claude 2>&1)"
-W_CX="$(CCKIT_OUTPUT=human cckit wave --adapter codex 2>&1)"
-W_BOTH="$(CCKIT_OUTPUT=human cckit wave --adapter both 2>&1)"
+W_CL="$(CCKIT_OUTPUT=human cckit effort plan --wave --adapter claude 2>&1)"
+W_CX="$(CCKIT_OUTPUT=human cckit effort plan --wave --adapter codex 2>&1)"
+W_BOTH="$(CCKIT_OUTPUT=human cckit effort plan --wave --adapter both 2>&1)"
 has "$W_CL" "spawn 2 parallel Task subagent(s)" "wave(claude): dispatches Task subagents"
 no  "$W_CL" "cckit orchestrate --agent codex" "wave(claude): no Codex launch line"
 has "$W_CX" "cckit orchestrate --agent codex --detach 101 103" "wave(codex): cckit launches the wave-0 worktrees"
@@ -126,12 +126,12 @@ has "$W_BOTH" "### Codex" "wave(both): carries the Codex dispatch"
 wave_data() { printf '%s\n' "$1" | sed -n '/^### #/,$p' | grep -v 'cckit watch --loop'; }
 ok "$(wave_data "$W_CX")" "$(wave_data "$W_CL")" "wave: issue prompts + captain drive match across adapters"
 has "$(wave_data "$W_CL")" "### #103" "wave: the compared wave data is not empty"
-L_CL="$(cckit wave --adapter claude --llm 2>/dev/null)"
-L_CX="$(cckit wave --adapter codex --llm 2>/dev/null)"
+L_CL="$(cckit effort plan --wave --adapter claude --llm 2>/dev/null)"
+L_CX="$(cckit effort plan --wave --adapter codex --llm 2>/dev/null)"
 ok "$L_CX" "$L_CL" "wave --llm: byte-identical wave data for both adapters"
 has "$L_CL" "101" "wave --llm: carries wave-0 issue #101"
 no  "$L_CL" "Task subagent" "wave --llm: the prompt names no runtime"
-cckit wave --adapter cursor >/dev/null 2>&1; ok "$?" "2" "wave: an unknown adapter is refused"
+cckit effort plan --wave --adapter cursor >/dev/null 2>&1; ok "$?" "2" "wave: an unknown adapter is refused"
 
 echo "== next: surfaces the unblocked set + the top issue's start command =="
 NEXT="$(CCKIT_OUTPUT=human cckit next 2>&1)"
@@ -154,7 +154,7 @@ ok "$(git -C "$TMP/repo" ls-remote --heads origin fix/103-b | wc -l | tr -d ' ')
 ok "$(grep -c '^GH-SUBCOMMAND' "$GH_LOG")" "0" "the whole cycle so far ran no gh subcommand"
 
 echo "== advance: merging #101 unblocks #102 into wave 0 =="
-PLAN2="$(CCKIT_OUTPUT=human cckit plan --cap 8 2>&1)"
+PLAN2="$(CCKIT_OUTPUT=human cckit effort plan --issues --cap 8 2>&1)"
 no "$PLAN2" "#101 " "advance: #101 closed, gone from the board"
 w102b="$(printf '%s' "$PLAN2" | awk '/^## Wave/{w=$3} /^\| #102 \|/{print w}')"
 ok "$w102b" "0" "advance: #102 now unblocked in wave 0"

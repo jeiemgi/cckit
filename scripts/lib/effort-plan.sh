@@ -128,7 +128,7 @@ effort_next_rows() {
 # Every verb named here runs as written. `cckit digest` is deliberately absent: it summarises one
 # <path|url> with a local model, it does not report on the week.
 effort_cadence_md() {
-  printf '%s\n' '**Weekly cadence** — Monday: `cckit plan` orders the week · daily: `cckit next` picks up one issue · Friday: `cckit gc` reports what can be pruned.'
+  printf '%s\n' '**Weekly cadence** — Monday: `cckit effort plan --issues` orders the week · daily: `cckit next` picks up one issue · Friday: `cckit gc` reports what can be pruned.'
 }
 
 # Rows travel between the readers and the planner as five fields joined by the ASCII unit
