@@ -353,7 +353,9 @@ t  "effort_close leaves a PR on another base alone" "$(grep -c '^PATCH repos/o/r
 t  "effort_close re-targets before the merge deletes the branch" \
    "$(grep -nE 'PATCH repos/o/r/pulls/43 |PUT repos/o/r/pulls/9/merge' "$GH_LOG" | sed -E 's/^[0-9]+:(PATCH|PUT).*/\1/' | tr '\n' ' ')" "PATCH PUT "
 case "$close_out" in *"PR 41 re-targeted to main"*) echo "ok: close output carries the re-targeted line" ;; *) echo "FAIL: no re-targeted line in close output"; fail=1 ;; esac
-tc "$GH_LOG" '^PATCH repos/o/r/issues/101 \{"state":"closed","state_reason":"completed"\}$' "effort_close closes sub #101"
+# #565: the shim's subs are already closed — close keeps their close reason (no second PATCH);
+# the open-sub cases are in effort-close-subs-test.sh
+t  "effort_close does not re-close an already-closed sub" "$(grep -c '^PATCH repos/o/r/issues/101 ' "$GH_LOG")" "0"
 tc "$GH_LOG" '^PATCH repos/o/r/issues/99 \{"state":"closed","state_reason":"completed"\}$'  "effort_close closes the parent"
 no_gh "effort_close"
 case "$close_out" in *"metrics:"*) echo "ok: capture_effort_metrics composed into close" ;; *) echo "FAIL: no metrics capture in close"; fail=1 ;; esac
