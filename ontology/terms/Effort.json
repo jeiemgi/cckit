@@ -1,13 +1,13 @@
 {
   "id": "Effort",
   "label": ["effort"],
-  "definition": "One goal that decomposes into several sub-issues and ships as one unit: one parent issue, one effort/<N> branch, one worktree, one PR. Closed by cckit effort close, which closes the parent and every sub-issue.",
+  "definition": "One goal that decomposes into several sub-issues and ships as one unit: one parent issue, one effort/<N> branch, one worktree, one PR. Closed by cckit effort close, which closes the parent and every sub-issue. In Scrum terms an effort is a large backlog item; its sub-issues are the tasks it adds to a sprint backlog.",
   "is_not": [
     "A task: a task is one issue with one PR and no decomposition.",
     "A wave: a wave is the set of issues that can run at once; an effort is a goal and may span several waves.",
     "An epic or a milestone: the effort is the unit of work and of the work record, not a label over issues."
   ],
-  "avoid": ["epic", "project", "initiative", "plan (as the name of the effort)"],
+  "avoid": ["epic", "project", "initiative", "plan (as the name of the effort)", "story"],
   "home": {
     "cli": "effort",
     "skill": "kit-effort-new",

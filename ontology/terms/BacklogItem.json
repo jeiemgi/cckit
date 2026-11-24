@@ -1,0 +1,16 @@
+{
+  "id": "BacklogItem",
+  "label": ["backlog item"],
+  "definition": "One entry of the backlog: one open GitHub issue with board Status Backlog. A small one is a task; a large one is an effort, whose sub-issues are planned when a sprint takes it.",
+  "is_not": [
+    "A sub-issue: a sub-issue is a task inside an effort the sprint already took, not an entry of the backlog.",
+    "A light task: a light task is a file under tasks/ and has no GitHub issue.",
+    "A sprint backlog task: once a sprint takes the item, its work is tracked in the sprint backlog."
+  ],
+  "avoid": ["story", "epic", "user story", "ticket", "PBI"],
+  "home": {
+    "cli": "new",
+    "skill": "kit-task-new"
+  },
+  "status": "seed"
+}

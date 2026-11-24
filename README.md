@@ -230,8 +230,9 @@ run says so. `--upgrade` is unchanged and never enters this flow.
 
 ## Efforts and slug handles
 
-A big piece of work is an **effort** — a parent issue with sub-issues. `cckit effort new "<name>" "sub :: desc" …`
-creates the parent issue (the four-section plan body), applies the `ctx/kind/priority/role/flow` labels, and lints
+A big piece of work is an **effort** — a parent issue with sub-issues. `cckit effort new --spec "<done means>" "<name>" "sub :: desc" …`
+creates the parent issue (the five-section plan body; its `## Spec` says what done means, and both
+`effort new` and `effort close` refuse an effort without one — `close --no-spec-check` skips it, saying so), applies the `ctx/kind/priority/role/flow` labels, and lints
 every sub-issue title — the same effort `/kit-effort-new` produces, since both call one shared core. `--kind` sets
 the `kind:` label on the parent and every sub: one of `feat fix task chore security scaffold ci adr spike plan`
 (default `task`), the same closed set `cckit start` uses as the branch prefix, or a content kind — `post`,
@@ -273,7 +274,7 @@ The GitHub issue **number** stays the canonical key, but every effort also has a
 already in its `effort/<N>-<slug>` branch). Effort commands take the slug *or* the number interchangeably:
 
 ```bash
-cckit effort new "Slug handles for efforts" --slug slug-handles   # optional explicit handle
+cckit effort new "Slug handles for efforts" --slug slug-handles --spec "start takes the slug"
 cckit effort start slug-handles                                   # same as: cckit effort start 93
 cckit effort pr slug-handles
 cckit effort close slug-handles
@@ -656,10 +657,19 @@ With no forge the git core stands alone: `start`, `pr` (commit + push, the compa
 they skipped; a verb that only exists on the forge refuses with one line naming itself.
 
 Claude Code cloud sessions reach GitHub through a proxy that refuses GraphQL. REST works there, so
-every lifecycle verb does; two things are skipped, each with one line on stderr:
+every lifecycle verb does.
 
-- **Board (Projects v2) steps**, GraphQL-only: `cckit: board step skipped …`. Turn on the board's
-  built-in workflows (item closed → Done, PR merged → Done, auto-add) and the card still moves.
+The board (Projects v2) moves over REST: adding an issue or PR, finding its card, and setting
+Status, Iteration and text fields call GitHub's Projects REST endpoints first, and GraphQL runs only
+when REST cannot serve the call (404, 410, an unexpected answer), with one note on stderr. So a cloud
+session can move a card when `github.owner` and `github.projectNumber` are set; with no captured
+`scripts/.project-ids.env` the ids are read over REST. The REST writes are tested against a stand-in
+of the documented API, not yet against a live board. User-owned boards do not accept GitHub App
+tokens over REST. Two things are still skipped there, each with one line on stderr:
+
+- **A board step REST could not serve**, where the GraphQL fallback is unavailable:
+  `cckit: board step skipped …`. Turn on the board's built-in workflows (item closed → Done, PR
+  merged → Done, auto-add) and the card still moves.
 - **Remote branch deletion** after a merge: the proxy rejects it. Delete merged branches on GitHub.
 
 ## cckit builds cckit

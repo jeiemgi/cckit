@@ -121,6 +121,13 @@ case "$cmd" in
           source "$LIB/role-identity.sh" 2>/dev/null || true
         fi
         effort_new "$@" ;;
+      sub)
+        if [ "${KIT_PROJECTS_V2:-}" = "true" ]; then
+          # shellcheck source=/dev/null
+          source "$LIB/gh-project.sh"; load_project_ids >/dev/null 2>&1 || true
+        fi
+        effort_sub "$@" ;;
+      retitle) effort_retitle "$@" ;;
       chain) effort_chain "$@" ;;
       start) effort_start "$@" ;;
       pr)
@@ -131,7 +138,7 @@ case "$cmd" in
         effort_pr "$@" ;;
       close) effort_close "$@" ;;
       plan)  source "$LIB/effort-plan.sh"; effort_plan "$@" ;;
-      *) echo "cckit effort <new|chain|start|pr|close|plan>" >&2; exit 2 ;;
+      *) echo "cckit effort <new|sub|retitle|chain|start|pr|close|plan>" >&2; exit 2 ;;
     esac
     ;;
   start)

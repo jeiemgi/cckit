@@ -278,6 +278,138 @@ unset GH_FIXTURE SR_REPO
 rm -rf "$ghtmp"
 
 
+# ── the agent trail (#572): a step report becomes one short comment on its issue ───────────────
+# The forge shim records every request with its JSON body. Synthetic leak words only: the real
+# list is private and never appears in a test.
+trtmp="$(mktemp -d)"; mkdir -p "$trtmp/bin"
+forge_shim_install "$trtmp/bin"
+export GH_LOG="$trtmp/gh.log" GH_COMMENTS="$trtmp/comments.txt" GH_FIXTURE="$trtmp/fixture"
+export GH_TOKEN=test-token CCKIT_FORGE=github SR_REPO=o/r
+printf 'zorblaxian\n# a comment line\nquuxcorp\n' > "$trtmp/leak-words"
+CCKIT_LEAK_WORDS_FILE="$trtmp/leak-words"; export CCKIT_LEAK_WORDS_FILE; unset CCKIT_LEAK_WORDS
+: > "$GH_LOG"; : > "$GH_COMMENTS"
+cat > "$GH_FIXTURE" <<'FIX'
+case "$method $ep" in
+  "GET repos/o/r/issues/"*"/comments")
+    out="$(jq -R 'split("\t") | {id: (.[0] | tonumber), body: (.[1] | fromjson)}' "$GH_COMMENTS" | jq -sc .)" ;;
+  "PATCH repos/o/r/issues/comments/"*) out="{\"id\":${ep##*/}}" ;;
+esac
+FIX
+PATH="$trtmp/bin:$OLDPATH"; export PATH
+# The suite keeps CCKIT_RECEIPT_REMOTE=0 so nothing else can post; the trail cases turn it on over
+# the shim, and one case checks that off means not posted.
+CCKIT_RECEIPT_REMOTE=1; export CCKIT_RECEIPT_REMOTE
+TRAIL_POST='^POST repos/o/r/issues/77/comments '
+
+REP="$trtmp/2026-11-24-1200-build-77.md"
+cat > "$REP" <<'EOF'
+# Build 77
+
+## Status
+Built and gated; PR open.
+Second status line.
+
+## Done
+- one commit, see https://github.com/o/r/pull/12.
+- the issue https://github.com/o/r/issues/77
+
+## Waiting for a yes
+- merge the PR
+
+## Numbers
+check.sh 120 passed
+
+## Next step
+review
+EOF
+
+out="$(CCKIT_RECEIPT_REMOTE=0 sr_cli 77 --report "$REP" 2>&1)"
+yes "CCKIT_RECEIPT_REMOTE=0 says the comment was not posted" "$out" "the comment was NOT posted to #77"
+t "CCKIT_RECEIPT_REMOTE=0 makes no request" "$(wc -l < "$GH_LOG" | tr -d ' ')" "0"
+
+out="$(sr_cli 77 --report "$REP" 2>&1)"; rc=$?
+t "a report posts with rc 0" "$rc" "0"
+yes "the verb says it posted" "$out" "trail comment posted on #77"
+posted="$(grep "$TRAIL_POST" "$GH_LOG")"
+t "exactly one comment was posted" "$(printf '%s\n' "$posted" | grep -c .)" "1"
+yes "the comment carries the Status head"   "$posted" "Built and gated; PR open."
+yes "the comment carries the PR URL, trailing dot dropped" "$posted" "- https://github.com/o/r/pull/12\\n"
+yes "the comment carries the issue URL"     "$posted" "https://github.com/o/r/issues/77"
+yes "the comment carries the waiting items" "$posted" "- merge the PR"
+yes "the comment names the report file"     "$posted" 'Full report: `2026-11-24-1200-build-77.md`'
+yes "the comment carries its trail marker"  "$posted" "cckit:trail report=2026-11-24-1200-build-77.md"
+case "$posted" in *"check.sh 120 passed"*) t "the Numbers section stays in the full report" "present" "absent" ;;
+  *) t "the Numbers section stays in the full report" "absent" "absent" ;; esac
+case "$posted" in *"$trtmp"*) t "no absolute path reaches the comment" "present" "absent" ;;
+  *) t "no absolute path reaches the comment" "absent" "absent" ;; esac
+
+# The same report again edits its comment instead of appending a second.
+printf '%s\t%s\n' 901 '"<!-- cckit:trail report=2026-11-24-1200-build-77.md --> earlier"' > "$GH_COMMENTS"
+: > "$GH_LOG"
+yes "a second post of one report edits" "$(sr_cli 77 --report "$REP" 2>&1)" "updated"
+yes "and it PATCHed the existing comment" "$(cat "$GH_LOG")" "PATCH repos/o/r/issues/comments/901 "
+t "it did not also create one" "$(grep -c "$TRAIL_POST" "$GH_LOG" || true)" "0"
+: > "$GH_COMMENTS"
+
+# No waiting items reads "none".
+NOW="$trtmp/no-wait.md"; printf '## Status\nAll done.\n\n## Done\n- x\n' > "$NOW"
+yes "no Waiting section reads none" "$(sr_cli 77 --report "$NOW" --dry-run 2>/dev/null)" "$(printf '**Waiting for a yes**\nnone')"
+
+# Truncation: a long report is cut to the cap, says so, and still names the file last.
+LONG="$trtmp/long.md"
+{ printf '## Status\nlong one\n\n## Waiting for a yes\n'; i=0; while [ "$i" -lt 80 ]; do printf -- '- decision number %s needs an answer from the owner\n' "$i"; i=$((i+1)); done; } > "$LONG"
+long="$(sr_cli 77 --report "$LONG" --dry-run 2>/dev/null)"
+t "a long comment stays within the cap" "$([ "${#long}" -le 1500 ] && echo yes || echo "no (${#long})")" "yes"
+yes "a cut comment says it was truncated" "$long" "Truncated to 1500 characters"
+t "a cut comment's last line names the file" "$(printf '%s\n' "$long" | tail -n 1)" 'Full report: `long.md` (local, not on GitHub)'
+
+# A leak-list word refuses the whole comment, posts nothing, and does not echo the word.
+LEAK="$trtmp/leak.md"; printf '## Status\nShipped the QuuxCorp import.\n' > "$LEAK"
+: > "$GH_LOG"
+out="$(sr_cli 77 --report "$LEAK" 2>&1)"; rc=$?
+t "a leak word is refused with rc 1" "$rc" "1"
+yes "the refusal names the leak list" "$out" "private leak list"
+case "$out" in *[Qq]uux[Cc]orp*) t "the refusal does not echo the word" "echoed" "hidden" ;;
+  *) t "the refusal does not echo the word" "hidden" "hidden" ;; esac
+t "a refused comment posts nothing" "$(wc -l < "$GH_LOG" | tr -d ' ')" "0"
+sr_cli 77 --report "$LEAK" --dry-run >/dev/null 2>&1; t "dry run refuses a leak word too" "$?" "1"
+
+# An absolute home path is refused the same way.
+HOMEP="$trtmp/home.md"; printf '## Status\nlog at /Users/alice/work/log.txt\n' > "$HOMEP"
+out="$(sr_cli 77 --report "$HOMEP" 2>&1)"; rc=$?
+t "a home path is refused with rc 1" "$rc" "1"
+yes "the refusal names the home path" "$out" "absolute home path"
+t "a home-path comment posts nothing" "$(wc -l < "$GH_LOG" | tr -d ' ')" "0"
+
+# --dry-run prints and writes nothing.
+: > "$GH_LOG"
+dry="$(sr_cli 77 --report "$REP" --dry-run 2>/dev/null)"; rc=$?
+t "dry run exits 0" "$rc" "0"
+yes "dry run prints the comment" "$dry" "Built and gated; PR open."
+t "dry run makes no request" "$(wc -l < "$GH_LOG" | tr -d ' ')" "0"
+
+# No forge: the comment is not posted, the verb says so and prints it.
+: > "$GH_LOG"
+out="$(unset _FORGE_LOADED; CCKIT_FORGE=none sr_cli 77 --report "$REP" 2>&1)"; rc=$?
+t "no forge exits 0" "$rc" "0"
+yes "no forge says the comment was not posted" "$out" "the comment was NOT posted to #77"
+yes "no forge still prints the comment" "$out" "Built and gated; PR open."
+t "no forge makes no request" "$(wc -l < "$GH_LOG" | tr -d ' ')" "0"
+
+# Usage errors.
+NOST="$trtmp/nostatus.md"; printf '## Done\n- x\n' > "$NOST"
+sr_cli 77 --report "$NOST" --dry-run >/dev/null 2>&1; t "a report with no Status is refused" "$?" "2"
+sr_cli 77 --report "$trtmp/missing.md" >/dev/null 2>&1; t "a missing report is refused" "$?" "2"
+sr_cli 77 --report </dev/null >/dev/null 2>&1;  t "--report with no file is refused" "$?" "2"
+sr_cli 77 --stage build --dry-run </dev/null >/dev/null 2>&1; t "--dry-run without --report is refused" "$?" "2"
+yes "the help names the trail mode" "$(sr_cli --help 2>&1)" "--report <file> [--dry-run]"
+
+t "no gh subcommand ran in the trail cases" "$(grep -c '^GH-SUBCOMMAND' "$GH_LOG" || true)" "0"
+PATH="$OLDPATH"; export PATH
+unset GH_FIXTURE SR_REPO CCKIT_LEAK_WORDS_FILE
+CCKIT_RECEIPT_REMOTE=0; export CCKIT_RECEIPT_REMOTE
+rm -rf "$trtmp"
+
 rm -rf "$(dirname "$KIT_STATE_DIR")"
 [ "$fail" -eq 0 ] && echo "ALL OK" || echo "stage receipt: FAILURES"
 exit "$fail"

@@ -9,7 +9,7 @@
 #   effort_branch_num                                   echo the effort issue # parsed from the current branch
 #   effort_trace_dir <parent_num>                       echo (and mkdir -p) the trace dir under the git-common-dir
 #   effort_snapshot_subs <parent_num> [base_ref]        snapshot per-sub-issue diffs BEFORE squash (work trace)
-#   effort_title_lint <full-title>                      enforce the concise / no-jargon / flow-tagged title rule
+#   effort_title_lint <full-title>                      the effort/sub title rule (wrapper over naming.sh)
 #   effort_set_blocked_by <issue> <blocker>             set a native GitHub blocked_by dependency edge
 #
 # Requires: gh, jq, git. bash 3.2 compatible.
@@ -45,6 +45,15 @@ if ! command -v kit_kind_commit_type >/dev/null 2>&1; then
   # shellcheck source=/dev/null
   [ -f "$_eff_kinds" ] && . "$_eff_kinds"
   unset _eff_kinds
+fi
+
+# The one title convention (naming.sh, E546.1): effort_title_lint and effort_pr_title_check below
+# are thin wrappers over naming_title_lint.
+if ! command -v naming_title_lint >/dev/null 2>&1; then
+  _eff_naming="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)/naming.sh"
+  # shellcheck source=/dev/null
+  [ -f "$_eff_naming" ] && . "$_eff_naming"
+  unset _eff_naming
 fi
 
 EFFORT_REPO="${EFFORT_REPO:-${KIT_REPO:-}}"
@@ -192,29 +201,29 @@ EOF_ROWS
 }
 
 # ── Effort PR title — ONE composer shared by the verb + the skill (#121) ────────────────────────
-# `cckit effort pr` (the verb) and /kit-effort-pr (the skill) previously composed different PR
-# titles; they now both call effort_pr_title so an effort PR is titled identically no matter who
-# opens it. The MANDATORY element is the [#N] effort id — a PR title without it is a review blocker
-# (effort-model.md), enforced by effort_pr_title_check.
+# `cckit effort pr` (the verb) and /kit-effort-pr (the skill) both call effort_pr_title, so an effort
+# PR is titled identically no matter who opens it. The MANDATORY element is the trailing [E<n>]
+# effort token (rules/naming-and-ids.md), enforced by naming_title_lint pr and effort_pr_title_check.
 #
 # effort_pr_title <num> <name> [labels_csv] [type] [role_display] — compose the title (#237).
 # PRs are squash-merged, so the title becomes the commit release-please reads and the commitlint
 # gate (.github/workflows/commitlint.yml) checks. The default is therefore a Conventional Commit
-# subject with the id trailing, which passes both commitlint_check and effort_pr_title_check:
-#   effort_pr_title 115 "adoption hardening"                         -> "feat: adoption hardening [#115]"
-#   effort_pr_title 115 "adoption hardening" "flow:core,kind:chore"  -> "chore(core): adoption hardening [#115]"
-#   effort_pr_title 115 "[Effort] 115 · [Core] adoption hardening"   -> "feat(core): adoption hardening [#115]"
-#   scope  the `flow:<flow>` label, else the name's leading [Flow] tag; lowercased, and dropped
-#          when it is not a valid Conventional Commit scope. The tag is peeled from the name.
+# subject with the token trailing:
+#   effort_pr_title 115 "adoption hardening"                         -> "feat: adoption hardening [E115]"
+#   effort_pr_title 115 "adoption hardening" "flow:core,kind:chore"  -> "chore(core): adoption hardening [E115]"
+#   effort_pr_title 115 "[E115] adoption hardening"                  -> "feat: adoption hardening [E115]"
+#   effort_pr_title 115 "[Effort] 115 · [Core] adoption hardening"   -> "feat(core): adoption hardening [E115]"
+#   scope  the `flow:<flow>` label, else the name's leading [Flow] tag (legacy titles); lowercased,
+#          and dropped when it is not a valid Conventional Commit scope. The tag is peeled.
 #   type   the explicit <type> (`effort pr --type`), else the `kind:` label mapped as kto_pr_title
 #          maps it (kind:task and anything unknown -> feat; a content kind -> docs; a `bug` label -> fix).
-# A full parent title is accepted — the "[Effort] N · " prefix is peeled so the id is never doubled.
+# A full parent title, new or legacy, is accepted: its prefix is peeled so the id is never doubled.
 # pr.titleStyle = issue-title (KIT_PR_TITLE_STYLE) keeps the non-conventional form, for a repo with
 # no commitlint gate: "[Role] [#N] <name>" (the role prefix only when <role_display> is given).
 effort_pr_title() {
   local num="${1:-}" name="${2:-}" labels="${3:-}" ctype="${4:-}" role="${5:-}" tag scope kind
   num="${num#\#}"
-  name="$(printf '%s' "$name" | sed -E 's/^\[Effort\] [0-9]+ · ?//')"
+  name="$(naming_strip_structural "$name")"
   [ -n "$name" ] || name="effort"
   if [ "${KIT_PR_TITLE_STYLE:-conventional}" = "issue-title" ]; then
     if [ -n "$role" ]; then printf '[%s] [#%s] %s' "$role" "$num" "$name"
@@ -244,31 +253,28 @@ effort_pr_title() {
     fi
     case ",$labels," in *,bug,*) ctype=fix ;; esac
   fi
-  if [ -n "$scope" ]; then printf '%s(%s): %s [#%s]' "$ctype" "$scope" "$name" "$num"
-  else printf '%s: %s [#%s]' "$ctype" "$name" "$num"; fi
+  if [ -n "$scope" ]; then printf '%s(%s): %s [E%s]' "$ctype" "$scope" "$name" "$num"
+  else printf '%s: %s [E%s]' "$ctype" "$name" "$num"; fi
 }
 
-# effort_pr_title_check <title> [num] — rc 0 iff <title> carries the effort id token [#N] (the exact
-# [#num] when given, else any [#digits]). Prints the reason + rc 1 when it doesn't, so both the verb
-# and the skill can refuse to open a PR whose title lacks the effort id.
+# effort_pr_title_check <title> [num] — rc 0 iff <title> carries the effort's token: [E<num>] or the
+# legacy [#<num>] when <num> is given, else any [E<digits>] or [#<digits>]. Prints the reason + rc 1
+# when it doesn't, so the verb and the skill refuse to open a PR whose title lacks the effort id.
 effort_pr_title_check() {
   local title="${1:-}" num="${2:-}"
   if [ -n "$num" ]; then
     num="${num#\#}"
-    case "$title" in *"[#$num]"*) return 0 ;; esac
-    echo "effort_pr_title_check: PR title lacks the [#$num] effort id: '$title'" >&2; return 1
+    case "$title" in *"[E$num]"*|*"[#$num]"*) return 0 ;; esac
+    echo "effort_pr_title_check: PR title lacks the [E$num] effort token: '$title'" >&2; return 1
   fi
-  grep -qE '\[#[0-9]+\]' <<<"$title" && return 0
-  echo "effort_pr_title_check: PR title lacks a [#N] effort id: '$title'" >&2; return 1
+  grep -qE '\[(E|#)[0-9]+\]' <<<"$title" && return 0
+  echo "effort_pr_title_check: PR title lacks an [E<n>] effort token: '$title'" >&2; return 1
 }
 
-# ── Effort-title rule — concise, jargon-free, flow-tagged ──────────────────────────────────────────
-# The board must say what an effort delivers and which FLOW it belongs to. So the `<Name>` part of an
-# effort/sub title is a short plain-language outcome with an optional leading `[Flow]` tag from a
-# controlled vocabulary — never internal jargon, glyphs, code identifiers, parentheticals, em-dash
-# sub-clauses, or >6 words (detail goes in the body). See rules/effort-model.md § Titles.
-
-# Controlled flow vocabulary for the optional leading [Flow] title tag. Resolution order (#150):
+# ── Effort-title rule — one convention, linted in naming.sh ───────────────────────────────────────
+# `[E<n>] <name>` for an effort, `[E<n>.<step>] <name>` for a sub (rules/naming-and-ids.md). The
+# flow lives in the `flow:` label; a legacy leading `[Flow]` tag is still tolerated by the lint, and
+# validated against this controlled vocabulary. Resolution order (#150):
 #   1. an explicit EFFORT_FLOWS env var always wins (per-invocation override)
 #   2. the project config `effort.flows[]` — via KIT_EFFORT_FLOWS (exported by load_kit_config) or
 #      read straight from the config file, so a configured vocabulary works even for callers that
@@ -292,50 +298,17 @@ EFFORT_FLOWS="${EFFORT_FLOWS:-Core UI API Docs Infra Auth Data Web App}"
 # Jargon denylist — internal terms that read as noise on the board. Override via EFFORT_TITLE_JARGON.
 EFFORT_TITLE_JARGON="${EFFORT_TITLE_JARGON:-chrome seam contract claim rescue stash teardown scaffolding shim boilerplate refactor wiring}"
 
-# effort_title_lint <full-title> — 0 if the title is clean; 1 + reasons on stderr otherwise.
-# Accepts "[Effort] N · [Flow] short name" or "[Effort N] M · short name".
+# effort_title_lint <full-title> — 0 if the title is clean; 1 + reasons on stderr otherwise. A thin
+# wrapper over naming_title_lint: a sub title ([E<n>.<step>] or legacy [Effort N] M · ) is linted as
+# a sub, anything else as an effort ([E<n>] or legacy [Effort] N · ).
 effort_title_lint() {
-  local title="$1" name flow rest
-  local -a reasons=()
+  local title="${1:-}"
   [[ -n "$title" ]] || { echo "effort_title_lint: title required" >&2; return 2; }
-
-  # 1. peel the structural prefix → the human name part.  parent: "[Effort] N · "  sub: "[Effort N] M · "
-  name="$(printf '%s' "$title" | sed -E 's/^\[Effort( [0-9]+)?\] [0-9]+ · ?//')"
-  [[ "$name" == "$title" ]] && reasons+=("missing the '[Effort] N · ' / '[Effort N] M · ' prefix")
-
-  # 2. peel one optional leading [Flow] tag and validate it against the controlled vocabulary.
-  if [[ "$name" =~ ^\[([A-Za-z]+)\]\ (.+)$ ]]; then
-    flow="${BASH_REMATCH[1]}"; rest="${BASH_REMATCH[2]}"; name="$rest"
-    case " $EFFORT_FLOWS " in
-      *" $flow "*) : ;;
-      *) reasons+=("flow tag [$flow] is not in the vocabulary ($EFFORT_FLOWS)") ;;
-    esac
+  if grep -qE '^\[(E[0-9]+\.[0-9]+|Effort [0-9]+)\] ' <<<"$title"; then
+    naming_title_lint sub "$title"
+  else
+    naming_title_lint effort "$title"
   fi
-
-  # 3. the remaining name must be a concise, plain outcome phrase.
-  case "$name" in *"("*|*")"*) reasons+=("no parentheses — detail goes in the body") ;; esac
-  case "$name" in *" — "*|*" · "*|*" / "*) reasons+=("no ' — ' / ' · ' / ' / ' sub-clauses — one clear phrase") ;; esac
-  case "$name" in *—*|*▾*|*▸*|*→*|*✓*|*✗*|*…*|*•*) reasons+=("no glyphs (— ▾ ▸ → ✓ ✗ … •) in the title") ;; esac
-  # code identifiers: file extensions, snake_case, or a code-dir path.
-  if grep -qE '\.(sh|ts|tsx|js|mjs|json|css|md|ya?ml)([^A-Za-z0-9]|$)|[a-z0-9]+_[a-z0-9]+|(^|[^A-Za-z])(scripts|apps|packages|src)/' <<<"$name"; then
-    reasons+=("no code identifiers (file names, paths, snake_case) — name the outcome")
-  fi
-  # jargon denylist (word-boundary, case-insensitive).
-  local w
-  for w in $EFFORT_TITLE_JARGON; do
-    grep -qiwE "$w" <<<"$name" && reasons+=("jargon word '$w' — use plain language")
-  done
-  # word count ≤ 6.
-  local wc; wc=$(printf '%s\n' "$name" | wc -w | tr -d ' ')
-  [[ "$wc" -gt 6 ]] && reasons+=("name is $wc words — keep it ≤ 6 (detail goes in the body)")
-
-  if [[ "${#reasons[@]}" -gt 0 ]]; then
-    { echo "✗ effort title fails the concise / no-jargon rule: $title"
-      for w in "${reasons[@]}"; do echo "    - $w"; done
-    } >&2
-    return 1
-  fi
-  return 0
 }
 
 # effort_set_blocked_by <issue> <blocker-issue> — declare the native GitHub dependency "<issue> is
@@ -356,11 +329,11 @@ if [[ "${BASH_SOURCE[0]:-}" == "${0:-}" && "${1:-}" == "--selftest" ]]; then
   _et_rc=0
   _et_fail() { if effort_title_lint "$1" >/dev/null 2>&1; then echo "FAIL expected-reject passed: $1"; _et_rc=1; else echo "ok  reject: $1"; fi; }
   _et_pass() { if effort_title_lint "$1" >/dev/null 2>&1; then echo "ok  accept: $1"; else echo "FAIL expected-accept rejected: $1"; effort_title_lint "$1"; _et_rc=1; fi; }
-  _et_fail "[Effort] 12 · operator chrome — Settings ▾ dropdown + layout fixes"
-  _et_fail "[Effort 12] 4 · Section tables — columns + joins (contract B)"
+  _et_fail "[E12] operator chrome — Settings ▾ dropdown + layout fixes"
+  _et_fail "[E12.4] Section tables — columns + joins (contract B)"
   _et_fail "[Effort] 12 · refactor scripts/kit + quote-aware free-prompt args"
+  _et_pass "[E12] operator navigation"
   _et_pass "[Effort] 12 · [UI] operator navigation"
-  _et_pass "[Effort] 12 · effort planning conventions"
-  _et_pass "[Effort 12] 4 · module tables"
+  _et_pass "[E12.4] module tables"
   exit "$_et_rc"
 fi

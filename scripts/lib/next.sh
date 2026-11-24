@@ -49,7 +49,7 @@ next_issue() {
   if [ "$out" = "json" ]; then
     local json
     json="$(printf '%s\n' "$wave0" | awk -F'\t' '{
-        t=$6; sub(/^\[Effort( [0-9]+)?\] [0-9]+ · ?/,"",t); sub(/^\[[A-Za-z]+\] /,"",t)
+        t=$6; sub(/^\[E[0-9]+(\.[0-9]+)?\] +/, "", t); sub(/^\[Effort( [0-9]+)?\] [0-9]+ · ?/, "", t); sub(/^\[[A-Za-z]+\] /,"",t)
         print $3"\t"$4"\t"t
       }' \
       | jq -R -s '[ split("\n")[] | select(length>0) | split("\t")
@@ -66,13 +66,13 @@ next_issue() {
   local top topnum toptitle
   top="$(printf '%s\n' "$wave0" | sed -n 1p)"
   topnum="$(printf '%s' "$top" | cut -f3)"
-  toptitle="$(printf '%s' "$top" | cut -f6 | sed -E 's/^\[Effort( [0-9]+)?\] [0-9]+ · ?//; s/^\[[A-Za-z]+\] //')"
+  toptitle="$(printf '%s' "$top" | cut -f6 | sed -E 's/^\[E[0-9]+(\.[0-9]+)?\] +//; s/^\[Effort( [0-9]+)?\] [0-9]+ · ?//; s/^\[[A-Za-z]+\] //')"
   {
     printf '# Next up — %s%s\n\n' "$repo" "$([ -n "$effort" ] && echo " · effort #$effort")"
     printf '## Unblocked now\n\n'
     printf '| # | ctx | issue |\n|---|-----|-------|\n'
     printf '%s\n' "$wave0" | awk -F'\t' '{
-      t=$6; sub(/^\[Effort( [0-9]+)?\] [0-9]+ · ?/,"",t); sub(/^\[[A-Za-z]+\] /,"",t)
+      t=$6; sub(/^\[E[0-9]+(\.[0-9]+)?\] +/, "", t); sub(/^\[Effort( [0-9]+)?\] [0-9]+ · ?/, "", t); sub(/^\[[A-Za-z]+\] /,"",t)
       printf "| #%s | %s | %s |\n", $3, $4, t
     }'
     printf '\n## Pick up #%s — %s\n\n' "$topnum" "$toptitle"

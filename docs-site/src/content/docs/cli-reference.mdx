@@ -158,7 +158,7 @@ How do I take one change from a branch to merged?
 does not run:
 
 ```text
-cckit start [--force] <issue> [slug]
+cckit start [--force] <issue|E<n>|E<n>.<step>> [slug]
 
   Answers: How do I start work on an issue without touching my main checkout?
   Paste:   "Start the issue I pick in its own worktree."
@@ -201,7 +201,7 @@ cckit: 'copilot' is an old name for 'wave'; it still works. Use 'cckit wave'.
 | `cckit init [<folder>]` | Guided project setup ([Initialize](/getting-started/initialize/)): classifies the folder before writing anything, asks what is missing (each question has one recommended answer; `--answers <file>` answers them without a terminal), starts a new project from a recipe (`--recipe nextjs-shadcn`), optionally adds a database option (`--database supabase`), scaffolds the kit, then runs the git + GitHub steps after one confirmation (`--yes` with no terminal): `git init` + first commit, `gh repo create` (private; `--public`), `develop` created and pushed, labels, milestones, delete-head-branches, base-branch protection, Projects v2 ids, the doctor report. Each step prints `done`, `skipped` or `failed`; a re-run skips finished steps. `--no-github` scaffolds only. `--dry-run` prints every step and writes nothing. Exit 0 · 1 a step failed · 2 refused before any write. A home or system folder is never scaffolded into. |
 | `cckit init --profile <p> --no-github` | Scaffold the project config (`.claude/kit.config.json`; the root `cckit.config.json` for a Codex-only project) and the adapter files for this repo, and nothing else. `--adapter <claude\|codex\|both>` selects the agent (default `claude`): `codex` writes `AGENTS.md` + `.agents/{skills,rules}` and, alone, no `.claude/` tree. `--upgrade` brings an existing project to the installed version ([Update a project](/getting-started/update/)): it adds missing files, keeps existing ones, and prints the files it added or modified as `Changed on disk`; `--upgrade --dry-run` runs the same upgrade on a temporary copy and prints that list as `Would change`, writing nothing. `--upgrade` keeps the stored selection; `--upgrade --adapter <name>` adds one. Both adapters get the guard and session-mail hooks; for Codex they are merged into `.codex/hooks.json` and run once trusted (`/hooks`). Each profile role is installed for both from one source: `.claude/agents/<role>/AGENT.md` and `.codex/agents/<role>.toml`. See [Adapters](/adapters/#choosing-adapters-at-install) and [Hooks](/hooks/#codex). |
 | `cckit scan` | Detect this repo's stack + kit state (JSON). |
-| `cckit doctor` | Onboarding preflight: deps present, the forge signed in (a GitHub token; `gh` is optional), one row per [integration](/integrations/) the config switches on, each installed from its descriptor by the shared runner, one `page-design skill` row per adapter when `tasks.design` is on (failing, and naming `cckit add page-design`, when the skill folder is absent), and (when memory is on) the per-wing wake-up header. Asks before installing; `--fix` installs and seeds without the prompt. With no terminal and no `--fix` the run is report-only: no package is installed, `pnpm install` is not run, no file is seeded or refreshed and no server is started. An integration installs only after a yes or `--fix`; otherwise it is reported missing and the exit code is 1. Also reports the CLI of each selected adapter present or absent; `--agents` prints only those rows, offline, and exits 1 when one is absent. With `codex` selected it adds a row for the hooks registered in `.codex/hooks.json`. Also prints the resident instruction-file total against the 150k limit. |
+| `cckit doctor` | Onboarding preflight: deps present, the forge signed in (a GitHub token; `gh` is optional), one row per [integration](/integrations/) the config switches on, each installed from its descriptor by the shared runner, one `page-design skill` row per adapter when `tasks.design` is on (failing, and naming `cckit add page-design`, when the skill folder is absent), and (when memory is on) the per-wing wake-up header. Asks before installing; `--fix` installs and seeds without the prompt. With no terminal and no `--fix` the run is report-only: no package is installed, `pnpm install` is not run, no file is seeded or refreshed and no server is started. An integration installs only after a yes or `--fix`; otherwise it is reported missing and the exit code is 1. Also reports the CLI of each selected adapter present or absent; `--agents` prints only those rows, offline, and exits 1 when one is absent. With `codex` selected it adds a row for the hooks registered in `.codex/hooks.json`. Also prints the resident instruction-file total against the 150k limit. Prints one `loose issues` row: the count of open issues that are no effort, no sub-issue and not in Backlog on the board (board off: every standalone issue counts); skipped, and said so, with no forge. `cckit doctor --loose` lists them (`#N title`); `--loose --ratchet [--baseline=FILE]` exits 1 when the count rose above `scripts/loose-issues.baseline`, 2 when it could not be judged. Not part of `scripts/check.sh`, which stays offline. |
 | `cckit add [<name>]` | No name: list the integrations described in `integrations/`, the modules and the kit skills that can be added. With an integration: set the one config key its descriptor names and copy the rules it lists into `.claude/rules/`; nothing is installed. Seven ship: `mempalace`, `mlx-lm`, `graft`, `lavish`, and the three design skills `impeccable`, `emil-design-eng` and `web-design-guidelines`. With a module (`software`): write this directory's `.claude/kit.config.json`. With `page-design`: set `tasks.design: true` and copy the [`page-design`](/skills/#page-design) skill into the skills folder of each adapter in the config; it asks nothing, needs no version bump, and keeps a copy already there. `KIT_DRY_RUN=1` previews, and for an integration also prints the install and wire plan. See [Integrations](/integrations/). |
 | `cckit adopt` | Record kit-shaped files a repo already has. |
 | `cckit migrate` | Reshuffle an old kit layout to the current one. `--dry-run` previews. Step 2 of [Update a project](/getting-started/update/). |
@@ -222,6 +222,7 @@ One issue becomes one branch, one worktree, one PR. These verbs walk that path.
 | `cckit merge [<pr>] [--merge\|--rebase]` | Merge the PR (squash by default), close its linked issues, clean the branch and worktree, and update the PR's base, which may be an `effort/<N>` branch. Refuses a PR whose **head** is `effort/*` and names `cckit effort close <N>`; `KIT_FORCE=1` merges anyway, with a warning. Without a forge, run from the branch's worktree with no PR number: the branch lands on the base through git (a squash commit titled after its last commit; `--merge` keeps the commits under a merge commit; `--rebase` replays them first), the base is pushed, the branch and worktree are cleaned up, and one line says no pull request was merged and no issue closed. |
 | `cckit sync` | Board state: issues by role with Project Status, a merge-ordered open-PR queue, and blocked / not-on-board / stale (>14d) flags. |
 | `cckit sync --json \| --write \| --cached [TTL] \| --watch [SECS] \| --plan` | The same board as one cached JSON document for a TUI or statusline — see [Board cache and watch mode](#board-cache-and-watch-mode). |
+| `cckit sync --no-snapshot` | Skip the local board snapshot `.cckit/board.md` — see [Local board snapshot](#local-board-snapshot). |
 | `cckit status` | "Where are we?" in three buckets — local undone work, open PRs waiting on a human, cleanup available (local + remote) — plus the board, the light tasks when the project has any (counts by state and the tasks somebody has to act on), the next effort that can start in each flow, and the resume handoff, and one line with the resident instruction-file total. Read-only. |
 | `cckit handoff "<note>"` | Save a resume-here note for the next session. |
 
@@ -345,7 +346,7 @@ A **wave** is a set of issues with no blockers between them, so they can run at 
 
 | Verb | Purpose |
 | --- | --- |
-| `cckit receipt <issue> --stage <s>` | Record one stage receipt from stdin, locally and as a comment on the issue (`--no-remote` skips the comment). `receipt list [<issue>]` and `receipt show <issue> <stage> [<attempt>]` read them back. |
+| `cckit receipt <issue> --stage <s>` | Record one stage receipt from stdin, locally and as a comment on the issue (`--no-remote` skips the comment). `receipt <issue> --report <file>` posts a step report's short trail comment instead: its `## Status` head, its URLs, its `## Waiting for a yes` items and the report's file name, capped at 1500 characters; it is refused when it would carry a leak-list word or a home path, `--dry-run` prints it, and with no forge it is printed and not posted. `receipt list [<issue>]` and `receipt show <issue> <stage> [<attempt>]` read them back. |
 | `cckit qa <up\|ready\|open\|stop\|verdict\|lanes> [--lane N]` | The [QA lane](/review/qa-lane/): `up` launches the stack command declared under `qa` on this lane's ports and exits 0 only once every readiness probe answers (`ready` waits on a launched lane), and refuses with exit 2 when a lane port is already in use; `open` opens the changed screen — the PR body's `QA route:` line, else `qa.route`; `stop` frees the lane's ports, leaving a listener the lane did not launch running unless `--force`; `verdict <pass\|fail>` records the verdict against the reviewed commit, and with no `pass\|fail` reads it back as `pass` · `fail` · `stale` · `none`; `lanes` takes no argument and prints one row per lane that has a port slot, a launch record or a verdict: branch, ports, `up` · `partial` · `down` · `unknown` by who listens on those ports, the verdict (`pass` · `fail` · `stale` · `none`, or `unknown` when a verdict exists and no local branch does) and the worktree. It is read-only — no launch, no stop, no write, no `gh` or `curl` call — and exits 0 with or without lanes (`--llm` prints a JSON array). |
 | `cckit page <mode\|open\|poll\|reply\|end\|answer>` | [Review pages](/project-management/plan-pages/). `mode` prints `page`, or `terminal: <reason>` for a session with no browser (CI, `CCKIT_HEADLESS`, a headless agent session, SSH, no display, no terminal, `reviewPages.enabled: false`). `open <html-file> [--fallback <md-file>]` opens the page through `lavish-axi` (`npx -y lavish-axi` when the binary is absent); in terminal mode, or when the tool exits non-zero, it prints the fallback file and exits 0; flags after `--` go to the tool. `poll`, `reply` and `end` pass their arguments to the tool and do nothing in terminal mode. `answer --kind <plan\|decision\|grill> --title "<t>" [--issue <n>] [--body-file <file>]` records the answer: a comment on the issue when `github.repo` is set and `--issue` is given, else `docs/answers/<date>-<kind>-<slug>.md`; the same answer twice writes nothing. Exit 0 · 1 the answer could not be written · 2 usage error. `--llm` → one JSON object. |
 | `cckit orchestrate <a> <b> …` | Run N flows in parallel worktrees (`--dry-run` / `--cap` / `--agent` / `--runtime tmux\|herdr`). |
@@ -462,6 +463,30 @@ cckit brief <issue>       # the brief for that issue
 ```
 
 Reading the issue is the verb's one hard dependency: a failed GitHub read propagates rather than yielding a brief with an empty issue in it.
+
+## Local board snapshot
+
+Every board read also writes `.cckit/board.md`, so an agent can grep the board instead of asking GitHub again. It is the primary checkout's `.cckit/`, shared by every worktree; `cckit sync` prints the absolute path on stderr. `.cckit/` is gitignored, so a bare `rg` skips the file: give it the path.
+
+```bash
+cckit sync --llm                      # reads the board, writes the snapshot
+rg '#575' /path/to/repo/.cckit/board.md
+rg -F 'E546.' /path/to/repo/.cckit/board.md   # every sub-issue of effort 546
+```
+
+One tab-separated line per open issue, grouped under `## Efforts`, `## Sub-issues` and `## Standalone`:
+
+```text
+#575	open	sub	E546.9	priority:p1,role:tech-lead,kind:feat	[Effort 546] 9 · Local board snapshot
+```
+
+| Column | Value |
+| --- | --- |
+| status | The Projects v2 Status when the board is on and was read (the human board, `--json`, `--write`); otherwise the issue state, `open`. |
+| kind | `effort`, `sub` or `issue`, from the title prefix (`[E<n>]`, `[E<n>.<s>]`, legacy `[Effort] N · ` and `[Effort N] M · `) or the `effort` label. |
+| token | `E<n>` for an effort, `E<n>.<s>` for a sub, `-` for a standalone issue. |
+
+The header records the time, the repository, the command and how to read the file. The write goes to a temp file renamed over the snapshot, and a failed read leaves the previous snapshot as it was. `--raw-json` and a `--cached` hit write nothing; neither does a project with no forge, which says so on stderr. `--no-snapshot` skips the write; `CCKIT_BOARD_SNAPSHOT=<path>` writes it elsewhere.
 
 ## Board cache and watch mode
 

@@ -10,9 +10,8 @@ a dataset if you train on your own development history.
 
 ## The unit
 
-**1 effort = 1 parent issue · 1 branch · 1 worktree · 1 PR.** No forced tiny PRs — a big effort-PR
-is fine while building. 1 effort decomposes into **N native GitHub sub-issues** (parallel or
-sequential, decided at scoping).
+**1 effort = 1 parent issue · 1 branch · 1 worktree · 1 PR.** A big effort-PR is fine while
+building. It decomposes into **N native GitHub sub-issues** (parallel or sequential, set at scoping).
 
 ```
 parent issue #N  ──►  effort/<N> branch + worktree (from {{BASE_BRANCH}})
@@ -28,11 +27,14 @@ the commit diff is that sub-issue's patch). Parallel sub-issues use their own wo
 
 ## Parent-issue template
 
-Every parent issue body uses these four sections (they double as the columns of the work record):
+Every parent issue body uses these five sections (they double as the columns of the work record):
 
 ```markdown
 ## Goal           → problem statement
 What outcome, in one or two lines.
+
+## Spec           → acceptance, checked (`effort new` and `effort close` refuse without it)
+What done means: at least one `- ` or `1. ` item that is not TODO / TBD.
 
 ## Scope          → plan (the sub-issue DAG; mark each parallel | sequential / dependsOn)
 The decomposition. Sub-issues are linked natively (GitHub parent/child).
@@ -46,23 +48,21 @@ How we know it's done (commands, checks, acceptance).
 
 **Effort + sub-issue titles must be recognizable on the board:**
 
-- **Umbrella / parent issue:** **`[Effort] <number> · <Name>`** — the literal `[Effort]` tag, the
-  issue's own number, then the human name. e.g. `[Effort] 42 · Auth hardening`.
-- **Sub-issue:** **`[Effort <parent>] <N> · <Title>`** — the parent's number in the tag, then a
-  **numeric** sequence index `N` (1, 2, 3 — **never letters** like A/B/C), then the title.
-  e.g. `[Effort 42] 1 · Add rate limiting to /login`.
+- **Umbrella / parent issue:** **`[E<n>] <Name>`** — its own number, then the name: `[E42] Auth hardening`.
+- **Sub-issue:** **`[E<parent>.<step>] <Title>`** — the parent's number, then a **numeric**
+  1-based step (1, 2, 3 — **never letters** like A/B/C), then the title.
+  e.g. `[E42.1] Rate limit the sign-in`.
 
-The parent ref is mandatory; `N` is a plain number so subs sort and read predictably. `effort-new`
-applies both formats when it creates the parent + native sub-issues, so a sub is identifiable by
-name alone in any flat list.
+`effort-new` applies both (the parent is renamed once it has a number); `cckit effort sub <N>
+"<name>"` adds step count+1. Legacy `[Effort] N · ` / `[Effort N] M · ` titles still parse;
+`cckit effort retitle [<N>] [--apply]` renames them. Full rule: `rules/naming-and-ids.md`.
 
 **One creation core (no drift).** Both ways to create an effort — the `cckit effort new` verb and
 the `/kit-effort-new` skill — call the **same** shared function `effort_new` (`scripts/lib/effort-ops.sh`).
-That single core fills the four body sections, applies the `ctx/kind/priority/role/flow` label set
-(`ctx:*` via `effort_ctx_bucket`), lints the parent **and every sub** title up front, links the
-native sub-issues, and adds everything to the board. `scripts/setup-labels.sh` provisions every
-label family the core applies (`ctx:* flow:* kind:* priority:* role:*`) so creation never fails on a
-missing label.
+That single core fills the five body sections, lints the Spec (`spec_lint`, `scripts/lib/spec-lint.sh`)
+and the parent **and every sub** title up front, applies the `ctx/kind/priority/role/flow` labels
+(`ctx:*` via `effort_ctx_bucket`), links the native sub-issues, and adds everything to the board.
+`scripts/setup-labels.sh` provisions every label family the core applies, so creation never fails.
 
 ### Title rule, flow tags, relations, session-fit
 
@@ -70,19 +70,20 @@ The board should be **legible at a glance** — a title says *what* an effort de
 flow* it belongs to; the *chain* (who blocks whom) and the *session weight* are machine-readable.
 
 **Concise, jargon-free titles (lint-enforced).** The `<Name>` part of an effort/sub title is a short
-plain-language **outcome** with an optional leading `[Flow]` tag:
+plain-language **outcome**:
 
-- **Format:** `[Effort] N · [Flow] short name` (parent) · `[Effort N] M · short name` (sub).
+- **Format:** `[E<n>] short name` (parent) · `[E<n>.<step>] short name` (sub); no `[Flow]` tag.
 - **Banned in the name:** glyphs (`— ▾ ▸ → ✓ ✗ … •`), parentheses, ` — ` / ` · ` / ` / ` sub-clauses,
   code identifiers (file names, paths, `snake_case`), internal jargon (`chrome`, `seam`, `contract`,
   `rescue stash`, `refactor`, `wiring`, …), and **> 6 words**. Detail goes in the body.
-- **`effort_title_lint`** (`scripts/lib/effort.sh`) is the check; `effort-new` lints the parent **and
-  every sub** title up front and refuses to create anything if one fails. Bad→good:
-  `operator chrome — Settings ▾ dropdown + fixes` → **`[UI] operator navigation`**.
+- **`naming_title_lint`** (`scripts/lib/naming.sh`; `effort_title_lint` in `effort.sh` wraps it) is
+  the check; `effort-new` lints the parent **and every sub** title up front and refuses to create
+  anything if one fails. Bad→good: `operator chrome — Settings ▾ dropdown + fixes` →
+  **`[E12] operator navigation`** with the `flow:ui` label.
 
-**Flow tag (`[Flow]` + `flow:<flow>` label).** A **flow** is a named thread of efforts toward one
-outcome. Controlled vocabulary (`EFFORT_FLOWS` in `effort.sh`; a project overrides it). The title
-carries `[Flow]` so membership reads off the board; the `flow:<flow>` label makes it filterable.
+**Flow (`flow:<flow>` label).** A **flow** is a named thread of efforts toward one outcome.
+Controlled vocabulary (`EFFORT_FLOWS` in `effort.sh`; a project overrides it). The `flow:<flow>`
+label carries membership and makes it filterable; the title no longer carries a `[Flow]` tag.
 
 **Relations (the chain) — native edge + `## Relations` mirror.** Cross-effort dependencies are
 **both** a native GitHub dependency (`blocked_by` — the edge GitHub renders on the issue/board, set
@@ -114,20 +115,19 @@ delegating an effort's sub-issues to **sub-agents in their own worktrees** keeps
 light (a sub-agent reads/writes in its own context; only a summary returns) — the lever that lets
 more efforts fit one session (`rules/agent-execution-routing.md`).
 
-Sub-issue bodies: a one-line description is enough (title is for humans, short desc not required).
-The parent carries the rich narrative; the **PR** carries the human-facing review write-up + a
-`## For agents` section.
+Sub-issue bodies: one line is enough (`effort sub --spec` may add a one-line Spec). The parent
+carries the narrative; the **PR** carries the human-facing review write-up + `## For agents`.
 
 ## Lifecycle (the commands — see the effort-* skills)
 
 | Step | What |
 |------|------|
-| `effort-new` | parent issue (4-section body **filled** + `ctx/kind/priority/role/flow` labels) + native sub-issues, every title linted; optional `--slug` sets the handle |
+| `effort-new` | parent issue (5-section body **filled**, `--spec` required + `ctx/kind/priority/role/flow` labels) + native sub-issues, every title and the Spec linted; optional `--slug` sets the handle |
 | `cckit effort chain <a> <b> …` | declare a running order over EXISTING issues: each successor `blocked_by` its predecessor + a `- Depends on #<predecessor>` line. Idempotent, additive, cycle-refusing (nothing is written on a refusal) |
 | `effort-start [--force] <slug\|N>` | `effort/<N>` branch + worktree; board → In Progress. Creating the branch stamps the start time for the metrics record. **WIP-limited** — see below |
 | orchestrate | sub-issues in own worktrees (file-disjoint) → merge into `effort/<N>`; each closes + board Done as it lands |
 | `effort-pr <slug\|N>` | ONE PR `effort/<N>` → {{BASE_BRANCH}} (rich body + `## For agents`) |
-| `effort-close <slug\|N>` | **snapshot sub-diffs pre-squash** → append the metrics record (`build_seconds` and `tokens_real` each name their source; with no source the field is `null`, never an estimate) → re-target open PRs based on the effort branch (refuses if one fails) → merge → close parent + subs → board Done(all) → GC prune → kit-sync drift check |
+| `effort-close <slug\|N>` | re-check the Spec (refuses without one; `--no-spec-check` skips it and says so) → **snapshot sub-diffs pre-squash** → append the metrics record (`build_seconds` and `tokens_real` each name their source; with no source the field is `null`, never an estimate) → re-target open PRs based on the effort branch (refuses if one fails) → merge → close parent + subs → board Done(all) → GC prune → kit-sync drift check |
 
 Board + record state are correct **by construction** — the close op owns them. Never rely on a
 separate, skippable "mark done" step.
@@ -189,7 +189,7 @@ parallel ID space. `effort-start`/`pr`/`close` accept `<slug|N>`: a pure-digits 
 anything else is resolved to the canonical number by matching `effort/*` branches (local + remote),
 then the `slug:<slug>` label, then open effort titles. Unknown/ambiguous → structured error, no
 guess. `effort-new --slug <s>` stores the handle as a `slug:<slug>` label; without it the slug is
-derived from the title (with the `[Effort] N ·` prefix and `[Flow]` tag peeled, so the number is not
+derived from the title (with the `[E<n>]` / `[Effort] N ·` prefix and any `[Flow]` tag peeled, so the number is not
 doubled into the slug). Efforts render as `slug #N`.
 
 ## Plans are issues, not files

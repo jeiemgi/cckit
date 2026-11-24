@@ -15,6 +15,7 @@
 #   GH_GRAPHQL      the JSON every POST graphql answers (default {"data":{}})
 #   GH_DIFF         the diff every `GET pulls/<n>` with the diff Accept header answers
 #   GH_SHIM_TOKEN   what `gh auth token` prints; empty = not signed in (tests usually set GH_TOKEN)
+#   GH_HDR_LOG      one line per extra request header (not Accept, not Authorization)
 #
 # A test that needs other fixtures sets GH_FIXTURE=<file>: a bash snippet sourced by the shim after
 # its own case, which may set `out` and `code` for the current `$method $path`.
@@ -28,7 +29,7 @@ method=GET; url=""; body=""; accept=""; hdr=""
 while [ $# -gt 0 ]; do
   case "$1" in
     -X) method="$2"; shift 2 ;;
-    -H) case "$2" in Accept:*) accept="$2" ;; esac; shift 2 ;;
+    -H) case "$2" in Accept:*) accept="$2" ;; Authorization:*) ;; *) [ -n "${GH_HDR_LOG:-}" ] && printf '%s\n' "$2" >> "$GH_HDR_LOG" ;; esac; shift 2 ;;
     --data-binary) body="$2"; shift 2 ;;
     -D) hdr="$2"; shift 2 ;;
     -w|-o|-m|--max-time|--retry|--retry-delay) shift 2 ;;

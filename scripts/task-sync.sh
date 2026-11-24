@@ -12,6 +12,10 @@
 #   --watch [SECS]    refresh + write every SECS seconds (default 30); a failed refresh keeps the
 #                     last good cache. KIT_SYNC_WATCH_MAX=<n> stops after n refreshes
 #   --plan            inline `effort plan` (a "### Effort plan" section; `plan` in the document)
+# The local snapshot (E546.9): every board read except --raw-json and a --cached hit also writes
+# .cckit/board.md (kit_state_dir: the primary checkout's, shared by every worktree), one
+# tab-separated line per open issue, for `rg`. Atomic (temp file + mv); never written from a failed
+# read or without a forge. --no-snapshot skips it; CCKIT_BOARD_SNAPSHOT=<path> moves it.
 # Every fetch emits op.start / op.done (op "sync") on the kit-events.jsonl bus.
 # --json document: { schema, repo, generatedAt, generatedEpoch, open,
 #   roles:[{role, slug, issues:[{number,title,status,priority,milestone,blocked}]}],
@@ -28,6 +32,8 @@ set -euo pipefail
 source "$(dirname "$0")/lib/kit-config.sh" && load_kit_config
 # Pure board-view helpers (merge queue, stale flag, not-on-board flag, Project Status).
 source "$(dirname "$0")/lib/board-view.sh"
+# The shared .cckit/ state dir (kit_state_file) — the snapshot's home.
+source "$(dirname "$0")/lib/kit-state.sh" 2>/dev/null || true
 # The rendering seam (#82): the human board is markdown, routed through cckit_render — rich via glow
 # in a TTY, verbatim markdown otherwise (renders natively in Claude Code, pipe-safe).
 source "$(dirname "$0")/lib/ui.sh" 2>/dev/null || true
@@ -40,7 +46,8 @@ ROLE_FILTER=""; MS_FILTER=""
 # OUT is what goes to stdout: human | json (TOON, the --llm form) | raw-json | doc (--json) | none.
 OUT="${CCKIT_OUTPUT:-human}"; OUT_SET=0
 case "$OUT" in json|raw-json) ;; *) OUT=human ;; esac
-WRITE=0; PLAN=0; CACHED_TTL=""; WATCH_SECS=""
+WRITE=0; PLAN=0; CACHED_TTL=""; WATCH_SECS=""; SNAPSHOT=1
+SYNC_ARGS="$*"
 _is_int() { case "${1:-}" in ''|*[!0-9]*) return 1 ;; *) return 0 ;; esac; }
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -51,6 +58,7 @@ while [[ $# -gt 0 ]]; do
     --json) OUT=doc; OUT_SET=1; shift ;;
     --write) WRITE=1; shift ;;
     --plan) PLAN=1; shift ;;
+    --no-snapshot) SNAPSHOT=0; shift ;;
     --cached) CACHED_TTL=60; shift; if _is_int "${1:-}"; then CACHED_TTL="$1"; shift; fi ;;
     --watch)  WATCH_SECS=30; shift; if _is_int "${1:-}"; then WATCH_SECS="$1"; shift; fi ;;
     *) echo "unknown flag: $1" >&2; exit 1 ;;
@@ -134,6 +142,74 @@ sync_fetch() {
   return 0
 }
 
+# sync_snapshot_path — CCKIT_BOARD_SNAPSHOT, else <kit_state_dir>/board.md (one per repository).
+sync_snapshot_path() {
+  if [ -n "${CCKIT_BOARD_SNAPSHOT:-}" ]; then printf '%s\n' "$CCKIT_BOARD_SNAPSHOT"; return 0; fi
+  if command -v kit_state_file >/dev/null 2>&1; then printf '%s\n' "$(kit_state_file board.md)"; return 0; fi
+  printf '%s/.cckit/board.md\n' "$PWD"
+}
+
+# sync_snapshot — write the fetched ISSUES to the snapshot, one tab-separated line per open issue:
+#   #N  status  kind  token  labels  title
+# status is the Projects v2 Status when the board is on and was read, else the issue state (open).
+# kind/token follow the title prefix (scripts/lib/naming.sh: [E<n>], [E<n>.<s>], legacy
+# [Effort] N · and [Effort N] M · ) or the `effort` label; a standalone issue is `issue` / `-`.
+# Best-effort: a write that fails says so on stderr and never fails the sync.
+sync_snapshot() {
+  [ "$SNAPSHOT" = 1 ] || return 0
+  local dest tmpf body
+  dest="$(sync_snapshot_path)" || return 0
+  body="$(printf '%s' "$ISSUES" | jq -r --argjson st "$STATUS_MAP" --arg repo "$KIT_REPO" \
+      --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg cmd "cckit sync${SYNC_ARGS:+ $SYNC_ARGS}" \
+      --arg path "$dest" '
+    def tok: (.title // "") as $t
+      | if   ($t | test("^\\[E[0-9]+\\.[0-9]+\\] ")) then ($t | capture("^\\[E(?<e>[0-9]+)\\.(?<s>[0-9]+)\\]") | "E\(.e).\(.s)")
+        elif ($t | test("^\\[E[0-9]+\\] ")) then ($t | capture("^\\[E(?<e>[0-9]+)\\]") | "E\(.e)")
+        elif ($t | test("^\\[Effort [0-9]+\\] [0-9]+ ·")) then ($t | capture("^\\[Effort (?<e>[0-9]+)\\] (?<s>[0-9]+) ·") | "E\(.e).\(.s)")
+        elif ($t | test("^\\[Effort\\] [0-9]+ ·")) then ($t | capture("^\\[Effort\\] (?<e>[0-9]+) ·") | "E\(.e)")
+        else null end;
+    def row: tok as $k
+      | (if ($k // "" | contains(".")) then "sub"
+         elif $k != null or any(.labels[]?; .name == "effort") then "effort"
+         else "issue" end) as $kind
+      | { n: .number, kind: $kind,
+          token: (if $kind == "issue" then "-" else ($k // "E\(.number)") end),
+          status: (($st[(.number | tostring)] // "open") | if . == "—" then "open" else . end),
+          labels: ([.labels[]?.name] | join(",") | if . == "" then "-" else . end),
+          title: ((.title // "") | gsub("[\t\r\n]"; " ")) };
+    def line: "#\(.n)\t\(.status)\t\(.kind)\t\(.token)\t\(.labels)\t\(.title)";
+    def section($name; $kind; $rows):
+      "", "## \($name)", ([$rows[] | select(.kind == $kind) | line] | if length == 0 then "(none)" else .[] end);
+    [.[] | row] | sort_by(.n) as $rows
+    | "# Board snapshot — \($repo)",
+      "generated-at: \($at)",
+      "made by: \($cmd)",
+      "read with: rg <pattern> \($path)",
+      "  (.cckit/ is gitignored, so a bare `rg` skips this file: always give rg the path)",
+      "columns: #N<TAB>status<TAB>kind<TAB>effort-token<TAB>labels<TAB>title — open issues only",
+      section("Efforts"; "effort"; $rows),
+      section("Sub-issues"; "sub"; $rows),
+      section("Standalone"; "issue"; $rows)')" \
+    || { echo "sync: could not build the board snapshot — $dest left as it was" >&2; return 0; }
+  mkdir -p "$(dirname "$dest")" 2>/dev/null || { echo "sync: cannot create $(dirname "$dest") — no board snapshot" >&2; return 0; }
+  tmpf="$dest.$$.tmp"
+  if printf '%s\n' "$body" > "$tmpf" 2>/dev/null && mv -f "$tmpf" "$dest" 2>/dev/null; then
+    echo "sync: board snapshot $dest (read with: rg <pattern> $dest)" >&2
+  else
+    rm -f "$tmpf"; echo "sync: could not write the board snapshot $dest" >&2
+  fi
+  return 0
+}
+
+# sync_snapshot_check_forge — without a forge there is no board to snapshot: say so once.
+sync_snapshot_check_forge() {
+  [ "$SNAPSHOT" = 1 ] || return 0
+  [ "$OUT" = raw-json ] && return 0
+  command -v forge_available >/dev/null 2>&1 || return 0
+  forge_available && return 0
+  forge_note_none sync "no board snapshot written ($(sync_snapshot_path))"
+}
+
 # sync_plan — fill PLAN_TEXT with `effort plan` output. Non-zero when the plan cannot be produced.
 sync_plan() {
   local lib; lib="$(dirname "$0")/lib/effort-plan.sh"
@@ -205,7 +281,9 @@ sync_write() {
 sync_refresh() {
   local ok=1
   emit_event op.start sync "{\"mode\":\"$OUT\",\"write\":$WRITE}"
+  sync_snapshot_check_forge
   sync_fetch strict || ok=0
+  if [ "$ok" = 1 ]; then sync_snapshot; fi
   if [ "$ok" = 1 ] && [ "$PLAN" = 1 ]; then sync_plan || ok=0; fi
   if [ "$ok" = 1 ]; then sync_doc || ok=0; fi
   if [ "$ok" = 1 ] && [ "$WRITE" = 1 ]; then sync_write || ok=0; fi
@@ -257,7 +335,9 @@ if [ "$OUT" = doc ] || [ "$WRITE" = 1 ]; then
   [ "$OUT" = none ] && exit 0
 else
   emit_event op.start sync "{\"mode\":\"$OUT\",\"write\":0}"
+  sync_snapshot_check_forge
   sync_fetch lenient || { emit_event op.done sync '{"ok":false}'; echo "sync: could not read the board" >&2; exit 1; }
+  [ "$OUT" = raw-json ] || sync_snapshot
   emit_event op.done sync "{\"ok\":true,\"open\":$(printf '%s' "$ISSUES" | jq 'length' 2>/dev/null || echo 0)}"
 fi
 

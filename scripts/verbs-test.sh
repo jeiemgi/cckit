@@ -67,7 +67,7 @@ json="$("$CCKIT" commands --json)"
 t "cckit commands --json is valid JSON with one object per name" "$(jq length <<<"$json")" "$(verbs_names | wc -l | tr -d ' ')"
 t "commands --json: start's question" "$(jq -r '.[] | select(.name=="start") | .question' <<<"$json")" "$(verbs_get start 8)"
 t "commands --json: an alias carries its target" "$(jq -r '.[] | select(.name=="copilot") | .target' <<<"$json")" "wave"
-t "commands --json: a multi-line usage is an array" "$(jq -r '.[] | select(.name=="effort") | .usage | length' <<<"$json")" "6"
+t "commands --json: a multi-line usage is an array" "$(jq -r '.[] | select(.name=="effort") | .usage | length' <<<"$json")" "8"
 has "the completions read cckit commands" "$("$CCKIT" completions bash)" 'cckit commands'
 
 # ── 4. the CLI reference page ───────────────────────────────────────────────────────────────────

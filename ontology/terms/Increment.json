@@ -1,0 +1,16 @@
+{
+  "id": "Increment",
+  "label": ["increment"],
+  "definition": "Work that meets the definition of done and is merged on the base branch, usable as it stands. Each merged PR adds one; a sprint's increments are what the sprint review inspects.",
+  "is_not": [
+    "A PR: an open PR is not done; it becomes an increment when it merges with the gate green.",
+    "A release: a release ships increments to users; an increment exists on the base branch before any release.",
+    "A commit: a commit on a feature branch has not met the definition of done."
+  ],
+  "avoid": ["deliverable", "drop", "build (for the merged work)"],
+  "home": {
+    "cli": "merge",
+    "skill": "kit-task-pr-merge"
+  },
+  "status": "seed"
+}

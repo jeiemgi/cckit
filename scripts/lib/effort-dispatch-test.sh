@@ -27,7 +27,7 @@ t "config load precedes the effort libs"      "$([ -n "$cfg_ln" ] && [ -n "$lib_
 # The usage lives in the verb table (#555): one `cckit effort <sub>` line per subcommand.
 usage_subs="$(awk -F'\t' '$1 == "effort" && $2 == "verb" { print $10 }' "$(dirname "$BIN")/../scripts/lib/verbs.tsv" \
   | sed 's/\\n/\n/g' | awk '$1 == "cckit" && $2 == "effort" { printf "%s%s", sep, $3; sep = " " }')"
-t "the verb table's usage lists the effort subcommands" "$usage_subs" "new chain start pr close plan"
+t "the verb table's usage lists the effort subcommands" "$usage_subs" "new sub retitle chain start pr close plan"
 for s in $usage_subs; do
   t "effort) dispatches '$s'" \
     "$(printf '%s\n' "$blk" | grep -cE "^      ${s}\)" | tr -d ' ')" "1"
