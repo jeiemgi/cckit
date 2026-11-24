@@ -5,7 +5,8 @@
 # in effort.sh (linking, snapshots, title lint) plus gh + git. bash 3.2 compatible. Requires: gh, jq, git.
 #
 #   effort_new [flags] "<name>" [<sub spec> …]   parent (5-section body + labels) + native sub-issues;
-#                                         --grilling[-file] appends a linted `## Grilling` record
+#                                         --grilling[-file] appends a linted `## Grilling` record;
+#                                         --sprint[=YYYY-MM-DD] files it into that week's sprint
 #   effort_sub <slug|N> "<name>" [--kind K]      add one sub-issue, titled [E<N>.<step>] <name>
 #   effort_retitle [<slug|N>] [--apply]          rename legacy [Effort] titles (dry run by default)
 #   effort_chain <a> <b> [<c> …]          wire N issues into a linear blocked_by chain (#243)
@@ -60,6 +61,14 @@ if ! command -v grill_record_lint >/dev/null 2>&1; then
   _eo_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
   # shellcheck source=/dev/null
   [ -f "$_eo_dir/grill-record.sh" ] && . "$_eo_dir/grill-record.sh"
+  unset _eo_dir
+fi
+
+# The sprint (sprint.sh, #570): effort_new --sprint files the effort into the current week's sprint.
+if ! command -v sprint_name >/dev/null 2>&1; then
+  _eo_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+  # shellcheck source=/dev/null
+  [ -f "$_eo_dir/sprint.sh" ] && . "$_eo_dir/sprint.sh"
   unset _eo_dir
 fi
 
@@ -195,7 +204,7 @@ effort_new() {
   local repo; repo="$(_eff_repo)"
   [ -n "$repo" ] || { echo "effort_new: no repo (KIT_REPO/EFFORT_REPO unset — run in a kit project)" >&2; return 1; }
 
-  local flow="" role="" priority="p1" goal="" scope="" for_agents="" verification="" depends_on="" milestone="" explicit_slug="" kind="task" spec_text="" grilling=""
+  local flow="" role="" priority="p1" goal="" scope="" for_agents="" verification="" depends_on="" milestone="" explicit_slug="" kind="task" spec_text="" grilling="" sprint_day=""
   # Flags are position-INDEPENDENT: recognized --flag [value] pairs are consumed wherever they occur
   # (before the title, between subs, or after them) and the remaining positionals are collected as the
   # title (first) + sub specs (rest). Previously the parser broke at the first positional, so any flag
@@ -220,6 +229,8 @@ effort_new() {
       --grilling-file)
         [ -r "${2:-}" ] || { echo "effort_new: --grilling-file: cannot read '${2:-}'" >&2; return 1; }
         grilling="$(cat "$2")"; shift 2 ;;
+      --sprint)       sprint_day="today"; shift ;;
+      --sprint=*)     sprint_day="${1#*=}"; shift ;;
       --depends-on)   depends_on="${2:-}"; shift 2 ;;
       --milestone)    milestone="${2:-}"; shift 2 ;;
       --slug)         explicit_slug="${2:-}"; shift 2 ;;
@@ -273,6 +284,20 @@ effort_new() {
     grill_record_lint "$grilling" || { echo 'effort_new: fix the --grilling record and retry' >&2; return 1; }
     body="$body"$'\n\n'"$(grill_record_section "$grilling")"
   fi
+  # The sprint (#570): --sprint names the week the effort is planned into, in the body and as the
+  # milestone of the parent and every sub. The milestone is opened when it does not exist yet.
+  local sprint="" sprint_start="" sprint_end=""
+  if [ -n "$sprint_day" ]; then
+    [ "$sprint_day" = today ] && sprint_day="$(_sprint_today)"
+    sprint="$(sprint_name "$sprint_day")" || { echo "effort_new: --sprint=YYYY-MM-DD names a day of the sprint" >&2; return 1; }
+    IFS="$(printf '\t')" read -r sprint_start sprint_end <<EOF_SB
+$(sprint_bounds "$sprint_day")
+EOF_SB
+    [ -z "$milestone" ] || [ "$milestone" = "$sprint" ] \
+      || { echo "effort_new: --sprint and --milestone name different milestones ($sprint, $milestone)" >&2; return 1; }
+    milestone="$sprint"
+    body="$body"$'\n\n'"$(printf '## Sprint\n%s · Monday %s to Monday %s' "$sprint" "$sprint_start" "$sprint_end")"
+  fi
   if [ -n "$depends_on" ]; then
     for d in $(printf '%s' "$depends_on" | tr ',' ' '); do
       d="${d#\#}"; [ -n "$d" ] && body="$(_eff_relations_add "$body" "$d")"
@@ -303,6 +328,11 @@ effort_new() {
     local flow_lc; flow_lc="$(printf '%s' "$flow" | tr '[:upper:]' '[:lower:]')"
     _eff_ensure_label "flow:$flow_lc" 1d76db "kit flow lane"
     labels="$labels,flow:$flow_lc"
+  fi
+
+  if [ -n "$sprint" ]; then
+    sprint_open --date "$sprint_day" >/dev/null 2>&1 \
+      || echo "effort_new: could not open the sprint milestone $sprint — the effort is filed without it" >&2
   fi
 
   local url num slug

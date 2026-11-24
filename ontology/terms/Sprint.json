@@ -1,7 +1,7 @@
 {
   "id": "Sprint",
   "label": ["sprint"],
-  "definition": "One week of work, Monday to Monday, with one sprint goal. On GitHub a sprint is a milestone: its description is the sprint goal and the issues on it are the sprint backlog. Waves run inside a sprint. The cckit sprint verb that opens and closes one is not built yet.",
+  "definition": "One week of work, Monday to Monday, with one sprint goal. On GitHub a sprint is a milestone: its description is the sprint goal and the issues on it are the sprint backlog. Waves run inside a sprint. `cckit effort sprint open` opens one and `cckit effort sprint close` writes its review and retrospective and closes it.",
   "is_not": [
     "A wave: a wave is a parallel batch of unblocked issues inside a sprint and ends when its PRs merge; a sprint ends on Monday.",
     "An effort: an effort is one goal that ships as one PR and may finish inside a sprint or span two.",
@@ -9,7 +9,7 @@
   ],
   "avoid": ["iteration", "cycle", "timebox (as the name)", "wave (for the week)"],
   "home": {
-    "cli": "sprint"
+    "cli": "effort sprint"
   },
-  "status": "seed"
+  "status": "sapling"
 }

@@ -9,7 +9,7 @@
   ],
   "avoid": ["demo", "showcase", "sprint demo"],
   "home": {
-    "cli": "sprint"
+    "cli": "effort sprint"
   },
   "status": "seed"
 }

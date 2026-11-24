@@ -126,6 +126,18 @@ tc "$GH_LOG" '^POST repos/o/r/issues \{"title":"demo effort","body":"## Goal[^"]
 effort_new --spec "it ships" --grilling-file "$tmp/no-such-grill" "demo effort" >/dev/null 2>&1 && rc=0 || rc=1
 t  "effort_new refuses an unreadable --grilling-file"    "$rc" "1"
 
+# ── #570: --sprint files the effort into a week's sprint ────────────────────────────────────────
+: > "$GH_LOG"
+effort_new --spec "it ships" --sprint=2026-11-25 "demo effort" >/dev/null 2>&1 && rc=0 || rc=1
+t  "effort_new --sprint=<day> files the effort"           "$rc" "0"
+tc "$GH_LOG" '^POST repos/o/r/milestones \{"title":"2026-W48"' "effort_new --sprint opens the sprint milestone"
+tc "$GH_LOG" '^POST repos/o/r/issues \{"title":"demo effort","body":"[^"]*\\n\\n## Sprint\\n2026-W48 · Monday 2026-11-23 to Monday 2026-11-30"' \
+   "the body names the sprint and its Monday-to-Monday bounds"
+: > "$GH_LOG"
+effort_new --spec "it ships" --sprint=2026-11-25 --milestone v1 "demo effort" >/dev/null 2>&1 && rc=0 || rc=1
+t  "effort_new refuses --sprint with another --milestone" "$rc" "1"
+t  "effort_new writes nothing on that refusal"            "$(grep -c . "$GH_LOG")" "0"
+
 # ── effort_start / effort_pr / effort_close (real git + bare remote) ───────────────────────────
 ( cd "$tmp" && git init -q --bare remote.git )
 ( cd "$tmp" && git clone -q remote.git work \

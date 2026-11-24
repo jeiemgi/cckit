@@ -9,7 +9,7 @@
   ],
   "avoid": ["objective", "OKR", "theme", "target"],
   "home": {
-    "cli": "sprint"
+    "cli": "effort sprint"
   },
   "status": "seed"
 }

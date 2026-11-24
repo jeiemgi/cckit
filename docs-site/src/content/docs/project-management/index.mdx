@@ -44,15 +44,15 @@ visible until its own work is done.
 
 ## If you know Scrum
 
-Most of the vocabulary carries over. Two parts do not, and they are named here so nobody goes
-looking for them.
+Most of the vocabulary carries over. The parts that do not are named here so nobody goes looking
+for them.
 
 | Scrum | In cckit | How close |
 | --- | --- | --- |
 | Backlog | The open issues on the board, read with `cckit status --board` and `cckit next` | Close |
 | Story | One issue, or one sub-issue of an effort | Close |
 | Epic | An effort: a parent issue with sub-issues | Loose |
-| Sprint | Nothing. A wave is the nearest unit | No counterpart |
+| Sprint | One week, Monday to Monday, as a milestone: `cckit effort sprint open` and `close` | Close |
 | Product owner | The human owner, who approves plans and decides what merges | Close |
 | Scrum master | Split in two: the project manager agent reads the board and drafts issues, and the captain drives a plan the owner approved | Loose |
 
@@ -60,9 +60,11 @@ looking for them.
 
 - **An effort is smaller than most epics.** It is one branch and one pull request, and it is meant
   to close in days. A quarter-long theme is several efforts, linked by dependencies.
-- **There is no sprint.** cckit has no timebox. A wave is not a fixed length of time: it is a batch
-  of unblocked issues run in parallel, and it ends when its work merges, whether that takes an
-  hour or three days.
+- **A sprint is one week, and a wave is not a sprint.** `cckit effort sprint open --goal "<goal>"`
+  opens the week as a milestone named after its ISO week (`2026-W48`), with the goal as its
+  description. `cckit effort new --sprint` files an effort into it. `cckit effort sprint close`
+  writes the sprint review and the retrospective to a page and closes the milestone. A wave runs
+  inside a sprint: a batch of unblocked issues run in parallel, which ends when its work merges.
 - **There are no story points and no velocity.** The size label `ctx:S`, `ctx:M`, `ctx:L` or
   `ctx:XL` measures something else: how much of one agent session an effort uses. A session can
   only hold so much text at once, and a large effort fills it. `cckit effort plan` uses it to pack efforts into session-sized

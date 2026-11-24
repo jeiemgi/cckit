@@ -157,7 +157,12 @@ case "$cmd" in
         effort_pr "$@" ;;
       close) effort_close "$@" ;;
       plan)  source "$LIB/effort-plan.sh"; effort_plan "$@" ;;
-      *) echo "cckit effort <new|sub|retitle|chain|start|pr|close|plan>" >&2; exit 2 ;;
+      sprint)
+        # One week, Monday to Monday, as a forge milestone (#570). A sub-verb, so the top-level verb
+        # count does not grow; `name` and `bounds` run on git alone.
+        # shellcheck source=/dev/null
+        source "$LIB/sprint.sh"; sprint_cli "$@" ;;
+      *) echo "cckit effort <new|sub|retitle|chain|start|pr|close|plan|sprint>" >&2; exit 2 ;;
     esac
     ;;
   start)
