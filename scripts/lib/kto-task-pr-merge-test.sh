@@ -36,7 +36,7 @@ git checkout -q -b develop; git commit -q --allow-empty -m init; git push -q ori
 kto_task_pr_merge --help >/dev/null 2>&1; rc=$?
 t "a flag is refused as a PR number (rc 2)"      "$rc" "2"
 t "nothing was merged on a refused flag"         "$(merged "")" "0"
-t "the dispatcher answers --help with usage"     "$("$ROOT/bin/cckit" merge --help | cut -c1-18)" "cckit merge [<pr>]"
+t "the dispatcher answers --help with usage"     "$("$ROOT/bin/cckit" merge --help | sed -n 1p | cut -c1-18)" "cckit merge [<pr>]"
 # #376: a bad flag, or a second PR number, is refused with usage and merges nothing
 kto_task_pr_merge 7 --fast >/dev/null 2>"$tmp/errf"; rc=$?
 t "an unknown flag is refused (rc 2)"            "$rc" "2"

@@ -40,7 +40,7 @@ t "every verb sits in a declared group" "$bad" ""
 verbs=" $(verbs_names verb default | tr '\n' ' ') "
 bad="$(verbs_rows | awk -F'\t' -v v="$verbs" '$2 == "alias" && !index(v, " " $3 " ") { print $1 }')"
 t "every alias targets a verb" "$bad" ""
-first="$(verbs_names group | head -1)"
+first="$(verbs_names group | sed -n 1p)"
 t "git mechanics come first in the help" "$first" "git"
 bad="$(verbs_rows | awk -F'\t' '$4 == "git" && $1 !~ /^(start|pr|merge|close|hotfix|task)$/ { print $1 }')"
 t "the git group holds the branch-to-merged verbs" "$bad" ""
@@ -71,7 +71,7 @@ has "the completions read cckit commands" "$("$CCKIT" completions bash)" 'cckit 
 # ── 4. the CLI reference page ───────────────────────────────────────────────────────────────────
 out="$(bash "$ROOT/scripts/verbs-gen.sh" --check 2>&1)"; rc=$?
 t "the CLI reference block matches the table" "$rc" "0"
-[ "$rc" -eq 0 ] || printf '%s\n' "$out" | head -20
+[ "$rc" -eq 0 ] || printf '%s\n' "$out" | sed -n 1,20p
 page="$ROOT/docs-site/src/content/docs/cli-reference.mdx"
 missing=""; for v in $(verbs_names verb); do grep -qE "\`cckit $v( |\`)" "$page" || missing="$missing $v"; done
 t "the CLI reference names every verb" "$missing" ""

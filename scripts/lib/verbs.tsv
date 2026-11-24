@@ -35,10 +35,10 @@ task	verb	-	git	forge	-	yes	How do I track work in the project itself, without a
 where	group	-	-	-	-	-	Where are we, and what comes next?	-	-
 status	verb	-	where	forge	kit-status	no	Where are we?	Where are we? Show me what is undone, what waits on me and what can be cleaned up.	cckit status
 sync	verb	-	where	forge	kit-task-sync	no	What is on the board, by role, and what is blocked?	Sync the board and show me what is ready.	cckit sync [--role <name>] [--milestone <label>] [--plan]\ncckit sync --json | --write | --cached [TTL] | --watch [SECS]
-next	verb	-	where	forge	kit-next	yes	What should I pick up next?	Show me what is unblocked and how to start the top item; I will pick.	cckit next [--effort N]
-plan	verb	-	where	forge	-	yes	In what order can the open issues run?	Plan the open issues into waves and show me the first wave.	cckit plan [--effort N]
+next	verb	-	where	forge	kit-next	no	What should I pick up next?	Show me what is unblocked and how to start the top item; I will pick.	cckit next [--effort N]
+plan	verb	-	where	forge	-	no	In what order can the open issues run?	Plan the open issues into waves and show me the first wave.	cckit plan [--effort N]
 plan-next	verb	-	where	git	kit-plan-next	yes	Given what the kit already does, what should we build next?	Inventory what the kit can do and propose what to build next.	cckit plan-next
-wave	verb	-	where	forge	kit-next	yes	Which waves of work can start from the open efforts?	Read the open efforts and propose the next wave of work.	cckit wave [--effort N] [--adapter <claude|codex|both>]
+wave	verb	-	where	forge	kit-next	no	Which waves of work can start from the open efforts?	Read the open efforts and propose the next wave of work.	cckit wave [--effort N] [--adapter <claude|codex|both>]
 claims	verb	-	where	git	-	no	Which session is working on which issue?	Show me which live session holds which issue.	cckit claims
 handoff	verb	-	where	git	-	no	How do I leave the next session a note?	Save a handoff note: what is pending, the next step, the references.	cckit handoff "<note>"
 resume	default	-	where	git	-	no	Where did the last session stop?	Read the last handoff and pick up where it stopped.	cckit
@@ -66,7 +66,7 @@ digest	verb	-	review	git	kit-digest	no	What does this file or page say, in short
 
 setup	group	-	-	-	-	-	How do I set up, update or ship cckit?	-	-
 install	verb	-	setup	git	-	no	How do I put cckit on my PATH?	Install cckit on this machine.	cckit install [bin-dir]
-init	verb	-	setup	forge	-	yes	How do I set cckit up in a project?	Set cckit up in this folder; ask me what you need.	cckit init [<folder>] [--profile P] [--adapter claude|codex|both] [--recipe <id>] [--database <id>]\n           [--answers FILE] [--no-github] [--public] [--yes] [--dry-run] [--upgrade]
+init	verb	-	setup	forge	-	no	How do I set cckit up in a project?	Set cckit up in this folder; ask me what you need.	cckit init [<folder>] [--profile P] [--adapter claude|codex|both] [--recipe <id>] [--database <id>]\n           [--answers FILE] [--no-github] [--public] [--yes] [--dry-run] [--upgrade]
 doctor	verb	-	setup	forge	kit-onboard	yes	Is this machine ready to run cckit?	Check that this machine has everything cckit needs, and tell me what is missing.	cckit doctor [--fix] [--agents]
 add	verb	-	setup	forge	kit-add	yes	What can I switch on in this project?	List what I can add to this project, and add the one I pick.	cckit add [<name>] [--set k=v]
 update	verb	-	setup	git	-	no	Is this project behind the installed cckit?	Check whether this project is behind the installed cckit.	cckit update

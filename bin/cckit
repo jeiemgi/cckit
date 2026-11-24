@@ -68,6 +68,20 @@ cmd="${1:-resume}"; shift || true
 # The verb name, for a forge refusal that names it (scripts/lib/forge.sh forge_need).
 export CCKIT_VERB="$cmd"
 
+# `cckit <verb> --help` (#556): the dispatcher answers from the verb table before the verb runs, so
+# every verb has help and none sees a --help it does not parse. A verb whose table row says
+# ownhelp=yes then runs with that --help too, in a child, and its own text follows under "Details:".
+# Help always exits 0: some verbs print their usage on --help with rc 2.
+case "${1:-}" in
+    -h|--help)
+      if [ -z "${_CCKIT_HELP_SHOWN:-}" ] && verbs_entry "$cmd"; then
+        [ "$(verbs_get "$cmd" 7)" = yes ] || exit 0
+        printf '\nDetails:\n'
+        _CCKIT_HELP_SHOWN=1 "$BIN/cckit" "$cmd" --help </dev/null || true
+        exit 0
+      fi ;;
+esac
+
 case "$cmd" in
   version)
     # The installed cckit version is cckit's OWN config, independent of the project we're invoked in.
@@ -529,6 +543,12 @@ cckit bench verbs [--runs N] [--checkout <dir>] [--verb "<verb>"] [--json]   (at
       *)    echo "cckit completions [bash|zsh]" >&2; exit 2 ;;
     esac
     ;;
-  help|--help|-h) usage ;;
+  help|--help|-h)
+    # `cckit help <verb>` is `cckit <verb> --help`.
+    if [ -n "${1:-}" ]; then
+      verbs_get "$1" 2 >/dev/null || { echo "cckit help: no verb '$1' — run 'cckit help'" >&2; exit 2; }
+      exec "$BIN/cckit" "$1" --help
+    fi
+    usage ;;
   *) echo "cckit: unknown command '$cmd' — run 'cckit help'" >&2; exit 2 ;;
 esac

@@ -17,7 +17,7 @@ To learn when and why to use a verb, start from its area: each area page in the
 cckit is a thin bash dispatcher over a git-mechanics bundle. Every verb reads from `cckit.config.json` — no org or repo is hardcoded. Append `--llm` to any verb for machine-readable output an agent can parse.
 
 <Aside type="tip" title="How to read this page">
-The tables are grouped by job: setup, the daily lifecycle, planning a wave, running flows in parallel, and housekeeping. Copy any command straight from the table. Run `cckit <verb> --help` for the details of one verb.
+The tables are grouped by job: setup, the daily lifecycle, planning a wave, running flows in parallel, and housekeeping. Copy any command straight from the table. `cckit <verb> --help` (or `cckit help <verb>`) prints one verb's usage, the question it answers, a prompt to paste and what it needs. The dispatcher answers it from the verb table before the verb runs, so it works for every verb and changes nothing; a verb with more to say adds its own text under **Details**.
 </Aside>
 
 ## Every verb, by the question it answers

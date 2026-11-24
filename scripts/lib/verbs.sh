@@ -9,6 +9,7 @@
 #   verbs_names [kinds…]       names of the rows of those kinds (default: verb default alias)
 #   verbs_count                the number of `verb` rows (the ratchet in scripts/verbs.baseline)
 #   verbs_help                 the grouped help: one line per verb under each group's question
+#   verbs_entry <name>         usage, question, prompt, needs and skill of one verb; rc 1 if none
 #   verbs_json                 every non-group row as a JSON array of objects (no jq needed)
 #   verbs_reference_md         the CLI reference page's generated block: one table per group
 # errors: pure — reads one file; a missing table prints nothing and returns 1
@@ -39,6 +40,7 @@ verbs_count() { verbs_rows | awk -F'\t' '$2 == "verb" { n++ } END { print n + 0 
 
 verbs_help() {
   printf 'cckit — every verb answers a question.\n'
+  printf '  cckit <verb> --help    one verb: its usage, its question and a prompt to paste\n'
   printf '  cckit commands --json  every verb as data: question, prompt to paste, usage, needs\n'
   verbs_rows | awk -F'\t' '
     $2 == "group" { printf "\n%s\n", $8; next }
@@ -47,6 +49,21 @@ verbs_help() {
   local aliases
   aliases="$(verbs_rows | awk -F'\t' '$2 == "alias" { printf "%s%s -> %s", sep, $1, $3; sep = " · " }')"
   [ -z "$aliases" ] || printf '\nOld names that still work: %s\n' "$aliases"
+}
+
+verbs_entry() {
+  local row
+  row="$(verbs_rows | awk -F'\t' -v n="$1" '$1 == n && ($2 == "verb" || $2 == "default") { print; exit }')"
+  [ -n "$row" ] || return 1
+  printf '%s\n' "$row" | awk -F'\t' '{
+    u = $10; gsub(/\\n/, "\n", u); print u
+    print ""
+    printf "  Answers: %s\n", $8
+    printf "  Paste:   \"%s\"\n", $9
+    if ($5 == "forge") print "  Needs:   git; reads or writes the forge (GitHub) when one is configured"
+    else               print "  Needs:   git only"
+    if ($6 != "-") printf "  Skill:   %s\n", $6
+  }'
 }
 
 verbs_json() {
