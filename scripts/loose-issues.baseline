@@ -1,0 +1,5 @@
+# loose-issues.baseline — the loose-issue count `cckit doctor --loose --ratchet` holds the line at
+# (E546.2). A loose issue is open, not an effort, not a sub-issue, and not in Backlog on the board.
+# The number may only go down: when an issue is closed or filed under an effort, lower it in the
+# same change. Not run by scripts/check.sh (the gate stays offline); measured 2026-11-24 with a GET.
+11
