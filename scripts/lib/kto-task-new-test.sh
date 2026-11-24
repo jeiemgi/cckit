@@ -80,5 +80,23 @@ t  "create fails: rc non-zero"                       "$([ "$rc" -ne 0 ] && echo 
 t  "create fails: prints nothing on stdout"          "$(wc -c < "$tmp/out" | tr -d ' ')" "0"
 t  "no gh subcommand ran"                            "$(grep -c '^GH-SUBCOMMAND' "$GH_LOG")" "0"
 
+# ── the board Status (E546.2): no milestone -> Backlog when the board has it, else Todo ──────────────
+have kind:feat priority:p2 role:backend
+export KIT_PROJECTS_V2="true"
+load_project_ids() { STATUS_FIELD_ID="SF"; STATUS_OPT_TODO="OPT_TODO"; return 0; }
+project_add_item() { echo "ITEM"; }
+project_set_single_select() { echo "set $1 $2 $3" >> "$tmp/board"; }
+: > "$tmp/board"; fresh
+STATUS_OPT_BACKLOG="OPT_BACKLOG" kto_task_new "Test" backend feat p2 "" "" "" x >"$tmp/out" 2>"$tmp/err"
+tc "$tmp/board" '^set ITEM SF OPT_BACKLOG$' "no milestone, a Backlog option: Status is Backlog"
+tn "$tmp/board" 'OPT_TODO'                  "no milestone, a Backlog option: Status is not Todo"
+: > "$tmp/board"; fresh
+STATUS_OPT_BACKLOG="OPT_BACKLOG" kto_task_new "Test" backend feat p2 "M1" "" "" x >"$tmp/out" 2>"$tmp/err"
+tc "$tmp/board" '^set ITEM SF OPT_TODO$'    "a milestone named: Status is Todo"
+: > "$tmp/board"; fresh
+kto_task_new "Test" backend feat p2 "" "" "" x >"$tmp/out" 2>"$tmp/err"
+tc "$tmp/board" '^set ITEM SF OPT_TODO$'    "no Backlog option on the board: Status stays Todo"
+export KIT_PROJECTS_V2="false"
+
 [ "$fail" -eq 0 ] && echo "kto-task-new: all passed" || echo "kto-task-new: FAILURES"
 exit "$fail"

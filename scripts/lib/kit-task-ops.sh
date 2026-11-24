@@ -662,13 +662,13 @@ EOF
 }
 
 # kit task new — create a GitHub issue with labels + milestone, add it to the board, set Role +
-# Status(Todo) + Plan Link. Inputs are passed (the caller does the AskUserQuestion). No invented
+# Status (Backlog when no milestone is named and the board has that option, else Todo) + Plan Link. Inputs are passed (the caller does the AskUserQuestion). No invented
 # values: a label the repo does not have is dropped with a warning, never created, and the issue is
 # still filed (#387). Non-zero only when the issue itself was not created.
 # Args: <title> <role-display-or-slug> <kind> <priority> [milestone|""] [plan-link] [blocked-by] <body>
 kto_task_new() {
   local title="${1:-}" role="${2:-}" kind="${3:-}" prio="${4:-}" milestone="${5:-}" plan="${6:-}" blocked="${7:-}" body_user="${8:-}"
-  local repo role_slug labels body url num node item role_opt
+  local repo role_slug labels body url num node item role_opt status_opt
   repo="$(kto_repo)"
   # Milestone is optional: a repo with no milestones (cckit itself) must still be able to file an
   # issue through the verb, or agents fall back to raw `gh issue create` and the board drops it.
@@ -700,7 +700,11 @@ kto_task_new() {
       if [[ -n "$item" ]]; then
         role_opt="$(_kto_role_option_for_slug "$role_slug")"
         [[ -n "$role_opt" ]] && project_set_single_select "$item" "$ROLE_FIELD_ID" "$role_opt" 2>/dev/null || true
-        [[ -n "${STATUS_OPT_TODO:-}" ]] && project_set_single_select "$item" "$STATUS_FIELD_ID" "$STATUS_OPT_TODO" 2>/dev/null || true
+        # No sprint (milestone) named: the issue waits in the Backlog column, so it is not loose
+        # (E546.2). A board without a Backlog option keeps Todo.
+        status_opt="${STATUS_OPT_TODO:-}"
+        [[ -z "$milestone" && -n "${STATUS_OPT_BACKLOG:-}" ]] && status_opt="$STATUS_OPT_BACKLOG"
+        [[ -n "$status_opt" ]] && project_set_single_select "$item" "$STATUS_FIELD_ID" "$status_opt" 2>/dev/null || true
         [[ -n "$plan" && -n "${PLAN_LINK_FIELD_ID:-}" ]] && project_set_text "$item" "$PLAN_LINK_FIELD_ID" "$plan" 2>/dev/null || true
       fi
     fi

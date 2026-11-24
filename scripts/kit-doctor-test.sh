@@ -172,6 +172,11 @@ pv2="$(project pv2 '{"github":{"projectsV2":true,"repo":"o/r","baseBranch":"main
 out="$(doctor "$tmp/h1" "$pv2" --dry-run)"
 has "token scope: Projects v2 on, a token with no scope header -> a skip row for a fine-grained token" "$(frow "$out" 'token scope:project')" "- token scope:project a fine-grained token lists no scopes — give it Projects access if the board stays empty"
 has "base branch: read from GET repos/<r> default_branch" "$(cat "$GH_LOG")" "GET repos/o/r "
+# The loose-issue row (E546.2): the count only; the default shim issues are an effort and a PR.
+has "loose issues: a repo -> one ok row with the count" "$(frow "$out" 'loose issues')" "ok loose issues 0 in o/r"
+has "loose issues: no repository -> a skip row" "$(frow "$out_bare" 'loose issues')" "- loose issues skipped — no repository"
+out="$(DOCTOR_FORGE=none DOCTOR_TOKEN= doctor "$tmp/h1" "$pv2" --dry-run)"
+has "loose issues: no forge -> a skip row, never a silent pass" "$(frow "$out" 'loose issues')" "- loose issues skipped — no forge"
 rm -f "$stubs/gh"
 : > "$log"
 out="$(doctor "$tmp/h1" "$bare" --dry-run)"; r=$?

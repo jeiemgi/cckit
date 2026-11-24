@@ -12,6 +12,11 @@
 #                                         # until the next x.y kit update
 #   scripts/kit-doctor.sh --agents        # only the selected agent runtimes (claude / codex):
 #                                         # present or absent; exit 1 if one is absent. No network.
+#   scripts/kit-doctor.sh --loose         # only the loose-issue count + the list (#N title): open
+#                                         # issues that are no effort, no sub-issue, not in Backlog
+#   scripts/kit-doctor.sh --loose --ratchet [--baseline=FILE]
+#                                         # exit 1 when the count rose above the baseline
+#                                         # (default scripts/loose-issues.baseline); 2 = not judged
 #
 # Tiers:
 #   Tier 0  Homebrew (macOS bootstrap — requires sudo password)
@@ -38,6 +43,7 @@ _export_dir_doctor="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" &&
 
 # ---- flags ------------------------------------------------------------------
 DRY_RUN=0; NO_INSTALL=0; DISMISS_LOCAL=0; ASSUME_YES=0; AGENTS_ONLY=0
+LOOSE_ONLY=0; LOOSE_RATCHET=0; LOOSE_BASELINE=""
 INSTALL_APPROVED=0   # 1 = the operator said yes to installs in THIS run (--fix/--yes, or the prompt)
 for _a in "$@"; do
   case "$_a" in
@@ -46,8 +52,11 @@ for _a in "$@"; do
     --fix|--yes|-y)  ASSUME_YES=1; INSTALL_APPROVED=1 ;;
     --dismiss-local) DISMISS_LOCAL=1 ;;
     --agents)        AGENTS_ONLY=1 ;;
+    --loose)         LOOSE_ONLY=1 ;;
+    --ratchet)       LOOSE_ONLY=1; LOOSE_RATCHET=1 ;;
+    --baseline=*)    LOOSE_BASELINE="${_a#--baseline=}" ;;
     -h|--help)
-      sed -n '2,15p' "$0" | grep '^#' | sed 's/^# \?//'
+      sed -n '2,20p' "$0" | grep '^#' | sed 's/^# \?//'
       exit 0 ;;
   esac
 done
@@ -111,7 +120,7 @@ fi
 # file, no server start (#448 — it used to run `pnpm install` in whatever directory it was called
 # from). --dry-run / --no-install already skip installs entirely. MAY_INSTALL is the one gate every
 # install or write below reads.
-if [[ $DRY_RUN -eq 0 && $NO_INSTALL -eq 0 && $ASSUME_YES -eq 0 && $AGENTS_ONLY -eq 0 && -t 0 ]]; then
+if [[ $DRY_RUN -eq 0 && $NO_INSTALL -eq 0 && $ASSUME_YES -eq 0 && $AGENTS_ONLY -eq 0 && $LOOSE_ONLY -eq 0 && -t 0 ]]; then
   printf '\n  %s%scckit doctor can install anything missing for you%s (via Homebrew, corepack, etc.).\n' "$C_BOLD" "" "$C_RESET"
   printf '  It will show each thing as it goes. Nothing is installed if you decline.\n\n'
   printf '  Install missing dependencies? [Y/n] '
@@ -209,6 +218,85 @@ if [[ $AGENTS_ONLY -eq 1 ]]; then
   printf '  %s%sAgent runtimes%s\n' "$C_BOLD" "" "$C_RESET"
   doctor_agents
   [[ $AGENTS_ABSENT -eq 0 ]] || exit 1
+  exit 0
+fi
+
+# ---- loose issues (E546.2) ---------------------------------------------------
+# A loose issue is open, not a pull request, not an effort, not a sub-issue, and not on the board
+# with Status = Backlog (scripts/lib/loose-issues.sh). One row with the count; `list` adds one
+# `#N title` line per issue. Sets LOOSE_STATE (read | skipped | failed) and LOOSE_COUNT. Read-only.
+LOOSE_STATE=skipped; LOOSE_COUNT=""
+doctor_loose() {
+  local _want_list="${1:-}" _cfg _repo _out _n _why
+  command -v loose_issues_list >/dev/null 2>&1 || . "$_export_dir_doctor/lib/loose-issues.sh"
+  _cfg="$(kit_config_path "${TARGET:-$PWD}" 2>/dev/null || true)"
+  if ! forge_available; then
+    row "$MARK_SKIP" "loose issues" "skipped — no forge, so the open issues cannot be read (export GH_TOKEN=<token>)"
+    return 0
+  fi
+  if ! _repo="$(loose_repo "$_cfg")"; then
+    row "$MARK_SKIP" "loose issues" "skipped — no repository (set github.repo, or add a GitHub origin remote)"
+    return 0
+  fi
+  if ! _out="$(loose_issues_list "$_repo" "$_cfg" 2>/dev/null)"; then
+    row "$MARK_FAIL" "loose issues" "could not read the open issues of $_repo"
+    CHECKS_FAIL=$((CHECKS_FAIL + 1)); LOOSE_STATE=failed
+    return 0
+  fi
+  _n="$(printf '%s' "$_out" | grep -c . || true)"
+  LOOSE_STATE=read; LOOSE_COUNT="$_n"
+  if loose_board_on "$_cfg"; then
+    _why="open issues that are no effort, no sub-issue, and not in Backlog on the board"
+  else
+    _why="the board is off (projectsV2 false), so no issue can carry the Backlog marker and every standalone issue counts"
+  fi
+  if [[ "$_n" -eq 0 ]]; then
+    row "$MARK_OK" "loose issues" "0 in $_repo — $_why"
+    CHECKS_OK=$((CHECKS_OK + 1))
+  else
+    row "$MARK_WARN" "loose issues" "$_n in $_repo — $_why. List them: cckit doctor --loose"
+    CHECKS_WARN=$((CHECKS_WARN + 1))
+  fi
+  if [[ "$_want_list" == list && -n "$_out" ]]; then
+    printf '%s\n' "$_out" | while IFS="$(printf '\t')" read -r _ln _lt; do
+      printf '       #%s %s\n' "$_ln" "$_lt"
+    done
+  fi
+  return 0
+}
+
+# ---- --loose [--ratchet]: only the loose-issue rows, then exit (no installs) -----
+# --ratchet compares the count with the baseline file: exit 1 when it rose, 2 when it could not be
+# judged (no forge, no repository, a failed read, no baseline). Not part of scripts/check.sh: the
+# gate stays offline. Run it by hand or in a job that has a token: cckit doctor --loose --ratchet
+if [[ $LOOSE_ONLY -eq 1 ]]; then
+  printf '  %s%sLoose issues%s\n' "$C_BOLD" "" "$C_RESET"
+  doctor_loose list
+  if [[ $LOOSE_RATCHET -eq 1 ]]; then
+    if [[ -z "$LOOSE_BASELINE" ]]; then
+      _lroot="$(git -C "${TARGET:-$PWD}" rev-parse --show-toplevel 2>/dev/null || printf '%s' "${TARGET:-$PWD}")"
+      LOOSE_BASELINE="$_lroot/scripts/loose-issues.baseline"
+    fi
+    if [[ "$LOOSE_STATE" != read ]]; then
+      row "$MARK_FAIL" "loose ratchet" "not judged — the count was not read"
+      exit 2
+    fi
+    _lbase="$(loose_baseline_read "$LOOSE_BASELINE" || true)"
+    if [[ -z "$_lbase" ]]; then
+      row "$MARK_FAIL" "loose ratchet" "not judged — no number in $LOOSE_BASELINE"
+      exit 2
+    fi
+    if [[ "$LOOSE_COUNT" -gt "$_lbase" ]]; then
+      row "$MARK_FAIL" "loose ratchet" "$LOOSE_COUNT loose > baseline $_lbase — put each new one under an effort, as a sub-issue, or in Backlog"
+      exit 1
+    elif [[ "$LOOSE_COUNT" -lt "$_lbase" ]]; then
+      row "$MARK_OK" "loose ratchet" "$LOOSE_COUNT loose < baseline $_lbase — lower the number in $LOOSE_BASELINE to $LOOSE_COUNT"
+    else
+      row "$MARK_OK" "loose ratchet" "$LOOSE_COUNT loose = baseline $_lbase"
+    fi
+    exit 0
+  fi
+  [[ "$LOOSE_STATE" == failed ]] && exit 1
   exit 0
 fi
 
@@ -844,6 +932,12 @@ if [[ $GH_AUTHED -eq 1 ]] && [[ -f "$_kitcfg" ]]; then
       ACTIONS_NEEDED+=("Align base branch: make '$_cfg_base' the default branch of $_cfg_repo on GitHub (or set github.baseBranch to '$_gh_default'). Note: 'cckit merge' already closes linked issues explicitly.")
     fi
   fi
+fi
+# ---- loose issues: the count only (the list is cckit doctor --loose) --------
+if [[ $GH_AUTHED -eq 1 || "$_fprov" == "none" ]]; then
+  doctor_loose
+else
+  row "$MARK_SKIP" "loose issues" "skipped — the token does not work, so the open issues cannot be read"
 fi
 printf '\n'
 
