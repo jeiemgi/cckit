@@ -132,7 +132,16 @@ half regresses.
 
 ## Scope of changes
 
-- **bash CLI + lib** → `bin/cckit`, `scripts/lib/*.sh`.
+- **bash CLI + lib** → `bin/cckit`, `scripts/lib/*.sh`. A new verb is a row in
+  `scripts/lib/verbs.tsv` (name, question, prompt, usage, needs) plus its `case` label in
+  `bin/cckit`; run `bash scripts/verbs-gen.sh` to refresh the CLI reference block.
+  `scripts/verbs-test.sh` fails when the dispatcher, the help, the catalog, the CLI reference,
+  `skills/routing.yaml` or `scripts/forge-report.sh` disagree with the table.
+  The top level only shrinks: `scripts/verbs-ratchet.sh` fails the gate when the table holds more
+  `verb` rows than `scripts/verbs.baseline`, so a new command is a subcommand of a verb that exists.
+  To rename a verb, change its row's name and add an `alias` row for the old name
+  (`old<TAB>alias<TAB>new`, the other columns `-`): the old name keeps working and prints a one-line
+  notice. To retire one, fold it under another verb and lower the baseline in the same change.
 - **Claude Code plugin** → `skills/`, `commands/`, `.claude-plugin/`.
 - **Docs** → `docs-site/` (published to [cckit.dev](https://cckit.dev)).
 - **What cckit installs for itself** → `.claude/skills/`, `.claude/rules/`, and the manifest in

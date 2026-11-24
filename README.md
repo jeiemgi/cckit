@@ -144,8 +144,9 @@ undone work, the open PRs waiting on a human, and the cleanup available, plus th
 resume handoff in one screen. It ends with the instruction-file line: the bytes `CLAUDE.md` and the
 rules without a `paths:` frontmatter put into every session, against Claude Code's 150k limit, and
 the three largest files (`cckit doctor` prints the same line; `scripts/instruction-budget-lint.sh`
-is the gate behind it). Run `cckit help` for the full verb list, or
-`cckit <verb> --help` for any one.
+is the gate behind it). Run `cckit help` for the full verb list, grouped by the question
+each verb answers, or `cckit <verb> --help` for any one: its usage, its question and a prompt to
+paste, answered before the verb runs.
 
 Updating a project an older cckit scaffolded? `cckit update` says whether it is behind (exit 10) and
 names the command; `cckit migrate` moves an old layout to the current one;

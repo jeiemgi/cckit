@@ -1,0 +1,90 @@
+# scripts/lib/verbs.tsv — the ONE source for every cckit verb (#555).
+#
+# Read by bin/cckit (help, `<verb> --help`, `commands`, the alias path), by scripts/lib/verbs.sh and
+# by scripts/verbs-check.sh, which fails on drift between this file and the dispatcher's case labels,
+# the CLI reference page, skills/routing.yaml and scripts/forge-report.sh.
+#
+# Format: tab-separated, one row per line, exactly 10 fields; `#` lines and blank lines are skipped.
+#   1 name      the word typed after `cckit`
+#   2 kind      group   a heading of `cckit help`; name = group id, question = the heading
+#               verb    a top-level verb; the count of these rows is the ratchet in
+#                       scripts/verbs.baseline (it may only go down)
+#               default what bare `cckit` runs; never typed
+#               alias   an old name; the dispatcher prints a one-line notice and runs <target>
+#   3 target    alias: the verb it runs · every other kind: -
+#   4 group     the group id the verb is listed under in `cckit help` (- for group and alias rows)
+#   5 needs     git   runs on git alone
+#               forge reads or writes the forge (GitHub) when one is configured
+#               (scripts/forge-report.sh --verbs is the measurement; verbs-check compares)
+#   6 skill     the skill under skills/ that drives the verb, or -
+#   7 ownhelp   yes: after the entry, `cckit <verb> --help` also prints the verb's own help
+#   8 question  the question the verb answers, in the reader's words
+#   9 prompt    one prompt to paste into an agent; never an issue number (rules/authoring.md § 2)
+#  10 usage     the usage lines; a literal \n separates lines
+#
+# Rows are listed in the order `cckit help` prints them: each group, then its verbs.
+
+git	group	-	-	-	-	-	How do I take one change from a branch to merged?	-	-
+start	verb	-	git	forge	kit-task-start	no	How do I start work on an issue without touching my main checkout?	Start the issue I pick in its own worktree.	cckit start [--force] <issue> [slug]
+pr	verb	-	git	forge	kit-task-pr	no	How do I open the pull request for this issue?	Commit this work and open its pull request.	cckit pr <issue> "<summary>" ["<commit-msg>"] [--base <branch>]
+merge	verb	-	git	forge	kit-task-pr-merge	no	Can this pull request land, and what does landing clean up?	Merge this branch's pull request once its gate is green, and clean up the branch.	cckit merge [<pr>] [--squash|--merge|--rebase]
+close	verb	-	git	forge	kit-task-close	no	How do I close an issue that no pull request closed?	Close the issue I name, with a one-line summary of why.	cckit close <issue> ["<summary>"] [--reason completed|not-planned|duplicate] [--duplicate-of N] [--superseded-by N]
+hotfix	verb	-	git	forge	-	yes	How do I carry one merged fix to the release branch?	Cherry-pick the merged fix I name onto the release branch and open its pull request.	cckit hotfix <pr|sha> [--base <branch>]
+task	verb	-	git	forge	-	yes	How do I track work in the project itself, without a GitHub issue?	Record this as a light task, then show me the task list.	cckit task new [--priority p0|p1|p2|p3] [--kind K] [--body B|--body-file F] "<title>"\ncckit task list [--all] · cckit task next\ncckit task start [--force] [--no-push] <id>\ncckit task finish [<id>] "<summary>" [--all]\ncckit task run <id> [--check "<cmd>"] [--max-iters N] [--max-seconds N] [--agent <cmd>] [--no-finish]\ncckit task share ["<summary>"] · cckit task default
+
+where	group	-	-	-	-	-	Where are we, and what comes next?	-	-
+status	verb	-	where	forge	kit-status	no	Where are we?	Where are we? Show me what is undone, what waits on me and what can be cleaned up.	cckit status
+sync	verb	-	where	forge	kit-task-sync	no	What is on the board, by role, and what is blocked?	Sync the board and show me what is ready.	cckit sync [--role <name>] [--milestone <label>] [--plan]\ncckit sync --json | --write | --cached [TTL] | --watch [SECS]
+next	verb	-	where	forge	kit-next	no	What should I pick up next?	Show me what is unblocked and how to start the top item; I will pick.	cckit next [--effort N]
+plan	verb	-	where	forge	-	no	In what order can the open issues run?	Plan the open issues into waves and show me the first wave.	cckit plan [--effort N]
+plan-next	verb	-	where	git	kit-plan-next	yes	Given what the kit already does, what should we build next?	Inventory what the kit can do and propose what to build next.	cckit plan-next
+wave	verb	-	where	forge	kit-next	no	Which waves of work can start from the open efforts?	Read the open efforts and propose the next wave of work.	cckit wave [--effort N] [--adapter <claude|codex|both>]
+claims	verb	-	where	git	-	no	Which session is working on which issue?	Show me which live session holds which issue.	cckit claims
+handoff	verb	-	where	git	-	no	How do I leave the next session a note?	Save a handoff note: what is pending, the next step, the references.	cckit handoff "<note>"
+resume	default	-	where	git	-	no	Where did the last session stop?	Read the last handoff and pick up where it stopped.	cckit
+
+work	group	-	-	-	-	-	How do I plan the work and run it?	-	-
+new	verb	-	work	forge	kit-task-new	no	How do I track a new piece of work as an issue?	File an issue for this, with its labels, and put it on the board.	cckit new [--role R --kind K --priority P --milestone M --plan L --blocked-by "#1" --body B|--body-file F] "<title>"
+effort	verb	-	work	forge	kit-effort-new	no	How do I scope, start, open and close a piece of work with several parts?	Scope this goal as an effort with sub-issues, show it to me, then start it.	cckit effort new [--flow F --role R --kind K --priority P --goal G --scope S --for-agents A --verification V --depends-on "#1,#2" --milestone M] "<name>" ["sub :: desc" …]\ncckit effort chain <a> <b> [<c> …]\ncckit effort start [--force] <slug|N> [slug]\ncckit effort pr [<N>] [--summary S|--summary-file F] [--for-agents A|--for-agents-file F] [--title T] [--type T]\ncckit effort close <N>\ncckit effort plan
+orchestrate	verb	-	work	forge	-	yes	How do I run several issues at once, each in its own worktree?	Run the issues I pick in parallel worktrees; show me the dry run first.	cckit orchestrate <issues…> [--dry-run] [--cap N] [--agent A|--profile P] [--runtime tmux|herdr]\ncckit orchestrate --results [--session=<s>] [--wait <secs>]
+autopilot	verb	-	work	forge	kit-autopilot	yes	How do I run approved work unattended, under a cap?	Run the unblocked work unattended under a cap of two; show me the dry run first.	cckit autopilot [<issues…>] [--cap N] [--dry-run]\ncckit autopilot run [<issue>] --objective "<text>" [--until "<cmd>"] [--check "<cmd>"]
+watch	verb	-	work	forge	-	no	Which open pull requests can merge now, and what is the next wave?	Gate the open pull requests and tell me which are clean to merge.	cckit watch [--merge] [--loop]
+brief	verb	-	work	forge	-	no	What does an agent need to know before it works an issue?	Write the delegation brief for the issue I pick.	cckit brief <issue>
+receipt	verb	-	work	forge	-	yes	How does a worker record what one stage did?	Record this stage's receipt on its issue.	cckit receipt <issue> --stage <s> [--no-remote]\ncckit receipt list [<issue>] · cckit receipt show <issue> <stage> [<attempt>]
+msg	verb	-	work	git	-	no	How do I tell another live session something?	Send the other live session a message about what I just changed.	cckit msg <send|read|list|hook-check>
+
+clean	group	-	-	-	-	-	What can be cleaned up?	-	-
+gc	verb	-	clean	forge	kit-gc	no	Which branches and worktrees can go?	Show me which branches and worktrees can be deleted, and why.	cckit gc [--prune [--yes]]
+cleanup	verb	-	clean	forge	kit-cleanup	no	How do I delete the merged branches and worktrees in one pass?	Clean up the merged branches and worktrees; show me the plan before deleting.	cckit cleanup [--yes]
+
+review	group	-	-	-	-	-	How do I check and review the work?	-	-
+qa	verb	-	review	forge	-	yes	Does the change work in the running app?	Bring up the review stack for this branch and open the screen the change touched.	cckit qa <up|ready> [--lane N] [--timeout S]\ncckit qa open [--lane N] [--pr N] [--route /p] [--print]\ncckit qa stop [--lane N] [--force]\ncckit qa verdict [pass|fail] [--lane N] [--note T] [--shot F]\ncckit qa lanes
+page	verb	-	review	forge	kit-page	yes	How do I review a plan or a decision as a page?	Open this plan as a review page and record my answer.	cckit page <mode|open|poll|reply|end|answer>
+debug	verb	-	review	git	-	no	What is the browser doing on this page?	Debug this page in the browser and tell me what fails.	cckit debug [--check] <args>
+bench	verb	-	review	forge	-	yes	How well are this project's docs found and used?	Run the docs benchmark and report the score.	cckit bench <run|quality|report|gate|stop-check> [--dry] [--json]\ncckit bench checkpoint <X.Y.Z> · checkpoints · check <X.Y.Z> · page\ncckit bench verbs [--runs N] [--json]
+digest	verb	-	review	git	kit-digest	no	What does this file or page say, in short?	Summarize this file with the local model.	cckit digest <path|url>
+
+setup	group	-	-	-	-	-	How do I set up, update or ship cckit?	-	-
+install	verb	-	setup	git	-	no	How do I put cckit on my PATH?	Install cckit on this machine.	cckit install [bin-dir]
+init	verb	-	setup	forge	-	no	How do I set cckit up in a project?	Set cckit up in this folder; ask me what you need.	cckit init [<folder>] [--profile P] [--adapter claude|codex|both] [--recipe <id>] [--database <id>]\n           [--answers FILE] [--no-github] [--public] [--yes] [--dry-run] [--upgrade]
+doctor	verb	-	setup	forge	kit-onboard	yes	Is this machine ready to run cckit?	Check that this machine has everything cckit needs, and tell me what is missing.	cckit doctor [--fix] [--agents]
+add	verb	-	setup	forge	kit-add	yes	What can I switch on in this project?	List what I can add to this project, and add the one I pick.	cckit add [<name>] [--set k=v]
+update	verb	-	setup	git	-	no	Is this project behind the installed cckit?	Check whether this project is behind the installed cckit.	cckit update
+migrate	verb	-	setup	git	-	yes	How do I move an old kit layout to the current one?	Migrate this project's kit layout; show me the dry run first.	cckit migrate [--dry-run]
+adopt	verb	-	setup	git	-	yes	Which kit-shaped files does this repo already have?	Record the kit files this repo already has.	cckit adopt
+completions	verb	-	setup	git	-	no	How do I get tab completion for cckit?	Set up cckit tab completion in my shell.	cckit completions [bash|zsh]
+release	verb	-	setup	forge	-	no	How do I cut a cckit release?	Dry-run the next cckit release and show me what it would publish.	cckit release <ver> [--publish] [--skip-bench-check]\ncckit release --next
+contribute	verb	-	setup	git	kit-contribute	no	How do I send a change back to cckit?	Contribute this change to cckit as a pull request.	cckit contribute "<summary>"
+version	verb	-	setup	git	-	no	Which cckit is installed?	Which cckit version is installed?	cckit version
+
+catalog	group	-	-	-	-	-	What does cckit offer, and what is it built from?	-	-
+help	verb	-	catalog	git	-	no	What can cckit do?	List the cckit verbs by the question each one answers.	cckit help [<verb>]
+commands	verb	-	catalog	git	-	no	Which verbs exist?	List every cckit verb with the question it answers.	cckit commands [--json]
+lib	verb	-	catalog	git	-	yes	Which helper already does this?	Find the cckit helper that already does this before writing one.	cckit lib [--all] [--reasons] [--root <dir>]
+scan	verb	-	catalog	git	-	no	What stack is this repo, and what kit state does it have?	Scan this repo's stack and kit state.	cckit scan
+encode-context	verb	-	catalog	git	-	no	How do I hand a subagent JSON in fewer tokens?	Encode this JSON as TOON before you hand it to the subagent.	cckit encode-context < data.json
+render	verb	-	catalog	git	-	no	How do I read markdown rendered in the terminal?	Render this markdown in the terminal.	cckit render < notes.md
+
+# Old names. Each runs its target after a one-line notice on stderr; none is removed before 1.0.
+copilot	alias	wave	-	forge	-	-	-	-	-
+ui	alias	status	-	forge	-	-	-	-	-

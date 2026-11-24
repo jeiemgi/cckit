@@ -78,7 +78,7 @@ t  "it is not closed again"                      "$(grep -cE '^(PATCH|POST) ' "$
 t  "no gh subcommand ran"                        "$(grep -c '^GH-SUBCOMMAND' "$GH_LOG")" 0
 tc "$BOARD_LOG" '^ITEM-11 SF DONE$'               "but the board still goes to Done"
 
-t  "the dispatcher answers --help"               "$("$ROOT/bin/cckit" close --help | cut -c1-19)" "cckit close <issue>"
+t  "the dispatcher answers --help"               "$("$ROOT/bin/cckit" close --help | sed -n 1p | cut -c1-19)" "cckit close <issue>"
 
 [ "$fail" -eq 0 ] && echo "kto-task-close: all passed" || echo "kto-task-close: FAILURES"
 exit "$fail"

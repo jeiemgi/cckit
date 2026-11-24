@@ -85,8 +85,8 @@ out="$("$LIB/../../bin/cckit" pr --help 2>/dev/null)"
 t  "cckit pr --help: rc 0"                   "$?" "0"
 case "$out" in *'[--base <branch>]'*) echo "ok: cckit pr --help shows --base" ;; *) echo "FAIL: cckit pr --help -> '$out'"; fail=1 ;; esac
 t  "cckit pr --help: no forge request"       "$(wc -l < "$GH_LOG" | tr -d ' ')" "0"
-grep -qE '^#   cckit pr <issue> <summary> \[--base <branch>\]' "$LIB/../../bin/cckit" \
-  && echo "ok: the usage header shows --base" || { echo "FAIL: usage header lacks --base"; fail=1; }
+grep -qE '^pr	.*	cckit pr <issue> "<summary>" .*\[--base <branch>\]' "$LIB/verbs.tsv" \
+  && echo "ok: the verb table's pr usage shows --base" || { echo "FAIL: the verb table's pr usage lacks --base"; fail=1; }
 
 # --base (#360): the flag wins over the configured integration branch, and the PR's target reaches a
 # git pre-push hook as KIT_PR_BASE.
