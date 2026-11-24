@@ -54,7 +54,7 @@ stub() {
 unstub() { rm -f "$stubs"/*; }
 
 fx="$tmp/integrations"; mkdir -p "$fx"
-cp "$ROOT/integrations/integration.schema.json" "$fx/"
+cp "$ROOT/kit/integrations/integration.schema.json" "$fx/"
 cat > "$fx/fixture-tool.json" <<'JSON'
 {
   "id": "fixture-tool",
@@ -305,7 +305,7 @@ fi
 # ── 14. the shipped Graft descriptor through the runner (E303.10) ──────────────────────────────
 # shellcheck source=/dev/null
 . "$LIB/integration-install.sh"
-gr="$ROOT/integrations/graft.json"
+gr="$ROOT/kit/integrations/graft.json"
 gwire="$(integration_wire_command "$gr")"
 t   "graft: the wire command" "$gwire" "graft init --agents claude --no-statusline --no-global"
 # No verb runs the wire step yet, so afterInstall hands the user the same command. It must not drift.

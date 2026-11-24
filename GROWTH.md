@@ -87,7 +87,7 @@ has very little to go on yet besides who links to you. In priority order:
 
 1. **`hesreallyhim/awesome-claude-code`** (45k stars, the canonical list) — currently mid-restructure
    ("new organizational system in progress" per their README as of today). Check their
-   `CONTRIBUTING.md` / `templates/` for the current submission format before opening a PR; a listing
+   `CONTRIBUTING.md` / `kit/templates/` for the current submission format before opening a PR; a listing
    here is the single highest-value backlink+traffic source available.
 2. **`ComposioHQ/awesome-claude-plugins`** and **`rohitg00/awesome-claude-code-toolkit`** — actively
    maintained, lower bar, both take PRs.

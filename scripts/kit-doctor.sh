@@ -24,7 +24,7 @@
 #   Tier 2  node + pnpm, vercel, turbo  — project-specific, auto-install if applicable
 #   Agents  the runtime binary of each adapter the project selected (`adapters` in the config),
 #           plus whether the Codex hooks are registered in .codex/hooks.json when codex is selected
-#   Integr. one row per descriptor in integrations/ that is on (its config key, or on by default
+#   Integr. one row per descriptor in kit/integrations/ that is on (its config key, or on by default
 #           with the key absent — a missing default-on tool is reported, not failed) — installed by the
 #           shared runner (scripts/lib/integration-install.sh), only with recorded consent
 #   Local   mlx_lm.server auto-start (when .local.enabled)
@@ -558,9 +558,9 @@ doctor_agents
 printf '\n'
 
 # ============================================================================
-# INTEGRATIONS (opt-in — one row per descriptor in integrations/ the project switched on)
+# INTEGRATIONS (opt-in — one row per descriptor in kit/integrations/ the project switched on)
 # ============================================================================
-# An optional third-party tool is DATA: integrations/<id>.json names its config key, its detect
+# An optional third-party tool is DATA: kit/integrations/<id>.json names its config key, its detect
 # command and its install candidates in order. This loop holds no tool's recipe. For every
 # descriptor whose config key is on it asks the shared runner (lib/integration-install.sh) and
 # turns the runner's one status line into a row. Silent when the project switched nothing on.
@@ -677,7 +677,7 @@ fi
 # LOCAL MODEL LAYER (opt-in — only checked when .local.enabled is true)
 # ============================================================================
 # Same gating principle as vercel: silence when the project didn't opt in. The runtime itself is
-# an integration (integrations/mlx-lm.json) and was handled by the loop above; this section is the
+# an integration (kit/integrations/mlx-lm.json) and was handled by the loop above; this section is the
 # part that is not an install — the server. When the runtime is present but the server is down,
 # the doctor starts it in background + health-checks the port. --dry-run stays 100% read-only: it
 # reports what it would do and starts nothing.
@@ -756,7 +756,7 @@ fi
 #      unless .claude/mempal-identity.<wing>.txt is present. --fix seeds a starter from kit.config.
 #   2. the session-start hook is current — older hooks just ran `wake-up --wing` and could not
 #      apply the per-wing header from (1). --fix re-emits the hook from the kit template.
-# The CLI itself is an integration (integrations/mempalace.json), handled by the loop above.
+# The CLI itself is an integration (kit/integrations/mempalace.json), handled by the loop above.
 _mem_on="false"
 [[ -f "$_kitcfg" ]] && _mem_on="$(jq -r '.memory.enabled // false' "$_kitcfg" 2>/dev/null || echo false)"
 if [[ "$_mem_on" == "true" ]]; then
@@ -794,7 +794,7 @@ if [[ "$_mem_on" == "true" ]]; then
   #    knows how to swap in the per-wing header (1). Older hooks lack it.
   _hook="${TARGET:-$PWD}/.claude/hooks/mempal_session_start.sh"
   _kit_root="$(dirname "$_export_dir_doctor")"
-  _hook_tmpl="$_kit_root/templates/hooks/mempal_session_start.sh.tmpl"
+  _hook_tmpl="$_kit_root/kit/templates/hooks/mempal_session_start.sh.tmpl"
   if [[ ! -f "$_hook" ]]; then
     : # no hook installed — the integration row already covers a non-functioning memory layer
   elif grep -q 'mempal-identity' "$_hook" 2>/dev/null; then

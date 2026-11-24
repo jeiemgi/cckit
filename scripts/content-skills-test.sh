@@ -40,7 +40,7 @@ verbs="$(CCKIT_OUTPUT=human "$ROOT/bin/cckit" commands 2>/dev/null)"
 has "cckit commands lists the task verb" " $verbs " " task "
 
 for s in $CONTENT_SKILLS; do
-  f="$ROOT/templates/skills/$s/SKILL.md"
+  f="$ROOT/kit/templates/skills/$s/SKILL.md"
   t "$s: the template exists" "$([ -f "$f" ] && echo yes)" "yes"
   [ -f "$f" ] || continue
   t "$s: name matches its directory" "$(_field "$f" name)" "$s"
@@ -60,9 +60,9 @@ for s in $CONTENT_SKILLS; do
 done
 
 # ── brand-voice ↔ its template ↔ copywriting ────────────────────────────────────────────────────
-bv="$ROOT/templates/skills/brand-voice/SKILL.md"
-tpl="$ROOT/templates/skills/brand-voice/references/voice-template.md"
-cw="$ROOT/templates/skills/copywriting/SKILL.md"
+bv="$ROOT/kit/templates/skills/brand-voice/SKILL.md"
+tpl="$ROOT/kit/templates/skills/brand-voice/references/voice-template.md"
+cw="$ROOT/kit/templates/skills/copywriting/SKILL.md"
 t "brand-voice: ships its template" "$([ -f "$tpl" ] && echo yes)" "yes"
 has "brand-voice: names the file it writes" "$(cat "$bv")" '`brand/voice.md`'
 has "brand-voice: points at its template" "$(cat "$bv")" 'references/voice-template.md'
@@ -79,8 +79,8 @@ has "cckit task new takes --kind" "$help" "cckit task new [--priority p0|p1|p2|p
 has "cckit task finish takes --all" "$help" 'cckit task finish [<id>] "<summary>" [--all]'
 
 # ── campaign ↔ its template ↔ the verbs it names ────────────────────────────────────────────────
-cp="$ROOT/templates/skills/campaign/SKILL.md"
-ptpl="$ROOT/templates/skills/campaign/references/plan-template.md"
+cp="$ROOT/kit/templates/skills/campaign/SKILL.md"
+ptpl="$ROOT/kit/templates/skills/campaign/references/plan-template.md"
 t "campaign: ships its plan template" "$([ -f "$ptpl" ] && echo yes)" "yes"
 for h in "Goal" "Audience" "Message" "Channels" "Pieces" "Timeline" "Measure" "Deliverables" "Result"; do
   t "plan template has ## $h" "$(grep -c "^## $h\$" "$ptpl" | tr -d ' ')" "1"
@@ -100,13 +100,13 @@ for fl in --kind --goal --spec --scope --verification; do
   has "effort new parses $fl" "$eo" "      $fl)"
 done
 # ── page-design names its three skills and never claims a missing one (#504) ────────────────────
-pd="$ROOT/templates/skills/page-design/SKILL.md"; pdr="$ROOT/templates/skills/page-design/references"
+pd="$ROOT/kit/templates/skills/page-design/SKILL.md"; pdr="$ROOT/kit/templates/skills/page-design/references"
 for f in design-file-template.md generic-page-patterns.md minimum-rules.md; do
   t "page-design: ships references/$f" "$([ -f "$pdr/$f" ] && echo yes)" "yes"
   has "page-design: SKILL.md points at references/$f" "$(cat "$pd")" "references/$f"
 done
 for sk in impeccable emil-design-eng web-design-guidelines; do
-  t "page-design: $sk has an integration descriptor" "$([ -f "$ROOT/integrations/$sk.json" ] && echo yes)" "yes"
+  t "page-design: $sk has an integration descriptor" "$([ -f "$ROOT/kit/integrations/$sk.json" ] && echo yes)" "yes"
   has "page-design: names how to add $sk" "$(cat "$pd")" "cckit add $sk"
   has "page-design: a missing $sk is written as not installed" "$(cat "$pd")" "\`$sk: not installed\`"
   has "page-design: the design file has a row for $sk" "$(cat "$pdr/design-file-template.md")" "| \`$sk\` | present / not installed |"
@@ -127,7 +127,7 @@ for sec in Direction Motion Audit; do
   has "page-design: minimum rules have a section for $sec" "$(cat "$pdr/minimum-rules.md")" "## $sec — when"
 done
 # The skill holds none of the third-party text: it is not vendored under templates/.
-t "no third-party design skill is vendored" "$(ls -d "$ROOT/templates/skills/impeccable" "$ROOT/templates/skills/emil-design-eng" "$ROOT/templates/skills/web-design-guidelines" 2>/dev/null | grep -c . || true)" "0"
+t "no third-party design skill is vendored" "$(ls -d "$ROOT/kit/templates/skills/impeccable" "$ROOT/kit/templates/skills/emil-design-eng" "$ROOT/kit/templates/skills/web-design-guidelines" 2>/dev/null | grep -c . || true)" "0"
 
 # Every kind the skills tell the agent to pass is a kind `--kind` accepts.
 # shellcheck source=/dev/null
@@ -136,7 +136,7 @@ for k in post campaign brand research; do
   kit_kind_label_valid "$k"; t "kind $k is accepted" "$?" "0"
 done
 # the designer agent lists page-design, in its skills and in its routing table
-dg="$ROOT/templates/agents/designer.md"
+dg="$ROOT/kit/templates/agents/designer.md"
 t "designer: page-design is in the skills frontmatter" "$(sed -n '1,/^---$/{/^---$/!p;}' "$dg" | sed -n '2,$p' | grep -c '^  - page-design$')" "1"
 has "designer: the routing table sends a page to page-design" "$(cat "$dg")" '| Build or change a page                  | `page-design`'
 

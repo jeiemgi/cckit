@@ -39,7 +39,7 @@ cd "$ROOT"
 # `skills` made the installed copy a permanent no-op: it exited 0 with "nothing to lint" in every
 # project it was ever shipped to, so the context budget was enforced only in the kit's own repo.
 SKILL_ROOTS=""
-for _root in skills .claude/skills; do
+for _root in kit/skills skills .claude/skills; do
   [ -d "$_root" ] && SKILL_ROOTS="$SKILL_ROOTS $_root"
 done
 BASELINE="scripts/skill-frontmatter-baseline.txt"

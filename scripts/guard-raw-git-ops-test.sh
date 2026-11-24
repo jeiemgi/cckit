@@ -5,7 +5,7 @@
 # errors: strict — a test runner: rc 1 on any failed assertion
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-HOOK="$ROOT/templates/hooks/guard-raw-git-ops.sh.tmpl"
+HOOK="$ROOT/kit/templates/hooks/guard-raw-git-ops.sh.tmpl"
 fail=0
 t() { if [ "$2" = "$3" ]; then echo "ok: $1"; else echo "FAIL: $1 -> got '[$2]' want '[$3]'"; fail=1; fi; }
 command -v jq >/dev/null 2>&1 || { echo "guard-raw-git-ops-test: jq required" >&2; exit 1; }

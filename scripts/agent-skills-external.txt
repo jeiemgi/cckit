@@ -1,9 +1,9 @@
-# agent-skills-external.txt — bare skill names templates/agents/*.md may list that the kit does
+# agent-skills-external.txt — bare skill names kit/templates/agents/*.md may list that the kit does
 # NOT ship. Read by scripts/agent-skills-lint.sh.
 #
 # A name here is OPTIONAL for the agent that lists it: it comes from a third-party skill pack or
 # from the harness, and an agent scaffolded into a project without it runs without that skill.
-# A bare name that is neither here nor under skills/ or templates/skills/ fails the lint, so a
+# A bare name that is neither here nor under skills/ or kit/templates/skills/ fails the lint, so a
 # renamed kit skill cannot linger in an agent template (pm.md listed task-sync / task-new /
 # task-close long after they became kit-task-*).
 #

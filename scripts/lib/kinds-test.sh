@@ -71,7 +71,7 @@ sorted() { printf '%s\n' $1 | sort | tr '\n' ' ' | sed 's/ *$//'; }
 want="$(sorted "$KIT_KINDS")"
 
 # 1. the hygiene hook's accepted branch prefixes == the kind set.
-hook="$(sed -n 's/.*=~ \^(\([a-z|]*\))\/\[0-9\]+-.*/\1/p' "$root/templates/hooks/repo-hygiene.sh.tmpl" | sed -n 1p | tr '|' ' ')"
+hook="$(sed -n 's/.*=~ \^(\([a-z|]*\))\/\[0-9\]+-.*/\1/p' "$root/kit/templates/hooks/repo-hygiene.sh.tmpl" | sed -n 1p | tr '|' ' ')"
 t "hygiene hook prefixes == KIT_KINDS" "$(sorted "$hook")" "$want"
 
 # 2. setup-labels.sh's built-in fallback (used where kinds.sh is not installed) == the kind set.

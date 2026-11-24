@@ -8,7 +8,7 @@
 # 2. Every home resolves: `cli` is a top-level verb of bin/cckit (the first word is checked, so
 #    `effort plan` resolves through `effort`), `skill` is a folder with a SKILL.md under skills/ or
 #    .claude/skills/, `rule` is a file. A seed's unresolved home is printed, not counted a defect.
-# 3. skills/routing.yaml parses in its strict subset (stated at the top of that file); every entry
+# 3. kit/skills/routing.yaml parses in its strict subset (stated at the top of that file); every entry
 #    names an existing skill and an existing term or `none`; every skill under skills/ is routed;
 #    each skill's `terms:` frontmatter line equals its routing terms.
 # 4. AGENTS.md's "Which skill does what" table has one row per routed skill, with the same tasks
@@ -36,6 +36,8 @@ cd "$ROOT" || exit 2
 
 command -v jq >/dev/null 2>&1 || { echo "terms-check: jq is required" >&2; exit 2; }
 [ -d ontology/terms ] || { echo "terms-check: no ontology/terms/ under $ROOT" >&2; exit 2; }
+# The kit's own skills live under kit/skills/ (the self-host layout); a project keeps them in skills/.
+SK=skills; [ -d kit/skills ] && SK=kit/skills
 
 # Defect lines and notes go to stdout for a person; with --llm they go to stderr so stdout is one JSON object.
 defects=0
@@ -92,7 +94,7 @@ if [ -f bin/cckit ]; then
   verbs="$(grep -E '^  [a-z][a-z0-9|-]*\)' bin/cckit | sed -E 's/^  ([a-z0-9|-]*)\).*/\1/' | tr '|' '\n' | sort -u)"
 fi
 skill_dir() { # the folder holding <name>/SKILL.md, or nothing
-  for d in skills .claude/skills; do [ -f "$d/$1/SKILL.md" ] && { echo "$d/$1"; return 0; }; done; return 1
+  for d in $SK .claude/skills; do [ -f "$d/$1/SKILL.md" ] && { echo "$d/$1"; return 0; }; done; return 1
 }
 homes=0; homes_ok=0
 for stem in $valid_terms; do
@@ -116,7 +118,7 @@ done
 # ── 3. the routing table ─────────────────────────────────────────────────────────────────────────
 # routing.yaml → `task<TAB>skill<TAB>term` rows, or `!<line>: <reason>` for a line outside the subset.
 routes=""
-if [ -f skills/routing.yaml ]; then
+if [ -f $SK/routing.yaml ]; then
   routes="$(awk '
     function bad(why) { printf "!%d: %s\n", NR, why; expect = 0; next_ok = 0 }
     BEGIN { expect = 0 }
@@ -134,13 +136,13 @@ if [ -f skills/routing.yaml ]; then
       bad("expected `  term: <Term>` or `  term: none`")
     }
     END { if (expect != 0) printf "!%d: entry ends before its term line\n", NR }
-  ' skills/routing.yaml)"
+  ' $SK/routing.yaml)"
   while IFS= read -r line; do
-    case "$line" in '!'*) x "skills/routing.yaml:${line#!}" ;; esac
+    case "$line" in '!'*) x "$SK/routing.yaml:${line#!}" ;; esac
   done <<< "$routes"
   routes="$(printf '%s\n' "$routes" | grep -v '^!' || true)"
 else
-  x "skills/routing.yaml: missing"
+  x "$SK/routing.yaml: missing"
 fi
 
 all_terms="$(for f in ontology/terms/*.json; do [ -e "$f" ] && basename "$f" .json; done)"
@@ -148,12 +150,12 @@ routed_skills="$(printf '%s\n' "$routes" | awk -F'\t' 'NF==3{print $2}' | sort -
 no_term_skills="$(printf '%s\n' "$routes" | awk -F'\t' 'NF==3 && $3=="none"{print $2}' | sort -u | grep . || true)"
 while IFS=$'\t' read -r task skill term; do
   [ -n "$skill" ] || continue
-  skill_dir "$skill" >/dev/null || x "skills/routing.yaml: skill $skill has no SKILL.md"
-  [ "$term" = none ] || grep -qx -- "$term" <<< "$all_terms" || x "skills/routing.yaml: term $term is not under ontology/terms/"
+  skill_dir "$skill" >/dev/null || x "$SK/routing.yaml: skill $skill has no SKILL.md"
+  [ "$term" = none ] || grep -qx -- "$term" <<< "$all_terms" || x "$SK/routing.yaml: term $term is not under ontology/terms/"
 done <<< "$routes"
 
 skills_total=0; unrouted=0; routed=0
-for d in skills/*/; do
+for d in $SK/*/; do
   [ -f "${d}SKILL.md" ] || continue
   s="$(basename "$d")"; skills_total=$((skills_total + 1))
   if grep -qx -- "$s" <<< "$routed_skills"; then
@@ -161,9 +163,9 @@ for d in skills/*/; do
     want="$(printf '%s\n' "$routes" | awk -F'\t' -v s="$s" '$2==s{print $3}' | sort -u | awk '{a = (a ? a ", " : "") $0} END{print a}')"
     have="$(awk '/^---/{c++; if (c==2) exit; next} c==1 && /^terms:/{sub(/^terms:[[:space:]]*/, ""); print; exit}' "${d}SKILL.md" \
             | tr ',' '\n' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | grep . | sort -u | awk '{a = (a ? a ", " : "") $0} END{print a}')"
-    [ "$have" = "$want" ] || x "${d}SKILL.md: terms: '$have' but skills/routing.yaml says '$want'"
+    [ "$have" = "$want" ] || x "${d}SKILL.md: terms: '$have' but $SK/routing.yaml says '$want'"
   else
-    unrouted=$((unrouted + 1)); x "skills/$s: not routed in skills/routing.yaml"
+    unrouted=$((unrouted + 1)); x "$SK/$s: not routed in $SK/routing.yaml"
   fi
 done
 
@@ -185,12 +187,12 @@ if [ -f AGENTS.md ]; then
       want_terms="$(printf '%s\n' "$routes" | awk -F'\t' -v s="$s" '$2==s{a = (a ? a ", " : "") $3} END{print a}')"
       row="$(printf '%s\n' "$agents_rows" | awk -F'\t' -v s="$s" '$1==s{print; exit}')"
       if [ -z "$row" ]; then x "AGENTS.md: no row for $s"; continue; fi
-      [ "$(printf '%s' "$row" | cut -f2)" = "$want_tasks" ] || x "AGENTS.md: $s tasks differ from skills/routing.yaml"
-      [ "$(printf '%s' "$row" | cut -f3)" = "$want_terms" ] || x "AGENTS.md: $s terms differ from skills/routing.yaml"
+      [ "$(printf '%s' "$row" | cut -f2)" = "$want_tasks" ] || x "AGENTS.md: $s tasks differ from $SK/routing.yaml"
+      [ "$(printf '%s' "$row" | cut -f3)" = "$want_terms" ] || x "AGENTS.md: $s terms differ from $SK/routing.yaml"
     done
     while IFS=$'\t' read -r s _; do
       [ -n "$s" ] || continue
-      grep -qx -- "$s" <<< "$routed_skills" || x "AGENTS.md: row for $s, which skills/routing.yaml does not route"
+      grep -qx -- "$s" <<< "$routed_skills" || x "AGENTS.md: row for $s, which $SK/routing.yaml does not route"
     done <<< "$agents_rows"
   fi
 fi
@@ -222,8 +224,8 @@ if [ -f "$PAGE" ]; then
   done
   while IFS=$'\t' read -r s _; do
     [ -n "$s" ] || continue
-    [ -f "skills/$s/SKILL.md" ] || continue          # a scaffolded template skill, not one of skills/
-    grep -qx -- "$s" <<< "$routed_skills" || x "$PAGE: row for $s, which skills/routing.yaml does not route"
+    [ -f "$SK/$s/SKILL.md" ] || continue          # a scaffolded template skill, not one of skills/
+    grep -qx -- "$s" <<< "$routed_skills" || x "$PAGE: row for $s, which $SK/routing.yaml does not route"
   done <<< "$page_rows"
 fi
 

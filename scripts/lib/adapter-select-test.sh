@@ -114,11 +114,11 @@ if [ -n "${ADAPTER_TEST_INNER:-}" ]; then
 
   # --- packaging: everything the installer reads ships in the npm artifact -------------------
   if command -v jq >/dev/null 2>&1; then
-    for need in templates scripts; do
+    for need in kit scripts; do
       t "package.json files[] ships $need/" "$(jq -r --arg n "$need" '.files | index($n) != null' "$PLUGIN_DIR/package.json")" "true"
     done
-    t "one instruction source exists" "$([ -f "$PLUGIN_DIR/templates/instructions.md.tmpl" ] && echo yes || echo no)" "yes"
-    t "no second instruction source"  "$(ls "$PLUGIN_DIR/templates" | grep -cE '^(CLAUDE|AGENTS)\.md\.tmpl$')" "0"
+    t "one instruction source exists" "$([ -f "$PLUGIN_DIR/kit/templates/instructions.md.tmpl" ] && echo yes || echo no)" "yes"
+    t "no second instruction source"  "$(ls "$PLUGIN_DIR/kit/templates" | grep -cE '^(CLAUDE|AGENTS)\.md\.tmpl$')" "0"
   fi
 
   [ "$fail" -eq 0 ] && echo "ALL OK($ADAPTER_TEST_INNER)"

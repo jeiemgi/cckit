@@ -45,8 +45,8 @@ _p="${CLAUDE_PLUGIN_ROOT:-}"
 if [ -z "$_p" ]; then
   _p="$(ls -d "$HOME"/.claude/plugins/cache/*/claude-kit*/ 2>/dev/null | sort -V | tail -1)"
 fi
-_sl="$_p/statusline/kit-statusline.sh"
-[ -f "$_sl" ] || _sl="$_p/templates/statusline/kit-statusline.sh"
+_sl="$_p/kit/statusline/kit-statusline.sh"
+[ -f "$_sl" ] || _sl="$_p/kit/templates/statusline/kit-statusline.sh"
 if [ -f "$_sl" ]; then exec bash "$_sl" "$@"; fi
 cat >/dev/null 2>&1; exit 0   # no engine found: consume stdin, render nothing, never error
 SHIM

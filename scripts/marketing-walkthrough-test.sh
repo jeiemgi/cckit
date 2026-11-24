@@ -138,10 +138,10 @@ t "status: no forge request names the task" "$(grep -c -e "$id" -e 'light/' "$GH
 t "the whole walkthrough ran no gh subcommand" "$(grep -c '^GH-SUBCOMMAND' "$tmp/forge.log")" "0"
 
 # ── 8. no absolute home-directory path in what cckit ships ──────────────────────────────────────
-hits="$(grep -rlE '/(Users|home)/[a-z][a-z0-9_-]+/' "$ROOT/commands" "$ROOT/skills" "$ROOT/templates" 2>/dev/null | sed "s#^$ROOT/##" | tr '\n' ' ')"
+hits="$(grep -rlE '/(Users|home)/[a-z][a-z0-9_-]+/' "$ROOT/kit/commands" "$ROOT/kit/skills" "$ROOT/kit/templates" 2>/dev/null | sed "s#^$ROOT/##" | tr '\n' ' ')"
 t "no command, skill or template holds a home-directory path" "$hits" ""
 has "kit-update reads the plugin version through the documented variable" \
-  "$(cat "$ROOT/commands/kit-update.md")" '"${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json"'
+  "$(cat "$ROOT/kit/commands/kit-update.md")" '"${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json"'
 
 [ "$fail" -eq 0 ] && echo "marketing-walkthrough-test: PASS" || echo "marketing-walkthrough-test: FAIL"
 exit "$fail"

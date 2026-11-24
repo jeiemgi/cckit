@@ -96,7 +96,7 @@ while IFS= read -r f; do
   else
     par+=("$f")
   fi
-done < <(find bin scripts -type f -name '*-test.sh' 2>/dev/null | sort)
+done < <(find bin scripts lib -type f -name '*-test.sh' 2>/dev/null | sort)
 
 if [ "${#tests[@]}" -eq 0 ]; then
   note "test: no *-test.sh found${PATTERN:+ matching '$PATTERN'}"

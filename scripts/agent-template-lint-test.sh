@@ -14,8 +14,8 @@ has() { case "$2" in *"$3"*) echo "ok: $1" ;; *) echo "FAIL: $1 (missing '$3' in
 
 fx="$(mktemp -d)"; trap 'rm -rf "$fx"' EXIT
 role() {  # role <tree> <name>
-  mkdir -p "$fx/$1/templates/agents"
-  printf -- '---\nname: %s\ndescription: The %s role.\ntools: [Bash]\nskills: []\n---\n\n# body\n' "$2" "$2" > "$fx/$1/templates/agents/$2.md"
+  mkdir -p "$fx/$1/kit/templates/agents"
+  printf -- '---\nname: %s\ndescription: The %s role.\ntools: [Bash]\nskills: []\n---\n\n# body\n' "$2" "$2" > "$fx/$1/kit/templates/agents/$2.md"
 }
 lint() { bash "$LINT" --root "$fx/$1" 2>&1; }
 
@@ -26,7 +26,7 @@ has "clean run reports the role count" "$out" "2 role(s)"
 
 # 2. name must equal the basename and description must be present (both runtimes key on them)
 role meta pm
-sed -i.bak 's/^name: pm$/name: project-manager/; s/^description: .*$/description:/' "$fx/meta/templates/agents/pm.md" && rm -f "$fx/meta/templates/agents/pm.md.bak"
+sed -i.bak 's/^name: pm$/name: project-manager/; s/^description: .*$/description:/' "$fx/meta/kit/templates/agents/pm.md" && rm -f "$fx/meta/kit/templates/agents/pm.md.bak"
 out="$(lint meta)"; t "bad name/description fails (rc)" "$?" "1"
 has "name mismatch is named" "$out" "frontmatter name is 'project-manager', expected 'pm'"
 has "empty description is named" "$out" "pm: empty description"

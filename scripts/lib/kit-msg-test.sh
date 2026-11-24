@@ -129,7 +129,7 @@ esac
 t "long-poll consumed the steer (no double block)" "$(msg_hook_check Stop)" ""
 
 # ── hook script resolution (#179): the project's own bin/cckit beats a stale PATH cckit ─────────
-HOOK="$LIB/../../templates/hooks/kit-mail-check.sh.tmpl"
+HOOK="$LIB/../../kit/templates/hooks/kit-mail-check.sh.tmpl"
 mkdir -p "$tmp/appA/bin" "$tmp/stalebin"
 cat > "$tmp/appA/bin/cckit" <<'SH'
 #!/usr/bin/env bash

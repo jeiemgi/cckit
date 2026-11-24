@@ -2,7 +2,7 @@
 # shellcheck shell=bash
 # agent-def.sh — read a specialist role template and translate it per runtime (E257.6, #263).
 #
-# A role lives ONCE, in templates/agents/<role>.md: YAML frontmatter (name, description, tools,
+# A role lives ONCE, in kit/templates/agents/<role>.md: YAML frontmatter (name, description, tools,
 # skills) over a markdown body of responsibilities. Claude Code reads that file as-is, installed at
 # .claude/agents/<role>/AGENT.md. Codex reads a custom agent as TOML at .codex/agents/<role>.toml
 # with three required keys — name, description, developer_instructions. This file is the one
@@ -88,7 +88,7 @@ agent_def_codex() {
   [ -n "$desc" ] || { echo "agent-def: $f has no description: in its frontmatter" >&2; return 1; }
   [ -z "$when" ] || desc="$desc $when"
 
-  printf '# Codex custom agent for the %s role. cckit init renders it from templates/agents/%s.md,\n' "$name" "$name"
+  printf '# Codex custom agent for the %s role. cckit init renders it from kit/templates/agents/%s.md,\n' "$name" "$name"
   printf '# the same role source the Claude Code adapter installs as AGENT.md.\n'
   [ -z "$tools" ] || printf '# Not translated — Claude Code tool allowlist: %s\n' "$tools"
   [ -z "$model" ] || printf '# Not translated — Claude model alias: %s\n' "$model"

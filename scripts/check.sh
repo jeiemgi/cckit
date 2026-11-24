@@ -11,13 +11,13 @@ note() { printf '%s\n' "$*" >&2; }
 note "==> shell syntax (bash -n)"
 while IFS= read -r f; do
   bash -n "$f" || { note "x syntax: $f"; fail=1; }
-done < <(find bin scripts -type f \( -name '*.sh' -o -perm -u+x \) 2>/dev/null | sort -u)
+done < <(find bin scripts lib -type f \( -name '*.sh' -o -perm -u+x \) 2>/dev/null | sort -u)
 
 # 1b. shellcheck at error severity — static analysis when available, skipped if not installed
 # (like jq below) so the gate stays dependency-light. CI installs shellcheck so this always runs there.
 note "==> shellcheck (errors)"
 if command -v shellcheck >/dev/null 2>&1; then
-  find bin scripts -type f \( -name '*.sh' -o -name 'cckit' \) -print0 \
+  find bin scripts lib -type f \( -name '*.sh' -o -name 'cckit' \) -print0 \
     | xargs -0 shellcheck --severity=error || fail=1
 else
   note "  (shellcheck absent - skipping)"
@@ -53,6 +53,17 @@ bash scripts/forge-fence.sh || fail=1
 # Ratchet in scripts/force-push-fence.baseline (0).
 note "==> force-push fence"
 bash scripts/force-push-fence.sh || fail=1
+
+# 3d. The layout fence (#605, decisions 45 and 55). Every top-level directory is on the allowlist
+# in lib/core/layout-fence.allow, the retired payload roots (now under kit/) hold nothing, and the
+# file counts directly under scripts/ and scripts/lib/ may not grow (lib/core/layout-fence.baseline).
+note "==> layout fence"
+bash lib/core/layout-fence.sh || fail=1
+
+# 3e. The feature map. FEATURES.md is generated from scripts/lib/verbs.tsv and bin/cckit; a verb
+# added, moved or renamed without regenerating it fails here.
+note "==> feature map"
+bash lib/core/feature-map.sh --check || fail=1
 
 note "==> secret + privacy guard"
 if [ -f scripts/lib/secret-guard.sh ]; then
@@ -91,7 +102,7 @@ bash scripts/review-lint.sh || fail=1
 note "==> top-level verb ratchet"
 bash scripts/verbs-ratchet.sh || fail=1
 
-# 7. Agent skill references. Every `skills:` entry in templates/agents/*.md must resolve to a skill
+# 7. Agent skill references. Every `skills:` entry in kit/templates/agents/*.md must resolve to a skill
 # the kit ships or scaffolds, a `plugin:skill` reference, or a name declared third-party in
 # scripts/agent-skills-external.txt. An unresolved entry fails silently at runtime: the agent loads
 # with fewer skills than its frontmatter lists.
@@ -99,7 +110,7 @@ note "==> agent skill references"
 bash scripts/agent-skills-lint.sh || fail=1
 
 # 7b. Terms and skill routing — WARN mode. Every term under ontology/terms/ validates, every home
-# resolves, every skill is routed and AGENTS.md's table mirrors skills/routing.yaml. It prints its
+# resolves, every skill is routed and AGENTS.md's table mirrors kit/skills/routing.yaml. It prints its
 # defects and counts and never fails the gate: the terms are new and a word under discussion must
 # not block an unrelated PR. scripts/terms-check-test.sh (step 8) is what fails on a broken checker.
 note "==> terms and skill routing (warn mode)"

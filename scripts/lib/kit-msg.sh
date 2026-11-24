@@ -2,7 +2,7 @@
 # shellcheck shell=bash
 # kit-msg.sh — session mail (#175): a MACHINE-GLOBAL filesystem mailbox so parallel sessions reach
 # each other mid-flight — across projects or within one — instead of waiting for a resume.
-# Delivery is hook-driven (see templates/hooks/kit-mail-check.sh.tmpl): PostToolUse injects unread
+# Delivery is hook-driven (see kit/templates/hooks/kit-mail-check.sh.tmpl): PostToolUse injects unread
 # mail between a working session's tool calls (the steer), UserPromptSubmit/SessionStart cover
 # human-driven and cold-start delivery, and Stop blocks a finishing session ONLY for unread
 # --steer messages.

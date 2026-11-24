@@ -1,0 +1,130 @@
+---
+name: kit-effort-close
+terms: Effort
+description: Close an effort in ONE op — snapshot each sub-issue's diff BEFORE squash (work record), capture and judge effort metrics, squash-merge the effort PR, close the parent + finished subs (open ones stay, listed), board Done for each, GC the worktree/branch, run the optional knowledge-ingest hook, and finish with the kit-sync drift check.
+when_to_use: When the effort PR has been reviewed and is ready to land. This is the single close op for the effort lifecycle (effort-model.md) — board + record state are correct by construction. Replaces the separate merge / close / mark-done / gc steps.
+---
+
+# kit-effort-close
+
+Plugin-direct skill — runs straight from `${CLAUDE_PLUGIN_ROOT}` (no per-project `scripts/`
+checkout needed). It is a **thin caller** of the single close implementation `effort_close`
+(`scripts/lib/effort-ops.sh`) — the exact function `cckit effort close <N>` runs — so the skill
+and the verb close an effort identically (#148, the #121 single-implementation precedent). No
+close logic is re-authored inline (kit-engine-boundary #1/#2). Respects `KIT_BASE_BRANCH`
+(default `main`) and the `KIT_PROJECTS_V2` board toggle.
+
+The effort lifecycle's terminal op. Board state, issue state, and the work record are correct
+**by construction** — the core op owns them, in this order:
+
+0. **Spec check** — the parent body is re-read and its `## Spec` must hold at least one real list
+   item (not empty, not TODO/TBD only); otherwise the close refuses with the reasons and writes
+   nothing. `--no-spec-check` skips it and prints one line saying it was skipped.
+   **Pre-close hook** (optional, config-gated via `effort.preCloseHook`) — a project gate called as
+   `<hook> <effort#> <sub#…>` from the effort worktree before anything is written. A non-zero exit
+   refuses the close and its output is printed; `KIT_FORCE=1` skips it and says so.
+1. **Snapshot sub-diffs BEFORE squash** (squash destroys the per-sub-issue commit pairs that ARE
+   the work record — effort-model.md "Trace hard rules"), with a **refuse-squash-without-trace**
+   backstop (`KIT_FORCE=1` overrides).
+2. **Capture effort metrics** pre-squash (telemetry: live-branch diff + commit signals). The record
+   also carries `build_seconds` — from the stamp `cckit effort start` wrote, else from the oldest
+   commit on the branch — and `tokens_real` where a usage log or a `cckit autopilot run` state file
+   has a figure. With no source the field is `null` and `tokens_null_reason` names why; nothing is
+   estimated.
+3. **Re-target dependent PRs, then squash-merge** the effort PR. The merge deletes the remote
+   effort branch, and GitHub closes — unmerged — any open PR still based on it. So the core first
+   lists them (`gh pr list --base effort/<N>-… --state open`) and moves each to the base branch
+   (`gh pr edit <n> --base <base>`, one `↻ PR <n> re-targeted to <base>` line). If an edit fails,
+   or the list cannot be read, the close **refuses**, names the PR, and merges nothing; this runs
+   before step 2, so a refusal writes no metrics row. Skipped over REST, where the branch is kept.
+4. **Judge** the metrics (reads the durable trace dir; the record stays in the local buffer).
+5. **Close the parent + its finished sub-issues** and set the **board Status=Done** for each
+   (guarded — a no-op when Projects v2 is off). A sub is **finished** when it is already closed
+   (its close reason is kept, no second write) or a commit on the effort branch delivers it: the
+   commit's last `#N`, a `Closes|Fixes|Resolves #N`, or the sub's `[E<N>.<k>]` step tag (#565).
+   An **unfinished** sub stays open and linked under the parent — never detached, never refused
+   on — and is listed in the close comment on the parent and at the end of the output.
+6. **GC**: base branch checked out + pulled in the main checkout; then the effort's **`sub/<N>…`
+   worktrees and branches** are collected through `kit_gc_prune --only '^sub/<N>[a-z]-'` — the
+   squash just put their work on base, so they classify **LANDED** (no PR of their own, content or
+   lineage on base) and go under the same recover-before-prune guards as `cckit cleanup` (a dirty
+   sub worktree, or a sub ahead of its remote, stays and is reported). Then the effort worktree is
+   removed, its local branch deleted, pruned (the remote branch is deleted by the merge). A sub
+   that fails both LANDED checks is left for `cckit gc` to show as ORPHAN.
+7. **Knowledge-ingest hook** (optional, config-gated via `effort.knowledgeIngestHook`).
+8. **Kit-sync drift check** — advisory warning when the effort touched kit-managed files that
+   belong upstream (/kit-contribute). Under `.claude/rules/` only the rule files the kit ships
+   (`kit/templates/rules/*.md`) count; a rule the project wrote itself is never flagged.
+
+## Preconditions
+
+1. The effort PR exists, is reviewed, not in draft, and is mergeable (or can take the base by merge).
+2. You are on the `effort/<N>-<slug>` branch (its worktree), working tree clean.
+
+If not, abort and route to `/kit-effort-pr` first.
+
+## Inputs
+
+| Field        | Required | Notes                                                   |
+| ------------ | -------- | ------------------------------------------------------- |
+| Issue number | optional | Parent #N or slug — derived from `effort/<N>-<slug>` if omitted |
+
+## Execution
+
+The core handles both effort styles (#164): run from the `effort/<N>-…` branch it squash-merges
+the integration PR; run from anywhere else with an explicit `#N`, and if no `effort/<N>` branch
+exists anywhere (a **wave-driven** effort — subs merged as individual task PRs), it verifies every
+sub is closed with a merged PR, traces from the merged PR diffs, and runs the same close tail.
+
+```bash
+source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/kit-config.sh" && load_kit_config
+source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/effort.sh"
+source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/effort-ops.sh"   # effort_close — the single close op
+
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+# Resolve the parent #N (accepts a slug too — effort_slug_resolve); default to the branch.
+NUM="${INPUT_NUM:-}"
+[[ -z "$NUM" ]] && NUM=$(effort_branch_num "$BRANCH")
+[[ -z "$NUM" ]] && { echo "✗ Not on an effort branch (effort/<N>-<slug>) and no #N passed"; exit 1; }
+
+if [[ -n "$(git status --porcelain)" ]]; then
+  echo "✗ Working tree dirty — commit via /kit-effort-pr first"; exit 1
+fi
+
+# The single close op — identical to `cckit effort close $NUM`.
+effort_close "$NUM"
+```
+
+> The block above is intentionally short: all close logic lives in `effort_close`. If you need to
+> change what a close does (trace, telemetry, board, GC, hooks, drift check), change the core —
+> both the skill and the verb move together.
+
+## Output
+
+- Pre-squash trace dir (`<git-common-dir>/traces/effort-<N>/` + `index.jsonl`) + captured metrics
+- PR squash-merged; parent + finished sub-issues closed; a close comment on the parent listing the finished subs and any left open
+- Unfinished subs still open, still linked, listed as `⚠ left open: sub #N` and in the final report
+- Every PR that was based on the effort branch is still OPEN, now based on the base branch
+- Board Status=Done for the parent + every finished sub (if Projects v2 is on)
+- Main checkout on the base branch, up to date; effort worktree + local/remote branch removed and pruned, and every LANDED `sub/<N>…` worktree + branch with them (`✓ sub gc:` lines)
+- Knowledge-ingest hook ran (if configured); a kit-sync warning if the effort touched kit-managed files
+
+## Rules
+
+- **One close implementation** — `effort_close` in `scripts/lib/effort-ops.sh`. Never re-author
+  merge/close/board/GC steps inline here (#148; the #121 PR-title precedent).
+- **Snapshot BEFORE squash — absolute.** Squash destroys the per-sub-issue commit pairs that ARE
+  the per-unit work record; the core refuses to squash when no trace was captured (`KIT_FORCE=1`
+  overrides). The trace lives under the **shared git-common-dir** so it survives the worktree prune.
+- **One op owns board + issue + record state** — never rely on a separate, skippable "mark done"
+  (effort-model.md). Finished subs go Done in the core; an unfinished one stays open, linked, and named.
+- recover-before-prune (branch-naming.md): never remove a worktree with a staged-but-uncommitted
+  delta — the working tree must be clean (precondition) before this op proceeds.
+- Scrub secrets from the trace if any commit diff could contain them (trace hygiene).
+- Never force-push to trunk; never delete the default branch.
+- **Heed the kit-sync warning:** a kit-managed change that isn't contributed upstream is a latent
+  regression the next `/kit-update` can revert. Treat the warning as a to-do.
+- Closing frees a **WIP slot**: the core's GC deletes the `effort/<N>-<slug>` branch, which is what
+  `cckit effort start`'s WIP limit counts (`effort.wipLimit`, default 2). If a start was just
+  refused, this is the op that unblocks it — not `--force`.

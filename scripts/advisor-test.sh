@@ -6,7 +6,7 @@
 # errors: strict — a test runner: rc 1 on any failed assertion
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SK="$ROOT/skills/kit-advisor"
+SK="$ROOT/kit/skills/kit-advisor"
 fail=0
 ok()  { echo "ok: $1"; }
 bad() { echo "FAIL: $1"; fail=1; }

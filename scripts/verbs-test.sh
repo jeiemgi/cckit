@@ -89,9 +89,9 @@ bash "$tmp/fx/scripts/verbs-gen.sh" --check >/dev/null 2>&1; t "regenerating the
 has "the regenerated page carries the new verb" "$(cat "$tmp/fx/docs-site/src/content/docs/cli-reference.mdx")" '| `cckit zzz` | A new question? |'
 
 # ── 5. skills/routing.yaml ──────────────────────────────────────────────────────────────────────
-routed=" $(grep -E '^[[:space:]]+skill:' "$ROOT/skills/routing.yaml" | awk '{print $2}' | sort -u | tr '\n' ' ') "
+routed=" $(grep -E '^[[:space:]]+skill:' "$ROOT/kit/skills/routing.yaml" | awk '{print $2}' | sort -u | tr '\n' ' ') "
 bad=""; for s in $(verbs_rows | awk -F'\t' '$6 != "-" && $2 != "group" { print $6 }' | sort -u); do
-  [ -f "$ROOT/skills/$s/SKILL.md" ] || bad="$bad $s(no-skill)"
+  [ -f "$ROOT/kit/skills/$s/SKILL.md" ] || bad="$bad $s(no-skill)"
   case "$routed" in *" $s "*) ;; *) bad="$bad $s(not-routed)" ;; esac
 done
 t "every skill the table names exists and is routed in skills/routing.yaml" "$bad" ""

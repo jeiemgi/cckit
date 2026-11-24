@@ -483,7 +483,7 @@ t "a file under a rules subdirectory is not"       "$(_re_hit .claude/rules/loca
 t "skills / hooks / lib / agents stay kit-managed" \
   "$(_re_hit .claude/skills/x/SKILL.md)$(_re_hit .claude/hooks/h.sh)$(_re_hit .claude/lib/l.sh)$(_re_hit .claude/agents/a.md)$(_re_hit scripts/lib/x.sh)" "yesyesyesyesyes"
 re_rules="$(printf '%s\n' "$_EO_KIT_MANAGED_RE" | sed -n 's/.*rules\/(\([^)]*\)).*/\1/p' | tr '|' '\n' | sort)"
-tpl_rules="$(find "$ROOT/templates/rules" -maxdepth 1 -type f -name '*.md' -exec basename {} .md \; | sort)"
+tpl_rules="$(find "$ROOT/kit/templates/rules" -maxdepth 1 -type f -name '*.md' -exec basename {} .md \; | sort)"
 t "the regex lists exactly the templates/rules basenames" "$re_rules" "$tpl_rules"
 case "$tpl_rules" in "") echo "FAIL: no templates/rules/*.md found — the sync assertion compared nothing"; fail=1 ;; esac
 

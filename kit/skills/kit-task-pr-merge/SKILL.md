@@ -1,0 +1,59 @@
+---
+name: kit-task-pr-merge
+terms: Gate
+description: Squash-merge the open PR for the current branch, switch to the base branch, and pull. Merges the base into the branch if conflicts are detected.
+when_to_use: When work on an issue branch is ready to land. Always run after `/kit-task-pr`.
+---
+
+# kit-task-pr-merge
+
+Plugin-direct skill — thin caller over the ONE canonical home
+`${CLAUDE_PLUGIN_ROOT}/scripts/lib/kit-task-ops.sh` (`kto_task_pr_merge`). The verb logic lives
+there, never inline here (kit-engine-boundary #1/#2). The op respects `KIT_BASE_BRANCH` (default
+`develop`) and closes the PR's linked issues (native auto-close only fires on the default branch).
+
+## Inputs
+
+| Field     | Required | Notes                                          |
+| --------- | -------- | ---------------------------------------------- |
+| PR number | optional | Defaults to the open PR for the current branch |
+
+## Execution
+
+```bash
+source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/kit-config.sh" && load_kit_config
+source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/role-identity.sh"
+source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/gh-project.sh"
+source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/kit-task-ops.sh"
+
+kto_task_pr_merge            # open PR for the current branch
+# kto_task_pr_merge 845      # an explicit PR number
+```
+
+After it returns on the base branch, run the kit-sync drift check (advisory; never blocks). The
+pattern is `_EO_KIT_MANAGED_RE` from `effort-ops.sh` — the same one `cckit effort close` uses, so
+the two checks agree. Under `.claude/rules/` it matches only the rule files the kit ships
+(`kit/templates/rules/*.md`); a rule the project wrote itself is not flagged.
+
+```bash
+source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/effort-ops.sh"   # _EO_KIT_MANAGED_RE
+MAIN_WT=$(git worktree list --porcelain | awk '/^worktree /{print $2; exit}')
+KIT_TOUCHED=$(git -C "$MAIN_WT" show --name-only --pretty=format: HEAD 2>/dev/null \
+  | grep -E "$_EO_KIT_MANAGED_RE" | sort -u || true)
+if [[ -n "$KIT_TOUCHED" ]]; then
+  echo ""
+  echo "⚠ kit-sync: this change touched kit-managed files — review for upstream (/kit-contribute):"
+  printf '   %s\n' $KIT_TOUCHED
+  echo "   kit ⇄ project must stay in sync; an un-upstreamed change can be clobbered by /kit-update."
+fi
+```
+
+## Rules
+
+- Never merge a DRAFT PR — undraft first
+- An effort's PR (head `effort/*`) is refused: merge it with `cckit effort close <N>`, which snapshots the per-sub diffs before the squash. `KIT_FORCE=1` overrides, with a warning
+- Never force-push, anywhere: a pushed branch is updated with `git merge origin/<base>` and a plain push, never a rebase
+- If the merge hits conflicts, the op aborts it cleanly and tells you to resolve with `git merge origin/<base>` from the branch's worktree
+- If merge fails for a non-conflict reason (failing checks), the op reports verbatim and does not retry
+- The op always ends on the base branch with a clean pull on success, and always cleans up the merged branch + worktree
+- Never delete a branch that still has an open PR or unpushed commits not on the base branch's remote

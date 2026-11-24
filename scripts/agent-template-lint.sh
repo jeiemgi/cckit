@@ -2,12 +2,12 @@
 # agent-template-lint.sh — every agent template carries the two fields both runtimes key on
 # (E257.6, #263).
 #
-# WHY: templates/agents/<role>.md is the one role source, translated per adapter by
+# WHY: kit/templates/agents/<role>.md is the one role source, translated per adapter by
 # scripts/lib/agent-def.sh. Codex refuses a custom agent whose TOML has no `name` or no
 # `description`, and Claude Code addresses an agent by its `name`. A template whose `name:` drifted
 # from its file name installs as `.codex/agents/<basename>.toml` declaring a different agent.
 #
-# WHAT: for each templates/agents/<role>.md, `name:` equals the file's basename and `description:`
+# WHAT: for each kit/templates/agents/<role>.md, `name:` equals the file's basename and `description:`
 # is not empty.
 #
 # Not here: whether a `skills:` entry resolves. scripts/agent-skills-lint.sh owns that check and its
@@ -34,7 +34,7 @@ done
 # shellcheck source=/dev/null
 . "$ROOT/scripts/lib/agent-def.sh"
 
-AGENTS_DIR="$LINT_ROOT/templates/agents"
+AGENTS_DIR="$LINT_ROOT/kit/templates/agents"
 [ -d "$AGENTS_DIR" ] || { echo "agent-template-lint: no $AGENTS_DIR" >&2; exit 2; }
 
 FAIL=0

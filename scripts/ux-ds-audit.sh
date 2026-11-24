@@ -143,4 +143,4 @@ printf '%s\n' "$REPEATED" | cut -f2 | while IFS= read -r lit; do
   printf '%s\n' "$FILES" | xargs grep -nF -- "$lit" 2>/dev/null | cut -d: -f1,2 | sed 's|^|    |'
 done
 
-echo; echo "# end — classify with skills/kit-ux-audit/references/consistency.md"
+echo; echo "# end — classify with kit/skills/kit-ux-audit/references/consistency.md"

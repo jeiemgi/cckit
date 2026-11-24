@@ -120,7 +120,7 @@ else
     || echo "  ⚠ could not auto-register — run it yourself: $MCP_ADD_CMD"
 fi
 
-emit_rule "$KIT_ROOT/templates/rules/react-annotate.md" "$TARGET/.claude/rules/react-annotate.md"
+emit_rule "$KIT_ROOT/kit/templates/rules/react-annotate.md" "$TARGET/.claude/rules/react-annotate.md"
 echo "  ✓ .claude/rules/react-annotate.md"
 
 if [[ -f "$CFG" ]]; then

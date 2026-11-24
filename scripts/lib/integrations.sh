@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # integrations.sh — the integration registry: one JSON descriptor per optional third-party tool
-# in integrations/ at the plugin root, beside modules/ and interview/ (E303.1).
+# in kit/integrations/ at the plugin root, beside kit/modules/ and kit/interview/ (E303.1).
 #
 # A descriptor is DATA: label, the config key that turns the tool on, a detect command, ordered
 # install candidates, a verify command, a docs link, an attribution block, and an optional
@@ -41,9 +41,9 @@ _kit_ig_require() { command -v jq >/dev/null 2>&1 || { kit_warn "integrations: j
 # integrations_dir -> the descriptor directory. Plugin root = two levels up from scripts/lib/.
 integrations_dir() {
   if [ -n "${KIT_INTEGRATIONS_DIR:-}" ]; then printf '%s\n' "$KIT_INTEGRATIONS_DIR"; return 0; fi
-  if [ -n "${KIT_PLUGIN_ROOT:-}" ]; then printf '%s/integrations\n' "$KIT_PLUGIN_ROOT"; return 0; fi
-  if [ -n "${CLAUDE_PLUGIN_ROOT:-}" ]; then printf '%s/integrations\n' "$CLAUDE_PLUGIN_ROOT"; return 0; fi
-  printf '%s/integrations\n' "$(CDPATH='' cd -- "$_kit_ig_dir/../.." && pwd)"
+  if [ -n "${KIT_PLUGIN_ROOT:-}" ]; then printf '%s/kit/integrations\n' "$KIT_PLUGIN_ROOT"; return 0; fi
+  if [ -n "${CLAUDE_PLUGIN_ROOT:-}" ]; then printf '%s/kit/integrations\n' "$CLAUDE_PLUGIN_ROOT"; return 0; fi
+  printf '%s/kit/integrations\n' "$(CDPATH='' cd -- "$_kit_ig_dir/../.." && pwd)"
 }
 
 # integrations_list -> ids, sorted. The schema lives in the same dir and is not a descriptor.

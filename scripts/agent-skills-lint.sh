@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# agent-skills-lint.sh — resolve every `skills:` entry in templates/agents/*.md (kit-owned).
+# agent-skills-lint.sh — resolve every `skills:` entry in kit/templates/agents/*.md (kit-owned).
 #
 # WHY: a skill reference that does not resolve fails silently. The agent loads, answers, and has
 # fewer capabilities than its frontmatter lists; nothing warns at init time or later. A rename is
-# how it happens: templates/agents/pm.md kept listing task-sync / task-new / task-close after the
+# how it happens: kit/templates/agents/pm.md kept listing task-sync / task-new / task-close after the
 # kit shipped them as kit-task-*, so all three of the PM agent's lifecycle skills were dead.
 #
 # WHAT: an entry resolves when it is one of
 #   - a skill the kit ships:            skills/<name>/SKILL.md
-#   - a skill the kit scaffolds:        templates/skills/<name>/SKILL.md
+#   - a skill the kit scaffolds:        kit/templates/skills/<name>/SKILL.md
 #   - another plugin's skill:           <plugin>:<skill>  (the namespace names the provider)
 #   - a declared third-party bare name: a line in scripts/agent-skills-external.txt
 # Anything else fails, reported as `<file>:<line>: <entry>`. An allowlisted name that the kit now
@@ -21,7 +21,7 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-AGENTS_DIR="templates/agents"
+AGENTS_DIR="kit/templates/agents"
 EXTERNAL="scripts/agent-skills-external.txt"
 
 FAIL=0
@@ -62,7 +62,7 @@ skills_entries() {
   ' "$1"
 }
 
-shipped() { [ -f "skills/$1/SKILL.md" ] || [ -f "templates/skills/$1/SKILL.md" ]; }
+shipped() { [ -f "kit/skills/$1/SKILL.md" ] || [ -f "kit/templates/skills/$1/SKILL.md" ]; }
 
 external_names() {
   [ -f "$EXTERNAL" ] || return 0
@@ -104,7 +104,7 @@ EOF_ENTRIES
 done
 
 if [ "$dead" -gt 0 ]; then
-  note "$dead skills: entr$( [ "$dead" -eq 1 ] && echo y || echo ies ) resolve to nothing: not under skills/ or templates/skills/,"
+  note "$dead skills: entr$( [ "$dead" -eq 1 ] && echo y || echo ies ) resolve to nothing: not under kit/skills/ or kit/templates/skills/,"
   note "not a plugin:skill reference, and not in $EXTERNAL."
   note "A renamed kit skill takes its new name; a third-party one gets a line in $EXTERNAL."
 fi

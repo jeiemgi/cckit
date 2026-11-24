@@ -14,7 +14,7 @@ cat > "$tmp/body.sh" <<'BODY'
 fail=0
 t() { if [ "$2" = "$3" ]; then echo "ok($SH): $1"; else echo "FAIL($SH): $1 -> got '[$2]' want '[$3]'"; fail=1; fi; }
 . "$LIB/codex-hooks.sh"
-TPL="$ROOT/templates/codex/hooks.json.tmpl"
+TPL="$ROOT/kit/templates/codex/hooks.json.tmpl"
 w="$tmp/$SH"; mkdir -p "$w"
 
 # --- the command string ------------------------------------------------------------------------
@@ -26,7 +26,7 @@ t "template commands are all checkout-relative" \
 t "template registers the five events" "$(jq -r '.hooks | keys | join(" ")' "$TPL")" \
   "PostToolUse PreToolUse SessionStart Stop UserPromptSubmit"
 t "template: every registered script has a hook template" \
-  "$(jq -r '.hooks[][].hooks[].command' "$TPL" | sed 's|.*/\.codex/hooks/||; s|"$||' | sort -u | while IFS= read -r s; do [ -f "$ROOT/templates/hooks/$s.tmpl" ] || echo "$s"; done | tr '\n' ' ')" ""
+  "$(jq -r '.hooks[][].hooks[].command' "$TPL" | sed 's|.*/\.codex/hooks/||; s|"$||' | sort -u | while IFS= read -r s; do [ -f "$ROOT/kit/templates/hooks/$s.tmpl" ] || echo "$s"; done | tr '\n' ' ')" ""
 
 # --- create ------------------------------------------------------------------------------------
 t "no file: created"            "$(codex_hooks_merge "$w/a.json" "$TPL")" "created"

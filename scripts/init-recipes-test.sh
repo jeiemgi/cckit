@@ -31,7 +31,7 @@ for id in $(recipes_list); do
   f="$(recipe_file "$id")"
   t "recipe $id: valid" "$(recipe_validate "$f" 2>&1; echo "rc=$?")" "rc=0"
   [ "$(jq -r .recommended "$f")" = "true" ] && rec=$((rec + 1))
-  t "recipe $id: its profile exists" "$([ -f "$ROOT/profiles/$(jq -r .profile "$f").json" ] && echo yes)" "yes"
+  t "recipe $id: its profile exists" "$([ -f "$ROOT/kit/profiles/$(jq -r .profile "$f").json" ] && echo yes)" "yes"
   t "recipe $id: lists its sources" "$(jq -r '(.sources // []) | length > 0' "$f")" "true"
 done
 t "recipes: exactly one is recommended" "$rec" "1"
@@ -88,7 +88,7 @@ t "databases: exactly one is recommended" "$rec" "1"
 # ── an option without its guide or its test is not offered ──────────────────────────────────────
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 fx="$tmp/databases"; mkdir -p "$fx/demo"
-jq '.id = "demo" | .guide = "demo/guide.html" | .test = "demo-test.sh"' "$ROOT/databases/supabase.json" > "$fx/demo.json"
+jq '.id = "demo" | .guide = "demo/guide.html" | .test = "demo-test.sh"' "$ROOT/kit/databases/supabase.json" > "$fx/demo.json"
 t "fixture: neither guide nor test -> not offered" "$(database_offered "$fx/demo.json"; echo "rc=$?")" "rc=1"
 : > "$fx/demo/guide.html"
 t "fixture: guide without test -> not offered" "$(database_offered "$fx/demo.json"; echo "rc=$?")" "rc=1"

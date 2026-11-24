@@ -26,7 +26,7 @@ baseline="$ROOT/scripts/force-push-fence.baseline"
 
 # A forbidden push: `push` then --force / --force-with-lease / -f on one line, or a bare --force-with-lease.
 re='push[^|;&]*(--force|[[:space:]]-f([[:space:]]|$))|--force-with-lease'
-hits="$(cd "$ROOT" && { for f in bin/*; do [ -f "$f" ] && echo "$f"; done; for f in scripts/*.sh scripts/lib/*.sh; do [ -f "$f" ] && echo "$f"; done; } \
+hits="$(cd "$ROOT" && { for f in bin/*; do [ -f "$f" ] && echo "$f"; done; for f in scripts/*.sh scripts/lib/*.sh lib/*/*.sh; do [ -f "$f" ] && echo "$f"; done; true; } \
   | grep -vE -- '-test\.sh$|(^|/)test-[a-z-]+\.sh$|^scripts/force-push-fence\.sh$' | sort -u | while IFS= read -r f; do
       grep -nE "$re" "$f" | grep -vE '^[0-9]+:[[:space:]]*#' | sed "s|^|$f:|" || true
     done)"
@@ -46,6 +46,6 @@ if [ "$n" -gt "$max" ]; then
   printf '%s\n' "$hits" | sed '/^$/d' | sed 's/^/    /'
   exit 1
 fi
-echo "ok force-push fence: $n/$max force-push lines in bin/ and scripts/"
+echo "ok force-push fence: $n/$max force-push lines in bin/, scripts/ and lib/"
 if [ "$n" -lt "$max" ]; then echo "   the count went down — ratchet it: scripts/force-push-fence.sh --write"; fi
 exit 0

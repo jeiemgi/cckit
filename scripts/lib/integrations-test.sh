@@ -23,7 +23,7 @@ command -v jq >/dev/null 2>&1 || { echo "integrations-test: jq absent — skippi
 
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 fx="$tmp/integrations"; mkdir -p "$fx"
-cp "$ROOT/integrations/integration.schema.json" "$fx/"
+cp "$ROOT/kit/integrations/integration.schema.json" "$fx/"
 
 # The fixture carries every field the issue names: label, the config key that turns it on, a
 # detect command, ORDERED install candidates, a verify command, a docs link, an attribution block
@@ -227,12 +227,12 @@ integration_explicit "$tmp/defon.json" "$tmp/unset.json";   rc "integration_expl
 integration_explicit "$tmp/defon.json" "$tmp/mem-off.json"; rc "integration_explicit: key present and false" "$?" "0"
 jq '.config = {"key":"memory.enabled","default":"yes"}' "$good" > "$tmp/defbad/fixture-tool.json"
 has "config.default must be a boolean" "$(integration_validate "$tmp/defbad/fixture-tool.json" 2>&1)" "config.default: expected boolean"
-lav="$ROOT/integrations/lavish.json"
+lav="$ROOT/kit/integrations/lavish.json"
 integration_validate "$lav" >/dev/null 2>&1; rc "lavish validates" "$?" "0"
 t "lavish: turned off by reviewPages.enabled" "$(integration_config_key "$lav")" "reviewPages.enabled"
 integration_default_on "$lav"; rc "lavish: on by default" "$?" "0"
 t "lavish: ships the review-pages rule" "$(jq -c '.rules' "$lav")" '["review-pages"]'
-t "lavish: its rule template exists" "$([ -f "$ROOT/templates/rules/review-pages.md" ] && echo yes || echo no)" "yes"
+t "lavish: its rule template exists" "$([ -f "$ROOT/kit/templates/rules/review-pages.md" ] && echo yes || echo no)" "yes"
 
 # ── 7. the CLI form other scripts call ─────────────────────────────────────────────────────────
 t "--list" "$(bash "$LIB/integrations.sh" --list)" "fixture-tool"
@@ -252,7 +252,7 @@ fi
 unset KIT_INTEGRATIONS_DIR
 
 # ── 9. what actually ships ─────────────────────────────────────────────────────────────────────
-jq -e . "$ROOT/integrations/integration.schema.json" >/dev/null 2>&1; rc "integration.schema.json is valid JSON" "$?" "0"
+jq -e . "$ROOT/kit/integrations/integration.schema.json" >/dev/null 2>&1; rc "integration.schema.json is valid JSON" "$?" "0"
 out="$(integrations_validate_all 2>&1)"; r=$?
 rc "every shipped descriptor validates${out:+ ($out)}" "$r" "0"
 jq -e . "$ROOT/kit.config.schema.json" >/dev/null 2>&1; rc "kit.config.schema.json is valid JSON" "$?" "0"
@@ -268,7 +268,7 @@ done
 # The two tools that used to be hardcoded in scripts/kit-doctor.sh (E303.4), one unit test each.
 # They are unlike on purpose: the format has to carry both shapes.
 t "shipped descriptors" "$(integrations_list | tr '\n' ' ')" "emil-design-eng graft impeccable lavish mempalace mlx-lm web-design-guidelines "
-mp="$ROOT/integrations/mempalace.json"; mlx="$ROOT/integrations/mlx-lm.json"
+mp="$ROOT/kit/integrations/mempalace.json"; mlx="$ROOT/kit/integrations/mlx-lm.json"
 integration_validate "$mp" >/dev/null 2>&1;  rc "mempalace validates" "$?" "0"
 t "mempalace: turned on by memory.enabled" "$(integration_config_key "$mp")" "memory.enabled"
 t "mempalace: pipx first, uv second" "$(jq -r '[.install[].run] | join(" | ")' "$mp")" "pipx install mempalace | uv tool install mempalace"
@@ -290,7 +290,7 @@ t "no shipped candidate is a plain pip install" \
 
 # Graft (E303.10): the first descriptor that judges the REPO (anyExtension), wires into it, and
 # ships a rule. The wire flags below are the ones the hook-merge test ran with.
-gr="$ROOT/integrations/graft.json"
+gr="$ROOT/kit/integrations/graft.json"
 integration_validate "$gr" >/dev/null 2>&1; rc "graft validates" "$?" "0"
 t "graft: turned on by codeGraph.provider" "$(integration_config_key "$gr")" "codeGraph.provider"
 t "graft: ON value names the provider" "$(jq -r '.config.value' "$gr")" "graft"
@@ -307,11 +307,11 @@ on_machine Linux x86_64 "$gr" "$repo";         rc "graft applies once a .ts file
 # Every rule a descriptor ships must exist as a template, or `cckit add` would write nothing.
 for id in $(integrations_list); do
   for r in $(jq -r '.rules // [] | .[]' "$(integration_file "$id")"); do
-    t "$id: rule template $r exists" "$([ -f "$ROOT/templates/rules/$r.md" ] && echo yes || echo no)" "yes"
+    t "$id: rule template $r exists" "$([ -f "$ROOT/kit/templates/rules/$r.md" ] && echo yes || echo no)" "yes"
   done
 done
 t "graft: ships the code-retrieval rule" "$(jq -c '.rules' "$gr")" '["code-retrieval"]'
-rule="$ROOT/templates/rules/code-retrieval.md"
+rule="$ROOT/kit/templates/rules/code-retrieval.md"
 # `cckit add` copies the rule verbatim, so it must hold nothing init.sh would have to resolve.
 t "code-retrieval: no template variable or IF block" "$(grep -cE '\{\{|<!-- /?IF:' "$rule")" "0"
 t "code-retrieval: names no machine-specific search tool" "$(grep -ciE '(^|[^a-z])fff([^a-z]|$)' "$rule")" "0"
@@ -330,7 +330,7 @@ t "kit.config.schema.json declares local.enabled" \
 # The three design skills `page-design` coordinates (#504). A skill is files, not a binary: detect
 # and verify are file checks in the project and in ~/.claude/skills, and each is off until added.
 for id in impeccable emil-design-eng web-design-guidelines; do
-  d="$ROOT/integrations/$id.json"
+  d="$ROOT/kit/integrations/$id.json"
   integration_validate "$d" >/dev/null 2>&1; rc "$id validates" "$?" "0"
   integration_default_on "$d"; rc "$id: off until added" "$?" "1"
   t "$id: ON value names the skill" "$(jq -r '.config.value' "$d")" "$id"
@@ -344,23 +344,23 @@ for id in impeccable emil-design-eng web-design-guidelines; do
   t "$id: alsoWrites names what that run wrote besides the skill" "$(jq -r '.alsoWrites | length > 0' "$d")" "true"
 done
 t "the three design keys are three capabilities" \
-  "$(for id in impeccable emil-design-eng web-design-guidelines; do integration_config_key "$ROOT/integrations/$id.json"; done | tr '\n' ' ')" \
+  "$(for id in impeccable emil-design-eng web-design-guidelines; do integration_config_key "$ROOT/kit/integrations/$id.json"; done | tr '\n' ' ')" \
   "designDirection.provider designMotion.provider designAudit.provider "
-t "impeccable: the add text names the binary download" "$(jq -r '.why | test("downloaded once into ~/.impeccable/bin/")' "$ROOT/integrations/impeccable.json")" "true"
-t "impeccable: the add text names the catalogue fetch" "$(jq -r '.why | test("impeccable.style catalogue")' "$ROOT/integrations/impeccable.json")" "true"
-t "impeccable: installs into the project, for Claude Code" "$(jq -r '.install[0].run' "$ROOT/integrations/impeccable.json")" "npx -y impeccable install --providers=claude --scope=project"
-t "emil-design-eng: one skill, not the pack" "$(jq -r '.install[0].run' "$ROOT/integrations/emil-design-eng.json")" "npx -y skills@latest add emilkowalski/skills --skill emil-design-eng -a claude-code -y"
-t "web-design-guidelines: one skill" "$(jq -r '.install[0].run' "$ROOT/integrations/web-design-guidelines.json")" "npx -y skills@latest add vercel-labs/agent-skills --skill web-design-guidelines -a claude-code -y"
-t "web-design-guidelines: the licence line says where MIT is stated" "$(jq -r '.attribution.notice | test("holds no LICENSE file")' "$ROOT/integrations/web-design-guidelines.json")" "true"
+t "impeccable: the add text names the binary download" "$(jq -r '.why | test("downloaded once into ~/.impeccable/bin/")' "$ROOT/kit/integrations/impeccable.json")" "true"
+t "impeccable: the add text names the catalogue fetch" "$(jq -r '.why | test("impeccable.style catalogue")' "$ROOT/kit/integrations/impeccable.json")" "true"
+t "impeccable: installs into the project, for Claude Code" "$(jq -r '.install[0].run' "$ROOT/kit/integrations/impeccable.json")" "npx -y impeccable install --providers=claude --scope=project"
+t "emil-design-eng: one skill, not the pack" "$(jq -r '.install[0].run' "$ROOT/kit/integrations/emil-design-eng.json")" "npx -y skills@latest add emilkowalski/skills --skill emil-design-eng -a claude-code -y"
+t "web-design-guidelines: one skill" "$(jq -r '.install[0].run' "$ROOT/kit/integrations/web-design-guidelines.json")" "npx -y skills@latest add vercel-labs/agent-skills --skill web-design-guidelines -a claude-code -y"
+t "web-design-guidelines: the licence line says where MIT is stated" "$(jq -r '.attribution.notice | test("holds no LICENSE file")' "$ROOT/kit/integrations/web-design-guidelines.json")" "true"
 # A skill in the project is detected with no tool on PATH; a project without it is not.
 sk="$(mktemp -d)"
-( cd "$sk" && HOME="$sk/home" sh -c "$(jq -r '.detect.run' "$ROOT/integrations/impeccable.json")" ); rc "impeccable: not detected in an empty project" "$?" "1"
+( cd "$sk" && HOME="$sk/home" sh -c "$(jq -r '.detect.run' "$ROOT/kit/integrations/impeccable.json")" ); rc "impeccable: not detected in an empty project" "$?" "1"
 mkdir -p "$sk/.claude/skills/impeccable"; : > "$sk/.claude/skills/impeccable/SKILL.md"
-( cd "$sk" && HOME="$sk/home" sh -c "$(jq -r '.detect.run' "$ROOT/integrations/impeccable.json")" ); rc "impeccable: detected from the project's skill file" "$?" "0"
+( cd "$sk" && HOME="$sk/home" sh -c "$(jq -r '.detect.run' "$ROOT/kit/integrations/impeccable.json")" ); rc "impeccable: detected from the project's skill file" "$?" "0"
 rm -rf "$sk"
 
-t "package.json ships integrations/ in the npm tarball" \
-  "$(jq -r '.files | index("integrations") != null' "$ROOT/package.json")" "true"
+t "package.json ships kit/ (integrations included) in the npm tarball" \
+  "$(jq -r '.files | index("kit") != null' "$ROOT/package.json")" "true"
 
 [ "$fail" -eq 0 ] && echo "ALL OK (integrations)" || echo "integrations: FAILURES"
 exit "$fail"
