@@ -9,11 +9,11 @@
 #     REAL — produced by running `init.sh` with the same test values.
 # To capture the genuine interactive flow, record it yourself in a real terminal (see media README).
 #
-# Requires: agg, jq, awk, bash.  Usage: bash docs/media/build-kit-init.sh
+# Requires: agg, jq, awk, bash.  Usage: bash docs-site/media/build-kit-init.sh
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-MEDIA="$ROOT/docs/media"; COLS=92; ROWS=30
+MEDIA="$ROOT/docs-site/media"; COLS=92; ROWS=30
 CAST="$MEDIA/kit-init.cast"; GIF="$MEDIA/kit-init.gif"
 
 # Real scaffold output for the test values (minimal profile, memory off) into a throwaway dir.

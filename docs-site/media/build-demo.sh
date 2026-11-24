@@ -11,18 +11,18 @@
 # terminal programs, so they are documented in prose — not faked as terminal GIFs.
 #
 # Requires: agg (https://github.com/asciinema/agg), jq, awk, bash.
-# Usage:    bash docs/media/build-demo.sh
+# Usage:    bash docs-site/media/build-demo.sh
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-MEDIA="$ROOT/docs/media"
+MEDIA="$ROOT/docs-site/media"
 COLS=98; ROWS=34
 
 esc()  { printf '%s' "$1" | jq -Rs .; }                 # JSON-encode a string
 bump() { awk "BEGIN{printf \"%.2f\", $1 + $2}"; }        # add seconds
 
 # make_gif <name> <shown-command> <output-text>
-# Renders a typed-command-then-output clip to docs/media/<name>.{cast,gif}.
+# Renders a typed-command-then-output clip to docs-site/media/<name>.{cast,gif}.
 make_gif() {
   local name="$1" shown="$2" out="$3"
   local cast="$MEDIA/$name.cast" gif="$MEDIA/$name.gif"

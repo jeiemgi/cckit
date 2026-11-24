@@ -17,7 +17,6 @@
     "bin",
     "scripts",
     "kit",
-    "docs",
     "cckit.config.json",
     "kit.config.schema.json",
     "privacy-denylist.example",

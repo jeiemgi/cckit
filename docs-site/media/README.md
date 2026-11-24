@@ -18,15 +18,15 @@ Terminal demos for the docs.
 
 ```bash
 # Onboarding GIF — re-render from the saved capture (no claude call):
-ONB_CAST=docs/media/.onboarding-capture.cast bash docs/media/build-onboarding.sh
+ONB_CAST=docs-site/media/.onboarding-capture.cast bash docs-site/media/build-onboarding.sh
 # …or capture a fresh real claude session (needs claude auth + an API call):
-bash docs/media/build-onboarding.sh
+bash docs-site/media/build-onboarding.sh
 
 # Deterministic CLI demos (dry-run, scaffold, help):
-bash docs/media/build-demo.sh
+bash docs-site/media/build-demo.sh
 
 # Illustrative interactive /kit-init clip (mocked chips + real scaffold output):
-bash docs/media/build-kit-init.sh
+bash docs-site/media/build-kit-init.sh
 ```
 
 To capture the **genuine interactive `/kit-init`** (which can't be done headlessly), record it in a

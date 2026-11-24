@@ -7,14 +7,14 @@
 # watchable GIF (claude's ~16s think time is replaced with a short beat, and the
 # burst output is streamed line by line). Content is not faked.
 #
-# Re-capture + rebuild:   bash docs/media/build-onboarding.sh
-# Rebuild from a saved capture only:   ONB_CAST=/path/to.cast bash docs/media/build-onboarding.sh
+# Re-capture + rebuild:   bash docs-site/media/build-onboarding.sh
+# Rebuild from a saved capture only:   ONB_CAST=/path/to.cast bash docs-site/media/build-onboarding.sh
 #
 # Requires: claude (authenticated) for capture; agg + jq + awk for rendering.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-MEDIA="$ROOT/docs/media"
+MEDIA="$ROOT/docs-site/media"
 COLS=98; ROWS=38
 CAP="${ONB_CAST:-$MEDIA/.onboarding-capture.cast}"
 SHOWN='claude -p '\''run init.sh --profile automation --name "Acme Bot" --memory on --dry-run and show the output'\'''
