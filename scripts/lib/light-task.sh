@@ -426,7 +426,7 @@ _lt_config_file() {
 
 # ── page tasks (#504) ───────────────────────────────────────────────────────────────────────────
 # The design skills a page is built with: cckit's own `page-design`, then the three third-party
-# skills it coordinates (integrations/impeccable.json, emil-design-eng.json,
+# skills it coordinates (kit/integrations/impeccable.json, emil-design-eng.json,
 # web-design-guidelines.json).
 _LT_DESIGN_SKILLS="page-design impeccable emil-design-eng web-design-guidelines"
 

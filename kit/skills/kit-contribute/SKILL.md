@@ -32,9 +32,9 @@ If `$ARGUMENTS` names one (`agent`, `skill`, `profile`, `request`), use it. Othe
 
 | Type                    | What it adds                                  | Target path                              |
 | ----------------------- | --------------------------------------------- | ---------------------------------------- |
-| **Agent**               | a reusable agent template                     | `templates/agents/<name>.md`             |
-| **Skill**               | a `SKILL.md` (scaffolded or plugin)           | `templates/skills/<name>/` or `skills/<name>/` |
-| **Profile**             | a preset role profile JSON                    | `profiles/<name>.json`                   |
+| **Agent**               | a reusable agent template                     | `kit/templates/agents/<name>.md`             |
+| **Skill**               | a `SKILL.md` (scaffolded or plugin)           | `kit/templates/skills/<name>/` or `skills/<name>/` |
+| **Profile**             | a preset role profile JSON                    | `kit/profiles/<name>.json`                   |
 | **Feature request / idea** | a proposal — GitHub **issue** by default   | (issue) or `requests/<slug>.md`          |
 
 ## 3. Assemble the artifact
@@ -52,25 +52,25 @@ Take a project agent `./.claude/agents/<name>/AGENT.md` and **invert kit-customi
 
 - **Re-wrap the `## Memory (MemPalace)` section** in `<!-- IF:MEMORY -->…<!-- /IF:MEMORY -->`. If the
   project had memory **off** (no Memory section), **add** the block with the standard MemPalace table
-  (wing=`agent-<name>` for diary, `{{WING}}` for shared rooms — match `templates/agents/n8n.md`).
+  (wing=`agent-<name>` for diary, `{{WING}}` for shared rooms — match `kit/templates/agents/n8n.md`).
 - **Strip anything project-specific or secret** — concrete repo names, hostnames, IDs, tokens,
   credential names. Read `kit.config.json` to know exactly which literals to swap out.
 - Keep the frontmatter contract intact (`name` = file basename, `description`, `when_to_use`,
-  `tools`, `skills`). Target: `templates/agents/<name>.md`.
+  `tools`, `skills`). Target: `kit/templates/agents/<name>.md`.
 
 ### Skill — a SKILL.md
 
 Ask whether it's a **scaffolded skill** (lands in a project's `.claude/skills/` via init) →
-`templates/skills/<name>/SKILL.md`, or a **plugin skill** (ships with the plugin itself) →
+`kit/templates/skills/<name>/SKILL.md`, or a **plugin skill** (ships with the plugin itself) →
 `skills/<name>/SKILL.md`. Strip project-specific paths/values.
 
 ### Profile — a preset JSON
 
 Often the user already saved one via kit-customize at `~/.claude/kit-profiles/<name>.json`. Match the
 preset shape exactly (`name`, `label`, `description`, `agents`, `skills`, `rules`, `roles`,
-`milestones`, `defaults`) — see `profiles/automation.json`. **Verify every agent it lists exists** as
-`templates/agents/<agent>.md` in the upstream clone (step 4) — bundle any missing agent template in
-the **same PR**, or drop it from the list. Target: `profiles/<name>.json`.
+`milestones`, `defaults`) — see `kit/profiles/automation.json`. **Verify every agent it lists exists** as
+`kit/templates/agents/<agent>.md` in the upstream clone (step 4) — bundle any missing agent template in
+the **same PR**, or drop it from the list. Target: `kit/profiles/<name>.json`.
 
 ### Feature request / idea — a proposal
 

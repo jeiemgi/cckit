@@ -91,7 +91,7 @@ Keep it compact — you hand slices to the agent, not the whole graph.
 
 ### Lane `flows`
 
-Spawn the **ux** agent (`templates/agents/ux.md`; in an onboarded project
+Spawn the **ux** agent (`kit/templates/agents/ux.md`; in an onboarded project
 `.claude/agents/ux/AGENT.md`). Give it **only** these slices as compact JSON — never source files:
 routes/screens with click-depth · god-nodes (id, fan-in, rendering screens) · community bridges ·
 per `data-entity` its `reads`/`writes`/`mutates` edges + source screen · per `form` its field

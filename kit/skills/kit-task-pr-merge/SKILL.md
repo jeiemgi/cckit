@@ -33,7 +33,7 @@ kto_task_pr_merge            # open PR for the current branch
 After it returns on the base branch, run the kit-sync drift check (advisory; never blocks). The
 pattern is `_EO_KIT_MANAGED_RE` from `effort-ops.sh` — the same one `cckit effort close` uses, so
 the two checks agree. Under `.claude/rules/` it matches only the rule files the kit ships
-(`templates/rules/*.md`); a rule the project wrote itself is not flagged.
+(`kit/templates/rules/*.md`); a rule the project wrote itself is not flagged.
 
 ```bash
 source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/effort-ops.sh"   # _EO_KIT_MANAGED_RE

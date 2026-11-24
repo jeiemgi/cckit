@@ -35,9 +35,9 @@ Authority:
    form its field/required counts, steps, host screens, duplicates. For the consistency and a11y
    lanes you receive the deterministic scanner's occurrence lists.
 2. **Apply the full catalogue for the lane** — every heuristic, no cherry-picking:
-   - flows → `skills/kit-ux-audit/references/heuristics.md` (H1–H12)
-   - consistency → `skills/kit-ux-audit/references/consistency.md` (C1–C6)
-   - a11y → `skills/kit-ux-audit/references/a11y.md` (A1–A5)
+   - flows → `kit/skills/kit-ux-audit/references/heuristics.md` (H1–H12)
+   - consistency → `kit/skills/kit-ux-audit/references/consistency.md` (C1–C6)
+   - a11y → `kit/skills/kit-ux-audit/references/a11y.md` (A1–A5)
 3. **Never invent an edge.** If a verdict needs something the graph/scan does not show, set
    `needs_visual: true` and say exactly what to check — do not assert it.
 4. **Open a source file only to confirm a specific flagged finding**, and only within the caller's

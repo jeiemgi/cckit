@@ -18,7 +18,7 @@ examples, templates):
   the `CCKIT_LEAK_WORDS` repository secret for CI. The list is never committed, and a hit prints
   `file:line` without the matched text, so a public CI log cannot leak it either.
 - **Enforcement** — runs in the local gate (`scripts/check.sh`) and as a pre-commit hook
-  (`githooks/pre-commit`; enable with `git config core.hooksPath githooks`). A finding blocks the
+  (`kit/githooks/pre-commit`; enable with `git config core.hooksPath githooks`). A finding blocks the
   commit.
 
 ## Reporting a vulnerability

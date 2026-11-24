@@ -423,7 +423,7 @@ EOF
     local owned_libs sourced_libs want_libs table
     owned_libs="$(printf '%s\n' "$files" | sed -n 's#.*/\([A-Za-z0-9_.-]*\.sh\)$#\1#p')"
     # `if`, not `[ -f … ] &&`: a while loop's rc is its LAST iteration's, so a trailing non-file
-    # token (`templates/skills/` — the parser keeps directory tokens) made this assignment rc 1 and
+    # token (`kit/templates/skills/` — the parser keeps directory tokens) made this assignment rc 1 and
     # `bin/cckit`'s `set -eu` killed the brief right here. Every section below — the helpers table,
     # the standing gotchas, the durable-prose mandate — was silently missing from every generated
     # brief. An `if` with no else always returns 0, so the loop's rc no longer depends on the input.

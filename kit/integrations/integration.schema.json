@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://cckit.dev/integration.schema.json",
   "title": "cckit integration descriptor",
-  "description": "One optional third-party tool cckit can offer, install and verify. One file per tool: integrations/<id>.json. Checked by integration_validate (scripts/lib/integrations.sh), which implements exactly these keywords: type, required, properties, additionalProperties:false, items, minItems, minLength, pattern, enum. A keyword outside that list is NOT enforced — extend the validator before using one here.",
+  "description": "One optional third-party tool cckit can offer, install and verify. One file per tool: kit/integrations/<id>.json. Checked by integration_validate (scripts/lib/integrations.sh), which implements exactly these keywords: type, required, properties, additionalProperties:false, items, minItems, minLength, pattern, enum. A keyword outside that list is NOT enforced — extend the validator before using one here.",
   "type": "object",
   "additionalProperties": false,
   "required": ["id", "label", "summary", "config", "detect", "install", "verify", "docs", "attribution"],
@@ -30,7 +30,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["key"],
-      "description": "The project-config key that turns the integration on. Naming rule: the key names a CAPABILITY, never the vendor — `<capability>.provider` whose value names the tool (the `deploy.target` / `ci.provider` precedent in modules/software.json), or `<capability>.enabled` for a boolean switch that already exists (`memory.enabled`, `local.enabled`). A key containing the descriptor's own id is refused. Every key used here needs a property in kit.config.schema.json.",
+      "description": "The project-config key that turns the integration on. Naming rule: the key names a CAPABILITY, never the vendor — `<capability>.provider` whose value names the tool (the `deploy.target` / `ci.provider` precedent in kit/modules/software.json), or `<capability>.enabled` for a boolean switch that already exists (`memory.enabled`, `local.enabled`). A key containing the descriptor's own id is refused. Every key used here needs a property in kit.config.schema.json.",
       "properties": {
         "key": {
           "type": "string",
@@ -166,7 +166,7 @@
     "rules": {
       "type": "array",
       "items": { "type": "string", "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$" },
-      "description": "Optional: rule templates (templates/rules/<name>.md) that `cckit add <id>` writes into the project's .claude/rules/ when the integration is switched on. A rule file already in the project is kept, never overwritten."
+      "description": "Optional: rule templates (kit/templates/rules/<name>.md) that `cckit add <id>` writes into the project's .claude/rules/ when the integration is switched on. A rule file already in the project is kept, never overwritten."
     },
     "afterInstall": {
       "type": "string",

@@ -74,7 +74,7 @@ EOF_SCAN
   esac
   [ -n "$reasons" ] || return 0
   {
-    echo "✗ the Grilling record is not one (skills/kit-advisor/references/grill.md):"
+    echo "✗ the Grilling record is not one (kit/skills/kit-advisor/references/grill.md):"
     printf '%s' "$reasons" | sed '/^$/d; s/^/    - /'
     echo "    (or write the single line 'waived: <reason>')"
   } >&2

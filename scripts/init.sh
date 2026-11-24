@@ -13,9 +13,9 @@
 #   --yes                     run the git + GitHub setup without asking (required with no terminal)
 #   --public                  create the GitHub repository public       (default: private)
 #   --answers <file>          JSON {"<question key>":"<answer>"} for the guided questions
-#   --recipe <id|none>        start a NEW project from recipes/<id>.json
-#   --database <id|none>      add the database option databases/<id>.json
-#   --profile <name>          role profile, one of profiles/*.json: software · content · marketing ·
+#   --recipe <id|none>        start a NEW project from kit/recipes/<id>.json
+#   --database <id|none>      add the database option kit/databases/<id>.json
+#   --profile <name>          role profile, one of kit/profiles/*.json: software · content · marketing ·
 #                             research · automation · minimal (asked when a terminal or an
 #                             answers file is there; else required unless --upgrade)
 #   --name <str>              human project name                  (default: target basename)
@@ -429,7 +429,7 @@ if [[ $UPGRADE -eq 1 ]]; then
   fi
 fi
 
-# The profile names come from profiles/*.json, so a profile added there is offered here.
+# The profile names come from kit/profiles/*.json, so a profile added there is offered here.
 _PROFILE_NAMES="$(for _pf in "$KIT_ROOT"/kit/profiles/*.json; do [[ -f "$_pf" ]] && basename "$_pf" .json; done | paste -sd '|' -)"
 [[ -z "$PROFILE" ]] && { echo "x --profile is required ($_PROFILE_NAMES)"; exit 1; }
 PROFILE_FILE="$KIT_ROOT/kit/profiles/$PROFILE.json"
@@ -557,7 +557,7 @@ RULES="$(jq -r '.rules[]' "$PROFILE_FILE")"
 
 # Kit-namespaced skill set: templates whose names take $SKILL_PREFIX (the workflow skills:
 # task-*, effort-*). Content skills (morning-briefing, karpathy-…) are NOT listed and stay bare.
-# Listed in templates/skills/NAMESPACED (one name per line) so the marker lives outside the artifact.
+# Listed in kit/templates/skills/NAMESPACED (one name per line) so the marker lives outside the artifact.
 NAMESPACED_SKILLS="$(grep -vE '^\s*(#|$)' "$KIT_ROOT/kit/templates/skills/NAMESPACED" 2>/dev/null || true)"
 _is_namespaced() {  # <skill-name> -> 0 if it takes the prefix
   grep -qxF "$1" <<<"$NAMESPACED_SKILLS"
@@ -1083,7 +1083,7 @@ jq -n \
    | if $prbody == "content" then .pr = {bodyStyle:"content"} else . end
    | if $plain then .plainLanguage = {enabled:true} else . end
    | if $tasksdef == "light" then .tasks = {default:"light"} else . end
-   # Config keys the recipe carries (`config` in recipes/<id>.json), merged over the above: the
+   # Config keys the recipe carries (`config` in kit/recipes/<id>.json), merged over the above: the
    # recipe knows the commands of the project it made (tasks.check, the gate of `cckit task run`).
    | . * $recipecfg
    # The config is committed by the guided setup, so it carries no absolute machine path (#490).
@@ -1131,7 +1131,7 @@ else
 fi
 
 # ---- agents: one role source, one definition per selected runtime (E257.6) ----
-# templates/agents/<role>.md is the role. Claude Code reads it as markdown; Codex reads a custom
+# kit/templates/agents/<role>.md is the role. Claude Code reads it as markdown; Codex reads a custom
 # agent as TOML, so the SAME rendered role is translated by agent_def_codex (scripts/lib/agent-def.sh).
 if adapter_has "$ADAPTERS" claude; then
 use_adapter claude
@@ -1166,7 +1166,7 @@ for a in $AGENTS; do
     echo "  + $_ca_rel"
   else
     rm -f "$_ca_dst.kit-new"
-    echo "  ! $_ca_rel not written — templates/agents/$a.md has no name or description" >&2
+    echo "  ! $_ca_rel not written — kit/templates/agents/$a.md has no name or description" >&2
   fi
   rm -f "$_ca_tmp"
 done
@@ -1180,7 +1180,7 @@ for _ad in $ADAPTERS; do
 use_adapter "$_ad"
 AD="$ADAPTER_DIR"; _instr="$(adapter_instructions "$_ad")"
 
-# CLAUDE.md / AGENTS.md — one source (templates/instructions.md.tmpl). A pre-existing AGENTS.md is
+# CLAUDE.md / AGENTS.md — one source (kit/templates/instructions.md.tmpl). A pre-existing AGENTS.md is
 # usually the project's own contract, so a fresh init keeps it unless --force (CLAUDE.md keeps its
 # historical behavior: a fresh init writes it).
 if [[ "$_ad" == "codex" && -e "$TARGET/$_instr" && $UPGRADE -eq 0 && $FORCE -eq 0 ]]; then
@@ -1353,7 +1353,7 @@ if [[ "$MEMORY_BOOL" == "true" && $UPGRADE -eq 0 ]]; then
   chmod +x "$TARGET/.claude/hooks/mempal_session_start.sh" "$TARGET/.claude/hooks/mempal_save.sh" "$TARGET/.claude/hooks/mempal_precompact.sh" "$TARGET/.claude/hooks/mempal_followup.sh"
   # Per-wing wake-up header — without it, `mempalace wake-up` shows the single global
   # ~/.mempalace/identity.txt for every wing (the session-start hook swaps this in). See
-  # templates/rules/mempalace.md; `cckit doctor` re-seeds it if it goes missing.
+  # kit/templates/rules/mempalace.md; `cckit doctor` re-seeds it if it goes missing.
   _mpid="$TARGET/.claude/mempal-identity.$SLUG.txt"
   if [[ ! -e "$_mpid" ]]; then
     {
@@ -1603,7 +1603,7 @@ if [[ $UPGRADE -eq 1 ]]; then
   if [[ ${#UPGRADE_PRESERVED[@]} -gt 0 ]]; then echo "  Preserved (your edits, untouched):"; printf '    = %s\n' "${UPGRADE_PRESERVED[@]}"; fi
   if [[ ${#UPGRADE_SKIPPED[@]}   -gt 0 ]]; then echo "  Skipped (removed/renamed via kit.config upgrade):"; printf '    - %s\n' "${UPGRADE_SKIPPED[@]}"; fi
   if [[ ${#UPGRADE_REFRESHED[@]} -gt 0 ]]; then echo "  Refreshed (unmodified hook, now the current template):"; printf '    ~ %s\n' "${UPGRADE_REFRESHED[@]}"; fi
-  if [[ ${#UPGRADE_DRIFTED[@]}   -gt 0 ]]; then echo "  Drifted (customized hook, kept — diff it against templates/hooks/ by hand):"; printf '    ! %s\n' "${UPGRADE_DRIFTED[@]}"; fi
+  if [[ ${#UPGRADE_DRIFTED[@]}   -gt 0 ]]; then echo "  Drifted (customized hook, kept — diff it against kit/templates/hooks/ by hand):"; printf '    ! %s\n' "${UPGRADE_DRIFTED[@]}"; fi
   [[ $CODEX_HOOKS_CHANGED -eq 1 ]] && echo "  Codex hooks changed: Codex skips a new or changed hook until you trust it — run /hooks in Codex."
 else
   echo ""
@@ -1619,7 +1619,7 @@ else
   echo "  2. Add the first task:  cckit task new \"<title>\"   then: cckit next"
   echo "  3. Start it:            cckit task start <id>"
   fi
-  [[ "$LOCAL_ON" == "true" ]] && echo "  4. /kit-doctor   # local model layer: installs mlx-lm (recipe: integrations/mlx-lm.json) + starts mlx_lm.server"
+  [[ "$LOCAL_ON" == "true" ]] && echo "  4. /kit-doctor   # local model layer: installs mlx-lm (recipe: kit/integrations/mlx-lm.json) + starts mlx_lm.server"
   # The page-design skill coordinates three third-party design skills. They are offered, never
   # installed by init: each is an integration the person switches on and consents to (#504).
   if grep -qx "page-design" <<<"$SKILLS"; then

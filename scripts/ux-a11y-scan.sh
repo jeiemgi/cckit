@@ -93,4 +93,4 @@ g '<[a-zA-Z][^>]*\baria-hidden="true"[^>]*\b(onClick=|tabIndex=|href=)' || true
 printf -- '-- autoFocus (moves focus on load — confirm it is wanted):\n'
 g '\bautoFocus\b' || true
 
-echo; echo "# end — classify with skills/kit-ux-audit/references/a11y.md"
+echo; echo "# end — classify with kit/skills/kit-ux-audit/references/a11y.md"

@@ -1,4 +1,4 @@
-# skills/routing.yaml — what a person wants → the skill that does it → the term it serves.
+# kit/skills/routing.yaml — what a person wants → the skill that does it → the term it serves.
 #
 # Read by scripts/terms-check.sh with awk, so this file is a STRICT flat subset of YAML:
 #   - one entry is exactly three lines, in this order, no other keys:

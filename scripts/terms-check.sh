@@ -8,7 +8,7 @@
 # 2. Every home resolves: `cli` is a top-level verb of bin/cckit (the first word is checked, so
 #    `effort plan` resolves through `effort`), `skill` is a folder with a SKILL.md under skills/ or
 #    .claude/skills/, `rule` is a file. A seed's unresolved home is printed, not counted a defect.
-# 3. skills/routing.yaml parses in its strict subset (stated at the top of that file); every entry
+# 3. kit/skills/routing.yaml parses in its strict subset (stated at the top of that file); every entry
 #    names an existing skill and an existing term or `none`; every skill under skills/ is routed;
 #    each skill's `terms:` frontmatter line equals its routing terms.
 # 4. AGENTS.md's "Which skill does what" table has one row per routed skill, with the same tasks

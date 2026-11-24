@@ -3,7 +3,7 @@
 #
 # `cckit start` turns an issue's `kind:<k>` label into the branch `<k>/<N>-<slug>`, so a kind value
 # is only usable if it is also a legal branch prefix. The set below is the closed set of
-# rules/branch-naming.md and of the SessionStart hygiene hook (templates/hooks/repo-hygiene.sh.tmpl),
+# rules/branch-naming.md and of the SessionStart hygiene hook (kit/templates/hooks/repo-hygiene.sh.tmpl),
 # which warns on any other prefix. scripts/lib/kinds-test.sh pins the three lists together.
 #
 #   KIT_KINDS                 space-separated closed set of BRANCH kinds

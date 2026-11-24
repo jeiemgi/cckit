@@ -14,8 +14,8 @@ Two kinds of thing can be added, through the same entry:
 
 | Kind | Described by | What `add` writes |
 | --- | --- | --- |
-| **Integration** — an optional third-party tool | `integrations/<id>.json` | the one config key the descriptor names (`config.key`), in the project config `kit_config_path` resolves, plus each rule the descriptor lists (`rules`) into `.claude/rules/` |
-| **Module** — e.g. `software`, `qa` | `modules/<name>.json` | this directory's `.claude/kit.config.json`: `modules[]` plus the wizard answers |
+| **Integration** — an optional third-party tool | `kit/integrations/<id>.json` | the one config key the descriptor names (`config.key`), in the project config `kit_config_path` resolves, plus each rule the descriptor lists (`rules`) into `.claude/rules/` |
+| **Module** — e.g. `software`, `qa` | `kit/modules/<name>.json` | this directory's `.claude/kit.config.json`: `modules[]` plus the wizard answers |
 
 `cckit add <integration>` **installs nothing.** It records the choice; the tool's install is a
 separate step.
@@ -57,7 +57,7 @@ separate step.
 | --- | --- |
 | An `appliesWhen` condition does not hold: no file with a listed extension (`anyExtension`), or the wrong machine (`platform`) | declined, exit 0, nothing written |
 | No project config found from the directory | exit 1 — run `cckit init` first; `add` does not invent a config for an integration |
-| The descriptor fails `integrations/integration.schema.json` | exit 1, the bad field is named, nothing written |
+| The descriptor fails `kit/integrations/integration.schema.json` | exit 1, the bad field is named, nothing written |
 | The name is neither a module nor an integration | exit 1 |
 
 ## Rules

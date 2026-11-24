@@ -2,7 +2,7 @@
 # shellcheck shell=bash
 # review-page.sh — plans, decisions and grilling rounds open as a review page (#451).
 #
-# The page tool is an integration (integrations/lavish.json, `reviewPages.enabled`, ON by default).
+# The page tool is an integration (kit/integrations/lavish.json, `reviewPages.enabled`, ON by default).
 # This file is the `cckit page` verb: it decides whether THIS session can show a page, opens one
 # through the tool when it can, prints to the terminal when it cannot, and writes the reader's
 # answer where the project keeps its record.

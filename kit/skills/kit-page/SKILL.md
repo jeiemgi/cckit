@@ -17,7 +17,7 @@ metadata:
 
 Thin caller of the `cckit page` verb (`scripts/lib/review-page.sh`). The verb decides whether this
 session can show a page; this skill never re-implements that check. The page tool is Lavish
-(`lavish-axi`, third-party, run through `npx`), described by `integrations/lavish.json` and on by
+(`lavish-axi`, third-party, run through `npx`), described by `kit/integrations/lavish.json` and on by
 default (`reviewPages.enabled`).
 
 ## 1. Ask whether a page can open

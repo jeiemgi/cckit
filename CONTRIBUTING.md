@@ -70,7 +70,7 @@ paths:
 ---
 ```
 
-`templates/rules/react-annotate.md` is the shipped example. A cross-cutting rule (branch naming, the
+`kit/templates/rules/react-annotate.md` is the shipped example. A cross-cutting rule (branch naming, the
 effort model) stays unscoped, and a behavioural routing rule must: scoped, it would not load until a
 matching file had already been read. A rule that outgrows 200 lines splits into a short rule plus a
 `knowledge/` doc it points at. `scripts/instruction-budget-lint.sh` is the gate — `--report` lists
@@ -98,7 +98,7 @@ after the fact.
 
 ## cckit's own `.claude/`
 
-`templates/skills/` and `templates/rules/` are what `cckit init` writes into a **consuming**
+`kit/templates/skills/` and `kit/templates/rules/` are what `cckit init` writes into a **consuming**
 project. cckit is the kit, so it was never `cckit init`'d against itself — for its whole history
 those templates shipped to every consumer and applied to nothing here.
 
@@ -110,7 +110,7 @@ on. No agents are installed — `AGENTS.md` plus `cckit brief` is this repo's de
 
 `scripts/self-install-test.sh` is the guard, and the manifest lives in it:
 
-- Every template under `templates/skills/` and `templates/rules/` must be listed as **installed** or
+- Every template under `kit/templates/skills/` and `kit/templates/rules/` must be listed as **installed** or
   **skipped with a reason**. A new template fails the test until someone decides — which is what
   stops the silent partial install from coming back.
 - Every installed file must still match its template: byte-identical, or byte-identical after
@@ -120,7 +120,7 @@ on. No agents are installed — `AGENTS.md` plus `cckit brief` is this repo's de
 
 Edit a template and the installed copy in the same commit, or the test fails.
 
-**A template must never hard-code a value the project can override.** `templates/rules/effort-model.md`
+**A template must never hard-code a value the project can override.** `kit/templates/rules/effort-model.md`
 named `main` as the branch efforts cut from and open their PR against; this repo integrates on
 `develop`, so the installed copy told agents to target a releases-only branch — and it passed the
 byte-identical check, because byte-identical to a wrong template is exactly the bug. The integration
@@ -136,7 +136,7 @@ half regresses.
   `scripts/lib/verbs.tsv` (name, question, prompt, usage, needs) plus its `case` label in
   `bin/cckit`; run `bash scripts/verbs-gen.sh` to refresh the CLI reference block.
   `scripts/verbs-test.sh` fails when the dispatcher, the help, the catalog, the CLI reference,
-  `skills/routing.yaml` or `scripts/forge-report.sh` disagree with the table.
+  `kit/skills/routing.yaml` or `scripts/forge-report.sh` disagree with the table.
   The top level only shrinks: `scripts/verbs-ratchet.sh` fails the gate when the table holds more
   `verb` rows than `scripts/verbs.baseline`, so a new command is a subcommand of a verb that exists.
   To rename a verb, change its row's name and add an `alias` row for the old name

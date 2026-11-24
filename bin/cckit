@@ -6,7 +6,7 @@
 # Every verb, its question, a prompt to paste and its usage live in ONE table: scripts/lib/verbs.tsv
 # (read through scripts/lib/verbs.sh). `cckit help` prints it grouped by question; `cckit commands
 # --json` prints it as data; scripts/verbs-test.sh fails when this dispatcher's case labels, the CLI
-# reference page, skills/routing.yaml or scripts/forge-report.sh drift from it.
+# reference page, kit/skills/routing.yaml or scripts/forge-report.sh drift from it.
 set -eu
 
 # Resolve this script through symlinks — Homebrew and scripts/install.sh link bin/cckit onto

@@ -4,9 +4,9 @@
 # THE SPLIT: the ASKING is interactive (the kit-onboard skill drives AskUserQuestion — Tier A,
 # portable to Cowork/claude.ai). The DERIVING is pure data and lives here, so it is unit-testable
 # under bash AND zsh with zero interactivity:
-#   - catalog : the question set per tier (global | project | software | qa), loaded from interview/*.json
-#               and modules/*.json — data, reviewable, not buried in bash. A tier that names an
-#               integration descriptor (integrations/<id>.json) gets a one-question catalog DERIVED
+#   - catalog : the question set per tier (global | project | software | qa), loaded from kit/interview/*.json
+#               and kit/modules/*.json — data, reviewable, not buried in bash. A tier that names an
+#               integration descriptor (kit/integrations/<id>.json) gets a one-question catalog DERIVED
 #               from that descriptor, so `cckit add <integration>` runs through this same engine.
 #   - context : profile + repo detection, used to PRE-FILL per-project / wizard defaults.
 #   - render  : the catalog with every `default` resolved from context (what the skill renders).
@@ -46,7 +46,7 @@ kit_iv_plugin_root() {
 _kit_iv_require() { command -v jq >/dev/null 2>&1 || { kit_warn "kit-interview: jq is required"; return 1; }; }
 
 # kit_interview_catalog_file <tier> -> path of the catalog JSON for a tier.
-#   global|project -> interview/<tier>.json ;  anything else -> modules/<tier>.json (software, ...)
+#   global|project -> kit/interview/<tier>.json ;  anything else -> kit/modules/<tier>.json (software, ...)
 kit_interview_catalog_file() {
   local tier="$1" root; root="$(kit_iv_plugin_root)"
   case "$tier" in
@@ -59,7 +59,7 @@ kit_interview_catalog_file() {
 # descriptor: ONE select question, `enable`. `yes` sets the descriptor's `config.key` to its ON
 # value (`config.value`, or boolean true when the descriptor names none); `no` carries no `set`,
 # so declining writes nothing — except for a descriptor that is on by default (`config.default`),
-# where `no` writes the off value (`false`, or `"none"` for a named key). The shape is the one modules/*.json uses, which is why render and
+# where `no` writes the off value (`false`, or `"none"` for a named key). The shape is the one kit/modules/*.json uses, which is why render and
 # apply need no integration-specific branch.
 kit_interview_integration_catalog() {
   _kit_iv_require || return 1
@@ -92,7 +92,7 @@ kit_interview_integration_catalog() {
         ] }' "$f" 2>/dev/null || { kit_warn "kit-interview: cannot read integration descriptor $f"; return 1; }
 }
 
-# kit_interview_catalog <tier> -> the catalog JSON (verbatim for interview/ and modules/; derived
+# kit_interview_catalog <tier> -> the catalog JSON (verbatim for kit/interview/ and kit/modules/; derived
 # for a tier that names an integration). A module wins a name it shares with an integration.
 kit_interview_catalog() {
   _kit_iv_require || return 1

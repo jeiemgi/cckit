@@ -18,8 +18,8 @@
 #      file (`--answers FILE`, a JSON object {"<key>":"<value>"}, the `cckit add --answers` format),
 #      the terminal, or — with an answers file and no entry for the key — the recommended option.
 #      With neither a terminal nor an answers file the advisor is off and init runs from flags only.
-#   3. RECIPES AND DATABASES AS DATA — one JSON descriptor per recipe in recipes/ and per database
-#      option in databases/ at the kit root. Adding one is adding a file: nothing here names an id.
+#   3. RECIPES AND DATABASES AS DATA — one JSON descriptor per recipe in kit/recipes/ and per database
+#      option in kit/databases/ at the kit root. Adding one is adding a file: nothing here names an id.
 #
 #   init_detect_class <dir>            one of the class names above
 #   init_abs_path <path>               absolute path of a folder that may not exist yet
@@ -184,7 +184,7 @@ init_ask_text() {
   printf '%s\n' "${ans:-$def}"
 }
 
-# ── registries: recipes/ and databases/ ─────────────────────────────────────────────────────────
+# ── registries: kit/recipes/ and kit/databases/ ─────────────────────────────────────────────────────────
 
 recipes_dir()   { printf '%s\n' "${KIT_RECIPES_DIR:-$_ig_kit_root/kit/recipes}"; }
 databases_dir() { printf '%s\n' "${KIT_DATABASES_DIR:-$_ig_kit_root/kit/databases}"; }

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # integrations.sh — the integration registry: one JSON descriptor per optional third-party tool
-# in integrations/ at the plugin root, beside modules/ and interview/ (E303.1).
+# in kit/integrations/ at the plugin root, beside kit/modules/ and kit/interview/ (E303.1).
 #
 # A descriptor is DATA: label, the config key that turns the tool on, a detect command, ordered
 # install candidates, a verify command, a docs link, an attribution block, and an optional

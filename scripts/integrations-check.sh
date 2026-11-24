@@ -10,7 +10,7 @@
 # would run.
 #
 # Steps per descriptor, in order; the first that fails ends that descriptor:
-#   validate   the descriptor matches integrations/integration.schema.json
+#   validate   the descriptor matches kit/integrations/integration.schema.json
 #   platform   `appliesWhen.platform` matches this machine — a mismatch is a skip, not a failure.
 #              `appliesWhen.anyExtension` is satisfied on purpose: the scratch repo is seeded with
 #              one file of the first listed extension, because the recipe is under test, not a repo
@@ -24,7 +24,7 @@
 # `bootstrap` on a machine that already holds one of the managers, `uninstall`, and `build.deep`.
 #
 # Usage: integrations-check.sh [--yes] [id|file ...]
-#   no ids   every descriptor in integrations/ ($KIT_INTEGRATIONS_DIR overrides)
+#   no ids   every descriptor in kit/integrations/ ($KIT_INTEGRATIONS_DIR overrides)
 #   --yes    install for real. Without it nothing runs: each descriptor is validated and its plan
 #            is printed. Meant for a throwaway machine — it installs tools on the machine it runs on.
 # Output: one `ok|skip|FAIL <id>: <step>: <detail>` line per step on stdout, runner progress on

@@ -3,7 +3,7 @@
 # Backed by mlx_lm.server (Apple MLX), an OpenAI-compatible HTTP server on localhost.
 #
 # Setup (one-time — /kit-doctor does both automatically, #313):
-#   the runtime: the install recipe is integrations/mlx-lm.json, run by lib/integration-install.sh
+#   the runtime: the install recipe is kit/integrations/mlx-lm.json, run by lib/integration-install.sh
 #   the server:  mlx_lm.server --model mlx-community/Qwen3-8B-4bit --port 8080
 #
 # Source this from hooks/skills:  source scripts/lib/kit-local.sh

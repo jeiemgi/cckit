@@ -12,13 +12,13 @@
 # minimal terminal fallback so it stands alone.
 #
 # INTEGRATIONS (E303.2): the same entry also switches on an optional third-party tool described by
-# integrations/<id>.json. `kit-add.sh` with no name LISTS what can be added. `kit-add.sh <id>` asks
+# kit/integrations/<id>.json. `kit-add.sh` with no name LISTS what can be added. `kit-add.sh <id>` asks
 # the one question kit-interview derives from the descriptor and sets that descriptor's config key
 # in the project config kit_config_path resolves — no other key changes. It installs nothing.
 # A descriptor that lists `rules` (E303.10) also gets each rule template copied into the project's
 # .claude/rules/, and under KIT_DRY_RUN the install + wire plan is printed after the config diff.
 #
-# SKILLS (#504): a skill cckit ships that declares itself addable (templates/skills/<name>/add.json:
+# SKILLS (#504): a skill cckit ships that declares itself addable (kit/templates/skills/<name>/add.json:
 # label, summary and the one config key it switches on) is the third thing `add` accepts.
 # `kit-add.sh page-design` sets that key in the project config and copies the skill's SKILL.md and
 # references/ into the skills folder of each adapter the project selects. It asks nothing, keeps a
@@ -103,7 +103,7 @@ kit_add_kind() {
 # --- addable kit skills (#504) ---------------------------------------------
 # kit_add_skill_file <name> -> the add.json of a kit skill that can be added; rc 1 when the name is
 # not a skill id or the skill ships no add.json. The id grammar is checked first, so `../x` never
-# resolves outside templates/skills/.
+# resolves outside kit/templates/skills/.
 kit_add_skill_file() {
   local f
   grep -qE '^[a-z][a-z0-9]*(-[a-z0-9]+)*$' <<<"${1:-}" || return 1
@@ -130,7 +130,7 @@ kit_add_skill_missing() {
 
 # kit_add_skill <name> [targetdir]
 # Sets the skill's config key in the project config (the same merge an integration gets: every
-# other key is kept) and copies templates/skills/<name>/ — SKILL.md and references/ — into
+# other key is kept) and copies kit/templates/skills/<name>/ — SKILL.md and references/ — into
 # <adapter-dir>/skills/<name>/ for each adapter in the config. A folder that already holds a
 # SKILL.md is kept whole, so a project's edits survive a re-run; a second run changes nothing.
 # KIT_DRY_RUN prints the plan and writes nothing. rc 1: no project config, or a failed copy.

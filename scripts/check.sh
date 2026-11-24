@@ -91,7 +91,7 @@ bash scripts/review-lint.sh || fail=1
 note "==> top-level verb ratchet"
 bash scripts/verbs-ratchet.sh || fail=1
 
-# 7. Agent skill references. Every `skills:` entry in templates/agents/*.md must resolve to a skill
+# 7. Agent skill references. Every `skills:` entry in kit/templates/agents/*.md must resolve to a skill
 # the kit ships or scaffolds, a `plugin:skill` reference, or a name declared third-party in
 # scripts/agent-skills-external.txt. An unresolved entry fails silently at runtime: the agent loads
 # with fewer skills than its frontmatter lists.
@@ -99,7 +99,7 @@ note "==> agent skill references"
 bash scripts/agent-skills-lint.sh || fail=1
 
 # 7b. Terms and skill routing — WARN mode. Every term under ontology/terms/ validates, every home
-# resolves, every skill is routed and AGENTS.md's table mirrors skills/routing.yaml. It prints its
+# resolves, every skill is routed and AGENTS.md's table mirrors kit/skills/routing.yaml. It prints its
 # defects and counts and never fails the gate: the terms are new and a word under discussion must
 # not block an unrelated PR. scripts/terms-check-test.sh (step 8) is what fails on a broken checker.
 note "==> terms and skill routing (warn mode)"

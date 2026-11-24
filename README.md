@@ -174,15 +174,15 @@ every question has one recommended answer.
 | empty, or not there yet | asks whether this is a new project, then what it starts from |
 | your home directory, `~/Desktop`, `~/Documents`, `~/Downloads`, `/` | never scaffolds there. Asks whether this is a new project and which folder it gets; with no terminal and no answers file it exits 2 |
 
-**2. A new project starts from a recipe.** A recipe is a JSON file in `recipes/`; adding a file adds
+**2. A new project starts from a recipe.** A recipe is a JSON file in `kit/recipes/`; adding a file adds
 a recipe. One ships: `nextjs-shadcn` (Next.js, shadcn/ui, pnpm). A recipe's `config` object is
 merged into the project config: `nextjs-shadcn` sets `tasks.check` to `pnpm build && pnpm lint`,
 the gate `cckit task run` uses, and `tasks.design` to `true`, which installs the `page-design`
 skill and makes every task of the project a [page task](#pages-are-built-with-named-design-skills). init then asks whether the project
-needs a database and offers the options in `databases/`. One ships: `supabase`. It adds
+needs a database and offers the options in `kit/databases/`. One ships: `supabase`. It adds
 `@supabase/supabase-js` and `@supabase/ssr`, `lib/supabase/client.ts` and `lib/supabase/server.ts`,
 and the two variable names in `.env.local` with placeholders. A guide page
-(`databases/supabase/guide.html`) shows where to create the Supabase project and where each value
+(`kit/databases/supabase/guide.html`) shows where to create the Supabase project and where each value
 is; init opens it with `npx -y lavish-axi` when a browser is available and prints the same steps
 otherwise. You type the values into `.env.local` yourself: cckit never prints or reads them back,
 and git ignores the file.
@@ -679,7 +679,7 @@ through its own lifecycle: an issue, an isolated worktree, a pull request, a mer
 public: [every issue closed in the repo →](https://github.com/jeiemgi/cckit/issues?q=is%3Aissue%20state%3Aclosed)
 — including [the effort that produced this README](https://github.com/jeiemgi/cckit/issues/160).
 
-cckit also runs on the rules and skills it ships. `templates/` is what `cckit init` writes into a
+cckit also runs on the rules and skills it ships. `kit/templates/` is what `cckit init` writes into a
 project; `.claude/skills/` and `.claude/rules/` here are the subset cckit applies to its own work —
 `concrete` (the anti-slop catalogue every commit and PR body goes through) and
 `karpathy-guidelines`, plus the rules that govern this repo's branches, efforts, PR titles,
@@ -726,13 +726,13 @@ cckit/
   scripts/benchmark/     # doc-retrieval benchmark harness (cckit bench)
   benchmarks/runs/       # recorded benchmark checkpoints, one file per release (format: its README.md)
   .claude-plugin/        # the Claude Code plugin manifest
-  skills/ commands/      # Claude Code skills + slash commands; skills/routing.yaml routes a task to a
+  skills/ commands/      # Claude Code skills + slash commands; kit/skills/routing.yaml routes a task to a
                          #   skill and the term it serves (the same table: AGENTS.md)
   ontology/              # the terms: one JSON file per word the CLI, skills and rules share
                          #   (format: ontology/README.md; checked by scripts/terms-check.sh)
-  profiles/ templates/   # init profiles + scaffold templates
-  routines/ modules/     # scheduled routines + optional modules
-  integrations/          # one JSON descriptor per optional third-party tool + its schema
+  kit/profiles/ kit/templates/   # init profiles + scaffold templates
+  kit/routines/ kit/modules/     # scheduled routines + optional modules
+  kit/integrations/          # one JSON descriptor per optional third-party tool + its schema
                          #   (mempalace.json, mlx-lm.json, graft.json, lavish.json — the last is on
                          #   by default and never installed unasked; impeccable.json,
                          #   emil-design-eng.json, web-design-guidelines.json — the design skills
@@ -744,14 +744,14 @@ cckit/
                          #   the 1st of every month and opens an issue on a failure
                          #   user-facing page: https://cckit.dev/integrations/
   docs-site/             # documentation source — Astro/Starlight (deployed to cckit.dev)
-  .claude/skills/        # the subset of templates/skills/ cckit installs for ITSELF
-  .claude/rules/         # the subset of templates/rules/ cckit installs for ITSELF
+  .claude/skills/        # the subset of kit/templates/skills/ cckit installs for ITSELF
+  .claude/rules/         # the subset of kit/templates/rules/ cckit installs for ITSELF
                          #   the manifest + every skip reason: scripts/self-install-test.sh
   cckit.config.json      # project configuration (no hardcoded org/repo)
 ```
 
-Every `skills:` entry in `templates/agents/*.md` has to resolve: `scripts/agent-skills-lint.sh` (a
-step of `bash scripts/check.sh`) fails on a name that is not under `skills/` or `templates/skills/`,
+Every `skills:` entry in `kit/templates/agents/*.md` has to resolve: `scripts/agent-skills-lint.sh` (a
+step of `bash scripts/check.sh`) fails on a name that is not under `skills/` or `kit/templates/skills/`,
 not a `plugin:skill` reference, and not declared third-party in `scripts/agent-skills-external.txt`.
 See [Codified review gates](https://cckit.dev/review/gates/).
 
