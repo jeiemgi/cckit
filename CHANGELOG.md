@@ -5,6 +5,19 @@ All notable changes to cckit are documented here. New entries below are generate
 [Conventional Commits](https://www.conventionalcommits.org/) and land when the Release PR is
 merged to `main`. Earlier entries follow [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.11.0](https://github.com/jeiemgi/cckit/compare/v0.10.0...v0.11.0) (2026-11-24)
+
+
+### Features
+
+* **core:** every verb answers a question [[#545](https://github.com/jeiemgi/cckit/issues/545)] ([#563](https://github.com/jeiemgi/cckit/issues/563)) ([ddfb69d](https://github.com/jeiemgi/cckit/commit/ddfb69ded03bb87aa88a63bf5a6220f0b5c9228a))
+* **core:** skills routing and terms [[#548](https://github.com/jeiemgi/cckit/issues/548)] ([#554](https://github.com/jeiemgi/cckit/issues/554)) ([08ddf27](https://github.com/jeiemgi/cckit/commit/08ddf27285eb76a3445e0b9176b28051a43ef613))
+
+
+### Bug Fixes
+
+* **release:** stay on 0.x, executable version bump, automatic back-merge, benchmark paused in the docs ([#536](https://github.com/jeiemgi/cckit/issues/536)) ([5a9a89e](https://github.com/jeiemgi/cckit/commit/5a9a89e1d84082414904ec6073ec6f0c06180fec))
+
 ## [0.10.0](https://github.com/jeiemgi/cckit/compare/v0.9.0...v0.10.0) (2026-11-21)
 
 
