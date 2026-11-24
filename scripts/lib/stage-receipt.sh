@@ -257,6 +257,7 @@ sr_cli() {
   # Every local gets a value: `local n stage` leaves them UNSET, not empty, and a caller running
   # under `set -u` (bin/cckit does) dies on the first reference instead of reaching the refusal.
   local sub="${1:-}" n="" stage="" attempt="" prof="" tier="" src="" perms="" report="" remote=1
+  local trail="" dry=""
   case "$sub" in
     list) shift; sr_list "${1:-}"; return $? ;;
     show)
@@ -270,6 +271,7 @@ sr_cli() {
 cckit receipt <issue> --stage <stage> [--attempt <n>] [--profile <p>] [--tier <t>]
                       [--source <where>] [--permissions <policy>] [--no-remote]
                       < the report on stdin
+cckit receipt <issue> --report <file> [--dry-run]
 cckit receipt list [<issue>]
 cckit receipt show <issue> <stage> [<attempt>]
 
@@ -278,6 +280,11 @@ Outcomes: merged pr-open closed-no-op blocked
 
 The receipt is written locally AND mirrored as a comment on the issue. --no-remote (or
 CCKIT_RECEIPT_REMOTE=0) writes the file and posts nothing; a remote failure only warns.
+
+--report posts the trail comment for a step report (sections: Status · Done · Waiting for a
+yes · Numbers · Failing or risky · Open questions · Next step): the Status head, the report's
+URLs, the Waiting for a yes items and the report's file name, capped at 1500 characters. It
+is refused when it would carry a private leak-list word or a home path. --dry-run prints it.
 EOF
       return 2
       ;;
@@ -300,9 +307,19 @@ EOF
       --permissions)   perms="$2"; shift 2 ;;
       --permissions=*) perms="${1#*=}"; shift ;;
       --no-remote)     remote=0; shift ;;
+      --report)        [ -n "${2:-}" ] || { echo "cckit receipt: --report needs a file" >&2; return 2; }
+                       trail="$2"; shift 2 ;;
+      --report=*)      trail="${1#*=}"; shift ;;
+      --dry-run)       dry=--dry-run; shift ;;
       *) echo "cckit receipt: unknown arg '$1'" >&2; return 2 ;;
     esac
   done
+  # The trail mode (#572): post a short comment from a step report file. No stdin, no receipt.
+  if [ -n "$trail" ]; then
+    sr_trail_post "$n" "$trail" "$dry"
+    return $?
+  fi
+  [ -z "$dry" ] || { echo "cckit receipt: --dry-run goes with --report <file>" >&2; return 2; }
   [ -n "$stage" ] || { echo "cckit receipt: --stage is required (one of: $SR_STAGES)" >&2; return 2; }
   _sr_in "$stage" "$SR_STAGES" || { echo "cckit receipt: stage '$stage' is not one of: $SR_STAGES" >&2; return 2; }
   _sr_need_jq || return $?
@@ -450,4 +467,166 @@ sr_mirror() {
     rm -f "$body"; SR_MIRROR_LAST_RESULT=created; return 0
   fi
   rm -f "$body"; _sr_mirror_warn post-failed "could not comment on #$n"; return 0
+}
+
+# ── the agent trail (#572) ──────────────────────────────────────────────────────────────────────
+# A step report is the long form of what a worker did, kept in `.cckit/reports/`, which is local and
+# gitignored. Agents working in parallel cannot read each other's `.cckit/`, but they can all read
+# the issue. So `cckit receipt <issue> --report <file>` posts a SHORT comment built from the report:
+# the head of its `## Status`, the bare URLs it names, its `## Waiting for a yes` items, and the
+# report's file name, so the trail is readable on GitHub and the full report stays local.
+#
+# The report format, section by section: Status · Done · Waiting for a yes · Numbers · Failing or
+# risky · Open questions · Next step. Only `## Status` is required; the comment reads two sections.
+#
+# Nothing private reaches GitHub. The comment is checked against the leak fence's own word list
+# (scripts/lib/leak-fence.sh: the built-in word, `.cckit/leak-words`, `CCKIT_LEAK_WORDS`) and
+# against absolute home paths, and refused whole on a hit — the matched text is never printed.
+#
+# UPSERT keyed by the report's file name, on the same marker pattern as the receipt mirror: posting
+# one report twice edits its comment instead of appending a second.
+#
+#   sr_trail_body <report> <shown-path>    the comment, marker first (pure; no forge)
+#   sr_trail_check <file>                  rc 1 naming the reason when the comment must not be posted
+#   sr_trail_post <issue> <report> [--dry-run]   build, check, upsert; rc 0 posted or printed
+
+SR_TRAIL_MAX="${SR_TRAIL_MAX:-1500}"
+SR_TRAIL_STATUS_LINES=6
+SR_TRAIL_MARKER_PREFIX='<!-- cckit:trail report='
+
+command -v leak_fence_patterns >/dev/null 2>&1 || . "$_sr_dir/leak-fence.sh"
+
+# _sr_trail_section <file> <heading> — the lines under `## <heading>` up to the next `## `, blank
+# lines dropped. Case-insensitive on the heading, so `## Waiting for a Yes` still reads.
+_sr_trail_section() {
+  awk -v want="$2" '
+    /^##[[:space:]]/ {
+      h = $0; sub(/^##[[:space:]]+/, "", h); sub(/[[:space:]]+$/, "", h)
+      on = (tolower(h) == tolower(want)); next
+    }
+    on && NF { print }
+  ' "$1"
+}
+
+# _sr_trail_shown_path <report> — the report's path as the comment names it: relative to the
+# checkout or the primary checkout when it lives inside one, else the bare file name. Never
+# absolute, so no home directory reaches the comment through it.
+_sr_trail_shown_path() {
+  local f="$1" dir base abs root
+  dir="$(cd "$(dirname "$f")" 2>/dev/null && pwd -P)" || { basename "$f"; return 0; }
+  base="$(basename "$f")"; abs="$dir/$base"
+  for root in "$(git rev-parse --show-toplevel 2>/dev/null)" "$(_kit_state_root)"; do
+    [ -n "$root" ] || continue
+    root="$(cd "$root" 2>/dev/null && pwd -P)" || continue
+    case "$abs" in "$root"/*) printf '%s\n' "${abs#"$root"/}"; return 0 ;; esac
+  done
+  printf '%s\n' "$base"
+}
+
+_sr_trail_marker() { printf '%s%s -->' "$SR_TRAIL_MARKER_PREFIX" "$1"; }
+
+# sr_trail_body <report> <shown-path> — the comment. rc 2 when the report has no `## Status`.
+# Capped at $SR_TRAIL_MAX characters; a cut comment says so, and its last line still names the file.
+sr_trail_body() {
+  local f="$1" shown="$2" status urls waiting body footer note line
+  [ -f "$f" ] || { echo "cckit receipt: no report at '$f'" >&2; return 2; }
+  status="$(_sr_trail_section "$f" "Status" | sed -n "1,${SR_TRAIL_STATUS_LINES}p")"
+  [ -n "$status" ] || { echo "cckit receipt: the report has no '## Status' section — nothing to post" >&2; return 2; }
+  urls="$(grep -oE 'https?://[^][[:space:]<>()`"'"'"']+' "$f" | sed -E 's/[.,;:]+$//' | awk '!seen[$0]++')"
+  waiting="$(_sr_trail_section "$f" "Waiting for a yes")"
+
+  body="$(_sr_trail_marker "$(basename "$f")")"
+  body="$body"$'\n\n'"**cckit step report** · \`$(basename "$f")\`"
+  body="$body"$'\n\n'"**Status**"
+  while IFS= read -r line; do body="$body"$'\n'"> ${line:0:300}"; done <<S
+$status
+S
+  body="$body"$'\n\n'"**Links**"
+  if [ -n "$urls" ]; then
+    while IFS= read -r line; do body="$body"$'\n'"- $line"; done <<S
+$urls
+S
+  else
+    body="$body"$'\n'"none"
+  fi
+  body="$body"$'\n\n'"**Waiting for a yes**"
+  if [ -n "$waiting" ]; then
+    while IFS= read -r line; do
+      case "$line" in [-*]\ *) ;; *) line="- $line" ;; esac
+      body="$body"$'\n'"${line:0:300}"
+    done <<S
+$waiting
+S
+  else
+    body="$body"$'\n'"none"
+  fi
+
+  footer="Full report: \`$shown\` (local, not on GitHub)"
+  if [ "$(( ${#body} + ${#footer} + 2 ))" -gt "$SR_TRAIL_MAX" ]; then
+    note="_Truncated to $SR_TRAIL_MAX characters; the rest is in the full report._"
+    body="${body:0:$(( SR_TRAIL_MAX - ${#footer} - ${#note} - 6 ))}"
+    body="${body%$'\n'*}"$'\n\n'"$note"
+  fi
+  printf '%s\n\n%s\n' "$body" "$footer"
+}
+
+# sr_trail_check <file> — rc 0 when the comment may be posted. rc 1 names the reason on stderr and
+# never the matched text: the leak fence's patterns, an absolute home path, or a pattern set that
+# does not compile (a check that cannot run is not a clean check).
+sr_trail_check() {
+  local f="$1" pat rc
+  pat="$(leak_fence_patterns | paste -sd'|' -)"
+  grep -iqE "$pat" "$f" 2>/dev/null; rc=$?
+  if [ "$rc" -eq 0 ]; then
+    echo "cckit receipt: refused — the comment would carry a word from the private leak list (the word is not shown)" >&2
+    return 1
+  elif [ "$rc" -ge 2 ]; then
+    echo "cckit receipt: refused — the leak list did not compile, so the comment could not be checked" >&2
+    return 1
+  fi
+  if grep -qE '(^|[^[:alnum:]_.])/(Users|home)/[^/[:space:]]+' "$f" \
+    || { [ "${#HOME}" -gt 1 ] && grep -qF "$HOME" "$f"; }; then
+    echo "cckit receipt: refused — the comment would carry an absolute home path" >&2
+    return 1
+  fi
+  return 0
+}
+
+# sr_trail_post <issue> <report> [--dry-run] — build, check, then upsert the comment. rc 0 posted,
+# printed (--dry-run), or not posted for want of a forge or with CCKIT_RECEIPT_REMOTE off (said,
+# and printed); 1 a refusal or a
+# forge failure; 2 a usage error or a report with no Status.
+sr_trail_post() {
+  local n="$1" f="$2" dry="${3:-}" tmp repo marker listing ids id rc
+  tmp="$(mktemp 2>/dev/null)" || { echo "cckit receipt: no temp file" >&2; return 1; }
+  sr_trail_body "$f" "$(_sr_trail_shown_path "$f")" > "$tmp" || { rc=$?; rm -f "$tmp"; return "$rc"; }
+  sr_trail_check "$tmp" || { rm -f "$tmp"; echo "cckit receipt: nothing was posted to #$n" >&2; return 1; }
+
+  if [ "$dry" = "--dry-run" ]; then
+    echo "cckit receipt: dry run — the comment for #$n, not posted:" >&2
+    cat "$tmp"; rm -f "$tmp"; return 0
+  fi
+  case "${CCKIT_RECEIPT_REMOTE:-1}" in
+    0|false|no|off|FALSE|NO|OFF)
+      echo "cckit receipt: CCKIT_RECEIPT_REMOTE is off — the comment was NOT posted to #$n; here it is:" >&2
+      cat "$tmp"; rm -f "$tmp"; return 0 ;;
+  esac
+  if ! forge_available; then
+    echo "cckit receipt: no forge is configured — the comment was NOT posted to #$n; here it is:" >&2
+    cat "$tmp"; rm -f "$tmp"; return 0
+  fi
+
+  repo="$(_sr_repo)"; [ -n "$repo" ] || repo="$(forge_repo_from_git 2>/dev/null)" || repo=""
+  [ -n "$repo" ] || { rm -f "$tmp"; echo "cckit receipt: no repo (set github.repo or an origin remote) — nothing posted" >&2; return 1; }
+  marker="$(_sr_trail_marker "$(basename "$f")")"
+  listing="$(_sr_mirror_list "$repo" "$n")" || {
+    rm -f "$tmp"; echo "cckit receipt: could not read the comments on #$n — not posting (a blind post would duplicate)" >&2; return 1; }
+  ids="$(printf '%s\n' "$listing" | _sr_mirror_match_id "$marker")" || ids=""
+  if [ -n "$ids" ]; then
+    id="$(printf '%s\n' "$ids" | sed -n 1p)"
+    _sr_mirror_edit "$repo" "$id" "$tmp" || { rm -f "$tmp"; echo "cckit receipt: could not edit comment $id on #$n" >&2; return 1; }
+    rm -f "$tmp"; echo "cckit receipt: trail comment on #$n updated"; return 0
+  fi
+  _sr_mirror_create "$repo" "$n" "$tmp" || { rm -f "$tmp"; echo "cckit receipt: could not comment on #$n" >&2; return 1; }
+  rm -f "$tmp"; echo "cckit receipt: trail comment posted on #$n"
 }
