@@ -51,7 +51,7 @@ if [ -n "${KIT_ADD_TEST_INNER:-}" ]; then
   has() { if grep -qF -- "$3" <<<"$2"; then echo "ok($KIT_ADD_TEST_INNER): $1"; else echo "FAIL($KIT_ADD_TEST_INNER): $1 -> '$3' not in: $2"; fail=1; fi; }
   CCKIT="$dir/../bin/cckit"
   reg="$ws/integrations"; mkdir -p "$reg"
-  cp "$dir/../integrations/integration.schema.json" "$reg/"
+  cp "$dir/../kit/integrations/integration.schema.json" "$reg/"
   # desc <id> <config json> <appliesWhen json|null> -> a valid fixture descriptor
   desc() {
     jq -n --arg id "$1" --argjson c "$2" --argjson a "$3" '
@@ -137,7 +137,7 @@ if [ -n "${KIT_ADD_TEST_INNER:-}" ]; then
 
   # ── a descriptor that ships a rule (E303.10): the shipped Graft descriptor, with detect forced
   # to fail so the plan is the same on a machine that has graft and one that does not ───────────
-  jq '.detect.run = "false"' "$dir/../integrations/graft.json" > "$reg/graft.json"
+  jq '.detect.run = "false"' "$dir/../kit/integrations/graft.json" > "$reg/graft.json"
   # a repo of only .sh files: declined, rc 0, nothing written and nothing installed
   shg="$ws/sh-graft"; mkdir -p "$shg/.claude" "$shg/scripts"; : > "$shg/scripts/run.sh"
   printf '%s\n' '{"project":{"name":"s"}}' > "$shg/.claude/kit.config.json"
@@ -160,7 +160,7 @@ if [ -n "${KIT_ADD_TEST_INNER:-}" ]; then
   # a real add: the key and the rule, and still no install
   out="$("$ADD" graft --dir "$tsg" 2>&1)"; t "graft add rc" "$?" "0"
   t "graft add: the key" "$(jq -r .codeGraph.provider "$tsg/.claude/kit.config.json")" "graft"
-  t "graft add: the rule is the template, verbatim" "$(cmp -s "$dir/../templates/rules/code-retrieval.md" "$tsg/.claude/rules/code-retrieval.md" && echo same || echo differs)" "same"
+  t "graft add: the rule is the template, verbatim" "$(cmp -s "$dir/../kit/templates/rules/code-retrieval.md" "$tsg/.claude/rules/code-retrieval.md" && echo same || echo differs)" "same"
   t "graft add: writes the config and the rule, nothing else" "$(cd "$tsg" && find . -type f | sort | tr '\n' ' ')" "./.claude/kit.config.json ./.claude/rules/code-retrieval.md ./src/a.ts "
   has "graft add: says nothing was installed" "$out" "Nothing was installed."
   # a second run keeps an edited rule, and restores a deleted one
@@ -174,7 +174,7 @@ if [ -n "${KIT_ADD_TEST_INNER:-}" ]; then
 
   # --- on by default (#451): the shipped lavish descriptor. Declining is the one case that
   # writes — the off value — and it writes no rule; switching it back on restores the default.
-  cp "$dir/../integrations/lavish.json" "$reg/lavish.json"
+  cp "$dir/../kit/integrations/lavish.json" "$reg/lavish.json"
   lv="$ws/lavish-proj"; mkdir -p "$lv/.claude"
   printf '{"project":{"name":"l"}}\n' > "$lv/.claude/kit.config.json"
   t "lavish: listed as enabled with no key in the config" \
@@ -190,7 +190,7 @@ if [ -n "${KIT_ADD_TEST_INNER:-}" ]; then
     "$( (cd "$lv" && CCKIT_OUTPUT=json "$ADD" 2>/dev/null) | jq -c '.integrations[] | select(.id == "lavish") | .enabled')" 'false'
   out="$("$ADD" lavish --dir "$lv" 2>&1)"; t "lavish on rc" "$?" "0"
   t "lavish on: the config records true" "$(jq -c .reviewPages "$lv/.claude/kit.config.json")" '{"enabled":true}'
-  t "lavish on: the rule is the template, verbatim" "$(cmp -s "$dir/../templates/rules/review-pages.md" "$lv/.claude/rules/review-pages.md" && echo same || echo differs)" "same"
+  t "lavish on: the rule is the template, verbatim" "$(cmp -s "$dir/../kit/templates/rules/review-pages.md" "$lv/.claude/rules/review-pages.md" && echo same || echo differs)" "same"
   has "lavish on: the attribution notice" "$out" "cckit is not affiliated with its author"
   rm -f "$reg/lavish.json"
 
@@ -242,7 +242,7 @@ if [ -n "${KIT_ADD_TEST_INNER:-}" ]; then
   t "skill: key set, others kept" "$(jq -c '[.tasks.design, .tasks.default, .kitVersion, .project.name]' "$skc")" '[true,"light","9.9.9","P"]'
   t "skill: copied for each adapter, add.json left behind" "$(cd "$sk" && find .claude/skills .agents/skills -type f | LC_ALL=C sort | tr '\n' ' ')" \
     ".agents/skills/page-design/SKILL.md .agents/skills/page-design/references/design-file-template.md .agents/skills/page-design/references/generic-page-patterns.md .agents/skills/page-design/references/minimum-rules.md .claude/skills/page-design/SKILL.md .claude/skills/page-design/references/design-file-template.md .claude/skills/page-design/references/generic-page-patterns.md .claude/skills/page-design/references/minimum-rules.md "
-  t "skill: the copy is the template" "$(cmp -s "$sk/.claude/skills/page-design/SKILL.md" "$dir/../templates/skills/page-design/SKILL.md" && echo same)" "same"
+  t "skill: the copy is the template" "$(cmp -s "$sk/.claude/skills/page-design/SKILL.md" "$dir/../kit/templates/skills/page-design/SKILL.md" && echo same)" "same"
   t "skill: list --llm after" "$(cd "$sk" && "$CCKIT" add --llm 2>/dev/null | jq -c '.skills[] | select(.id=="page-design") | [.enabled,.installed]')" '[true,true]'
   # a copy the project edited is kept; a copy missing for one adapter is restored
   echo "edited by the project" > "$sk/.claude/skills/page-design/SKILL.md"; rm -rf "$sk/.agents/skills/page-design"

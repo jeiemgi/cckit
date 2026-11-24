@@ -186,8 +186,8 @@ init_ask_text() {
 
 # ── registries: recipes/ and databases/ ─────────────────────────────────────────────────────────
 
-recipes_dir()   { printf '%s\n' "${KIT_RECIPES_DIR:-$_ig_kit_root/recipes}"; }
-databases_dir() { printf '%s\n' "${KIT_DATABASES_DIR:-$_ig_kit_root/databases}"; }
+recipes_dir()   { printf '%s\n' "${KIT_RECIPES_DIR:-$_ig_kit_root/kit/recipes}"; }
+databases_dir() { printf '%s\n' "${KIT_DATABASES_DIR:-$_ig_kit_root/kit/databases}"; }
 
 _ig_list() {  # <dir> -> descriptor ids, sorted (a *.schema.json file is not a descriptor)
   [ -d "$1" ] || return 0
@@ -618,7 +618,7 @@ init_guide_resolve() {
   # ---- profile ----
   if [ -z "${PROFILE:-}" ] && [ "$adv" -eq 1 ]; then
     set --
-    for f in "$_ig_kit_root"/profiles/*.json; do
+    for f in "$_ig_kit_root"/kit/profiles/*.json; do
       [ -f "$f" ] || continue
       id="$(basename "$f" .json)"
       set -- "$@" "$id|$(_ig_opt_text "$(jq -r '.label // .name' "$f")")|$(_ig_opt_text "$(jq -r '.description // ""' "$f")")|$([ "$id" = software ] && echo R)"

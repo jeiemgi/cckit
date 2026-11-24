@@ -51,7 +51,7 @@ done
 # Every role of every shipped profile has a display name equal to the profile's own spelling.
 command -v jq >/dev/null 2>&1 || { echo "skip: jq missing — profile roles not checked"; exit "$fail"; }
 . "$dir/role-identity.sh"
-for f in "$root"/profiles/*.json; do
+for f in "$root"/kit/profiles/*.json; do
   roles="$(jq -r '.roles[]' "$f")"
   old_ifs="$IFS"; IFS='
 '

@@ -197,19 +197,19 @@ t "upgrade: a stored tasks.default is kept" "$(cfg "$m" '.tasks.default')" '"iss
 t "upgrade: plain language stays on"        "$(cfg "$m" '.plainLanguage.enabled')" "true"
 
 # The data form: marketing has the keys every profile has, and is content plus named additions.
-keys() { jq -c 'keys' "$ROOT/profiles/$1.json"; }
+keys() { jq -c 'keys' "$ROOT/kit/profiles/$1.json"; }
 t "marketing has the same top-level keys as content" "$(keys marketing)" "$(keys content)"
-t "marketing agents == content agents" "$(jq -c .agents "$ROOT/profiles/marketing.json")" "$(jq -c .agents "$ROOT/profiles/content.json")"
+t "marketing agents == content agents" "$(jq -c .agents "$ROOT/kit/profiles/marketing.json")" "$(jq -c .agents "$ROOT/kit/profiles/content.json")"
 t "marketing skills = content + brand-voice + campaign + page-design" \
-  "$(jq -c '.skills - ["brand-voice","campaign","page-design"]' "$ROOT/profiles/marketing.json")" "$(jq -c '.skills' "$ROOT/profiles/content.json")"
+  "$(jq -c '.skills - ["brand-voice","campaign","page-design"]' "$ROOT/kit/profiles/marketing.json")" "$(jq -c '.skills' "$ROOT/kit/profiles/content.json")"
 t "marketing rules = content + plain-language + effort-model" \
-  "$(jq -c '.rules - ["plain-language","effort-model"]' "$ROOT/profiles/marketing.json")" "$(jq -c '.rules' "$ROOT/profiles/content.json")"
-for f in "$ROOT"/profiles/*.json; do
+  "$(jq -c '.rules - ["plain-language","effort-model"]' "$ROOT/kit/profiles/marketing.json")" "$(jq -c '.rules' "$ROOT/kit/profiles/content.json")"
+for f in "$ROOT"/kit/profiles/*.json; do
   n="$(basename "$f" .json)"
   miss=""
-  for s in $(jq -r '.skills[]' "$f"); do [ -f "$ROOT/templates/skills/$s/SKILL.md" ] || miss="$miss skill:$s"; done
-  for r in $(jq -r '.rules[]' "$f");  do [ -f "$ROOT/templates/rules/$r.md" ] || miss="$miss rule:$r"; done
-  for a in $(jq -r '.agents[]' "$f"); do [ -f "$ROOT/templates/agents/$a.md" ] || miss="$miss agent:$a"; done
+  for s in $(jq -r '.skills[]' "$f"); do [ -f "$ROOT/kit/templates/skills/$s/SKILL.md" ] || miss="$miss skill:$s"; done
+  for r in $(jq -r '.rules[]' "$f");  do [ -f "$ROOT/kit/templates/rules/$r.md" ] || miss="$miss rule:$r"; done
+  for a in $(jq -r '.agents[]' "$f"); do [ -f "$ROOT/kit/templates/agents/$a.md" ] || miss="$miss agent:$a"; done
   t "profile $n: every skill, rule and agent it lists has a template" "$miss" ""
 done
 

@@ -794,7 +794,7 @@ if [[ "$_mem_on" == "true" ]]; then
   #    knows how to swap in the per-wing header (1). Older hooks lack it.
   _hook="${TARGET:-$PWD}/.claude/hooks/mempal_session_start.sh"
   _kit_root="$(dirname "$_export_dir_doctor")"
-  _hook_tmpl="$_kit_root/templates/hooks/mempal_session_start.sh.tmpl"
+  _hook_tmpl="$_kit_root/kit/templates/hooks/mempal_session_start.sh.tmpl"
   if [[ ! -f "$_hook" ]]; then
     : # no hook installed — the integration row already covers a non-functioning memory layer
   elif grep -q 'mempal-identity' "$_hook" 2>/dev/null; then

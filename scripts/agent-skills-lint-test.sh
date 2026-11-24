@@ -17,11 +17,11 @@ trap 'rm -rf "$TMP"' EXIT
 # A fresh temp ROOT holding the lint, one kit skill, one template skill and a one-name allowlist.
 new_root() {
   rm -rf "$TMP/r"
-  mkdir -p "$TMP/r/scripts" "$TMP/r/templates/agents" \
-           "$TMP/r/skills/kit-task-sync" "$TMP/r/templates/skills/morning-briefing"
+  mkdir -p "$TMP/r/scripts" "$TMP/r/kit/templates/agents" \
+           "$TMP/r/kit/skills/kit-task-sync" "$TMP/r/kit/templates/skills/morning-briefing"
   cp "$LINT" "$TMP/r/scripts/"
-  : > "$TMP/r/skills/kit-task-sync/SKILL.md"
-  : > "$TMP/r/templates/skills/morning-briefing/SKILL.md"
+  : > "$TMP/r/kit/skills/kit-task-sync/SKILL.md"
+  : > "$TMP/r/kit/templates/skills/morning-briefing/SKILL.md"
   printf '# third-party\ndeep-research\n' > "$TMP/r/scripts/agent-skills-external.txt"
 }
 
@@ -36,7 +36,7 @@ mk_agent() {
     echo
     echo "Body mentions \`task-sync\` in prose and a list:"
     echo "  - not-a-skill"
-  } > "$TMP/r/templates/agents/$name.md"
+  } > "$TMP/r/kit/templates/agents/$name.md"
 }
 
 # Capture rather than pipe: `run | grep -q` lets grep exit early and SIGPIPE the lint, which
@@ -92,19 +92,19 @@ fi
 # --- 5. the regression this lint exists for: pm.md with the pre-rename name --
 # Real agents + real skill names + real allowlist, with `task-sync` put back into pm.md.
 new_root
-cp "$REPO"/templates/agents/*.md "$TMP/r/templates/agents/"
+cp "$REPO"/kit/templates/agents/*.md "$TMP/r/kit/templates/agents/"
 cp "$REPO/scripts/agent-skills-external.txt" "$TMP/r/scripts/"
-for d in "$REPO"/skills/*/ "$REPO"/templates/skills/*/; do
+for d in "$REPO"/kit/skills/*/ "$REPO"/kit/templates/skills/*/; do
   [ -f "$d/SKILL.md" ] || continue
   case "$d" in
-    "$REPO"/skills/*) mkdir -p "$TMP/r/skills/$(basename "$d")"; : > "$TMP/r/skills/$(basename "$d")/SKILL.md" ;;
-    *) mkdir -p "$TMP/r/templates/skills/$(basename "$d")"; : > "$TMP/r/templates/skills/$(basename "$d")/SKILL.md" ;;
+    "$REPO"/kit/skills/*) mkdir -p "$TMP/r/kit/skills/$(basename "$d")"; : > "$TMP/r/kit/skills/$(basename "$d")/SKILL.md" ;;
+    *) mkdir -p "$TMP/r/kit/templates/skills/$(basename "$d")"; : > "$TMP/r/kit/templates/skills/$(basename "$d")/SKILL.md" ;;
   esac
 done
 capture
 [ "$run_rc" -eq 0 ] && pass "copied real tree is green before the mutation" \
                     || fail "copied real tree is green before the mutation ($run_out)"
-sed 's/^  - kit-task-sync.*$/  - task-sync/' "$REPO/templates/agents/pm.md" > "$TMP/r/templates/agents/pm.md"
+sed 's/^  - kit-task-sync.*$/  - task-sync/' "$REPO/kit/templates/agents/pm.md" > "$TMP/r/kit/templates/agents/pm.md"
 capture
 if [ "$run_rc" -ne 0 ] && grep -qE "templates/agents/pm\.md:[0-9]+: task-sync" <<<"$run_out"; then
   pass "re-adding task-sync to pm.md fails the lint"
@@ -114,7 +114,7 @@ fi
 
 # --- 6. an allowlisted name the kit now ships is flagged --------------------
 new_root
-mkdir -p "$TMP/r/skills/deep-research"; : > "$TMP/r/skills/deep-research/SKILL.md"
+mkdir -p "$TMP/r/kit/skills/deep-research"; : > "$TMP/r/kit/skills/deep-research/SKILL.md"
 mk_agent r "skills:" "  - deep-research"
 capture
 if [ "$run_rc" -ne 0 ] && grep -q "agent-skills-external.txt: deep-research" <<<"$run_out"; then
@@ -124,7 +124,7 @@ else
 fi
 
 # --- 7. no templates/agents: self-disables ----------------------------------
-new_root; rm -rf "$TMP/r/templates/agents"
+new_root; rm -rf "$TMP/r/kit/templates/agents"
 capture
 [ "$run_rc" -eq 0 ] && pass "no templates/agents exits 0" || fail "no templates/agents exits 0 ($run_out)"
 

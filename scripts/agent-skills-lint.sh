@@ -21,7 +21,7 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-AGENTS_DIR="templates/agents"
+AGENTS_DIR="kit/templates/agents"
 EXTERNAL="scripts/agent-skills-external.txt"
 
 FAIL=0
@@ -62,7 +62,7 @@ skills_entries() {
   ' "$1"
 }
 
-shipped() { [ -f "skills/$1/SKILL.md" ] || [ -f "templates/skills/$1/SKILL.md" ]; }
+shipped() { [ -f "kit/skills/$1/SKILL.md" ] || [ -f "kit/templates/skills/$1/SKILL.md" ]; }
 
 external_names() {
   [ -f "$EXTERNAL" ] || return 0
@@ -104,7 +104,7 @@ EOF_ENTRIES
 done
 
 if [ "$dead" -gt 0 ]; then
-  note "$dead skills: entr$( [ "$dead" -eq 1 ] && echo y || echo ies ) resolve to nothing: not under skills/ or templates/skills/,"
+  note "$dead skills: entr$( [ "$dead" -eq 1 ] && echo y || echo ies ) resolve to nothing: not under kit/skills/ or kit/templates/skills/,"
   note "not a plugin:skill reference, and not in $EXTERNAL."
   note "A renamed kit skill takes its new name; a third-party one gets a line in $EXTERNAL."
 fi

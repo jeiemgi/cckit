@@ -430,9 +430,9 @@ if [[ $UPGRADE -eq 1 ]]; then
 fi
 
 # The profile names come from profiles/*.json, so a profile added there is offered here.
-_PROFILE_NAMES="$(for _pf in "$KIT_ROOT"/profiles/*.json; do [[ -f "$_pf" ]] && basename "$_pf" .json; done | paste -sd '|' -)"
+_PROFILE_NAMES="$(for _pf in "$KIT_ROOT"/kit/profiles/*.json; do [[ -f "$_pf" ]] && basename "$_pf" .json; done | paste -sd '|' -)"
 [[ -z "$PROFILE" ]] && { echo "x --profile is required ($_PROFILE_NAMES)"; exit 1; }
-PROFILE_FILE="$KIT_ROOT/profiles/$PROFILE.json"
+PROFILE_FILE="$KIT_ROOT/kit/profiles/$PROFILE.json"
 [[ -f "$PROFILE_FILE" ]] || { echo "x no such profile: $PROFILE — one of: $_PROFILE_NAMES"; exit 1; }
 
 # ---- resolve target + defaults ------------------------------------------
@@ -558,7 +558,7 @@ RULES="$(jq -r '.rules[]' "$PROFILE_FILE")"
 # Kit-namespaced skill set: templates whose names take $SKILL_PREFIX (the workflow skills:
 # task-*, effort-*). Content skills (morning-briefing, karpathy-…) are NOT listed and stay bare.
 # Listed in templates/skills/NAMESPACED (one name per line) so the marker lives outside the artifact.
-NAMESPACED_SKILLS="$(grep -vE '^\s*(#|$)' "$KIT_ROOT/templates/skills/NAMESPACED" 2>/dev/null || true)"
+NAMESPACED_SKILLS="$(grep -vE '^\s*(#|$)' "$KIT_ROOT/kit/templates/skills/NAMESPACED" 2>/dev/null || true)"
 _is_namespaced() {  # <skill-name> -> 0 if it takes the prefix
   grep -qxF "$1" <<<"$NAMESPACED_SKILLS"
 }
@@ -647,7 +647,7 @@ short_desc() {
 AGENT_TABLE="| Agent | Role |
 | ----- | ---- |"
 for a in $AGENTS; do
-  f="$KIT_ROOT/templates/agents/$a.md"
+  f="$KIT_ROOT/kit/templates/agents/$a.md"
   [[ -f "$f" ]] || { echo "  missing agent template: $a" >&2; continue; }
   AGENT_TABLE="$AGENT_TABLE
 | \`$a\` | $(short_desc "$f") |"
@@ -655,7 +655,7 @@ done
 SKILL_TABLE="| Skill | When |
 | ----- | ---- |"
 for s in $SKILLS; do
-  f="$KIT_ROOT/templates/skills/$s/SKILL.md"
+  f="$KIT_ROOT/kit/templates/skills/$s/SKILL.md"
   [[ -f "$f" ]] || { echo "  missing skill template: $s" >&2; continue; }
   SKILL_TABLE="$SKILL_TABLE
 | \`$s\` | $(short_desc "$f") |"
@@ -694,7 +694,7 @@ plain-language"
 fi
 RULE_LIST=""
 for r in $RULES; do
-  _rule_enabled "$r" && [[ -f "$KIT_ROOT/templates/rules/$r.md" ]] || continue
+  _rule_enabled "$r" && [[ -f "$KIT_ROOT/kit/templates/rules/$r.md" ]] || continue
   RULE_LIST="${RULE_LIST:+$RULE_LIST
 }- \`.agents/rules/$r.md\`"
 done
@@ -931,7 +931,7 @@ if [[ $DRY_RUN -eq 1 ]]; then
   echo "    .claude/hooks/kit_version_check.sh   (SessionStart: update check)"
   echo "    .claude/hooks/kit-mail-check.sh      (session mail, tracked settings.json: PostToolUse / UserPromptSubmit / SessionStart / Stop)"
   for a in $AGENTS; do
-    [[ -f "$KIT_ROOT/templates/agents/$a.md" ]] && echo "    .claude/agents/$a/AGENT.md"
+    [[ -f "$KIT_ROOT/kit/templates/agents/$a.md" ]] && echo "    .claude/agents/$a/AGENT.md"
   done
   fi
   for _ad in $ADAPTERS; do
@@ -939,20 +939,20 @@ if [[ $DRY_RUN -eq 1 ]]; then
     echo "    $(adapter_instructions "$_ad")"
     for r in $RULES; do
       _rule_enabled "$r" || continue
-      [[ -f "$KIT_ROOT/templates/rules/$r.md" ]] && echo "    $_add/rules/$r.md"
+      [[ -f "$KIT_ROOT/kit/templates/rules/$r.md" ]] && echo "    $_add/rules/$r.md"
     done
     [[ "$CODEGRAPH_ON" == "true" ]] && echo "    $_add/rules/code-retrieval.md           (codeGraph.provider is set)"
     for s in $SKILLS; do
       _dn="$s"; { [[ -n "$SKILL_PREFIX" ]] && _is_namespaced "$s"; } && _dn="${SKILL_PREFIX}${s}"
-      [[ -f "$KIT_ROOT/templates/skills/$s/SKILL.md" ]] && echo "    $_add/skills/$_dn/SKILL.md"
-      [[ -d "$KIT_ROOT/templates/skills/$s/references" ]] && echo "    $_add/skills/$_dn/references/"
+      [[ -f "$KIT_ROOT/kit/templates/skills/$s/SKILL.md" ]] && echo "    $_add/skills/$_dn/SKILL.md"
+      [[ -d "$KIT_ROOT/kit/templates/skills/$s/references" ]] && echo "    $_add/skills/$_dn/references/"
     done
   done
   if adapter_has "$ADAPTERS" codex; then
   echo "    .codex/hooks/ (repo-hygiene.sh, kit_version_check.sh, kit-mail-check.sh, guard-base-branch-commit.sh, guard-raw-git-ops.sh$([[ "$PREPUSH_ENABLED" == "true" ]] && echo ", prepush_gate.sh")$([[ "$LOCAL_ON" == "true" ]] && echo ", kit-local-status.sh"))"
   echo "    .codex/hooks.json                         (merged: cckit's registrations are added, yours are kept; trust them in Codex with /hooks)"
   for a in $AGENTS; do
-    [[ -f "$KIT_ROOT/templates/agents/$a.md" ]] && echo "    .codex/agents/$a.toml"
+    [[ -f "$KIT_ROOT/kit/templates/agents/$a.md" ]] && echo "    .codex/agents/$a.toml"
   done
   echo "    (Codex adapter: no memory hooks — they read Claude Code transcripts)"
   fi
@@ -1136,7 +1136,7 @@ fi
 if adapter_has "$ADAPTERS" claude; then
 use_adapter claude
 for a in $AGENTS; do
-  src="$KIT_ROOT/templates/agents/$a.md"
+  src="$KIT_ROOT/kit/templates/agents/$a.md"
   [[ -f "$src" ]] || continue
   safe_write "$src" "$TARGET/.claude/agents/$a/AGENT.md"
   echo "  + .claude/agents/$a/AGENT.md"
@@ -1147,7 +1147,7 @@ use_adapter codex
 # shellcheck source=/dev/null
 . "$KIT_ROOT/scripts/lib/agent-def.sh"
 for a in $AGENTS; do
-  src="$KIT_ROOT/templates/agents/$a.md"
+  src="$KIT_ROOT/kit/templates/agents/$a.md"
   [[ -f "$src" ]] || continue
   _ca_rel=".codex/agents/$a.toml"; _ca_dst="$TARGET/$_ca_rel"
   if _upgrade_excluded "$_ca_rel"; then UPGRADE_SKIPPED+=("$_ca_rel"); continue; fi
@@ -1186,7 +1186,7 @@ AD="$ADAPTER_DIR"; _instr="$(adapter_instructions "$_ad")"
 if [[ "$_ad" == "codex" && -e "$TARGET/$_instr" && $UPGRADE -eq 0 && $FORCE -eq 0 ]]; then
   echo "  = $_instr exists — kept (re-run with --force to replace it with the cckit instructions)"
 else
-  safe_write "$KIT_ROOT/templates/instructions.md.tmpl" "$TARGET/$_instr"
+  safe_write "$KIT_ROOT/kit/templates/instructions.md.tmpl" "$TARGET/$_instr"
   echo "  + $_instr"
 fi
 
@@ -1194,7 +1194,7 @@ fi
 for r in $RULES; do
   # Skip rules whose feature is disabled for this project.
   _rule_enabled "$r" || continue
-  src="$KIT_ROOT/templates/rules/$r.md"
+  src="$KIT_ROOT/kit/templates/rules/$r.md"
   [[ -f "$src" ]] || { echo "  missing rule: $r"; continue; }
   safe_write "$src" "$TARGET/$AD/rules/$r.md"
   echo "  + $AD/rules/$r.md"
@@ -1202,13 +1202,13 @@ done
 # code-retrieval is in no profile: `cckit add <id>` writes it when a code-graph integration is
 # switched on. An upgrade re-adds it only for a project whose config already has one on.
 if [[ "$CODEGRAPH_ON" == "true" ]]; then
-  safe_write "$KIT_ROOT/templates/rules/code-retrieval.md" "$TARGET/$AD/rules/code-retrieval.md"
+  safe_write "$KIT_ROOT/kit/templates/rules/code-retrieval.md" "$TARGET/$AD/rules/code-retrieval.md"
   echo "  + $AD/rules/code-retrieval.md"
 fi
 
 # ---- skills --------------------------------------------------------------
 for s in $SKILLS; do
-  src="$KIT_ROOT/templates/skills/$s/SKILL.md"
+  src="$KIT_ROOT/kit/templates/skills/$s/SKILL.md"
   [[ -f "$src" ]] || continue
   # Namespaced skills take $SKILL_PREFIX so we scaffold to the project's name (kit-task-close)
   # instead of a bare-name duplicate (task-close) alongside it.
@@ -1226,8 +1226,8 @@ for s in $SKILLS; do
   echo "  + $AD/skills/$dest_name/SKILL.md"
   # bundled references for multi-file skills (copied verbatim, no templating).
   # Per-file safe_copy so the upgrade contract (preserve existing, skip excluded) applies.
-  if [[ -d "$KIT_ROOT/templates/skills/$s/references" ]]; then
-    for _ref in "$KIT_ROOT/templates/skills/$s/references/"*; do
+  if [[ -d "$KIT_ROOT/kit/templates/skills/$s/references" ]]; then
+    for _ref in "$KIT_ROOT/kit/templates/skills/$s/references/"*; do
       [[ -f "$_ref" ]] || continue
       safe_copy "$_ref" "$TARGET/$AD/skills/$dest_name/references/$(basename "$_ref")"
     done
@@ -1305,13 +1305,13 @@ echo "  + scripts/benchmark/ (doc-retrieval benchmark harness — see benchmarks
 
 mkdir -p "$TARGET/benchmarks"
 for bf in SCHEMA.md benchmark.config.json retrieval.jsonl adversarial.jsonl abstain.jsonl quality.jsonl .gitignore; do
-  safe_write "$KIT_ROOT/templates/benchmarks/$bf" "$TARGET/benchmarks/$bf"
+  safe_write "$KIT_ROOT/kit/templates/benchmarks/$bf" "$TARGET/benchmarks/$bf"
 done
 echo "  + benchmarks/ (example dataset + schema — grow your own; run: scripts/benchmark/report.sh)"
 
 # ---- knowledge base (governed dir: INDEX manifest; upgrade-safe) ---------
 mkdir -p "$TARGET/knowledge"
-safe_write "$KIT_ROOT/templates/knowledge-INDEX.md.tmpl" "$TARGET/knowledge/INDEX.md"
+safe_write "$KIT_ROOT/kit/templates/knowledge-INDEX.md.tmpl" "$TARGET/knowledge/INDEX.md"
 echo "  + knowledge/INDEX.md (manifest — see $ADAPTER_DIR/rules/knowledge-base.md)"
 
 # ==== Claude adapter only: sigil lib, settings, hooks, statusline wiring ====
@@ -1324,7 +1324,7 @@ if adapter_has "$ADAPTERS" claude; then
 # Sourced by the task-* skill footers + repo-hygiene to emit one "claude-kit"
 # attribution sigil per kit-action boundary (see knowledge/brand.md §6).
 mkdir -p "$TARGET/.claude/lib"
-safe_write "$KIT_ROOT/templates/lib/kit-sigil.sh.tmpl" "$TARGET/.claude/lib/kit-sigil.sh"
+safe_write "$KIT_ROOT/kit/templates/lib/kit-sigil.sh.tmpl" "$TARGET/.claude/lib/kit-sigil.sh"
 chmod +x "$TARGET/.claude/lib/kit-sigil.sh" 2>/dev/null || true
 echo "  + .claude/lib/kit-sigil.sh"
 
@@ -1333,12 +1333,12 @@ echo "  + .claude/lib/kit-sigil.sh"
 # captain's pre-authorized wave-merge (gh pr merge under an approved plan) works in every
 # worktree and for every collaborator without re-prompting. safe_write = preserve-if-exists.
 mkdir -p "$TARGET/.claude"
-safe_write "$KIT_ROOT/templates/settings/settings.json.tmpl" "$TARGET/.claude/settings.json"
+safe_write "$KIT_ROOT/kit/templates/settings/settings.json.tmpl" "$TARGET/.claude/settings.json"
 echo "  + .claude/settings.json (versioned captain merge permission)"
 
 # ---- settings.local.json (+ hooks, additive) ----------------------------
 mkdir -p "$TARGET/.claude"
-safe_write "$KIT_ROOT/templates/settings/settings.local.json.tmpl" "$TARGET/.claude/settings.local.json"
+safe_write "$KIT_ROOT/kit/templates/settings/settings.local.json.tmpl" "$TARGET/.claude/settings.local.json"
 SETTINGS="$TARGET/.claude/settings.local.json"
 # A merge that leaves the value as it was does not rewrite the file (json_write_minimal, #448).
 merge_settings() { jq "$@" "$SETTINGS" > "$SETTINGS.tmp" && json_write_minimal "$SETTINGS.tmp" "$SETTINGS" >/dev/null; }
@@ -1346,10 +1346,10 @@ HOOK_NOTE=""
 
 if [[ "$MEMORY_BOOL" == "true" && $UPGRADE -eq 0 ]]; then
   mkdir -p "$TARGET/.claude/hooks"
-  emit "$KIT_ROOT/templates/hooks/mempal_session_start.sh.tmpl" "$TARGET/.claude/hooks/mempal_session_start.sh"
-  emit "$KIT_ROOT/templates/hooks/mempal_save.sh.tmpl"       "$TARGET/.claude/hooks/mempal_save.sh"
-  emit "$KIT_ROOT/templates/hooks/mempal_precompact.sh.tmpl" "$TARGET/.claude/hooks/mempal_precompact.sh"
-  emit "$KIT_ROOT/templates/hooks/mempal_followup.sh.tmpl"   "$TARGET/.claude/hooks/mempal_followup.sh"
+  emit "$KIT_ROOT/kit/templates/hooks/mempal_session_start.sh.tmpl" "$TARGET/.claude/hooks/mempal_session_start.sh"
+  emit "$KIT_ROOT/kit/templates/hooks/mempal_save.sh.tmpl"       "$TARGET/.claude/hooks/mempal_save.sh"
+  emit "$KIT_ROOT/kit/templates/hooks/mempal_precompact.sh.tmpl" "$TARGET/.claude/hooks/mempal_precompact.sh"
+  emit "$KIT_ROOT/kit/templates/hooks/mempal_followup.sh.tmpl"   "$TARGET/.claude/hooks/mempal_followup.sh"
   chmod +x "$TARGET/.claude/hooks/mempal_session_start.sh" "$TARGET/.claude/hooks/mempal_save.sh" "$TARGET/.claude/hooks/mempal_precompact.sh" "$TARGET/.claude/hooks/mempal_followup.sh"
   # Per-wing wake-up header — without it, `mempalace wake-up` shows the single global
   # ~/.mempalace/identity.txt for every wing (the session-start hook swaps this in). See
@@ -1372,7 +1372,7 @@ fi
 
 if [[ "$PREPUSH_ENABLED" == "true" && $UPGRADE -eq 0 ]]; then
   mkdir -p "$TARGET/.claude/hooks"
-  emit "$KIT_ROOT/templates/hooks/prepush_gate.sh.tmpl" "$TARGET/.claude/hooks/prepush_gate.sh"
+  emit "$KIT_ROOT/kit/templates/hooks/prepush_gate.sh.tmpl" "$TARGET/.claude/hooks/prepush_gate.sh"
   chmod +x "$TARGET/.claude/hooks/prepush_gate.sh"
   merge_settings --arg gate "$TARGET/.claude/hooks/prepush_gate.sh" \
     '.hooks.PreToolUse = [{matcher:"Bash",hooks:[{type:"command",command:$gate,timeout:120}]}]'
@@ -1382,7 +1382,7 @@ fi
 # ---- local model layer SessionStart hook (opt-in; idempotent, also on --upgrade) ----
 if [[ "$LOCAL_ON" == "true" ]]; then
   mkdir -p "$TARGET/.claude/hooks"
-  hook_write "$KIT_ROOT/templates/hooks/kit-local-status.sh.tmpl" "$TARGET/.claude/hooks/kit-local-status.sh"
+  hook_write "$KIT_ROOT/kit/templates/hooks/kit-local-status.sh.tmpl" "$TARGET/.claude/hooks/kit-local-status.sh"
   chmod +x "$TARGET/.claude/hooks/kit-local-status.sh" 2>/dev/null || true
   merge_settings --arg ls "$TARGET/.claude/hooks/kit-local-status.sh" \
     '.hooks.SessionStart = (((.hooks.SessionStart // []) | map(select((.hooks[0].command // "") != $ls))) + [{matcher:"",hooks:[{type:"command",command:$ls,timeout:10}]}])'
@@ -1391,7 +1391,7 @@ fi
 
 # ---- repo-hygiene SessionStart hook (all projects; read-only; idempotent) ----
 mkdir -p "$TARGET/.claude/hooks"
-hook_write "$KIT_ROOT/templates/hooks/repo-hygiene.sh.tmpl" "$TARGET/.claude/hooks/repo-hygiene.sh"
+hook_write "$KIT_ROOT/kit/templates/hooks/repo-hygiene.sh.tmpl" "$TARGET/.claude/hooks/repo-hygiene.sh"
 chmod +x "$TARGET/.claude/hooks/repo-hygiene.sh" 2>/dev/null || true
 merge_settings --arg rh "$TARGET/.claude/hooks/repo-hygiene.sh" \
   '.hooks.SessionStart = (((.hooks.SessionStart // []) | map(select((.hooks[0].command // "") != $rh))) + [{matcher:"",hooks:[{type:"command",command:$rh,timeout:10}]}])'
@@ -1399,7 +1399,7 @@ HOOK_NOTE="$HOOK_NOTE + repo-hygiene"
 
 # ---- base-branch commit guard PreToolUse(Bash) hook (all projects; idempotent) ----
 mkdir -p "$TARGET/.claude/hooks"
-hook_write "$KIT_ROOT/templates/hooks/guard-base-branch-commit.sh.tmpl" "$TARGET/.claude/hooks/guard-base-branch-commit.sh"
+hook_write "$KIT_ROOT/kit/templates/hooks/guard-base-branch-commit.sh.tmpl" "$TARGET/.claude/hooks/guard-base-branch-commit.sh"
 chmod +x "$TARGET/.claude/hooks/guard-base-branch-commit.sh" 2>/dev/null || true
 merge_settings --arg gd "$TARGET/.claude/hooks/guard-base-branch-commit.sh" \
   '.hooks.PreToolUse = (((.hooks.PreToolUse // []) | map(select((.hooks[0].command // "") != $gd))) + [{matcher:"Bash",hooks:[{type:"command",command:$gd,timeout:10}]}])'
@@ -1410,7 +1410,7 @@ HOOK_NOTE="$HOOK_NOTE + commit-guard"
 # cckit verb to run instead (#364). Wired in the TRACKED settings.json with $CLAUDE_PROJECT_DIR, not
 # settings.local.json: the local file is per-checkout and gitignored, so a guard wired there never
 # reaches a worktree — which is exactly where agents work.
-hook_write "$KIT_ROOT/templates/hooks/guard-raw-git-ops.sh.tmpl" "$TARGET/.claude/hooks/guard-raw-git-ops.sh"
+hook_write "$KIT_ROOT/kit/templates/hooks/guard-raw-git-ops.sh.tmpl" "$TARGET/.claude/hooks/guard-raw-git-ops.sh"
 chmod +x "$TARGET/.claude/hooks/guard-raw-git-ops.sh" 2>/dev/null || true
 _TRACKED="$TARGET/.claude/settings.json"
 [[ -f "$_TRACKED" ]] || echo '{}' > "$_TRACKED"
@@ -1430,7 +1430,7 @@ echo "  + .claude/hooks/guard-raw-git-ops.sh (PreToolUse Bash, wired in tracked 
 # registration that is already there is left as it is (its timeout or position may be the user's),
 # and a project that listed the hook in `upgrade.removed` is not re-wired.
 if ! _upgrade_excluded ".claude/hooks/kit-mail-check.sh"; then
-  hook_write "$KIT_ROOT/templates/hooks/kit-mail-check.sh.tmpl" "$TARGET/.claude/hooks/kit-mail-check.sh"
+  hook_write "$KIT_ROOT/kit/templates/hooks/kit-mail-check.sh.tmpl" "$TARGET/.claude/hooks/kit-mail-check.sh"
   chmod +x "$TARGET/.claude/hooks/kit-mail-check.sh" 2>/dev/null || true
   # shellcheck disable=SC2016  # $CLAUDE_PROJECT_DIR is expanded by Claude Code at hook time
   jq --arg m 'bash "$CLAUDE_PROJECT_DIR/.claude/hooks/kit-mail-check.sh"' '
@@ -1444,7 +1444,7 @@ fi
 
 # ---- version-check SessionStart hook (all projects; idempotent) ---------
 mkdir -p "$TARGET/.claude/hooks"
-hook_write "$KIT_ROOT/templates/hooks/kit_version_check.sh.tmpl" "$TARGET/.claude/hooks/kit_version_check.sh"
+hook_write "$KIT_ROOT/kit/templates/hooks/kit_version_check.sh.tmpl" "$TARGET/.claude/hooks/kit_version_check.sh"
 chmod +x "$TARGET/.claude/hooks/kit_version_check.sh" 2>/dev/null || true
 merge_settings --arg vc "$TARGET/.claude/hooks/kit_version_check.sh" \
   '.hooks.SessionStart = (((.hooks.SessionStart // []) | map(select((.hooks[0].command // "") != $vc))) + [{matcher:"",hooks:[{type:"command",command:$vc,timeout:10}]}])'
@@ -1470,7 +1470,7 @@ if adapter_has "$ADAPTERS" codex; then
 . "$KIT_ROOT/scripts/lib/kit-manifest.sh"
 mkdir -p "$TARGET/.codex/hooks"
 _CX_SRC="$(mktemp)"
-cp "$KIT_ROOT/templates/codex/hooks.json.tmpl" "$_CX_SRC"
+cp "$KIT_ROOT/kit/templates/codex/hooks.json.tmpl" "$_CX_SRC"
 _CX_HOOKS="repo-hygiene.sh kit_version_check.sh kit-mail-check.sh guard-base-branch-commit.sh guard-raw-git-ops.sh"
 _cx_optional() {  # <event> <matcher> <script> <timeout> — an opt-in hook joins the set to register
   local frag; frag="$(mktemp)"
@@ -1487,7 +1487,7 @@ for _h in $_CX_HOOKS; do
     # A fresh init over a .codex/hooks/ the user already keeps: their file wins, as AGENTS.md does.
     echo "  = .codex/hooks/$_h (already there — kept; --force replaces it)"
   else
-    hook_write "$KIT_ROOT/templates/hooks/$_h.tmpl" "$_cx_dst"
+    hook_write "$KIT_ROOT/kit/templates/hooks/$_h.tmpl" "$_cx_dst"
     chmod +x "$_cx_dst" 2>/dev/null || true
   fi
   [[ $(( ${#WRITTEN[@]} + ${#UPGRADE_REFRESHED[@]} )) -gt $_cx_n ]] && CODEX_HOOKS_CHANGED=1

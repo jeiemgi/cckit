@@ -67,7 +67,7 @@ supabase-patterns :: cckit has no Supabase; the only matches for "supabase" in t
 SKIPPED_RULES='plain-language :: follows plainLanguage.enabled, which cckit.config.json does not set; its reader is a person who does not use git, and cckit is developed by people who do
 code-retrieval :: in no profile; `cckit add graft` writes it per-project, and graft has no shell grammar, so on cckit (bash, plus docs-site/) the integration does not index the code the rule would route
 design-routing :: routes every design question to .claude/agents/designer/AGENT.md; cckit installs no agents, so the rule would dereference a path that does not exist
-gate-and-review :: both enforcement surfaces it names are off here — prePush is null in cckit.config.json and templates/hooks/prepush_gate.sh.tmpl reads .claude/kit.config.json, a file this repo does not have; review.command is unset. The gate for cckit is stated in delegation-brief.md § Gate commands
+gate-and-review :: both enforcement surfaces it names are off here — prePush is null in cckit.config.json and kit/templates/hooks/prepush_gate.sh.tmpl reads .claude/kit.config.json, a file this repo does not have; review.command is unset. The gate for cckit is stated in delegation-brief.md § Gate commands
 knowledge-base :: governs a knowledge/ dir with status/owner/updated frontmatter and a knowledge/INDEX.md manifest; cckit knowledge.dir is docs-site/src/content/docs, Starlight title/description frontmatter, no INDEX.md
 mempalace :: memory.enabled is false in cckit.config.json, so init.sh own rules loop skips this rule for this config
 plan-next :: not in profiles/software.json; it describes the cckit plan-next verb rather than governing work, and its See-also links point at plan-output-format.md, which cckit does not install
@@ -82,9 +82,9 @@ _skipped_names() { printf '%s\n' "$1" | grep . | sed 's/ :: .*//' | sort; }
 
 # ── 1. every template is either installed or skipped, with a reason ────────────────────────────
 # A new template under templates/skills or templates/rules fails here until someone decides.
-tpl_skills="$(find templates/skills -mindepth 2 -maxdepth 2 -name SKILL.md -type f 2>/dev/null \
+tpl_skills="$(find kit/templates/skills -mindepth 2 -maxdepth 2 -name SKILL.md -type f 2>/dev/null \
   | while IFS= read -r f; do basename "$(dirname "$f")"; done | sort)"
-tpl_rules="$(find templates/rules -maxdepth 1 -type f -name '*.md' 2>/dev/null \
+tpl_rules="$(find kit/templates/rules -maxdepth 1 -type f -name '*.md' 2>/dev/null \
   | while IFS= read -r f; do b="$(basename "$f")"; echo "${b%.md}"; done | sort)"
 
 decided_skills="$( { _names "$INSTALLED_SKILLS"; _skipped_names "$SKIPPED_SKILLS"; } | sort -u)"
@@ -203,14 +203,14 @@ _compare() {  # <name> <template> <installed> <mode>
 
 while IFS=' ' read -r name mode; do
   [ -n "$name" ] || continue
-  _compare "skills/$name" "templates/skills/$name/SKILL.md" ".claude/skills/$name/SKILL.md" "$mode"
+  _compare "skills/$name" "kit/templates/skills/$name/SKILL.md" ".claude/skills/$name/SKILL.md" "$mode"
 done <<EOF
 $(printf '%s\n' "$INSTALLED_SKILLS" | grep .)
 EOF
 
 while IFS=' ' read -r name mode; do
   [ -n "$name" ] || continue
-  _compare "rules/$name" "templates/rules/$name.md" ".claude/rules/$name.md" "$mode"
+  _compare "rules/$name" "kit/templates/rules/$name.md" ".claude/rules/$name.md" "$mode"
 done <<EOF
 $(printf '%s\n' "$INSTALLED_RULES" | grep .)
 EOF
@@ -219,7 +219,7 @@ EOF
 # must be the template byte for byte, or this repo runs a different mail hook than it ships.
 while IFS=' ' read -r name mode; do
   [ -n "$name" ] || continue
-  _compare "hooks/$name" "templates/hooks/$name.sh.tmpl" ".claude/hooks/$name.sh" "$mode"
+  _compare "hooks/$name" "kit/templates/hooks/$name.sh.tmpl" ".claude/hooks/$name.sh" "$mode"
 done <<EOF
 $(printf '%s\n' "$INSTALLED_HOOKS" | grep .)
 EOF
@@ -249,14 +249,14 @@ has "the brief lists the untouchable evidence"  "$prose" "Untouchable"
 # project overrides, byte-identical IS the bug. The template is parameterized on {{BASE_BRANCH}}
 # now; these assertions fail if either half regresses.
 for _pat in '(from main)' '──►  main' '→ main (rich body'; do
-  grep -qF -- "$_pat" templates/rules/effort-model.md \
-    && bad "templates/rules/effort-model.md hard-codes the integration branch ('$_pat') — use {{BASE_BRANCH}} so each project renders its own"
+  grep -qF -- "$_pat" kit/templates/rules/effort-model.md \
+    && bad "kit/templates/rules/effort-model.md hard-codes the integration branch ('$_pat') — use {{BASE_BRANCH}} so each project renders its own"
   grep -qF -- "$_pat" .claude/rules/effort-model.md \
     && bad ".claude/rules/effort-model.md names 'main' as the integration branch; this repo integrates on '$CFG_BASE'"
 done
 has "installed effort-model branches from this repo's base"   "$(cat .claude/rules/effort-model.md)" "(from $CFG_BASE)"
 has "installed effort-model targets this repo's base"          "$(cat .claude/rules/effort-model.md)" "ONE PR ──►  $CFG_BASE"
-has "the task-management template parameterizes its base too"  "$(cat templates/rules/task-management.md)" '{{BASE_BRANCH}}'
+has "the task-management template parameterizes its base too"  "$(cat kit/templates/rules/task-management.md)" '{{BASE_BRANCH}}'
 
 # ── 6. #218: every installed rule is a template basename ───────────────────────────────────────
 # effort_close's kit-sync drift check (_EO_KIT_MANAGED_RE) matches .claude/rules/ by template
@@ -265,7 +265,7 @@ has "the task-management template parameterizes its base too"  "$(cat templates/
 # keeps that true: a rule with no template would be a file cckit ships to nobody.
 find .claude/rules -maxdepth 1 -type f -name '*.md' 2>/dev/null | while IFS= read -r f; do
   b="$(basename "$f")"
-  [ -f "templates/rules/$b" ] || echo "FAIL: $f has no templates/rules/$b — cckit's own rules are all kit templates; add the template or drop the rule"
+  [ -f "kit/templates/rules/$b" ] || echo "FAIL: $f has no kit/templates/rules/$b — cckit's own rules are all kit templates; add the template or drop the rule"
 done | grep . && fail=1
 
 if [ "$fail" -eq 0 ]; then echo "PASS: cckit self-install matches its manifest"; fi
@@ -293,13 +293,13 @@ if [ "$fail" -ne 0 ]; then
     echo "  for r in $_hint_rules; do"
     echo "    COMMS_LANG=\"\$CFG_LANG\" OWNER_NAME=\"\$CFG_OWNER\" PROJECT_NAME=\"\$CFG_NAME\" BASE_BRANCH=\"\$CFG_BASE\" \\"
     echo "      perl -0777 -pe 's/\\{\\{(\\w+)\\}\\}/ exists \$ENV{\$1} ? \$ENV{\$1} : \"{{\$1}}\" /ge' \\"
-    echo "      \"templates/rules/\$r.md\" > \".claude/rules/\$r.md\""
+    echo "      \"kit/templates/rules/\$r.md\" > \".claude/rules/\$r.md\""
     echo "  done"
     echo
     echo "For one rule, keep the same four assignments and drop the loop, e.g. effort-model:"
     echo
     echo "  … BASE_BRANCH=\"\$CFG_BASE\" perl -0777 -pe 's/…/…/ge' \\"
-    echo "      templates/rules/effort-model.md > .claude/rules/effort-model.md"
+    echo "      kit/templates/rules/effort-model.md > .claude/rules/effort-model.md"
     echo
     echo "CFG_BASE must keep the full fallback chain — baseBranch, then integrationBranch, then flow,"
     echo "then \"main\". Checking only .github.baseBranch renders a different value than this script"

@@ -107,14 +107,14 @@ kit_add_kind() {
 kit_add_skill_file() {
   local f
   grep -qE '^[a-z][a-z0-9]*(-[a-z0-9]+)*$' <<<"${1:-}" || return 1
-  f="$(kit_iv_plugin_root)/templates/skills/$1/add.json"
+  f="$(kit_iv_plugin_root)/kit/templates/skills/$1/add.json"
   [ -f "$f" ] && [ -f "$(dirname "$f")/SKILL.md" ] || return 1
   printf '%s\n' "$f"
 }
 
 # kit_add_skills_list -> the names of the addable kit skills, sorted.
 kit_add_skills_list() {
-  find "$(kit_iv_plugin_root)/templates/skills" -mindepth 2 -maxdepth 2 -type f -name add.json 2>/dev/null \
+  find "$(kit_iv_plugin_root)/kit/templates/skills" -mindepth 2 -maxdepth 2 -type f -name add.json 2>/dev/null \
     | sed -e 's#/add\.json$##' -e 's#.*/##' | sort
 }
 
@@ -206,9 +206,9 @@ _kit_add_list_json() {
   done
   mods="[]"
   # Ids, not paths, go through the word-split: a plugin root with a space in it stays one path.
-  for m in $(find "$(kit_iv_plugin_root)/modules" -maxdepth 1 -type f -name '*.json' 2>/dev/null \
+  for m in $(find "$(kit_iv_plugin_root)/kit/modules" -maxdepth 1 -type f -name '*.json' 2>/dev/null \
                | sed -e 's#.*/##' -e 's#\.json$##' | sort); do
-    f="$(kit_iv_plugin_root)/modules/$m.json"
+    f="$(kit_iv_plugin_root)/kit/modules/$m.json"
     jq -e 'type == "object"' "$f" >/dev/null 2>&1 || continue
     mods="$(printf '%s' "$mods" | jq -c --slurpfile x "$f" --arg id "$m" '. + [{id: $id, label: ($x[0].label // $id)}]')"
   done
@@ -271,7 +271,7 @@ _kit_add_root() {
 _kit_add_rules() {
   local f="$1" root="$2" id="$3" r src dest
   for r in $(jq -r '.rules // [] | .[]' "$f" 2>/dev/null); do
-    src="$(kit_iv_plugin_root)/templates/rules/$r.md"; dest=".claude/rules/$r.md"
+    src="$(kit_iv_plugin_root)/kit/templates/rules/$r.md"; dest=".claude/rules/$r.md"
     [ -e "$root/$dest" ] && continue
     [ -f "$src" ] || { kit_warn "kit add $id: rule template missing ($src) — rule not written"; continue; }
     if [ -n "${KIT_DRY_RUN:-}" ]; then kit_say "  [dry-run] would write $root/$dest"; continue; fi

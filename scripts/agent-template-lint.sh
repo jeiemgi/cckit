@@ -34,7 +34,7 @@ done
 # shellcheck source=/dev/null
 . "$ROOT/scripts/lib/agent-def.sh"
 
-AGENTS_DIR="$LINT_ROOT/templates/agents"
+AGENTS_DIR="$LINT_ROOT/kit/templates/agents"
 [ -d "$AGENTS_DIR" ] || { echo "agent-template-lint: no $AGENTS_DIR" >&2; exit 2; }
 
 FAIL=0

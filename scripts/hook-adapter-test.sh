@@ -137,7 +137,7 @@ OUT="$(cd "$W" && ev claude PreToolUse "$W" 'git commit -m x' | CLAUDE_PROJECT_D
 t "claude: event cwd wins over CLAUDE_PROJECT_DIR" "$?" "0"
 
 # ── pre-push gate: either config location ──────────────────────────────────────────────────────
-GATE="$ROOT/templates/hooks/prepush_gate.sh.tmpl"
+GATE="$ROOT/kit/templates/hooks/prepush_gate.sh.tmpl"
 gate() {  # gate <runtime> <dir> <command> -> the .continue value
   ( cd "$2" && ev "$1" PreToolUse "$2" "$3" | bash "$GATE" 2>/dev/null ) | jq -r '.continue'
 }

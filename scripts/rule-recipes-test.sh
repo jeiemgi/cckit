@@ -41,7 +41,7 @@ git -C "$repo" -c user.email=t@example.com -c user.name=t commit -q --allow-empt
 git -C "$repo" worktree add -q "$work/linked" -b linked >/dev/null 2>&1
 mkdir -p "$work/linked/deep"
 
-for rule in templates/rules/shared-checkout.md .claude/rules/shared-checkout.md; do
+for rule in kit/templates/rules/shared-checkout.md .claude/rules/shared-checkout.md; do
   recipe="$(primary_recipe "$ROOT/$rule")"
   t "$rule: recipe found"                      "$([ -n "$recipe" ] && echo yes || echo no)" "yes"
   [ -n "$recipe" ] || continue

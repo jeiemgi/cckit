@@ -31,7 +31,7 @@ command -v jq >/dev/null 2>&1 || { echo "database-supabase-test: jq absent — s
 
 # shellcheck source=/dev/null
 . "$ROOT/scripts/lib/init-guide.sh"
-DB="$ROOT/databases/supabase.json"
+DB="$ROOT/kit/databases/supabase.json"
 ENV_FILE="$(jq -r .envFile "$DB")"
 NAMES="$(jq -r '.env[].name' "$DB")"
 

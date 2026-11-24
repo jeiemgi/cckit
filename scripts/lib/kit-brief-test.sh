@@ -79,8 +79,8 @@ EOF
   eq  "missing file is skipped, not fatal" "$(kit_brief_sourced "$tmp/nope.sh")" ""
 
   # ── kit_brief_gotchas ────────────────────────────────────────────────────────────────────────
-  mkdir -p "$tmp/proj/.claude/rules" "$tmp/proj/templates/rules"
-  cat > "$tmp/proj/templates/rules/delegation-brief.md" <<'EOF'
+  mkdir -p "$tmp/proj/.claude/rules" "$tmp/proj/kit/templates/rules"
+  cat > "$tmp/proj/kit/templates/rules/delegation-brief.md" <<'EOF'
 # Delegation brief
 ## Standing gotchas
 - template gotcha
@@ -127,7 +127,7 @@ EOF
   eq  "no rule file yields no durable prose" "$(kit_brief_durable_prose "$tmp/empty-root")" ""
 
   # The kit's OWN template must carry the section, or every project scaffolds a brief without it.
-  ktpl="$dir/../../templates/rules/delegation-brief.md"
+  ktpl="$dir/../../kit/templates/rules/delegation-brief.md"
   if [ -f "$ktpl" ]; then
     tpl_prose="$(awk '/^##[[:space:]]/ { in_s = ($0 ~ /[Dd]urable prose/) ? 1 : 0; next } in_s' "$ktpl")"
     has "kit template has a Durable prose section" "$tpl_prose" 'concrete'
@@ -136,7 +136,7 @@ EOF
     has "kit template forbids cutting by length"   "$tpl_prose" "never by length"
     has "kit template cross-refs communication-style" "$tpl_prose" "communication-style.md"
   else
-    echo "  (templates/rules/delegation-brief.md absent — skipping the kit-template assertions)"
+    echo "  (kit/templates/rules/delegation-brief.md absent — skipping the kit-template assertions)"
   fi
 
   # ── git-dependent lookups, against a throwaway repo ──────────────────────────────────────────

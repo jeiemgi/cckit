@@ -33,7 +33,7 @@ _kit_rt_plugin_root() {
 }
 
 _kit_rt_catalogue() {
-  local f; f="$(_kit_rt_plugin_root)/routines/catalogue.json"
+  local f; f="$(_kit_rt_plugin_root)/kit/routines/catalogue.json"
   [ -f "$f" ] || kit_die "routines catalogue not found: $f"
   cat "$f"
 }

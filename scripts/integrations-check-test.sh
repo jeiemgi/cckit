@@ -28,7 +28,7 @@ tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 tmp="$(cd "$tmp" && pwd -P)"
 export HOME="$tmp/home"; mkdir -p "$HOME"
 fx="$tmp/integrations"; mkdir -p "$fx"
-cp "$ROOT/integrations/integration.schema.json" "$fx/"
+cp "$ROOT/kit/integrations/integration.schema.json" "$fx/"
 export KIT_INTEGRATIONS_DIR="$fx"
 mkdir -p "$tmp/stubs"; printf '#!/bin/sh\nexit 0\n' > "$tmp/stubs/npm"; chmod +x "$tmp/stubs/npm"
 export PATH="$tmp/stubs:$PATH"
@@ -55,7 +55,7 @@ JSON
 }
 # The install command a working recipe uses: drop an executable that exits 0.
 good_install() { printf "mkdir -p \$HOME/.local/bin && printf '#!/bin/sh\\\\nexit 0\\\\n' > \$HOME/.local/bin/%s-bin && chmod +x \$HOME/.local/bin/%s-bin" "$1" "$1"; }
-reset() { rm -rf "$HOME/.local" "$fx"/*.json; cp "$ROOT/integrations/integration.schema.json" "$fx/"; }
+reset() { rm -rf "$HOME/.local" "$fx"/*.json; cp "$ROOT/kit/integrations/integration.schema.json" "$fx/"; }
 
 # ── a healthy descriptor ───────────────────────────────────────────────────────────────────────
 fixture healthy "$(good_install healthy)" "healthy-bin --version"
@@ -170,7 +170,7 @@ rc  "consent: never written to an inherited KIT_STATE_DIR" "$r" 0
 
 # ── every shipped descriptor has what the check runs ───────────────────────────────────────────
 unset KIT_INTEGRATIONS_DIR
-for f in "$ROOT"/integrations/*.json; do
+for f in "$ROOT"/kit/integrations/*.json; do
   [ "$(basename "$f")" = "integration.schema.json" ] && continue
   jq -e '(.detect.run | type == "string") and (.verify.run | type == "string") and (.install | length > 0)' "$f" >/dev/null 2>&1
   rc "shipped $(basename "$f" .json): has detect, install and verify commands" "$?" 0

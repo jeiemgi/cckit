@@ -50,8 +50,8 @@ _kit_iv_require() { command -v jq >/dev/null 2>&1 || { kit_warn "kit-interview: 
 kit_interview_catalog_file() {
   local tier="$1" root; root="$(kit_iv_plugin_root)"
   case "$tier" in
-    global|project) printf '%s/interview/%s.json\n' "$root" "$tier";;
-    *)              printf '%s/modules/%s.json\n'    "$root" "$tier";;
+    global|project) printf '%s/kit/interview/%s.json\n' "$root" "$tier";;
+    *)              printf '%s/kit/modules/%s.json\n'    "$root" "$tier";;
   esac
 }
 

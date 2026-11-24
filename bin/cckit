@@ -587,8 +587,8 @@ cckit bench verbs [--runs N] [--checkout <dir>] [--verb "<verb>"] [--json]   (at
     ;;
   completions)
     case "${1:-bash}" in
-      bash) cat "$ROOT/completions/cckit.bash" ;;
-      zsh)  echo "autoload -Uz bashcompinit && bashcompinit"; cat "$ROOT/completions/cckit.bash" ;;
+      bash) cat "$ROOT/kit/completions/cckit.bash" ;;
+      zsh)  echo "autoload -Uz bashcompinit && bashcompinit"; cat "$ROOT/kit/completions/cckit.bash" ;;
       *)    echo "cckit completions [bash|zsh]" >&2; exit 2 ;;
     esac
     ;;

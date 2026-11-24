@@ -99,8 +99,8 @@ kit_brief_sourced() {
 kit_brief_rule_section() {
   local want="$1" root="${2:-.}" f
   for f in "$root/.claude/rules/delegation-brief.md" \
-           "$root/templates/rules/delegation-brief.md" \
-           "${CCKIT_ROOT:-$root}/templates/rules/delegation-brief.md"; do
+           "$root/kit/templates/rules/delegation-brief.md" \
+           "${CCKIT_ROOT:-$root}/kit/templates/rules/delegation-brief.md"; do
     [ -f "$f" ] || continue
     awk -v want="$want" '
       /^##[[:space:]]/ { in_s = ($0 ~ want) ? 1 : 0; next }
@@ -227,7 +227,7 @@ kit_brief_skill_ok() {
   local s="$1" root="${2:-.}" kit
   case "$s" in ''|*/*|.*) return 1 ;; esac
   kit="${CCKIT_ROOT:-$_KB_LIB/../..}"
-  [ -f "$root/.claude/skills/$s/SKILL.md" ] || [ -f "$root/skills/$s/SKILL.md" ] || [ -f "$kit/skills/$s/SKILL.md" ]
+  [ -f "$root/.claude/skills/$s/SKILL.md" ] || [ -f "$root/skills/$s/SKILL.md" ] || [ -f "$kit/kit/skills/$s/SKILL.md" ]
 }
 
 # kit_brief_verb_ok <verb words> — rc 0 when the first word is a row of verbs.tsv (a verb or an

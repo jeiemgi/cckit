@@ -55,7 +55,7 @@ own_before="$(cat "$own")"
 # A template fix ships with a new kit version: rewind kitVersion so the upgrade runs again.
 jq '.kitVersion = "0.0.1"' "$proj/.claude/kit.config.json" > "$tmp/cfg" && mv "$tmp/cfg" "$proj/.claude/kit.config.json"
 out="$(up)"
-t "the unmodified hook now equals the template"  "$(cmp -s "$old" "$ROOT/templates/hooks/guard-base-branch-commit.sh.tmpl" && echo same || echo differs)" same
+t "the unmodified hook now equals the template"  "$(cmp -s "$old" "$ROOT/kit/templates/hooks/guard-base-branch-commit.sh.tmpl" && echo same || echo differs)" same
 case "$out" in *"~ .claude/hooks/guard-base-branch-commit.sh"*) echo "ok: the refresh is reported" ;; *) echo "FAIL: refresh not reported"; fail=1 ;; esac
 t "the customized hook is untouched"             "$(cat "$own")" "$own_before"
 case "$out" in *"! .claude/hooks/repo-hygiene.sh"*) echo "ok: the customized hook is reported as drifted" ;; *) echo "FAIL: drift not reported"; fail=1 ;; esac

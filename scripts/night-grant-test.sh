@@ -11,7 +11,7 @@ t() { # <label> <want> <got>
   if [ "$2" = "$3" ]; then printf '  ok   %s\n' "$1"
   else printf '  FAIL %s\n       want: %s\n       got:  %s\n' "$1" "$2" "$3"; fails=$((fails + 1)); fi
 }
-SKILL="$ROOT/skills/kit-autopilot/SKILL.md"
+SKILL="$ROOT/kit/skills/kit-autopilot/SKILL.md"
 # A consuming project has no scripts/ checkout: every night script path in the skill must start at
 # the plugin root, as every other plugin-direct skill's paths do.
 # shellcheck disable=SC2016
