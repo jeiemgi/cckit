@@ -145,7 +145,8 @@ EOF
 # Add an issue/PR to the project. Echoes the new item ID.
 # Args: <content node id> [<repo> <number> [Issue|PullRequest]]. REST adds by repo + number, so it
 # runs when those are given (the type defaults from the node id: PR_… is a pull request); GraphQL
-# adds by the node id.
+# adds by the node id. Unlike the setters, ANY REST failure falls back to GraphQL here: an item
+# missing from the board strands every later board step, and addProjectV2ItemById is idempotent (#590).
 project_add_item() {
   cckit_board_skipped && return 0
   local node="${1:-}" repo="${2:-}" num="${3:-}" type="${4:-}" base out rc=3
@@ -154,7 +155,7 @@ project_add_item() {
     gh_log rest mutation "project_add_item" "gh-project"
     rc=0; out="$(gh_rest_board_add_item "$base" "$type" "$repo" "$num")" || rc=$?
   fi
-  case "$rc" in 0) printf '%s\n' "$out"; return 0 ;; 3) ;; *) return 1 ;; esac
+  case "$rc" in 0) [ -n "$out" ] && { printf '%s\n' "$out"; return 0; } ;; esac
   _ghp_fallback "add item" || return 0
   [ -n "$node" ] || { echo "cckit: project_add_item: no content node id for the GraphQL fallback" >&2; return 1; }
   gh_log graphql mutation "project_add_item" "gh-project"
