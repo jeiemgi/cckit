@@ -48,6 +48,12 @@ leak_fence_check || fail=1
 note "==> forge fence"
 bash scripts/forge-fence.sh || fail=1
 
+# 3c. The force-push fence (#592). A pushed branch is brought onto its base by merge, never by a
+# rebase, so no non-test line under bin/ or scripts/ pushes with --force, -f or --force-with-lease.
+# Ratchet in scripts/force-push-fence.baseline (0).
+note "==> force-push fence"
+bash scripts/force-push-fence.sh || fail=1
+
 note "==> secret + privacy guard"
 if [ -f scripts/lib/secret-guard.sh ]; then
   . scripts/lib/secret-guard.sh

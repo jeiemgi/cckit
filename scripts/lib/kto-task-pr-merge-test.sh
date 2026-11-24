@@ -151,5 +151,49 @@ t "KIT_FORCE=1 warns about the lost trace"       "$(grep -c 'KIT_FORCE=1' "$tmp/
 t "KIT_FORCE=1 reaches the merge"                "$(merged 14)" "1"
 t "no gh subcommand ran"                         "$(grep -c '^GH-SUBCOMMAND' "$GH_LOG")" "0"
 
+# ── #592: a CONFLICTING PR is brought onto its base by merge and pushed plain, never rebased ─────
+git checkout -q develop
+GH_BASE="develop"; GH_MERGEABLE="false"; GH_HEAD="fix/30-x"
+cwt="$tmp/work/.claude/worktrees/fix+30-x"
+git worktree add -q -b fix/30-x "$cwt" develop
+git -C "$cwt" commit -q --allow-empty -m "branch work"
+git -C "$cwt" push -q origin fix/30-x
+own="$(git -C "$cwt" rev-parse HEAD)"
+git clone -q "$tmp/remote.git" "$tmp/gh-side2" 2>/dev/null
+git -C "$tmp/gh-side2" checkout -q develop
+git -C "$tmp/gh-side2" -c user.email=t@t -c user.name=t commit -q --allow-empty -m "base moved"
+git -C "$tmp/gh-side2" push -q origin develop
+basetip="$(git -C "$tmp/gh-side2" rev-parse HEAD)"
+# a fake git on PATH records every push so the test can assert none carries --force*
+mkdir -p "$tmp/gitwrap"; real_git="$(command -v git)"
+printf '#!/usr/bin/env bash\ncase "$*" in *push*--delete*) ;; *push*) echo "$*" >> "%s/git-pushes.log"; "%s" rev-parse HEAD > "%s/pushed-head" ;; esac\nexec "%s" "$@"\n' "$tmp" "$real_git" "$tmp" "$real_git" > "$tmp/gitwrap/git"
+chmod +x "$tmp/gitwrap/git"; : > "$tmp/git-pushes.log"
+: > "$GH_LOG"
+( cd "$cwt" && PATH="$tmp/gitwrap:$PATH" kto_task_pr_merge 30 ) >/dev/null 2>"$tmp/err30"; rc=$?
+t "a conflicting PR from its own worktree merges (rc 0)" "$rc" "0"
+t "the PR was merged"                                    "$(merged 30)" "1"
+t "origin/develop was merged into the branch, then pushed" "$(git -C "$tmp/remote.git" merge-base --is-ancestor "$basetip" "$(cat "$tmp/pushed-head")" 2>/dev/null && echo yes || echo no)" "yes"
+t "the branch's own commit was kept, not rewritten"      "$(git -C "$tmp/remote.git" merge-base --is-ancestor "$own" "$(cat "$tmp/pushed-head")" 2>/dev/null && echo yes || echo no)" "yes"
+t "the push was plain"                                   "$(grep -c 'push origin fix/30-x$' "$tmp/git-pushes.log")" "1"
+t "no push carried --force or --force-with-lease"        "$(grep -cE -- '--force|[[:space:]]-f([[:space:]]|$)' "$tmp/git-pushes.log")" "0"
+
+# a merge that conflicts is aborted and the user is told to resolve it with a merge
+git checkout -q develop
+git pull -q origin develop 2>/dev/null
+cwt2="$tmp/work/.claude/worktrees/fix+31-x"
+git worktree add -q -b fix/31-x "$cwt2" develop
+echo mine > "$cwt2/clash.txt"; git -C "$cwt2" add clash.txt; git -C "$cwt2" commit -q -m "mine"
+git -C "$cwt2" push -q origin fix/31-x
+echo theirs > "$tmp/gh-side2/clash.txt"; git -C "$tmp/gh-side2" pull -q origin develop 2>/dev/null
+git -C "$tmp/gh-side2" add clash.txt; git -C "$tmp/gh-side2" -c user.email=t@t -c user.name=t commit -q -m "theirs"
+git -C "$tmp/gh-side2" push -q origin develop
+: > "$GH_LOG"; GH_HEAD="fix/31-x"
+( cd "$cwt2" && kto_task_pr_merge 31 ) >/dev/null 2>"$tmp/err31"; rc=$?
+t "a textual conflict is refused (rc 1)"                 "$rc" "1"
+t "nothing was merged"                                   "$(merged "")" "0"
+t "the merge was aborted (no MERGE_HEAD)"                "$(git -C "$cwt2" rev-parse -q --verify MERGE_HEAD >/dev/null && echo present || echo gone)" "gone"
+t "the user is told to merge the base in"                "$(grep -c 'git merge origin/develop' "$tmp/err31")" "1"
+t "the branch on origin was not rewritten"               "$(git ls-remote origin fix/31-x | cut -f1)" "$(git -C "$cwt2" rev-parse HEAD)"
+
 [ "$fail" -eq 0 ] && echo "kto-task-pr-merge: all passed" || echo "kto-task-pr-merge: FAILURES"
 exit "$fail"

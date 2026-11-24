@@ -58,7 +58,7 @@ The effort lifecycle's terminal op. Board state, issue state, and the work recor
 
 ## Preconditions
 
-1. The effort PR exists, is reviewed, not in draft, and is mergeable (or rebaseable).
+1. The effort PR exists, is reviewed, not in draft, and is mergeable (or can take the base by merge).
 2. You are on the `effort/<N>-<slug>` branch (its worktree), working tree clean.
 
 If not, abort and route to `/kit-effort-pr` first.

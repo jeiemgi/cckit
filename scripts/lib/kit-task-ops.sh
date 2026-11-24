@@ -435,7 +435,7 @@ kto_task_pr() {
   fi
 }
 
-# kit task pr-merge — merge a PR (squash by default; --merge or --rebase), rebase-fix conflicts onto
+# kit task pr-merge — merge a PR (squash by default; --merge or --rebase), merge-fix conflicts from
 # the PR's base first, close its linked issues (GitHub native auto-close only fires on the default
 # branch), then clean up the PR's head branch + worktree and bring the PR's base up to date.
 # Args: [<pr-num>] [--squash|--merge|--rebase]   (the PR defaults to the open PR for the current branch)
@@ -502,22 +502,23 @@ kto_task_pr_merge() {
     fi
   fi
 
-  # Branches that are never rebased, force-pushed or deleted here: the repo base, the PR's base
-  # (it may be an effort branch), and the release branches (#366).
+  # Branches that are never merged into, pushed to or deleted here: the repo base, the PR's base
+  # (it may be an effort branch), and the release branches (#366). A pushed branch is brought onto
+  # its base by merge, never by rebase, so no push here needs --force (#592).
   _kto_protected() { case "$1" in "$base"|"$pr_base"|main|master|develop|HEAD) return 0 ;; esac; return 1; }
 
   if [[ "$merge_state" == "CONFLICTING" ]]; then
     if [[ "$branch" != "$head" ]] || _kto_protected "$branch"; then
-      echo "✗ PR #$pr_num conflicts — rebase $head onto $pr_base from its own worktree (not from $branch)" >&2; return 1
+      echo "✗ PR #$pr_num conflicts — merge origin/$pr_base into $head from its own worktree (not from $branch)" >&2; return 1
     fi
-    echo "→ Conflicts detected — rebasing onto $pr_base..."
+    echo "→ Conflicts detected — merging origin/$pr_base into $head..."
     git fetch origin "$pr_base"
-    if git rebase "origin/$pr_base"; then
-      git push --force-with-lease origin "$head"
-      echo "✓ Rebased and pushed — re-checking mergeability..."
+    if git merge --no-edit "origin/$pr_base"; then
+      git push origin "$head"
+      echo "✓ Merged $pr_base in and pushed — re-checking mergeability..."
     else
-      echo "✗ Rebase had conflicts that need manual resolution — resolve, then run cckit merge again" >&2
-      git rebase --abort 2>/dev/null || true
+      echo "✗ Merge had conflicts that need manual resolution — from this branch's worktree run: git merge origin/$pr_base, resolve, commit, push, then run cckit merge again" >&2
+      git merge --abort 2>/dev/null || true
       return 1
     fi
   fi
