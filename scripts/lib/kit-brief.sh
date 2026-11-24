@@ -219,7 +219,7 @@ _kb_rows() {
 
 # The effort sub-verbs a brief may name as `effort <sub>`. Kept beside the dispatcher's own list
 # in bin/cckit; kit-brief-test.sh fails when the two drift.
-KB_EFFORT_SUBS="new sub retitle chain start pr close plan sprint"
+KB_EFFORT_SUBS="new sub retitle chain start pr close plan sprint review"
 
 # kit_brief_skill_ok <name> [root] — rc 0 when a skill of that name ships: the project's
 # `.claude/skills/<name>/SKILL.md`, its `skills/<name>/SKILL.md`, or the kit's own skills/.

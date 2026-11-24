@@ -21,7 +21,7 @@ mode prints the same questions as one numbered message:
 
 ```bash
 cckit page mode
-cckit page open <interview.html> <interview.md>
+cckit page open <interview.html> --fallback <interview.md>
 cckit page poll <interview.html>
 ```
 

@@ -29,6 +29,9 @@ Two optional flags add a section each, after Verification:
   section naming the sprint and its two Mondays, opens the sprint's milestone when it is missing,
   and puts the parent and its subs on it. `cckit effort sprint` opens, lists and closes sprints.
 
+`cckit effort review <N>` checks each sub against its own `## Spec` before the close: a sub is done
+when it is closed and a commit on the effort branch names it. It exits 1 while any sub is not done.
+
 ## Titles
 
 The parent is titled `[E<n>] <name>` and each sub `[E<n>.<step>] <name>`, where `<n>` is the

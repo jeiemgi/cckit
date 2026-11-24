@@ -162,7 +162,11 @@ case "$cmd" in
         # count does not grow; `name` and `bounds` run on git alone.
         # shellcheck source=/dev/null
         source "$LIB/sprint.sh"; sprint_cli "$@" ;;
-      *) echo "cckit effort <new|sub|retitle|chain|start|pr|close|plan|sprint>" >&2; exit 2 ;;
+      review)
+        # Each sub against its own `## Spec`, one verdict line per sub (#583). A read.
+        # shellcheck source=/dev/null
+        source "$LIB/effort-review.sh"; effort_review "$@" ;;
+      *) echo "cckit effort <new|sub|retitle|chain|start|pr|close|plan|sprint|review>" >&2; exit 2 ;;
     esac
     ;;
   start)
