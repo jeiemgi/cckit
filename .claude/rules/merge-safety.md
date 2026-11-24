@@ -27,16 +27,18 @@ The steps, from the branch's own worktree:
 
 ```bash
 git fetch origin develop
-git rebase origin/develop                 # or: git merge origin/develop
+git merge origin/develop                  # never a rebase of a pushed branch
 git diff --stat origin/develop...HEAD     # read the deletions
 # run the project's gate here
-git push --force-with-lease                       # a plain push after a merge
+git push                                  # plain; no push needs --force
 ```
 
 - **Read the deletions.** A file or a block the issue never asked to remove, showing as deleted in
   that diff, is the revert. Stop and restore it before pushing.
-- **Merge instead of rebase** when other branches are cut from this one (an effort branch with live
-  sub-branches): a rebase rewrites the commits they sit on.
+- **Never force-push, never rebase a pushed branch.** A pushed branch is brought onto the base with
+  `git merge origin/<base>`, so every push is a plain one. The squash merge keeps history linear
+  anyway, and a rebase would also rewrite the commits that sub-branches of an effort branch sit on.
+  `scripts/force-push-fence.sh` (in `check.sh`) fails the gate on a force push in `bin/` or `scripts/`.
 - **After every landing, the remaining open PRs are stale again.** Repeat for the next one in
   `branch-naming.md`'s merge order; do not merge a batch that was current only before the first of
   them landed.
@@ -44,10 +46,10 @@ git push --force-with-lease                       # a plain push after a merge
 **What the kit's merge ops do today.** Neither makes a stale, conflict-free branch current — that
 is why this is a rule for whoever merges, not a description of the tooling.
 
-| Op | What it merges | What it rebases |
+| Op | What it merges | What it updates by merge |
 | --- | --- | --- |
-| `cckit watch --merge` (the captain) | a PR it classifies `CLEAN`: `mergeable` is `MERGEABLE`, `mergeStateStatus` is `CLEAN`, `UNSTABLE`, `HAS_HOOKS` or empty, no check is failing or pending, no review verdict is failing, and no policy floor trips | nothing. `BEHIND` is classified `BLOCKED` and skipped — not merged, not rebased |
-| `cckit merge` / `/kit-task-pr-merge` | the PR as GitHub has it | only a PR GitHub reports `CONFLICTING`, and only when run from the PR's own head branch: `git rebase origin/<base>`, then `git push --force-with-lease`. A branch that is behind but conflict-free is merged as it stands |
+| `cckit watch --merge` (the captain) | a PR it classifies `CLEAN`: `mergeable` is `MERGEABLE`, `mergeStateStatus` is `CLEAN`, `UNSTABLE`, `HAS_HOOKS` or empty, no check is failing or pending, no review verdict is failing, and no policy floor trips | nothing. `BEHIND` is classified `BLOCKED` and skipped — not merged, not updated |
+| `cckit merge` / `/kit-task-pr-merge` | the PR as GitHub has it | only a PR GitHub reports `CONFLICTING`, and only when run from the PR's own head branch: `git merge --no-edit origin/<base>`, then a plain `git push`. A textual conflict aborts the merge and asks you to resolve it with a merge from that worktree. A branch that is behind but conflict-free is merged as it stands |
 
 GitHub reports `BEHIND` only when the base branch's protection requires branches to be up to date
 before merging. With that setting off, a stale branch reads `CLEAN` and the captain merges it. Turn

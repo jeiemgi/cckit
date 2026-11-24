@@ -168,7 +168,7 @@ status_prs_classify() {
      elif ($ai == 1 and (($p.ai_review // false) | not)) then "ai-review"
      elif (($p.approvals // 0) == 0)             then "review"
      else "ready" end) as $v |
-    (if   $v == "conflict"  then "merge state is CONFLICTING — rebase onto the base"
+    (if   $v == "conflict"  then "merge state is CONFLICTING — merge the base into the branch"
      elif $v == "checks"    then "a required check is failing"
      elif $v == "draft"     then "still a draft"
      elif $v == "wait"      then (if ($p.mergeable // "") == "UNKNOWN" and ($p.checks // "NONE") != "PENDING"

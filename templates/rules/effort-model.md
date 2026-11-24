@@ -69,6 +69,9 @@ and the parent **and every sub** title up front, applies the `ctx/kind/priority/
 The board should be **legible at a glance** — a title says *what* an effort delivers and *which
 flow* it belongs to; the *chain* (who blocks whom) and the *session weight* are machine-readable.
 
+**Branches update by merge, never force-push.** Bring a pushed branch onto its base with
+`git merge origin/<base>` and push plain; never rebase it (`merge-safety.md` § 1).
+
 **Concise, jargon-free titles (lint-enforced).** The `<Name>` part of an effort/sub title is a short
 plain-language **outcome**:
 

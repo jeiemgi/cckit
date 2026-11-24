@@ -24,5 +24,5 @@ If the PR can't be merged immediately (draft, checks pending, conflicts), report
 
 - Inherits all rules from `kit-task-pr` and `kit-task-pr-merge`
 - If `kit-task-pr` fails, stop — do not attempt merge
-- If merge fails due to conflicts, attempt the rebase fix from `kit-task-pr-merge` before giving up
+- If merge fails due to conflicts, attempt the merge-the-base-in fix from `kit-task-pr-merge` before giving up
 - Always end on the base branch with a clean pull on success
