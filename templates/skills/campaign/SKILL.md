@@ -23,7 +23,7 @@ and the Editor do, one piece at a time, after the plan is approved.
   there. If the file does not exist, say so and offer the `brand-voice` skill first; a campaign
   planned without it is planned on a guess.
 - `{{PLANS_DIR}}` — an existing plan for the same goal is continued, not duplicated.
-- The open work: `cckit task list`, and `cckit sync` when the project uses GitHub issues.
+- The open work: `cckit task list`, and `cckit status --board` when the project uses GitHub issues.
 
 ## 2 · The brief
 
@@ -96,7 +96,7 @@ list as not started; `cckit task next` names the first one.
 One effort, one sub-issue per piece:
 
 ```bash
-cckit effort new "<name>" "<piece title> :: <channel · the one action>" "<piece title> :: <…>" --kind campaign --goal "<the goal line>" --scope "<the Pieces table, one line each>" --verification "<the number and its date>"
+cckit effort new "<name>" "<piece title> :: <channel · the one action>" "<piece title> :: <…>" --kind campaign --goal "<the goal line>" --spec "<the number and its date>" --scope "<the Pieces table, one line each>" --verification "<the number and its date>"
 cckit effort start <effort>
 ```
 

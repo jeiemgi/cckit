@@ -1,7 +1,7 @@
 ---
 name: kit-effort-close
 terms: Effort
-description: Close an effort in ONE op — snapshot each sub-issue's diff BEFORE squash (work record), capture and judge effort metrics, squash-merge the effort PR, close the parent + ALL native sub-issues, set the board Status=Done for each, garbage-collect the worktree/branch, run the optional knowledge-ingest hook, and finish with the kit-sync drift check.
+description: Close an effort in ONE op — snapshot each sub-issue's diff BEFORE squash (work record), capture and judge effort metrics, squash-merge the effort PR, close the parent + finished subs (open ones stay, listed), board Done for each, GC the worktree/branch, run the optional knowledge-ingest hook, and finish with the kit-sync drift check.
 when_to_use: When the effort PR has been reviewed and is ready to land. This is the single close op for the effort lifecycle (effort-model.md) — board + record state are correct by construction. Replaces the separate merge / close / mark-done / gc steps.
 ---
 
@@ -17,7 +17,10 @@ close logic is re-authored inline (kit-engine-boundary #1/#2). Respects `KIT_BAS
 The effort lifecycle's terminal op. Board state, issue state, and the work record are correct
 **by construction** — the core op owns them, in this order:
 
-0. **Pre-close hook** (optional, config-gated via `effort.preCloseHook`) — a project gate called as
+0. **Spec check** — the parent body is re-read and its `## Spec` must hold at least one real list
+   item (not empty, not TODO/TBD only); otherwise the close refuses with the reasons and writes
+   nothing. `--no-spec-check` skips it and prints one line saying it was skipped.
+   **Pre-close hook** (optional, config-gated via `effort.preCloseHook`) — a project gate called as
    `<hook> <effort#> <sub#…>` from the effort worktree before anything is written. A non-zero exit
    refuses the close and its output is printed; `KIT_FORCE=1` skips it and says so.
 1. **Snapshot sub-diffs BEFORE squash** (squash destroys the per-sub-issue commit pairs that ARE
@@ -35,8 +38,12 @@ The effort lifecycle's terminal op. Board state, issue state, and the work recor
    or the list cannot be read, the close **refuses**, names the PR, and merges nothing; this runs
    before step 2, so a refusal writes no metrics row. Skipped over REST, where the branch is kept.
 4. **Judge** the metrics (reads the durable trace dir; the record stays in the local buffer).
-5. **Close the parent + ALL native sub-issues** and set the **board Status=Done** for each
-   (guarded — a no-op when Projects v2 is off).
+5. **Close the parent + its finished sub-issues** and set the **board Status=Done** for each
+   (guarded — a no-op when Projects v2 is off). A sub is **finished** when it is already closed
+   (its close reason is kept, no second write) or a commit on the effort branch delivers it: the
+   commit's last `#N`, a `Closes|Fixes|Resolves #N`, or the sub's `[E<N>.<k>]` step tag (#565).
+   An **unfinished** sub stays open and linked under the parent — never detached, never refused
+   on — and is listed in the close comment on the parent and at the end of the output.
 6. **GC**: base branch checked out + pulled in the main checkout; then the effort's **`sub/<N>…`
    worktrees and branches** are collected through `kit_gc_prune --only '^sub/<N>[a-z]-'` — the
    squash just put their work on base, so they classify **LANDED** (no PR of their own, content or
@@ -51,7 +58,7 @@ The effort lifecycle's terminal op. Board state, issue state, and the work recor
 
 ## Preconditions
 
-1. The effort PR exists, is reviewed, not in draft, and is mergeable (or rebaseable).
+1. The effort PR exists, is reviewed, not in draft, and is mergeable (or can take the base by merge).
 2. You are on the `effort/<N>-<slug>` branch (its worktree), working tree clean.
 
 If not, abort and route to `/kit-effort-pr` first.
@@ -96,9 +103,10 @@ effort_close "$NUM"
 ## Output
 
 - Pre-squash trace dir (`<git-common-dir>/traces/effort-<N>/` + `index.jsonl`) + captured metrics
-- PR squash-merged; parent + all native sub-issues closed
+- PR squash-merged; parent + finished sub-issues closed; a close comment on the parent listing the finished subs and any left open
+- Unfinished subs still open, still linked, listed as `⚠ left open: sub #N` and in the final report
 - Every PR that was based on the effort branch is still OPEN, now based on the base branch
-- Board Status=Done for parent + every sub (if Projects v2 is on)
+- Board Status=Done for the parent + every finished sub (if Projects v2 is on)
 - Main checkout on the base branch, up to date; effort worktree + local/remote branch removed and pruned, and every LANDED `sub/<N>…` worktree + branch with them (`✓ sub gc:` lines)
 - Knowledge-ingest hook ran (if configured); a kit-sync warning if the effort touched kit-managed files
 
@@ -110,7 +118,7 @@ effort_close "$NUM"
   the per-unit work record; the core refuses to squash when no trace was captured (`KIT_FORCE=1`
   overrides). The trace lives under the **shared git-common-dir** so it survives the worktree prune.
 - **One op owns board + issue + record state** — never rely on a separate, skippable "mark done"
-  (effort-model.md). All subs go Done in the core.
+  (effort-model.md). Finished subs go Done in the core; an unfinished one stays open, linked, and named.
 - recover-before-prune (branch-naming.md): never remove a worktree with a staged-but-uncommitted
   delta — the working tree must be clean (precondition) before this op proceeds.
 - Scrub secrets from the trace if any commit diff could contain them (trace hygiene).

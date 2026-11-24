@@ -38,10 +38,10 @@ deleted and its working folder removed.
   ran={[
     "git fetch origin <base>",
     "git rev-list --count HEAD..origin/<base>",
-    "git rebase origin/<base>",
+    "git merge origin/<base>",
     "git diff --stat origin/<base>...HEAD",
     "pnpm build && pnpm lint",
-    "git push --force-with-lease",
+    "git push",
     "cckit merge <pr>",
   ]}
   means="A branch that GitHub calls mergeable can still undo somebody else's merge without a conflict, and cckit merge merges a behind branch as it stands. So the agent does three things first, and you read the second one."
@@ -60,11 +60,11 @@ deleted and its working folder removed.
    ```bash frame="terminal"
    git fetch origin <base>
    git rev-list --count HEAD..origin/<base>    # anything but 0: the branch is behind
-   git rebase origin/<base>                    # or: git merge origin/<base>
+   git merge origin/<base>
    ```
 
-   Merge in place of rebasing when other branches are cut from this one, such as an effort branch
-   with live sub-branches: a rebase rewrites the commits they sit on.
+   Never rebase a pushed branch and never force-push: the base comes in by merge, so every push is
+   a plain one. The squash merge keeps the base's history linear anyway.
 
 2. **Read what the diff deletes.**
 
@@ -78,7 +78,7 @@ deleted and its working folder removed.
 3. **Run your gate on that tree, then push.**
 
    ```bash frame="terminal"
-   git push --force-with-lease     # a plain `git push` after a merge
+   git push
    ```
 
 4. **Merge.**
@@ -103,12 +103,12 @@ What `cckit merge` does, in order:
 - It refuses a pull request whose head is an `effort/*` branch and names `cckit effort close`.
   `KIT_FORCE=1` merges anyway, with a warning that no per-sub-issue record was taken.
 - When GitHub reports the pull request as conflicting, and you ran the verb from that pull
-  request's own branch, it rebases onto the base and pushes with `--force-with-lease`. A branch
+  request's own branch, it merges the base into the branch and pushes plain. A merge conflict is aborted and you resolve it with `git merge origin/<base>`. A branch
   that is behind but has no conflict is merged as it stands, which is why steps 1 to 3 come first.
 - It squash-merges. `--merge` and `--rebase` pick the other two methods.
 - It closes every open issue the pull request links.
 - It removes the branch and its worktree. The base branch, the pull request's own base, `main`,
-  `master` and `develop` are never rebased, force-pushed or deleted.
+  `master` and `develop` are never merged into, pushed to or deleted.
 
 After every merge, the other open pull requests are behind again. Repeat from step 1 for the next
 one; do not merge a batch that was current only before the first of them landed.
@@ -337,6 +337,6 @@ with a warning.
 remains is work somebody still has to look at.
 
 In Claude Code, `/kit-gc` gives the report and `/kit-cleanup` runs the sweep after you confirm. The
-weekly rhythm cckit prints is Monday `cckit plan`, daily `cckit next`, Friday `cckit gc`. The exact
+weekly rhythm cckit prints is Monday `cckit effort plan --issues`, daily `cckit next`, Friday `cckit gc`. The exact
 rules behind each label are in the
 [CLI reference](/cli-reference/#housekeeping-and-output).

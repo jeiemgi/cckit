@@ -1,0 +1,15 @@
+{
+  "id": "Retrospective",
+  "label": ["retrospective", "retro"],
+  "definition": "The last event of a sprint, after the sprint review: the team looks at how the week went (process, tools, the definition of done) and picks the changes it will make, each filed as an issue on the backlog.",
+  "is_not": [
+    "The sprint review: the review inspects the increments; the retrospective inspects the way of working.",
+    "A postmortem: a postmortem follows one incident; the retrospective follows every sprint.",
+    "A report: a report records one delegated run; the retrospective decides changes."
+  ],
+  "avoid": ["post-mortem (for the retrospective)", "lessons learned", "debrief"],
+  "home": {
+    "cli": "effort sprint"
+  },
+  "status": "seed"
+}

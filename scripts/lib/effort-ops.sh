@@ -4,11 +4,16 @@
 # from any shell or agent (not only via the effort-* skills). Thin: composes the git-mechanics helpers
 # in effort.sh (linking, snapshots, title lint) plus gh + git. bash 3.2 compatible. Requires: gh, jq, git.
 #
-#   effort_new [flags] "<name>" [<sub spec> …]   parent (4-section body + labels) + native sub-issues
+#   effort_new [flags] "<name>" [<sub spec> …]   parent (5-section body + labels) + native sub-issues;
+#                                         --grilling[-file] appends a linted `## Grilling` record;
+#                                         --sprint[=YYYY-MM-DD] files it into that week's sprint
+#   effort_sub <slug|N> "<name>" [--kind K]      add one sub-issue, titled [E<N>.<step>] <name>
+#   effort_retitle [<slug|N>] [--apply]          rename legacy [Effort] titles (dry run by default)
 #   effort_chain <a> <b> [<c> …]          wire N issues into a linear blocked_by chain (#243)
 #   effort_start [--force] <slug|N> [<slug>]  effort/<N> branch + worktree from base, WIP-limited (#244)
 #   effort_pr [<slug|N>]                  open the ONE PR effort/<N> → base branch
-#   effort_close <slug|N>                 snapshot sub-diffs, squash-merge the PR, close parent + subs
+#   effort_close <slug|N> [--no-spec-check]  check the Spec, snapshot sub-diffs, squash-merge, close the
+#                                         parent + finished subs (unfinished stay open, listed)
 #
 # effort_new is the SHARED creation core (effort #98): both `cckit effort new` (the verb) and
 # /kit-effort-new (the skill) call it, so they produce structurally identical efforts — one source of
@@ -31,6 +36,40 @@ if ! command -v effort_slug_resolve >/dev/null 2>&1; then
   _eo_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
   # shellcheck source=/dev/null
   [ -f "$_eo_dir/effort-slug.sh" ] && . "$_eo_dir/effort-slug.sh"
+  unset _eo_dir
+fi
+
+# The one title convention (naming.sh, E546.1): every title effort_new / effort_sub / effort_pr
+# writes is linted there first, and every title read back is stripped there.
+if ! command -v naming_title_lint >/dev/null 2>&1; then
+  _eo_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+  # shellcheck source=/dev/null
+  [ -f "$_eo_dir/naming.sh" ] && . "$_eo_dir/naming.sh"
+  unset _eo_dir
+fi
+
+# The `## Spec` check (spec-lint.sh, E546.5): effort_new lints the body it composed, effort_close
+# the body it reads back.
+if ! command -v spec_lint >/dev/null 2>&1; then
+  _eo_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+  # shellcheck source=/dev/null
+  [ -f "$_eo_dir/spec-lint.sh" ] && . "$_eo_dir/spec-lint.sh"
+  unset _eo_dir
+fi
+
+# The `## Grilling` record check (grill-record.sh, E547.2): effort_new lints --grilling before writing.
+if ! command -v grill_record_lint >/dev/null 2>&1; then
+  _eo_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+  # shellcheck source=/dev/null
+  [ -f "$_eo_dir/grill-record.sh" ] && . "$_eo_dir/grill-record.sh"
+  unset _eo_dir
+fi
+
+# The sprint (sprint.sh, #570): effort_new --sprint files the effort into the current week's sprint.
+if ! command -v sprint_name >/dev/null 2>&1; then
+  _eo_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+  # shellcheck source=/dev/null
+  [ -f "$_eo_dir/sprint.sh" ] && . "$_eo_dir/sprint.sh"
   unset _eo_dir
 fi
 
@@ -58,15 +97,20 @@ _eff_need()  { command -v "$1" >/dev/null 2>&1 || { echo "effort: $1 is required
 # _eff_forge — rc 0 with a forge; without one, forge_need's one line (naming the verb), rc 1.
 _eff_forge() { forge_need; }
 
-# Compose the four-section parent body (rules/effort-model.md): the sections double as the work
+# Compose the five-section parent body (rules/effort-model.md): the sections double as the work
 # record. An empty section falls back to its template placeholder so a bare call still yields the
-# full four-heading scaffold; passing content fills it. The `## Relations` chain is NOT composed
-# here — it is layered on afterwards by _eff_relations_add (one formatter, #243).
+# full scaffold; passing content fills it. The Spec is built by spec_section (plain lines become
+# bullets); an empty one keeps only its hint, which spec_lint refuses. The `## Relations` chain is
+# NOT composed here — it is layered on afterwards by _eff_relations_add (one formatter, #243).
 _eff_compose_body() {
-  local goal="$1" scope="$2" for_agents="$3" verification="$4"
+  local goal="$1" scope="$2" for_agents="$3" verification="$4" spec="${5:-}" spec_md
+  if [ -n "$spec" ]; then spec_md="$(spec_section "$spec")"
+  else spec_md="$(printf '## Spec\n<!-- what done means: a checkable list, one item per line -->')"; fi
   cat <<EOF
 ## Goal
 ${goal:-<!-- problem statement: what outcome, in one or two lines -->}
+
+${spec_md}
 
 ## Scope
 ${scope:-<!-- the sub-issue plan; mark each parallel | sequential / dependsOn -->}
@@ -135,7 +179,7 @@ _eff_board_add() {
   command -v project_add_item >/dev/null 2>&1 || return 0
   repo="$(_eff_repo)"
   node="$(forge_rest "repos/$repo/issues/$n" --jq .node_id 2>/dev/null)" || return 0
-  item="$(project_add_item "$node" 2>/dev/null)" || return 0
+  item="$(project_add_item "$node" "$repo" "$n" Issue 2>/dev/null)" || return 0
   [ -n "$item" ] || return 0
   [ -n "${STATUS_FIELD_ID:-}" ] && [ -n "${STATUS_OPT_TODO:-}" ] \
     && project_set_single_select "$item" "$STATUS_FIELD_ID" "$STATUS_OPT_TODO" 2>/dev/null || true
@@ -148,9 +192,10 @@ _eff_board_add() {
 }
 
 # effort_new [flags] "<name>" [<sub spec> …] — the shared creation core (effort #98).
-# Flags (all optional): --flow F --role R --priority p1 --goal G --scope S --for-agents A
+# Flags: --spec T | --spec-file F (required: what done means, checked by spec_lint before any forge
+#   write); optional --flow F --role R --priority p1 --goal G --scope S --for-agents A
 #   --verification V --depends-on "#1,#2" --milestone M --slug S.  A <sub spec> is "name :: one-line
-#   desc" (the desc is optional → just "name"). Fills the four body sections, applies the
+#   desc" (the desc is optional → just "name"). Fills the five body sections, applies the
 #   ctx/kind/priority/role/flow label set, lints the parent + EVERY sub title up front (so a bad sub
 #   name aborts before anything is created), links native sub-issues, sets blocked_by edges, adds
 #   everything to the board (guarded), and records the human slug handle (#93) as a slug:<slug> label.
@@ -160,7 +205,7 @@ effort_new() {
   local repo; repo="$(_eff_repo)"
   [ -n "$repo" ] || { echo "effort_new: no repo (KIT_REPO/EFFORT_REPO unset — run in a kit project)" >&2; return 1; }
 
-  local flow="" role="" priority="p1" goal="" scope="" for_agents="" verification="" depends_on="" milestone="" explicit_slug="" kind="task"
+  local flow="" role="" priority="p1" goal="" scope="" for_agents="" verification="" depends_on="" milestone="" explicit_slug="" kind="task" spec_text="" grilling="" sprint_day=""
   # Flags are position-INDEPENDENT: recognized --flag [value] pairs are consumed wherever they occur
   # (before the title, between subs, or after them) and the remaining positionals are collected as the
   # title (first) + sub specs (rest). Previously the parser broke at the first positional, so any flag
@@ -176,6 +221,17 @@ effort_new() {
       --scope)        scope="${2:-}"; shift 2 ;;
       --for-agents)   for_agents="${2:-}"; shift 2 ;;
       --verification) verification="${2:-}"; shift 2 ;;
+      --spec)         spec_text="${2:-}"; shift 2 ;;
+      --spec=*)       spec_text="${1#*=}"; shift ;;
+      --spec-file)
+        [ -r "${2:-}" ] || { echo "effort_new: --spec-file: cannot read '${2:-}'" >&2; return 1; }
+        spec_text="$(cat "$2")"; shift 2 ;;
+      --grilling)     grilling="${2:-}"; shift 2 ;;
+      --grilling-file)
+        [ -r "${2:-}" ] || { echo "effort_new: --grilling-file: cannot read '${2:-}'" >&2; return 1; }
+        grilling="$(cat "$2")"; shift 2 ;;
+      --sprint)       sprint_day="today"; shift ;;
+      --sprint=*)     sprint_day="${1#*=}"; shift ;;
       --depends-on)   depends_on="${2:-}"; shift 2 ;;
       --milestone)    milestone="${2:-}"; shift 2 ;;
       --slug)         explicit_slug="${2:-}"; shift 2 ;;
@@ -200,29 +256,49 @@ effort_new() {
   local name="${1:-}"; shift || true
   [ -n "$name" ] || { echo 'effort_new: usage: effort_new [flags] "<name>" [<sub spec> …]' >&2; return 1; }
 
-  # Optional leading [Flow] tag on the board title (validated by effort_title_lint).
-  local flow_tag=""; [ -n "$flow" ] && flow_tag="[$flow] "
+  # The title is `[E<n>] <name>` (rules/naming-and-ids.md, E546.1): the flow lives in the flow:
+  # label, so no [Flow] tag is written into the title any more. Lint the parent name BEFORE creating
+  # anything (synthetic number 0: the rule is about the NAME, not the not-yet-assigned N).
+  naming_title_lint effort "$(naming_effort_title 0 "$name")" || { echo "effort_new: fix the name and retry" >&2; return 1; }
 
-  # Guard the parent name against the title rule BEFORE creating anything (synthetic number — the
-  # rule is about the NAME, not the not-yet-assigned N).
-  effort_title_lint "[Effort] 0 · ${flow_tag}${name}" || { echo "effort_new: fix the name and retry" >&2; return 1; }
-
-  # Lint EVERY sub title up front too (parity with the skill's intent) so a bad sub name fails the
-  # whole op before a half-effort exists. Synthetic parent number 0 for the lint.
+  # Lint EVERY sub title up front too, so a bad sub name fails the whole op before a half-effort
+  # exists. Synthetic parent number 0 for the lint.
   local i=0 spec sub_name sub_title
   for spec in "$@"; do
     i=$((i + 1))
     sub_name="${spec%% :: *}"
-    sub_title="[Effort 0] $i · $sub_name"
-    effort_title_lint "$sub_title" \
+    sub_title="$(naming_sub_title 0 "$i" "$sub_name")"
+    naming_title_lint sub "$sub_title" \
       || { echo "effort_new: fix sub title #$i and retry: $sub_name" >&2; return 1; }
   done
 
-  # Compose the four-section body, then layer the ## Relations chain from --depends-on through the
+  # Compose the five-section body, then layer the ## Relations chain from --depends-on through the
   # ONE formatter (#243) — the same one `effort_chain` uses, so both write identical lines. (It was
   # built inline here before, and `$( … )` ate every newline: the section shipped as the single
   # mangled line `## Relations- Depends on #1- Depends on #2`.)
-  local body d; body="$(_eff_compose_body "$goal" "$scope" "$for_agents" "$verification")"
+  local body d; body="$(_eff_compose_body "$goal" "$scope" "$for_agents" "$verification" "$spec_text")"
+  # The Spec (E546.5): checked on the composed body, before any label or issue is written.
+  spec_lint "$body" || { echo 'effort_new: say what done means with --spec "<item>" or --spec-file F, and retry' >&2; return 1; }
+  # The Grilling record (E547.2): optional, but a record that is passed must be one — linted here,
+  # before any forge write, then appended as the body's `## Grilling` section.
+  if [ -n "$grilling" ]; then
+    grill_record_lint "$grilling" || { echo 'effort_new: fix the --grilling record and retry' >&2; return 1; }
+    body="$body"$'\n\n'"$(grill_record_section "$grilling")"
+  fi
+  # The sprint (#570): --sprint names the week the effort is planned into, in the body and as the
+  # milestone of the parent and every sub. The milestone is opened when it does not exist yet.
+  local sprint="" sprint_start="" sprint_end=""
+  if [ -n "$sprint_day" ]; then
+    [ "$sprint_day" = today ] && sprint_day="$(_sprint_today)"
+    sprint="$(sprint_name "$sprint_day")" || { echo "effort_new: --sprint=YYYY-MM-DD names a day of the sprint" >&2; return 1; }
+    IFS="$(printf '\t')" read -r sprint_start sprint_end <<EOF_SB
+$(sprint_bounds "$sprint_day")
+EOF_SB
+    [ -z "$milestone" ] || [ "$milestone" = "$sprint" ] \
+      || { echo "effort_new: --sprint and --milestone name different milestones ($sprint, $milestone)" >&2; return 1; }
+    milestone="$sprint"
+    body="$body"$'\n\n'"$(printf '## Sprint\n%s · Monday %s to Monday %s' "$sprint" "$sprint_start" "$sprint_end")"
+  fi
   if [ -n "$depends_on" ]; then
     for d in $(printf '%s' "$depends_on" | tr ',' ' '); do
       d="${d#\#}"; [ -n "$d" ] && body="$(_eff_relations_add "$body" "$d")"
@@ -255,19 +331,27 @@ effort_new() {
     labels="$labels,flow:$flow_lc"
   fi
 
+  if [ -n "$sprint" ]; then
+    sprint_open --date "$sprint_day" >/dev/null 2>&1 \
+      || echo "effort_new: could not open the sprint milestone $sprint — the effort is filed without it" >&2
+  fi
+
   local url num slug
-  url="$(gh_rest_issue_create "$repo" "[Effort] · ${flow_tag}${name}" "$body" "$labels" "$milestone" 0)" \
+  # The number is assigned by the create, so the parent is filed under its plain name and renamed
+  # to `[E<n>] <name>` at once. The `effort` label marks it as an effort in between.
+  url="$(gh_rest_issue_create "$repo" "$name" "$body" "$labels" "$milestone" 0)" \
     || { echo "effort_new: failed to create the parent issue" >&2; return 1; }
   num="${url##*/}"
-  gh_rest_issue_edit_title "$repo" "$num" "[Effort] $num · ${flow_tag}${name}" >/dev/null 2>&1
-  # The human handle (#93): explicit --slug if given, else derived from the title (number/flow peeled).
+  gh_rest_issue_edit_title "$repo" "$num" "$(naming_effort_title "$num" "$name")" >/dev/null 2>&1 \
+    || echo "effort_new: #$num was created but not renamed to $(naming_effort_title "$num" "$name") — run: cckit effort retitle $num --apply" >&2
+  # The human handle (#93): explicit --slug if given, else derived from the name.
   if [ -n "$explicit_slug" ]; then slug="$(_eff_slug "$explicit_slug")"
-  else slug="$(_eff_title_slug "[Effort] $num · ${flow_tag}${name}")"; fi
+  else slug="$(_eff_title_slug "$(naming_effort_title "$num" "$name")")"; fi
   if [ -n "$slug" ]; then
     gh_rest_label_create "$repo" "slug:$slug" ededed "effort slug handle"
     gh_rest_issue_add_labels "$repo" "$num" "slug:$slug" >/dev/null 2>&1 || true
   fi
-  echo "  ✓ effort $(effort_display "$num" "$slug") · ${flow_tag}${name}" >&2
+  echo "  ✓ effort $(effort_display "$num" "$slug") · ${name}" >&2
 
   # Native dependency edges (the visible board chain) — guarded on the helper being available.
   if [ -n "$depends_on" ] && command -v effort_set_blocked_by >/dev/null 2>&1; then
@@ -286,7 +370,7 @@ effort_new() {
     i=$((i + 1))
     sub_name="${spec%% :: *}"
     sub_desc="${spec#* :: }"; [ "$sub_desc" = "$spec" ] && sub_desc=""
-    sub_title="[Effort $num] $i · $sub_name"
+    sub_title="$(naming_sub_title "$num" "$i" "$sub_name")"
     local sub_labels="kind:$kind,priority:$priority"
     [ -n "$role" ] && sub_labels="$sub_labels,role:$role"
     child="$(gh_rest_issue_create "$repo" "$sub_title" \
@@ -297,6 +381,144 @@ effort_new() {
     echo "  ✓ sub #$child_num · $sub_name" >&2
   done
   printf '%s\n' "$num"
+}
+
+# effort_sub <slug|N> "<name>" [--kind K] [--body B] [--spec T] — add ONE sub-issue to an effort
+# (E546.1). The title is `[E<N>.<step>] <name>`, step = the effort's current native sub count + 1; it
+# is linted before any forge write. The sub takes the parent's priority, role and milestone, and
+# the kind:<k> label (--kind, else the parent's kind, else task), as effort_new's subs do; it is
+# linked natively under the parent and added to the board. --spec adds an optional `## Spec` section
+# (E546.5), linted like the parent's when given; a sub needs none. Echoes the new sub's number.
+effort_sub() {
+  _eff_forge || return 1; _eff_need jq || return 1
+  local raw="" name="" kind="" body_in="" spec="" pos=()
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --kind)   kind="${2:-}"; shift 2 ;;
+      --kind=*) kind="${1#*=}"; shift ;;
+      --body)   body_in="${2:-}"; shift 2 ;;
+      --body=*) body_in="${1#*=}"; shift ;;
+      --spec)   spec="${2:-}"; shift 2 ;;
+      --spec=*) spec="${1#*=}"; shift ;;
+      --)       shift; while [ $# -gt 0 ]; do pos+=("$1"); shift; done ;;
+      -*)       echo "effort_sub: unknown flag $1" >&2; return 2 ;;
+      *)        pos+=("$1"); shift ;;
+    esac
+  done
+  set -- "${pos[@]+"${pos[@]}"}"
+  raw="${1:-}"; name="${2:-}"
+  [ -n "$raw" ] && [ -n "$name" ] || { echo 'effort_sub: usage: cckit effort sub <N> "<name>" [--kind K] [--body B] [--spec T]' >&2; return 2; }
+  # The rule is about the NAME: lint it first, with a synthetic token, before any forge read or write.
+  naming_title_lint sub "$(naming_sub_title 0 1 "$name")" || { echo "effort_sub: fix the name and retry" >&2; return 1; }
+  if [ -n "$spec" ]; then
+    if [ -n "$body_in" ]; then body_in="$(printf '%s\n\n%s' "$body_in" "$(spec_section "$spec")")"
+    else body_in="$(spec_section "$spec")"; fi
+    spec_lint "$body_in" || { echo "effort_sub: fix the --spec and retry" >&2; return 1; }
+  fi
+  if [ -n "$kind" ] && command -v kit_kind_label_valid >/dev/null 2>&1 && ! kit_kind_label_valid "$kind"; then
+    echo "effort_sub: --kind must be one of: $KIT_KINDS $KIT_CONTENT_KINDS (got '$kind')" >&2; return 1
+  fi
+  local repo num meta labels milestone priority role count step title child child_num sub_labels
+  repo="$(_eff_repo)"
+  [ -n "$repo" ] || { echo "effort_sub: no repo (KIT_REPO/EFFORT_REPO unset — run in a kit project)" >&2; return 1; }
+  num="$(effort_slug_resolve "$raw")" || { echo "effort_sub: could not resolve '$raw' to an effort" >&2; return 1; }
+  meta="$(gh_rest_issue_json "$repo" "$num" 2>/dev/null)" || { echo "effort_sub: effort #$num not found" >&2; return 1; }
+  labels="$(printf '%s' "$meta" | jq -r '[.labels[]?.name] | join(",")' 2>/dev/null)"
+  case ",$labels," in *,effort,*) : ;; *)
+    echo "effort_sub: #$num is not an effort (no 'effort' label) — file a standalone issue with cckit new" >&2; return 1 ;;
+  esac
+  milestone="$(printf '%s' "$meta" | jq -r '.milestone.title // ""' 2>/dev/null)"
+  priority="$(printf '%s' "$labels" | tr ',' '\n' | sed -n 's/^priority://p' | sed -n 1p)"; priority="${priority:-p1}"
+  role="$(printf '%s' "$labels" | tr ',' '\n' | sed -n 's/^role://p' | sed -n 1p)"
+  [ -n "$kind" ] || kind="$(printf '%s' "$labels" | tr ',' '\n' | sed -n 's/^kind://p' | sed -n 1p)"
+  kind="${kind:-task}"
+  count="$(forge_rest "repos/$repo/issues/$num/sub_issues" -X GET -f per_page=100 --jq 'length' 2>/dev/null)" \
+    || { echo "effort_sub: could not read the sub-issues of #$num" >&2; return 1; }
+  step=$(( ${count:-0} + 1 ))
+  title="$(naming_sub_title "$num" "$step" "$name")"
+  naming_title_lint sub "$title" || return 1
+  _eff_ensure_label "kind:$kind" d4c5f9 "kit issue kind"
+  _eff_ensure_label "priority:$priority" e99695 "kit priority"
+  sub_labels="kind:$kind,priority:$priority"
+  [ -n "$role" ] && sub_labels="$sub_labels,role:$role"
+  child="$(gh_rest_issue_create "$repo" "$title" \
+    "$(printf '%s\n\nSub-issue of #%s (effort).' "$body_in" "$num")" "$sub_labels" "$milestone" 0)" \
+    || { echo "effort_sub: failed to create the sub-issue" >&2; return 1; }
+  child_num="${child##*/}"
+  effort_link_sub "$num" "$child_num" || true
+  _eff_board_add "$child_num" "$role" || true
+  echo "  ✓ sub #$child_num · $title" >&2
+  printf '%s\n' "$child_num"
+}
+
+# _eff_retitle_rows <N> — the legacy titles of effort N and its open subs, one "num<TAB>old<TAB>new"
+# row each. A title already in the new form, or one with no prefix at all, gives no row.
+_eff_retitle_rows() {
+  local repo num title new tab subs s_num s_title tok
+  repo="$(_eff_repo)"; num="$1"; tab="$(printf '\t')"
+  title="$(forge_rest "repos/$repo/issues/$num" --jq '.title // ""' 2>/dev/null)" || return 1
+  case "$title" in
+    "[Effort] "*)
+      new="$(naming_effort_title "$num" "$(naming_strip_prefix "$title")")"
+      printf '%s\t%s\t%s\n' "$num" "$title" "$new" ;;
+  esac
+  subs="$(forge_rest "repos/$repo/issues/$num/sub_issues" -X GET -f per_page=100 \
+    --jq '.[] | select((.state // "open") == "open") | "\(.number)\t\(.title // "")"' 2>/dev/null)" || return 0
+  while IFS="$tab" read -r s_num s_title; do
+    [ -n "$s_num" ] || continue
+    case "$s_title" in "[Effort "[0-9]*) : ;; *) continue ;; esac
+    tok="$(naming_title_token "$s_title")" || continue
+    new="$(naming_sub_title "$num" "${tok#*.}" "$(naming_strip_prefix "$s_title")")"
+    printf '%s\t%s\t%s\n' "$s_num" "$s_title" "$new"
+  done <<EOF_SUBS
+$subs
+EOF_SUBS
+}
+
+# effort_retitle [<slug|N>] [--apply] — rename legacy `[Effort] N · ` / `[Effort N] M · ` titles to
+# `[E<n>] ` / `[E<n>.<step>] ` (E546.1). Without <N>: every open effort (label `effort`) and its open
+# subs. A dry run by default: it lists each old title and the new one and writes nothing. --apply
+# edits the titles through the forge. A [Flow] tag is dropped: the flow lives in the flow: label.
+effort_retitle() {
+  _eff_forge || return 1; _eff_need jq || return 1
+  local raw="" apply=0 a repo nums n rows="" tab line r_num r_old r_new count=0 failed=0
+  for a in "$@"; do
+    case "$a" in
+      --apply) apply=1 ;;
+      -*) echo "effort_retitle: unknown flag $a — usage: cckit effort retitle [<N>] [--apply]" >&2; return 2 ;;
+      *) [ -z "$raw" ] && raw="$a" ;;
+    esac
+  done
+  repo="$(_eff_repo)"; tab="$(printf '\t')"
+  [ -n "$repo" ] || { echo "effort_retitle: no repo (KIT_REPO/EFFORT_REPO unset — run in a kit project)" >&2; return 1; }
+  if [ -n "$raw" ]; then
+    nums="$(effort_slug_resolve "$raw")" || { echo "effort_retitle: could not resolve '$raw' to an effort" >&2; return 1; }
+  else
+    nums="$(gh_rest_issue_numbers_by_label "$repo" effort)" || { echo "effort_retitle: could not list the open efforts" >&2; return 1; }
+  fi
+  while IFS= read -r n; do
+    [ -n "$n" ] || continue
+    line="$(_eff_retitle_rows "$n")" || { echo "effort_retitle: could not read #$n" >&2; failed=1; continue; }
+    [ -n "$line" ] && rows="${rows:+$rows
+}$line"
+  done <<EOF_NUMS
+$nums
+EOF_NUMS
+  if [ -z "$rows" ]; then echo "(no legacy titles: every effort and sub already reads [E<n>] / [E<n>.<step>])"; return "$failed"; fi
+  while IFS="$tab" read -r r_num r_old r_new; do
+    [ -n "$r_num" ] || continue
+    count=$((count + 1))
+    printf '#%s  %s\n   -> %s\n' "$r_num" "$r_old" "$r_new"
+    if [ "$apply" = 1 ]; then
+      gh_rest_issue_edit_title "$repo" "$r_num" "$r_new" >/dev/null 2>&1 \
+        || { echo "  ✗ #$r_num not renamed" >&2; failed=1; }
+    fi
+  done <<EOF_ROWS
+$rows
+EOF_ROWS
+  if [ "$apply" = 1 ]; then echo "renamed $count title(s)"
+  else echo "dry run: $count title(s) would change — run again with --apply to rename them"; fi
+  return "$failed"
 }
 
 # _eo_source_effort — lazily source the git-mechanics lib (effort.sh) so the ops that need
@@ -344,7 +566,7 @@ _eff_chain_reaches() {
 
 # effort_chain <a> <b> [<c> …] — wire N issues into a LINEAR dependency chain (#243): B becomes
 # blocked_by A, C blocked_by B, and so on, and each issue after the first gets a `- Depends on #<its
-# predecessor>` line in its `## Relations` section. This is the verb that FEEDS `cckit plan` — the
+# predecessor>` line in its `## Relations` section. This is the verb that FEEDS `cckit effort plan --issues` — the
 # wave layering in plan-machine.sh reads exactly these `blocked_by` edges, so a chained set lands
 # one issue per wave, in the order given.
 #
@@ -358,7 +580,7 @@ _eff_chain_reaches() {
 #                chain. Nothing is written.
 #   cycles       a repeated number (`chain 1 2 1`) is refused — the chain would revisit a node. So
 #                is a chain whose new edge closes a loop through edges GitHub ALREADY holds (the
-#                pre-flight walks the combined graph). `cckit plan` cannot layer a cyclic graph into
+#                pre-flight walks the combined graph). `cckit effort plan --issues` cannot layer a cyclic graph into
 #                waves, so a cycle is refused rather than written. Nothing is written.
 #   pre-existing an issue already blocked by something else KEEPS that blocker: blocked_by is a set,
 #     blockers  and this only ever ADDS its edge. The issue ends up with both.
@@ -695,12 +917,14 @@ effort_start() {
 }
 
 # effort_pr [<slug|N>] — open the single PR effort/<N> → base. Defaults to the current effort branch.
+_EO_PR_USAGE='cckit effort pr [<slug|N>] [--summary S|--summary-file F] [--for-agents A|--for-agents-file F] [--message M] [--title T] [--type T]   open the ONE PR effort/<N> → base'
 effort_pr() {
   # The ONE effort-PR implementation (#363). The kit-effort-pr skill calls this; before, the skill
   # carried its own inline copy, so agents hand-copied the script and the copy drifted (a PR missing
   # from the board, a mangled body). Args: [<slug|N>] [--summary S|--summary-file F]
   # [--for-agents A|--for-agents-file F] [--message M] [--title T]. SUMMARY / FOR_AGENTS / COMMIT_MSG env are
   # honoured as fallbacks.
+  case "${1:-}" in -h|--help) echo "$_EO_PR_USAGE"; return 0 ;; esac
   _eff_forge || return 1
   local raw="" summary="${SUMMARY:-}" for_agents="${FOR_AGENTS:-}" msg="${COMMIT_MSG:-}" title_override="" ctype=""
   while [ $# -gt 0 ]; do
@@ -712,6 +936,7 @@ effort_pr() {
       --message|-m)       msg="${2:-}"; shift 2 ;;
       --title)            title_override="${2:-}"; shift 2 ;;
       --type)             ctype="${2:-}"; shift 2 ;;
+      -h|--help)          echo "$_EO_PR_USAGE"; return 0 ;;
       *)                  [ -z "$raw" ] && raw="$1"; shift ;;
     esac
   done
@@ -736,7 +961,18 @@ effort_pr() {
   if [ -n "$role" ] && command -v role_display >/dev/null 2>&1; then
     role_disp="$(role_display "$role" 2>/dev/null || true)"
   fi
-  name="$(printf '%s' "$title" | sed -E 's/^\[Effort\] [0-9]+ · ?//')"
+  name="$(naming_strip_structural "$title")"
+
+  # ONE shared composer (effort.sh) so every surface titles identically, then the naming rule and
+  # the effort-token check before the commit, the push or any forge write — refuse rather than open
+  # an id-less PR (#121).
+  # --title replaces the composed title; it must still carry the effort's token, checked below.
+  pr_title="${title_override:-$(effort_pr_title "$num" "${name:-effort}" "$labels" "$ctype" "$role_disp")}"
+  effort_pr_title_check "$pr_title" "$num" || { echo "effort_pr: refusing to open a PR without the [E$num] effort token" >&2; return 1; }
+  # #237 + E546.1: under pr.titleStyle = conventional (the default) the title becomes the squash
+  # commit the commitlint gate checks, so naming_title_lint pr holds it to the Conventional Commit
+  # form with a trailing token. issue-title repos run no such gate; the lint passes them through.
+  naming_title_lint pr "$pr_title" || { echo "effort_pr: refusing to open a PR whose title breaks the naming rule (pass --type <type> or --title, or set pr.titleStyle to issue-title)" >&2; return 1; }
 
   # Commit pending changes. Role identity is a Co-authored-by TRAILER, never the git author (some
   # deploy providers refuse commits whose author email matches no account). TRACKED changes only:
@@ -760,26 +996,6 @@ effort_pr() {
   fi
   git push -u origin "$branch" >/dev/null 2>&1 || echo "effort_pr: push of $branch failed — continuing (the PR may already be current)" >&2
 
-  # ONE shared composer (effort.sh) so every surface titles identically, then the mandatory-[#N]
-  # check before we ever call gh — refuse rather than open an id-less PR (#121).
-  # --title replaces the composed title; it must still carry the [#N] id, checked below.
-  pr_title="${title_override:-$(effort_pr_title "$num" "${name:-effort}" "$labels" "$ctype" "$role_disp")}"
-  effort_pr_title_check "$pr_title" "$num" || { echo "effort_pr: refusing to open a PR without the [#$num] effort id" >&2; return 1; }
-  # #237: under pr.titleStyle = conventional (the default) the title becomes the squash commit the
-  # commitlint gate checks, so a title that gate rejects — composed (a bad --type) or passed with
-  # --title — is refused here, before gh. issue-title repos run no such gate and skip the check.
-  if [ "${KIT_PR_TITLE_STYLE:-conventional}" != "issue-title" ]; then
-    if ! command -v commitlint_check >/dev/null 2>&1; then
-      local _cl_dir; _cl_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)"
-      # shellcheck source=/dev/null
-      [ -f "$_cl_dir/commitlint.sh" ] && . "$_cl_dir/commitlint.sh"
-    fi
-    if command -v commitlint_check >/dev/null 2>&1; then
-      commitlint_check "$pr_title" || { echo "effort_pr: refusing to open a PR whose title is not a Conventional Commit subject (pass --type <type> or --title, or set pr.titleStyle to issue-title)" >&2; return 1; }
-    else
-      echo "effort_pr: commitlint.sh not found — the PR title was not checked against Conventional Commits" >&2
-    fi
-  fi
   body="$(_eff_pr_body "$num" "$summary" "$for_agents" "$role")"
 
   url="$(gh_rest_pr_create "$repo" "$base" "$branch" "$pr_title" "$body" "$labels" "$milestone")" || return 1
@@ -824,7 +1040,7 @@ _eff_pr_board() {
   repo="$(_eff_repo)"; pr_num="${url##*/}"
   node="$(forge_rest "repos/$repo/pulls/$pr_num" --jq .node_id 2>/dev/null)" || node=""
   item=""
-  [ -n "$node" ] && item="$(project_add_item "$node" 2>/dev/null || true)"
+  [ -n "$node" ] && item="$(project_add_item "$node" "$repo" "$pr_num" PullRequest 2>/dev/null || true)"
   if [ -z "$item" ]; then
     echo "⚠ PR #$pr_num was opened but NOT added to the board — add it by hand" >&2
   else
@@ -1010,15 +1226,28 @@ EOF_SUBS
 # effort_close <N> — the SINGLE close implementation (#148): the /kit-effort-close skill is a thin
 # caller of this function, never a second close. Snapshot per-sub diffs + capture metrics BEFORE the
 # squash (the squash erases the per-sub history), REFUSE to squash if no work trace was captured
-# (KIT_FORCE=1 overrides), squash-merge, judge the metrics, close parent + subs, set the board
+# (KIT_FORCE=1 overrides), squash-merge, judge the metrics, close parent + finished subs, set the board
 # Status=Done for each (guarded), GC the worktree/branch, run the optional knowledge-ingest hook,
 # and finish with the advisory kit-sync drift check. Destructive: it merges, closes, and prunes.
+# First of all it re-reads the parent body and refuses an effort whose `## Spec` fails spec_lint
+# (E546.5); --no-spec-check skips that one check and says so on stderr.
+_EO_CLOSE_USAGE='cckit effort close <slug|N> [--no-spec-check]   squash-merge the effort PR, close the parent and its finished subs (unfinished subs stay open, linked, and are listed), GC'
 effort_close() {
+  case "${1:-}" in -h|--help) echo "$_EO_CLOSE_USAGE"; return 0 ;; esac
   _eff_forge || return 1; _eff_need jq || return 1
-  local raw="${1:-}" num repo base branch root self_wt trace_dir kit_touched
+  local raw="" spec_check=1 num repo base branch root self_wt trace_dir kit_touched
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      -h|--help) echo "$_EO_CLOSE_USAGE"; return 0 ;;
+      --no-spec-check) spec_check=0; shift ;;
+      -*) echo "effort_close: unknown flag $1" >&2; return 2 ;;
+      *)  [ -z "$raw" ] && raw="$1"; shift ;;
+    esac
+  done
   [ -n "$raw" ] || { echo "effort_close: <slug|effort issue #> required" >&2; return 1; }
   num="$(effort_slug_resolve "$raw")" || { echo "effort_close: could not resolve '$raw' to an effort" >&2; return 1; }
   repo="$(_eff_repo)"; base="$(_eff_base)"
+  _eo_spec_check "$repo" "$num" "$spec_check" || return 1
   branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)"
   case "$branch" in
     effort/"$num"-*) : ;;
@@ -1092,6 +1321,19 @@ effort_close() {
   kit_touched="$(git diff --name-only "origin/$base"...HEAD 2>/dev/null \
     | grep -E "$_EO_KIT_MANAGED_RE" | sort -u || true)"
 
+  # (b3) which subs are finished (#565, decision 52), read PRE-squash while the effort branch's
+  # commits still exist. A sub is finished when it is already closed, or a commit on this branch
+  # delivers it (_eo_delivered_refs). Unfinished subs are NOT closed and NOT detached: they stay
+  # open under the parent and are listed in the close comment and in this command's output.
+  local sub_rows delivered sub_split done_subs="" open_subs="" open_lines=""
+  sub_rows="$(forge_rest "repos/$repo/issues/$num/sub_issues" \
+    --jq '.[] | "\(.number)|\(.state)|\(.title // "")"' 2>/dev/null)" || sub_rows=""
+  delivered="$(_eo_delivered_refs "origin/$base")"
+  sub_split="$(printf '%s\n' "$sub_rows" | _eo_partition_subs "$num" "$delivered")"
+  done_subs="$(printf '%s\n' "$sub_split" | awk -F'|' '$1 == "done" {print $2 "|" $3}')"
+  open_subs="$(printf '%s\n' "$sub_split" | awk -F'|' '$1 == "open" {print $2}')"
+  open_lines="$(printf '%s\n' "$sub_split" | awk -F'|' '$1 == "open" {t=$0; sub(/^[^|]*\|[^|]*\|/, "", t); print "- #" $2 (t == "" ? "" : " " t)}')"
+
   # (c) squash-merge the effort PR, then delete the remote branch (git, not the API). In a cloud
   # session the proxy rejects the deletion (#396): the branch is kept and the close says so.
   { [ -n "$rest_pr" ] && gh_rest_pr_merge "$repo" "$rest_pr" squash >/dev/null 2>&1; } \
@@ -1107,17 +1349,32 @@ effort_close() {
   # (d) judge the metrics (reads the durable trace dir; the record stays in the local buffer).
   command -v judge_effort_metrics >/dev/null 2>&1 && judge_effort_metrics "$num" "origin/$base" || true
 
-  # (e) close every native sub-issue, then the parent — and set the board Status=Done for each
-  # (guarded: a no-op when Projects v2 is off or the board helpers/ids are unavailable). Board +
-  # issue + record state are owned by this ONE op (effort-model.md) — never a separate "mark done".
+  # (e) close the FINISHED sub-issues (#565), then the parent — and set the board Status=Done for
+  # each (guarded: a no-op when Projects v2 is off or the board helpers/ids are unavailable). A sub
+  # already closed keeps its own close reason (no second PATCH). An unfinished sub stays open and
+  # linked; the close comment on the parent lists it. Board + issue + record state are owned by
+  # this ONE op (effort-model.md) — never a separate "mark done".
   _eo_source_board
-  local sub
-  while IFS= read -r sub; do
+  local sub sstate done_list="" comment
+  while IFS='|' read -r sub sstate; do
     [ -n "$sub" ] || continue
-    _eo_issue_close_completed "$repo" "$sub" && echo "  ✓ closed sub #$sub" >&2
+    if [ "$sstate" = closed ]; then
+      echo "  ✓ sub #$sub already closed" >&2
+    else
+      _eo_issue_close_completed "$repo" "$sub" && echo "  ✓ closed sub #$sub" >&2
+    fi
     _eo_board_done "$sub"
-  done < <(forge_rest "repos/$repo/issues/$num/sub_issues" --jq '.[].number' 2>/dev/null)
-  _eo_issue_close_completed "$repo" "$num" && echo "  ✓ closed effort #$num" >&2
+    done_list="${done_list:+$done_list, }#$sub"
+  done <<EOF_DONE
+$done_subs
+EOF_DONE
+  while IFS= read -r sub; do
+    [ -n "$sub" ] && echo "  ⚠ left open: sub #$sub — unfinished, still linked under #$num" >&2
+  done <<EOF_OPEN
+$open_subs
+EOF_OPEN
+  comment="$(_eo_close_comment "$branch" "$done_list" "$open_lines")"
+  gh_rest_issue_close "$repo" "$num" completed "$comment" >/dev/null 2>&1 && echo "  ✓ closed effort #$num" >&2
   _eo_board_done "$num"
 
   # (f) GC: switch the main checkout to base, remove the effort worktree, delete the local branch,
@@ -1150,6 +1407,76 @@ effort_close() {
 
   # (h) kit-sync drift check — kit ⇄ project stay in sync (#148, moved here from the skill).
   _eo_kit_sync_warn "$kit_touched"
+
+  # (i) the report's last word: the subs this close left open (#565).
+  if [ -n "$open_lines" ]; then
+    echo "" >&2
+    echo "  ⚠ #$num closed with unfinished sub-issues still open (linked under it):" >&2
+    printf '%s\n' "$open_lines" | sed 's/^/     /' >&2
+  fi
+  return 0
+}
+
+# _eo_delivered_refs <base_ref> — what the commits in <base_ref>..HEAD deliver, one token per line:
+# `#N` for an issue number, `E<n>.<k>` for a sub step id. A commit delivers (1) the LAST `#N` it
+# mentions — the same commit→sub pairing effort_snapshot_subs writes to the trace, (2) every `#N`
+# after a closing keyword (close/fix/resolve and their forms), and (3) every `[E<n>.<k>]` step tag.
+# Pure git; prints nothing when there are no commits.
+_eo_delivered_refs() {
+  local sha msg
+  git rev-list "$1..HEAD" 2>/dev/null | while IFS= read -r sha; do
+    [ -n "$sha" ] || continue
+    msg="$(git log -1 --format='%s%n%b' "$sha" 2>/dev/null)"
+    printf '%s\n' "$msg" | grep -oE '#[0-9]+' | tail -1
+    printf '%s\n' "$msg" | grep -oiE '(close[sd]?|fix(e[sd])?|resolve[sd]?):?[[:space:]]+#[0-9]+' | grep -oE '#[0-9]+'
+    printf '%s\n' "$msg" | grep -oE '\[E[0-9]+\.[0-9]+\]' | tr -d '[]'
+  done | sort -u
+}
+
+# _eo_partition_subs <effort#> <delivered-refs> — stdin: "<sub#>|<state>|<title>" rows (state as the
+# REST API spells it). stdout: "done|<sub#>|<state>" or "open|<sub#>|<title>", one per sub. A sub is
+# done when it is already closed, its `#N` is in <delivered-refs>, or its title carries a step id
+# `[E<effort>.<k>]` that a commit tagged. Pure: no forge, no git.
+_eo_partition_subs() {
+  local eff="$1" refs="$2" n st title step
+  while IFS='|' read -r n st title; do
+    [ -n "$n" ] || continue
+    st="$(printf '%s' "$st" | tr '[:upper:]' '[:lower:]')"
+    if [ "$st" = closed ]; then echo "done|$n|closed"; continue; fi
+    if grep -qxF "#$n" <<<"$refs"; then echo "done|$n|$st"; continue; fi
+    step="$(grep -oE "\[E$eff\.[0-9]+\]" <<<"$title" | sed -n 1p | tr -d '[]')"
+    if [ -n "$step" ] && grep -qxF "$step" <<<"$refs"; then echo "done|$n|$st"; continue; fi
+    echo "open|$n|$title"
+  done
+}
+
+# _eo_close_comment <branch> <done-list> <open-lines> — the comment effort_close posts on the parent
+# as it closes it: which subs closed with it and which stay open, linked (#565).
+_eo_close_comment() {
+  printf 'Closed by `cckit effort close` (merged `%s`).\n\n' "$1"
+  printf 'Finished sub-issues: %s\n' "${2:-none}"
+  if [ -n "${3:-}" ]; then
+    printf '\nLeft open, still linked under this effort (no commit on the effort branch delivers them):\n%s\n' "$3"
+  fi
+}
+
+# _eo_spec_check <repo> <num> <1|0> — the close-time Spec check (E546.5), shared by both close
+# styles because it runs before they split. 1: read the parent body and refuse, with spec_lint's
+# reasons, when it has no checkable `## Spec`; a failed read refuses too, since an unread body is not
+# a checked one. 0 (--no-spec-check): skip, and print one line recording that the check was skipped.
+_eo_spec_check() {
+  local repo="$1" num="$2" body
+  if [ "${3:-1}" = 0 ]; then
+    echo "effort_close: Spec check skipped for #$num (--no-spec-check) — the close does not confirm what done means" >&2
+    return 0
+  fi
+  body="$(_eff_issue_body "$repo" "$num" 2>/dev/null)" || {
+    echo "effort_close: could not read #$num's body to check its Spec — rerun when GitHub answers, or pass --no-spec-check (nothing was written)" >&2
+    return 1
+  }
+  spec_lint "$body" && return 0
+  echo "effort_close: refusing to close #$num — add a '## Spec' list to its body (what done means), or pass --no-spec-check (nothing was written)" >&2
+  return 1
 }
 
 # _eo_kit_sync_warn <files> — the advisory kit-sync drift warning, shared by both close styles
@@ -1166,7 +1493,7 @@ _eo_kit_sync_warn() {
 }
 
 # _eo_close_wave <num> <repo> <base> — close a WAVE-style effort (#164): every sub was delivered as
-# its own task PR squash-merged straight to base (`cckit wave` → fan-out → `cckit watch --merge`),
+# its own task PR squash-merged straight to base (`cckit effort plan --wave` → fan-out → `cckit watch --merge`),
 # so no effort/<N> integration branch ever existed. Verifies every sub is CLOSED with a merged
 # closing PR (refuses and lists the stragglers otherwise), snapshots the work trace from the merged
 # sub PR diffs, then runs the SAME close tail as the branch path: judge the metrics, close the

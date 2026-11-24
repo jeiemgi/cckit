@@ -4,7 +4,8 @@
 # Family 1 of kit-engine-boundary.md (rule #1/#2): one bash home for the op, consumed by the
 # kit-task-start skill, scripts/orchestrate.sh, and `kit task start`. No second implementation.
 #
-#   wt_start [--force] <issue-number> [slug-override]
+#   wt_start [--force] <issue-number|E<n>|E<n>.<step>> [slug-override]
+#     A token resolves first: E<n> is issue n, E<n>.<step> the effort's sub at that step.
 #     Refuses (rc 1, before any fetch / branch / worktree) when another LIVE session already holds
 #     the issue's claim in <git-common-dir>/kit-sessions (session-registry.sh). `--force` or
 #     KIT_FORCE=1 starts anyway and takes the claim over.
@@ -56,6 +57,42 @@ _wt_kind_prefix() {
 }
 
 WT_START_REPO="${WT_START_REPO:-${KIT_REPO:-}}"
+
+# The token parser (naming.sh, E546.1): `start E545` / `start E545.1` name an effort or a sub.
+if ! command -v naming_token_parse >/dev/null 2>&1; then
+  _wt_naming="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)/naming.sh"
+  # shellcheck source=/dev/null
+  [ -f "$_wt_naming" ] && . "$_wt_naming"
+  unset _wt_naming
+fi
+
+# _wt_resolve_token <token> — the issue number a token names (rules/naming-and-ids.md). E<n> is
+# issue n. E<n>.<step> reads effort n's native sub-issues and takes the one titled [E<n>.<step>]
+# (or the legacy [Effort <n>] <step> · ), else the sub at position <step>. rc 1, with the reason on
+# stderr, when no sub matches or the sub-issues cannot be read.
+_wt_resolve_token() {
+  local tok="$1" parsed n s subs hit
+  parsed="$(naming_token_parse "$tok")" || { echo "wt_start: '$tok' is not an E<n> or E<n>.<step> token" >&2; return 1; }
+  n="${parsed%% *}"; s=""
+  case "$parsed" in *" "*) s="${parsed#* }" ;; esac
+  if [ -z "$s" ]; then printf '%s' "$n"; return 0; fi
+  if ! forge_available; then
+    echo "wt_start: $tok is step $s of effort $n; resolving it reads the effort's sub-issues and no forge is configured — pass the sub's issue number" >&2
+    return 1
+  fi
+  subs="$(forge_rest "repos/$WT_START_REPO/issues/$n/sub_issues" -X GET -f per_page=100 \
+    --jq '.[] | "\(.number)\t\(.title // "")"' 2>/dev/null)" \
+    || { echo "wt_start: could not read the sub-issues of effort $n" >&2; return 1; }
+  hit="$(printf '%s\n' "$subs" | awk -F'\t' -v t="[E$n.$s] " -v l="[Effort $n] $s " \
+    'index($2, t) == 1 || index($2, l) == 1 { print $1; exit }')"
+  [ -n "$hit" ] || hit="$(printf '%s\n' "$subs" | awk -F'\t' -v s="$s" 'NF && ++i == s { print $1; exit }')"
+  if [ -z "$hit" ]; then
+    echo "wt_start: $tok not found — effort $n has no sub titled [E$n.$s] and fewer than $s sub-issues" >&2
+    return 1
+  fi
+  echo "[$tok] → #$hit" >&2
+  printf '%s' "$hit"
+}
 
 # _wt_set_port <app-env-file> <port> <issue-num> — append a per-worktree dev PORT to an app's
 # .env.local, but only where one exists (i.e. the app is locally runnable). Idempotent: an existing
@@ -617,6 +654,10 @@ wt_start() {
     esac
   done
   [[ -n "$num" ]] || { echo "wt_start: issue number required" >&2; return 1; }
+  # An E<n> / E<n>.<step> token resolves to its issue number before anything else runs.
+  case "$num" in
+    [Ee][0-9]*) num="$(_wt_resolve_token "$num")" || return 1 ;;
+  esac
 
   root="$(git worktree list --porcelain | awk '/^worktree / && !hit {print $2; hit=1}')"
   [[ -n "$root" ]] || { echo "wt_start: not in a git repo" >&2; return 1; }

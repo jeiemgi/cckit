@@ -11,10 +11,46 @@ order. This page is the detail behind each one. The flags are also listed in the
 
 ## Creating an effort
 
-`cckit effort new` creates the effort and its subs: it fills the parent's four-section plan body
-(Goal / Scope / For agents / Verification), applies the `ctx/kind/priority/role/flow` labels, and
-lints every title. The `/kit-effort-new` skill produces the identical effort: both call one shared
+`cckit effort new` creates the effort and its subs: it fills the parent's five-section plan body
+(Goal / Spec / Scope / For agents / Verification), applies the `ctx/kind/priority/role/flow` labels, and
+lints every title and the Spec. The `## Spec` says what done means as a list (`--spec "<text>"` or
+`--spec-file F`; plain lines become `- ` bullets). A missing Spec, an empty one or one holding only
+TODO / TBD is refused before anything is written, and `cckit effort close` re-reads the parent and
+refuses the same way; `--no-spec-check` skips that check and prints one line saying so. The `/kit-effort-new` skill produces the identical effort: both call one shared
 core, so there is no drift between the verb and the skill.
+
+Two optional flags add a section each, after Verification:
+
+- `--grilling "<record>"` or `--grilling-file F` adds the `## Grilling` record: a first line
+  `Grilled: <who>`, a `YYYY-MM-DD` date, and at least 3 decisions as column-0 `1.` items or a link
+  to the issue comment that holds them; or the single line `waived: <reason>`. A record that is
+  not one is refused before anything is written.
+- `--sprint` (this week) or `--sprint=YYYY-MM-DD` (the week of that day) adds a `## Sprint`
+  section naming the sprint and its two Mondays, opens the sprint's milestone when it is missing,
+  and puts the parent and its subs on it. `cckit effort sprint` opens, lists and closes sprints.
+
+`cckit effort review <N>` checks each sub against its own `## Spec` before the close: a sub is done
+when it is closed and a commit on the effort branch names it. It exits 1 while any sub is not done.
+
+## Titles
+
+The parent is titled `[E<n>] <name>` and each sub `[E<n>.<step>] <name>`, where `<n>` is the
+parent's issue number and `<step>` the sub's 1-based position. A standalone issue from
+`cckit new` is a plain name with no prefix. The name is a short outcome: at most 6 words, no
+parentheses, glyphs, code identifiers or jargon. The flow goes in the `flow:` label, not the title.
+Every creating verb lints the title before it writes anything, and refuses with the reasons on
+stderr. The full rule is `rules/naming-and-ids.md`.
+
+```bash
+cckit effort sub 42 "Rate limit the sign-in"   # adds [E42.<count+1>] Rate limit the sign-in
+cckit start E42.3                              # starts the sub titled [E42.3]
+cckit effort retitle 42                        # lists legacy [Effort] titles and their new form
+cckit effort retitle 42 --apply                # renames them
+```
+
+Titles in the older `[Effort] N · <name>` and `[Effort N] M · <name>` forms still parse and lint.
+`cckit effort retitle` is a dry run until you pass `--apply`; without a number it covers every open
+effort.
 
 ## Slug handles
 
@@ -25,7 +61,7 @@ and dependencies all reference it. But a bare number is hard to remember, so eve
 `cckit effort start`, `pr`, and `close` accept the slug *or* the number interchangeably:
 
 ```bash
-cckit effort new "Slug handles for efforts" --slug slug-handles   # optional explicit handle
+cckit effort new "Slug handles for efforts" --slug slug-handles --spec "start takes the slug"
 cckit effort start slug-handles                                   # identical to: cckit effort start <N>
 cckit effort pr slug-handles
 cckit effort close slug-handles
@@ -51,8 +87,8 @@ The slug is a *derived* convenience, not a second source of truth. `--slug` only
   is titled `docs:`.
   That is the closed set `cckit start` uses as the branch prefix (`<kind>/<N>-<slug>`), so a value
   outside it is refused before anything is created; an issue that already carries such a label
-  starts on a `task/` branch, with a warning. The `--flow` values (the `[Flow]`
-  title tags) come from a controlled vocabulary your project sets once as `effort.flows` in
+  starts on a `task/` branch, with a warning. The `--flow` values (the `flow:`
+  label) come from a controlled vocabulary your project sets once as `effort.flows` in
   the project config (`.claude/kit.config.json`, or a root `cckit.config.json`) — e.g. `"effort": { "flows": ["Growth", "Checkout"] }`.
   Unset, it defaults to `Core UI API Docs Infra Auth Data Web App`; an explicit `EFFORT_FLOWS` env
   var still overrides both for one invocation.
@@ -66,11 +102,11 @@ The slug is a *derived* convenience, not a second source of truth. `--slug` only
   name `cckit gc` recognizes so it is never pruned while the effort issue is open. It is also
   **WIP-limited** — see [Only so many efforts at once](#the-wip-limit) below.
 - **`cckit effort pr`** and the `/kit-effort-pr` skill compose the PR title from **one shared
-  composer**, and both refuse to open a PR whose title lacks the mandatory `[#N]` effort id.
-  The composed title is a Conventional Commit subject carrying that id —
-  `feat(core): adoption hardening [#115]` — because the PR is squash-merged and the title becomes
+  composer**, and both refuse, before the commit or the push, a title the naming lint rejects.
+  The composed title is a Conventional Commit subject ending in the effort token —
+  `feat(core): adoption hardening [E115]` — because the PR is squash-merged and the title becomes
   the commit release-please and the commitlint gate read. The scope is the effort's `flow:` label
-  (else the `[Flow]` tag in its title); the type is `--type <type>` when you pass it, else the
+  (else the `[Flow]` tag of a legacy title); the type is `--type <type>` when you pass it, else the
   `kind:` label (`kind:task` → `feat`, a `bug` label → `fix`). A title that fails the commitlint
   check — a bad `--type`, or a non-conventional `--title` — is refused before any PR is opened.
   With [`pr.titleStyle: issue-title`](/config-and-permissions/) the title is `[Role] [#N] <name>`
@@ -248,7 +284,7 @@ The row format and the override are in
 
 ### Inside a wave, the most urgent work comes first
 
-Within one wave `cckit plan` orders the issues by their `priority:pN` label —
+Within one wave `cckit effort plan --issues` orders the issues by their `priority:pN` label —
 **p0 → p1 → p2 → p3**, with unlabeled issues last. Issues that
 share a priority keep the order they already had, and the batch packing follows that order, so the
 p0 work lands in the first batch rather than wherever it happened to fall.
@@ -268,7 +304,7 @@ cckit effort chain <a> <b> <c>     # <b> blocked_by <a> · <c> blocked_by <b>
 ```
 
 Every issue after the first gets two things: the native GitHub **`blocked_by`** edge on its
-predecessor — the edge `cckit plan` reads to layer the waves — and a `- Depends on #<predecessor>`
+predecessor — the edge `cckit effort plan --issues` reads to layer the waves — and a `- Depends on #<predecessor>`
 line in its **`## Relations`** section, the human-readable mirror. It is the same line
 `cckit effort new --depends-on` writes, produced by the same formatter, so the two never drift.
 A chained set therefore lands one issue per wave, in the order you gave.
@@ -289,15 +325,15 @@ A chained set therefore lands one issue per wave, in the order you gave.
 plain issues, not just efforts.
 </Aside>
 
-### What `cckit status` and `--llm` carry
+### What `cckit status` and `--json` carry
 
 `cckit status` also opens with **Next effort per flow**: for each flow, the effort that has no open
 blocker — p0 → p3, then the lowest issue number — and a count of the efforts still waiting. That
 table reads the `effort` label, which `cckit effort new` applies; with no labelled effort open it
 says so instead of printing an empty table.
 
-The line is for people. `cckit next --llm` rows stay `{number,ctx,title}` and carry no cadence text;
-`cckit status --llm` carries the per-flow rows under `next_efforts`
+The line is for people. `cckit next --json` rows stay `{number,ctx,title}` and carry no cadence text;
+`cckit status --json` carries the per-flow rows under `next_efforts`
 ([CLI reference](/cli-reference/)).
 
 <Aside type="note" title="Why digest is not a Friday step">

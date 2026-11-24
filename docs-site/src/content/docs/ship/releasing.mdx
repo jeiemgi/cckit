@@ -48,8 +48,8 @@ release-please reads every Conventional Commit since the last tag and picks the 
 ## Commit titles that carry the version
 
 - **Every PR title** uses a Conventional Commit subject: `type(scope): summary`. PRs are **squash-merged**, so the PR title becomes the single commit on the base branch — the exact line release-please reads to pick the next version.
-- **`cckit pr` generates a conventional title for you** — it derives the `type` from the issue's `kind:` label (`kind:feat` and `kind:task` → `feat`, `kind:fix` or a `bug` label → `fix`, `kind:chore` → `chore`, `kind:ci` → `ci`; the other kinds → `feat`) and strips the `[Effort N] M ·` / `[Tag]` prefix from the issue title. Pass a summary that is *already* a Conventional Commit subject (e.g. `cckit pr <issue> "fix: guard the empty case"`) to override the derived type when you know the change's true nature. A CI check on the title keeps a non-conventional one from merging; cckit's own is described in [How cckit itself is released](/releasing-cckit/#the-title-check-in-ci).
-- **`cckit effort pr` does the same for an effort PR** — `type(scope): name [#N]`, with the scope from the effort's `flow:` label and the type from `--type` or the `kind:` label (default `feat`). It refuses to open a PR whose title fails the title check CI runs, so an effort PR never needs a manual retitle to merge.
+- **`cckit pr` generates a conventional title for you** — it derives the `type` from the issue's `kind:` label (`kind:feat` and `kind:task` → `feat`, `kind:fix` or a `bug` label → `fix`, `kind:chore` → `chore`, `kind:ci` → `ci`; the other kinds → `feat`) strips the `[E<n>.<step>]` (or legacy `[Effort N] M ·`) / `[Tag]` prefix from the issue title, and appends the work's token: `[E<n>.<step>]`, `[E<n>]` or `[#<n>]`. A title without a trailing token is refused before the commit. Pass a summary that is *already* a Conventional Commit subject (e.g. `cckit pr <issue> "fix: guard the empty case"`) to override the derived type when you know the change's true nature. A CI check on the title keeps a non-conventional one from merging; cckit's own is described in [How cckit itself is released](/releasing-cckit/#the-title-check-in-ci).
+- **`cckit effort pr` does the same for an effort PR** — `type(scope): name [E<n>]`, with the scope from the effort's `flow:` label and the type from `--type` or the `kind:` label (default `feat`). It refuses to open a PR whose title fails the title check CI runs, so an effort PR never needs a manual retitle to merge.
 - **Breaking changes** use `!` after the type/scope **or** a `BREAKING CHANGE:` footer — never a silent major.
 - **One logical change per PR** so the generated release notes read cleanly.
 
@@ -143,7 +143,7 @@ the branch is reported instead of re-created. If the pick conflicts, nothing is 
 in the worktree, run `git cherry-pick --continue` there, and run the same `cckit hotfix` again. A
 change `origin/<base>` already carries is refused, and the worktree it made is removed.
 
-With `--llm` the result is one JSON object (`ok`, `url`, `worktree`, `detail`). A refusal or a
+With `--json` the result is one JSON object (`ok`, `url`, `worktree`, `detail`). A refusal or a
 conflict exits non-zero with `ok: false` and the reason in `detail`.
 
 For a hotfix that is new work, not a cherry-pick, branch from the release branch by hand and open the

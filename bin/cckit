@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # cckit — the CLI dispatcher. A thin bash front-end over the git-mechanics bundle (scripts/lib).
-# Agent-agnostic: every verb runs from a shell; append --llm for machine-readable output.
+# Agent-agnostic: every verb runs from a shell; append --json for machine-readable output.
 # Driven entirely from cckit.config.json — no org/repo is hardcoded. See AGENTS.md.
 #
 # Every verb, its question, a prompt to paste and its usage live in ONE table: scripts/lib/verbs.tsv
@@ -51,36 +51,55 @@ source "$LIB/ui.sh"
 source "$LIB/verbs.sh"
 usage() { verbs_help; }
 
-# --llm flag → structured output (parsed by agents). Strip it from positional args, export a flag.
+# --json → structured output (parsed by agents). Strip it from positional args, export a flag.
+# `--llm` and `--output=json` are older spellings of the same flag and keep working (#588).
 CCKIT_OUTPUT="human"
+_json_flag=0
 args=()
 for a in "$@"; do
   case "$a" in
     --llm|--output=json) CCKIT_OUTPUT="json" ;;
+    --json) _json_flag=1 ;;
     *) args+=("$a") ;;
   esac
 done
 set -- "${args[@]+"${args[@]}"}"
-export CCKIT_OUTPUT
 
 # Bare `cckit` (no verb) resumes the last session's handoff (locked behavior).
 cmd="${1:-resume}"; shift || true
 # The verb name, for a forge refusal that names it (scripts/lib/forge.sh forge_need).
 export CCKIT_VERB="$cmd"
+# The first argument as typed, before an alias adds words in front of it: `cckit sync --help` is help.
+_first_arg="${1:-}"
 
 # An old verb name (a `kind=alias` row of scripts/lib/verbs.tsv) still works (#557): it prints a
-# one-line notice on stderr and runs the verb it was renamed to. CCKIT_VERB keeps the typed name, so
-# a refusal names what the user ran. Aliases are never removed in the rename arc.
+# one-line notice on stderr and runs the verb it was renamed to. A target may carry words after the
+# verb (`status --board`, `agent lib`, #588); they go in front of the typed arguments. CCKIT_VERB
+# keeps the typed name, so a refusal names what the user ran. Aliases are never removed before 1.0.
 if _alias_target="$(verbs_alias_target "$cmd")"; then
   verbs_alias_notice "$cmd" "$_alias_target" >&2
-  cmd="$_alias_target"
+  # shellcheck disable=SC2086 # the target's words split on purpose: "status --board" → status, --board
+  set -- $_alias_target "$@"
+  cmd="$1"; shift
 fi
+
+# `--json` is the documented output flag. Three verbs own a `--json` of their own, with another
+# shape, and receive it untouched: `commands --json` (the full catalog), `status --board --json`
+# (the board as one document) and `bench … --json`. Everywhere else it means CCKIT_OUTPUT=json.
+if [ "$_json_flag" = 1 ]; then
+  case "$cmd" in
+    commands|bench) set -- "$@" --json ;;
+    status) case " $* " in *" --board "*) set -- "$@" --json ;; *) CCKIT_OUTPUT="json" ;; esac ;;
+    *) CCKIT_OUTPUT="json" ;;
+  esac
+fi
+export CCKIT_OUTPUT
 
 # `cckit <verb> --help` (#556): the dispatcher answers from the verb table before the verb runs, so
 # every verb has help and none sees a --help it does not parse. A verb whose table row says
 # ownhelp=yes then runs with that --help too, in a child, and its own text follows under "Details:".
 # Help always exits 0: some verbs print their usage on --help with rc 2.
-case "${1:-}" in
+case "$_first_arg" in
     -h|--help)
       if [ -z "${_CCKIT_HELP_SHOWN:-}" ] && verbs_entry "$cmd"; then
         [ "$(verbs_get "$cmd" 7)" = yes ] || exit 0
@@ -121,6 +140,13 @@ case "$cmd" in
           source "$LIB/role-identity.sh" 2>/dev/null || true
         fi
         effort_new "$@" ;;
+      sub)
+        if [ "${KIT_PROJECTS_V2:-}" = "true" ]; then
+          # shellcheck source=/dev/null
+          source "$LIB/gh-project.sh"; load_project_ids >/dev/null 2>&1 || true
+        fi
+        effort_sub "$@" ;;
+      retitle) effort_retitle "$@" ;;
       chain) effort_chain "$@" ;;
       start) effort_start "$@" ;;
       pr)
@@ -130,8 +156,35 @@ case "$cmd" in
         source "$LIB/role-identity.sh" 2>/dev/null || true
         effort_pr "$@" ;;
       close) effort_close "$@" ;;
-      plan)  source "$LIB/effort-plan.sh"; effort_plan "$@" ;;
-      *) echo "cckit effort <new|chain|start|pr|close|plan>" >&2; exit 2 ;;
+      plan)
+        # One planning verb (#585). Bare: the session-fit view of the open efforts. `--issues`: the
+        # open issues in dependency waves (was `cckit plan`). `--wave`: the next wave as a fan-out
+        # brief plus the captain drive (was `cckit wave` / `copilot`). `--next`: what to build next,
+        # from what the kit already does (was `cckit plan-next`). The old names are alias rows.
+        case "${1:-}" in
+          --issues) shift
+            # shellcheck source=/dev/null
+            source "$LIB/plan-machine.sh"; plan_machine "$@" ;;
+          --wave) shift
+            # shellcheck source=/dev/null
+            source "$LIB/copilot.sh"; copilot_brief "$@" ;;
+          --next) shift
+            # shellcheck source=/dev/null
+            source "$LIB/plan-next.sh"; plan_next "$@" ;;
+          *)
+            # shellcheck source=/dev/null
+            source "$LIB/effort-plan.sh"; effort_plan "$@" ;;
+        esac ;;
+      sprint)
+        # One week, Monday to Monday, as a forge milestone (#570). A sub-verb, so the top-level verb
+        # count does not grow; `name` and `bounds` run on git alone.
+        # shellcheck source=/dev/null
+        source "$LIB/sprint.sh"; sprint_cli "$@" ;;
+      review)
+        # Each sub against its own `## Spec`, one verdict line per sub (#583). A read.
+        # shellcheck source=/dev/null
+        source "$LIB/effort-review.sh"; effort_review "$@" ;;
+      *) echo "cckit effort <new|sub|retitle|chain|start|pr|close|plan|sprint|review>" >&2; exit 2 ;;
     esac
     ;;
   start)
@@ -262,25 +315,6 @@ case "$cmd" in
     case "${1:-}" in -h|--help) echo 'cckit merge [<pr>] [--squash|--merge|--rebase]   merge (squash by default; rebases on conflict), close linked issues, GC branch + worktree, update the PR base'; exit 0 ;; esac
     kto_task_pr_merge "$@"
     ;;
-  sync)        exec "$ROOT/scripts/task-sync.sh" "$@" ;;
-  plan)
-    # Wave plan over the board (deps-ordered, file-disjoint, session-fit). Runs in the invoking
-    # project; needs config so KIT_REPO is set before plan-machine reads it.
-    # shellcheck source=/dev/null
-    source "$LIB/kit-config.sh" && load_kit_config
-    # shellcheck source=/dev/null
-    source "$LIB/plan-machine.sh"; plan_machine "$@"
-    ;;
-  plan-next)
-    # Forward planner: introspect the CURRENT capability surface (skills/verbs/rules/docs) and
-    # propose what to build next, grounded in what the kit can already do. Filesystem-only — config
-    # is loaded for the project-root inference (KIT_CONFIG), then plan-next scans that root. Output
-    # is HUMAN / orchestrator-facing only — never wired into a monitored model's context (#86).
-    # shellcheck source=/dev/null
-    source "$LIB/kit-config.sh" && load_kit_config 2>/dev/null || true
-    # shellcheck source=/dev/null
-    source "$LIB/plan-next.sh"; plan_next "$@"
-    ;;
   cleanup)
     # ONE guided destructive sweep over the gc analysis: plan first, delete only the SAFE rows, and
     # only with --yes. Orphans, protected branches and stashes are surfaced and left alone.
@@ -363,15 +397,6 @@ case "$cmd" in
     # shellcheck source=/dev/null
     source "$LIB/next.sh"; next_issue "$@"
     ;;
-  wave)
-    # Read the open efforts and propose the incoming waves of work: emit the wave-0 Task-subagent
-    # fan-out + the between-waves captain drive. (`copilot`, its old name, reaches here through the alias path above.)
-    # Runs in the invoking project; needs config so KIT_REPO is set before it reads it.
-    # shellcheck source=/dev/null
-    source "$LIB/kit-config.sh" && load_kit_config
-    # shellcheck source=/dev/null
-    source "$LIB/copilot.sh"; copilot_brief "$@"
-    ;;
   watch)
     # Captain: gate open PRs, squash-merge the CLEAN ones, advance to the next wave. Runs in the
     # invoking project; needs config so KIT_REPO is set before captain reads it.
@@ -438,8 +463,6 @@ cckit bench verbs [--runs N] [--checkout <dir>] [--verb "<verb>"] [--json]   (at
     esac
     ;;
   scan)        source "$LIB/project-scan.sh"; project_scan "$@" ;;
-  encode-context) source "$LIB/toon.sh"; toon_encode ;;
-  render)      source "$LIB/render.sh"; cckit_render ;;
   debug)       exec "$ROOT/scripts/debug.sh" "$@" ;;
   contribute)
     # The cckit checkout containing cwd (a worktree, per the rules) wins over the installed one, so
@@ -449,7 +472,15 @@ cckit bench verbs [--runs N] [--checkout <dir>] [--verb "<verb>"] [--json]   (at
     croot="$(contribute_root "$PWD" "$ROOT")"
     [ "$croot" = "$ROOT" ] || echo "contribute: using the checkout at $croot" >&2
     cd "$croot"; exec "$croot/scripts/contribute.sh" "$@" ;;
-  status)   exec "$ROOT/scripts/status.sh" "$@" ;;
+  status)
+    # `--board` is the board view by role, what `cckit sync` printed before it folded in here (#588);
+    # every other form is the "where are we?" dashboard.
+    case " $* " in
+      *" --board "*)
+        board_args=(); for a in "$@"; do [ "$a" = --board ] || board_args+=("$a"); done
+        exec "$ROOT/scripts/task-sync.sh" "${board_args[@]+"${board_args[@]}"}" ;;
+    esac
+    exec "$ROOT/scripts/status.sh" "$@" ;;
   claims)
     # Live session claims (#384) — which session is working which issue. Read-only: a dead claim is
     # skipped here and reaped by the next `cckit start` on that issue, never by this verb.
@@ -466,18 +497,6 @@ cckit bench verbs [--runs N] [--checkout <dir>] [--verb "<verb>"] [--json]   (at
     ;;
   resume)      source "$LIB/handoff.sh"; handoff_read ;;
   handoff)     source "$LIB/handoff.sh"; handoff_write "$@" ;;
-  msg)
-    # Session mail (#175) — pure git-local state (.cckit/mail at the root worktree), no config.
-    source "$LIB/kit-msg.sh"
-    sub="${1:-}"; shift || true
-    case "$sub" in
-      send)       msg_send "$@" ;;
-      read)       msg_read "$@" ;;
-      list)       msg_list ;;
-      hook-check) msg_hook_check "$@" ;;
-      *) echo 'cckit msg <send|read|list|hook-check>' >&2; exit 2 ;;
-    esac
-    ;;
   install)     exec "$ROOT/scripts/install.sh" "$@" ;;
   init)
     # init resolves the config from the folder it sets up. The KIT_CONFIG this dispatcher worked out
@@ -493,16 +512,6 @@ cckit bench verbs [--runs N] [--checkout <dir>] [--verb "<verb>"] [--json]   (at
     case " $* " in *" --json "*) verbs_json; exit 0 ;; esac
     verbs="$(verbs_names | sort -u)"
     if cckit_is_json; then printf '%s\n' "$verbs" | jq -R . | jq -cs .; else printf '%s\n' "$verbs" | tr '\n' ' '; echo; fi
-    ;;
-  lib)
-    # The HELPER catalog — the companion to `commands` (#222). `commands` lists the verbs; this
-    # lists the library they are built from, so a helper like pr-evidence.sh is discoverable
-    # without an `ls`. Filesystem-only; config is loaded purely for the project-root inference
-    # (KIT_CONFIG), then it catalogs that project's scripts/lib, else cckit's own.
-    # shellcheck source=/dev/null
-    source "$LIB/kit-config.sh" && load_kit_config 2>/dev/null || true
-    # shellcheck source=/dev/null
-    source "$LIB/kit-lib.sh"; kit_lib "$@"
     ;;
   brief)
     # The delegation BRIEF for an issue, generated from real state (#221). The companion to `lib`:
@@ -520,14 +529,46 @@ cckit bench verbs [--runs N] [--checkout <dir>] [--verb "<verb>"] [--json]   (at
     CCKIT_ROOT="$ROOT" kit_brief "$@"
     ;;
 
-  receipt)
-    # One durable record per stage attempt (#322). The WORKER calls this itself: cckit never reads
-    # pane output, because #326 requires that pane history — off by default, and able to hold
-    # secrets — is never a dependency. The report arrives on stdin in the shape `cckit brief`'s
-    # receipt contract asked for, so the prompt and this parser cannot drift apart.
-    # shellcheck source=/dev/null
-    source "$LIB/stage-receipt.sh"
-    sr_cli "$@"
+  agent)
+    # The plumbing agents call and people rarely type (#588): each was a top-level verb and keeps
+    # its old name as an alias row of scripts/lib/verbs.tsv.
+    sub="${1:-}"; shift || true
+    case "$sub" in
+      lib)
+        # The HELPER catalog — the companion to `commands` (#222). `commands` lists the verbs; this
+        # lists the library they are built from, so a helper like pr-evidence.sh is discoverable
+        # without an `ls`. Filesystem-only; config is loaded purely for the project-root inference
+        # (KIT_CONFIG), then it catalogs that project's scripts/lib, else cckit's own.
+        # shellcheck source=/dev/null
+        source "$LIB/kit-config.sh" && load_kit_config 2>/dev/null || true
+        # shellcheck source=/dev/null
+        source "$LIB/kit-lib.sh"; kit_lib "$@"
+        ;;
+      receipt)
+        # One durable record per stage attempt (#322). The WORKER calls this itself: cckit never
+        # reads pane output, because #326 requires that pane history — off by default, and able to
+        # hold secrets — is never a dependency. The report arrives on stdin in the shape `cckit
+        # brief`'s receipt contract asked for, so the prompt and this parser cannot drift apart.
+        # shellcheck source=/dev/null
+        source "$LIB/stage-receipt.sh"
+        sr_cli "$@"
+        ;;
+      msg)
+        # Session mail (#175) — pure git-local state (.cckit/mail at the root worktree), no config.
+        source "$LIB/kit-msg.sh"
+        msub="${1:-}"; shift || true
+        case "$msub" in
+          send)       msg_send "$@" ;;
+          read)       msg_read "$@" ;;
+          list)       msg_list ;;
+          hook-check) msg_hook_check "$@" ;;
+          *) echo 'cckit agent msg <send|read|list|hook-check>' >&2; exit 2 ;;
+        esac
+        ;;
+      encode-context) source "$LIB/toon.sh"; toon_encode ;;
+      render)         source "$LIB/render.sh"; cckit_render ;;
+      *) echo 'cckit agent <lib|receipt|msg|encode-context|render>' >&2; exit 2 ;;
+    esac
     ;;
   qa)
     # The QA lane (#295): launch the stack command the project declared under `qa`, on this lane's

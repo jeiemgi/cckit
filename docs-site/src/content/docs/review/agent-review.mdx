@@ -106,8 +106,8 @@ reviewer.
   title="reading what the reviewer said about the menu page"
   say="What did the reviewer say about the menu page?"
   ran={[
-    "cckit receipt list <issue>",
-    "cckit receipt show <issue> review",
+    "cckit agent receipt list <issue>",
+    "cckit agent receipt show <issue> review",
   ]}
   means="The same report is posted as a comment on the issue. Its gate line is pass or fail, and blocker names the defect when there is one."
 >
@@ -154,7 +154,7 @@ reviewer.
 
 ## How to check it worked
 
-- `cckit receipt show <issue> review` prints a receipt whose `gate` line is `pass` or `fail`.
+- `cckit agent receipt show <issue> review` prints a receipt whose `gate` line is `pass` or `fail`.
 - The same report is a comment on the issue.
 - `cckit watch --merge` merges a pull request with a pass on its current head and reports
   `REVIEW_FAILING` or `REVIEW_MISSING` for one without.
@@ -241,7 +241,7 @@ commit: that makes the verdict stale and the next pass reviews the new head.
     { name: 'Declare a reviewer and turn the stage on', text: 'Add review.headless true and one agent profile that lists the review stage and does not set write to the project config.' },
     { name: 'Open a pull request the usual way', text: 'The branch must name its issue; a PR opened with cckit pr from a cckit start worktree does.' },
     { name: 'Run one captain pass', text: 'cckit watch sends each PR it would merge to the reviewer and holds it for that pass.' },
-    { name: 'Read the verdict', text: 'cckit receipt show <issue> review prints the latest review receipt; the report is also a comment on the issue.' },
+    { name: 'Read the verdict', text: 'cckit agent receipt show <issue> review prints the latest review receipt; the report is also a comment on the issue.' },
     { name: 'Run the next pass with the merge on', text: 'cckit watch --merge merges a PR with gate: pass on its current head and holds one that reads REVIEW_FAILING or REVIEW_MISSING.' },
     { name: 'Fix and push to earn a new review', text: 'A verdict belongs to one commit. A push makes it stale and the next pass reviews the new head.' },
   ]}

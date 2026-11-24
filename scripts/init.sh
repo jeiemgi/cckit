@@ -1257,7 +1257,7 @@ safe_copy "$KIT_ROOT/scripts/lib/board-view.sh"     "$TARGET/scripts/lib/board-v
 safe_copy "$KIT_ROOT/scripts/lib/effort-plan.sh"    "$TARGET/scripts/lib/effort-plan.sh"
 safe_copy "$KIT_ROOT/scripts/lib/worktree-start.sh" "$TARGET/scripts/lib/worktree-start.sh"
 # pr-evidence.sh is the helper rules/gate-and-review.md tells a project to source; without this copy
-# `cckit lib` resolves to the project's own scripts/lib, where the helper would be missing.
+# `cckit agent lib` resolves to the project's own scripts/lib, where the helper would be missing.
 safe_copy "$KIT_ROOT/scripts/lib/pr-evidence.sh"    "$TARGET/scripts/lib/pr-evidence.sh"
 safe_copy "$KIT_ROOT/scripts/lib/session-registry.sh" "$TARGET/scripts/lib/session-registry.sh"
 safe_copy "$KIT_ROOT/scripts/lib/kinds.sh"          "$TARGET/scripts/lib/kinds.sh"
@@ -1425,7 +1425,7 @@ jq --arg g '$CLAUDE_PROJECT_DIR/.claude/hooks/guard-raw-git-ops.sh' \
 echo "  + .claude/hooks/guard-raw-git-ops.sh (PreToolUse Bash, wired in tracked settings.json: raw gh/git -> cckit verb)"
 
 # ---- session-mail hook (all projects; init AND --upgrade; idempotent) ----
-# One script on four events delivers `cckit msg` mail to a running session (E257.5). Wired in the
+# One script on four events delivers `cckit agent msg` mail to a running session (E257.5). Wired in the
 # TRACKED settings.json for the same reason as the raw-git guard: mail has to reach worktrees. A
 # registration that is already there is left as it is (its timeout or position may be the user's),
 # and a project that listed the hook in `upgrade.removed` is not re-wired.

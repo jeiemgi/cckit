@@ -5,9 +5,9 @@
 # kit can already do. Run against cckit itself (full inventory) or any project the kit is installed
 # in (degrades to whatever capability dirs exist, never crashes).
 #
-#   cckit plan-next                current capabilities + a proposed forward plan (markdown)
-#   cckit plan-next --llm          the proposed plan as TOON rows {rank,area,proposal,next} (JSON fallback)
-#   cckit plan-next --root <dir>   scan <dir> instead of the resolved project/kit root
+#   cckit effort plan --next                current capabilities + a proposed forward plan (markdown)
+#   cckit effort plan --next --llm          the proposed plan as TOON rows {rank,area,proposal,next} (JSON fallback)
+#   cckit effort plan --next --root <dir>   scan <dir> instead of the resolved project/kit root
 #
 # CRITICAL — context-anxiety rule: this output is HUMAN / orchestrator-facing ONLY. It is NEVER to
 # be injected into a monitored model's prompt or context. The planner pre-grounds planning in the
@@ -140,7 +140,7 @@ plan_next() {
   local out="${CCKIT_OUTPUT:-human}" root=""
   while [ "$#" -gt 0 ]; do
     case "$1" in
-      --llm|--output=json) out="json"; shift ;;
+      --json|--llm|--output=json) out="json"; shift ;;
       --root)   root="$2"; shift 2 ;;
       --root=*) root="${1#*=}"; shift ;;
       -h|--help) sed -n '8,11p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; return 0 ;;

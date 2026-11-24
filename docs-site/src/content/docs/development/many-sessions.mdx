@@ -65,7 +65,7 @@ Do not fix it from a session that did not put it there — another session may b
 
 | Situation | Do |
 | --- | --- |
-| It is parked on a branch that is not the base | find the session that owns that branch and tell it: `cckit msg send <branch> --steer "<text>"` reaches a live session between its tool calls ([Cookbook](/cookbook/#steer-a-parallel-session)) |
+| It is parked on a branch that is not the base | find the session that owns that branch and tell it: `cckit agent msg send <branch> --steer "<text>"` reaches a live session between its tool calls ([Cookbook](/cookbook/#steer-a-parallel-session)) |
 | It is on the base but behind | leave it. Read `origin/<base>`; the next close op fast-forwards it |
 | You need a verb it does not have yet | habit 3 |
 | No other session is live and you own the machine | then moving it is your call, by hand, once |

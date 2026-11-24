@@ -80,8 +80,8 @@ recommended, not required: `cckit effort start` checks for no approval.
 <Chat
   title="creating the Bakery site launch effort"
   say="That plan is right. Create the effort."
-  ran='cckit effort new "Launch the bakery site" "<step> :: <one-line description>" "<step> :: <one-line description>"'
-  means="The parent issue gets four sections (Goal, Scope, For agents, Verification), and each step becomes a sub-issue linked to it."
+  ran='cckit effort new --spec "<what done means>" "Launch the bakery site" "<step> :: <one-line description>" "<step> :: <one-line description>"'
+  means="The parent issue gets five sections (Goal, Spec, Scope, For agents, Verification), and each step becomes a sub-issue linked to it."
 >
   The parent issue and the four sub-issues are created and linked.
 </Chat>
@@ -131,9 +131,9 @@ is on the branch, before the pull request opens. No cckit command runs them for 
 
 ## How it works
 
-`cckit effort new` fills the parent's four-section body (Goal / Scope / For agents / Verification),
-applies the `ctx/kind/priority/role/flow` labels, and lints every title up front, so a bad sub name
-fails before anything is created. cckit reads the sub-issues' *blocked-by* links and sorts them into
+`cckit effort new` fills the parent's five-section body (Goal / Spec / Scope / For agents /
+Verification), applies the `ctx/kind/priority/role/flow` labels, and lints every title and the Spec
+up front, so a bad sub name or a missing Spec fails before anything is created. cckit reads the sub-issues' *blocked-by* links and sorts them into
 **waves**: everything unblocked runs together, dependents wait their turn. `cckit effort plan`
 shows the open efforts packed into session-sized batches. Each effort also gets a
 **slug** handle (`effort/<N>-<slug>`), so `start`, `pr`, and `close` accept the slug or the
@@ -174,7 +174,7 @@ a *blocked-by* link between them; cckit will schedule the dependent one in a lat
   steps={[
     { name: 'Ask your agent to make it an effort', text: 'Describe the goal and that it is too big for one PR. Ask to break it into a sub-task per independent piece and size the work first.' },
     { name: 'Read the plan and approve it', text: 'The kit-effort-new skill shows the parent issue and its sub-issues before it creates anything, as a page or in the terminal. Change a step or the order here.' },
-    { name: 'The agent creates the effort', text: 'cckit effort new creates the parent issue with its four sections and one linked sub-issue per step.' },
+    { name: 'The agent creates the effort', text: 'cckit effort new creates the parent issue with its five sections and one linked sub-issue per step.' },
     { name: 'The agent starts it and builds the steps', text: 'cckit effort start makes the effort branch and worktree; sequential steps are one commit each on that branch, parallel steps use their own worktrees and merge back.' },
     { name: 'Run the checks on the effort branch', text: 'Run the project checks once every step is on the effort branch, before the pull request opens.' },
     { name: 'Ship it as one pull request', text: 'cckit effort pr opens a single pull request for the whole effort; cckit effort close squash-merges it and closes the parent and every sub-issue together.' },

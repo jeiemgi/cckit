@@ -81,7 +81,7 @@ has "section is present with no efforts"   "$out3" "## Next effort per flow"
 has "no efforts: states its own emptiness" "$out3" 'No open issue carries the `effort` label'
 has "the section sits before the buckets"  "$(printf '%s\n' "$out3" | grep -E '^## ' | tr '\n' '|')" \
     "## Board|## Next effort per flow|## 1 · Local undone work|"
-has "status names the cadence"             "$out3" 'Monday: `cckit plan`'
+has "status names the cadence"             "$out3" 'Monday: `cckit effort plan --issues`'
 has "status names the Friday step"         "$out3" 'Friday: `cckit gc`'
 
 # Two flows; core #11 is blocked_by the OPEN core #10, docs #20 is free.

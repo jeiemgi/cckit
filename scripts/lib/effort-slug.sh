@@ -57,8 +57,9 @@ _eff_slug() {
 # the cosmetic doubling that produced branches like `effort/98-98-core-…`). See #93 / sub #96.
 _eff_title_slug() {
   local t="$1"
-  # structural prefix: "[Effort] N · " (parent) or "[Effort N] M · " (sub)
-  t="$(printf '%s' "$t" | sed -E 's/^\[Effort( [0-9]+)?\] [0-9]+ ·? ?//')"
+  # structural prefix: "[E<n>] " / "[E<n>.<step>] ", or the legacy "[Effort] N · " (parent) and
+  # "[Effort N] M · " (sub)
+  t="$(printf '%s' "$t" | sed -E -e 's/^\[E[0-9]+(\.[0-9]+)?\] +//' -e 's/^\[Effort( [0-9]+)?\] [0-9]+ ·? ?//')"
   # one optional leading [Flow] tag
   t="$(printf '%s' "$t" | sed -E 's/^\[[A-Za-z]+\][[:space:]]*//')"
   _eff_slug "$t"
@@ -133,7 +134,7 @@ effort_branch_rows_origin() {
 # effort_slug_resolve <slug|N> → echo the canonical effort number on stdout (rc 0).
 #   - pure digits → passthrough (number stays canonical; never re-mapped).
 #   - otherwise normalize and match, in order: effort/* branches (local + remote), then (via gh)
-#     slug:<slug> labels, then title-derived slugs of open `[Effort]` issues.
+#     slug:<slug> labels, then title-derived slugs of open `[E<n>]` (or legacy `[Effort]`) issues.
 #   - no match → rc 1; >1 distinct match → rc 1 (ambiguous, never a wrong guess); empty/unusable → rc 2.
 effort_slug_resolve() {
   local input="${1:-}"
@@ -161,7 +162,7 @@ effort_slug_resolve() {
       matches="$(gh_rest_issue_numbers_by_label "$repo" "slug:$norm" 2>/dev/null | grep -E '^[0-9]+$' | sort -un)"
       if [ -z "$matches" ]; then
         local in it
-        matches="$( { gh_rest_open_issue_titles "$repo" | grep -F '[Effort]'; } 2>/dev/null \
+        matches="$( { gh_rest_open_issue_titles "$repo" | grep -E "$(printf '\t')"'\[(Effort\]|E[0-9]+\] )'; } 2>/dev/null \
                    | while IFS="$(printf '\t')" read -r in it; do
                        [ "$(_eff_title_slug "$it")" = "$norm" ] && printf '%s\n' "$in"
                      done | grep -E '^[0-9]+$' | sort -un)"

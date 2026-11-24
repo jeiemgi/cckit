@@ -1,7 +1,7 @@
 ---
 name: kit-task-pr-merge
 terms: Gate
-description: Squash-merge the open PR for the current branch, switch to the base branch, and pull. Auto-rebases onto the base if conflicts are detected.
+description: Squash-merge the open PR for the current branch, switch to the base branch, and pull. Merges the base into the branch if conflicts are detected.
 when_to_use: When work on an issue branch is ready to land. Always run after `/kit-task-pr`.
 ---
 
@@ -52,8 +52,8 @@ fi
 
 - Never merge a DRAFT PR — undraft first
 - An effort's PR (head `effort/*`) is refused: merge it with `cckit effort close <N>`, which snapshots the per-sub diffs before the squash. `KIT_FORCE=1` overrides, with a warning
-- Never force-push to the base branch
-- If rebase conflicts can't auto-resolve, the op aborts cleanly and surfaces the conflicting files
+- Never force-push, anywhere: a pushed branch is updated with `git merge origin/<base>` and a plain push, never a rebase
+- If the merge hits conflicts, the op aborts it cleanly and tells you to resolve with `git merge origin/<base>` from the branch's worktree
 - If merge fails for a non-conflict reason (failing checks), the op reports verbatim and does not retry
 - The op always ends on the base branch with a clean pull on success, and always cleans up the merged branch + worktree
 - Never delete a branch that still has an open PR or unpushed commits not on the base branch's remote

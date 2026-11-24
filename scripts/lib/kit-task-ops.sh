@@ -22,7 +22,7 @@
 #   kto_closing_issue_numbers <pr-num>                echo the issue #s a merged PR closes
 #   kto_task_pr   <num> <summary> [commit-msg] [--base <branch>]   commit+push+open PR (board → In Review)
 #   kto_task_pr_merge [pr-num] [--squash|--merge|--rebase]   merge (squash default) + close issues + GC + update the PR base; refuses an effort/* head
-#   kto_task_new  <title> <role> <kind> <prio> [ms] [plan] [blocked] <body>   create issue + board fields (ms may be empty)
+#   kto_task_new  <title> <role> <kind> <prio> [ms] [plan] [blocked] <body>   lint the title, create issue + board fields (ms may be empty)
 #   kto_task_close <num> <summary> [pr-num] [--reason R] [--duplicate-of N] [--superseded-by N]   close + reason + board → Done
 # errors: mixed — git/gh ops propagate; board + label side effects are best-effort
 
@@ -68,6 +68,18 @@ if ! type kit_kind_commit_type >/dev/null 2>&1; then
 fi
 type cckit_board_skipped >/dev/null 2>&1 || cckit_board_skipped() { return 1; }
 
+# The one title convention (naming.sh, E546.1): kto_task_new lints the issue title and kto_task_pr
+# the PR title before any forge write; kto_pr_title strips issue prefixes and appends the token.
+if ! type naming_title_lint >/dev/null 2>&1; then
+  if [ -n "${BASH_SOURCE:-}" ]; then _kto_self="${BASH_SOURCE[0]}"
+  elif [ -n "${ZSH_VERSION:-}" ]; then eval '_kto_self="${(%):-%x}"'
+  else _kto_self="$0"; fi
+  _kto_self="$(cd "$(dirname "$_kto_self")" 2>/dev/null && pwd)/naming.sh"
+  # shellcheck source=naming.sh
+  [ -f "$_kto_self" ] && . "$_kto_self"
+  unset _kto_self
+fi
+
 kto_repo() {
   printf '%s' "${KIT_TASK_REPO:-${KIT_REPO:-}}"
 }
@@ -109,13 +121,34 @@ kto_labels_kind() {
 # Compose the PR title as a Conventional Commit subject. Because PRs are squash-merged, this title
 # becomes the single commit release-please reads to pick the next version — a non-conventional title
 # under-bumps silently, and the commitlint gate (.github/workflows/commitlint.yml) now rejects it.
-# Args: <raw-issue-title> <summary> <labels-csv>
+# Args: <raw-issue-title> <summary> <labels-csv> [<issue-num>]
 #   1. An author <summary> that is ALREADY a conventional subject wins — the author knows the change's
 #      true type (e.g. a kind:task that is really a fix). Validated by the shared commitlint.sh.
 #   2. Otherwise derive the type from the kind:/bug label (kind:task, the default, → feat) and strip
-#      the "[Effort N] M · " / leading "[Tag] " noise from the issue title.
+#      the issue title's prefix, new ([E<n>.<s>] ) or legacy ([Effort N] M · ), and a leading [Tag].
+#   3. With <issue-num>, the title ends in the work's token (rules/naming-and-ids.md) unless it
+#      already does: [E<n>.<s>] when the issue is a sub, [E<n>] when it is an effort, else [#<num>].
 # Network-free (covered by the self-test). Output always passes commitlint_check.
 kto_pr_title() {
+  local raw="${1:-}" summary="${2:-}" labels="${3:-}" num="${4:-}" t
+  t="$(_kto_pr_title_subject "$raw" "$summary" "$labels")" || return 1
+  if [ -n "$num" ] && [ "${KIT_PR_TITLE_STYLE:-conventional}" != "issue-title" ]; then
+    t="$(_kto_pr_title_token "$t" "$raw" "$num")"
+  fi
+  printf '%s' "$t"
+}
+
+# _kto_pr_title_token <title> <raw-issue-title> <num> — <title> with the work's trailing token.
+_kto_pr_title_token() {
+  local t="$1" raw="$2" num="${3#\#}" tok=""
+  if grep -qE '\[(E[0-9]+(\.[0-9]+)?|#[0-9]+|share-[0-9]+)\][[:space:]]*$' <<<"$t"; then printf '%s' "$t"; return 0; fi
+  if type naming_title_token >/dev/null 2>&1; then tok="$(naming_title_token "$raw" 2>/dev/null || true)"; fi
+  [ -n "$tok" ] || tok="#$num"
+  printf '%s [%s]' "$t" "$tok"
+}
+
+# _kto_pr_title_subject <raw-issue-title> <summary> <labels-csv> — steps 1 and 2 of kto_pr_title.
+_kto_pr_title_subject() {
   local raw="${1:-}" summary="${2:-}" labels="${3:-}" kind ctype desc
   # pr.titleStyle = issue-title (KIT_PR_TITLE_STYLE): the PR title IS the issue title, verbatim — for
   # repos whose convention is "PR title = exact issue title" and that run no commitlint gate.
@@ -152,10 +185,12 @@ kto_pr_title() {
     esac
   fi
   case ",$labels," in *,bug,*) ctype=fix ;; esac   # a plain `bug` label → fix
-  # 3) Strip "[Effort N] M · " (the "· " consumed here as a literal — byte-wise match is portable
-  #    across BSD/GNU sed + locales; a negated class over the multibyte middot is not) and then a
-  #    leading "[Tag] " (e.g. [Core]). Order matters: eat the separator before the next tag's "[".
+  # 3) Strip "[E<n>.<s>] " / "[E<n>] " and the legacy "[Effort N] M · " (the "· " consumed here as
+  #    a literal — byte-wise match is portable across BSD/GNU sed + locales; a negated class over the
+  #    multibyte middot is not), then a leading "[Tag] " (e.g. [Core]). Order matters: eat the
+  #    separator before the next tag's "[".
   desc="$(printf '%s' "$raw" | sed -E \
+    -e 's/^\[E[0-9]+(\.[0-9]+)?\] +//' \
     -e 's/^\[Effort[^]]*\] +[0-9]+ +· +//' \
     -e 's/^\[[^]]+\] +//' \
     -e 's/^[[:space:]]+//')"
@@ -346,7 +381,12 @@ kto_task_pr() {
   fi
   role="$(kto_labels_role "$labels")"
   # Conventional Commit PR title (squash-merge commit release-please reads + the commitlint gate).
-  local pr_title; pr_title="$(kto_pr_title "$title" "$summary" "$labels")"
+  local pr_title; pr_title="$(kto_pr_title "$title" "$summary" "$labels" "$num")"
+  # The naming rule (E546.1) before the commit, the push or the PR: a Conventional Commit subject
+  # ending in the work's token. Refused here, nothing is written.
+  if type naming_title_lint >/dev/null 2>&1; then
+    naming_title_lint pr "$pr_title" || { echo "✗ kto_task_pr: the PR title breaks the naming rule — pass a summary of the form 'type(scope): subject'" >&2; return 1; }
+  fi
   [[ -z "$commit_msg" ]] && commit_msg="$pr_title"
 
   # TRACKED changes only: `git add -A` would sweep an untracked .env.local (copied into every worktree)
@@ -382,7 +422,7 @@ kto_task_pr() {
     pr_num="$(basename "$url")"
     pr_node=$(forge_rest "repos/$repo/pulls/$pr_num" --jq .node_id 2>/dev/null)
     if [[ -n "$pr_node" ]]; then
-      item=$(project_add_item "$pr_node" 2>/dev/null || true)
+      item=$(project_add_item "$pr_node" "$repo" "$pr_num" PullRequest 2>/dev/null || true)
       if [[ -n "$item" ]]; then
         role_opt="$(_kto_role_option_for_slug "$role")"
         [[ -n "$role_opt" ]] && project_set_single_select "$item" "$ROLE_FIELD_ID" "$role_opt" 2>/dev/null || true
@@ -395,7 +435,7 @@ kto_task_pr() {
   fi
 }
 
-# kit task pr-merge — merge a PR (squash by default; --merge or --rebase), rebase-fix conflicts onto
+# kit task pr-merge — merge a PR (squash by default; --merge or --rebase), merge-fix conflicts from
 # the PR's base first, close its linked issues (GitHub native auto-close only fires on the default
 # branch), then clean up the PR's head branch + worktree and bring the PR's base up to date.
 # Args: [<pr-num>] [--squash|--merge|--rebase]   (the PR defaults to the open PR for the current branch)
@@ -462,22 +502,23 @@ kto_task_pr_merge() {
     fi
   fi
 
-  # Branches that are never rebased, force-pushed or deleted here: the repo base, the PR's base
-  # (it may be an effort branch), and the release branches (#366).
+  # Branches that are never merged into, pushed to or deleted here: the repo base, the PR's base
+  # (it may be an effort branch), and the release branches (#366). A pushed branch is brought onto
+  # its base by merge, never by rebase, so no push here needs --force (#592).
   _kto_protected() { case "$1" in "$base"|"$pr_base"|main|master|develop|HEAD) return 0 ;; esac; return 1; }
 
   if [[ "$merge_state" == "CONFLICTING" ]]; then
     if [[ "$branch" != "$head" ]] || _kto_protected "$branch"; then
-      echo "✗ PR #$pr_num conflicts — rebase $head onto $pr_base from its own worktree (not from $branch)" >&2; return 1
+      echo "✗ PR #$pr_num conflicts — merge origin/$pr_base into $head from its own worktree (not from $branch)" >&2; return 1
     fi
-    echo "→ Conflicts detected — rebasing onto $pr_base..."
+    echo "→ Conflicts detected — merging origin/$pr_base into $head..."
     git fetch origin "$pr_base"
-    if git rebase "origin/$pr_base"; then
-      git push --force-with-lease origin "$head"
-      echo "✓ Rebased and pushed — re-checking mergeability..."
+    if git merge --no-edit "origin/$pr_base"; then
+      git push origin "$head"
+      echo "✓ Merged $pr_base in and pushed — re-checking mergeability..."
     else
-      echo "✗ Rebase had conflicts that need manual resolution — resolve, then run cckit merge again" >&2
-      git rebase --abort 2>/dev/null || true
+      echo "✗ Merge had conflicts that need manual resolution — from this branch's worktree run: git merge origin/$pr_base, resolve, commit, push, then run cckit merge again" >&2
+      git merge --abort 2>/dev/null || true
       return 1
     fi
   fi
@@ -622,18 +663,24 @@ EOF
 }
 
 # kit task new — create a GitHub issue with labels + milestone, add it to the board, set Role +
-# Status(Todo) + Plan Link. Inputs are passed (the caller does the AskUserQuestion). No invented
+# Status (Backlog when no milestone is named and the board has that option, else Todo) + Plan Link. Inputs are passed (the caller does the AskUserQuestion). No invented
 # values: a label the repo does not have is dropped with a warning, never created, and the issue is
 # still filed (#387). Non-zero only when the issue itself was not created.
 # Args: <title> <role-display-or-slug> <kind> <priority> [milestone|""] [plan-link] [blocked-by] <body>
 kto_task_new() {
   local title="${1:-}" role="${2:-}" kind="${3:-}" prio="${4:-}" milestone="${5:-}" plan="${6:-}" blocked="${7:-}" body_user="${8:-}"
-  local repo role_slug labels body url num node item role_opt
+  local repo role_slug labels body url num node item role_opt status_opt
   repo="$(kto_repo)"
   # Milestone is optional: a repo with no milestones (cckit itself) must still be able to file an
   # issue through the verb, or agents fall back to raw `gh issue create` and the board drops it.
   [[ -n "$title" && -n "$role" && -n "$kind" && -n "$prio" ]] || {
     echo "✗ kto_task_new: title, role, kind, priority are required" >&2; return 1; }
+
+  # The naming rule (E546.1): a standalone issue is a plain outcome of at most six words, no prefix.
+  # Checked before any forge read or write; multi-part work is `cckit effort new`.
+  if type naming_title_lint >/dev/null 2>&1; then
+    naming_title_lint issue "$title" || { echo "✗ kto_task_new: fix the title and retry — nothing was filed" >&2; return 1; }
+  fi
 
   role_slug="$(printf '%s' "$role" | tr 'A-Z ' 'a-z-')"
   labels="kind:${kind},priority:${prio},role:${role_slug}"
@@ -647,14 +694,18 @@ kto_task_new() {
   if kto_board_enabled && type load_project_ids >/dev/null 2>&1 && load_project_ids 2>/dev/null; then
     node=$(forge_rest "repos/$repo/issues/$num" --jq .node_id 2>/dev/null)
     item=""
-    [[ -n "$node" ]] && item=$(project_add_item "$node" 2>/dev/null || true)
+    [[ -n "$node" ]] && item=$(project_add_item "$node" "$repo" "$num" Issue 2>/dev/null || true)
     # Loud, not silent: an issue missing from the board is the failure this verb exists to prevent.
     [[ -z "$item" ]] && echo "⚠ #$num was created but NOT added to the board — add it by hand" >&2
     if [[ -n "$node" ]]; then
       if [[ -n "$item" ]]; then
         role_opt="$(_kto_role_option_for_slug "$role_slug")"
         [[ -n "$role_opt" ]] && project_set_single_select "$item" "$ROLE_FIELD_ID" "$role_opt" 2>/dev/null || true
-        [[ -n "${STATUS_OPT_TODO:-}" ]] && project_set_single_select "$item" "$STATUS_FIELD_ID" "$STATUS_OPT_TODO" 2>/dev/null || true
+        # No sprint (milestone) named: the issue waits in the Backlog column, so it is not loose
+        # (E546.2). A board without a Backlog option keeps Todo.
+        status_opt="${STATUS_OPT_TODO:-}"
+        [[ -z "$milestone" && -n "${STATUS_OPT_BACKLOG:-}" ]] && status_opt="$STATUS_OPT_BACKLOG"
+        [[ -n "$status_opt" ]] && project_set_single_select "$item" "$STATUS_FIELD_ID" "$status_opt" 2>/dev/null || true
         [[ -n "$plan" && -n "${PLAN_LINK_FIELD_ID:-}" ]] && project_set_text "$item" "$PLAN_LINK_FIELD_ID" "$plan" 2>/dev/null || true
       fi
     fi

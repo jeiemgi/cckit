@@ -6,15 +6,19 @@
 # errors: strict — an HTTP error is rc 1 with the API message on stderr; jq is required for JSON
 _fg_api_base() { printf '%s' "${CCKIT_FORGE_API:-https://api.github.com}"; }
 
-# _fg_curl <method> <path> <body-or-empty> [accept] [headers-file]: one request. The body on stdout,
-# rc 1 on HTTP >= 400 (the API's message on stderr) or a transport failure. <path> may be a full URL.
+# _fg_curl <method> <path> <body-or-empty> [accept] [headers-file] [extra-headers]: one request. The
+# body on stdout, rc 1 on HTTP >= 400 (the API's message on stderr) or a transport failure. <path>
+# may be a full URL. [extra-headers] is newline-separated `Name: value` lines.
 _fg_curl() {
   # `rpath`, not `path`: in zsh `path` is the array tied to PATH, and a local by that name hides
   # every command from the function (the delegation brief's zsh gotcha).
-  local method="$1" rpath="$2" body="${3:-}" accept="${4:-application/vnd.github+json}" hdr="${5:-}" token out code url
+  local method="$1" rpath="$2" body="${3:-}" accept="${4:-application/vnd.github+json}" hdr="${5:-}" xh="${6:-}" token out code url line
   token="$(forge_token)" || { echo "cckit: no forge token (GH_TOKEN, GITHUB_TOKEN, or gh auth login)" >&2; return 1; }
   case "$rpath" in http://*|https://*) url="$rpath" ;; *) url="$(_fg_api_base)/${rpath#/}" ;; esac
   set -- -sS -X "$method" -H "Authorization: Bearer $token" -H "Accept: $accept" -w '\n%{http_code}'
+  while IFS= read -r line; do [ -n "$line" ] && set -- "$@" -H "$line"; done <<EOF
+$xh
+EOF
   [ -n "$hdr" ] && set -- "$@" -D "$hdr"
   if [ -n "$body" ]; then set -- "$@" -H "Content-Type: application/json" --data-binary "$body"; fi
   out="$(curl "$@" "$url")" || return 1
@@ -47,12 +51,13 @@ forge_graphql() {
 # forge_rest <endpoint> [gh api flags…]: the `gh api` argument form over curl, so a call site moves
 # with its arguments unchanged. Understood: -X|--method, -f|--raw-field k=v (string), -F|--field k=v
 # (true|false|null|integer typed, @file reads the file, k[]=v appends), -q|--jq <filter> (applied
-# with jq -r, per page), --paginate (follows Link rel=next), -H|--header 'Name: value',
+# with jq -r, per page), --paginate (follows Link rel=next), -H|--header 'Name: value' (Accept
+# replaces the default; any other header is sent as given),
 # --input <file|-> (a raw JSON body), --silent. Fields go to the query string on GET and DELETE and
 # to a JSON body otherwise; fields with no method mean POST. `graphql` as the endpoint posts the
 # query= and variables as forge_graphql does. rc 1 on an HTTP error with nothing on stdout.
 forge_rest() {
-  local ep="" method="" filter="" paginate=0 accept="application/vnd.github+json" input="" silent=0
+  local ep="" method="" filter="" paginate=0 accept="application/vnd.github+json" input="" silent=0 xh=""
   local body='{}' has_field=0 q="" k v raw typed arr
   while [ $# -gt 0 ]; do
     case "$1" in
@@ -60,7 +65,13 @@ forge_rest() {
       -q|--jq) filter="$2"; shift 2 ;;
       --paginate) paginate=1; shift ;;
       --silent) silent=1; shift ;;
-      -H|--header) case "$2" in [Aa]ccept:*) accept="$(printf '%s' "${2#*:}" | sed 's/^ *//')" ;; esac; shift 2 ;;
+      -H|--header)
+        case "$2" in
+          [Aa]ccept:*) accept="$(printf '%s' "${2#*:}" | sed 's/^ *//')" ;;
+          *:*) xh="$xh${xh:+
+}$2" ;;
+        esac
+        shift 2 ;;
       --input) input="$2"; shift 2 ;;
       -f|--raw-field|-F|--field)
         raw="$2"; k="${raw%%=*}"; v="${raw#*=}"; has_field=1
@@ -118,7 +129,7 @@ forge_rest() {
   fi
   hdr="$(mktemp)"; local frc=0
   while :; do
-    out="$(_fg_curl "$method" "$url" "$send" "$accept" "$hdr")" || { rm -f "$hdr"; return 1; }
+    out="$(_fg_curl "$method" "$url" "$send" "$accept" "$hdr" "$xh")" || { rm -f "$hdr"; return 1; }
     if [ "$silent" != 1 ]; then
       # A --jq that fails (a non-JSON 200 body) is a failed read, rc 1, not an empty answer.
       if [ -n "$filter" ]; then printf '%s\n' "$out" | jq -r "$filter" || frc=1; else printf '%s\n' "$out"; fi

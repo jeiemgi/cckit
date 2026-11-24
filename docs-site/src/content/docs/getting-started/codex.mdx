@@ -140,7 +140,7 @@ Start Codex in the repo and hand it the loop:
 <Chat
   title="working one Bakery site issue in Codex"
   say="Read AGENTS.md. Sync the board with cckit and show me what is unblocked. I will pick one issue; start it with cckit, work in the worktree it prints, and open the pull request with cckit when the project's gate passes. Do not merge."
-  ran={["cckit sync", "cckit start <issue>", 'cckit pr <issue> "<summary>"']}
+  ran={["cckit status --board", "cckit start <issue>", 'cckit pr <issue> "<summary>"']}
   means="You pick the issue and Codex does not merge. Merging stays a decision for a person."
 >
   I synced the board and listed what is unblocked. Once you pick one, I start it, work in its
@@ -153,7 +153,7 @@ Start Codex in the repo and hand it the loop:
   title="running three Bakery site issues at once in Codex"
   say="Run the issues I picked in parallel with Codex, one worktree each. Show me the plan first, then launch, and tell me how each one ended."
   ran={[
-    "cckit wave --adapter codex",
+    "cckit effort plan --wave --adapter codex",
     "cckit orchestrate --agent codex --dry-run <issues…>",
     "cckit orchestrate --agent codex --detach <issues…>",
     "cckit orchestrate --results --wait 3600",
@@ -164,7 +164,7 @@ Start Codex in the repo and hand it the loop:
   dry run prints `DRY RUN - would launch <n> flow(s)` and creates no worktree and no pane.
 </Chat>
 
-`cckit wave` prints the launch commands for the adapter, `orchestrate --dry-run` prints the plan,
+`cckit effort plan --wave` prints the launch commands for the adapter, `orchestrate --dry-run` prints the plan,
 `--detach` launches, and `orchestrate --results` reads how each worker ended.
 
 ### 7 · Run one objective with no terminal
@@ -207,7 +207,7 @@ agents. What differs is where the files go and how hooks are registered: Codex r
 
 `export CCKIT_AGENT=codex` makes Codex the default for `orchestrate`, `autopilot` and
 `autopilot run`, so `--agent codex` can be left off. The project's stored adapter choice sets the
-default for `cckit wave`.
+default for `cckit effort plan --wave`.
 
 - File by file, what each adapter writes:
   [Install matrix](/install-matrix/#what-cckit-init-writes-claude-code-codex-or-both).

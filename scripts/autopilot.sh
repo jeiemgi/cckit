@@ -41,9 +41,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # No explicit issues -> auto-select from the board: open issues, minus effort PARENTS (the
-# "[Effort] N ..." umbrella issues that decompose into subs, identified by label:effort OR the
-# title convention) and minus anything blocked_by an open issue. orchestrate re-checks the
-# blocked_by gate at launch; this is the coarse pre-filter so the board drives the wave.
+# "[E<n>] ..." umbrella issues, legacy "[Effort] N ...", that decompose into subs, identified by
+# label:effort OR the title convention) and minus anything blocked_by an open issue. orchestrate
+# re-checks the blocked_by gate at launch; this is the coarse pre-filter so the board drives the wave.
 if [ "${#ISSUES[@]}" -eq 0 ]; then
   echo "autopilot: no issues passed - auto-selecting unblocked open issues from the board"
   board="$(bash "$ROOT/scripts/task-sync.sh" --raw-json)" || {
@@ -53,7 +53,7 @@ if [ "${#ISSUES[@]}" -eq 0 ]; then
   selected="$(printf '%s' "$board" | jq -r '
     if type != "array" then error("expected an issue array") else . end
     | .[]
-    | select((any(.labels[]; .name == "effort")) or (.title | test("^\\[Effort\\] ")) | not)
+    | select((any(.labels[]; .name == "effort")) or (.title | test("^\\[Effort\\] |^\\[E[0-9]+\\] ")) | not)
     | .number')" || { echo "autopilot: invalid board data" >&2; exit 1; }
   while IFS= read -r n; do
     [ -n "$n" ] && ISSUES+=("$n")

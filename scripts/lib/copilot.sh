@@ -12,11 +12,11 @@
 # how this runtime starts N isolated workers — is chosen per adapter: Claude Code fans out Task
 # subagents with worktree isolation; for Codex, cckit creates the worktrees (`cckit orchestrate`).
 #
-#   cckit wave                    brief for the open board: wave 0 fan-out + the loop
-#   cckit wave --effort <N>       brief scoped to effort #N's sub-issues
-#   cckit wave --cap <K>          session ctx budget per wave (passed to the plan machine)
-#   cckit wave --adapter <claude|codex|both>   dispatch wording (default: the project's adapters)
-#   cckit wave --llm              the fan-out as TOON rows (wave,number,ctx,prompt) for an agent
+#   cckit effort plan --wave                    brief for the open board: wave 0 fan-out + the loop
+#   cckit effort plan --wave --effort <N>       brief scoped to effort #N's sub-issues
+#   cckit effort plan --wave --cap <K>          session ctx budget per wave (passed to the plan machine)
+#   cckit effort plan --wave --adapter <claude|codex|both>   dispatch wording (default: the project's adapters)
+#   cckit effort plan --wave --llm              the fan-out as TOON rows (wave,number,ctx,prompt) for an agent
 #
 # Requires: gh, jq (via the plan machine). bash 3.2 / zsh compatible.
 # errors: strict — refuses to emit a brief without gh + jq
@@ -35,7 +35,7 @@ _COPILOT_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" >/dev/nu
 # Runtime-neutral on purpose: it is wave data, so it must read the same whichever agent receives it.
 _copilot_seed() {
   local num="$1" title="$2"
-  printf 'You are a worker in a cckit wave run — NO human is present, so never ask: decide autonomously and apply effort proportional to the task. Your worktree and branch for issue #%s are already isolated. Do: read the issue with `cckit brief %s`, implement "%s", run `bash scripts/check.sh` until green, then open the PR with `cckit pr %s "<summary>"`. If it is a no-op, run `cckit close %s "<reason>"` with why. Return a one-line result.' \
+  printf 'You are a worker in a cckit effort plan --wave run — NO human is present, so never ask: decide autonomously and apply effort proportional to the task. Your worktree and branch for issue #%s are already isolated. Do: read the issue with `cckit brief %s`, implement "%s", run `bash scripts/check.sh` until green, then open the PR with `cckit pr %s "<summary>"`. If it is a no-op, run `cckit close %s "<reason>"` with why. Return a one-line result.' \
     "$num" "$num" "$title" "$num" "$num"
 }
 
@@ -70,11 +70,11 @@ _copilot_dispatch() {
 }
 
 copilot_brief() {
-  forge_need copilot || return 1; command -v jq >/dev/null 2>&1 || { echo "copilot: needs jq" >&2; return 1; }
+  forge_need "effort plan --wave" || return 1; command -v jq >/dev/null 2>&1 || { echo "copilot: needs jq" >&2; return 1; }
   local repo="$COPILOT_REPO" out="${CCKIT_OUTPUT:-human}" effort="" cap="" adapter_arg="" adapters planargs=()
   while [ "$#" -gt 0 ]; do
     case "$1" in
-      --llm|--output=json) out="json"; shift ;;
+      --json|--llm|--output=json) out="json"; shift ;;
       --effort)    effort="$2"; planargs+=(--effort "$2"); shift 2 ;;
       --effort=*)  effort="${1#*=}"; planargs+=(--effort "${1#*=}"); shift ;;
       --cap)       cap="$2"; planargs+=(--cap "$2"); shift 2 ;;
@@ -111,7 +111,7 @@ copilot_brief() {
     json="$(printf '%s\n' "$wave0" | awk -F'\t' '{print $3"\t"$4"\t"$6}' \
       | while IFS="$(printf '\t')" read -r num ctx title; do
           [ -n "$num" ] || continue
-          disp="$(printf '%s' "$title" | sed -E 's/^\[Effort( [0-9]+)?\] [0-9]+ · ?//; s/^\[[A-Za-z]+\] //')"
+          disp="$(printf '%s' "$title" | sed -E 's/^\[E[0-9]+(\.[0-9]+)?\] +//; s/^\[Effort( [0-9]+)?\] [0-9]+ · ?//; s/^\[[A-Za-z]+\] //')"
           printf '%s\t%s\t%s\n' "$num" "$ctx" "$(_copilot_seed "$num" "$disp")"
         done \
       | jq -R -s '[ split("\n")[] | select(length>0) | split("\t")
@@ -133,7 +133,7 @@ copilot_brief() {
   if [ -n "$effort" ]; then esfx=" --effort $effort"; fi
   nums="$(printf '%s\n' "$wave0" | awk -F'\t' '$3 != "" { printf "%s%s", sep, $3; sep = " " }')"
   {
-    printf '# cckit wave — %s%s\n' "$repo" "$([ -n "$effort" ] && echo " · effort #$effort")"
+    printf '# cckit effort plan --wave — %s%s\n' "$repo" "$([ -n "$effort" ] && echo " · effort #$effort")"
     printf '\nThe plan machine laid out %s wave(s). You are the orchestrator: fan wave 0 out as parallel\nworkers, gate + merge with the captain, then re-run this brief for the next wave.\n' "$((waves_total + 1))"
 
     printf '\n## Wave 0 — %s parallel worker(s)\n\n' "$n0"
@@ -142,7 +142,7 @@ copilot_brief() {
     printf '%s\n' "$wave0" | awk -F'\t' '{print $3"\t"$4"\t"$6}' \
       | while IFS="$(printf '\t')" read -r num ctx title; do
           [ -n "$num" ] || continue
-          disp="$(printf '%s' "$title" | sed -E 's/^\[Effort( [0-9]+)?\] [0-9]+ · ?//; s/^\[[A-Za-z]+\] //')"
+          disp="$(printf '%s' "$title" | sed -E 's/^\[E[0-9]+(\.[0-9]+)?\] +//; s/^\[Effort( [0-9]+)?\] [0-9]+ · ?//; s/^\[[A-Za-z]+\] //')"
           printf '### #%s · [%s] · %s\n\n' "$num" "$ctx" "$disp"
           printf '> %s\n\n' "$(_copilot_seed "$num" "$disp")"
         done
@@ -151,8 +151,8 @@ copilot_brief() {
     printf '1. When the wave-0 workers have opened their PRs, gate + merge them:\n'
     printf '   ```\n   cckit watch --merge%s\n   ```\n' "$esfx"
     printf '2. Merging unblocks the next wave. Re-run this brief to get it:\n'
-    printf '   ```\n   cckit wave%s\n   ```\n' "$esfx"
-    printf '3. Repeat until `cckit wave` reports nothing to drive. To let the captain self-pace the\n   gate/merge passes, use `cckit watch --loop`'
+    printf '   ```\n   cckit effort plan --wave%s\n   ```\n' "$esfx"
+    printf '3. Repeat until `cckit effort plan --wave` reports nothing to drive. To let the captain self-pace the\n   gate/merge passes, use `cckit watch --loop`'
     # `/loop` is a Claude Code command; a brief for Codex alone must not name it.
     case " $adapters " in *" claude "*) printf ' (or drive this brief under `/loop` in Claude Code)' ;; esac
     printf '.\n\n'

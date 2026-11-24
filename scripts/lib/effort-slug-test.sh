@@ -43,6 +43,10 @@ t "_eff_title_slug peels prefix + flow (sub)" \
   "$(_eff_title_slug '[Effort 93] 2 · [UI] Accept slug in commands')" "accept-slug-in-commands"
 t "_eff_title_slug without a flow tag" \
   "$(_eff_title_slug '[Effort] 12 · plain outcome name')" "plain-outcome-name"
+t "_eff_title_slug peels the [E<n>] prefix" \
+  "$(_eff_title_slug '[E93] Slug handles for efforts')" "slug-handles-for-efforts"
+t "_eff_title_slug peels the [E<n>.<step>] prefix" \
+  "$(_eff_title_slug '[E93.2] Accept slug in commands')" "accept-slug-in-commands"
 t "_eff_slug lowercases + dashes arbitrary text" \
   "$(_eff_slug 'Some Mixed CASE!!')" "some-mixed-case"
 

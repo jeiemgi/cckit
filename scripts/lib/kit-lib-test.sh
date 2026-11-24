@@ -159,7 +159,7 @@ if [ -n "${KL_TEST_INNER:-}" ]; then
     eq  "empty exits 0"              "$erc" "0"
     has "empty has a graceful state" "$eout" 'no `.sh` helpers'
 
-    eq "help lists the flags" "$(KIT_LIB_DIR="$fix" kit_lib --help | grep -c '^cckit lib')" "5"
+    eq "help lists the flags" "$(KIT_LIB_DIR="$fix" kit_lib --help | grep -c '^cckit agent lib')" "5"
 
     if command -v jq >/dev/null 2>&1; then
       llm="$(KIT_LIB_DIR="$fix" CCKIT_OUTPUT=json kit_lib --llm)"

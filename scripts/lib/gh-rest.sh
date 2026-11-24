@@ -7,13 +7,17 @@
 # (GraphQL) transport of #396 is gone, so `cckit_gh_rest` is always true and `CCKIT_GH_TRANSPORT`
 # does nothing but warn once. What still depends on where cckit runs is GraphQL itself: a cloud
 # agent session reaches GitHub through a proxy that refuses it (403), and Projects v2 is GraphQL-only,
-# so board steps are skipped there with ONE notice line (exit 0, never a failure). They are skipped
-# the same way when the forge provider is `none`.
+# so the board moves over the Projects v2 REST endpoints first (E546.7, gh_rest_board_* below) and
+# GraphQL is only the fallback; where GraphQL is unavailable too, a board step that REST could not
+# serve is skipped with ONE notice line (exit 0, never a failure). With the forge provider `none`
+# every board step is skipped the same way.
 #
 #   cckit_gh_rest                         rc 0 (kept for callers; REST is the only transport)
 #   cckit_gh_transport                    echo rest
-#   cckit_board_skipped                   rc 0 iff board steps are skipped (prints the notice once):
-#                                         CLAUDE_CODE_REMOTE=true, CCKIT_GRAPHQL=0, or no forge
+#   cckit_board_skipped                   rc 0 iff board steps are skipped (prints the notice once): no
+#                                         forge, or GraphQL off with KIT_OWNER/KIT_PROJECT_NUMBER unset
+#   cckit_graphql_off                     rc 0 iff GraphQL is unavailable: CLAUDE_CODE_REMOTE=true or CCKIT_GRAPHQL=0
+#   cckit_board_graphql_notice            the GraphQL-unavailable board notice, once per process
 #   gh_rest_closing_refs                  stdin: a PR body → the issue #s it closes (pure)
 #   gh_rest_issue_json <repo> <n>         {number,title,body,state,labels[{name}],milestone{title,number}}
 #   gh_rest_issue_state <repo> <n>        OPEN | CLOSED
@@ -42,8 +46,18 @@
 #   gh_rest_issue_closing_prs <repo> <n>  merged PRs that close <n> by keyword (timeline)
 #   gh_rest_wave_rows <repo> <parent>     "sub|STATE|pr|merge-sha|pr-title" per sub (wave close)
 #
-# Not reachable in the cloud: Projects v2 (skipped), and remote branch deletion (the proxy rejects
-# DELETE git/refs) — callers keep the branch and say so.
+#   gh_rest_board_base <owner-type> <owner> <number>       orgs/<o>/projectsV2/<n> | users/<o>/projectsV2/<n>
+#   gh_rest_board_project <base>          {id,node_id,number,title}
+#   gh_rest_board_fields <base>           [{id,node_id,name,data_type,options[{id,name}],iterations[{id,title,start_date}]}]
+#   gh_rest_board_ids_env <base>          the scripts/.project-ids.env lines, read over REST
+#   gh_rest_board_find_item <base> <Issue|PullRequest> <repo> <n>  "<item id>:<item node id>", empty when not on the board
+#   gh_rest_board_find_issue_item <base> <repo> <n>        the same, for an issue
+#   gh_rest_board_add_item <base> <Issue|PullRequest> <repo> <n>   "<item id>:<item node id>"
+#   gh_rest_board_set_field <base> <item id> <field id|node id> <single_select|iteration|text> <value>
+#   (board rc: 0 ok · 3 REST cannot serve it, the caller may fall back to GraphQL · 1 any other error)
+#
+# Not reachable in the cloud: GraphQL (so the board's GraphQL fallback), and remote branch deletion
+# (the proxy rejects DELETE git/refs) — callers keep the branch and say so.
 # bash 3.2 + zsh compatible. Requires jq.
 # errors: mixed — creates, closes and merges propagate; labels/milestone/assignee are best-effort
 _ghr_self="${BASH_SOURCE[0]:-$0}"
@@ -74,18 +88,33 @@ cckit_gh_transport() { cckit_gh_rest; printf 'rest'; }
 # rc 0 in a cloud agent session, where the proxy also rejects remote branch deletion (#396).
 cckit_in_cloud() { [ "${CLAUDE_CODE_REMOTE:-}" = "true" ]; }
 
-# rc 0 when board steps (Projects v2, GraphQL-only) are skipped: a cloud session, CCKIT_GRAPHQL=0,
-# or no forge. Prints the notice at most once per process.
-cckit_board_skipped() {
-  local why=""
-  if [ "${CLAUDE_CODE_REMOTE:-}" = "true" ] || [ "${CCKIT_GRAPHQL:-1}" = "0" ]; then why="$CCKIT_BOARD_SKIP_NOTICE"
-  elif command -v forge_available >/dev/null 2>&1 && ! forge_available; then why="$CCKIT_BOARD_SKIP_NOTICE_NOFORGE"
-  else return 1; fi
+# rc 0 when GraphQL is unavailable: a cloud session (the proxy answers 403) or CCKIT_GRAPHQL=0.
+# The board still moves over REST there; only its GraphQL fallback is gone.
+cckit_graphql_off() { [ "${CLAUDE_CODE_REMOTE:-}" = "true" ] || [ "${CCKIT_GRAPHQL:-1}" = "0" ]; }
+
+_cckit_board_notice() {
   if [ -z "${_CCKIT_BOARD_NOTICE_DONE:-}" ]; then
-    printf '%s\n' "$why" >&2
+    printf '%s\n' "$1" >&2
     _CCKIT_BOARD_NOTICE_DONE=1
   fi
-  return 0
+}
+
+# The notice for a board step REST could not serve where GraphQL is unavailable. Once per process.
+cckit_board_graphql_notice() { _cckit_board_notice "$CCKIT_BOARD_SKIP_NOTICE"; }
+
+# rc 0 when board steps are skipped outright: no forge is configured, or GraphQL is unavailable and
+# REST cannot name the board (KIT_OWNER or KIT_PROJECT_NUMBER unset). Prints the notice at most once
+# per process. A cloud session with both set is not a skip: the board moves over REST (E546.7).
+cckit_board_skipped() {
+  if command -v forge_available >/dev/null 2>&1 && ! forge_available; then
+    _cckit_board_notice "$CCKIT_BOARD_SKIP_NOTICE_NOFORGE"
+    return 0
+  fi
+  if cckit_graphql_off && { [ -z "${KIT_OWNER:-}" ] || [ -z "${KIT_PROJECT_NUMBER:-}" ]; }; then
+    _cckit_board_notice "$CCKIT_BOARD_SKIP_NOTICE"
+    return 0
+  fi
+  return 1
 }
 
 # --- pure ----------------------------------------------------------------------------------------
@@ -350,4 +379,149 @@ EOF
       fi
       printf '%s|%s|%s|%s|%s\n' "$sub" "$state" "$pr" "$oid" "$title"
     done
+}
+
+# --- Projects v2 board over REST (E546.7) --------------------------------------------------------
+# GitHub's REST endpoints for Projects v2, as documented (read 2026-11-24):
+#   https://docs.github.com/en/rest/projects/projects   GET {orgs/<org>|users/<user>}/projectsV2/<number>
+#   https://docs.github.com/en/rest/projects/fields     GET …/projectsV2/<number>/fields
+#   https://docs.github.com/en/rest/projects/items      GET|POST …/projectsV2/<number>/items
+#                                                       PATCH …/projectsV2/<number>/items/<item_id>
+# The docs send `X-GitHub-Api-Version: 2026-03-10` (CCKIT_BOARD_API_VERSION overrides it).
+#   add an item    POST {"type":"Issue"|"PullRequest","owner":"<o>","repo":"<r>","number":<n>} → 201, the item
+#   set a field    PATCH {"fields":[{"id":<field id, integer>,"value":<string|number|null>}]} → 200, the item;
+#                  a single-select value is the option id, an iteration value the iteration id (strings)
+# Field and item ids are integers in REST and node ids (`node_id`) in GraphQL; option and iteration ids
+# are strings. A REST item travels as "<id>:<node_id>" so a GraphQL fallback still has its node id.
+# The user-owned endpoints do not accept GitHub App tokens.
+CCKIT_BOARD_API_VERSION_DEFAULT="2026-03-10"
+
+# _ghr_board <endpoint> [flags…] — one board call. rc 0 with the output; rc 3 when REST cannot serve
+# it (HTTP 404, 410, 415 or 501, a transport failure, or an answer the --jq filter rejects), with
+# nothing printed; rc 1 on any other HTTP error, the API's message on stderr.
+_ghr_board() {
+  local err out rc=0 code
+  err="$(mktemp)" || return 1
+  out="$(_ghr_api "$@" -H "X-GitHub-Api-Version: ${CCKIT_BOARD_API_VERSION:-$CCKIT_BOARD_API_VERSION_DEFAULT}" 2>"$err")" || rc=$?
+  if [ "$rc" = 0 ]; then
+    rm -f "$err"
+    [ -n "$out" ] && printf '%s\n' "$out"
+    return 0
+  fi
+  code="$(sed -nE 's/.*GitHub answered ([0-9]{3}) .*/\1/p' "$err" | sed -n 1p)"
+  case "$code" in
+    ''|404|410|415|501) rm -f "$err"; return 3 ;;
+  esac
+  cat "$err" >&2; rm -f "$err"
+  return 1
+}
+
+# gh_rest_board_base <owner-type> <owner> <number> — the endpoint prefix; rc 3 with an owner or
+# number missing or malformed.
+gh_rest_board_base() {
+  local otype="${1:-user}" owner="${2:-}" num="${3:-}"
+  case "$owner" in ''|*[!A-Za-z0-9-]*) return 3 ;; esac
+  case "$num" in ''|*[!0-9]*) return 3 ;; esac
+  case "$otype" in
+    org|organization) printf 'orgs/%s/projectsV2/%s' "$owner" "$num" ;;
+    *)                printf 'users/%s/projectsV2/%s' "$owner" "$num" ;;
+  esac
+}
+
+gh_rest_board_project() {
+  _ghr_board "$1" --jq 'if (.node_id | type) == "string" then {id, node_id, number, title} | tojson else error("no project") end'
+}
+
+gh_rest_board_fields() {
+  _ghr_board "$1/fields" -X GET -f per_page=100 --jq '
+    if type != "array" then error("not a field list") else
+    [.[] | {id, node_id, name, data_type,
+            options: [(.options // [])[] | {id, name: (.name.raw? // .name)}],
+            iterations: [((.configuration.iterations // [])[]) | {id, title: (.title.raw? // .title), start_date}]}]
+    | tojson end'
+}
+
+# gh_rest_board_ids_env <base> — the lines capture-project-ids.sh writes, over REST: PROJECT_ID (the
+# project node id), <FIELD>_FIELD_ID (the field node id, which the GraphQL fallback needs too),
+# <FIELD>_FIELD_NUM (the REST field id), <FIELD>_OPT_<OPTION> and <FIELD>_ITER_<TITLE>. Names are
+# upper-cased, spaces and hyphens become underscores, anything else outside [A-Z0-9_] is dropped.
+gh_rest_board_ids_env() {
+  local proj fields
+  proj="$(gh_rest_board_project "$1")" || return $?
+  fields="$(gh_rest_board_fields "$1")" || return $?
+  printf 'PROJECT_ID=%s\n' "$(printf '%s' "$proj" | jq -r .node_id)"
+  printf '%s' "$fields" | jq -r '
+    def n: ascii_upcase | gsub("[ -]"; "_") | gsub("[^A-Z0-9_]"; "");
+    .[] | select(.name != null) | (.name | n) as $f | select($f != "")
+    | "\($f)_FIELD_ID=\(.node_id // .id)", "\($f)_FIELD_NUM=\(.id)",
+      (.options[] | (.name | n) as $o | select($o != "") | "\($f)_OPT_\($o)=\(.id)"),
+      (.iterations[] | (.title | n) as $t | select($t != "") | "\($f)_ITER_\($t)=\(.id)")'
+}
+
+# gh_rest_board_find_item <base> <Issue|PullRequest> <repo> <n> — the issue's or PR's card on the
+# board, as "<id>:<node_id>"; empty (rc 0) when it is not on it. REST has no content-side lookup, so
+# this reads the board's items, 100 a page.
+gh_rest_board_find_item() {
+  local base="$1" type="$2" repo="$3" n="$4" out
+  case "$type" in Issue|PullRequest) ;; *) return 3 ;; esac
+  case "$n" in ''|*[!0-9]*) return 3 ;; esac
+  case "$repo" in */*) ;; *) return 3 ;; esac
+  case "$repo" in *[!A-Za-z0-9._/-]*) return 3 ;; esac
+  out="$(_ghr_board "$base/items" -X GET -f per_page=100 --paginate --jq "
+    if type != \"array\" then error(\"not an item list\") else .[] end
+    | select(.content_type == \"$type\")
+    | select((.content.number // -1) == $n)
+    | select(((.content.repository.full_name // \"$repo\") | ascii_downcase) == (\"$repo\" | ascii_downcase))
+    | \"\(.id):\(.node_id // \"\")\"")" || return $?
+  printf '%s\n' "$out" | sed '/^$/d' | sed -n 1p
+}
+
+# gh_rest_board_find_issue_item <base> <repo> <n> — gh_rest_board_find_item for an issue.
+gh_rest_board_find_issue_item() { gh_rest_board_find_item "$1" Issue "$2" "$3"; }
+
+# gh_rest_board_add_item <base> <Issue|PullRequest> <repo> <n> — add an issue or PR; prints
+# "<id>:<node_id>" of the new (or existing) item. REST answers 422 "Content already exists in this
+# project" when the item is already on the board, where GraphQL's addProjectV2ItemById returned the
+# existing item. A board with GitHub's auto-add workflow puts every new issue and PR on the board
+# within seconds, so the 422 is the common case there (#590): the existing card is read back instead.
+# rc 3 when it cannot be read, so the GraphQL fallback (idempotent) decides.
+gh_rest_board_add_item() {
+  local base="$1" type="$2" repo="$3" n="$4" err out rc=0
+  case "$type" in Issue|PullRequest) ;; *) return 3 ;; esac
+  case "$n" in ''|*[!0-9]*) return 3 ;; esac
+  case "$repo" in */*) ;; *) return 3 ;; esac
+  err="$(mktemp)" || return 1
+  out="$(_ghr_board "$base/items" -X POST -f "type=$type" -f "owner=${repo%%/*}" -f "repo=${repo##*/}" -F "number=$n" \
+    --jq 'if (.id | type) == "number" then "\(.id):\(.node_id // "")" else error("no item id") end' 2>"$err")" || rc=$?
+  if [ "$rc" = 1 ] && grep -q 'GitHub answered 422 .*already exists' "$err"; then
+    rm -f "$err"
+    out="$(gh_rest_board_find_item "$base" "$type" "$repo" "$n" 2>/dev/null)" || return 3
+    [ -n "$out" ] || return 3
+    printf '%s\n' "$out"
+    return 0
+  fi
+  cat "$err" >&2; rm -f "$err"
+  [ "$rc" = 0 ] || return "$rc"
+  [ -n "$out" ] && printf '%s\n' "$out"
+  return 0
+}
+
+# gh_rest_board_set_field <base> <item id> <field> <kind> <value> — set one field of one item.
+# <field> is the REST field id or its node id (the captured <FIELD>_FIELD_ID); <kind> is
+# single_select (value = an option id), iteration (an iteration id) or text. The field is read
+# first: a field, option or iteration REST does not list is rc 3, so the GraphQL fallback decides.
+gh_rest_board_set_field() {
+  local base="$1" item="$2" field="$3" kind="$4" value="$5" fields fnum body
+  case "$item" in ''|*[!0-9]*) return 3 ;; esac
+  fields="$(gh_rest_board_fields "$base")" || return $?
+  fnum="$(printf '%s' "$fields" | jq -r --arg f "$field" --arg k "$kind" --arg v "$value" '
+    [.[] | select((.id | tostring) == $f or .node_id == $f)
+         | select(if $k == "single_select" then any(.options[]; .id == $v)
+                  elif $k == "iteration" then any(.iterations[]; .id == $v)
+                  else .data_type == "text" end)
+         | .id][0] // empty')"
+  case "$fnum" in ''|*[!0-9]*) return 3 ;; esac
+  body="$(jq -cn --argjson f "$fnum" --arg v "$value" '{fields: [{id: $f, value: $v}]}')"
+  printf '%s' "$body" | _ghr_board "$base/items/$item" -X PATCH --input - \
+    --jq 'if (.id | type) == "number" then .id else error("no item") end' >/dev/null
 }

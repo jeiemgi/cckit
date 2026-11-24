@@ -79,7 +79,7 @@ stays: it is how GitHub links the two and how cckit finds which issues to close.
 
 <Aside type="caution" title="What the merge verbs do not do">
 Neither `cckit merge` nor `cckit watch --merge` brings a stale, conflict-free branch up to date.
-`cckit merge` rebases only a pull request GitHub reports as conflicting. Without the GitHub setting
+`cckit merge` merges the base in only for a pull request GitHub reports as conflicting. Without the GitHub setting
 above, a stale branch reads as clean and is merged as it stands. Bringing the branch current is a
 step for whoever merges: [Merge, close and clean up](/ship/merge-and-close/) has the commands.
 </Aside>

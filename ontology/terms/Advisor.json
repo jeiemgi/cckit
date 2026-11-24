@@ -1,7 +1,7 @@
 {
   "id": "Advisor",
   "label": ["advisor"],
-  "definition": "The role that reads the board and the terms and tells the owner which work to start, which word a thing has, and which skill serves it. Named here so the skills that will fill it have a term; the skill does not exist yet.",
+  "definition": "The role that helps the owner decide the work and then keeps it honest: it grills a goal, plans it into an effort inside the current sprint, briefs the workers, reviews each sub-issue against its Spec and closes the sprint. It writes no code. The kit-advisor skill fills it.",
   "is_not": [
     "The captain: the captain executes an approved plan; the advisor helps the owner decide one.",
     "A builder: the advisor writes no code.",
@@ -11,5 +11,5 @@
   "home": {
     "skill": "kit-advisor"
   },
-  "status": "seed"
+  "status": "sapling"
 }

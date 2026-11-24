@@ -2,8 +2,8 @@
 # shellcheck shell=bash
 # gh-rest-test.sh — the lifecycle verbs over the forge (E537.3; #396 before it). cckit pr, merge,
 # close, new, effort new, effort pr and effort close send only REST requests on repos/… endpoints —
-# never a gh subcommand, never GraphQL — and in a cloud session every board step is skipped with
-# one notice. Hermetic: the shared forge shim (test-forge-shim.sh) answers like the REST API over a
+# never a gh subcommand, never GraphQL — and in a cloud session with no board named (KIT_OWNER,
+# KIT_PROJECT_NUMBER) every board step is skipped with one notice. Hermetic: the shared forge shim (test-forge-shim.sh) answers like the REST API over a
 # curl stand-in and logs `METHOD path {json}`; a throwaway repo and a bare remote.
 # Run: bash scripts/lib/gh-rest-test.sh
 # errors: strict — a test runner: rc 1 on any failed assertion
@@ -95,7 +95,7 @@ unset _CCKIT_BOARD_NOTICE_DONE; kto_task_pr 42 "Did the thing." >"$tmp/out" 2>"$
 t  "pr: rc 0 over REST"                             "$rc" "0"
 rest_only "$GH_LOG" "pr: only REST calls"
 tc "$GH_LOG" '^GET repos/o/r/issues/42 '            "pr: reads the issue over REST"
-tc "$GH_LOG" '^POST repos/o/r/pulls \{"title":"fix: Fix the thing","head":"fix/42-the-thing","base":"develop"' "pr: opens the PR with POST pulls"
+tc "$GH_LOG" '^POST repos/o/r/pulls \{"title":"fix: Fix the thing \[#42\]","head":"fix/42-the-thing","base":"develop"' "pr: opens the PR with POST pulls"
 tc "$GH_LOG" '^PATCH repos/o/r/issues/7 \{"labels":\["kind:fix","role:tech-lead"\],"assignees":\["me"\],"milestone":3\}' "pr: labels, assignee and milestone in one PATCH"
 tc "$tmp/out" 'https://github.com/o/r/pull/7'       "pr: prints the PR url"
 t  "pr: the board notice is printed once"           "$(grep -c 'board step skipped' "$tmp/err")" "1"
@@ -191,15 +191,18 @@ t "no gh subcommand ran in the task verbs"          "$(grep -c '^GH-SUBCOMMAND' 
 . "$LIB/effort-ops.sh"
 GH_TITLE="[Effort] 99 · demo effort"; GH_LABELS='[{"name":"role:tech-lead"},{"name":"kind:task"}]'
 export KIT_BASE_BRANCH="main"
+# The parent body effort close re-reads (E546.5): a Spec, so the close goes past its check. JSON-escaped.
+export GH_BODY='## Goal\nship it\n\n## Spec\n- it ships'
+
 
 # cckit effort new
 : > "$GH_LOG"
-unset _CCKIT_BOARD_NOTICE_DONE; parent="$(effort_new --flow Core "demo effort" "first sub" "second sub" 2>"$tmp/err")"; rc=$?
+unset _CCKIT_BOARD_NOTICE_DONE; parent="$(effort_new --flow Core --spec "it ships" "demo effort" "first sub" "second sub" 2>"$tmp/err")"; rc=$?
 t  "effort new: rc 0 over REST"                     "$rc" "0"
 rest_only "$GH_LOG" "effort new: only REST calls"
 tc "$GH_LOG" '^POST repos/o/r/labels \{"name":"effort",'            "effort new: ensures labels over REST"
-tc "$GH_LOG" "^POST repos/o/r/issues \{\"title\":\"\[Effort\] · \[Core\] demo effort\".*\"labels\":\[\"effort\"" "effort new: POST issues for the parent"
-tc "$GH_LOG" "^PATCH repos/o/r/issues/$parent \{\"title\":\"\[Effort\] $parent · \[Core\] demo effort\"\}$" "effort new: renames the parent with its number"
+tc "$GH_LOG" "^POST repos/o/r/issues \{\"title\":\"demo effort\".*\"labels\":\[\"effort\"" "effort new: POST issues for the parent"
+tc "$GH_LOG" "^PATCH repos/o/r/issues/$parent \{\"title\":\"\[E$parent\] demo effort\"\}$" "effort new: renames the parent with its number"
 tc "$GH_LOG" "^POST repos/o/r/issues/$parent/labels \{\"labels\":\[\"slug:demo-effort\"\]\}$" "effort new: adds the slug label"
 t  "effort new: parent + 2 subs created"            "$(grep -c '^POST repos/o/r/issues ' "$GH_LOG")" "3"
 t  "effort new: 2 sub-issues linked"                "$(grep -c 'sub_issues' "$GH_LOG")" "2"
@@ -215,7 +218,7 @@ echo work > file.txt; git add file.txt; git commit -q -m "feat: do the thing (#1
 unset _CCKIT_BOARD_NOTICE_DONE; effort_pr 99 --summary "SUMMARY" >"$tmp/out" 2>"$tmp/err"; rc=$?
 t  "effort pr: rc 0 over REST"                      "$rc" "0"
 rest_only "$GH_LOG" "effort pr: only REST calls"
-tc "$GH_LOG" '^POST repos/o/r/pulls \{"title":"feat: demo effort \[#99\]","head":"effort/99-demo","base":"main"' "effort pr: POST pulls effort/99 → main"
+tc "$GH_LOG" '^POST repos/o/r/pulls \{"title":"feat: demo effort \[E99\]","head":"effort/99-demo","base":"main"' "effort pr: POST pulls effort/99 → main"
 tc "$GH_LOG" '^PATCH repos/o/r/issues/7 \{"labels":\["role:tech-lead","kind:task".*"milestone":3' "effort pr: inherits labels + milestone"
 t  "effort pr: the board notice is printed once"    "$(grep -c 'board step skipped' "$tmp/err")" "1"
 
@@ -225,7 +228,8 @@ cd "$tmp/work" || exit 1
 t  "effort close: rc 0 over REST"                   "$rc" "0"
 rest_only "$GH_LOG" "effort close: only REST calls"
 tc "$GH_LOG" '^PUT repos/o/r/pulls/9/merge \{"merge_method":"squash"\}$' "effort close: squash-merges over REST"
-tc "$GH_LOG" '^PATCH repos/o/r/issues/101 \{"state":"closed","state_reason":"completed"\}$' "effort close: closes sub #101"
+# #565: the shim's subs are already closed, so close keeps their close reason (no second PATCH)
+t  "effort close: does not re-close an already-closed sub" "$(grep -c '^PATCH repos/o/r/issues/101 ' "$GH_LOG")" "0"
 tc "$GH_LOG" '^PATCH repos/o/r/issues/99 \{"state":"closed","state_reason":"completed"\}$'  "effort close: closes the parent"
 case "$close_out" in *"remote branch effort/99-demo kept"*) echo "ok: effort close: says why the remote branch stays" ;; *) echo "FAIL: effort close: no remote-branch notice: $close_out"; fail=1 ;; esac
 t  "effort close: the board notice is printed once" "$(printf '%s\n' "$close_out" | grep -c 'board step skipped')" "1"

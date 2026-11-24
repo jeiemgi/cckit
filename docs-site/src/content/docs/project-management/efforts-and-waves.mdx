@@ -56,7 +56,7 @@ hours and a contact form that sends mail. Each window below is one command of th
 <Chat
   title="asking what can run now on the Bakery site"
   say="What can run now, and how many efforts fit in one session?"
-  ran={["cckit effort plan", "cckit plan"]}
+  ran={["cckit effort plan", "cckit effort plan --issues"]}
   means="effort plan packs the open efforts into session-sized batches. plan shows the waves of issues."
 >
   Here are the batches and the waves.
@@ -140,7 +140,7 @@ rules, the offline behaviour and the config key are under
 ## Waves
 
 A wave is the set of issues that can run at the same time because none of them waits for another.
-`cckit plan` shows the waves, with the most urgent work (`priority:p0`) first inside each one. A
+`cckit effort plan --issues` shows the waves, with the most urgent work (`priority:p0`) first inside each one. A
 "blocked by" link always wins over priority.
 [How work is written down](/project-management/#the-three-units) defines the unit, and
 [Run work in parallel waves](/development/waves/) runs one.
@@ -151,7 +151,7 @@ Priority, chains and the WIP limit decide the order. The cadence is when you rea
 
 | When | Run | What it gives you |
 | --- | --- | --- |
-| Monday | `cckit plan` | The week's order: the waves, and inside each wave p0 → p3. |
+| Monday | `cckit effort plan --issues` | The week's order: the waves, and inside each wave p0 → p3. |
 | Daily | `cckit next` | The unblocked set, and the one command that starts the top issue. |
 | Friday | `cckit gc` | The branches and worktrees that can be pruned. It is a report and deletes nothing; `cckit cleanup` acts on it. |
 
@@ -159,7 +159,7 @@ You do not have to remember the table. `cckit next` and `cckit status` both end 
 the same line, printed by one shared function:
 
 ```text
-Weekly cadence — Monday: `cckit plan` orders the week · daily: `cckit next` picks up one issue · Friday: `cckit gc` reports what can be pruned.
+Weekly cadence — Monday: `cckit effort plan --issues` orders the week · daily: `cckit next` picks up one issue · Friday: `cckit gc` reports what can be pruned.
 ```
 
 <Aside type="note" title="Each piece of work has its own folder">

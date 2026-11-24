@@ -71,6 +71,23 @@ if [ -n "${KTO_TEST_INNER:-}" ]; then
   eq "titleStyle issue-title → the issue title verbatim" \
      "$(KIT_PR_TITLE_STYLE=issue-title kto_pr_title '[Effort 182] 1 · Enforce it' 'ci: x' 'kind:task')" \
      "[Effort 182] 1 · Enforce it"
+  # The trailing token (E546.1), when the issue number is given
+  eq "standalone issue → [#N]" \
+     "$(kto_pr_title 'mail hook goes silent' '' 'bug' 209)" \
+     "fix: mail hook goes silent [#209]"
+  eq "new sub title → [E<n>.<s>]" \
+     "$(kto_pr_title '[E546.1] One naming convention' '' 'kind:feat' 567)" \
+     "feat: One naming convention [E546.1]"
+  eq "legacy sub title → [E<n>.<s>]" \
+     "$(kto_pr_title '[Effort 182] 2 · Publish to npm' 'ci: publish via OIDC' 'kind:task' 184)" \
+     "ci: publish via OIDC [E182.2]"
+  eq "a summary that carries a token keeps it" \
+     "$(kto_pr_title 'x' 'fix(start): keep it [#12]' 'kind:task' 12)" \
+     "fix(start): keep it [#12]"
+  eq "issue-title style appends nothing" \
+     "$(KIT_PR_TITLE_STYLE=issue-title kto_pr_title 'Enforce it' '' 'kind:task' 12)" \
+     "Enforce it"
+  if naming_title_lint pr "$(kto_pr_title '[E546.1] One naming convention' '' 'kind:feat' 567)" 2>/dev/null; then :; else eq "generated PR title passes the naming lint" "no" "yes"; fi
   eq "titleStyle conventional (explicit) → derive" \
      "$(KIT_PR_TITLE_STYLE=conventional kto_pr_title 'mail hook goes silent' '' 'bug')" \
      "fix: mail hook goes silent"

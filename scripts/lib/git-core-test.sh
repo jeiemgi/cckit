@@ -73,7 +73,7 @@ t "start with no slug: issue-<N>"             "$(printf '%s' "$out2" | cut -d'|'
 echo two > "$wt/tracked.txt"
 out="$(cd "$wt" && kto_task_pr 7 "fix: do the thing" 2>"$tmp/err")"; rc=$?
 t "pr without a forge: rc 0"                  "$rc" "0"
-t "pr: the change is committed"               "$(git -C "$wt" log -1 --format=%s)" "fix: do the thing"
+t "pr: the change is committed"               "$(git -C "$wt" log -1 --format=%s)" "fix: do the thing [#7]"
 t "pr: the branch is pushed"                  "$(git ls-remote --heads origin task/7-the-thing | wc -l | tr -d ' ')" "1"
 tc "$tmp/err" '^cckit pr: no forge — issue #7 is not read and the pull request is not opened' "pr: the one line says what it skipped"
 t "pr: says the pull request is to be opened by hand (origin is not on GitHub)" \
@@ -87,7 +87,7 @@ t "no compare page for a local origin"        "$(forge_compare_url develop fix/1
 out="$(cd "$wt" && kto_task_pr_merge 2>"$tmp/err")"; rc=$?
 t "merge without a forge: rc 0"               "$rc" "0"
 tc "$tmp/err" '^cckit merge: no forge — the branch lands on develop through git; no pull request is merged and no issue is closed' "merge: the one line says what it skipped"
-t "merge: develop on origin carries the squash commit" "$(git -C "$tmp/work" log -1 --format=%s origin/develop)" "fix: do the thing"
+t "merge: develop on origin carries the squash commit" "$(git -C "$tmp/work" log -1 --format=%s origin/develop)" "fix: do the thing [#7]"
 t "merge: one commit landed (a squash)"       "$(git -C "$tmp/work" rev-list --count origin/develop)" "2"
 t "merge: the worktree is removed"            "$([ -d "$wt" ] && echo present || echo gone)" "gone"
 t "merge: the local branch is deleted"        "$(git -C "$tmp/work" branch --list task/7-the-thing | wc -l | tr -d ' ')" "0"

@@ -53,7 +53,7 @@ number.
   `cckit orchestrate 46 47 48`. Those numbers were issues in the author's repository on the day the
   page was written; in the reader's repository they are other issues, closed ones, or nothing.
 - **Write instead:** *sync the board, show me what is ready, and I will pick.* The agent runs
-  `cckit sync`, presents what is unblocked, and the person chooses. Which lane the choice goes to —
+  `cckit status --board`, presents what is unblocked, and the person chooses. Which lane the choice goes to —
   one issue, an effort, a wave, an unattended run — depends on what was picked, so the prompt does
   not fix that either.
 - **In a command line:** a placeholder (`cckit start <issue>`, `cckit orchestrate <issues…>`) or a
@@ -77,13 +77,13 @@ one. This rule decides that a pasted prompt has none. For a prompt, this rule wi
 the name of the work and its outcome.** Two parts:
 
 - **No machine-flag decoration.** Do not attach an output-mode variant to a verb you are only
-  mentioning: `cckit sync --llm`, `--output=json`, `--porcelain`. The flag tells the reader how a
+  mentioning: `cckit status --board --json`, `--output=json`, `--porcelain`. The flag tells the reader how a
   program would parse the output, which is not something they asked.
 - **Name the work, with its number.** An effort is written `slug #N` — `auth-hardening #42` — the
   form `effort_display` prints in the kit's own listings. A bare `#42` makes the reader look the
   issue up to learn what it is.
 
-- **Origin:** a correction. Recaps carried `cckit … --llm` beside each verb they mentioned, and the
+- **Origin:** a correction. Recaps carried `cckit … --json` beside each verb they mentioned, and the
   maintainer's response was that the tags said nothing and were not visually useful. The same
   correction asked for efforts to be named `slug #N` and not by number alone.
 - **A command still belongs in a summary when the reader runs it next.** Then it is written
@@ -91,6 +91,10 @@ the name of the work and its outcome.** Two parts:
   line; a command listed to show what the agent ran is decoration.
 - **Scope:** text a person reads. Output an agent parses, a brief handed to a sub-agent, and the
   machine-read lines `naming-and-ids.md` lists (`- Depends on #N`, `Closes #N`) are not summaries.
+- **A step report also goes on its issue.** A report saved under `.cckit/reports/` uses the
+  sections Status · Done · Waiting for a yes · Numbers · Failing or risky · Open questions · Next
+  step. `cckit agent receipt <issue> --report <file>` posts its short trail comment on the issue, so other
+  agents read the trail there; the full report stays local.
 
 **Precedence — `naming-and-ids.md`.** That rule writes an effort as `E241`, a pull request as
 `PR 268` and a standalone issue as `#209`, and forbids a bare `#241` for an effort. Where it is

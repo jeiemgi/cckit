@@ -1,0 +1,15 @@
+{
+  "id": "SprintBacklog",
+  "label": ["sprint backlog"],
+  "definition": "What one sprint took from the backlog and how it will be done: the issues on the sprint's GitHub milestone, with the sub-issues of each effort as its tasks. The sprint goal says why it holds these; the builders may add or split tasks during the sprint.",
+  "is_not": [
+    "The backlog: the backlog is all the work not yet taken; the sprint backlog is this week's share.",
+    "A wave: a wave is one parallel batch of the sprint backlog; a sprint usually runs several.",
+    "A checklist in an issue body: the sprint backlog is issues on a milestone, each with its own state."
+  ],
+  "avoid": ["sprint scope", "commitment", "todo list"],
+  "home": {
+    "cli": "effort sprint"
+  },
+  "status": "seed"
+}

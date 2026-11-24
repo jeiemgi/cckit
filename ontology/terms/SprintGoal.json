@@ -1,0 +1,15 @@
+{
+  "id": "SprintGoal",
+  "label": ["sprint goal"],
+  "definition": "The one outcome a sprint commits to, written as the description of the sprint's GitHub milestone. It says why the sprint backlog holds what it holds; the work may change during the sprint, the goal does not.",
+  "is_not": [
+    "The sprint backlog: the backlog is the list of work; the goal is the single outcome that work serves.",
+    "An effort's goal: an effort's ## Goal is one unit of work; the sprint goal spans the week.",
+    "A milestone title: the title names the sprint; the description holds the goal."
+  ],
+  "avoid": ["objective", "OKR", "theme", "target"],
+  "home": {
+    "cli": "effort sprint"
+  },
+  "status": "seed"
+}

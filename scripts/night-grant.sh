@@ -58,7 +58,7 @@ NIGHT_GRANT_REQUIRED_ALLOW='Bash(cckit merge:*)
 Bash(git push:*)
 Bash(cckit close:*)
 Bash(cckit effort close:*)
-Bash(cckit receipt:*)
+Bash(cckit agent receipt:*)
 Bash(curl:*)'
 
 _ng_err() { printf 'night-grant: %s\n' "$*" >&2; }

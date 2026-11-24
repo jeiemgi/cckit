@@ -10,7 +10,7 @@ sub-issue, `#248` a PR — and nothing in `#N` distinguishes them. No convention
 *inside* `#N`. The fix is to stop writing efforts and PRs as bare `#N`.
 
 A second problem: a sub-issue's own number is invisible where you look for it.
-`[Effort 257] 8 · Gate releases` tells you effort 257, step 8 — but acting on it needs `#265`,
+A sub titled `[E257.8] Gate releases` (legacy `[Effort 257] 8 · Gate releases`) tells you effort 257, step 8 — but acting on it needs `#265`,
 which appears nowhere in that title. You should be able to act on what you can already see.
 
 ## The tokens
@@ -23,7 +23,7 @@ which appears nowhere in that title. You should be able to act on what you can a
 | **Pull request** | `PR <n>` | `PR 268 merged` |
 
 `<n>` is the effort's **own GitHub issue number**. `<step>` is its 1-based position in the
-effort, the same index the sub title already carries.
+effort, the same index the sub title carries.
 
 Two absolutes, and they govern **human-facing text** — issue and PR titles, prose, commit subjects,
 docs, chat:
@@ -60,16 +60,16 @@ parenthetical is GitHub's, not a person's, and it stays as GitHub writes it.
 
 ## Why `E241.2` and not the sub's own number
 
-`E241.2` is derivable from what you are already looking at. The sub's title says effort 241,
-step 2 — so you can act on it without first resolving `#243`. The identifier you read is the
-identifier you type.
+`E241.2` is derivable from what you are already looking at, so you act on it without first
+resolving `#243`: `cckit start E241.2` takes effort 241's sub titled `[E241.2]` (or legacy
+`[Effort 241] 2 · `), else its sub at position 2. `cckit start E241` is issue 241.
 
-```shell
-cckit start E241.2      # not: cckit start 243
-```
+## Issue titles
 
-That is this rule's target, not today's CLI: `wt_start` (`scripts/lib/worktree-start.sh`) passes its
-argument to `gh issue view` as the issue number and parses no token. Until it does, type `243`.
+Effort `[E<n>] <name>` (`cckit effort new`) · sub `[E<n>.<step>] <name>` (`cckit effort new`,
+`cckit effort sub`) · standalone issue `<name>`, no prefix (`cckit new`). `<name>` is a plain
+outcome of at most 6 words: no parentheses, glyphs, ` — ` sub-clauses, code identifiers or jargon.
+The flow lives in the `flow:` label; no verb writes a `[Flow]` tag.
 
 ## PR titles
 
@@ -87,22 +87,18 @@ chore(security): update docs-site deps to clear Dependabot alerts [#249]
 - The conventional-commit prefix is unchanged and still governs release-please's version bump.
   The token is additive; it never replaces `type(scope):`.
 
-### What is enforced today vs. what this rule targets
+### Enforced
 
-**Enforced now:** `effort_pr_title_check` (`scripts/lib/effort.sh`) requires a `[#<num>]` token —
-the exact `[#num]` when given a number, otherwise any `[#digits]` — and `effort_pr` refuses to open
-a PR without it. That check runs on **effort PRs only**; standalone task PRs are unchecked.
-`effort_pr_title` generates the conventional form above, `type(scope): <name> [#<num>]`, and under
-`pr.titleStyle: conventional` (the default) `effort_pr` also refuses, before calling `gh`, a title
-that `commitlint_check` (`scripts/lib/commitlint.sh`) rejects.
+`naming_title_lint <effort|sub|issue|pr> <title>` (`scripts/lib/naming.sh`) runs in `cckit new`,
+`effort new`, `effort sub`, `pr`, `effort pr` and `task share` before any forge write. A bad title
+is refused: reasons on stderr, non-zero exit, nothing filed, committed or pushed.
 
-**This rule targets** `[E<n>]` / `[E<n>.<step>]` on effort and sub PRs, and the check extended to
-every PR. Until that ships, `[#<num>]` is correct and `effort_pr` will keep generating it.
-
-Do not hand-write `[E241.2]` into a PR title before the checker understands it — `effort_pr` would
-reject the title for lacking `[#241]`. The migration is tracked in the implementation issue for
-this rule, and it must move the generator (`effort_pr_title`), the validator
-(`effort_pr_title_check`) and this section together.
+- **PR rule:** `commitlint_check` plus a trailing token, which `cckit pr` and `cckit effort pr`
+  append. `[share-<digits>]` (`cckit task share`) is the one exception. `pr.titleStyle:
+  issue-title` is exempt.
+- **Legacy titles stay valid:** `[Effort] N · ` and `[Effort N] M · `, with an optional `[Flow] `
+  tag, parse and lint; `effort_pr_title_check` accepts `[E<n>]` or `[#<n>]`.
+  `cckit effort retitle [<N>]` lists their new form (a dry run); `--apply` renames them.
 
 **Brackets, never parentheses — this is load-bearing.** GitHub's squash-merge appends the PR
 number in parentheses when it writes the commit subject, so the trailing-parens slot is already

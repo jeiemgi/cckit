@@ -2,7 +2,7 @@
 # next.sh — "what can I pick up right now?" The everyday-dev helper (Effort 75 · #79).
 #
 # Surfaces the unblocked set (wave 0 of the plan machine) and the single recommended next issue with
-# the one command to start it. This is the daily-loop counterpart to `cckit wave`: wave fans a whole
+# the one command to start it. This is the daily-loop counterpart to `cckit effort plan --wave`: wave fans a whole
 # wave out to subagents; `cckit next` is for a human (or agent) picking up one issue by hand.
 #
 #   cckit next                  the unblocked issues + the top one's start command + the weekly
@@ -26,7 +26,7 @@ next_issue() {
   local repo="$NEXT_REPO" out="${CCKIT_OUTPUT:-human}" effort="" planargs=()
   while [ "$#" -gt 0 ]; do
     case "$1" in
-      --llm|--output=json) out="json"; shift ;;
+      --json|--llm|--output=json) out="json"; shift ;;
       --effort)    effort="$2"; planargs+=(--effort "$2"); shift 2 ;;
       --effort=*)  effort="${1#*=}"; planargs+=(--effort "${1#*=}"); shift ;;
       -h|--help)   sed -n '8,11p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; return 0 ;;
@@ -49,7 +49,7 @@ next_issue() {
   if [ "$out" = "json" ]; then
     local json
     json="$(printf '%s\n' "$wave0" | awk -F'\t' '{
-        t=$6; sub(/^\[Effort( [0-9]+)?\] [0-9]+ · ?/,"",t); sub(/^\[[A-Za-z]+\] /,"",t)
+        t=$6; sub(/^\[E[0-9]+(\.[0-9]+)?\] +/, "", t); sub(/^\[Effort( [0-9]+)?\] [0-9]+ · ?/, "", t); sub(/^\[[A-Za-z]+\] /,"",t)
         print $3"\t"$4"\t"t
       }' \
       | jq -R -s '[ split("\n")[] | select(length>0) | split("\t")
@@ -66,19 +66,19 @@ next_issue() {
   local top topnum toptitle
   top="$(printf '%s\n' "$wave0" | sed -n 1p)"
   topnum="$(printf '%s' "$top" | cut -f3)"
-  toptitle="$(printf '%s' "$top" | cut -f6 | sed -E 's/^\[Effort( [0-9]+)?\] [0-9]+ · ?//; s/^\[[A-Za-z]+\] //')"
+  toptitle="$(printf '%s' "$top" | cut -f6 | sed -E 's/^\[E[0-9]+(\.[0-9]+)?\] +//; s/^\[Effort( [0-9]+)?\] [0-9]+ · ?//; s/^\[[A-Za-z]+\] //')"
   {
     printf '# Next up — %s%s\n\n' "$repo" "$([ -n "$effort" ] && echo " · effort #$effort")"
     printf '## Unblocked now\n\n'
     printf '| # | ctx | issue |\n|---|-----|-------|\n'
     printf '%s\n' "$wave0" | awk -F'\t' '{
-      t=$6; sub(/^\[Effort( [0-9]+)?\] [0-9]+ · ?/,"",t); sub(/^\[[A-Za-z]+\] /,"",t)
+      t=$6; sub(/^\[E[0-9]+(\.[0-9]+)?\] +/, "", t); sub(/^\[Effort( [0-9]+)?\] [0-9]+ · ?/, "", t); sub(/^\[[A-Za-z]+\] /,"",t)
       printf "| #%s | %s | %s |\n", $3, $4, t
     }'
     printf '\n## Pick up #%s — %s\n\n' "$topnum" "$toptitle"
     printf 'Start it in an isolated worktree + branch:\n\n'
     printf '```\ncckit start %s\n```\n\n' "$topnum"
-    printf 'Or fan the whole unblocked wave out to subagents with `cckit wave%s`.\n' "$([ -n "$effort" ] && echo " --effort $effort")"
+    printf 'Or fan the whole unblocked wave out to subagents with `cckit effort plan --wave%s`.\n' "$([ -n "$effort" ] && echo " --effort $effort")"
     # the weekly cadence this verb is the daily step of — human output only; the TOON rows above
     # stay {number,ctx,title}.
     # shellcheck source=/dev/null

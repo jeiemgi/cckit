@@ -153,6 +153,40 @@ has "--plan lists the effort" "$pout" "demo effort"
 has "--json --plan carries the plan text" "$(sync --json --plan 2>/dev/null | jq -r '.plan')" "kit effort plan"
 t "--json without --plan has no plan key" "$(printf '%s' "$doc" | jq -r 'has("plan")')" "false"
 
+# ── (7) the local board snapshot (E546.9): one greppable line per open issue ─────────────────────
+cat > "$tmp/issues-efforts.json" <<'JSON'
+[ {"number":546,"title":"[Effort] 546 · Traceable work","labels":[{"name":"effort"},{"name":"flow:core"}],"milestone":null,"assignees":[],"updated_at":"2026-11-24T00:00:00Z","body":""},
+  {"number":575,"title":"[E546.3] Local board snapshot","labels":[{"name":"kind:feat"}],"milestone":null,"assignees":[],"updated_at":"2026-11-24T00:00:00Z","body":""},
+  {"number":600,"title":"Fix the docs link","labels":[],"milestone":null,"assignees":[],"updated_at":"2026-11-24T00:00:00Z","body":""} ]
+JSON
+SNAP="$tmp/snap/board.md"; rm -f "$SNAP"
+ENVV="GH_ISSUES=$tmp/issues-efforts.json CCKIT_BOARD_SNAPSHOT=$SNAP"; serr="$(sync --llm 2>&1 >/dev/null)"
+t "the snapshot is written to CCKIT_BOARD_SNAPSHOT" "$([ -f "$SNAP" ] && echo yes || echo no)" "yes"
+has "sync names the snapshot and how to read it" "$serr" "read with: rg <pattern> $SNAP"
+t "the snapshot has one line per open issue" "$(grep -c '^#[0-9]' "$SNAP")" "3"
+t "an effort line carries its token" "$(grep '^#546' "$SNAP" | cut -f2-5)" "$(printf 'open\teffort\tE546\teffort,flow:core')"
+t "a sub line carries effort.step" "$(grep '^#575' "$SNAP" | cut -f3,4,6)" "$(printf 'sub\tE546.3\t[E546.3] Local board snapshot')"
+t "a standalone line has no token" "$(grep '^#600' "$SNAP" | cut -f3-5)" "$(printf 'issue\t-\t-')"
+t "rg on one number hits one line" "$(grep -c '#575' "$SNAP")" "1"
+t "issues are grouped effort, sub, standalone" "$(grep -E '^(## |#[0-9])' "$SNAP" | cut -f1 | tr '\n' ' ')" "## Efforts #546 ## Sub-issues #575 ## Standalone #600 "
+has "the header names the repo" "$(cat "$SNAP")" "# Board snapshot — octo/fixture"
+has "the header names the command" "$(cat "$SNAP")" "made by: cckit status --board --llm"
+has "the header says rg needs the path" "$(cat "$SNAP")" "gitignored"
+t "the atomic write leaves no temp file" "$(find "$tmp/snap" -name 'board.md.*' | wc -l | tr -d ' ')" "0"
+ENVV="GH_ISSUES=$tmp/issues-efforts.json"; sync >/dev/null 2>&1
+t "the default snapshot lands in the repo's .cckit/" "$(grep -c '^#[0-9]' "$fix/.cckit/board.md" 2>/dev/null)" "3"
+rm -f "$SNAP"
+ENVV="GH_ISSUES=$tmp/issues-efforts.json CCKIT_BOARD_SNAPSHOT=$SNAP"; sync --no-snapshot >/dev/null 2>&1
+t "--no-snapshot writes nothing" "$([ -e "$SNAP" ] && echo yes || echo no)" "no"
+sync --raw-json >/dev/null 2>&1
+t "--raw-json writes no snapshot" "$([ -e "$SNAP" ] && echo yes || echo no)" "no"
+ENVV="CCKIT_FORGE=none CCKIT_BOARD_SNAPSHOT=$SNAP"; nerr="$(sync 2>&1 >/dev/null)"
+t "no forge writes no snapshot" "$([ -e "$SNAP" ] && echo yes || echo no)" "no"
+has "no forge says the snapshot was not written" "$nerr" "no forge — no board snapshot written"
+ENVV="GH_FAIL=1 CCKIT_BOARD_SNAPSHOT=$SNAP"; sync >/dev/null 2>&1
+t "a failed read writes no snapshot" "$([ -e "$SNAP" ] && echo yes || echo no)" "no"
+ENVV=""
+
 # ── unchanged surfaces ─────────────────────────────────────────────────────────────────────────
 has "human board still renders" "$(sync 2>/dev/null)" "## Board — octo/fixture"
 t "--raw-json still returns the issue objects" "$(sync --raw-json 2>/dev/null | jq -r '.[0].labels[0].name')" "role:tech-lead"

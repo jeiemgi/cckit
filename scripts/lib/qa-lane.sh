@@ -1248,7 +1248,7 @@ before the listeners, so nothing respawns. It reports only the processes that ar
 Exit 0 when the ports are free, including on a lane that was already down; exit 1 names the pid
 still listening.
 
-verdict writes a `qa` receipt (cckit receipt show <lane> qa) bound to the reviewed commit: --head,
+verdict writes a `qa` receipt (cckit agent receipt show <lane> qa) bound to the reviewed commit: --head,
 else the local tip of the lane's branch, else the PR's head. It upserts ONE comment on the lane's
 PR (a second verdict edits it) plus one per --shot; a screenshot is a path reference unless
 KIT_EVIDENCE_URL_BASE is set, because gh cannot upload an image. A fail needs notes and mails them

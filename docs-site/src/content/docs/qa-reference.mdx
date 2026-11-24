@@ -93,7 +93,7 @@ Recording one does four things:
 
 | Write | What |
 | --- | --- |
-| Receipt | `cckit receipt show <lane> qa` reads it. |
+| Receipt | `cckit agent receipt show <lane> qa` reads it. |
 | PR comment | **One** `QA verdict` comment on the lane's PR; a second verdict edits it. Each `--shot` adds one `QA screenshot <n>` comment. |
 | Mail | A `fail` sends its notes to the builder's branch as a steer. `--to <branch>` names another branch. |
 | Event | One `qa.verdict` line in `kit-events.jsonl`. |
@@ -119,7 +119,7 @@ commit no longer matches the head.
 ## List the lanes — `cckit qa lanes`
 
 ```sh
-cckit qa lanes [--llm]
+cckit qa lanes [--json]
 ```
 
 One row per lane, read from what the other verbs recorded. It takes no argument, launches and
@@ -151,7 +151,7 @@ on disk (`cckit start` writes it), a launch record (`cckit qa up`), or a verdict
   --lane <n>` also falls back to the PR's head.
 - Exit `0` with or without lanes, `2` on any argument, `3` without `jq`. With no lane the table is
   empty and one line on stderr says so.
-- `--llm` prints a JSON array, `[]` with no lane:
+- `--json` prints a JSON array, `[]` with no lane:
 
   ```json
   [{"lane":"311","branch":"feat/311-billing-form","worktree":"/repo/.claude/worktrees/feat+311-billing-form","ports":{"WEB_PORT":3030,"API_PORT":4030},"up":"up","verdict":"pass"}]

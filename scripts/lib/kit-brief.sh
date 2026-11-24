@@ -24,6 +24,7 @@ fi
 _kb_dir="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" >/dev/null 2>&1 && pwd)"
 # shellcheck source=/dev/null
 command -v kit_config_path >/dev/null 2>&1 || . "$_kb_dir/config-path.sh"
+_KB_LIB="$_kb_dir"
 unset _kb_dir
 
 # ── pure parsers (no gh, no git; every one is unit-tested against fixture text) ─────────────────
@@ -214,6 +215,71 @@ _kb_rows() {
   done
 }
 
+# ── the worker's toolset (#582): --skills / --verbs ─────────────────────────────────────────────
+
+# The effort sub-verbs a brief may name as `effort <sub>`. Kept beside the dispatcher's own list
+# in bin/cckit; kit-brief-test.sh fails when the two drift.
+KB_EFFORT_SUBS="new sub retitle chain start pr close plan sprint review"
+
+# kit_brief_skill_ok <name> [root] — rc 0 when a skill of that name ships: the project's
+# `.claude/skills/<name>/SKILL.md`, its `skills/<name>/SKILL.md`, or the kit's own skills/.
+kit_brief_skill_ok() {
+  local s="$1" root="${2:-.}" kit
+  case "$s" in ''|*/*|.*) return 1 ;; esac
+  kit="${CCKIT_ROOT:-$_KB_LIB/../..}"
+  [ -f "$root/.claude/skills/$s/SKILL.md" ] || [ -f "$root/skills/$s/SKILL.md" ] || [ -f "$kit/skills/$s/SKILL.md" ]
+}
+
+# kit_brief_verb_ok <verb words> — rc 0 when the first word is a row of verbs.tsv (a verb or an
+# alias) and, for `effort`, the second word is one of its sub-verbs.
+kit_brief_verb_ok() {
+  local v="$1" first rest tsv="$_KB_LIB/verbs.tsv"
+  first="${v%% *}"; rest=""
+  [ "$first" = "$v" ] || rest="${v#* }"; rest="${rest%% *}"
+  [ -n "$first" ] && [ -f "$tsv" ] || return 1
+  awk -F'\t' -v n="$first" '$1 == n { f = 1 } END { exit !f }' "$tsv" || return 1
+  if [ "$first" = "effort" ] && [ -n "$rest" ]; then
+    case " $KB_EFFORT_SUBS " in *" $rest "*) return 0 ;; *) return 1 ;; esac
+  fi
+  return 0
+}
+
+# kit_brief_toolset <skills-csv> <verbs-csv> [root] — print the `## Your toolset` section listing
+# exactly the named skills and verbs, in the order given. A name that does not resolve is an error
+# (rc 2, every unknown name on stderr), so a brief never hands a worker a tool that is not there.
+kit_brief_toolset() {
+  local skills="$1" verbs="$2" root="${3:-.}" bad=0 item rest
+  rest="$skills"
+  while [ -n "$rest" ]; do
+    item="${rest%%,*}"; [ "$item" = "$rest" ] && rest="" || rest="${rest#*,}"
+    item="$(printf '%s' "$item" | sed 's/^ *//; s/ *$//')"; [ -n "$item" ] || continue
+    kit_brief_skill_ok "$item" "$root" || { echo "cckit brief: unknown skill '$item'" >&2; bad=1; }
+  done
+  rest="$verbs"
+  while [ -n "$rest" ]; do
+    item="${rest%%,*}"; [ "$item" = "$rest" ] && rest="" || rest="${rest#*,}"
+    item="$(printf '%s' "$item" | sed 's/^ *//; s/ *$//; s/^cckit  *//')"; [ -n "$item" ] || continue
+    kit_brief_verb_ok "$item" || { echo "cckit brief: unknown verb 'cckit $item'" >&2; bad=1; }
+  done
+  [ "$bad" -eq 0 ] || return 2
+  echo "## Your toolset"
+  echo
+  echo "Use these and no others. A step they cannot do is a defect to report, not a reason to hand-roll \`git\` or \`gh\`."
+  echo
+  rest="$skills"
+  while [ -n "$rest" ]; do
+    item="${rest%%,*}"; [ "$item" = "$rest" ] && rest="" || rest="${rest#*,}"
+    item="$(printf '%s' "$item" | sed 's/^ *//; s/ *$//')"; [ -n "$item" ] || continue
+    printf -- '- skill `%s`\n' "$item"
+  done
+  rest="$verbs"
+  while [ -n "$rest" ]; do
+    item="${rest%%,*}"; [ "$item" = "$rest" ] && rest="" || rest="${rest#*,}"
+    item="$(printf '%s' "$item" | sed 's/^ *//; s/ *$//; s/^cckit  *//')"; [ -n "$item" ] || continue
+    printf -- '- verb `cckit %s`\n' "$item"
+  done
+}
+
 # ── the verb ───────────────────────────────────────────────────────────────────────────────────
 
 # kit_brief <issue> — print the delegation brief for an issue as markdown. strict about its one
@@ -222,15 +288,29 @@ _kb_rows() {
 # a brief that silently omits a section is the failure mode this verb exists to remove.
 kit_brief() {
   local n="${1:-}" root base repo body title state labels foragents files files_from wt wtpath wtbranch
-  local seed gotchas prose libdir row f gate qaroute
+  local seed gotchas prose libdir row f gate qaroute want_skills="" want_verbs="" toolset=""
   case "$n" in
-    ''|--*) echo "usage: cckit brief <issue>" >&2; return 2 ;;
+    ''|--*) echo "usage: cckit brief <issue> [--skills a,b] [--verbs 'x,effort start']" >&2; return 2 ;;
   esac
+  shift
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --skills)   [ $# -ge 2 ] || { echo "cckit brief: --skills needs a list" >&2; return 2; }; want_skills="$2"; shift 2 ;;
+      --skills=*) want_skills="${1#--skills=}"; shift ;;
+      --verbs)    [ $# -ge 2 ] || { echo "cckit brief: --verbs needs a list" >&2; return 2; }; want_verbs="$2"; shift 2 ;;
+      --verbs=*)  want_verbs="${1#--verbs=}"; shift ;;
+      *) echo "cckit brief: unknown argument '$1'" >&2; return 2 ;;
+    esac
+  done
   n="${n#\#}"
+  root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+  # The toolset is checked before any forge read, so a typo costs nothing and writes nothing.
+  if [ -n "$want_skills$want_verbs" ]; then
+    toolset="$(kit_brief_toolset "$want_skills" "$want_verbs" "$root")" || return 2
+  fi
   forge_need brief || return 1
   command -v jq >/dev/null 2>&1 || { echo "cckit brief: jq is required" >&2; return 1; }
 
-  root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
   base="${KIT_BASE_BRANCH:-main}"
   repo="${KIT_REPO:-}"
 
@@ -266,6 +346,11 @@ kit_brief() {
   printf '**%s**\n' "${title:-（untitled）}"
   printf '\n- issue: `#%s` · %s%s\n' "$n" "${state:-unknown}" "${labels:+ · $labels}"
   [ -n "$repo" ] && printf -- '- repo: `%s` · base branch `%s`\n' "$repo" "$base"
+
+  if [ -n "$toolset" ]; then
+    echo
+    printf '%s\n' "$toolset"
+  fi
 
   # ── where the work happens
   wt="$(kit_brief_worktree "$n")"
@@ -371,15 +456,15 @@ EOF
       echo "| --- | --- | --- |"
       printf '%s\n' "$shown_owned" | grep . || true
       printf '%s\n' "$shown_src" | grep . || true
-      [ "$n_over" -gt 0 ] && printf -- '\n_+%s more helper(s) these files source — `cckit lib` lists them._\n' "$n_over"
+      [ "$n_over" -gt 0 ] && printf -- '\n_+%s more helper(s) these files source — `cckit agent lib` lists them._\n' "$n_over"
     else
       echo "_None of the issue's files are helpers or source one._"
     fi
     echo
-    printf -- '_Full catalog: `cckit lib` (%s helpers). Do not reimplement what it already lists._\n' \
+    printf -- '_Full catalog: `cckit agent lib` (%s helpers). Do not reimplement what it already lists._\n' \
       "$(kit_lib_files "$libdir" | grep -c . || true)"
   else
-    echo "_No helper catalog here — `cckit lib` is unavailable in this project._"
+    echo "_No helper catalog here — `cckit agent lib` is unavailable in this project._"
   fi
 
   # ── standing gotchas, from the project's own rule

@@ -1,0 +1,15 @@
+{
+  "id": "DefinitionOfDone",
+  "label": ["definition of done", "DoD"],
+  "definition": "The bar every piece of work meets before it counts as an increment: the gate green on the combined tree, the PR merged, its issue closed and its board card Done. Work that misses it goes back to the backlog, it is not shown at the sprint review.",
+  "is_not": [
+    "The gate: the gate is the check command; the definition of done also asks for the merge, the closed issue and the board.",
+    "Acceptance criteria: those are one issue's own conditions; the definition of done is the same for every item.",
+    "A review: a review is one reading of a PR; the definition of done is the whole list a change meets."
+  ],
+  "avoid": ["done-ness", "ready to ship", "exit criteria (for the whole list)"],
+  "home": {
+    "rule": ".claude/rules/merge-safety.md"
+  },
+  "status": "seed"
+}

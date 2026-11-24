@@ -1,6 +1,6 @@
 ---
 title: Run work in parallel waves
-description: What cckit wave proposes, how the work is dispatched to parallel agents, and how results are collected.
+description: What cckit effort plan --wave proposes, how the work is dispatched to parallel agents, and how results are collected.
 ---
 
 import { Aside } from '@astrojs/starlight/components';
@@ -24,7 +24,7 @@ A **wave** is the set of issues that nothing is blocking right now: everything r
 in parallel. [How work is written down](/project-management/#the-three-units) defines it beside
 the issue and the effort.
 
-`cckit wave` looks at your open efforts, works out that set, and writes a **brief**: one task per
+`cckit effort plan --wave` looks at your open efforts, works out that set, and writes a **brief**: one task per
 issue, each scoped to its own isolated worktree so the parallel work cannot collide. It runs
 nothing itself. It hands the brief to the agent, and the agent does the work.
 
@@ -48,13 +48,13 @@ builds neither.
 
 ### 1. Propose the wave
 
-`cckit wave` reads the board, finds the issues unblocked right now, and writes the brief: one
+`cckit effort plan --wave` reads the board, finds the issues unblocked right now, and writes the brief: one
 worker task per issue, each in its own worktree.
 
 <Chat
   title="asking which Bakery site issues can run in parallel"
   say="What can run in parallel on the Bakery site right now?"
-  ran="cckit wave"
+  ran="cckit effort plan --wave"
   means="This only writes the brief. Nothing has started, and you can read it first."
 >
   Two issues are unblocked: the opening hours and the contact form. I wrote one task for each, each
@@ -115,9 +115,9 @@ The result values, the exit codes and the branch claim are in the
 
 | What you say | What runs |
 | ------- | ------- |
-| "What can run in parallel right now?" | `cckit wave` |
-| "Only for this effort." | `cckit wave --effort <N>` |
-| "Write the brief for Codex." | `cckit wave --adapter <claude\|codex\|both>` |
+| "What can run in parallel right now?" | `cckit effort plan --wave` |
+| "Only for this effort." | `cckit effort plan --wave --effort <N>` |
+| "Write the brief for Codex." | `cckit effort plan --wave --adapter <claude\|codex\|both>` |
 | "Launch these issues in cckit worktrees." | `cckit orchestrate <issues…>` |
 | "How did each worker end?" | `cckit orchestrate --results` |
 | "Check the pull requests and merge the clean ones." | `cckit watch --merge` |
@@ -135,13 +135,13 @@ first wave.
 - **An agent reviewer.** If you have configured
   [a review stage](/config-and-permissions/#the-agent-review-stage), a pull request the captain
   would merge goes to a reviewer first and waits for its verdict: one extra turn of the loop, not
-  a separate command. `cckit receipt show <issue> review` prints what the reviewer decided.
+  a separate command. `cckit agent receipt show <issue> review` prints what the reviewer decided.
 - **A person looking at the running app.** The [QA lane](/review/qa-lane/) starts one copy of the
   app per change (a lane): `cckit qa up`, then `cckit qa open`, then
   `cckit qa verdict <pass|fail>`. With `captain.mergePolicy.requireQa` set, the captain holds a
   pull request until `cckit qa verdict pass` is recorded against its latest commit.
   `cckit qa lanes` shows every lane's ports and verdicts.
-- **The plan as data.** `cckit plan --llm` prints the wave plan in a form a program reads.
+- **The plan as data.** `cckit effort plan --issues --json` prints the wave plan in a form a program reads.
 
 ## Guides and related pages
 

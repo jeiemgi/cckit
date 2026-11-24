@@ -2,7 +2,7 @@
 # plan-machine.sh — the wave plan: turn the board into a deps-ordered, file-disjoint, session-fit
 # execution plan the copilot fans out over (Effort 75 · #76).
 #
-# `cckit plan` reads the open board (or one effort's sub-issues), resolves the native GitHub
+# `cckit effort plan --issues` reads the open board (or one effort's sub-issues), resolves the native GitHub
 # `blocked_by` edges, and layers the issues into WAVES: wave 0 is everything unblocked, wave N is
 # everything whose blockers all landed in earlier waves. Every issue in a wave is independent of the
 # others in that wave, so a wave is exactly "what N agents can run in parallel right now". Within a
@@ -10,11 +10,11 @@
 # under a session ctx budget, starting a new batch when the budget would overflow or two issues
 # declare overlapping files (so parallel subagents don't collide).
 #
-#   cckit plan                 human wave plan for the open board
-#   cckit plan --llm           TOON wave plan (rows: wave,batch,number,ctx,blockers,title,priority)
-#   cckit plan --effort <N>    plan only effort #N's sub-issues
-#   cckit plan --milestone <M> filter to milestone M
-#   cckit plan --cap <N>       session ctx budget per batch (default KIT_SESSION_BUDGET or 4)
+#   cckit effort plan --issues                 human wave plan for the open board
+#   cckit effort plan --issues --llm           TOON wave plan (rows: wave,batch,number,ctx,blockers,title,priority)
+#   cckit effort plan --issues --effort <N>    plan only effort #N's sub-issues
+#   cckit effort plan --issues --milestone <M> filter to milestone M
+#   cckit effort plan --issues --cap <N>       session ctx budget per batch (default KIT_SESSION_BUDGET or 4)
 #
 # ctx weights: S=1 · M=2 · L=4 · XL=8. File hints: a "Files:"/"Touches:" line in the issue body
 # (comma/space-separated paths) drives intra-wave disjointness; absent → ctx budget alone batches.
@@ -180,7 +180,7 @@ plan_machine() {
   local repo="$PLAN_REPO" budget="${KIT_SESSION_BUDGET:-4}" out="${CCKIT_OUTPUT:-human}" effort="" ms=""
   while [ "$#" -gt 0 ]; do
     case "$1" in
-      --llm|--output=json) out="json"; shift ;;
+      --json|--llm|--output=json) out="json"; shift ;;
       --effort)    effort="$2"; shift 2 ;;
       --effort=*)  effort="${1#*=}"; shift ;;
       --milestone) ms="$2"; shift 2 ;;
@@ -307,7 +307,7 @@ EOF2
   # shellcheck source=/dev/null
   . "$here/render.sh"
   {
-    printf '# cckit plan — %s\n\n' "$repo"
+    printf '# cckit effort plan --issues — %s\n\n' "$repo"
     printf '_session budget %s · ctx S=1 M=2 L=4 XL=8 · ? = no ctx: label, weighed %s · each wave runs in parallel, p0 first_\n' "$budget" "$PM_UNSIZED_WEIGHT"
     emit_rows | awk -F'\t' '
       BEGIN { lw="" }
@@ -319,7 +319,7 @@ EOF2
           print "|---|-----|-----|-------|-------|-------|"
           lw=wv
         }
-        sub(/^\[Effort( [0-9]+)?\] [0-9]+ · ?/, "", title)
+        sub(/^\[E[0-9]+(\.[0-9]+)?\] +/, "", title); sub(/^\[Effort( [0-9]+)?\] [0-9]+ · ?/, "", title)
         sub(/^\[[A-Za-z]+\] /, "", title)
         dep="—"
         if (blk != "") { gsub(/,/, ", #", blk); dep="#" blk }

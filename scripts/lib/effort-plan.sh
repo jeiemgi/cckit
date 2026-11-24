@@ -102,7 +102,7 @@ effort_next_pick() {
       if ($6 != "-") { waiting[f]++; next }
       r = rank($4); n = $1 + 0
       if (!(f in bn) || r < br[f] || (r == br[f] && n < bn[f])) {
-        t = $7; sub(/^\[Effort( [0-9]+)?\] [0-9]+ · ?/, "", t); sub(/^\[[A-Za-z]+\] /, "", t)
+        t = $7; sub(/^\[E[0-9]+(\.[0-9]+)?\] +/, "", t); sub(/^\[Effort( [0-9]+)?\] [0-9]+ · ?/, "", t); sub(/^\[[A-Za-z]+\] /, "", t)
         bn[f] = n; br[f] = r; bc[f] = $3; bt[f] = t
       }
     }
@@ -128,7 +128,7 @@ effort_next_rows() {
 # Every verb named here runs as written. `cckit digest` is deliberately absent: it summarises one
 # <path|url> with a local model, it does not report on the week.
 effort_cadence_md() {
-  printf '%s\n' '**Weekly cadence** — Monday: `cckit plan` orders the week · daily: `cckit next` picks up one issue · Friday: `cckit gc` reports what can be pruned.'
+  printf '%s\n' '**Weekly cadence** — Monday: `cckit effort plan --issues` orders the week · daily: `cckit next` picks up one issue · Friday: `cckit gc` reports what can be pruned.'
 }
 
 # Rows travel between the readers and the planner as five fields joined by the ASCII unit
@@ -281,7 +281,7 @@ effort_plan() {
       local note=""; case "${ctxs[$i]}" in L|XL) note="   → delegate subs" ;; esac
       local dep=""; [[ -n "${blocks[$i]}" ]] && dep="   (after #${blocks[$i]//,/, #})"
       # strip the "[Effort] N · " prefix + a leading "[Flow] " tag — #N and the flow are already shown.
-      local disp; disp="$(printf '%s' "${titles[$i]}" | sed -E 's/^\[Effort( [0-9]+)?\] [0-9]+ · ?//; s/^\[[A-Za-z]+\] //')"
+      local disp; disp="$(printf '%s' "${titles[$i]}" | sed -E 's/^\[E[0-9]+(\.[0-9]+)?\] +//; s/^\[Effort( [0-9]+)?\] [0-9]+ · ?//; s/^\[[A-Za-z]+\] //')"
       printf '      #%-4s [%-2s] %s%s%s\n' "${nums[$i]}" "${ctxs[$i]}" "$disp" "$dep" "$note"
     done
   done
