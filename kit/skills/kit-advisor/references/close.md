@@ -50,4 +50,5 @@ cckit agent receipt <N> --report .cckit/reports/<file>.md
 ```
 
 Numbers: issues done and carried over, efforts closed. Waiting for a yes: the sprint close itself,
-and any release, which this stage never runs.
+any release, which this stage never runs, and one line per Spec item ending `(needs a yes)` in an
+effort this stage closes, naming what the person must look at.

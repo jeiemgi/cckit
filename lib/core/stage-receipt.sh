@@ -478,6 +478,8 @@ sr_mirror() {
 #
 # The report format, section by section: Status · Done · Waiting for a yes · Numbers · Failing or
 # risky · Open questions · Next step. Only `## Status` is required; the comment reads two sections.
+# Waiting for a yes also carries one line per Spec item ending `(needs a yes)` (rules/authoring.md
+# § 3), so the trail comment names every human acceptance the effort still needs.
 #
 # Nothing private reaches GitHub. The comment is checked against the leak fence's own word list
 # (lib/core/leak-fence.sh: the built-in word, `.cckit/leak-words`, `CCKIT_LEAK_WORDS`) and
