@@ -24,6 +24,9 @@
 #   naming_title_token <title>                        echo E<n> / E<n>.<step> read from the prefix, or rc 1
 #   naming_title_parent <title>                       echo <n> when the title is a sub of effort n, or rc 1
 #   naming_token_parse <token>                        E545 -> "545" · E545.1 -> "545 1" · else rc 1
+#   naming_body_effort_numbers <body>                 echo each effort number a body cites as [E<n>] / [E<n>.<s>]
+#   naming_body_has_relation <body> <n>               rc 0 when the body carries a relation line to #<n>
+#   naming_body_relation_lint <body>                  rc 0 clean · 1 + a fix on stderr per cited effort with no relation
 #
 # bash 3.2 compatible; sourceable under zsh (no BASH_REMATCH, no arrays in the pure helpers).
 # errors: strict — a validator: rc 1 on a title that breaks the rule
@@ -53,6 +56,57 @@ naming_token_parse() {
   out="$(printf '%s' "$t" | sed -nE -e 's/^[Ee]([0-9]+)\.([0-9]+)$/\1 \2/p' -e 's/^[Ee]([0-9]+)$/\1/p')"
   [ -n "$out" ] || return 1
   printf '%s\n' "$out"
+}
+
+# naming_body_effort_numbers <body> — the effort numbers a body cites as a bracketed token, [E632] or
+# [E632.4], one per line, de-duplicated in order of first appearance. Each candidate goes through
+# naming_token_parse, so a body token and a title token mean the same thing. Prints nothing (rc 0)
+# for a body that cites none.
+naming_body_effort_numbers() {
+  local tok parsed seen=" "
+  # One token per line, read back: zsh does not word-split an unquoted expansion.
+  while IFS= read -r tok; do
+    [ -n "$tok" ] || continue
+    parsed="$(naming_token_parse "$tok")" || continue
+    parsed="${parsed%% *}"
+    case "$seen" in *" $parsed "*) continue ;; esac
+    seen="$seen$parsed "
+    printf '%s\n' "$parsed"
+  done <<EOF
+$(printf '%s\n' "${1:-}" | grep -oE '\[[Ee][0-9]+(\.[0-9]+)?\]')
+EOF
+}
+
+# naming_body_has_relation <body> <n> — rc 0 when a line of <body> relates it to issue #<n> in a form
+# the kit writes: the `## Relations` lines (`Depends on #N`, `Blocks #N`, `Extends #N`,
+# `Parallel-safe with #N`, rules/effort-model.md), `Sub-issue of #N`, or the `**Blocked by:** #N`
+# line `cckit new --blocked-by` composes. A leading list marker and bold markers are allowed; case is
+# ignored; #<n> must not run on into more digits (#63 is not #632).
+naming_body_has_relation() {
+  local n="${2#\#}"
+  [ -n "$n" ] || return 1
+  printf '%s\n' "${1:-}" | tr -d '*' | grep -qiE \
+    "^[[:space:]]*([-+][[:space:]]+)?(depends on|blocks|extends|parallel-safe with|sub-issue of|blocked by:?)[[:space:]]+(.*[^0-9])?#${n}([^0-9]|\$)"
+}
+
+# naming_body_relation_lint <body> — rc 0 when every effort the body cites ([E<n>] / [E<n>.<s>]) has
+# a relation line to #<n>; rc 1 with one reason per loose citation on stderr. A cited effort with no
+# relation files a loose issue (ontology LooseIssue).
+naming_body_relation_lint() {
+  local body="${1:-}" n rc=0
+  while IFS= read -r n; do
+    [ -n "$n" ] || continue
+    naming_body_has_relation "$body" "$n" && continue
+    rc=1
+    {
+      echo "✗ the body cites [E$n] but carries no relation to #$n — it would be a loose issue"
+      echo "    - add a relation line, e.g. '- Depends on #$n' (or Blocks / Extends / Parallel-safe with / Sub-issue of #$n)"
+      echo "    - or file it anyway with --force (KIT_FORCE=1)"
+    } >&2
+  done <<EOF
+$(naming_body_effort_numbers "$body")
+EOF
+  return "$rc"
 }
 
 # naming_title_token <title> — the token a title's prefix names: [E545.1] and [Effort 545] 1 · give

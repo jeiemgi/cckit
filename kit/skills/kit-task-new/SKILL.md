@@ -28,6 +28,9 @@ One flow → creates a GitHub issue **and** (if Projects v2 is enabled) adds it 
 | Plan link  | optional | Path under the project's plans dir            |
 | Blocked by | optional | `#N, #M`                                      |
 | Body       | ✓        | Context + DoD checklist + acceptance          |
+| Force      | optional | `KIT_FORCE=1` (`cckit new --force`): file a body that cites an effort with no relation |
+
+A body that cites an effort as `[E<n>]` or `[E<n>.<step>]` must carry a relation to `#<n>`: a `## Relations` line (`- Depends on #<n>`, `Blocks`, `Extends`, `Parallel-safe with`), `Sub-issue of #<n>`, or `#<n>` in Blocked by. Otherwise the op refuses before any forge call and names the token; add the line, or set `KIT_FORCE=1` to file it anyway.
 
 Validate Kind/Priority/Role against the project's closed sets before dispatching — the op does not invent label families. A `kind:` / `priority:` / `role:` label the repo does not have is dropped with a `⚠ label '<name>' not found` warning on stderr and the issue is still created; the op fails only when the issue itself is not created.
 

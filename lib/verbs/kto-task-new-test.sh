@@ -98,5 +98,33 @@ kto_task_new "Test" backend feat p2 "" "" "" x >"$tmp/out" 2>"$tmp/err"
 tc "$tmp/board" '^set ITEM SF OPT_TODO$'    "no Backlog option on the board: Status stays Todo"
 export KIT_PROJECTS_V2="false"
 
+# ── an issue that cites an effort carries a relation to it (E632.4) ──────────────────────────────────
+have kind:feat priority:p2 role:backend
+creates() { grep -c '^POST repos/o/r/issues ' "$GH_LOG" | tr -d ' '; }
+fresh; unset KIT_FORCE
+kto_task_new "Test" backend feat p2 "" "" "" "Part of [E632.4]." >"$tmp/out" 2>"$tmp/err"; rc=$?
+t  "cites [E632] with no relation: rc non-zero"      "$([ "$rc" -ne 0 ] && echo nonzero)" "nonzero"
+t  "cites [E632] with no relation: no create call"   "$(creates)" "0"
+tc "$tmp/err" 'cites \[E632\] but carries no relation to #632' "cites [E632] with no relation: the refusal names the token"
+tc "$tmp/err" -- '--force'                           "cites [E632] with no relation: the refusal names --force"
+fresh
+KIT_FORCE=1 kto_task_new "Test" backend feat p2 "" "" "" "Part of [E632.4]." >"$tmp/out" 2>"$tmp/err"; rc=$?
+t  "cites [E632], KIT_FORCE=1: rc 0"                 "$rc" "0"
+t  "cites [E632], KIT_FORCE=1: the issue is created" "$(creates)" "1"
+fresh
+kto_task_new "Test" backend feat p2 "" "" "" "Part of [E632].
+
+## Relations
+- Depends on #632" >"$tmp/out" 2>"$tmp/err"; rc=$?
+t  "cites [E632] with Depends on #632: rc 0"         "$rc" "0"
+t  "cites [E632] with Depends on #632: created"      "$(creates)" "1"
+fresh
+kto_task_new "Test" backend feat p2 "" "" "#632" "Part of [E632]." >"$tmp/out" 2>"$tmp/err"; rc=$?
+t  "cites [E632] with --blocked-by #632: rc 0"       "$rc" "0"
+fresh
+kto_task_new "Test" backend feat p2 "" "" "" "A body with no effort token." >"$tmp/out" 2>"$tmp/err"; rc=$?
+t  "no effort token: rc 0"                           "$rc" "0"
+t  "no effort token: created"                        "$(creates)" "1"
+
 [ "$fail" -eq 0 ] && echo "kto-task-new: all passed" || echo "kto-task-new: FAILURES"
 exit "$fail"
