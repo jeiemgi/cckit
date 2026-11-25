@@ -1,0 +1,166 @@
+# Branch & Merge Conventions
+
+Canonical naming + merge-order rules so you're never confused about *what a branch is*, *what order PRs merge in*, or *which agent is touching what*.
+
+## Branch name format
+
+```
+<kind>/<issue-number>-<slug>
+```
+
+- `<kind>` — one of the closed set below, one of the two effort prefixes, or `light` (a light task). No others.
+- `<issue-number>` — the issue this branch closes. **Always required** for human work.
+- `<slug>` — short kebab-case description (≤ 5 words).
+
+### Effort prefixes (the two exceptions to the closed set)
+
+An effort's integration branch and its sub-branches are **not** in the kind table — they are named
+after the effort, not after a kind of change:
+
+| Pattern | What | `N` |
+| --- | --- | --- |
+| `effort/<N>-<slug>` | the effort's ONE integration branch, cut from the base; its ONE PR opens from here. `effort-model.md` writes it `effort/<N>` — same branch, slug elided | the **parent effort issue's** GitHub issue number |
+| `sub/<N><letter>-<slug>` | one sub-issue of that effort, cut from `effort/<N>` and merged back into it | the same parent effort issue number, plus one lowercase letter |
+
+`effort-start` creates the first and `orchestrate` the second; do not hand-roll either.
+
+**Effort sub-branches** add one lowercase letter to the number — `sub/<N><letter>-<slug>`
+(`sub/1604a-parser`), branched from `effort/<N>` and merged back into it (`rules/effort-model.md`).
+Tooling derives the parent effort **#N** from that form, so `gc` protects a live sub the same way
+it protects any branch whose issue is still open. One trailing letter only — `16a04` or `1604a4`
+is not an issue number and gets no protection. (The parser honors the suffix for any kind, not
+just `sub` — it errs toward protection rather than risk deleting a misnamed live branch.)
+
+### Hotfix branches (created by `cckit hotfix`, not by hand)
+
+`cckit hotfix <pr|sha> [--base <branch>]` cherry-picks one merged change onto the release branch and
+names its branch after the **source PR**, not an issue — a cherry-pick has no issue of its own:
+
+| Pattern | When | `N` |
+| --- | --- | --- |
+| `fix/<N>-hotfix-<base>` | the source is a PR, or a commit whose subject names one | the **source PR's** number |
+| `fix/hotfix-<sha7>-<base>` | the source commit names no PR | none |
+
+`<base>` is the target branch, lowercased with every non-alphanumeric run turned into `-`
+(`release/1.x` → `release-1-x`), so the same PR can be carried to two release branches. `N` parses
+as an issue number, and a merged PR reads as closed, so `gc` treats the branch like any other whose
+issue is closed: prunable once its own PR merges. Do not run `cckit pr` in a hotfix worktree — it
+would read the source PR number as the issue to close.
+
+### Light-task branches (created by `cckit task start`, not by hand)
+
+A light task is work tracked in the project's task list, with no GitHub issue. `cckit task start
+<id>` cuts `light/<id>-<slug>`. `<id>` starts with a letter (`t3f9a`), so the branch never parses as
+an issue number; `gc` asks the task source and keeps the branch until the task is done on the base
+branch. `light/share-<timestamp>` is the branch `cckit task share` opens its PR from. Do not run
+`cckit pr` in a light worktree: `cckit task finish` opens the PR.
+
+### Closed set of kinds
+
+| Kind       | For                                                | Typical risk |
+| ---------- | -------------------------------------------------- | ------------ |
+| `feat`     | New user-facing feature                            | med          |
+| `fix`      | Bug fix                                            | low–med      |
+| `task`     | Concrete chunk of work (no feature/bug label fits) | low–med      |
+| `chore`    | Tooling, deps, config, housekeeping                | low–med      |
+| `security` | Vulnerability fix or hardening                     | **high**     |
+| `scaffold` | Repo/infra scaffolding                             | med          |
+| `ci`       | CI/CD, workflows, automation                       | med          |
+| `adr`      | Architecture Decision Record                       | low          |
+| `spike`    | Time-boxed research (may be thrown away)           | low          |
+| `plan`     | Plan/report deliverable                            | low          |
+
+**Content kinds are labels, never branch prefixes.** `post`, `campaign`, `brand` and `research`
+(`KIT_CONTENT_KINDS`, `scripts/lib/kinds.sh`) are `kind:` values for content work. `cckit start` maps
+each onto the set above — `kind:post` and `kind:brand` → `task/`, `kind:campaign` → `plan/`,
+`kind:research` → `spike/` — so the set `gc` and the hygiene hook parse does not grow. A PR opened
+from one is titled `docs:`.
+
+### Bot branches (do not create by hand)
+
+| Pattern    | Who                  | Notes                                                        |
+| ---------- | -------------------- | ------------------------------------------------------------ |
+| `agent/*`  | Auto-Dev CI agent    | Label an issue `agent:auto` → it branches + opens a PR. Never merges. |
+| `claude/*` | Claude GitHub Action | Created when an issue/PR mentions `@claude`.                 |
+
+## Merge order
+
+The integration branch is decided by, in priority:
+
+1. **Declared dependencies first.** If PR B needs PR A, put `Depends on #A` in B's body. Land A before B.
+2. **`risk:low` before `risk:high`.** Land cheap, safe, reviewed PRs first to shrink the conflict surface.
+3. **Lockfile-touching PRs last, one at a time** (see below).
+4. **Smaller before larger.** Merging the moving base into a big diff is cleaner than the reverse.
+
+**Effort relations & session-fit.** At the **effort** level (above PRs), cross-effort dependencies
+are declared as a native GitHub `blocked_by` edge + a `## Relations` line (the board-visible chain) —
+the analogue of the PR-level `Depends on #N` above. A `[Flow]` title tag + `flow:<flow>` label group
+an effort's thread, and a `ctx:*` label drives `kit effort plan`'s session batching. Full spec:
+`rules/effort-model.md` § *Title rule, flow tags, relations, session-fit*.
+
+## The lockfile rule
+
+Lockfiles (`pnpm-lock.yaml`, `package-lock.json`, …) and manifest config conflict on almost every parallel merge. So:
+
+- **Merge at most one dependency-changing PR at a time**, then bring each of the others onto the
+  base with `git merge origin/<base>`: never a rebase, never a force push.
+- On a lockfile conflict: take the **base** branch's lockfile, then regenerate (`pnpm install` / `npm install`). Never hand-merge lockfile hunks.
+- Keep a single block per config key (e.g. one `overrides:` in `pnpm-workspace.yaml`). A duplicate key is invalid YAML and breaks CI — a real, recurring incident.
+
+## Parallel work — one worktree per agent (hard rule)
+
+**Two agents in the same git checkout corrupt each other.** The working tree, index, and `HEAD` are a single unguarded shared resource: one agent's `mv`/`add`/`stage` is silently clobbered by another's `reset`/`checkout`/`stash`/`rebase`. Git has no locking for this.
+
+- **One agent = one git worktree** (or a separate clone). Never two agents in the same directory.
+- **`orchestrate` enforces this with a lease, not just prose.** Git refuses one branch in two
+  worktrees; it does not stop two agent processes from driving the branch cckit handed them. Every
+  branch in a wave is claimed before any pane starts (`scripts/lib/branch-owner.sh`), a branch a
+  live writer already owns refuses the launch, and the wave's other claims are released. A lease is
+  reclaimed only on positive evidence — its worktree is gone, or its process died on the host that
+  recorded it — never on a process check against another host.
+- **`start` enforces it too, with a session claim.** `orchestrate`'s lease covers a wave; a second
+  session running `cckit start <issue>` by hand is outside it. `wt_start` records one claim per
+  issue under `<git-common-dir>/kit-sessions/` (`scripts/lib/session-registry.sh`) and refuses a
+  start while another live session holds it — before any fetch, branch or worktree. `--force` /
+  `KIT_FORCE=1` starts anyway; a claim whose pid is dead is reaped; `cckit claims` lists the live
+  ones. A board Status of In Progress or In Review only warns.
+- Prefer giving local sub-agents their own worktree.
+- Remote CI agents (Auto-Dev) are isolated per runner — favor them for parallel fixes.
+- Before editing shared files, check whether another agent is active.
+- One PR per issue. No monster PRs (a `size:XL` label is a smell — split it).
+
+## Optional: PR automation labels
+
+If the project adopts the kit's PR-automation workflows, these labels are applied automatically:
+
+| Label group | Applied by   | Meaning                                                  |
+| ----------- | ------------ | -------------------------------------------------------- |
+| `size:*`    | pr-labeler   | XS/S/M/L/XL by changed lines                             |
+| `risk:*`    | pr-labeler   | low/med/high by diff (sensitive paths, deps, size)       |
+| `blocked`   | pr-deps      | has an open `Depends on #N`                              |
+| `hold`      | human        | opt-out — never auto-merge even if it qualifies          |
+
+**GitHub gotcha:** `pull_request_target` / `workflow_run` / label-event workflows are read from the **default branch only**. If your automation lives on a non-default integration branch, trigger on `pull_request` (read from the PR base) instead — otherwise it silently never fires.
+
+## Branch lifecycle & cleanup
+
+One branch = one issue = one PR = **deleted on merge**. A branch is a short-lived container, not a place work lives.
+
+- **No long-lived uncommitted work.** Don't let a working tree sit dirty across sessions. Commit + PR, or discard. A branch sitting many commits behind the base with uncommitted work can silently revert merged work on a bad rebase.
+- **Never work directly on the base branch (`main`/`develop`).** The `guard-base-branch-commit.sh` hook blocks commits there; start every change with `/kit-task-start <issue>` (it branches from a *fresh* base).
+- **Delete on merge.** `/kit-task-pr-merge` removes the worktree and deletes the local + remote branch automatically. Never leave a merged branch or its worktree lingering.
+- **One worktree per branch; remove it when its PR merges.** Parallel agents must use worktrees (never share a checkout).
+- **Sweep on demand.** `/kit-task-gc` prunes merged branches + worktrees, surfaces orphan/unpushed commits and stale stashes, and flags issues whose PR merged but stayed open. Dry-run + confirm.
+- The **SessionStart hygiene hook** (`.claude/hooks/repo-hygiene.sh`) surfaces all of the above at the start of every session so it never accumulates silently.
+
+## Leverage GitHub automations (the enforced layer)
+
+Local hooks + skills are **fast feedback**; the **durable, everyone-applies enforcement** belongs on GitHub. Move guardrails there as they mature — they then enforce for humans, CI agents (Auto-Dev), and the Claude Action alike, regardless of anyone's local setup.
+
+- **Do first (1 toggle):** repo Settings → **"Automatically delete head branches"** — GitHub then deletes each remote branch when its PR merges.
+- **Branch protection** on the base branch: require PR, required CI checks, linear history, no direct pushes.
+- **Stale-branch / stale-PR Action** (scheduled) to flag/close abandoned branches + PRs.
+- **Scheduled sweep** that flags "PR merged but issue still open" and "branch merged but not deleted".
+- Extend any adopted `pr-labeler` / `pr-deps` / `pr-automerge` workflows as the enforcement surface.
+
+Principle: keep only the local concerns (worktrees, stale base, dirty tree) in hooks.

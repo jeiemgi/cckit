@@ -1,0 +1,4 @@
+# layout-fence.baseline — tracked-file counts that may not grow (lib/core/layout-fence.sh).
+# Lower a number in the same change that moves files out; never raise one.
+scripts-top 33
+scripts-lib 32

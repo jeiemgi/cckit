@@ -1,7 +1,7 @@
 # ontology — the words cckit uses, one file each
 
 `ontology/terms/<Term>.json` holds one term: a word the CLI, the skills and the rules use with
-one meaning. `scripts/terms-check.sh` reads every file and `bash scripts/check.sh` runs it in
+one meaning. `lib/core/terms-check.sh` reads every file and `bash lib/core/check.sh` runs it in
 warn mode (it prints, it never fails the gate).
 
 Terms are JSON, not YAML: cckit's gate is bash + `jq` and installs no YAML parser, and a format
@@ -30,23 +30,23 @@ No other field is allowed.
 ## Adding a term
 
 1. Write `ontology/terms/<Term>.json` with the seven fields. Copy an existing file for the shape.
-2. Run `bash scripts/terms-check.sh`. It names the file and the field when one is wrong.
+2. Run `bash lib/core/terms-check.sh`. It names the file and the field when one is wrong.
 3. Name the term in the skills that serve it (`terms:` in the skill's frontmatter) and in
-   `skills/routing.yaml`.
+   `kit/skills/routing.yaml`.
 
 ## What the check reads
 
-`scripts/terms-check.sh` reads four things and prints one `x <where>: <reason>` line per defect:
+`lib/core/terms-check.sh` reads four things and prints one `x <where>: <reason>` line per defect:
 the term files; every `home` against `bin/cckit` (the first word of `cli`), `skills/` or
-`.claude/skills/` and the rule path; `skills/routing.yaml` (every skill routed, every entry naming
+`.claude/skills/` and the rule path; `kit/skills/routing.yaml` (every skill routed, every entry naming
 a real skill and a real term or `none`, each skill's `terms:` line equal to its routes); and the
 "Which skill does what" table in `AGENTS.md`, one row per skill with the same tasks and terms.
-`bash scripts/check.sh` runs it in warn mode. `scripts/terms-check-test.sh` is its test.
+`bash lib/core/check.sh` runs it in warn mode. `lib/core/terms-check-test.sh` is its test.
 
 ## Reading them
 
 ```bash
-bash scripts/terms-check.sh            # validate every term; print the counts
-bash scripts/terms-check.sh --json      # the same counts as one JSON object
+bash lib/core/terms-check.sh            # validate every term; print the counts
+bash lib/core/terms-check.sh --json      # the same counts as one JSON object
 jq -r '.definition' ontology/terms/Effort.json
 ```

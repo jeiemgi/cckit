@@ -1,6 +1,6 @@
 ---
 title: Integrations
-description: The optional third-party tools cckit can switch on, install and re-check — MemPalace, mlx-lm, Graft, Lavish and three design skills — and what each step asks of you.
+description: The optional third-party tools cckit can switch on, install and re-check — mlx-lm, Graft, Lavish and three design skills — and what each step asks of you.
 ---
 
 import { Steps, Aside } from '@astrojs/starlight/components';
@@ -22,7 +22,6 @@ row, installs nothing and changes no exit code, and `cckit add lavish --set enab
 
 | `cckit add …` | What it gives you | Config key | Offered where | Made by |
 | --- | --- | --- | --- | --- |
-| `mempalace` | Persistent per-project memory: sessions wake up with context and file their work back. | `memory.enabled` | any repo, any machine | [MemPalace](https://github.com/MemPalace/mempalace) |
 | `mlx-lm` | A local model runtime: digest, summarize and classify run on this Mac through `mlx_lm.server`. | `local.enabled` | Apple silicon only (`Darwin` + `arm64`) | [Apple, ml-explore](https://github.com/ml-explore/mlx-lm) |
 | `graft` | Code-graph retrieval: agents ask an index where code lives and who calls a symbol. | `codeGraph.provider` = `graft` | a repo with at least one file in a language Graft indexes | [NanoNets / Trail](https://github.com/trailhq/Trail-Code) |
 | `impeccable` | Design direction for a page: plan it, set type, layout and colour, flag the look of a generated page. Step 1 of [`page-design`](/skills/#page-design). | `designDirection.provider` = `impeccable` | any repo; installed for Claude Code | [pbakaus](https://github.com/pbakaus/impeccable) |
@@ -61,7 +60,7 @@ and says which ones do not apply here.
    is a skip row instead: not installed even with `--fix`, and not a failure.
 
 3. **Finish the step the doctor names.** After an install the doctor prints the one step it leaves
-   to you: `mempalace mcp` for MemPalace, `graft init --agents claude --no-statusline --no-global`
+   to you: `graft init --agents claude --no-statusline --no-global`
    for Graft. mlx-lm and Lavish have none. For each of the three design skills: reload the agent
    session so it lists the skill, and commit the files the install wrote.
 
@@ -77,7 +76,7 @@ gitignored and shared by every worktree of the repo.
 
 | Fact | Detail |
 | --- | --- |
-| What writes the line | `cckit doctor --fix`, a yes at the doctor's terminal prompt, or `bash scripts/lib/integration-install.sh --consent <id>`. |
+| What writes the line | `cckit doctor --fix`, a yes at the doctor's terminal prompt, or `bash lib/core/integration-install.sh --consent <id>`. |
 | What it permits | The shared runner installing and wiring that one integration in that one repo. |
 | What it does not permit | Any other integration, any other repo, or any other change cckit makes. |
 | Without the line | The runner reports `no-consent` and runs nothing. `KIT_ASSUME_YES` is not consent. |
@@ -88,7 +87,7 @@ repo: see [the permission gate](/config-and-permissions/#the-permission-gate-ask
 
 ## How an install runs
 
-`scripts/lib/integration-install.sh` is the one runner. For a missing tool with consent recorded,
+`lib/core/integration-install.sh` is the one runner. For a missing tool with consent recorded,
 it tries the descriptor's install candidates in the order written and skips one whose package
 manager is not on `PATH`. The first candidate that exits 0 **and** leaves the tool detectable wins;
 later candidates never run. If the tool is already detectable, nothing runs, so a second
@@ -96,7 +95,6 @@ later candidates never run. If the tool is already detectable, nothing runs, so 
 
 | Integration | Candidates, in order | If no manager is present |
 | --- | --- | --- |
-| `mempalace` | `pipx install mempalace`, then `uv tool install mempalace` | `brew install pipx` |
 | `mlx-lm` | `uv tool install mlx-lm`, then `pipx install mlx-lm` | `brew install uv` |
 | `graft` | `npm install -g @nanonets/graft`, then `pnpm add -g @nanonets/graft` | nothing: the install fails |
 | `impeccable` | `npx -y impeccable install --providers=claude --scope=project` | nothing: the install fails |
@@ -121,17 +119,6 @@ step that broke. Details: [the monthly recipe check](/config-and-permissions/#th
 
 cckit wrote none of these tools. Each descriptor carries an `attribution` block, and the validator
 refuses a descriptor without one.
-
-### MemPalace
-
-Persistent memory, scoped to one wing per project. Local, no API key. Setup and what the hooks do:
-[Set up memory](/memory/).
-
-<Aside type="note" title="Not affiliated">
-MemPalace is independent open-source software by the [MemPalace](https://github.com/MemPalace/mempalace)
-project. cckit is not a maintainer of it and has no affiliation with or endorsement from its
-authors. Send MemPalace bugs to [its issue tracker](https://github.com/MemPalace/mempalace/issues).
-</Aside>
 
 ### mlx-lm
 
@@ -225,6 +212,6 @@ affiliated with any of them.
 ## Add a tool of your own
 
 Write `integrations/<id>.json` against `integrations/integration.schema.json`, then run
-`bash scripts/lib/integrations.sh --validate`: it prints one `<id>: <field>: <problem>` line per
+`bash lib/core/integrations.sh --validate`: it prints one `<id>: <field>: <problem>` line per
 problem. The field list is in [Config & permissions → Integrations](/config-and-permissions/#integrations).
 The steps, with a worked descriptor: [Add your own tool as an integration](/development/add-your-own-integration/).

@@ -45,8 +45,8 @@ if [ "${BENCH_SKIP_KNOWLEDGE_LINT:-0}" = "1" ]; then
   note "  (knowledge-lint skipped — BENCH_SKIP_KNOWLEDGE_LINT=1)"
 elif [ -f "$PWD/scripts/knowledge-lint.sh" ]; then
   bash "$PWD/scripts/knowledge-lint.sh" || { note "x knowledge-lint failed"; fail=1; }
-elif [ -f "$SCRIPT_DIR/../knowledge-lint.sh" ]; then
-  bash "$SCRIPT_DIR/../knowledge-lint.sh" || { note "x knowledge-lint failed"; fail=1; }
+elif [ -f "$SCRIPT_DIR/../../lib/core/knowledge-lint.sh" ]; then
+  bash "$SCRIPT_DIR/../../lib/core/knowledge-lint.sh" || { note "x knowledge-lint failed"; fail=1; }
 else
   note "  (knowledge-lint absent — skipping)"
 fi

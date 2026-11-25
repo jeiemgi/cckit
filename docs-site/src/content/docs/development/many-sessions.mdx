@@ -73,8 +73,8 @@ Do not fix it from a session that did not put it there — another session may b
 
 The rest of the page is the detail behind each mechanism, for the day something refuses to start.
 The session claim is implemented in `scripts/lib/session-registry.sh`, the branch lease in
-`scripts/lib/branch-owner.sh`, the shared state directory in `scripts/lib/kit-state.sh`, and the
-source install's symlink in `scripts/install.sh`.
+`lib/core/branch-owner.sh`, the shared state directory in `lib/core/kit-state.sh`, and the
+source install's symlink in `lib/verbs/install.sh`.
 
 ### What every session shares
 
@@ -163,8 +163,8 @@ their last step:
 
 | Verb | What it runs in the primary checkout | Source |
 | --- | --- | --- |
-| `cckit merge` | `git checkout <base>` then `git pull --ff-only origin <base>` | `scripts/lib/kit-task-ops.sh:424-425` |
-| `cckit effort close` | `git checkout <base>` then `git pull origin <base>` | `scripts/lib/effort-ops.sh:1025-1026` |
+| `cckit merge` | `git checkout <base>` then `git pull --ff-only origin <base>` | `lib/verbs/kit-task-ops.sh:424-425` |
+| `cckit effort close` | `git checkout <base>` then `git pull origin <base>` | `lib/verbs/effort-ops.sh:1025-1026` |
 
 They are the one sanctioned mover. With the primary checkout already on the base and clean, the
 checkout switches nothing and the pull is a fast-forward, so no session notices. Both lines end in

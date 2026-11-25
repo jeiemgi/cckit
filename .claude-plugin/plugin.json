@@ -18,5 +18,7 @@
     "orchestration",
     "claude-code",
     "cli"
-  ]
+  ],
+  "skills": "./kit/skills/",
+  "commands": "./kit/commands/"
 }

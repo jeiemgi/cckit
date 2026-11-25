@@ -38,7 +38,7 @@ The core is pure bash plus the standard toolchain (`git`, `gh`, `jq`, `tmux`). I
 | `scripts/*.sh` | The runnable ops (publish, migrate, doctor, digest, ...) |
 | `cckit.config.json` | The only source of repo / owner / base-branch — nothing is hardcoded |
 
-The contract the core exposes to agents lives in [`AGENTS.md`](https://github.com/jeiemgi/cckit/blob/main/AGENTS.md): every verb, its arguments, and its `--json` output. An agent that can run a shell and parse the output can drive the whole lifecycle through this contract alone.
+The contract the core exposes to agents starts at [`AGENTS.md`](https://github.com/jeiemgi/cckit/blob/main/AGENTS.md), an index: the ground rules, the skill table, and where each verb's arguments and `--json` output are described (`lib/verbs/PROMPTS.md`). An agent that can run a shell and parse the output can drive the whole lifecycle through this contract alone.
 
 ## Adapter one — Claude Code
 
@@ -74,15 +74,15 @@ install writes — is in the
 - **One role source.** A specialist is written once, in `templates/agents/<role>.md`. Claude Code
   gets that file as `AGENT.md`. Codex gets the same rendered role translated to a custom-agent
   TOML file with `name`, `description` (the role's `description` plus `when_to_use`) and
-  `developer_instructions` (the role body). `scripts/lib/agent-def.sh` is the one translation, and
-  `scripts/init-upgrade-test.sh` asserts the two definitions carry the same description and body.
+  `developer_instructions` (the role body). `lib/core/agent-def.sh` is the one translation, and
+  `lib/verbs/init-upgrade-test.sh` asserts the two definitions carry the same description and body.
 - **Stored selection.** The config's `adapters` array records the choice. `cckit init --upgrade`
   reads it and never drops an adapter; `--upgrade --adapter codex` adds one, and the adapter already
   installed keeps its files byte for byte. Config and manifest stay where the first install put them.
 - **Ownership.** Every adapter file init writes is recorded in the manifest with its hash. An edited
-  file reads as modified and is preserved by an upgrade and kept by the uninstall script, `scripts/kit-remove.sh`.
+  file reads as modified and is preserved by an upgrade and kept by the uninstall script, `lib/verbs/kit-remove.sh`.
 - **Portable Codex output.** A Codex-only config carries no absolute path, and no generated file
-  under `.agents/` or `AGENTS.md` references `CLAUDE_PLUGIN_ROOT`. `scripts/init-upgrade-test.sh`
+  under `.agents/` or `AGENTS.md` references `CLAUDE_PLUGIN_ROOT`. `lib/verbs/init-upgrade-test.sh`
   asserts both on the `minimal` profile.
 - **Doctor.** `cckit doctor` reports the CLI of each selected adapter present or absent;
   `cckit doctor --agents` prints only that, offline, and exits 1 when one is absent.
@@ -91,8 +91,7 @@ Limits of the Codex adapter today:
 
 - The guards and session mail are installed and fixture-tested against the event JSON Codex
   documents, but no live Codex session has fired them, and Codex runs a project hook only after you
-  trust it (`/hooks`). Until that is verified, treat a Codex guard as unproven. No memory hook is
-  installed: those read Claude Code transcripts.
+  trust it (`/hooks`). Until that is verified, treat a Codex guard as unproven.
 - A Codex agent file is generated and parses as TOML, but no live Codex session has spawned one.
   Three things do not translate, and each is written into the TOML as a comment or a note instead
   of being dropped: the Claude `tools:` allowlist (Codex has no per-agent tool list — its sandbox
@@ -102,9 +101,8 @@ Limits of the Codex adapter today:
   Codex documentation; whether Codex accepts a hyphen is not verified.
 - `.agents/rules/` is a cckit location, not one Codex loads on its own. `AGENTS.md` lists each rule
   file so the agent reads the one that applies.
-- Shared rules still describe Claude-only mechanics in prose — `mempalace.md` names the hooks in
-  `.claude/settings.local.json`, `branch-naming.md` the SessionStart hygiene hook, `design-routing.md`
-  the Designer agent. Those passages describe things a Codex-only project does not have.
+- Shared rules still describe Claude-only mechanics in prose — `branch-naming.md` the SessionStart
+  hygiene hook, `design-routing.md` the Designer agent. Those passages describe things a Codex-only project does not have.
 - Whether a fresh Codex session discovers the installed skills is not verified here; that is the live
   run in [#261](https://github.com/jeiemgi/cckit/issues/261). `.agents/skills` is the directory name
   present in the `codex-cli 0.154.0` binary.

@@ -6,7 +6,7 @@ set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/../.." && pwd)"
 CP="$HERE/checkpoint.sh"
-PUBLISH="$ROOT/scripts/publish.sh"
+PUBLISH="$ROOT/lib/verbs/publish.sh"
 
 fail=0
 t() { if [ "$2" != "$3" ]; then echo "FAIL: $1 -> got '[$2]' want '[$3]'"; fail=1; else echo "ok: $1"; fi; }

@@ -77,7 +77,7 @@ covers the questions it asks.
 This is the step for a repository that got its cckit files by hand: a copied `.claude/`, an old
 init, skills a teammate pasted in. The files are present, but the **manifest**, cckit's record of
 which files it owns, does not know them, so an upgrade (`cckit init --upgrade`) and the uninstall
-script (`scripts/kit-remove.sh`) will not touch them. `adopt` records each at its current hash. It
+script (`lib/verbs/kit-remove.sh`) will not touch them. `adopt` records each at its current hash. It
 never claims your `knowledge/`, plans or app code.
 
 ### 4 · `migrate`: fix an old layout
@@ -117,7 +117,7 @@ never claims your `knowledge/`, plans or app code.
 
 <Aside type="note" title="What is the manifest?">
 The manifest is cckit's list of which files in your repository it owns and manages. Files outside
-it (your app code, your `knowledge/`, your plans) are never touched by an upgrade or by the uninstall script, `scripts/kit-remove.sh`, which
+it (your app code, your `knowledge/`, your plans) are never touched by an upgrade or by the uninstall script, `lib/verbs/kit-remove.sh`, which
 deletes only what the manifest lists.
 `adopt` is how you add cckit files that are already present to that list.
 </Aside>

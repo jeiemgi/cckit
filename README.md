@@ -70,7 +70,7 @@ npm install -g @jeiemgi/cckit
 
 ```bash
 git clone https://github.com/jeiemgi/cckit.git
-cd cckit && ./scripts/install.sh    # symlinks bin/cckit onto your PATH
+cd cckit && ./lib/verbs/install.sh    # symlinks bin/cckit onto your PATH
 ```
 
 ### Platforms & requirements
@@ -174,15 +174,15 @@ every question has one recommended answer.
 | empty, or not there yet | asks whether this is a new project, then what it starts from |
 | your home directory, `~/Desktop`, `~/Documents`, `~/Downloads`, `/` | never scaffolds there. Asks whether this is a new project and which folder it gets; with no terminal and no answers file it exits 2 |
 
-**2. A new project starts from a recipe.** A recipe is a JSON file in `recipes/`; adding a file adds
+**2. A new project starts from a recipe.** A recipe is a JSON file in `kit/recipes/`; adding a file adds
 a recipe. One ships: `nextjs-shadcn` (Next.js, shadcn/ui, pnpm). A recipe's `config` object is
 merged into the project config: `nextjs-shadcn` sets `tasks.check` to `pnpm build && pnpm lint`,
 the gate `cckit task run` uses, and `tasks.design` to `true`, which installs the `page-design`
 skill and makes every task of the project a [page task](#pages-are-built-with-named-design-skills). init then asks whether the project
-needs a database and offers the options in `databases/`. One ships: `supabase`. It adds
+needs a database and offers the options in `kit/databases/`. One ships: `supabase`. It adds
 `@supabase/supabase-js` and `@supabase/ssr`, `lib/supabase/client.ts` and `lib/supabase/server.ts`,
 and the two variable names in `.env.local` with placeholders. A guide page
-(`databases/supabase/guide.html`) shows where to create the Supabase project and where each value
+(`kit/databases/supabase/guide.html`) shows where to create the Supabase project and where each value
 is; init opens it with `npx -y lavish-axi` when a browser is available and prints the same steps
 otherwise. You type the values into `.env.local` yourself: cckit never prints or reads them back,
 and git ignores the file.
@@ -404,7 +404,7 @@ cckit task run <id> --check "pnpm build"       # start + ONE headless agent roun
   branch = `doing`, that branch saying done = `review`, the base branch saying done = `done`.
 - **One file per task** so two branches that each add a task merge without a conflict.
 - **`cckit gc` keeps a live task's branch**: `PROTECTED: light task <id> still OPEN`.
-- **Sources.** Tasks are read through one interface (`scripts/lib/task-source.sh`). The `file`
+- **Sources.** Tasks are read through one interface (`lib/core/task-source.sh`). The `file`
   source ships; another store plugs in as `scripts/lib/task-source-<name>.sh` plus
   `tasks.source: "<name>"`.
 - **Delegating a task.** `cckit task run <id>` does `start`, one `cckit autopilot run` objective
@@ -572,7 +572,7 @@ and `orchestrate` prints a line naming the override and the config value it repl
 
 **Night mode** runs approved waves unattended under a token budget the Workflow runtime enforces.
 The owner posts one `<!-- night-grant -->` comment on the plan parent — budget, waves, waivers — and
-`/kit-autopilot` reads it with `scripts/night-grant.sh`, then launches `scripts/night-run.mjs`. Only
+`/kit-autopilot` reads it with `lib/verbs/night-grant.sh`, then launches `lib/verbs/night-run.mjs`. Only
 a grant written by the repository owner (or a login in `night.grantors`) counts. The run is no wider
 than `effort.wipLimit`, stops at the first wave that did not fully merge, and finishes on the gate.
 See [Night mode](https://cckit.dev/config-and-permissions/#night-mode).
@@ -643,13 +643,13 @@ cckit orchestrate --results --json # each worker's collected result as JSON
 
 Human output renders as markdown — rich via `glow` in a terminal, native in the Claude Code
 transcript, verbatim when piped. Every human-facing verb (`status`, `status --board`, `plan`, `next`) goes
-through one renderer (`cckit_render`, `scripts/lib/render.sh`), so board tables, wave plans, and the
+through one renderer (`cckit_render`, `lib/core/render.sh`), so board tables, wave plans, and the
 status dashboard read the same in all three and print no escape codes into a pipe (`cckit agent render` exposes
 it for any script).
 
 ### The forge, and cloud sessions
 
-Every GitHub call is REST over `curl` with a token, through one port (`scripts/lib/forge.sh`;
+Every GitHub call is REST over `curl` with a token, through one port (`lib/forge/forge.sh`;
 `forge.provider` in the config, `github` when a token resolves from `GH_TOKEN`, `GITHUB_TOKEN` or a
 signed-in `gh`, else `none`). No verb runs a `gh` subcommand; `gh` is the optional way to sign in.
 With no forge the git core stands alone: `start`, `pr` (commit + push, the compare page printed),
@@ -679,7 +679,7 @@ through its own lifecycle: an issue, an isolated worktree, a pull request, a mer
 public: [every issue closed in the repo →](https://github.com/jeiemgi/cckit/issues?q=is%3Aissue%20state%3Aclosed)
 — including [the effort that produced this README](https://github.com/jeiemgi/cckit/issues/160).
 
-cckit also runs on the rules and skills it ships. `templates/` is what `cckit init` writes into a
+cckit also runs on the rules and skills it ships. `kit/templates/` is what `cckit init` writes into a
 project; `.claude/skills/` and `.claude/rules/` here are the subset cckit applies to its own work —
 `concrete` (the anti-slop catalogue every commit and PR body goes through) and
 `karpathy-guidelines`, plus the rules that govern this repo's branches, efforts, PR titles,
@@ -688,7 +688,7 @@ approved plan is executed without re-confirming each merge, and a close op — n
 closes the issue) and merge safety (`merge-safety.md`: bring a branch onto the current base before
 merging, ship a coupled chain as one PR, re-run the gate on the integration branch) and authoring (`authoring.md`: docs and README change with the behaviour, a pasted prompt carries no issue number, a summary names the work and drops machine flags) and review pages (`review-pages.md`: a plan, a decision or a grilling round opens as a page, terminal output where there is no browser, the answer written back — see [Review pages](https://cckit.dev/project-management/plan-pages/)) and the shared checkout (`shared-checkout.md`: the primary checkout is never moved by hand, all work happens in a worktree, a freshly merged verb is called from a current worktree — see [Multi-session safety](https://cckit.dev/development/many-sessions/) and the [install & update matrix](https://cckit.dev/install-matrix/)). Every shipped rule is listed in [Rules cckit ships](https://cckit.dev/rules/) — `gate-and-review.md` (the gate blocks the push and its output goes on the PR; every AI-reviewer finding is fixed or rebutted before the merge) ships to projects and is skipped here.
 It is a subset on purpose: several templates target stacks cckit does not have.
-`scripts/self-install-test.sh` holds the manifest, the reason for every skip, and the assertion that
+`lib/core/self-install-test.sh` holds the manifest, the reason for every skip, and the assertion that
 the installed copies have not drifted from their templates.
 
 ## Documentation
@@ -720,39 +720,39 @@ cckit/
                          #   each declares `# errors:` — see CONTRIBUTING.md
   scripts/lib/forge*.sh  # the forge port: forge.sh selects github (REST over curl) or none (refuses,
                          #   naming the verb); forge.provider in the config, CCKIT_FORGE for one command
-  scripts/forge-report.sh # where cckit needs a forge (gh) and where git alone: per file, per verb,
+  lib/core/forge-report.sh # where cckit needs a forge (gh) and where git alone: per file, per verb,
                          #   and the ratchet (files outside the forge layer that call gh)
-  scripts/forge-fence.sh  # the gate step that fails when a file outside the layer calls gh or the API
+  lib/core/forge-fence.sh  # the gate step that fails when a file outside the layer calls gh or the API
   scripts/benchmark/     # doc-retrieval benchmark harness (cckit bench)
   benchmarks/runs/       # recorded benchmark checkpoints, one file per release (format: its README.md)
   .claude-plugin/        # the Claude Code plugin manifest
-  skills/ commands/      # Claude Code skills + slash commands; skills/routing.yaml routes a task to a
+  skills/ commands/      # Claude Code skills + slash commands; kit/skills/routing.yaml routes a task to a
                          #   skill and the term it serves (the same table: AGENTS.md)
   ontology/              # the terms: one JSON file per word the CLI, skills and rules share
-                         #   (format: ontology/README.md; checked by scripts/terms-check.sh)
-  profiles/ templates/   # init profiles + scaffold templates
-  routines/ modules/     # scheduled routines + optional modules
-  integrations/          # one JSON descriptor per optional third-party tool + its schema
-                         #   (mempalace.json, mlx-lm.json, graft.json, lavish.json — the last is on
+                         #   (format: ontology/README.md; checked by lib/core/terms-check.sh)
+  kit/profiles/ kit/templates/   # init profiles + scaffold templates
+  kit/routines/ kit/modules/     # scheduled routines + optional modules
+  kit/integrations/          # one JSON descriptor per optional third-party tool + its schema
+                         #   (mlx-lm.json, graft.json, lavish.json — the last is on
                          #   by default and never installed unasked; impeccable.json,
                          #   emil-design-eng.json, web-design-guidelines.json — the design skills
                          #   the page-design skill coordinates). `cckit doctor` installs each one the
-                         #   config switches on through scripts/lib/integration-install.sh, only
+                         #   config switches on through lib/core/integration-install.sh, only
                          #   with consent recorded in .cckit/consent (`--fix`, or yes at the prompt)
-                         #   scripts/integrations-check.sh installs each one for real and names the
+                         #   lib/verbs/integrations-check.sh installs each one for real and names the
                          #   step that broke; .github/workflows/integrations-check.yml runs it on
                          #   the 1st of every month and opens an issue on a failure
                          #   user-facing page: https://cckit.dev/integrations/
   docs-site/             # documentation source — Astro/Starlight (deployed to cckit.dev)
-  .claude/skills/        # the subset of templates/skills/ cckit installs for ITSELF
-  .claude/rules/         # the subset of templates/rules/ cckit installs for ITSELF
-                         #   the manifest + every skip reason: scripts/self-install-test.sh
+  .claude/skills/        # the subset of kit/templates/skills/ cckit installs for ITSELF
+  .claude/rules/         # the subset of kit/templates/rules/ cckit installs for ITSELF
+                         #   the manifest + every skip reason: lib/core/self-install-test.sh
   cckit.config.json      # project configuration (no hardcoded org/repo)
 ```
 
-Every `skills:` entry in `templates/agents/*.md` has to resolve: `scripts/agent-skills-lint.sh` (a
-step of `bash scripts/check.sh`) fails on a name that is not under `skills/` or `templates/skills/`,
-not a `plugin:skill` reference, and not declared third-party in `scripts/agent-skills-external.txt`.
+Every `skills:` entry in `kit/templates/agents/*.md` has to resolve: `lib/core/agent-skills-lint.sh` (a
+step of `bash lib/core/check.sh`) fails on a name that is not under `skills/` or `kit/templates/skills/`,
+not a `plugin:skill` reference, and not declared third-party in `lib/core/agent-skills-external.txt`.
 See [Codified review gates](https://cckit.dev/review/gates/).
 
 `cckit init` also scaffolds `benchmarks/` — a per-project **documentation benchmark** that scores how
@@ -790,7 +790,7 @@ Using cckit in your project? Add a badge (optional, but appreciated):
 [![Built with cckit](https://img.shields.io/badge/built%20with-cckit-0A7E8C.svg)](https://github.com/jeiemgi/cckit)
 ```
 
-More variants (HTML, flat-square): [docs/badge.md](docs/badge.md).
+More variants (HTML, flat-square): [Built with cckit badge](https://cckit.dev/badge/).
 
 ## Contributing
 

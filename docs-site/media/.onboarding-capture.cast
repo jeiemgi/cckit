@@ -1,0 +1,4 @@
+{"version":3,"term":{"cols":80,"rows":24},"timestamp":1780564473,"command":"bash /tmp/onb-cmd.sh","env":{"SHELL":"/bin/zsh"}}
+[0.000, "o", "/skills/karpathy-guidelines/SKILL.md\r\n    scripts/ (kit-config.sh, gh-project.sh, setup-labels.sh, setup-milestones.sh, capture-project-ids.sh, task-sync.sh)\r\n\r\n  Onboarding would offer (opt-in): gh auth · gws (if you use Google Workspace)\r\n\r\nRe-run without --dry-run to write these files.\r\n```\r\n\u001b[?1006l\u001b[?1003l\u001b[?1002l\u001b[?1000l\u001b(B\u000f\u001b[>4m\u001b[<u\u001b[?1004l\u001b[?2031l\u001b[?2004l\u001b[?25h\u001b7\u001b[r\u001b8\u001b]0;\u0007"]
+[0.219, "o", "\u001b[?25h"]
+[0.007, "x", "0"]

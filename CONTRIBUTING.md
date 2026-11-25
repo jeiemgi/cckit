@@ -27,18 +27,18 @@ cckit pr <issue> "<summary>" # open the PR
   **`cckit pr` builds one for you** (derived from the issue's `kind:` label, `[Effort …]` prefix
   stripped); pass an already-conventional summary — `cckit pr <issue> "fix: guard the empty case"` —
   to set the type yourself. CI (`commitlint`) fails the PR until the title is valid; check one locally
-  with `scripts/lib/commitlint.sh "feat: your summary"`.
-- Run the local gate before opening a PR: `bash scripts/check.sh` (shell syntax, valid manifests,
+  with `lib/core/commitlint.sh "feat: your summary"`.
+- Run the local gate before opening a PR: `bash lib/core/check.sh` (shell syntax, valid manifests,
   the leak fence, the forge fence, the commitlint rules, the skill-listing and instruction-file budgets). A green gate is the bar.
 - **The leak fence.** cckit is public and is developed next to private repositories, so gate step 3
   fails on any tracked line that contains a private word: a product or client name, a person's name,
   a private path. The built-in word is always on; your own patterns live in `.cckit/leak-words`
   (local, gitignored, one extended regex per line) or in the `CCKIT_LEAK_WORDS` repository secret
   (CI, `|`-separated). Never commit the list: a public denylist publishes the words it hides. A hit
-  prints `file:line` only. `bash scripts/leak-fence-test.sh` is its selftest. Write a word end as
+  prints `file:line` only. `bash lib/core/leak-fence-test.sh` is its selftest. Write a word end as
   `([^[:alnum:]]|$)`, not `\b`: `\b` matches nothing in `git grep -E` on macOS.
-- The gate ends with `bash scripts/test.sh`, which runs every `*-test.sh` under `bin/` and
-  `scripts/`, several files at a time (the CPU count, capped at 8). `bash scripts/test.sh <pattern>`
+- The gate ends with `bash lib/core/test.sh`, which runs every `*-test.sh` under `bin/` and
+  `scripts/`, several files at a time (the CPU count, capped at 8). `bash lib/core/test.sh <pattern>`
   runs the files whose path matches; `-j <N>` or `TEST_JOBS=<N>` sets how many run at once,
   `--serial` runs one at a time and `--timings` lists wall seconds per file. A new test file keeps
   its fixtures under its own `mktemp -d` and binds no fixed port, because it runs beside others; if
@@ -50,13 +50,13 @@ cckit pr <issue> "<summary>" # open the PR
   at random under load (cckit issue 449: `printf: write error: Broken pipe`, then an assertion that
   read `no` for `yes`). Write `grep -q PAT <<<"$var"`; capture a command first
   (`out="$(cmd)"; grep -q PAT <<<"$out"`); use `sed -n 1p` for `head -1` and an `awk` rule without
-  `exit` for "first match". `scripts/review-lint.sh` fails the gate on a new `| grep -q` or
+  `exit` for "first match". `lib/core/review-lint.sh` fails the gate on a new `| grep -q` or
   `| head -N` under `bin/` or `scripts/` (rule `pipe-into-early-exit-reader`).
 - **A lock is taken with the shell, not with `mkdir`.** `( set -C; : > "$lock" ) 2>/dev/null` is an
   `O_EXCL` open. `mkdir "$lock"` is not exclusive everywhere: the `mkdir` of uutils coreutils
   0.10.0 (Ubuntu 26.04, GitHub's `ubuntu-latest`) exits 0 for every process that races to create
   the same directory. A test of a lock races the primitive itself — N processes, one attempt each,
-  exactly one winner — as `scripts/lib/worktree-ports-test.sh` section 7 does.
+  exactly one winner — as `lib/core/worktree-ports-test.sh` section 7 does.
 
 ## A rule declares when it loads
 
@@ -70,11 +70,11 @@ paths:
 ---
 ```
 
-`templates/rules/react-annotate.md` is the shipped example. A cross-cutting rule (branch naming, the
+`kit/templates/rules/react-annotate.md` is the shipped example. A cross-cutting rule (branch naming, the
 effort model) stays unscoped, and a behavioural routing rule must: scoped, it would not load until a
 matching file had already been read. A rule that outgrows 200 lines splits into a short rule plus a
-`knowledge/` doc it points at. `scripts/instruction-budget-lint.sh` is the gate — `--report` lists
-every file's cost; `scripts/instruction-budget-baseline.txt` grandfathers `effort-model.md` (209
+`knowledge/` doc it points at. `lib/core/instruction-budget-lint.sh` is the gate — `--report` lists
+every file's cost; `lib/core/instruction-budget-baseline.txt` grandfathers `effort-model.md` (209
 lines) and `naming-and-ids.md` (208), which may shrink but not grow.
 
 ## Durable prose goes through `concrete`
@@ -98,7 +98,7 @@ after the fact.
 
 ## cckit's own `.claude/`
 
-`templates/skills/` and `templates/rules/` are what `cckit init` writes into a **consuming**
+`kit/templates/skills/` and `kit/templates/rules/` are what `cckit init` writes into a **consuming**
 project. cckit is the kit, so it was never `cckit init`'d against itself — for its whole history
 those templates shipped to every consumer and applied to nothing here.
 
@@ -108,9 +108,9 @@ subset by decision, not by accident: `supabase-patterns` has no Supabase to patt
 `plan-output-format` mandates a plans dir cckit does not use (the parent issue is the plan), and so
 on. No agents are installed — `AGENTS.md` plus `cckit brief` is this repo's delegation contract.
 
-`scripts/self-install-test.sh` is the guard, and the manifest lives in it:
+`lib/core/self-install-test.sh` is the guard, and the manifest lives in it:
 
-- Every template under `templates/skills/` and `templates/rules/` must be listed as **installed** or
+- Every template under `kit/templates/skills/` and `kit/templates/rules/` must be listed as **installed** or
   **skipped with a reason**. A new template fails the test until someone decides — which is what
   stops the silent partial install from coming back.
 - Every installed file must still match its template: byte-identical, or byte-identical after
@@ -120,32 +120,32 @@ on. No agents are installed — `AGENTS.md` plus `cckit brief` is this repo's de
 
 Edit a template and the installed copy in the same commit, or the test fails.
 
-**A template must never hard-code a value the project can override.** `templates/rules/effort-model.md`
+**A template must never hard-code a value the project can override.** `kit/templates/rules/effort-model.md`
 named `main` as the branch efforts cut from and open their PR against; this repo integrates on
 `develop`, so the installed copy told agents to target a releases-only branch — and it passed the
 byte-identical check, because byte-identical to a wrong template is exactly the bug. The integration
 branch is `{{BASE_BRANCH}}` now, resolved by `init.sh` from `github.baseBranch` (falling back to
 `integrationBranch` / `flow` / the repo's GitHub default / `main`, the same precedence as
-`KIT_BASE_BRANCH` in `scripts/lib/kit-config.sh`) and written back into the generated config so the
-rendered rule and the resolver can never disagree. `scripts/self-install-test.sh` fails if either
+`KIT_BASE_BRANCH` in `lib/core/kit-config.sh`) and written back into the generated config so the
+rendered rule and the resolver can never disagree. `lib/core/self-install-test.sh` fails if either
 half regresses.
 
 ## Scope of changes
 
 - **bash CLI + lib** → `bin/cckit`, `scripts/lib/*.sh`. A new verb is a row in
-  `scripts/lib/verbs.tsv` (name, question, prompt, usage, needs) plus its `case` label in
-  `bin/cckit`; run `bash scripts/verbs-gen.sh` to refresh the CLI reference block.
-  `scripts/verbs-test.sh` fails when the dispatcher, the help, the catalog, the CLI reference,
-  `skills/routing.yaml` or `scripts/forge-report.sh` disagree with the table.
-  The top level only shrinks: `scripts/verbs-ratchet.sh` fails the gate when the table holds more
-  `verb` rows than `scripts/verbs.baseline`, so a new command is a subcommand of a verb that exists.
+  `lib/core/verbs.tsv` (name, question, prompt, usage, needs) plus its `case` label in
+  `bin/cckit`; run `bash lib/core/verbs-gen.sh` to refresh the CLI reference block.
+  `lib/core/verbs-test.sh` fails when the dispatcher, the help, the catalog, the CLI reference,
+  `kit/skills/routing.yaml` or `lib/core/forge-report.sh` disagree with the table.
+  The top level only shrinks: `lib/core/verbs-ratchet.sh` fails the gate when the table holds more
+  `verb` rows than `lib/core/verbs.baseline`, so a new command is a subcommand of a verb that exists.
   To rename a verb, change its row's name and add an `alias` row for the old name
   (`old<TAB>alias<TAB>new`, the other columns `-`): the old name keeps working and prints a one-line
   notice. To retire one, fold it under another verb and lower the baseline in the same change.
 - **Claude Code plugin** → `skills/`, `commands/`, `.claude-plugin/`.
 - **Docs** → `docs-site/` (published to [cckit.dev](https://cckit.dev)).
 - **What cckit installs for itself** → `.claude/skills/`, `.claude/rules/`, and the manifest in
-  `scripts/self-install-test.sh`.
+  `lib/core/self-install-test.sh`.
 
 ### Every lib file declares how it fails
 
@@ -166,7 +166,7 @@ line at the end of its header comment:
 | `mixed` | Both, per function — the reason says which half is which. |
 
 The reason after the em dash is required, not decorative: for a `mixed` file it is the only thing
-telling a reader which functions propagate. `scripts/lib/errors-header-test.sh` fails on a missing
+telling a reader which functions propagate. `lib/core/errors-header-test.sh` fails on a missing
 header, a value outside the vocabulary, or a bare value with no reason — so a new lib file cannot
 land without one.
 

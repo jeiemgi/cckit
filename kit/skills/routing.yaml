@@ -1,0 +1,124 @@
+# kit/skills/routing.yaml — what a person wants → the skill that does it → the term it serves.
+#
+# Read by scripts/terms-check.sh with awk, so this file is a STRICT flat subset of YAML:
+#   - one entry is exactly three lines, in this order, no other keys:
+#       - task: "<what the person wants, in their words>"
+#         skill: <a folder name under skills/>
+#         term: <a PascalCase id under ontology/terms/, or none>
+#   - `#` comment lines and blank lines anywhere; nothing else.
+#   - no nesting, no anchors, no flow sequences, no multi-line strings.
+# A skill may appear in more than one entry (one task each). Every skill under skills/ must appear
+# at least once. `term: none` says the skill serves the kit's own setup and no process term yet;
+# the check counts those as "skills with no term", the candidates for a term or a merge.
+# AGENTS.md carries the same routes under "Which skill does what", one row per skill with its tasks
+# joined by " · " and its terms by ", "; the check compares the two.
+
+# ── the loop: where we are, what next ───────────────────────────────────────
+- task: "know where we are: local undone work, PRs waiting, cleanup"
+  skill: kit-status
+  term: Report
+- task: "read the board by role, see what is blocked"
+  skill: kit-task-sync
+  term: Sync
+- task: "pick up the next unblocked issue"
+  skill: kit-next
+  term: Task
+- task: "fan the unblocked wave out to builders"
+  skill: kit-next
+  term: Wave
+- task: "decide what to build next from what the kit already does"
+  skill: kit-plan-next
+  term: Effort
+- task: "run an approved plan unattended, waves merged as they go"
+  skill: kit-autopilot
+  term: Captain
+
+# ── the advisor: decide the work, then keep it honest ──────────────────────
+- task: "create or plan an effort: grill, plan, orchestrate, review, close"
+  skill: kit-advisor
+  term: Advisor
+
+# ── one issue ────────────────────────────────────────────────────────────────
+- task: "track a new piece of work as an issue"
+  skill: kit-task-new
+  term: Task
+- task: "start work on an issue in its own worktree"
+  skill: kit-task-start
+  term: Worktree
+- task: "open the PR for an issue"
+  skill: kit-task-pr
+  term: Task
+- task: "land an issue's PR once the gate is green"
+  skill: kit-task-pr-merge
+  term: Gate
+- task: "open and land the PR in one step"
+  skill: kit-task-pr-auto
+  term: Task
+- task: "close an issue whose PR merged"
+  skill: kit-task-close
+  term: Task
+- task: "take one issue from code to merged"
+  skill: kit-ship
+  term: Task
+
+# ── one effort ───────────────────────────────────────────────────────────────
+- task: "scope a goal into an effort"
+  skill: kit-effort-new
+  term: Effort
+- task: "record the deliverables as sub-issues"
+  skill: kit-effort-new
+  term: SubIssue
+- task: "start building an effort"
+  skill: kit-effort-start
+  term: Effort
+- task: "open the one PR of an effort"
+  skill: kit-effort-pr
+  term: Effort
+- task: "land and close an effort"
+  skill: kit-effort-close
+  term: Effort
+
+# ── keep the repository clean ────────────────────────────────────────────────
+- task: "see which branches and worktrees can go"
+  skill: kit-gc
+  term: Worktree
+- task: "delete the merged branches and worktrees"
+  skill: kit-cleanup
+  term: Worktree
+
+# ── checks on the product ────────────────────────────────────────────────────
+- task: "audit the project for security findings"
+  skill: kit-security-sweep
+  term: Check
+- task: "audit the UI's flows, consistency and accessibility"
+  skill: kit-ux-audit
+  term: Check
+- task: "give visual feedback on a running UI and triage it"
+  skill: kit-annotate
+  term: Check
+
+# ── the kit itself: no process term yet ──────────────────────────────────────
+- task: "set cckit up on a new machine"
+  skill: kit-onboard
+  term: none
+- task: "add an integration or a module to the project"
+  skill: kit-add
+  term: none
+- task: "add or edit an agent or a skill in a project"
+  skill: kit-customize
+  term: none
+- task: "send a change upstream to cckit"
+  skill: kit-contribute
+  term: none
+- task: "change cckit itself and test it live"
+  skill: kit-dev
+  term: none
+- task: "write a docs page in the house voice"
+  skill: kit-docs-writer
+  term: none
+- task: "shorten a long input before reading it"
+  skill: kit-digest
+  term: none
+- task: "show a plan, a decision or a grilling round as a page"
+  skill: kit-page
+  term: none

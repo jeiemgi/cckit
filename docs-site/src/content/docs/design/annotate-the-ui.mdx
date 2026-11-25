@@ -56,7 +56,7 @@ Claude Code session that pulls the notes you leave, fixes each one and marks it 
 <Chat
   title="asking for visual annotation on the Bakery site"
   say="Set up visual annotation for this app. Show me the plan first, and ask before you install anything or edit a file."
-  ran='"${CLAUDE_PLUGIN_ROOT}/scripts/annotate-setup.sh" --dry-run'
+  ran='"${CLAUDE_PLUGIN_ROOT}/lib/verbs/annotate-setup.sh" --dry-run'
   means="A dry run installs nothing and writes nothing. The slash command /kit-annotate setup does the same."
 >
   The Bakery site is a Next.js app that uses pnpm. Here is the plan. I have installed nothing.

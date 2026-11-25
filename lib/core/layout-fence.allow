@@ -1,0 +1,15 @@
+# layout-fence.allow — the top-level directories the repo may hold (lib/core/layout-fence.sh).
+# The target shape is bin/ · lib/ · kit/ · docs-site/ (decisions 45 and 55, .cckit/briefs).
+# A directory listed here but not yet present is allowed; one present but not listed fails the gate.
+.cckit
+.claude
+.claude-plugin
+.github
+Formula
+benchmarks
+bin
+docs-site
+kit
+lib
+ontology
+scripts

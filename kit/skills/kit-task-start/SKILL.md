@@ -1,0 +1,72 @@
+---
+name: kit-task-start
+terms: Worktree
+description: Start work on a GitHub issue — thin caller of `cckit start <N>`. Creates an isolated, bootstrapped worktree + `<kind>/<N>-<slug>` branch from the base branch and marks the issue In Progress on the board (if enabled). Worktree-first — there is no in-place mode.
+when_to_use: When beginning work on a tracked issue. Always run before editing files. Replaces ad-hoc `git checkout -b` and hand-rolled `git worktree add`.
+---
+
+# kit-task-start
+
+Thin caller over the ONE canonical start mechanic: the `cckit start` verb → `wt_start`
+(`${CLAUDE_PLUGIN_ROOT}/lib/core/worktree-start.sh`). The verb logic lives there, never inline
+here (kit-engine-boundary #1/#2 — same single-implementation principle as the PR title composer,
+#121). The verb owns ALL of the mechanics:
+
+- fresh fetch of the base branch (`KIT_BASE_BRANCH`, default `main`) + branch `<kind>/<N>-<slug>`
+  (kind derived from the issue's `kind:` label)
+- the isolated worktree at `.claude/worktrees/<kind>+<N>-<slug>` (reused if it already exists;
+  the dir name encodes issue #N so `kit-gc` won't wipe it while the issue is open)
+- **bootstrap** (`wt_bootstrap`): copies gitignored `.env.local*` + project ids into the worktree,
+  assigns a per-worktree dev PORT, installs deps **at the selected targets**, in
+  this precedence: **`worktree.installPaths` if set** — those dirs only, installed whether or not
+  each declares dependencies, `[]` means nothing, and the
+  checks below are skipped; **else** the root *only when* its manifest declares dependencies or it is a
+  workspace root *with at least one member*; **else nothing**. A dependency-free root is skipped so
+  pnpm can't plant an empty `pnpm-lock.yaml` the captain then holds the PR on. `installPaths`
+  entries that point outside the worktree are refused. `KIT_WT_INSTALL=0` opts out entirely
+- the **session claim** (#384): refuses the start (rc 1, nothing created) when another live session
+  already claims the issue in `<git-common-dir>/kit-sessions/`. `cckit start --force <N>` or
+  `KIT_FORCE=1` starts anyway; `cckit claims` lists the live claims. Re-running from the claiming
+  session, or from inside the claimed worktree, is not a collision
+- the **board precheck** (#124): warns — never refuses — when the issue is already In Progress or
+  In Review on the board; another session may own it
+- the pool **collision guard**: a pooled worktree a live session claims is never recycled
+- the board update: issue → In Progress (when Projects v2 is enabled)
+
+## Inputs
+
+| Field        | Required | Notes                                                     |
+| ------------ | -------- | --------------------------------------------------------- |
+| Issue number | ✓        | `123`                                                     |
+| Slug         | optional | Short kebab suffix; defaults to a slug of the issue title |
+
+## Execution
+
+```bash
+cckit start <N>            # or: cckit start <N> <slug-override>
+# cckit not on PATH? "${CLAUDE_PLUGIN_ROOT}/bin/cckit" start <N>
+```
+
+The last stdout line is machine-readable — `<worktree-path>|<branch>|<issue-number>` — then work
+continues **inside the worktree**:
+
+```bash
+cd <worktree-path>         # one branch per worktree; never edit the main checkout
+```
+
+## Output
+
+- Worktree path + `<kind>/<N>-<slug>` branch (from the base branch) — work happens in the worktree
+- Issue #N In Progress on the board (when Projects v2 is on)
+
+## Rules
+
+- **Engine boundary** — the start mechanic lives in `wt_start`; this skill only runs the verb.
+  Never re-implement `git worktree add` / `git checkout -B` / bootstrap / board steps here.
+- Worktree-first: parallel / sub-agent work MUST each get their own worktree via the verb —
+  never share a checkout, never fall back to an in-place branch switch.
+- Never start from a non-base branch (trunk-based) — the verb always branches from a fresh
+  `origin/<base>`.
+- If the issue has no `role:` label, fail loudly and ask for triage before starting.
+- Heed the claim-precheck warning: if the verb reports the issue is already In Progress, confirm
+  no other session owns it before continuing.

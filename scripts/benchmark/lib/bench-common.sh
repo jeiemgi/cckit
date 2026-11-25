@@ -4,7 +4,7 @@
 # predicate. Source this; do not execute it. Requires: jq.
 
 # Resolve the benchmarks directory: explicit $BENCH_DIR wins, else ./benchmarks under the invoking
-# project, else the example set shipped with cckit (templates/benchmarks) as a last resort so a
+# project, else the example set shipped with cckit (kit/templates/benchmarks) as a last resort so a
 # fresh checkout can `--dry` before it has grown its own data.
 bench_dir() {
   if [ -n "${BENCH_DIR:-}" ]; then printf '%s' "$BENCH_DIR"; return; fi

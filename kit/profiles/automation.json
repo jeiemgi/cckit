@@ -1,0 +1,41 @@
+{
+  "name": "automation",
+  "label": "Automation / n8n",
+  "description": "Workflow-automation org: a product manager, an n8n automation specialist, and a generalist.",
+  "agents": [
+    "pm",
+    "n8n",
+    "generalist"
+  ],
+  "skills": [
+    "morning-briefing",
+    "karpathy-guidelines",
+    "concrete"
+  ],
+  "rules": [
+    "branch-naming",
+    "communication-style",
+    "knowledge-base",
+    "plan-output-format",
+    "issue-lifecycle",
+    "merge-safety",
+    "gate-and-review",
+    "authoring",
+    "shared-checkout",
+    "task-management",
+    "review-pages"
+  ],
+  "roles": [
+    "PM",
+    "Automation",
+    "Generalist"
+  ],
+  "milestones": [
+    "Backlog",
+    "Building",
+    "Live"
+  ],
+  "defaults": {
+    "plans_format": "markdown"
+  }
+}

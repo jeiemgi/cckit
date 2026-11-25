@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/jeiemgi/cckit/kit.config.schema.json",
   "title": "claude-kit project config (v2)",
-  "description": "Identity layer of a kit project. Resolved in cascade workspace -> project -> island by scripts/lib/kit-config-resolve.sh; the nearest layer wins. The $schema reference in kit.config.json points here so editors validate + autocomplete.",
+  "description": "Identity layer of a kit project. Resolved in cascade workspace -> project -> island by lib/core/kit-config-resolve.sh; the nearest layer wins. The $schema reference in kit.config.json points here so editors validate + autocomplete.",
   "type": "object",
   "additionalProperties": true,
   "properties": {
@@ -48,7 +48,7 @@
       }
     },
     "profile": { "type": "string", "description": "Active role profile (minimal, software, content, research, automation, ...)." },
-    "skillPrefix": { "type": "string", "description": "Namespace prepended to kit-namespaced workflow skills on scaffold/upgrade (e.g. \"kit-\" -> kit-task-close). Empty = bare names. See templates/skills/NAMESPACED." },
+    "skillPrefix": { "type": "string", "description": "Namespace prepended to kit-namespaced workflow skills on scaffold/upgrade (e.g. \"kit-\" -> kit-task-close). Empty = bare names. See kit/templates/skills/NAMESPACED." },
     "modules": {
       "type": "array",
       "items": { "type": "string" },
@@ -58,7 +58,7 @@
     "qa": {
       "type": "object",
       "additionalProperties": true,
-      "description": "How THIS project's review stack boots, written by `kit-add.sh qa` from the QA interview (modules/qa.json). cckit records the answers; it does not boot the project by guessing and does not write a boot script. Credentials appear by env var NAME only — a value is refused at interview time and never stored.",
+      "description": "How THIS project's review stack boots, written by `kit-add.sh qa` from the QA interview (kit/modules/qa.json). cckit records the answers; it does not boot the project by guessing and does not write a boot script. Credentials appear by env var NAME only — a value is refused at interview time and never stored.",
       "required": ["command"],
       "properties": {
         "command": { "type": "string", "description": "The command that boots the whole review stack (every service a reviewer needs), run from the worktree root, e.g. \"pnpm dev:stack\"." },
@@ -154,7 +154,7 @@
       "type": "object",
       "additionalProperties": true,
       "properties": {
-        "content": { "type": "boolean", "default": false, "description": "When true, `scripts/setup-labels.sh` (and the label step of `cckit init`) provisions the content kind labels `kind:post`, `kind:campaign`, `kind:brand` and `kind:research`. The content and marketing profiles set it. The kinds are accepted by `--kind` with or without this key: a content kind starts on a branch prefix from the closed set (post and brand: `task/`, campaign: `plan/`, research: `spike/`) and titles its PR `docs:`." }
+        "content": { "type": "boolean", "default": false, "description": "When true, `lib/verbs/setup-labels.sh` (and the label step of `cckit init`) provisions the content kind labels `kind:post`, `kind:campaign`, `kind:brand` and `kind:research`. The content and marketing profiles set it. The kinds are accepted by `--kind` with or without this key: a content kind starts on a branch prefix from the closed set (post and brand: `task/`, campaign: `plan/`, research: `spike/`) and titles its PR `docs:`." }
       }
     },
     "pr": {
@@ -190,7 +190,7 @@
     "night": {
       "type": "object",
       "additionalProperties": true,
-      "description": "Night mode (`kit-autopilot` § Mode: night): what `scripts/night-grant.sh` adds to the owner's night grant before it launches `scripts/night-run.mjs`. Every key is optional; without the object a night run uses the base floors, the delegation brief's gate, and accepts a grant only from `github.owner` or a commenter GitHub reports as OWNER.",
+      "description": "Night mode (`kit-autopilot` § Mode: night): what `lib/verbs/night-grant.sh` adds to the owner's night grant before it launches `lib/verbs/night-run.mjs`. Every key is optional; without the object a night run uses the base floors, the delegation brief's gate, and accepts a grant only from `github.owner` or a commenter GitHub reports as OWNER.",
       "properties": {
         "floors": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Extra always-human floors, name -> what a diff must touch to trip it. Added to the base floors (lockfile, auth, security-code, security-prose, workflows, cost, secret). A tripped floor parks the effort unless that night's grant waives it by its exact name." },
         "neverWaivable": { "type": "array", "items": { "type": "string" }, "description": "Floor names no grant may waive, added to the base list (workflows, cost, secret). A grant that waives one is refused when it is read; the engine refuses it again at merge time." },
@@ -268,7 +268,7 @@
     "local": {
       "type": "object",
       "additionalProperties": true,
-      "description": "Local model layer: natural-language chores run on this machine through mlx_lm.server. Off when absent. `enabled` is the config key of the integration descriptor integrations/mlx-lm.json.",
+      "description": "Local model layer: natural-language chores run on this machine through mlx_lm.server. Off when absent. `enabled` is the config key of the integration descriptor kit/integrations/mlx-lm.json.",
       "properties": {
         "enabled": { "type": "boolean", "description": "true = `cckit doctor` installs the runtime (with consent) and starts the server." },
         "port": { "type": "integer", "description": "Port mlx_lm.server listens on. Default 8080." },
@@ -279,7 +279,7 @@
     "codeGraph": {
       "type": "object",
       "additionalProperties": true,
-      "description": "Code-graph retrieval: agents query an index of the code instead of grepping the tree. Off when absent. Turned on by an integration descriptor (integrations/<id>.json) whose `config.key` is `codeGraph.provider`.",
+      "description": "Code-graph retrieval: agents query an index of the code instead of grepping the tree. Off when absent. Turned on by an integration descriptor (kit/integrations/<id>.json) whose `config.key` is `codeGraph.provider`.",
       "properties": {
         "provider": { "type": "string", "description": "Which integration provides the code graph, as the descriptor's `config.value` names it. Absent or \"none\" = no code graph; every path that would use one skips." }
       }
@@ -287,7 +287,7 @@
     "designDirection": {
       "type": "object",
       "additionalProperties": true,
-      "description": "Design direction for a page: the visual idea, type, layout and colour, and the rules against a generic generated look. Off when absent. Turned on by an integration descriptor whose `config.key` is `designDirection.provider` (integrations/impeccable.json). The `page-design` skill reads the installed skill, not this key.",
+      "description": "Design direction for a page: the visual idea, type, layout and colour, and the rules against a generic generated look. Off when absent. Turned on by an integration descriptor whose `config.key` is `designDirection.provider` (kit/integrations/impeccable.json). The `page-design` skill reads the installed skill, not this key.",
       "properties": {
         "provider": { "type": "string", "description": "Which integration provides design direction, as the descriptor's `config.value` names it. Absent or \"none\" = `cckit doctor` installs nothing for it." }
       }
@@ -295,7 +295,7 @@
     "designMotion": {
       "type": "object",
       "additionalProperties": true,
-      "description": "Interaction and motion craft on a chosen design. Off when absent. Turned on by an integration descriptor whose `config.key` is `designMotion.provider` (integrations/emil-design-eng.json).",
+      "description": "Interaction and motion craft on a chosen design. Off when absent. Turned on by an integration descriptor whose `config.key` is `designMotion.provider` (kit/integrations/emil-design-eng.json).",
       "properties": {
         "provider": { "type": "string", "description": "Which integration provides the motion rules. Absent or \"none\" = `cckit doctor` installs nothing for it." }
       }
@@ -303,7 +303,7 @@
     "designAudit": {
       "type": "object",
       "additionalProperties": true,
-      "description": "The audit of a finished page's code: accessibility, focus, reduced motion. Off when absent. Turned on by an integration descriptor whose `config.key` is `designAudit.provider` (integrations/web-design-guidelines.json).",
+      "description": "The audit of a finished page's code: accessibility, focus, reduced motion. Off when absent. Turned on by an integration descriptor whose `config.key` is `designAudit.provider` (kit/integrations/web-design-guidelines.json).",
       "properties": {
         "provider": { "type": "string", "description": "Which integration provides the audit. Absent or \"none\" = `cckit doctor` installs nothing for it." }
       }
@@ -311,7 +311,7 @@
     "reviewPages": {
       "type": "object",
       "additionalProperties": true,
-      "description": "Review pages: a plan, a decision with options or a grilling round opens as an HTML page the reader annotates and answers (`cckit page`). ON when absent. `enabled` is the config key of the integration descriptor integrations/lavish.json, which is on by default.",
+      "description": "Review pages: a plan, a decision with options or a grilling round opens as an HTML page the reader annotates and answers (`cckit page`). ON when absent. `enabled` is the config key of the integration descriptor kit/integrations/lavish.json, which is on by default.",
       "properties": {
         "enabled": { "type": "boolean", "description": "false = plans, decisions and grills print to the terminal; `cckit page open` never starts the page tool. Absent or true = a page opens in a session that has a browser." },
         "answers": { "type": "string", "enum": ["issue", "file"], "description": "Where `cckit page answer` writes. Absent = a comment on the issue when `github.repo` is set and `--issue` is given, else a file. `issue` requires `--issue`; `file` always writes a file." },

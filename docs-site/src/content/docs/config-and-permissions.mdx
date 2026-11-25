@@ -31,7 +31,7 @@ No org, repo, or path is hardcoded — every value comes from this file. A repo 
 `cckit init` writes source 3 when the Claude adapter is selected and source 2 for a Codex-only
 project, which has no `.claude/` directory. The config's `adapters` array records the selection
 (`["claude"]`, `["codex"]` or both); a config without the key means `["claude"]`. The ownership
-manifest — the hashes the uninstall script (`scripts/kit-remove.sh`) and `--upgrade` use to tell a kit-owned file from an edited one —
+manifest — the hashes the uninstall script (`lib/verbs/kit-remove.sh`) and `--upgrade` use to tell a kit-owned file from an edited one —
 sits beside it: `.claude/kit.manifest.json`, or `.cckit/kit.manifest.json` in a project that started
 Codex-only. Neither file moves when the second adapter is enabled later.
 
@@ -132,7 +132,7 @@ resume-here handoff saved" everywhere else.
 
 cckit asks before it changes anything in a repo it has not worked in before.
 
-- **A config or `.claude/` file is proposed before it is written.** `cckit add <module>` and `cckit migrate` go through one machine (`scripts/lib/kit-operate.sh`): show the change, ask, apply, record. `KIT_DRY_RUN=1` previews and writes nothing; `KIT_ASSUME_YES=1` skips the question, and still keeps a file you edited. `cckit init --dry-run` prints the scaffold plan and writes nothing.
+- **A config or `.claude/` file is proposed before it is written.** `cckit add <module>` and `cckit migrate` go through one machine (`lib/core/kit-operate.sh`): show the change, ask, apply, record. `KIT_DRY_RUN=1` previews and writes nothing; `KIT_ASSUME_YES=1` skips the question, and still keeps a file you edited. `cckit init --dry-run` prints the scaffold plan and writes nothing.
 - **A third-party tool installs only with recorded consent.** Your yes to `cckit doctor` (its prompt, or `--fix`) is written as one `install:<id>` line in `.cckit/consent` (gitignored). That file holds install consent and nothing else: no other verb reads or writes it. See [Integrations](/integrations/#what-your-yes-records).
 - **Where the secret and privacy guard is wired in, no consent bypasses it.** It runs as a git pre-commit hook (`githooks/pre-commit`) and inside the gate of cckit's own repository. `cckit init` does not copy it into your project: [Stop agents committing secrets](/review/stop-committing-secrets/) has the commands, and [The secret guard](/review/secret-guard/) says what it blocks.
 - **Destructive or irreversible operations** (force-push, repo create, history rewrite) always require a separate, explicit confirmation.
@@ -141,7 +141,7 @@ cckit asks before it changes anything in a repo it has not worked in before.
 
 The three lint scripts `cckit init` scaffolds are described in
 [Turn repeated review findings into checks](/review/gates/). This section is the detail behind
-them, plus the one lint that runs only in cckit's own repository, where `scripts/check.sh` runs all
+them, plus the one lint that runs only in cckit's own repository, where `lib/core/check.sh` runs all
 four.
 
 ### Baselines are seeded once
@@ -158,9 +158,9 @@ red on your first commit of the scaffold.
 Each lint reports its own baseline path, which is how `init.sh` finds it:
 
 ```bash
-scripts/review-lint.sh --baseline-path             # scripts/review-lint-baseline.txt
-scripts/skill-frontmatter-lint.sh --baseline-path  # scripts/skill-frontmatter-baseline.txt
-scripts/instruction-budget-lint.sh --baseline-path # scripts/instruction-budget-baseline.txt
+scripts/review-lint.sh --baseline-path             # lib/core/review-lint-baseline.txt
+scripts/skill-frontmatter-lint.sh --baseline-path  # lib/core/skill-frontmatter-baseline.txt
+scripts/instruction-budget-lint.sh --baseline-path # lib/core/instruction-budget-baseline.txt
 ```
 
 A freshly scaffolded project's instruction-budget baseline already lists two rules: the shipped
@@ -185,7 +185,7 @@ than its frontmatter lists. A rename is how it happens — `templates/agents/pm.
 the PM agent's lifecycle skills were dead.
 
 ```bash
-scripts/agent-skills-lint.sh           # the gate: fails on any unresolved entry
+lib/core/agent-skills-lint.sh           # the gate: fails on any unresolved entry
 ```
 
 It reads the frontmatter `skills:` key of every `templates/agents/*.md` (block list or inline
@@ -196,11 +196,11 @@ It reads the frontmatter `skills:` key of every `templates/agents/*.md` (block l
 | a skill the kit ships | `skills/<name>/SKILL.md` |
 | a skill the kit scaffolds | `templates/skills/<name>/SKILL.md` |
 | another plugin's skill | the `plugin:skill` form, e.g. `agent-skills:context7` |
-| a third-party bare name | a line in `scripts/agent-skills-external.txt` |
+| a third-party bare name | a line in `lib/core/agent-skills-external.txt` |
 
-Anything else is reported as `<file>:<line>: <entry>` and fails `scripts/check.sh`.
+Anything else is reported as `<file>:<line>: <entry>` and fails `lib/core/check.sh`.
 
-`scripts/agent-skills-external.txt` is the list of **optional** skills: names an agent template
+`lib/core/agent-skills-external.txt` is the list of **optional** skills: names an agent template
 lists that come from a third-party skill pack or from the harness (`deep-research`, `impeccable`,
 the `gsap-*` and `n8n-*` sets). An agent scaffolded into a project without one of them runs without
 that skill. A name that is both in that file and shipped by the kit fails the lint, so the list
@@ -326,7 +326,7 @@ verdict. A non-numeric or zero value falls back to the default rather than disab
 
 <Aside type="note" title="What headless builds, and what it does not">
 `headless` uses the same launcher as [`cckit autopilot run`](/agent-compatibility/#unattended-run-limits)
-(`scripts/lib/agent-launch.sh`). It adds no permission flag and names no model, so what the reviewer
+(`lib/core/agent-launch.sh`). It adds no permission flag and names no model, so what the reviewer
 may do is set by the CLI's defaults, your own agent settings and the profile's `args` — cckit
 refuses a `write: true` profile but does not verify the process is read-only. Both command forms are
 read from each CLI's `--help`; the tests drive stub binaries, so no live reviewer has been run this
@@ -394,7 +394,7 @@ with no verdict prints that, names both keys that close it, and goes quiet once 
 </Aside>
 
 <Aside type="tip" title="Not the same thing as review-lint">
-[Turn repeated review findings into checks](/review/gates/) are static linters that run inside `scripts/check.sh` —
+[Turn repeated review findings into checks](/review/gates/) are static linters that run inside `lib/core/check.sh` —
 patterns earned from past review findings, enforced on every commit. This page's review stage is an
 **agent** reading a diff. Neither replaces the other.
 </Aside>
@@ -402,7 +402,7 @@ patterns earned from past review findings, enforced on every commit. This page's
 ## The QA lane
 
 `cckit qa` reads one block, `qa`, written by the `qa` module interview (`/kit-add qa`, or
-`scripts/kit-add.sh qa --answers <file>`). cckit records how the project's review stack boots; it
+`lib/verbs/kit-add.sh qa --answers <file>`). cckit records how the project's review stack boots; it
 does not guess a boot command and does not write a boot script. The walkthrough is the
 [QA lane guide](/review/qa-lane/).
 
@@ -659,7 +659,7 @@ signature are the same in both styles; the checklist and two headings differ:
 
 The branch set `cckit gc` and the SessionStart hygiene hook parse is unchanged, so a live branch of
 a content-kind issue keeps the same issue-open protection as any other
-(`scripts/lib/content-kinds-gc-test.sh`).
+(`lib/verbs/content-kinds-gc-test.sh`).
 
 ## Effort WIP limit
 
@@ -697,7 +697,7 @@ origin, and a `<slug>` argument was resolved before it, which can read the issue
 
 cckit's core needs only git. A **forge** (today: GitHub) is the optional provider behind the
 issues, pull requests, labels and comments the lifecycle verbs write. Every call goes through one
-port, `scripts/lib/forge.sh`, with two providers:
+port, `lib/forge/forge.sh`, with two providers:
 
 | Key | Default | What it does |
 | --- | --- | --- |
@@ -722,7 +722,7 @@ issue branch is UNKNOWN and kept). The verbs that only read or write the forge �
 `status --board`, `plan`, `next`, `status`'s board section, the effort verbs, `watch` — refuse by name. The
 note for a skipped step is printed once per verb and process: `cckit <verb>: no forge — <what>`.
 
-`scripts/forge-report.sh` prints which files and which verbs need a forge today.
+`lib/core/forge-report.sh` prints which files and which verbs need a forge today.
 
 ## Integrations
 
@@ -753,11 +753,10 @@ Three optional fields carry what an installer needs beyond the candidate list:
 | `rules` | Rule templates (`templates/rules/<name>.md`) that `cckit add <id>` copies into the project's `.claude/rules/` when the integration is switched on. |
 | `wire.kept` | Tool features left **on** although a flag could decline them, each mapped to the test behind that decision. The counterpart of `wire.declined`; it never reaches the command line. |
 
-Four descriptors ship:
+Three descriptors ship:
 
 | Descriptor | Config key | Candidates, in order | Bootstrap | Applies |
 | --- | --- | --- | --- | --- |
-| `integrations/mempalace.json` | `memory.enabled` | `pipx install mempalace`, then `uv tool install mempalace` | `brew install pipx` | any repo, any machine |
 | `integrations/mlx-lm.json` | `local.enabled` | `uv tool install mlx-lm`, then `pipx install mlx-lm` | `brew install uv` | `Darwin` + `arm64` only |
 | `integrations/graft.json` | `codeGraph.provider` = `graft` | `npm install -g @nanonets/graft`, then `pnpm add -g @nanonets/graft` | none | a repo with at least one file in a language Graft indexes |
 | `integrations/lavish.json` | `reviewPages.enabled`, **on by default** | `npm install -g lavish-axi`, then `brew install node` (only when neither `lavish-axi` nor `npx` is on `PATH`) | none | any repo, any machine |
@@ -769,7 +768,6 @@ refused by the validator.
 | Key | Default | What it does |
 | --- | --- | --- |
 | `codeGraph.provider` | *(unset — off)* | Which integration provides code-graph retrieval, as its descriptor's `config.value` names it. `graft` switches on `integrations/graft.json`. Unset or `none`: no code graph. |
-| `memory.enabled` | `false` | `true` switches on `integrations/mempalace.json`: `cckit doctor` installs the MemPalace CLI and checks the wake-up header and session-start hook. |
 | `local.enabled` | *(unset — off)* | `true` switches on `integrations/mlx-lm.json`: `cckit doctor` installs the runtime on Apple silicon and starts `mlx_lm.server` on `local.port` (default `8080`) with `local.model`. |
 | `local.port` | `8080` | The port `mlx_lm.server` listens on. |
 | `local.model` | `mlx-community/Qwen3-8B-4bit` | The model the server loads. The first start downloads it. |
@@ -778,7 +776,7 @@ refused by the validator.
 | `reviewPages.answersDir` | `docs/answers` | Directory, relative to the repo root, for answers written as files. |
 | `local.dismissed` | *(unset)* | The `kitVersion` at which the "local layer down" session notice was dismissed. Written by `cckit doctor --dismiss-local`. |
 
-`bash scripts/lib/integrations.sh --validate` checks every descriptor and prints one
+`bash lib/core/integrations.sh --validate` checks every descriptor and prints one
 `<id>: <field>: <problem>` line per problem; `--list` prints the ids; `--applies <id> [dir]` exits
 0 when the tool can work on the repo at `dir`.
 
@@ -818,7 +816,7 @@ the same verb; the typed-only `/kit-add` command it replaces is gone.
 
 ### Installing one: the shared runner
 
-`scripts/lib/integration-install.sh` is the one place an integration is installed from. It runs
+`lib/core/integration-install.sh` is the one place an integration is installed from. It runs
 only commands the descriptor names, and applies four rules in this order:
 
 | Rule | What happens |
@@ -830,7 +828,7 @@ only commands the descriptor names, and applies four rules in this order:
 
 Consent is one `install:<id>` line in `.cckit/consent`, the gitignored state file shared by every
 worktree of the repo. `cckit doctor` records it when you approve installs in that run — `--fix`
-(alias `--yes`), or a yes at its terminal prompt. `bash scripts/lib/integration-install.sh
+(alias `--yes`), or a yes at its terminal prompt. `bash lib/core/integration-install.sh
 --consent <id>` records it without running the doctor.
 
 `uv` and `pipx` put binaries in `~/.local/bin`, which is often not on `PATH` in the session that
@@ -860,15 +858,15 @@ holds no tool's recipe: the row is the runner's status line.
 With the key off or unset there is no row and the exit code is what it would be without the
 descriptor. `cckit init` runs the doctor with `--yes`, so setup keeps installing.
 
-Before this, a doctor run with no terminal and no flag installed the MemPalace CLI and mlx-lm
-without asking. It now reports them missing; pass `--fix` in automation that relied on the install.
+Before this, a doctor run with no terminal and no flag installed the tools it
+checks without asking. It now reports them missing; pass `--fix` in automation that relied on the install.
 
 ### The monthly recipe check
 
 A descriptor hardcodes upstream facts: a package name, an installer's flags, a binary's name. The
-gate (`scripts/check.sh`) never installs anything, so it cannot see one of them drift.
+gate (`lib/core/check.sh`) never installs anything, so it cannot see one of them drift.
 `.github/workflows/integrations-check.yml` does: at 06:17 UTC on the 1st of every month, and on a
-manual `gh workflow run integrations-check.yml`, it runs `bash scripts/integrations-check.sh --yes`
+manual `gh workflow run integrations-check.yml`, it runs `bash lib/verbs/integrations-check.sh --yes`
 on two clean runners, `ubuntu-latest` and `macos-15` (arm64, the one platform
 `integrations/mlx-lm.json` applies to).
 
@@ -890,7 +888,7 @@ an issue titled `Integration recipe check failed on <runner>` carrying the last 
 the run URL; while that issue is open, a later failing run comments on it.
 
 Without `--yes` the script installs nothing: it validates each descriptor, prints its install
-plan and exits 0. `bash scripts/integrations-check.sh --yes graft` checks one descriptor. Pass
+plan and exits 0. `bash lib/verbs/integrations-check.sh --yes graft` checks one descriptor. Pass
 `--yes` on a throwaway machine only, because the tools install onto the machine that runs it.
 
 What the check does not exercise:
@@ -944,7 +942,7 @@ The two declined flags and the one kept feature are recorded in the descriptor:
 | Out-of-repo writes (`--no-global`) | off | Without the flag `graft init` also writes `~/.claude/settings.json`, `~/.claude/helpers/graft-hooks.cjs` and `~/.claude.json`. |
 | Hooks | **on** | Tested with graft 0.18.0 on a `.claude/settings.json` that already held one hook entry on each of SessionStart, UserPromptSubmit, PostToolUse and Stop: all four survived unchanged and first in their event, and a second `graft init` left the file identical. |
 
-`GRAFT_MERGE_TEST=1 bash scripts/lib/integration-install-test.sh` re-runs that hook test against
+`GRAFT_MERGE_TEST=1 bash lib/core/integration-install-test.sh` re-runs that hook test against
 the installed `graft`, in a throwaway repo and `HOME`.
 
 `graft init` writes `.claude/settings.json` (hook blocks, four `permissions.allow` entries,
@@ -958,7 +956,7 @@ numbers and cckit has not reproduced them. Per the same README, Graft makes a da
 check and one batched anonymous usage ping; `graft telemetry disable` or `DO_NOT_TRACK=1` turns
 the ping off. `graft build --deep` is the one command that calls an LLM, and cckit never runs it.
 
-An upgrade (`/kit-update`, which runs `scripts/init.sh --upgrade`) over a config with `codeGraph.provider` set re-adds a missing
+An upgrade (`/kit-update`, which runs `lib/verbs/init.sh --upgrade`) over a config with `codeGraph.provider` set re-adds a missing
 `code-retrieval.md`, and a regenerated `CLAUDE.md` carries the line that points at it. A fresh
 `cckit init` writes neither: the integration is switched on by `cckit add`, never by an init flag.
 
@@ -1064,8 +1062,8 @@ invoked in, after every sub is verified closed with a merged PR and before the t
 ## Night mode
 
 Night mode runs approved effort waves unattended. The `kit-autopilot` skill reads the owner's
-**night grant** with `scripts/night-grant.sh`, then launches the Workflow script
-`scripts/night-run.mjs`; the Workflow runtime enforces the grant's token budget. In a project that
+**night grant** with `lib/verbs/night-grant.sh`, then launches the Workflow script
+`lib/verbs/night-run.mjs`; the Workflow runtime enforces the grant's token budget. In a project that
 installed cckit as a plugin both scripts live under `${CLAUDE_PLUGIN_ROOT}/scripts/`.
 
 The grant is one comment on the plan parent issue:

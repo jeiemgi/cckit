@@ -51,7 +51,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR/templates/hooks/guard-raw-git-ops.sh.tmpl\"",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/kit/templates/hooks/guard-raw-git-ops.sh.tmpl\"",
             "timeout": 10
           }
         ]

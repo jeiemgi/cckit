@@ -35,7 +35,6 @@ cckit init --dry-run
 | [`authoring`](#authoring) | docs and README updated in the same change, no issue numbers in pasted prompts, summaries that name the work without machine flags | all six | every session |
 | [`shared-checkout`](#shared-checkout) | the primary checkout is shared by every session: never move it by hand, work in a worktree, call a freshly merged verb from a current worktree | all six | every session |
 | [`review-pages`](#review-pages) | a plan, a decision with options or a grilling round opens as a review page; terminal output where there is no browser; the answer is written back | all six | every session |
-| `mempalace` | the persistent-memory protocol — written only when memory is on | all six | every session |
 | `knowledge-base` | frontmatter and the index for the project's knowledge docs | software, content, marketing, research, automation | every session |
 | `plan-output-format` | a plan is a file with a `## Deliverables` table | software, content, marketing, research, automation | every session |
 | `design-routing` | which agent answers a design question | software, content, marketing | every session |
@@ -155,7 +154,7 @@ branch; after such a merge, run `cckit close <N> "<summary>"`.
 
 | Convention | Where it came from | Wins against |
 | --- | --- | --- |
-| `MERGEABLE` is not safe: bring the branch onto the current base and pass the gate there before merging | a PR cut from a base that had since moved merged clean and reverted a sibling — 7,285 lines removed, no conflict, no failing check | `branch-naming` § *Merge order* decides the order and this rule decides what each PR passes first; it extends that section's lockfile "rebase the others" to every PR |
+| `MERGEABLE` is not safe: bring the branch onto the current base and pass the gate there before merging | a PR cut from a base that had since moved merged clean and reverted a sibling — 7,285 lines removed, no conflict, no failing check | `branch-naming` § *Merge order* decides the order and this rule decides what each PR passes first; it extends that section's lockfile "merge the base into the others" to every PR |
 | A coupled chain ships as ONE PR | the PRs of a chain are siblings cut from one base, each stale once the one before it lands; a single PR has no sibling to revert | `task-management`'s one-PR-per-issue line — its migration/DDL exception becomes any coupled chain — and `branch-naming`'s size guidance, for a chain only |
 | Re-run the gate on the integration branch after the subs merge | the gate had been run on each sub and not again on the branch they merged into | `effort-model` § *Lifecycle*, which lists no gate step between merging the subs and opening the PR |
 
@@ -263,8 +262,8 @@ machine has in common: the primary checkout, the first entry of `git worktree li
 | Work in a worktree, always, a one-line fix included | the same incident: the close ops only check out the base, so a primary checkout on a feature branch means a session checked it out there | `branch-naming` § *Parallel work* — its one-agent-one-worktree line is extended to a session working alone |
 | Call a freshly merged verb from a current worktree's `bin/`, not from PATH, when PATH resolves into the primary checkout | two incidents the same day: a verb merged minutes earlier answered "unknown command", and the version check read "ahead of plugin 0.3.0" from the stale branch's files | nothing — no shipped rule says which copy of a tool to run |
 
-The rule forbids hand-run git, not the verbs. `cckit merge` (`scripts/lib/kit-task-ops.sh:424-425`)
-and `cckit effort close` (`scripts/lib/effort-ops.sh:1025-1026`) check out and pull the base in the
+The rule forbids hand-run git, not the verbs. `cckit merge` (`lib/verbs/kit-task-ops.sh:424-425`)
+and `cckit effort close` (`lib/verbs/effort-ops.sh:1025-1026`) check out and pull the base in the
 primary checkout as their last step. With the checkout already on the base and clean, that switches
 nothing and fast-forwards; both lines end in `|| true`, so a dirty or re-parked checkout is left
 stale without a message.

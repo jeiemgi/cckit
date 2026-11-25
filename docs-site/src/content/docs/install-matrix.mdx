@@ -60,17 +60,17 @@ Updating cckit means moving up to three separate things, and they do not move to
 
 A release sets all of them to one number: release-please writes `cckit.config.json`,
 `.claude-plugin/plugin.json`, `package.json` and `docs-site/package.json` in the release PR
-(`release-please-config.json`), and `scripts/lib/version-bump.sh --write` does the same for a
+(`release-please-config.json`), and `lib/core/version-bump.sh --write` does the same for a
 manual `cckit release`.
 
 ## Install routes
 
 | Route | What lands on disk | What code you get | How it updates |
 | --- | --- | --- | --- |
-| One-liner | a shallow clone at `~/.cckit` (or `$CCKIT_HOME`), and a symlink to its `bin/cckit` in a PATH folder | the tip of the repository's default branch — `scripts/web-install.sh:17` clones with no `--branch` and no tag | run the one-liner again: an existing clone gets `git pull --ff-only` (`scripts/web-install.sh:14`) |
+| One-liner | a shallow clone at `~/.cckit` (or `$CCKIT_HOME`), and a symlink to its `bin/cckit` in a PATH folder | the tip of the repository's default branch — `lib/verbs/web-install.sh:17` clones with no `--branch` and no tag | run the one-liner again: an existing clone gets `git pull --ff-only` (`lib/verbs/web-install.sh:14`) |
 | Homebrew | the release tarball under Homebrew's `libexec`, with a wrapper script on PATH (`Formula/cckit.rb`) | exactly the tagged release | `brew upgrade cckit` |
 | npm | the published package, `bin/cckit` linked by npm (`package.json` → `bin`) | exactly the published version | `npm install -g @jeiemgi/cckit@latest` |
-| From source | a symlink from a PATH folder to `bin/cckit` in **your** clone — `ln -sf`, no copy (`scripts/install.sh:19`) | whatever branch that clone is parked on, at this moment | `git pull` in the clone, or anything else that moves its `HEAD` |
+| From source | a symlink from a PATH folder to `bin/cckit` in **your** clone — `ln -sf`, no copy (`lib/verbs/install.sh:19`) | whatever branch that clone is parked on, at this moment | `git pull` in the clone, or anything else that moves its `HEAD` |
 | Claude Code plugin | a copy in Claude Code's plugin cache under `~/.claude/plugins/` | the version the marketplace listed when you installed | `/plugin marketplace update <marketplace>`, then `/plugin update <plugin>@<marketplace>` |
 
 `bin/cckit` follows symlinks back to the real install root on every run (`bin/cckit:66-76`), so
@@ -95,7 +95,7 @@ That is the situation the [`shared-checkout` rule](/rules/#shared-checkout) and
 readlink "$(command -v cckit)"        # a path into a clone you work in = this applies to you
 ```
 
-`scripts/kit-self-update.sh` fast-forwards the clone it lives in: `git pull --ff-only` on the
+`lib/verbs/kit-self-update.sh` fast-forwards the clone it lives in: `git pull --ff-only` on the
 clone's **current branch** (line 47), at most once per four hours unless `--force`
 (`CCKIT_SELF_UPDATE_THROTTLE`, line 34), always exiting 0. No verb and no hook calls it — run it by
 path. Because it pulls the current branch, it does not rescue a clone parked on a stale branch.
@@ -112,7 +112,6 @@ the project's files, and the adapter decides which. The default is `claude`.
 | Rules | `.claude/rules/*.md` | `.agents/rules/*.md`, listed by path in `AGENTS.md` |
 | Specialist agents | `.claude/agents/<role>/AGENT.md` | `.codex/agents/<role>.toml` |
 | Hooks and guards | `.claude/hooks/`, registered in `.claude/settings*.json` | `.codex/hooks/`, registered in `.codex/hooks.json` ([details](/hooks/#codex)) |
-| Memory hooks | `.claude/hooks/mempal_*.sh` (with `--memory on`) | not installed |
 | Statusline, settings | `.claude/statusline.sh`, `.claude/settings*.json` | not installed |
 | Config (when it is the only adapter) | `.claude/kit.config.json` | `cckit.config.json` |
 | Ownership manifest (when it is the only adapter) | `.claude/kit.manifest.json` | `.cckit/kit.manifest.json` |
@@ -125,7 +124,7 @@ the project's files, and the adapter decides which. The default is `claude`.
   under `scripts/` and `knowledge/INDEX.md`.
 - **A pre-existing `AGENTS.md` is kept** by a fresh init unless `--force` is passed.
 - **Every file written is recorded in the ownership manifest with its hash.** A file you edited
-  reads as modified; an upgrade preserves it and the uninstall script (`scripts/kit-remove.sh`) keeps it.
+  reads as modified; an upgrade preserves it and the uninstall script (`lib/verbs/kit-remove.sh`) keeps it.
 
 `cckit init --dry-run` prints the exact list for your project before anything is written. How the
 two adapters render from one set of templates, and what the Codex adapter does not do yet:
@@ -156,7 +155,7 @@ the upgrade changes and what it never touches.
    file that exists, and sets `kitVersion` to the installed version. `--dry-run` runs the same
    upgrade on a temporary copy and prints the files it would add or modify; the real run prints
    that list as `Changed on disk`. It reads
-   `.claude/kit.config.json` and stops if that file is absent (`scripts/init.sh:282-283`).
+   `.claude/kit.config.json` and stops if that file is absent (`lib/verbs/init.sh:282-283`).
 
 ## Updates are skipped when the version string did not change
 
@@ -164,15 +163,15 @@ Two places compare version **strings**, not content. Both skip silently when the
 
 | Where | What is compared | What a skip looks like |
 | --- | --- | --- |
-| Claude Code's `/plugin update` | the marketplace's listed version against the cached one | nothing is fetched. `scripts/kit-bump-version.sh:15-17` exists for this reason: it bumps the version "so the installed plugin (deduped by version) sees every release" |
-| `cckit init --upgrade` | the project's `kitVersion` against the installed `plugin.json` version (`scripts/init.sh:297-300`) | `already at <version> -- nothing to upgrade`, exit 0, no file written |
+| Claude Code's `/plugin update` | the marketplace's listed version against the cached one | nothing is fetched. `lib/verbs/kit-bump-version.sh:15-17` exists for this reason: it bumps the version "so the installed plugin (deduped by version) sees every release" |
+| `cckit init --upgrade` | the project's `kitVersion` against the installed `plugin.json` version (`lib/verbs/init.sh:297-300`) | `already at <version> -- nothing to upgrade`, exit 0, no file written |
 
 The second one matters with a one-liner or source install. Those track a branch, and the version
 string on a branch only changes when a release PR merges. Pull forty commits of new templates and
 `cckit init --upgrade` still answers `already at 0.9.0`, because `0.9.0` is what both sides say.
 The new templates arrive in the project after the next release changes the string.
 
-`scripts/kit-bump-version.sh` is the manual bump for a plugin build between releases. It writes
+`lib/verbs/kit-bump-version.sh` is the manual bump for a plugin build between releases. It writes
 `.claude-plugin/plugin.json` and `package.json` (lines 65-66) and not `cckit.config.json`, so
 after it runs `cckit version` and `cckit update` report different numbers until a release realigns
 them.
@@ -184,7 +183,7 @@ them.
 | The CLI (`bin/`, `scripts/`) | the next `cckit` command. It is bash read from disk on every run |
 | Project rules, skills, hooks and settings under `.claude/` — after `cckit init --upgrade` | the next Claude Code session. A session that is already open keeps what it loaded at start |
 | The Claude Code plugin — after `/plugin update` | `/reload-plugins` in an open session, or a new session (`skills/kit-dev/SKILL.md:42-43`) |
-| An MCP server a setup step registered | a restart of Claude Code — `scripts/annotate-setup.sh:150` prints that instruction |
+| An MCP server a setup step registered | a restart of Claude Code — `lib/verbs/annotate-setup.sh:150` prints that instruction |
 
 The same holds for a branch switch: a session started in a checkout parked on an old branch has
 that branch's rules and hooks until it is restarted from a current one.
@@ -192,7 +191,7 @@ that branch's rules and hooks until it is restarted from a current one.
 ## A `kitVersion` that is not a released tag
 
 `kitVersion` is the `.version` of the `plugin.json` that sat in the install when `cckit init` ran
-(`scripts/init.sh:276-277`). It is a version **string**, not a commit. To test whether it names a
+(`lib/verbs/init.sh:276-277`). It is a version **string**, not a commit. To test whether it names a
 release:
 
 ```bash
@@ -202,6 +201,6 @@ git ls-remote --tags https://github.com/jeiemgi/cckit "v<kitVersion>"   # one li
 | You see | It means | Do |
 | --- | --- | --- |
 | `0.1.0`, or no `kitVersion` | the default in `templates/kit.config.json.tmpl`, never stamped by an install | run `cckit init --upgrade`; treat everything since as new |
-| a pre-release such as `0.7.0-beta.6` | scaffolded from a build stamped by `scripts/kit-bump-version.sh` in `beta` mode (lines 42-49). That script cuts no tag, so `git ls-remote` prints nothing | upgrade from a released install |
+| a pre-release such as `0.7.0-beta.6` | scaffolded from a build stamped by `lib/verbs/kit-bump-version.sh` in `beta` mode (lines 42-49). That script cuts no tag, so `git ls-remote` prints nothing | upgrade from a released install |
 | a tag's number, but files the tag does not have | scaffolded from a one-liner or source install that was past the tag. The string says the last release; the content is later | nothing. This is expected on those routes; compare files, not the number, if you need to know |
 | `cckit update` says `ahead of plugin <older>` | the install being compared is older than the one that scaffolded the project — typically a source install parked on an old branch | do **not** downgrade the project. Find out what PATH points at (`readlink "$(command -v cckit)"`) and run cckit from a current copy |

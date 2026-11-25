@@ -47,10 +47,6 @@ These are scaffolded for every project.
 | ----- | ---- | ---------- | ------------ |
 | `PreToolUse` (Bash) | `prepush_gate.sh` | pre-push gate | Runs your project's check (tests, lint) before a `git push`, so a red branch never reaches the remote. |
 | `SessionStart` | `kit-local-status.sh` | local model layer | Announces the local model (`mlx_lm.server`) when it's enabled and alive. |
-| `SessionStart` | `mempal_session_start.sh` | memory (MemPalace) | Loads this project's saved context (`wake-up --wing`) at the start of a session. The body is wing-scoped; for a wing-scoped identity header, drop in `.claude/mempal-identity.<wing>.txt`. |
-| `Stop` | `mempal_save.sh` | memory (MemPalace) | Files the finished session into MemPalace. |
-| `PreCompact` | `mempal_precompact.sh` | memory (MemPalace) | A safety-net sweep to memory before the conversation is compressed. |
-| `SessionEnd` | `mempal_followup.sh` | memory (MemPalace) | Captures any unsynced work if a session closes abruptly. |
 
 </div>
 
@@ -106,7 +102,6 @@ scripts read (`hook_event_name`, `cwd`, `tool_input.command`) and documents the 
 | Registration | `.claude/settings.local.json` (per checkout) and `.claude/settings.json` (tracked) | `.codex/hooks.json` (tracked) |
 | Command path | absolute in the local file, `$CLAUDE_PROJECT_DIR` in the tracked one | `$(git rev-parse --show-toplevel)/.codex/hooks/<name>.sh` — no absolute path |
 | Installed | every hook on this page | the "Always set up" hooks, plus `prepush_gate.sh` and `kit-local-status.sh` when enabled |
-| Not installed | — | the four memory hooks |
 
 - **Your `hooks.json` is merged, never replaced.** A handler is added only when the event does not
   already run the same command; your own handlers, their order and any other key stay. A merge that
@@ -119,13 +114,10 @@ scripts read (`hook_event_name`, `cwd`, `tool_input.command`) and documents the 
   skips it again after it changes. cckit cannot read or grant that trust: `cckit doctor` reports
   whether the hooks are registered, not whether they run. Commit `.codex/` so worktrees have the
   scripts the registration points at.
-- **Memory.** `mempal_save.sh` and `mempal_precompact.sh` mine `~/.claude/projects/`, the Claude
-  Code transcript store. No Codex transcript format has been validated against `mempalace mine`, so
-  the memory hooks are not installed for Codex. See [How cckit uses memory](/memory/how-cckit-uses-it/#under-codex).
-- **The uninstall script, `scripts/kit-remove.sh`,** deletes the hook scripts it installed and a `hooks.json` it created and you
+- **The uninstall script, `lib/verbs/kit-remove.sh`,** deletes the hook scripts it installed and a `hooks.json` it created and you
   never edited. Entries merged into a `hooks.json` of your own stay; delete those by hand.
 
-What is tested: `scripts/hook-adapter-test.sh` feeds each installed hook the event JSON each
+What is tested: `lib/core/hook-adapter-test.sh` feeds each installed hook the event JSON each
 runtime documents and asserts the same result on both — a base-branch commit blocked with a reason,
 a worktree commit passing, `--steer` mail blocking `Stop` once, ordinary mail never blocking it, and
 each message delivered once in a combined install. What is not: no live Codex session has fired
