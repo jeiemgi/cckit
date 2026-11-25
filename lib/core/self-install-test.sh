@@ -69,7 +69,6 @@ code-retrieval :: in no profile; `cckit add graft` writes it per-project, and gr
 design-routing :: routes every design question to .claude/agents/designer/AGENT.md; cckit installs no agents, so the rule would dereference a path that does not exist
 gate-and-review :: both enforcement surfaces it names are off here — prePush is null in cckit.config.json and kit/templates/hooks/prepush_gate.sh.tmpl reads .claude/kit.config.json, a file this repo does not have; review.command is unset. The gate for cckit is stated in delegation-brief.md § Gate commands
 knowledge-base :: governs a knowledge/ dir with status/owner/updated frontmatter and a knowledge/INDEX.md manifest; cckit knowledge.dir is docs-site/src/content/docs, Starlight title/description frontmatter, no INDEX.md
-mempalace :: memory.enabled is false in cckit.config.json, so init.sh own rules loop skips this rule for this config
 plan-next :: not in profiles/software.json; it describes the cckit plan-next verb rather than governing work, and its See-also links point at plan-output-format.md, which cckit does not install
 plan-output-format :: mandates that a plan is a file in plans.dir; cckit plans.dir is "" and plans.format is "github" — the parent issue IS the plan (effort-model.md)
 react-annotate :: no React app here; lib/verbs/annotate-setup.sh installs this rule per-project when annotation is wired
