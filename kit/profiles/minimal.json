@@ -18,7 +18,6 @@
     "authoring",
     "shared-checkout",
     "task-management",
-    "mempalace",
     "branch-naming",
     "review-pages"
   ],
@@ -32,7 +31,6 @@
     "Done"
   ],
   "defaults": {
-    "plans_format": "none",
-    "memory": "off"
+    "plans_format": "none"
   }
 }

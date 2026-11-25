@@ -16,7 +16,6 @@
     "communication-style",
     "design-routing",
     "knowledge-base",
-    "mempalace",
     "plan-output-format",
     "effort-model",
     "delegation-brief",
@@ -33,7 +32,6 @@
   "milestones": ["Foundation", "MVP", "Beta", "GA"],
   "defaults": {
     "plans_format": "markdown",
-    "memory": "off",
     "speckit": "off"
   }
 }

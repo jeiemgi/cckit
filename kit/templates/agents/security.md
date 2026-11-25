@@ -52,14 +52,3 @@ Authority:
 ```
 
 Severity: `CRITICAL` | `HIGH` | `MEDIUM` | `LOW` | `INFO`. Group by area, then severity. Hand findings to PM to file with label `role:security`.
-
-<!-- IF:MEMORY -->
-## Memory (MemPalace)
-
-| Action          | Tool                    | Params                              |
-| --------------- | ----------------------- | ----------------------------------- |
-| Wake-up recall  | `mempalace_diary_read`  | wing=`agent-security`               |
-| Search audits   | `mempalace_search`      | wing=`{{WING}}` room=`decisions`    |
-| Save finding    | `mempalace_add_drawer`  | wing=`{{WING}}` room=`decisions`    |
-| Save diary      | `mempalace_diary_write` | wing=`agent-security`, topic=audit  |
-<!-- /IF:MEMORY -->

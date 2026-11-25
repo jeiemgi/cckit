@@ -16,7 +16,6 @@
     "branch-naming",
     "communication-style",
     "knowledge-base",
-    "mempalace",
     "plan-output-format",
     "issue-lifecycle",
     "merge-safety",
@@ -37,7 +36,6 @@
     "Live"
   ],
   "defaults": {
-    "plans_format": "markdown",
-    "memory": "off"
+    "plans_format": "markdown"
   }
 }

@@ -15,7 +15,7 @@ content, and the visual identity.
 {
   "meta": {
     "target": "apps/web/src", "app": "Acme Console", "framework": "next", "router": "app-router",
-    "monorepo": true, "lane": "all", "graph_source": "graphify",
+    "monorepo": true, "lane": "all", "graph_source": "scan",
     "graph_stats": { "nodes": 1840, "edges": 4120, "screens": 46, "entities": 21, "forms": 14 },
     "generated_at": "2026-09-02T18:30:00Z", "files_opened": 8,
     "visual": { "ran": false, "shots": 0, "reason": "no --visual" }
@@ -54,8 +54,7 @@ content, and the visual identity.
    reading the app's component graph rather than clicking through every screen."
 3. **Run facts** — a short definition list: target path, framework/router, lane, graph source +
    node/edge counts, when it ran, how many source files were opened, whether the visual pass ran.
-   If `graph_source` is `scan`, one CAUTION callout: the graph is an approximate text scan, so
-   findings lean on structure — run `/graphify` for a semantic graph.
+   One CAUTION callout: the graph is an approximate text scan, so findings lean on structure.
 4. **The one diagram (only if it earns its place)** — a left-to-right flow of the single worst
    tangle (e.g. the deepest path, or the entity edited from the most screens). Self-explanatory
    from the title. Skip it if no single flow is worth drawing — do not draw a restated sentence.

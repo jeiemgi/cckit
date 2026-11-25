@@ -76,14 +76,3 @@ Authority:
 - Lead with the finding, then the evidence, then the fix. Tables for comparisons (sibling-screen
   drift, create-vs-edit field diffs). No long intros.
 - Every finding names a concrete node/screen/entity, never "the UX feels off".
-
-<!-- IF:MEMORY -->
-## Memory (MemPalace)
-
-| Action          | Tool                    | Params                                |
-| --------------- | ----------------------- | ------------------------------------- |
-| Wake-up recall  | `mempalace_diary_read`  | wing=`agent-ux`                       |
-| Search history  | `mempalace_search`      | wing=`{{WING}}` room=`architecture`   |
-| Save finding    | `mempalace_add_drawer`  | wing=`{{WING}}` room=`architecture`   |
-| Save diary      | `mempalace_diary_write` | wing=`agent-ux`, topic=audit         |
-<!-- /IF:MEMORY -->

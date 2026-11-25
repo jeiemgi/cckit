@@ -19,14 +19,14 @@
 #                             research · automation · minimal (asked when a terminal or an
 #                             answers file is there; else required unless --upgrade)
 #   --name <str>              human project name                  (default: target basename)
-#   --slug <str>             short slug / mempalace wing          (default: lowercased basename)
+#   --slug <str>             short slug                           (default: lowercased basename)
 #   --repo <owner/repo>       GitHub repo                          (default: <owner>/<slug>)
 #   --owner-login <login>     GitHub user/org login                (default: forge_rest user)
 #   --owner-name <str>        human owner name                     (default: owner-login)
 #   --project-number <int>    Projects v2 number (enables board)   (default: none -> board off)
 #   --plans <mdx|markdown|none>  plan file format                  (default: profile default)
 #   --plans-dir <dir>         where plans live                     (default: per format)
-#   --memory <on|off>         enable MemPalace memory + hooks      (default: profile default)
+#   --memory <on|off>         retired: accepted and ignored
 #   --speckit <on|off>        add the Spec-Driven Development flow  (default: off)
 #   --plain-language <on|off> install the plain-language rule: the agent says draft, review and
 #                             approve, and names git mechanics only when asked (default: profile default)
@@ -268,7 +268,7 @@ fi
 # ---- parse flags ---------------------------------------------------------
 _INIT_ARGS=("$@")   # as typed — the --upgrade dry run replays them against a copy (#448)
 PROFILE=""; TARGET="$PWD"; NAME=""; SLUG=""; REPO=""; GH_OWNER=""; OWNER_NAME=""
-PROJECT_NUMBER=""; PLANS_FORMAT=""; PLANS_DIR=""; MEMORY=""; LANG_PREF="English"; FORCE=0
+PROJECT_NUMBER=""; PLANS_FORMAT=""; PLANS_DIR=""; LANG_PREF="English"; FORCE=0
 PLAIN_LANGUAGE=""
 TASKS_DEFAULT=""   # light | issues — the profile's defaults.tasks; on --upgrade, the stored tasks.default
 SPECKIT=""; PREPUSH_CMD=""; LOCAL_LAYER=""; LOCAL_EXPLICIT=0; DRY_RUN=0; UPGRADE=0
@@ -289,7 +289,7 @@ while [[ $# -gt 0 ]]; do
     --project-number) PROJECT_NUMBER="$2"; shift 2 ;;
     --plans) PLANS_FORMAT="$2"; shift 2 ;;
     --plans-dir) PLANS_DIR="$2"; shift 2 ;;
-    --memory) MEMORY="$2"; shift 2 ;;
+    --memory) shift 2 ;;  # retired: the memory integration is gone
     --speckit) SPECKIT="$2"; shift 2 ;;
     --plain-language) PLAIN_LANGUAGE="$2"; shift 2 ;;
     --prepush) PREPUSH_CMD="$2"; shift 2 ;;
@@ -385,7 +385,6 @@ if [[ $UPGRADE -eq 1 ]]; then
   [[ -z "$SLUG" ]]         && SLUG="$(jq -r '.project.slug // ""' "$UP_CFG")"
   [[ -z "$REPO" ]]         && REPO="$(jq -r '.github.repo // ""' "$UP_CFG")"
   [[ -z "$GH_OWNER" ]]     && GH_OWNER="$(jq -r '.github.owner // ""' "$UP_CFG")"
-  [[ -z "$MEMORY" ]]       && MEMORY="$(jq -r 'if .memory.enabled then "on" else "off" end' "$UP_CFG")"
   [[ -z "$SPECKIT" ]]      && SPECKIT="$(jq -r 'if (.specKit.enabled // false) then "on" else "off" end' "$UP_CFG")"
   [[ -z "$LOCAL_LAYER" ]]  && LOCAL_LAYER="$(jq -r 'if (.local.enabled // false) then "on" else "off" end' "$UP_CFG")"
   # The stored switch is the truth on upgrade: a project that turned plain language off keeps it
@@ -514,7 +513,6 @@ _init_fallback_base() {
 
 # profile defaults
 [[ -z "$PLANS_FORMAT" ]] && PLANS_FORMAT="$(jq -r '.defaults.plans_format' "$PROFILE_FILE")"
-[[ -z "$MEMORY" ]] && MEMORY="$(jq -r '.defaults.memory' "$PROFILE_FILE")"
 [[ -z "$SPECKIT" ]] && SPECKIT="$(jq -r '.defaults.speckit // "off"' "$PROFILE_FILE")"
 [[ -z "$LOCAL_LAYER" ]] && LOCAL_LAYER="$(jq -r '.defaults.local // "off"' "$PROFILE_FILE")"
 # Content work (E415). Profile defaults only — no flag: a project changes them in its config.
@@ -585,10 +583,8 @@ MILESTONES_HUMAN="$(printf '%s' "$MS_NL" | paste -sd '·' - | sed 's/·/ · /g')
 
 # flags / booleans
 if [[ -n "$PROJECT_NUMBER" ]]; then PROJECTS_V2="true"; PNUM_JSON="$PROJECT_NUMBER"; else PROJECTS_V2="false"; PNUM_JSON="null"; PROJECT_NUMBER="null"; fi
-case "$MEMORY" in on|true|yes) MEMORY_BOOL="true";; *) MEMORY_BOOL="false";; esac
 if [[ "$PLANS_FORMAT" == "none" ]]; then PLANS_ON="false"; else PLANS_ON="true"; fi
 if grep -qx "Designer" <<<"$ROLES_NL"; then DESIGN_ON="true"; else DESIGN_ON="false"; fi
-CLAUDE_PROJECT_SLUG="$(echo "$TARGET" | sed 's#/#-#g')"
 
 # spec kit
 case "$SPECKIT" in on|true|yes) SPECKIT_ON="true";; *) SPECKIT_ON="false";; esac
@@ -613,7 +609,6 @@ fi
 
 # FLAGS_ON drives <!-- IF:X --> resolution
 FLAGS_ON=""
-[[ "$MEMORY_BOOL" == "true" ]]  && FLAGS_ON="${FLAGS_ON}MEMORY,"
 [[ "$PROJECTS_V2" == "true" ]]  && FLAGS_ON="${FLAGS_ON}PROJECTS_V2,"
 [[ "$PLANS_ON" == "true" ]]         && FLAGS_ON="${FLAGS_ON}PLANS,"
 [[ "$DESIGN_ON" == "true" ]]        && FLAGS_ON="${FLAGS_ON}DESIGN,"
@@ -665,7 +660,7 @@ done
 export PROJECT_NAME="$NAME" PROJECT_SLUG="$SLUG" OWNER_NAME="$OWNER_NAME" COMMS_LANG="$LANG_PREF"
 export PROFILE GH_REPO="$REPO" GH_OWNER="$GH_OWNER" PROJECT_NUMBER PROJECT_BOARD_TITLE="$NAME"
 export BASE_BRANCH
-export PLANS_DIR PLANS_FORMAT KNOWLEDGE_DIR="knowledge" WING="$SLUG" CLAUDE_PROJECT_SLUG
+export PLANS_DIR PLANS_FORMAT KNOWLEDGE_DIR="knowledge"
 export MILESTONES_HUMAN ROLES_HUMAN AGENT_TABLE SKILL_TABLE
 export KIT_FLAGS_ON="$FLAGS_ON"
 
@@ -679,7 +674,6 @@ MANIFEST_REL="$(adapter_manifest_rel "$TARGET" "$ADAPTERS")"
 export CONFIG_REL
 _rule_enabled() {  # <rule> -> 0 unless its feature is off for this project
   case "$1" in
-    mempalace)          [[ "$MEMORY_BOOL" == "true" ]] || return 1 ;;
     design-routing)     [[ "$DESIGN_ON"   == "true" ]] || return 1 ;;
     plan-output-format) [[ "$PLANS_ON"    == "true" ]] || return 1 ;;
     plain-language)     [[ "$PLAIN_ON"    == "true" ]] || return 1 ;;
@@ -886,7 +880,7 @@ if [[ $DRY_RUN -eq 1 ]]; then
   echo "  Base    : $BASE_BRANCH   (rules that name the integration branch render this)"
   echo "  Adapters: $ADAPTERS$([[ $ADAPTER_ADDED -eq 1 ]] && echo "   (adding to stored: $ADAPTERS_HAVE)")"
   echo "  Board   : $([[ "$PROJECTS_V2" == "true" ]] && echo "Projects v2 #$PROJECT_NUMBER" || echo "off (gh issues only)")"
-  echo "  Memory  : $MEMORY_BOOL   Plans: $PLANS_FORMAT   Lang: $LANG_PREF"
+  echo "  Plans   : $PLANS_FORMAT   Lang: $LANG_PREF"
   echo "  Spec Kit: $SPECKIT_ON   Pre-push gate: $PREPUSH_ENABLED   Local model: $LOCAL_ON   kitVersion: $PLUGIN_VERSION"
   [[ "$CONTENT_KINDS_ON" == "true" ]] && echo "  Content : kind labels post · campaign · brand · research"
   [[ "$PR_BODY_STYLE" == "content" ]] && echo "  PR text : content (draft and review wording)"
@@ -954,19 +948,16 @@ if [[ $DRY_RUN -eq 1 ]]; then
   for a in $AGENTS; do
     [[ -f "$KIT_ROOT/kit/templates/agents/$a.md" ]] && echo "    .codex/agents/$a.toml"
   done
-  echo "    (Codex adapter: no memory hooks — they read Claude Code transcripts)"
   fi
   echo "    scripts/ (kit-config.sh, gh-project.sh, kit-version-check.sh, setup-labels.sh, setup-milestones.sh, capture-project-ids.sh, task-sync.sh, knowledge-lint.sh, review-lint.sh + review-rules.conf, skill-frontmatter-lint.sh, instruction-budget-lint.sh)"
   echo "    knowledge/INDEX.md                        (knowledge-base manifest — rules/knowledge-base.md)"
   if adapter_has "$ADAPTERS" claude; then
   echo "    .claude/lib/kit-sigil.sh                  (claude-kit attribution sigil helper, sourced by task-* footers)"
-  [[ "$MEMORY_BOOL"     == "true" ]] && echo "    .claude/hooks/mempal_session_start.sh + mempal_save.sh + mempal_precompact.sh + mempal_followup.sh   (SessionStart / Stop / PreCompact / SessionEnd)"
-  [[ "$MEMORY_BOOL"     == "true" ]] && echo "    .claude/mempal-identity.$SLUG.txt              (per-wing wake-up header — edit the Stack line)"
   [[ "$PREPUSH_ENABLED" == "true" ]] && echo "    .claude/hooks/prepush_gate.sh   (PreToolUse Bash gate: $PREPUSH_CMD)"
   [[ "$LOCAL_ON"        == "true" ]] && echo "    .claude/hooks/kit-local-status.sh   (SessionStart: announce local model layer when alive)"
   fi
   echo ""
-  echo "  Onboarding would offer (opt-in): gh auth$([[ "$MEMORY_BOOL" == "true" ]] && echo " · MemPalace (mempalace-mcp)") · gws (if you use Google Workspace) · local model layer (--local on: NL chores at \$0 via mlx_lm.server)"
+  echo "  Onboarding would offer (opt-in): gh auth · gws (if you use Google Workspace) · local model layer (--local on: NL chores at \$0 via mlx_lm.server)"
   echo ""
   if [[ -n "$RECIPE_FILE" ]]; then
     echo "  Recipe $(jq -r .id "$RECIPE_FILE") would run, in $TARGET:"
@@ -1058,7 +1049,6 @@ jq -n \
   --argjson pv2 "$PROJECTS_V2" --argjson pnum "$PNUM_JSON" --arg ptitle "$NAME" \
   --argjson milestones "$MS_JSON" \
   --arg pfmt "$PLANS_FORMAT" --arg pdir "$PLANS_DIR" \
-  --argjson mem "$MEMORY_BOOL" --arg wing "$SLUG" --arg cps "$CLAUDE_PROJECT_SLUG" \
   --argjson speckit "$SPECKIT_JSON" \
   --argjson ppen "$PREPUSH_ENABLED" --arg ppcmd "$PREPUSH_CMD" \
   --argjson localon "$LOCAL_ON" \
@@ -1075,8 +1065,7 @@ jq -n \
     knowledge:{dir:"knowledge"},
     specKit:{enabled:$speckit},
     prePush:{enabled:$ppen,command:$ppcmd},
-    local:{enabled:$localon,port:8080,model:"mlx-community/Qwen3-8B-4bit"},
-    memory:{enabled:$mem,provider:"mempalace",wing:$wing,claudeProjectSlug:$cps}}
+    local:{enabled:$localon,port:8080,model:"mlx-community/Qwen3-8B-4bit"}}
    # Content-work keys are written only when the profile turns them on, so the config of a
    # software project does not gain keys it never reads (E415).
    | if $ckinds then .kinds = {content:true} else . end
@@ -1091,7 +1080,7 @@ jq -n \
   > "$KITCFG.kit-new"
 if [[ $UPGRADE -eq 1 && -f "$KITCFG" ]]; then
   # deep-merge: existing values win (preserve user choices), new REQUIRED keys added, version
-  # bumped. FEATURE blocks (plans/specKit/prePush/local/memory) are additive only when the
+  # bumped. FEATURE blocks (plans/specKit/prePush/local) are additive only when the
   # project's config ALREADY has them — a missing feature key is a deliberate absence, and an
   # upgrade must never inject profile defaults over it (#149). `adapters` follows the same rule: a
   # config without the key means Claude, and an upgrade that changes nothing must not write it.
@@ -1106,7 +1095,7 @@ if [[ $UPGRADE -eq 1 && -f "$KITCFG" ]]; then
       else $h end;
     .[1] as $have
     | (.[0] | with_entries(.key as $k | select(
-        (["plans","specKit","prePush","local","memory","adapters","plainLanguage"] | index($k)) == null
+        (["plans","specKit","prePush","local","adapters","plainLanguage"] | index($k)) == null
         or ($have | has($k))))) as $tmpl
     | fill($have; $tmpl) | .kitVersion = $kitver' "$KITCFG.kit-new" "$KITCFG" \
     > "$KITCFG.merged"
@@ -1345,32 +1334,6 @@ SETTINGS="$TARGET/.claude/settings.local.json"
 merge_settings() { jq "$@" "$SETTINGS" > "$SETTINGS.tmp" && json_write_minimal "$SETTINGS.tmp" "$SETTINGS" >/dev/null; }
 HOOK_NOTE=""
 
-if [[ "$MEMORY_BOOL" == "true" && $UPGRADE -eq 0 ]]; then
-  mkdir -p "$TARGET/.claude/hooks"
-  emit "$KIT_ROOT/kit/templates/hooks/mempal_session_start.sh.tmpl" "$TARGET/.claude/hooks/mempal_session_start.sh"
-  emit "$KIT_ROOT/kit/templates/hooks/mempal_save.sh.tmpl"       "$TARGET/.claude/hooks/mempal_save.sh"
-  emit "$KIT_ROOT/kit/templates/hooks/mempal_precompact.sh.tmpl" "$TARGET/.claude/hooks/mempal_precompact.sh"
-  emit "$KIT_ROOT/kit/templates/hooks/mempal_followup.sh.tmpl"   "$TARGET/.claude/hooks/mempal_followup.sh"
-  chmod +x "$TARGET/.claude/hooks/mempal_session_start.sh" "$TARGET/.claude/hooks/mempal_save.sh" "$TARGET/.claude/hooks/mempal_precompact.sh" "$TARGET/.claude/hooks/mempal_followup.sh"
-  # Per-wing wake-up header — without it, `mempalace wake-up` shows the single global
-  # ~/.mempalace/identity.txt for every wing (the session-start hook swaps this in). See
-  # kit/templates/rules/mempalace.md; `cckit doctor` re-seeds it if it goes missing.
-  _mpid="$TARGET/.claude/mempal-identity.$SLUG.txt"
-  if [[ ! -e "$_mpid" ]]; then
-    {
-      printf 'Project: %s (wing: %s)\n' "$NAME" "$SLUG"
-      [[ -n "$OWNER_NAME" ]] && printf 'Owner: %s\n' "$OWNER_NAME"
-      printf 'Stack: (describe this project — this header shows on every session wake-up)\n'
-    } > "$_mpid"
-  fi
-  merge_settings --arg start "$TARGET/.claude/hooks/mempal_session_start.sh" --arg save "$TARGET/.claude/hooks/mempal_save.sh" --arg pre "$TARGET/.claude/hooks/mempal_precompact.sh" --arg fup "$TARGET/.claude/hooks/mempal_followup.sh" \
-    '.hooks.SessionStart = [{matcher:"",hooks:[{type:"command",command:$start,timeout:30}]}]
-     | .hooks.Stop = [{matcher:"",hooks:[{type:"command",command:$save,timeout:30}]}]
-     | .hooks.PreCompact = [{matcher:"",hooks:[{type:"command",command:$pre,timeout:30}]}]
-     | .hooks.SessionEnd = [{matcher:"",hooks:[{type:"command",command:$fup,timeout:30}]}]'
-  HOOK_NOTE="$HOOK_NOTE + MemPalace"
-fi
-
 if [[ "$PREPUSH_ENABLED" == "true" && $UPGRADE -eq 0 ]]; then
   mkdir -p "$TARGET/.claude/hooks"
   emit "$KIT_ROOT/kit/templates/hooks/prepush_gate.sh.tmpl" "$TARGET/.claude/hooks/prepush_gate.sh"
@@ -1460,9 +1423,6 @@ fi   # ==== end Claude adapter only ====
 # The SAME hook templates as the Claude adapter, rendered into .codex/hooks/: Codex sends the event
 # fields they read (hook_event_name, cwd, tool_input.command) and honours the same answers (exit 2 +
 # stderr blocks a tool, decision:block continues a Stop, additionalContext injects text).
-# Not installed: the MemPalace hooks. mempal_save / mempal_precompact mine ~/.claude/projects/, the
-# Claude Code transcript store, and no Codex transcript format has been validated against
-# `mempalace mine` — see agent-compatibility.mdx.
 CODEX_HOOKS_CHANGED=0
 if adapter_has "$ADAPTERS" codex; then
 # shellcheck source=/dev/null
@@ -1519,7 +1479,6 @@ else
   echo "  ! .codex/hooks.json was left untouched — cckit's Codex hooks are NOT registered. Fix the file, then run: cckit init --upgrade" >&2
 fi
 rm -f "$_CX_SRC"
-[[ "$MEMORY_BOOL" == "true" ]] && echo "  · Codex adapter: no memory hooks — the transcript sweep reads Claude Code's ~/.claude/projects/ only"
 fi   # ==== end Codex adapter hooks ====
 
 # ---- recommended .gitignore entries (idempotent) ------------------------
@@ -1573,7 +1532,7 @@ echo "  Repo    : $REPO"
 echo "  Adapters: $ADAPTERS"
 echo "  Board   : $([[ "$PROJECTS_V2" == "true" ]] && echo "Projects v2 #$PROJECT_NUMBER" || echo "off (gh issues only)")"
 echo "  Agents  : $(echo $AGENTS | tr '\n' ' ')"
-echo "  Memory  : $MEMORY_BOOL   Plans: $PLANS_FORMAT   Lang: $LANG_PREF   kitVersion: $PLUGIN_VERSION"
+echo "  Plans   : $PLANS_FORMAT   Lang: $LANG_PREF   kitVersion: $PLUGIN_VERSION"
 echo "  Spec Kit: $SPECKIT_ON   Pre-push gate: $PREPUSH_ENABLED   Local model: $LOCAL_ON   Stack skills self-gate by package.json"
 [[ "$PLAIN_ON" == "true" ]] && echo "  Wording : plain language (draft, review, approve)"
 [[ "$TASKS_DEFAULT" == "light" ]] && echo "  Tasks   : light tasks are the default list (cckit task; no GitHub issue per task)"

@@ -43,15 +43,12 @@ CFG="$TARGET/.claude/kit.config.json"
 # shellcheck source=/dev/null
 . "$KIT_ROOT/lib/core/git-remote.sh"
 REMOTE_NAME="$(git_remote_repo_name "$TARGET" 2>/dev/null || true)"; REMOTE_NAME="${REMOTE_NAME:-$(basename "$TARGET")}"
-WING=""; MEMORY_BOOL="false"; PROJECT_NAME="$REMOTE_NAME"; HTTP_PORT=4747
+PROJECT_NAME="$REMOTE_NAME"; HTTP_PORT=4747
 if [[ -f "$CFG" ]]; then
-  WING="$(jq -r '.memory.wing // .project.slug // ""' "$CFG" 2>/dev/null || echo "")"
-  MEMORY_BOOL="$(jq -r '.memory.enabled // false'      "$CFG" 2>/dev/null || echo false)"
   PROJECT_NAME="$(jq -r '.project.name // ""'          "$CFG" 2>/dev/null || echo "$PROJECT_NAME")"
   [[ -z "$PROJECT_NAME" || "$PROJECT_NAME" == "null" ]] && PROJECT_NAME="$REMOTE_NAME"
   HTTP_PORT="$(jq -r '.annotate.mcp.httpPort // 4747'  "$CFG" 2>/dev/null || echo 4747)"
 fi
-[[ -z "$WING" || "$WING" == "null" ]] && WING="$(printf '%s' "$REMOTE_NAME" | tr '[:upper:]' '[:lower:]')"
 [[ -z "$HTTP_PORT" || "$HTTP_PORT" == "null" ]] && HTTP_PORT=4747
 
 case "$REACT_PKG_MANAGER" in
@@ -78,8 +75,7 @@ SNIPPET="import { Agentation } from \"agentation\";
 emit_rule() {  # resolve <!-- IF:FLAG --> blocks + {{VARS}} exactly like lib/verbs/init.sh
   local src="$1" dest="$2"
   mkdir -p "$(dirname "$dest")"
-  KIT_FLAGS_ON="$([[ "$MEMORY_BOOL" == "true" ]] && echo MEMORY || true)" \
-  WING="$WING" PROJECT_NAME="$PROJECT_NAME" \
+  KIT_FLAGS_ON="" PROJECT_NAME="$PROJECT_NAME" \
   perl -0777 -pe '
     my %on = map { $_=>1 } grep { length } split /,/, ($ENV{KIT_FLAGS_ON}//"");
     1 while s{<!-- IF:(\w+) -->(.*?)<!-- /IF:\1 -->}{ $on{$1} ? $2 : "" }gse;
@@ -94,13 +90,12 @@ if [[ $DRY_RUN -eq 1 ]]; then
   echo "  Framework    : $REACT_FRAMEWORK"
   echo "  Entry file   : ${REACT_ENTRY_FILE:-"(not auto-found — the skill will ask)"}"
   echo "  Pkg manager  : $REACT_PKG_MANAGER"
-  echo "  Memory/wing  : $MEMORY_BOOL / $WING"
   echo ""
   echo "  Would:"
   echo "    1. $INSTALL_CMD"
   echo "    2. $MCP_ADD_CMD"
   echo "         # Agentation's MCP: HTTP :4747 (browser toolbar → store) + MCP stdio (→ Claude)"
-  echo "    3. write .claude/rules/react-annotate.md   (memory block: $MEMORY_BOOL)"
+  echo "    3. write .claude/rules/react-annotate.md"
   echo "    4. merge .annotate into .claude/kit.config.json"
   echo "    5. (skill applies, with your OK) wire the dev-only toolbar into ${REACT_ENTRY_FILE:-<entry>}:"
   printf '%s\n' "$SNIPPET" | sed 's/^/           /'

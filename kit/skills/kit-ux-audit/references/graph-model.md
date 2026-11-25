@@ -1,6 +1,6 @@
 # kit-ux-audit — normalized graph model
 
-Both graph sources (graphify `graph.json`, and the fallback `ux-graph-scan.sh`) are read into one
+The graph from `ux-graph-scan.sh` is read into one
 model before the heuristics run. Keep it as compact JSON; you hand **slices** to the agent, never
 the whole graph and never source files.
 
@@ -50,8 +50,7 @@ the whole graph and never source files.
 | `validates` | form ↔ field / field ↔ field validation rule | H6, H7 |
 | `duplicates` | two forms / two routes judged equivalent (same entity + overlapping fields, or same screen under two parents) | H5, H7 |
 
-`duplicates` from the scan is heuristic (name + entity + field-overlap ≥ 0.6). From graphify, use
-`INFERRED` edges plus community co-membership.
+`duplicates` from the scan is heuristic (name + entity + field-overlap ≥ 0.6).
 
 ## Derived metrics (compute before slicing)
 
@@ -59,34 +58,16 @@ the whole graph and never source files.
   minimum. Screens unreachable by `navigates-to` → depth `∞` → orphan candidates (H4).
 - **god-nodes**: `component` (and `screen`) nodes ranked by inbound `renders` count. Top decile or
   fan-in ≥ 10 → H9 pool.
-- **community bridges**: if the graph carries communities (graphify does; for the scan, run a quick
-  label-propagation on the `renders`+`navigates-to` subgraph), collect edges whose endpoints are in
+- **community bridges**: run a quick label-propagation on the `renders`+`navigates-to` subgraph), collect edges whose endpoints are in
   different communities. These cross-feature edges are where "confusing" flows concentrate — feed
   them to the agent verbatim.
 - **edit-surface map**: per `data-entity`, the set of `screen`s with a `writes`/`mutates` edge
   (directly or `via` a form). This is the H1 input and a report section on its own.
 
-## Mapping graphify `graph.json` → this model
-
-graphify nodes carry `type`/`kind` and `source_location`; edges carry a `relation` and an
-`EXTRACTED|INFERRED|AMBIGUOUS` provenance.
-
-- node `kind`: map `file`/`module` whose path matches a route convention (`app/**/page.*`,
-  `pages/**`, `src/pages/**`, `src/routes/**`, a `*.route.*`) → `route`+`screen`; `layout.*` /
-  `*Layout` → `container`; a component export rendered by screens → `component`; a symbol matching
-  `/^use[A-Z]/` returning data or a Prisma/SQL/`.from(` call → fold into a `data-entity` +
-  `reads`/`writes`; a `*Form`/`useForm` symbol → `form`.
-- edges: graphify `imports`/`calls`/`renders` → `imports`/`renders`; a call into a router API →
-  `navigates-to`; a call into a data client → `reads`/`writes`/`mutates` by verb.
-- keep graphify `community` / `community_name` on nodes — reuse directly for bridges.
-- provenance: treat `AMBIGUOUS` edges as `needs_visual` fuel, never as hard evidence.
-
-Do the mapping in memory (or a tiny throwaway script). Persist the normalized graph to
-`<target>/graphify-out/.ux_model.json` so a re-run can reuse it.
-
-## Mapping the fallback scan → this model
+## Mapping the scan → this model
 
 `ux-graph-scan.sh --scan <dir>` already emits this shape at
-`<dir>/graphify-out/.ux_graph.json` (`{ "nodes": [...], "edges": [...], "meta": {...} }`). It is
+`<dir>/.ux-audit/.ux_graph.json` (`{ "nodes": [...], "edges": [...], "meta": {...} }`). It is
 **approximate** — regex over TSX/Vue, not an AST. Mark the report "graph source: deterministic
-scan" so findings are read with that caveat, and lean harder on `needs_visual`.
+scan" so findings are read with that caveat, and lean harder on `needs_visual`. Persist the
+normalized graph to `<target>/.ux-audit/.ux_model.json` so a re-run can reuse it.

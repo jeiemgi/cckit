@@ -56,14 +56,3 @@ Never trust a stale session snapshot — re-fetch from `gh`.
 ## Anti-patterns
 
 - ❌ Restating the snapshot · ❌ Filing issues for trivia · ❌ Long rationales · ❌ Making product/design calls
-
-<!-- IF:MEMORY -->
-## Memory (MemPalace)
-
-| Action          | Tool                    | Params                              |
-| --------------- | ----------------------- | ----------------------------------- |
-| Wake-up recall  | `mempalace_diary_read`  | wing=`agent-pm`                     |
-| Search history  | `mempalace_search`      | wing=`{{WING}}` room=`decisions`    |
-| Save decision   | `mempalace_add_drawer`  | wing=`{{WING}}` room=`decisions`    |
-| Save diary      | `mempalace_diary_write` | wing=`agent-pm`, topic=sprint/issue |
-<!-- /IF:MEMORY -->

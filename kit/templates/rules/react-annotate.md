@@ -60,14 +60,6 @@ user is annotating, the wired `<Agentation endpoint="http://localhost:4747" />` 
 `endpoint` prop** (toolbar is writing only to `localStorage`) or the tab is stale — fix the wiring /
 reload before continuing.
 
-<!-- IF:MEMORY -->
-## On session close
-
-Before the closing summary, write a short record to MemPalace wing **`{{WING}}`** (room `problems` or
-`decisions`): which annotations were resolved, the components/files touched, and anything deferred.
-Keeps UI-fix history per project.
-<!-- /IF:MEMORY -->
-
 ## Scope
 
 Wired for **Claude Code**. Other agents (Cursor, Codex, …) can read the same annotations through

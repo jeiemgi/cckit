@@ -75,9 +75,6 @@ load_kit_config() {
 
   export KIT_KNOWLEDGE_DIR="$(jq -r '.knowledge.dir // "knowledge"' "$cfg")"
 
-  export KIT_MEMORY="$(jq -r '.memory.enabled'      "$cfg")"
-  export KIT_WING="$(jq -r '.memory.wing'           "$cfg")"
-
   export KIT_SPECKIT="$(jq -r '.specKit.enabled // false'       "$cfg")"
 
   export KIT_ANNOTATE_ENABLED="$(jq -r '.annotate.enabled // false'  "$cfg")"

@@ -265,17 +265,10 @@ for id in $(integrations_list); do
     "$(jq -r --arg k "$top" '.properties | has($k)' "$ROOT/kit.config.schema.json")" "true"
 done
 
-# The two tools that used to be hardcoded in lib/verbs/kit-doctor.sh (E303.4), one unit test each.
-# They are unlike on purpose: the format has to carry both shapes.
-t "shipped descriptors" "$(integrations_list | tr '\n' ' ')" "emil-design-eng graft impeccable lavish mempalace mlx-lm web-design-guidelines "
-mp="$ROOT/kit/integrations/mempalace.json"; mlx="$ROOT/kit/integrations/mlx-lm.json"
-integration_validate "$mp" >/dev/null 2>&1;  rc "mempalace validates" "$?" "0"
-t "mempalace: turned on by memory.enabled" "$(integration_config_key "$mp")" "memory.enabled"
-t "mempalace: pipx first, uv second" "$(jq -r '[.install[].run] | join(" | ")' "$mp")" "pipx install mempalace | uv tool install mempalace"
-t "mempalace: bootstrap brings pipx, the FIRST candidate's manager" "$(jq -r '.install[0].bootstrap | "\(.manager): \(.run)"' "$mp")" "brew: brew install pipx"
-t "mempalace: no applicability condition" "$(jq -r 'has("appliesWhen")' "$mp")" "false"
-on_machine Linux x86_64 "$mp" "$repo/scripts"; rc "mempalace applies on any machine and repo" "$?" "0"
-t "mempalace: not affiliated" "$(jq -r '.attribution.affiliated' "$mp")" "false"
+# mlx-lm used to be hardcoded in lib/verbs/kit-doctor.sh (E303.4); its descriptor carries the
+# platform gate the format has to express.
+t "shipped descriptors" "$(integrations_list | tr '\n' ' ')" "emil-design-eng graft impeccable lavish mlx-lm web-design-guidelines "
+mlx="$ROOT/kit/integrations/mlx-lm.json"
 integration_validate "$mlx" >/dev/null 2>&1; rc "mlx-lm validates" "$?" "0"
 t "mlx-lm: turned on by local.enabled" "$(integration_config_key "$mlx")" "local.enabled"
 t "mlx-lm: uv first, pipx second" "$(jq -r '[.install[].run] | join(" | ")' "$mlx")" "uv tool install mlx-lm | pipx install mlx-lm"
@@ -284,9 +277,9 @@ on_machine Darwin arm64  "$mlx" "$repo/scripts"; rc "mlx-lm applies on Apple sil
 on_machine Darwin x86_64 "$mlx" "$repo";         rc "mlx-lm does not apply on an Intel Mac" "$?" "1"
 on_machine Linux  aarch64 "$mlx" "$repo";        rc "mlx-lm does not apply on Linux" "$?" "1"
 t "mlx-lm: not affiliated" "$(jq -r '.attribution.affiliated' "$mlx")" "false"
-# Neither descriptor may fall back to plain pip: Homebrew's Python is externally managed (PEP 668).
+# No descriptor may fall back to plain pip: Homebrew's Python is externally managed (PEP 668).
 t "no shipped candidate is a plain pip install" \
-  "$(jq -r '.install[].run, (.install[].bootstrap.run // empty)' "$mp" "$mlx" | grep -cE '(^| )pip3? install' )" "0"
+  "$(jq -r '.install[].run, (.install[].bootstrap.run // empty)' "$mlx" | grep -cE '(^| )pip3? install' )" "0"
 
 # Graft (E303.10): the first descriptor that judges the REPO (anyExtension), wires into it, and
 # ships a rule. The wire flags below are the ones the hook-merge test ran with.

@@ -17,7 +17,7 @@ if [ -n "${KIT_OB_TEST_INNER:-}" ]; then
   "$OB" status >/dev/null 2>&1; t "status before rc" "$?" "1"
 
   # global: writes profile, preserves schema/user, applies answers
-  printf '%s\n' '{"name":"Ada","language":"es","mode":"enforced","plans_format":"markdown","memory":"on"}' > "$work/g.json"
+  printf '%s\n' '{"name":"Ada","language":"es","mode":"enforced","plans_format":"markdown"}' > "$work/g.json"
   "$OB" global --answers "$work/g.json" >/dev/null 2>&1; t "global rc" "$?" "0"
   prof="$KIT_PROFILE_HOME/kit.profile.tester.json"
   t "profile created"  "$([ -f "$prof" ] && echo yes)"            "yes"
@@ -25,7 +25,6 @@ if [ -n "${KIT_OB_TEST_INNER:-}" ]; then
   t "user kept"        "$(jq -r .user "$prof")"                   "tester"
   t "name applied"     "$(jq -r .name "$prof")"                   "Ada"
   t "nested default"   "$(jq -r .defaults.mode "$prof")"          "enforced"
-  t "memory applied"   "$(jq -r .defaults.memory "$prof")"        "on"
   "$OB" status >/dev/null 2>&1; t "status after rc" "$?" "0"
 
   # global is mergeable (a 2nd partial run keeps prior fields)

@@ -362,7 +362,6 @@ t "codex: hook scripts installed"        "$(ls "$fx/hx/.codex/hooks" 2>/dev/null
 t "codex: hook scripts are executable"   "$(find "$fx/hx/.codex/hooks" -type f ! -perm -u+x | wc -l | tr -d ' ')" "0"
 t "codex: mail on four events"           "$(mail_events "$fx/hx/.codex/hooks.json" "$CXMAIL")" "PostToolUse SessionStart Stop UserPromptSubmit"
 t "codex: hooks carry no machine path"   "$(grep -rlF "$fx" "$fx/hx/.codex" 2>/dev/null | wc -l | tr -d ' ')" "0"
-t "codex: no memory hook installed"      "$(ls "$fx/hx/.codex/hooks" | grep -c mempal)" "0"
 t "codex: still no .claude tree"         "$(has_path hx .claude)" "no"
 t "codex: hooks recorded as owned"       "$(jq -r '[.entries | keys[] | select(startswith(".codex/hooks"))] | length' "$fx/hx/.cckit/kit.manifest.json")" "6"
 settle hx "scaffold codex with hooks"
