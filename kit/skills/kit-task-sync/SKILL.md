@@ -1,6 +1,6 @@
 ---
 name: kit-task-sync
-terms: Sync
+terms: Backlog
 description: Query GitHub issues (+ Projects v2 if enabled) and print a status table grouped by Role. Flags blocked items and items missing a board entry.
 when_to_use: "What's the state of work?", "what's blocked?", "show me the board", or the start of any chapter that needs current ground truth instead of a stale snapshot.
 ---

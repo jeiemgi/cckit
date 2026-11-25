@@ -19,7 +19,7 @@
   term: Report
 - task: "read the board by role, see what is blocked"
   skill: kit-task-sync
-  term: Sync
+  term: Backlog
 - task: "pick up the next unblocked issue"
   skill: kit-next
   term: Task

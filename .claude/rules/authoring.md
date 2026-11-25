@@ -52,8 +52,8 @@ number.
 - **Origin:** a correction. Tutorial prompts shipped with literal numbers, of the form
   `cckit orchestrate 46 47 48`. Those numbers were issues in the author's repository on the day the
   page was written; in the reader's repository they are other issues, closed ones, or nothing.
-- **Write instead:** *sync the board, show me what is ready, and I will pick.* The agent runs
-  `cckit status --board`, presents what is unblocked, and the person chooses. Which lane the choice goes to —
+- **Write instead:** *read the board, show me what is ready, and I will pick.* The agent runs
+  `cckit status --board`, presents what is unblocked, and the person chooses. What the choice starts —
   one issue, an effort, a wave, an unattended run — depends on what was picked, so the prompt does
   not fix that either.
 - **In a command line:** a placeholder (`cckit start <issue>`, `cckit orchestrate <issues…>`) or a
