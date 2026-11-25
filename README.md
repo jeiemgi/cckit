@@ -733,7 +733,7 @@ cckit/
   kit/profiles/ kit/templates/   # init profiles + scaffold templates
   kit/routines/ kit/modules/     # scheduled routines + optional modules
   kit/integrations/          # one JSON descriptor per optional third-party tool + its schema
-                         #   (mempalace.json, mlx-lm.json, graft.json, lavish.json — the last is on
+                         #   (mlx-lm.json, graft.json, lavish.json — the last is on
                          #   by default and never installed unasked; impeccable.json,
                          #   emil-design-eng.json, web-design-guidelines.json — the design skills
                          #   the page-design skill coordinates). `cckit doctor` installs each one the

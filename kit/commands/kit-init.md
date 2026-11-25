@@ -1,6 +1,6 @@
 ---
 description: Scaffold a tailored .claude/ (agents + skills + rules + workflow) into the current project from a claude-kit role profile.
-argument-hint: "[profile] [--name ...] [--repo owner/repo] [--project-number N] [--memory on]"
+argument-hint: "[profile] [--name ...] [--repo owner/repo] [--project-number N]"
 allowed-tools: Bash, Read, AskUserQuestion, Edit
 ---
 
@@ -18,9 +18,9 @@ You are initializing the current project with the **claude-kit** setup. The kit 
    - Inspect the target. If it looks like a **parent/workspace** holding several projects (multiple
      subdirectories with their own `.git` / `package.json` / `pyproject.toml` / `Cargo.toml` / `go.mod`),
      **recommend running `/kit-init` inside each project separately** — one `.claude/` per project —
-     instead of once at the workspace root. Explain the payoff: each project maps to its own MemPalace
-     **wing**, so the kit keeps **traceability and history per project** (decisions, plans, and agent
-     diaries never bleed across projects). List the projects you detected and let the user pick.
+     instead of once at the workspace root. Explain the payoff: the kit keeps **traceability and
+     history per project** (decisions, plans and config never bleed across projects). List the
+     projects you detected and let the user pick.
    - If it's a single project (a `.git` here, or one app), continue here.
    - Suggest a layout that favors the kit — `CLAUDE.md` + `.claude/` at the project root, plans under
      `docs/plans/`, the kit's `scripts/` alongside; **one repo = one kit setup**. See
@@ -32,7 +32,6 @@ You are initializing the current project with the **claude-kit** setup. The kit 
      (read `${CLAUDE_PLUGIN_ROOT}/profiles/*.json` to describe each)
    - **GitHub repo** — `owner/repo` (offer `gh api user --jq .login` as the default owner)
    - **Projects v2 board** — board number if they use one, else "off"
-   - **MemPalace memory** — on/off (off unless they actively use MemPalace)
    - **Spec Kit (SDD)** — on/off; pass `--speckit on` to enable the spec-driven workflow section
    - **Pre-push gate** — optional. If they want a check to run before every `git push` (e.g.
      `pnpm build`, `pnpm typecheck`, `pnpm -w lint`), pass `--prepush "<command>"`. Omit for none —
@@ -55,7 +54,6 @@ You are initializing the current project with the **claude-kit** setup. The kit 
      --name "<Project Name>" \
      --repo "<owner/repo>" \
      [--project-number <N>] \
-     [--memory on] \
      [--lang "<language>"] \
      [--adapter <claude|codex|both>]
    ```
@@ -79,16 +77,6 @@ You are initializing the current project with the **claude-kit** setup. The kit 
    **GitHub CLI (`gh`)** — backs the whole task/PR workflow (issues, PRs, labels, milestones).
    - Detect: `gh auth status`. If not authenticated, explain every `task-*` skill needs it and,
      with consent, run `gh auth login`. Re-check with `gh auth status`.
-
-   **MemPalace** (only when memory was enabled) — the persistent-memory backend: an MCP server
-   exposing the `mempalace_*` tools plus the `mempalace-mcp` binary, which the `Stop`/`PreCompact`
-   hooks and every agent's diary protocol depend on. Absent = dormant, never errors.
-   - Detect: `command -v mempalace-mcp` and `claude mcp list | grep -i mempalace`.
-   - Binary present but unregistered → with consent run `claude mcp add mempalace mempalace-mcp`;
-     verify with `claude mcp list`. Then confirm with a `mempalace_status` call.
-   - Binary missing → explain it and ask the user for their install method; `mempalace-mcp` is a
-     user-provided tool, so **do not guess a package name or fabricate an installer**. Re-check
-     `command -v mempalace-mcp`.
 
    **Google Workspace CLI (`gws`)** — opt-in; offer only if the user works with Google Docs / Sheets /
    Slides / Drive / Gmail / Calendar (e.g. the `gws-slides` skill drives it).

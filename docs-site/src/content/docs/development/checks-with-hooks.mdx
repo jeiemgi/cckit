@@ -9,7 +9,7 @@ tutorial:
     - { text: "cckit is installed and set up in this project", link: "Set it up", href: "/getting-started/initialize/" }
   ogTag: Hooks
   keywords: [claude code hooks, claude code pre-commit, automate checks ai agent]
-  related: [memory/install-mempalace, review/stop-committing-secrets, review/control-what-agents-can-do]
+  related: [review/stop-committing-secrets, review/control-what-agents-can-do]
 ---
 
 import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
@@ -78,8 +78,7 @@ registrations: check those in `.claude/settings.local.json`.
 ### 3. Turn on feature hooks as you need them
 
 Enabling the pre-push gate at `init` adds a hook that runs your project's tests and lint before a
-`git push`, so a red branch never reaches the remote. Memory adds four more (see
-[persistent memory](/memory/install-mempalace/)).
+`git push`, so a red branch never reaches the remote.
 
 
 ## Check it worked
@@ -121,7 +120,6 @@ gate doing its job. Fix the finding, or adjust the check the gate runs.
 ## Related guides
 
 <CardGrid>
-  <LinkCard title="Install MemPalace" href="/memory/install-mempalace/" description="The four hooks the memory layer adds." />
   <LinkCard title="Stop Claude Code from committing secrets" href="/review/stop-committing-secrets/" description="The secret guard that runs as a pre-commit hook." />
   <LinkCard title="Control what Claude Code is allowed to do" href="/review/control-what-agents-can-do/" description="The permission gate around mutating operations." />
 </CardGrid>

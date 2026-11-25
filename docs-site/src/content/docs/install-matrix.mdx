@@ -112,7 +112,6 @@ the project's files, and the adapter decides which. The default is `claude`.
 | Rules | `.claude/rules/*.md` | `.agents/rules/*.md`, listed by path in `AGENTS.md` |
 | Specialist agents | `.claude/agents/<role>/AGENT.md` | `.codex/agents/<role>.toml` |
 | Hooks and guards | `.claude/hooks/`, registered in `.claude/settings*.json` | `.codex/hooks/`, registered in `.codex/hooks.json` ([details](/hooks/#codex)) |
-| Memory hooks | `.claude/hooks/mempal_*.sh` (with `--memory on`) | not installed |
 | Statusline, settings | `.claude/statusline.sh`, `.claude/settings*.json` | not installed |
 | Config (when it is the only adapter) | `.claude/kit.config.json` | `cckit.config.json` |
 | Ownership manifest (when it is the only adapter) | `.claude/kit.manifest.json` | `.cckit/kit.manifest.json` |

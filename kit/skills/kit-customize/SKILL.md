@@ -14,8 +14,8 @@ them, search/suggest skills, lint everything, and apply a preset or custom profi
 
 ## 1. Load context
 
-- Read `./.claude/kit.config.json` → current `profile`, `roles`, `project.{name,slug,language}`,
-  `memory.enabled`. **If it's missing, stop**: tell the user to run `/kit-init` first — this skill
+- Read `./.claude/kit.config.json` → current `profile`, `roles`, and
+  `project.{name,slug,language}`. **If it's missing, stop**: tell the user to run `/kit-init` first — this skill
   only customizes a project the kit already scaffolded.
 - List existing agents: `.claude/agents/*/AGENT.md` (Glob). Note their `name`s.
 - Available raw material:
@@ -36,10 +36,8 @@ go straight to that path in step 3 — don't ask the mode. Otherwise ask via `As
 **Add** — two paths, ask which:
 
 - **From a kit template** — copy `${CLAUDE_PLUGIN_ROOT}/templates/agents/<name>.md`, then:
-  - substitute `{{PROJECT_NAME}}`, `{{COMMS_LANG}}`, `{{WING}}`, `{{PROJECT_SLUG}}` etc. from
-    `kit.config.json`;
-  - resolve the `<!-- IF:MEMORY -->…<!-- /IF:MEMORY -->` block — **keep** its inner content when
-    `memory.enabled` is true, **delete** the whole block (markers + body) when false.
+  - substitute `{{PROJECT_NAME}}`, `{{COMMS_LANG}}`, `{{PROJECT_SLUG}}` etc. from
+    `kit.config.json`.
 - **Fresh custom agent** — author one that follows the frontmatter contract (see below).
 
 Frontmatter contract (match the templates exactly):
@@ -54,8 +52,7 @@ skills:
   - plugin:skill
 ---
 ```
-Body: terse `## Authority` (✅ owns / ❌ defers + ❌ never), a numbered workflow, `## Voice + style`,
-and (only if memory enabled) the `## Memory (MemPalace)` table.
+Body: terse `## Authority` (✅ owns / ❌ defers + ❌ never), a numbered workflow, and `## Voice + style`.
 
 Write to `.claude/agents/<name>/AGENT.md`. Then **lint it (step 6)**. Offer to:
 - add the agent's role to `kit.config.json` `roles`, and

@@ -753,11 +753,10 @@ Three optional fields carry what an installer needs beyond the candidate list:
 | `rules` | Rule templates (`templates/rules/<name>.md`) that `cckit add <id>` copies into the project's `.claude/rules/` when the integration is switched on. |
 | `wire.kept` | Tool features left **on** although a flag could decline them, each mapped to the test behind that decision. The counterpart of `wire.declined`; it never reaches the command line. |
 
-Four descriptors ship:
+Three descriptors ship:
 
 | Descriptor | Config key | Candidates, in order | Bootstrap | Applies |
 | --- | --- | --- | --- | --- |
-| `integrations/mempalace.json` | `memory.enabled` | `pipx install mempalace`, then `uv tool install mempalace` | `brew install pipx` | any repo, any machine |
 | `integrations/mlx-lm.json` | `local.enabled` | `uv tool install mlx-lm`, then `pipx install mlx-lm` | `brew install uv` | `Darwin` + `arm64` only |
 | `integrations/graft.json` | `codeGraph.provider` = `graft` | `npm install -g @nanonets/graft`, then `pnpm add -g @nanonets/graft` | none | a repo with at least one file in a language Graft indexes |
 | `integrations/lavish.json` | `reviewPages.enabled`, **on by default** | `npm install -g lavish-axi`, then `brew install node` (only when neither `lavish-axi` nor `npx` is on `PATH`) | none | any repo, any machine |
@@ -769,7 +768,6 @@ refused by the validator.
 | Key | Default | What it does |
 | --- | --- | --- |
 | `codeGraph.provider` | *(unset — off)* | Which integration provides code-graph retrieval, as its descriptor's `config.value` names it. `graft` switches on `integrations/graft.json`. Unset or `none`: no code graph. |
-| `memory.enabled` | `false` | `true` switches on `integrations/mempalace.json`: `cckit doctor` installs the MemPalace CLI and checks the wake-up header and session-start hook. |
 | `local.enabled` | *(unset — off)* | `true` switches on `integrations/mlx-lm.json`: `cckit doctor` installs the runtime on Apple silicon and starts `mlx_lm.server` on `local.port` (default `8080`) with `local.model`. |
 | `local.port` | `8080` | The port `mlx_lm.server` listens on. |
 | `local.model` | `mlx-community/Qwen3-8B-4bit` | The model the server loads. The first start downloads it. |
@@ -860,8 +858,8 @@ holds no tool's recipe: the row is the runner's status line.
 With the key off or unset there is no row and the exit code is what it would be without the
 descriptor. `cckit init` runs the doctor with `--yes`, so setup keeps installing.
 
-Before this, a doctor run with no terminal and no flag installed the MemPalace CLI and mlx-lm
-without asking. It now reports them missing; pass `--fix` in automation that relied on the install.
+Before this, a doctor run with no terminal and no flag installed the tools it
+checks without asking. It now reports them missing; pass `--fix` in automation that relied on the install.
 
 ### The monthly recipe check
 

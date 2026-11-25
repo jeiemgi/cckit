@@ -37,7 +37,7 @@ emit() { printf '[%s, "o", %s]\n' "$1" "$(esc "$2")"; }
   emit "$t" $'\r\n\r\n'; t="$(bump "$t" 0.5)"
   # mocked answered chips (test values)
   emit "$t" $'\033[2m  answer the prompts (test values):\033[0m\r\n'; t="$(bump "$t" 0.35)"
-  for row in 'Profile          minimal' 'GitHub repo      acme/demo' 'Projects board   off' 'MemPalace        off' 'Language         English'; do
+  for row in 'Profile          minimal' 'GitHub repo      acme/demo' 'Projects board   off' 'Language         English'; do
     emit "$t" $'  \033[32m✔\033[0m '"$row"$'\r\n'; t="$(bump "$t" 0.45)"
   done
   emit "$t" $'\r\n'; t="$(bump "$t" 0.4)"

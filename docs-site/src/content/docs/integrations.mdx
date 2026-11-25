@@ -1,6 +1,6 @@
 ---
 title: Integrations
-description: The optional third-party tools cckit can switch on, install and re-check — MemPalace, mlx-lm, Graft, Lavish and three design skills — and what each step asks of you.
+description: The optional third-party tools cckit can switch on, install and re-check — mlx-lm, Graft, Lavish and three design skills — and what each step asks of you.
 ---
 
 import { Steps, Aside } from '@astrojs/starlight/components';
@@ -22,7 +22,6 @@ row, installs nothing and changes no exit code, and `cckit add lavish --set enab
 
 | `cckit add …` | What it gives you | Config key | Offered where | Made by |
 | --- | --- | --- | --- | --- |
-| `mempalace` | Persistent per-project memory: sessions wake up with context and file their work back. | `memory.enabled` | any repo, any machine | [MemPalace](https://github.com/MemPalace/mempalace) |
 | `mlx-lm` | A local model runtime: digest, summarize and classify run on this Mac through `mlx_lm.server`. | `local.enabled` | Apple silicon only (`Darwin` + `arm64`) | [Apple, ml-explore](https://github.com/ml-explore/mlx-lm) |
 | `graft` | Code-graph retrieval: agents ask an index where code lives and who calls a symbol. | `codeGraph.provider` = `graft` | a repo with at least one file in a language Graft indexes | [NanoNets / Trail](https://github.com/trailhq/Trail-Code) |
 | `impeccable` | Design direction for a page: plan it, set type, layout and colour, flag the look of a generated page. Step 1 of [`page-design`](/skills/#page-design). | `designDirection.provider` = `impeccable` | any repo; installed for Claude Code | [pbakaus](https://github.com/pbakaus/impeccable) |
@@ -61,7 +60,7 @@ and says which ones do not apply here.
    is a skip row instead: not installed even with `--fix`, and not a failure.
 
 3. **Finish the step the doctor names.** After an install the doctor prints the one step it leaves
-   to you: `mempalace mcp` for MemPalace, `graft init --agents claude --no-statusline --no-global`
+   to you: `graft init --agents claude --no-statusline --no-global`
    for Graft. mlx-lm and Lavish have none. For each of the three design skills: reload the agent
    session so it lists the skill, and commit the files the install wrote.
 
@@ -96,7 +95,6 @@ later candidates never run. If the tool is already detectable, nothing runs, so 
 
 | Integration | Candidates, in order | If no manager is present |
 | --- | --- | --- |
-| `mempalace` | `pipx install mempalace`, then `uv tool install mempalace` | `brew install pipx` |
 | `mlx-lm` | `uv tool install mlx-lm`, then `pipx install mlx-lm` | `brew install uv` |
 | `graft` | `npm install -g @nanonets/graft`, then `pnpm add -g @nanonets/graft` | nothing: the install fails |
 | `impeccable` | `npx -y impeccable install --providers=claude --scope=project` | nothing: the install fails |
@@ -121,17 +119,6 @@ step that broke. Details: [the monthly recipe check](/config-and-permissions/#th
 
 cckit wrote none of these tools. Each descriptor carries an `attribution` block, and the validator
 refuses a descriptor without one.
-
-### MemPalace
-
-Persistent memory, scoped to one wing per project. Local, no API key. Setup and what the hooks do:
-[Set up memory](/memory/).
-
-<Aside type="note" title="Not affiliated">
-MemPalace is independent open-source software by the [MemPalace](https://github.com/MemPalace/mempalace)
-project. cckit is not a maintainer of it and has no affiliation with or endorsement from its
-authors. Send MemPalace bugs to [its issue tracker](https://github.com/MemPalace/mempalace/issues).
-</Aside>
 
 ### mlx-lm
 

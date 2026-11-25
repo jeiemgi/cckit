@@ -11,7 +11,7 @@ tutorial:
     - "The tool you add has a one-line install command"
   ogTag: Integrations
   keywords: [cckit integration descriptor, add a tool to cckit, optional tool installer]
-  related: [development/code-graph, development/local-model-digest, memory/install-mempalace]
+  related: [development/code-graph, development/local-model-digest]
 ---
 
 import { Steps, Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
@@ -54,7 +54,7 @@ checks them.
   title="getting a cckit checkout to write the shfmt descriptor"
   say="Get a copy of cckit so we can write a descriptor for shfmt, and list the integrations it ships."
   ran={['git clone https://github.com/jeiemgi/cckit', 'cd cckit', 'bash lib/core/integrations.sh --list']}
-  means="You should see the ids that ship: `graft`, `lavish`, `mempalace`, `mlx-lm`."
+  means="You should see the ids that ship: `emil-design-eng`, `graft`, `impeccable`, `lavish`, `mlx-lm`, `web-design-guidelines`."
 >
   I cloned cckit and listed the descriptors that ship.
 </Chat>
@@ -211,7 +211,6 @@ repo or machine. `bash lib/core/integrations.sh --applies shfmt .` exits 0 when 
 <CardGrid>
   <LinkCard title="Find code with a code graph" href="/development/code-graph/" description="A shipped integration with a wire step, end to end." />
   <LinkCard title="Summarize long files locally" href="/development/local-model-digest/" description="A shipped integration limited to one platform." />
-  <LinkCard title="Install MemPalace" href="/memory/install-mempalace/" description="The memory integration." />
 </CardGrid>
 
 <TutorialSchema
