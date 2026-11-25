@@ -1,0 +1,15 @@
+{
+  "id": "LooseIssue",
+  "label": ["loose issue"],
+  "definition": "An open issue that is not a pull request, not an effort, not a sub-issue, and not on the board with Status = Backlog: work with no home. cckit doctor --loose counts and lists them; --ratchet fails when the count rises above lib/core/loose-issues.baseline.",
+  "is_not": [
+    "A backlog item: a backlog item sits on the board in Backlog; a loose issue sits nowhere.",
+    "An impediment: a loose issue stops nothing by itself; it is unfiled work.",
+    "A stale issue: a stale issue has a home and no recent activity; a loose issue has no home."
+  ],
+  "avoid": ["orphan issue", "stray issue"],
+  "home": {
+    "cli": "doctor"
+  },
+  "status": "sapling"
+}

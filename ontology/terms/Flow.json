@@ -1,0 +1,16 @@
+{
+  "id": "Flow",
+  "label": ["flow"],
+  "definition": "An area of the product, carried by the flow:<flow> label on an issue or an effort. The set is EFFORT_FLOWS in lib/core/effort.sh (Core, UI, API, Docs, Infra, Auth, Data, Web, App), and a project overrides it with effort.flows in its config. A flow says where the work lands, not when it runs.",
+  "is_not": [
+    "A sprint or a wave: those are units of time and of parallel work; a flow is a part of the product and spans many of them.",
+    "An effort: an effort is one goal with sub-issues; many efforts share a flow.",
+    "A role: role: says who builds it; flow: says which part of the product it changes."
+  ],
+  "avoid": ["workstream", "track", "lane", "sprint"],
+  "home": {
+    "cli": "effort",
+    "rule": ".claude/rules/effort-model.md"
+  },
+  "status": "sapling"
+}

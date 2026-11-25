@@ -84,7 +84,8 @@ plain-language **outcome**:
   anything if one fails. Bad→good: `operator chrome — Settings ▾ dropdown + fixes` →
   **`[E12] operator navigation`** with the `flow:ui` label.
 
-**Flow (`flow:<flow>` label).** A **flow** is a named thread of efforts toward one outcome.
+**Flow (`flow:<flow>` label).** A **flow** is an area of the product (`ontology/terms/Flow.json`): it
+says where the work lands, not when it runs.
 Controlled vocabulary (`EFFORT_FLOWS` in `effort.sh`; a project overrides it). The `flow:<flow>`
 label carries membership and makes it filterable; the title no longer carries a `[Flow]` tag.
 
