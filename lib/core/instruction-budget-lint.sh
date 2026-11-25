@@ -21,6 +21,7 @@
 #   scripts/instruction-budget-lint.sh                  lint against the baseline (the gate)
 #   scripts/instruction-budget-lint.sh --report         every file's cost, both sets; never fails
 #   scripts/instruction-budget-lint.sh --summary        one line: resident total + three largest
+#   scripts/instruction-budget-lint.sh --resident-bytes the resident total alone, a bare number
 #   scripts/instruction-budget-lint.sh --update         rewrite the baseline from current sizes
 #   scripts/instruction-budget-lint.sh --baseline-path  print the baseline path (init.sh asks for it)
 #
@@ -137,6 +138,13 @@ if [ "$MODE" = "--summary" ]; then
   [ "$count" -gt 0 ] || exit 0
   printf 'instruction files: %s of %s bytes resident (%s%%); largest: %s\n' \
     "$resident" "$BUDGET" "$pct" "$(largest_three)"
+  exit 0
+fi
+
+# ---- --resident-bytes -------------------------------------------------------
+# The resident total as a bare number (0 with nothing to measure), for a caller that adds it up.
+if [ "$MODE" = "--resident-bytes" ]; then
+  printf '%s\n' "$resident"
   exit 0
 fi
 
