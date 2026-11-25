@@ -121,6 +121,13 @@ kit autopilot --plan            # read the plan and launch the planned set
    checks / merged, and GCs each worktree + branch on merge.
 4. **Decide + advance** — as each wave's gates go green, **merge it** (established-plan autonomy
    above) and advance any effort that was `blocked_by` it. Surface to the human only a genuine blocker.
+5. **Close the wave** — a merged wave closes only with no new loose issues. `cckit watch --merge`
+   runs `cckit doctor --loose --ratchet` after it merges; merging by hand, run it yourself:
+   - exit 0 — at or under `lib/core/loose-issues.baseline`: the wave closes; launch the next one.
+   - exit 1 — over the baseline: the wave stays open (`cckit watch` exits 3 and shows no next wave).
+     File each listed issue — a sub-issue of its effort (`cckit effort sub`), a new issue with its
+     relation (`cckit new --blocked-by`), or Backlog on the board — then run the ratchet again.
+   - exit 2 — not judged (no forge, no repository, no baseline): note it in the report and advance.
 
 ## Mode: night (an approved plan, unattended, through a Workflow)
 
@@ -168,6 +175,7 @@ Tonight: run the two approved waves. I accept the lockfile floor.
 | Concurrency | `effort.wipLimit` efforts at once (default 2), never more than 4 | the script |
 | Wave reserve | 150k tokens left, or the next wave does not start | the script |
 | Wave order | a wave that did not fully merge ends the run `blocked`; no later wave starts | the script |
+| Loose issues | a merged wave over the `cckit doctor --loose --ratchet` baseline ends the run `blocked`; not judged is logged, never a block | the script |
 | Stop | `stopCommand` exits 0 after a wave, or every wave merged + the gate green on the base branch | the script |
 
 **Concurrency and the WIP limit.** Each executor runs `cckit effort start`, which refuses a new
@@ -185,7 +193,9 @@ consequences:
 
 **Wave order.** Waves are dependency-ordered: wave N+1 builds on wave N. `cckit effort start` does
 not check `blocked_by`, so the engine does: when any effort of a wave ends parked, refused or
-skipped, the run returns `blocked` naming them, and no later wave starts.
+skipped, the run returns `blocked` naming them, and no later wave starts. A wave that merged runs
+`cckit doctor --loose --ratchet` next: over the baseline, the run returns `blocked` with the loose
+issues listed, and the captain files them before the next night.
 
 **The final check is the gate.** After the last wave merges, the engine runs the gate on the base
 branch and reports `done` or `blocked` on that result. `stopCommand` is a separate check that runs

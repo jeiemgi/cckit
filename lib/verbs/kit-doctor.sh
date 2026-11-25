@@ -275,7 +275,7 @@ if [[ $LOOSE_ONLY -eq 1 ]]; then
   if [[ $LOOSE_RATCHET -eq 1 ]]; then
     if [[ -z "$LOOSE_BASELINE" ]]; then
       _lroot="$(git -C "${TARGET:-$PWD}" rev-parse --show-toplevel 2>/dev/null || printf '%s' "${TARGET:-$PWD}")"
-      LOOSE_BASELINE="$_lroot/scripts/loose-issues.baseline"
+      LOOSE_BASELINE="$_lroot/lib/core/loose-issues.baseline"
     fi
     if [[ "$LOOSE_STATE" != read ]]; then
       row "$MARK_FAIL" "loose ratchet" "not judged — the count was not read"
