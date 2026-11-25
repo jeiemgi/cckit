@@ -14,6 +14,10 @@
 #   cckit watch --loop          repeat passes until no CLEAN PR remains (checkpointed), then stop
 #   cckit watch --max-passes M  cap the loop at M passes (default 10)
 #
+# A wave closes only through the loose-issue ratchet (captain_wave_close, E632.5): after a pass that
+# merged, `cckit doctor --loose --ratchet` runs; a count above the baseline leaves the wave open
+# (rc 3, no next wave, the loop stops). Not judged (no forge) is a note, never a block.
+#
 # Gate decision is three pure helpers (cap_checks_summary / cap_classify / cap_action) so the policy
 # is unit-tested without the network. Requires gh + jq. bash 3.2 / zsh compatible.
 # errors: mixed — cap_* are pure; captain_gate/captain_pass propagate a gh failure
@@ -54,6 +58,8 @@ if [ -z "${CAPTAIN_CFG:-}" ] && command -v kit_config_path >/dev/null 2>&1; then
   CAPTAIN_CFG="$(kit_config_path 2>/dev/null || true)"
 fi
 CAPTAIN_CFG="${CAPTAIN_CFG:-}"
+# This file's own directory, resolved at source time: inside a function zsh has no BASH_SOURCE.
+CAPTAIN_LIB="$(CDPATH='' cd -- "$(dirname -- "$_cap_self")" && pwd)"
 unset _cap_self
 if [ -z "${CAPTAIN_STATE:-}" ] && command -v kit_state_file >/dev/null 2>&1; then
   CAPTAIN_STATE="$(kit_state_file captain.state)"
@@ -437,8 +443,37 @@ _cap_open_prs() {
   fi
 }
 
+# captain_wave_close — the loose-issue ratchet a wave must pass before the captain advances (E632.5).
+# Runs `cckit doctor --loose --ratchet` (CAPTAIN_LOOSE_BASELINE picks the baseline file;
+# CAPTAIN_LOOSE_CMD replaces the whole command, for tests). rc 0 = advance: the count is at or under
+# the baseline, or it was not judged (doctor rc 2: no forge, no repository, no baseline), which is
+# said in one note and never blocks. rc 1 = the wave stays open: the count rose, so the loose issues
+# are printed with how to file them.
+captain_wave_close() {
+  local here="$CAPTAIN_LIB" out rc=0
+  # `|| rc=$?`, not `; rc=$?`: bin/cckit runs under set -e, where a failing assignment exits.
+  if [ -n "${CAPTAIN_LOOSE_CMD:-}" ]; then
+    out="$(eval "$CAPTAIN_LOOSE_CMD" 2>&1)" || rc=$?
+  elif [ -n "${CAPTAIN_LOOSE_BASELINE:-}" ]; then
+    out="$(bash "$here/kit-doctor.sh" --loose --ratchet "--baseline=$CAPTAIN_LOOSE_BASELINE" 2>&1)" || rc=$?
+  else
+    out="$(bash "$here/kit-doctor.sh" --loose --ratchet 2>&1)" || rc=$?
+  fi
+  case "$rc" in
+    0) return 0 ;;
+    2) echo "captain: loose ratchet not judged (no forge, repository or baseline) — advancing; run cckit doctor --loose --ratchet with a token"
+       return 0 ;;
+  esac
+  echo "captain: the wave stays open — it left new loose issues:"
+  printf '%s\n' "$out"
+  echo "         file each one before the next wave: under an effort as a sub-issue (cckit effort sub),"
+  echo "         as a new issue with its relation (cckit new), or in Backlog on the board."
+  return 1
+}
+
 # captain_pass [--merge] [--effort N] — gate every open PR (in scope); merge the CLEAN ones if asked.
 # Returns the count of PRs merged this pass via the CAPTAIN_MERGED global (for the loop to detect progress).
+# rc 3 = the merged wave failed the loose-issue ratchet: it stays open and no next wave is shown.
 CAPTAIN_MERGED=0
 captain_pass() {
   forge_need watch || return 1; command -v jq >/dev/null 2>&1 || { echo "captain: needs jq" >&2; return 1; }
@@ -564,8 +599,11 @@ captain_pass() {
     printf '         `cckit qa verdict pass` is recorded against the current head.\n'
   fi
 
-  # advance: after merges, the newly-unblocked work shows up as the next wave.
+  # advance: after merges, the newly-unblocked work shows up as the next wave — once the wave that
+  # just merged passes the loose-issue ratchet. Over the baseline, the wave stays open: rc 3, and
+  # the loop stops there instead of starting the next one.
   if [ "$merged_any" -gt 0 ]; then
+    captain_wave_close || return 3
     echo "captain: merged $merged_any — next unblocked wave:"
     local here; here="$(dirname "${BASH_SOURCE[0]}")"
     if [ -f "$here/plan-machine.sh" ]; then
@@ -580,7 +618,7 @@ captain_pass() {
 # captain_loop — repeat passes until a pass merges nothing (steady state) or --max-passes is hit.
 # Checkpointed: each pass overwrites CAPTAIN_STATE so a fresh invocation resumes from the live board.
 captain_loop() {
-  local max=10 pass=0
+  local max=10 pass=0 rc
   local -a clean=()
   while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -593,7 +631,9 @@ captain_loop() {
   while [ "$pass" -lt "$max" ]; do
     pass=$((pass + 1))
     echo "── captain pass $pass/$max ──"
-    captain_pass "${clean[@]+"${clean[@]}"}" || return 1
+    rc=0; captain_pass "${clean[@]+"${clean[@]}"}" || rc=$?
+    [ "$rc" -eq 3 ] && { echo "captain: stopping at pass $pass — the wave stays open until its loose issues are filed"; return 3; }
+    [ "$rc" -eq 0 ] || return 1
     [ "$CAPTAIN_MERGED" -gt 0 ] || { echo "captain: steady state (no CLEAN PR merged) — stopping at pass $pass"; break; }
   done
 }
