@@ -21,12 +21,19 @@
 #   kit_kind_commit_type <kind>   echo the Conventional Commit type a PR title takes from <kind>:
 #                             feat chore docs ci test perf refactor fix -> itself; bug -> fix;
 #                             a content kind -> docs; anything else (kind:task included) -> feat
+#   KIT_PRIORITIES            space-separated closed set of `priority:` values, most urgent first
+#   kit_label_desc <family> [value]   echo the ONE description a kit label carries (#639). Both
+#                             writers of kit labels — setup-labels.sh and `cckit effort new|sub` —
+#                             call it, so a label reads the same whichever created it. Families:
+#                             effort kind priority ctx flow role agent.
+#   kit_label_color <family> [value]  echo the hex colour setup-labels.sh gives that label.
 #
 # Sourced by bash AND zsh (no arrays, no glob held in a variable). Requires: nothing.
 # errors: best-effort — an unknown kind degrades to `task` and says so; it never aborts a start
 
 KIT_KINDS="${KIT_KINDS:-feat fix task chore security scaffold ci adr spike plan}"
 KIT_CONTENT_KINDS="${KIT_CONTENT_KINDS:-post campaign brand research}"
+KIT_PRIORITIES="${KIT_PRIORITIES:-p0 p1 p2 p3}"
 
 kit_kind_valid() {
   [ -n "${1:-}" ] || return 1
@@ -62,5 +69,37 @@ kit_kind_commit_type() {
     feat|chore|docs|ci|test|perf|refactor|fix) printf '%s\n' "$1" ;;
     bug) printf 'fix\n' ;;
     *)   printf 'feat\n' ;;
+  esac
+}
+
+kit_label_desc() {
+  case "${1:-}" in
+    effort) printf 'An effort parent issue\n' ;;
+    kind)
+      if kit_kind_content "${2:-}"; then printf 'Kind: %s (content)\n' "$2"; else printf 'Kind: %s\n' "${2:-}"; fi ;;
+    priority)
+      case "${2:-}" in
+        p0) printf 'Drop everything\n' ;;
+        p1) printf 'Now / blocking\n' ;;
+        p2) printf 'Next\n' ;;
+        p3) printf 'Later\n' ;;
+        *)  printf 'Priority: %s\n' "${2:-}" ;;
+      esac ;;
+    ctx)    printf 'Session weight: %s\n' "${2:-}" ;;
+    flow)   printf 'Flow: an area of the product\n' ;;
+    role)   printf 'Role: who builds it\n' ;;
+    agent)  printf 'Agent profile: %s\n' "${2:-}" ;;
+    *)      printf '%s\n' "${2:-}" ;;
+  esac
+}
+
+kit_label_color() {
+  case "${1:-}" in
+    priority)
+      case "${2:-}" in p0) printf '8b0000\n' ;; p1) printf 'b60205\n' ;; p2) printf 'fbca04\n' ;; *) printf '0e8a16\n' ;; esac ;;
+    ctx)  printf 'c5def5\n' ;;
+    flow) printf '0e8a16\n' ;;
+    role) printf '1d76db\n' ;;
+    *)    printf '5319e7\n' ;;   # effort, kind, agent
   esac
 }
