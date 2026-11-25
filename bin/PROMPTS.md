@@ -5,7 +5,7 @@ work.
 
 | Rule | Check |
 | --- | --- |
-| Every verb row in `lib/core/verbs.tsv` has a case label here, and every case label has a row | `scripts/verbs-test.sh` |
+| Every verb row in `lib/core/verbs.tsv` has a case label here, and every case label has a row | `lib/core/verbs-test.sh` |
 | The verb count may not grow without lowering the baseline in the same change | `lib/core/verbs-ratchet.sh` against `lib/core/verbs.baseline` |
 | No GitHub call outside the forge layer | `lib/core/forge-fence.sh` |
 | No force push | `lib/core/force-push-fence.sh` |

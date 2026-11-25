@@ -1,0 +1,312 @@
+#!/usr/bin/env bash
+# self-install-test.sh — cckit's own `.claude/` must match what cckit intends to install for itself
+# (#283). cckit is the kit, so it was never `cckit init`'d against a profile: for its whole history
+# `templates/skills/` and `templates/rules/` shipped to every consumer and applied to nothing here.
+# `concrete` — the anti-slop catalogue `communication-style.md` mandates for every commit, PR and
+# issue body — was the sharpest case: it shipped in PR 247 and no body in this repo records a pass.
+#
+# This is the guard against that rotting again. It is deliberately NOT "install the whole software
+# profile": several templates do not apply to this repo, and each is listed below with the reason.
+# The manifest is the point — a template that is neither installed nor skipped fails this test, so a
+# new template forces a decision instead of drifting into the silent-partial-install state.
+#
+# Run:  bash lib/core/self-install-test.sh
+# errors: strict — a test runner: rc 1 on any failed assertion
+set -uo pipefail
+cd "$(cd "$(dirname "$0")/../.." && pwd)"
+
+fail=0
+t()   { if [ "$2" = "$3" ]; then :; else echo "FAIL: $1 -> got '[$2]' want '[$3]'"; fail=1; fi; }
+has() { case "$2" in *"$3"*) : ;; *) echo "FAIL: $1 -> output lacks '$3'"; fail=1 ;; esac; }
+bad() { echo "FAIL: $*"; fail=1; }
+
+# ── the manifest ───────────────────────────────────────────────────────────────────────────────
+# INSTALLED_SKILLS / INSTALLED_RULES: "<name> <mode>", one per line.
+#   verbatim — the installed file is byte-identical to its template.
+#   rendered — byte-identical to the template with init.sh's {{VARS}} substituted from
+#              cckit.config.json (init templates those files; the installed copy is its output).
+#   sections — the template's KIT-OWNED sections are byte-identical; the rest is this project's own
+#              content, because the template instructs the project to fill it in.
+INSTALLED_SKILLS='concrete verbatim
+karpathy-guidelines verbatim'
+
+INSTALLED_RULES='authoring verbatim
+branch-naming verbatim
+communication-style rendered
+delegation-brief sections
+effort-model rendered
+issue-lifecycle rendered
+merge-safety rendered
+naming-and-ids verbatim
+review-pages verbatim
+shared-checkout rendered'
+
+# INSTALLED_HOOKS: the hook scripts under .claude/hooks/, same "<name> <mode>" form. A hook cckit
+# runs straight from templates/hooks/ (guard-raw-git-ops, wired by path in .claude/settings.json) has
+# no installed copy and so nothing to drift; it is not listed. The other hook templates are wired by
+# `cckit init` into consuming projects and were never installed here.
+INSTALLED_HOOKS='kit-mail-check verbatim'
+
+# The kit-owned sections of delegation-brief.md — the transferable instruction `cckit brief` lifts.
+# Project-specific sections ("Project specifics", "Gate commands") are filled in for cckit and are
+# NOT compared.
+DELEGATION_BRIEF_KIT_SECTIONS='Standing gotchas
+Durable prose
+Effort flow'
+
+# SKIPPED_*: "<name> :: <reason>". Every skip is a decision on the record, not an omission.
+SKIPPED_SKILLS='campaign :: plans a marketing campaign from brand/voice.md; cckit plans its work as efforts through skills/kit-effort-new and has no campaign to run
+brand-voice :: records a brand voice in brand/voice.md for copywriting to read; cckit has no brand file and does not install copywriting, its reader
+copywriting :: not declared by any profile cckit uses (content profile only); cckit ships no marketing copy
+feature-build-refine :: stack-gated on a @refinedev/* dependency; cckit has no package.json dependencies at all
+page-design :: coordinates three third-party design skills for a page built through `cckit task run`; cckit is a bash CLI whose one site (docs-site/) is written by hand, has no light task list and installs none of the three skills
+morning-briefing :: reads .claude/kit.config.json, which this repo does not have, and cckit answers the same question with `cckit status` + skills/kit-status
+speckit :: the software profile ships it with defaults.speckit = "off", so init would not install it either
+supabase-patterns :: cckit has no Supabase; the only matches for "supabase" in the repo are the kit machinery that scaffolds this skill'
+
+SKIPPED_RULES='plain-language :: follows plainLanguage.enabled, which cckit.config.json does not set; its reader is a person who does not use git, and cckit is developed by people who do
+code-retrieval :: in no profile; `cckit add graft` writes it per-project, and graft has no shell grammar, so on cckit (bash, plus docs-site/) the integration does not index the code the rule would route
+design-routing :: routes every design question to .claude/agents/designer/AGENT.md; cckit installs no agents, so the rule would dereference a path that does not exist
+gate-and-review :: both enforcement surfaces it names are off here — prePush is null in cckit.config.json and kit/templates/hooks/prepush_gate.sh.tmpl reads .claude/kit.config.json, a file this repo does not have; review.command is unset. The gate for cckit is stated in delegation-brief.md § Gate commands
+knowledge-base :: governs a knowledge/ dir with status/owner/updated frontmatter and a knowledge/INDEX.md manifest; cckit knowledge.dir is docs-site/src/content/docs, Starlight title/description frontmatter, no INDEX.md
+mempalace :: memory.enabled is false in cckit.config.json, so init.sh own rules loop skips this rule for this config
+plan-next :: not in profiles/software.json; it describes the cckit plan-next verb rather than governing work, and its See-also links point at plan-output-format.md, which cckit does not install
+plan-output-format :: mandates that a plan is a file in plans.dir; cckit plans.dir is "" and plans.format is "github" — the parent issue IS the plan (effort-model.md)
+react-annotate :: no React app here; lib/verbs/annotate-setup.sh installs this rule per-project when annotation is wired
+risk-tiered-review :: not in profiles/software.json; it blesses pr-automerge / pr-labeler, and .github/workflows/ has no such workflow and the repo has no risk:* labels
+skill-gaps :: records its anti-repeat state in .claude/kit.config.json under skillPrompts; that file does not exist in this repo
+task-management :: duplicates the ground rules in AGENTS.md, and renders claims this repo contradicts — the software profile milestones (Foundation/MVP/Beta/GA) while the repo has zero milestones, and eight roles while only role:tech-lead and role:docs exist'
+
+_names() { printf '%s\n' "$1" | grep . | awk '{print $1}' | sort; }
+_skipped_names() { printf '%s\n' "$1" | grep . | sed 's/ :: .*//' | sort; }
+
+# ── 1. every template is either installed or skipped, with a reason ────────────────────────────
+# A new template under templates/skills or templates/rules fails here until someone decides.
+tpl_skills="$(find kit/templates/skills -mindepth 2 -maxdepth 2 -name SKILL.md -type f 2>/dev/null \
+  | while IFS= read -r f; do basename "$(dirname "$f")"; done | sort)"
+tpl_rules="$(find kit/templates/rules -maxdepth 1 -type f -name '*.md' 2>/dev/null \
+  | while IFS= read -r f; do b="$(basename "$f")"; echo "${b%.md}"; done | sort)"
+
+decided_skills="$( { _names "$INSTALLED_SKILLS"; _skipped_names "$SKIPPED_SKILLS"; } | sort -u)"
+decided_rules="$( { _names "$INSTALLED_RULES";  _skipped_names "$SKIPPED_RULES";  } | sort -u)"
+
+# A name in BOTH lists is a contradiction the `sort -u` above would hide: coverage still passes, the
+# installed-set check still passes, and the manifest reads as though the template were skipped while
+# the file is on disk. Reject the overlap explicitly.
+t "no skill template is both installed and skipped" \
+  "$(comm -12 <(_names "$INSTALLED_SKILLS") <(_skipped_names "$SKIPPED_SKILLS") | tr '\n' ' ' | sed 's/ *$//')" ""
+t "no rule template is both installed and skipped" \
+  "$(comm -12 <(_names "$INSTALLED_RULES") <(_skipped_names "$SKIPPED_RULES") | tr '\n' ' ' | sed 's/ *$//')" ""
+
+t "every skill template is decided (installed or skipped)" \
+  "$(comm -23 <(printf '%s\n' "$tpl_skills") <(printf '%s\n' "$decided_skills") | tr '\n' ' ' | sed 's/ *$//')" ""
+t "every rule template is decided (installed or skipped)" \
+  "$(comm -23 <(printf '%s\n' "$tpl_rules") <(printf '%s\n' "$decided_rules") | tr '\n' ' ' | sed 's/ *$//')" ""
+t "no manifest entry names a skill template that is gone" \
+  "$(comm -13 <(printf '%s\n' "$tpl_skills") <(printf '%s\n' "$decided_skills") | tr '\n' ' ' | sed 's/ *$//')" ""
+t "no manifest entry names a rule template that is gone" \
+  "$(comm -13 <(printf '%s\n' "$tpl_rules") <(printf '%s\n' "$decided_rules") | tr '\n' ' ' | sed 's/ *$//')" ""
+
+# Every skip carries a reason after the ` :: ` separator — an unexplained skip recreates the drift.
+printf '%s\n' "$SKIPPED_SKILLS" "$SKIPPED_RULES" | grep . | while IFS= read -r line; do
+  case "$line" in
+    *" :: "?*) : ;;
+    *) echo "FAIL: skip without a reason -> '$line'" ;;
+  esac
+done | grep . && fail=1
+
+# ── 2. what the manifest says is installed is on disk, and nothing else is ─────────────────────
+inst_skills="$(find .claude/skills -mindepth 2 -maxdepth 2 -name SKILL.md -type f 2>/dev/null \
+  | while IFS= read -r f; do basename "$(dirname "$f")"; done | sort)"
+inst_rules="$(find .claude/rules -maxdepth 1 -type f -name '*.md' 2>/dev/null \
+  | while IFS= read -r f; do b="$(basename "$f")"; echo "${b%.md}"; done | sort)"
+
+t "installed skills == the manifest" "$(printf '%s\n' "$inst_skills" | tr '\n' ' ')" \
+  "$(_names "$INSTALLED_SKILLS" | tr '\n' ' ')"
+t "installed rules == the manifest"  "$(printf '%s\n' "$inst_rules" | tr '\n' ' ')" \
+  "$(_names "$INSTALLED_RULES" | tr '\n' ' ')"
+inst_hooks="$(find .claude/hooks -maxdepth 1 -type f -name '*.sh' 2>/dev/null \
+  | while IFS= read -r f; do b="$(basename "$f")"; echo "${b%.sh}"; done | sort)"
+t "installed hooks == the manifest"  "$(printf '%s\n' "$inst_hooks" | tr '\n' ' ')" \
+  "$(_names "$INSTALLED_HOOKS" | tr '\n' ' ')"
+
+# ── 3. content: the installed copy has not drifted from its template ───────────────────────────
+# `jq` is REQUIRED here, not optional. A drift guard that skips its content comparison when a tool
+# is absent passes for the wrong reason — the one failure mode this test exists to prevent. `jq` is a
+# Tier-1 dependency (`scripts/doctor.sh`: "git, gh, jq, perl — hard deps, auto-install via brew") and
+# CI installs it, so requiring it costs nothing and removes a silent pass. Same for `perl`, which
+# performs the substitution.
+# A separate flag, not `$fail`: an earlier assertion failing must not be reported as a missing
+# dependency, and must not cut the report short — a reviewer needs every finding in one run.
+dep_missing=0
+for _dep in jq perl; do
+  command -v "$_dep" >/dev/null 2>&1 || {
+    bad "$_dep is required to compare an installed rule against its template — refusing to pass without it (Tier-1 dep, see scripts/doctor.sh)"
+    dep_missing=1
+  }
+done
+if [ "$dep_missing" -ne 0 ]; then
+  echo "FAIL: cckit self-install guard cannot compare content without jq + perl — install them and re-run" >&2
+  exit 1
+fi
+
+# The values init.sh substitutes, read from the config so a config change is caught rather than
+# hard-coded here. BASE_BRANCH uses the same precedence as kit-config.sh's KIT_BASE_BRANCH.
+CFG_LANG="$(jq -r '.project.language' cckit.config.json)"
+CFG_OWNER="$(jq -r '.project.owner' cckit.config.json)"
+CFG_NAME="$(jq -r '.project.name' cckit.config.json)"
+CFG_BASE="$(jq -r '.github.baseBranch // .github.integrationBranch // .github.flow // "main"' cckit.config.json)"
+for _pair in "project.language:$CFG_LANG" "project.owner:$CFG_OWNER" "project.name:$CFG_NAME" "github.baseBranch:$CFG_BASE"; do
+  case "${_pair#*:}" in
+    ''|null) bad "cckit.config.json has no ${_pair%%:*} — the rendered comparison would compare against an empty string" ;;
+  esac
+done
+
+# _render <template> — init.sh's substitution step for the vars these templates actually use.
+_render() {
+  COMMS_LANG="$CFG_LANG" OWNER_NAME="$CFG_OWNER" PROJECT_NAME="$CFG_NAME" BASE_BRANCH="$CFG_BASE" \
+    perl -0777 -pe 's/\{\{(\w+)\}\}/ exists $ENV{$1} ? $ENV{$1} : "{{$1}}" /ge' "$1"
+}
+
+# _section <file> <heading-regex> — the lines under a matching `## ` heading, next heading exclusive.
+_section() {
+  awk -v want="$2" '/^##[[:space:]]/ { in_s = ($0 ~ want) ? 1 : 0; next } in_s' "$1"
+}
+
+_compare() {  # <name> <template> <installed> <mode>
+  local name="$1" tpl="$2" got="$3" mode="$4" s
+  [ -f "$got" ] || { bad "$name: $got is missing"; return; }
+  [ -f "$tpl" ] || { bad "$name: template $tpl is missing"; return; }
+  case "$mode" in
+    verbatim)
+      cmp -s "$tpl" "$got" || bad "$name: $got differs from $tpl (mode verbatim)"
+      # A verbatim install of a templated file would ship a literal {{VAR}} to this repo.
+      grep -q '{{' "$got" && bad "$name: $got still contains a {{VAR}} placeholder"
+      ;;
+    rendered)
+      _render "$tpl" | cmp -s - "$got" \
+        || bad "$name: $got is not $tpl rendered with cckit.config.json values (mode rendered)"
+      grep -q '{{' "$got" && bad "$name: $got still contains a {{VAR}} placeholder"
+      ;;
+    sections)
+      printf '%s\n' "$DELEGATION_BRIEF_KIT_SECTIONS" | grep . | while IFS= read -r s; do
+        if [ "$(_section "$tpl" "$s")" != "$(_section "$got" "$s")" ]; then
+          echo "FAIL: $name: kit-owned section '$s' differs between $tpl and $got"
+        fi
+      done | grep . && fail=1
+      grep -q '{{' "$got" && bad "$name: $got still contains a {{VAR}} placeholder"
+      ;;
+    *) bad "$name: unknown manifest mode '$mode'" ;;
+  esac
+  return 0
+}
+
+while IFS=' ' read -r name mode; do
+  [ -n "$name" ] || continue
+  _compare "skills/$name" "kit/templates/skills/$name/SKILL.md" ".claude/skills/$name/SKILL.md" "$mode"
+done <<EOF
+$(printf '%s\n' "$INSTALLED_SKILLS" | grep .)
+EOF
+
+while IFS=' ' read -r name mode; do
+  [ -n "$name" ] || continue
+  _compare "rules/$name" "kit/templates/rules/$name.md" ".claude/rules/$name.md" "$mode"
+done <<EOF
+$(printf '%s\n' "$INSTALLED_RULES" | grep .)
+EOF
+
+# The session-mail hook is one script for every project and both adapters (E257.5): cckit's own copy
+# must be the template byte for byte, or this repo runs a different mail hook than it ships.
+while IFS=' ' read -r name mode; do
+  [ -n "$name" ] || continue
+  _compare "hooks/$name" "kit/templates/hooks/$name.sh.tmpl" ".claude/hooks/$name.sh" "$mode"
+done <<EOF
+$(printf '%s\n' "$INSTALLED_HOOKS" | grep .)
+EOF
+
+# ── 4. the mandate chain the issue is about actually connects ──────────────────────────────────
+# communication-style mandates the pass · the brief carries it into a delegated agent · the skill
+# file is present so the agent can read the catalogue. Break any link and the pass stops firing.
+has "communication-style mandates the concrete pass" \
+    "$(cat .claude/rules/communication-style.md 2>/dev/null)" 'the `concrete` skill'
+has "communication-style points at the brief as the carrier" \
+    "$(cat .claude/rules/communication-style.md 2>/dev/null)" 'delegation-brief.md'
+t "the concrete skill file an agent has to read is installed" \
+  "$([ -f .claude/skills/concrete/SKILL.md ] && echo yes || echo no)" "yes"
+
+prose="$(_section .claude/rules/delegation-brief.md '[Dd]urable prose' 2>/dev/null)"
+has "the brief tells a delegated agent to run the concrete pass" "$prose" '`concrete`'
+has "the brief names the durable artifacts"     "$prose" "commit message"
+has "the brief forbids cutting by length"       "$prose" "never by length"
+has "the brief carries O13"                     "$prose" "O13"
+has "the brief carries O14"                     "$prose" "O14"
+has "the brief lists the untouchable evidence"  "$prose" "Untouchable"
+
+# ── 5. no installed rule names an integration branch this repo does not use ────────────────────
+# The review finding on PR 284: `.claude/rules/effort-model.md` told agents to branch from and open
+# their PR against `main` while `github.baseBranch` is `develop`. It was byte-identical to its
+# template, which is precisely why it went unnoticed — for a template that hard-codes a value the
+# project overrides, byte-identical IS the bug. The template is parameterized on {{BASE_BRANCH}}
+# now; these assertions fail if either half regresses.
+for _pat in '(from main)' '──►  main' '→ main (rich body'; do
+  grep -qF -- "$_pat" kit/templates/rules/effort-model.md \
+    && bad "kit/templates/rules/effort-model.md hard-codes the integration branch ('$_pat') — use {{BASE_BRANCH}} so each project renders its own"
+  grep -qF -- "$_pat" .claude/rules/effort-model.md \
+    && bad ".claude/rules/effort-model.md names 'main' as the integration branch; this repo integrates on '$CFG_BASE'"
+done
+has "installed effort-model branches from this repo's base"   "$(cat .claude/rules/effort-model.md)" "(from $CFG_BASE)"
+has "installed effort-model targets this repo's base"          "$(cat .claude/rules/effort-model.md)" "ONE PR ──►  $CFG_BASE"
+has "the task-management template parameterizes its base too"  "$(cat kit/templates/rules/task-management.md)" '{{BASE_BRANCH}}'
+
+# ── 6. #218: every installed rule is a template basename ───────────────────────────────────────
+# effort_close's kit-sync drift check (_EO_KIT_MANAGED_RE) matches .claude/rules/ by template
+# basename since #218, so a project-OWNED rule is not flagged as kit-managed. Every file in this
+# repo's .claude/rules/ IS a kit template, so here the warning names all of them. This assertion
+# keeps that true: a rule with no template would be a file cckit ships to nobody.
+find .claude/rules -maxdepth 1 -type f -name '*.md' 2>/dev/null | while IFS= read -r f; do
+  b="$(basename "$f")"
+  [ -f "kit/templates/rules/$b" ] || echo "FAIL: $f has no kit/templates/rules/$b — cckit's own rules are all kit templates; add the template or drop the rule"
+done | grep . && fail=1
+
+if [ "$fail" -eq 0 ]; then echo "PASS: cckit self-install matches its manifest"; fi
+
+# Editing a template is a TWO-file change for any rule cckit installs for itself, and nothing else
+# tells an author that (#285: PR 282 edited templates/rules/effort-model.md on a branch cut before
+# the installed copy existed, so develop went red only once both PRs had landed). A guard that
+# reports drift without saying how to clear it is a tripwire with no defusal — so print the exact
+# re-render command, using the same substitution this file compares with.
+if [ "$fail" -ne 0 ]; then
+  # Generated from the manifest, not hand-written: a static hint drifts from the manifest and from
+  # _render's own fallback chain, and a remediation command that does not match what this script
+  # compares against is the very defect the guard exists to catch. `rendered` and `verbatim` are
+  # both listed — re-rendering a template with no {{VAR}} is a no-op copy, which is exactly right.
+  _hint_rules="$(printf '%s\n' "$INSTALLED_RULES" | awk '$2!="sections"{printf "%s ", $1}' | sed 's/ *$//')"
+  {
+    echo
+    echo "To clear a 'mode rendered' or 'mode verbatim' drift, re-render the installed copy from its"
+    echo "template. Run from the repo root; needs jq + perl:"
+    echo
+    echo "  CFG_LANG=\"\$(jq -r '.project.language' cckit.config.json)\""
+    echo "  CFG_OWNER=\"\$(jq -r '.project.owner' cckit.config.json)\""
+    echo "  CFG_NAME=\"\$(jq -r '.project.name' cckit.config.json)\""
+    echo "  CFG_BASE=\"\$(jq -r '.github.baseBranch // .github.integrationBranch // .github.flow // \"main\"' cckit.config.json)\""
+    echo "  for r in $_hint_rules; do"
+    echo "    COMMS_LANG=\"\$CFG_LANG\" OWNER_NAME=\"\$CFG_OWNER\" PROJECT_NAME=\"\$CFG_NAME\" BASE_BRANCH=\"\$CFG_BASE\" \\"
+    echo "      perl -0777 -pe 's/\\{\\{(\\w+)\\}\\}/ exists \$ENV{\$1} ? \$ENV{\$1} : \"{{\$1}}\" /ge' \\"
+    echo "      \"kit/templates/rules/\$r.md\" > \".claude/rules/\$r.md\""
+    echo "  done"
+    echo
+    echo "For one rule, keep the same four assignments and drop the loop, e.g. effort-model:"
+    echo
+    echo "  … BASE_BRANCH=\"\$CFG_BASE\" perl -0777 -pe 's/…/…/ge' \\"
+    echo "      kit/templates/rules/effort-model.md > .claude/rules/effort-model.md"
+    echo
+    echo "CFG_BASE must keep the full fallback chain — baseBranch, then integrationBranch, then flow,"
+    echo "then \"main\". Checking only .github.baseBranch renders a different value than this script"
+    echo "compares against, so the drift would survive the fix."
+    echo
+    echo "A 'mode sections' drift is NOT re-rendered wholesale: that file carries project-specific"
+    echo "fill-ins. Copy only the kit-owned section the failure names."
+  } >&2
+fi
+exit "$fail"

@@ -8,8 +8,10 @@ edit by hand.
 | Path | Holds | Rules |
 | --- | --- | --- |
 | `bin/` | the `cckit` dispatcher | `bin/PROMPTS.md` |
-| `lib/core/` | repo-wide checks with no forge or verb knowledge | `lib/PROMPTS.md` |
-| `scripts/` | verb implementations, the gate and its tests (moving to `lib/` by ratchet) | `scripts/PROMPTS.md` |
+| `lib/core/` | the gate, checks and helpers with no forge or verb knowledge, and their tests | `lib/PROMPTS.md` |
+| `lib/forge/` | the GitHub adapters: the only code that calls `gh` or the API | `lib/PROMPTS.md` |
+| `lib/verbs/` | verb implementations and their tests | `lib/PROMPTS.md` |
+| `scripts/` | forwarding stubs at the old paths installed projects call, and the benchmark harness | `scripts/PROMPTS.md` |
 | `kit/` | everything `cckit init` installs into a project | `kit/PROMPTS.md` |
 | `docs-site/` | the documentation site and its media | `docs-site/PROMPTS.md` |
 

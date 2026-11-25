@@ -163,7 +163,7 @@ _WT_LOCK_WAIT="${_WT_LOCK_WAIT:-10}"   # seconds to wait for a held lock before 
 
 # _wt_lock_try <lockfile> — ONE attempt: 0 when this call created the lock, 1 when it exists. The
 # subshell keeps noclobber out of the caller's shell. Never replace this with an external command
-# without racing it first (scripts/lib/worktree-ports-test.sh section 7 does).
+# without racing it first (lib/core/worktree-ports-test.sh section 7 does).
 _wt_lock_try() { ( set -C; : > "$1" ) 2>/dev/null; }
 
 # _wt_lock <lockfile> — 0 when the lock is held, 1 when it is not. A caller that fails to lock

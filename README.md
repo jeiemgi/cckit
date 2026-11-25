@@ -688,7 +688,7 @@ approved plan is executed without re-confirming each merge, and a close op — n
 closes the issue) and merge safety (`merge-safety.md`: bring a branch onto the current base before
 merging, ship a coupled chain as one PR, re-run the gate on the integration branch) and authoring (`authoring.md`: docs and README change with the behaviour, a pasted prompt carries no issue number, a summary names the work and drops machine flags) and review pages (`review-pages.md`: a plan, a decision or a grilling round opens as a page, terminal output where there is no browser, the answer written back — see [Review pages](https://cckit.dev/project-management/plan-pages/)) and the shared checkout (`shared-checkout.md`: the primary checkout is never moved by hand, all work happens in a worktree, a freshly merged verb is called from a current worktree — see [Multi-session safety](https://cckit.dev/development/many-sessions/) and the [install & update matrix](https://cckit.dev/install-matrix/)). Every shipped rule is listed in [Rules cckit ships](https://cckit.dev/rules/) — `gate-and-review.md` (the gate blocks the push and its output goes on the PR; every AI-reviewer finding is fixed or rebutted before the merge) ships to projects and is skipped here.
 It is a subset on purpose: several templates target stacks cckit does not have.
-`scripts/self-install-test.sh` holds the manifest, the reason for every skip, and the assertion that
+`lib/core/self-install-test.sh` holds the manifest, the reason for every skip, and the assertion that
 the installed copies have not drifted from their templates.
 
 ## Documentation
@@ -746,7 +746,7 @@ cckit/
   docs-site/             # documentation source — Astro/Starlight (deployed to cckit.dev)
   .claude/skills/        # the subset of kit/templates/skills/ cckit installs for ITSELF
   .claude/rules/         # the subset of kit/templates/rules/ cckit installs for ITSELF
-                         #   the manifest + every skip reason: scripts/self-install-test.sh
+                         #   the manifest + every skip reason: lib/core/self-install-test.sh
   cckit.config.json      # project configuration (no hardcoded org/repo)
 ```
 

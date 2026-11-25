@@ -1,4 +1,4 @@
-# errors-header.exempt — entry-point scripts under lib/ that carry no '# errors:' header (scripts/lib/errors-header-test.sh).
+# errors-header.exempt — entry-point scripts under lib/ that carry no '# errors:' header (lib/core/errors-header-test.sh).
 # They were top-level scripts/ files before #600-#602 moved them, and the header rule covered only
 # scripts/lib/ helpers. A helper never goes here; this list only shrinks.
 lib/core/agent-skills-lint.sh

@@ -5,7 +5,7 @@
 #   upgrade_snapshot / upgrade_changes   the before/after measurement `cckit init --upgrade` prints
 #   json_write_minimal                   a JSON write that changes as few lines as the change needs
 #
-# The end-to-end use of both is scripts/update-path-test.sh. Everything lives under one mktemp dir.
+# The end-to-end use of both is lib/core/update-path-test.sh. Everything lives under one mktemp dir.
 # Run:  bash lib/verbs/upgrade-report-test.sh
 # errors: strict — a test runner: rc 1 on any failed assertion
 ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/../.." && pwd)

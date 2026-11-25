@@ -108,7 +108,7 @@ _kl_header() {
 
 # kit_lib_errors <file> — the declared failure contract: pure | strict | best-effort | mixed, or
 # `unknown` when the file carries no `# errors:` header (a file that predates #223, or a host
-# project's own lib). Same parse as scripts/lib/errors-header-test.sh, which enforces it.
+# project's own lib). Same parse as lib/core/errors-header-test.sh, which enforces it.
 kit_lib_errors() {
   local v=""
   # Read the header block only (see _kl_header) so a body comment is never taken for the contract.

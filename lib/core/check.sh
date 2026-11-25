@@ -35,7 +35,7 @@ fi
 # 3. Leak fence - no private word (the legacy brand name, a product, a client, a person) in any
 # tracked file. One scan, three pattern sources: the built-in word, the gitignored
 # .cckit/leak-words list, and CCKIT_LEAK_WORDS in CI. Hits print as file:line only.
-# lib/core/leak-fence.sh is the single implementation; scripts/leak-fence-test.sh is its selftest.
+# lib/core/leak-fence.sh is the single implementation; lib/core/leak-fence-test.sh is its selftest.
 note "==> leak fence (tracked files)"
 . lib/core/kit-state.sh 2>/dev/null || true
 . lib/core/leak-fence.sh

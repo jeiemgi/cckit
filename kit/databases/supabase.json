@@ -20,7 +20,7 @@
     }
   ],
   "guide": "supabase/guide.html",
-  "test": "../../scripts/database-supabase-test.sh",
+  "test": "../../lib/verbs/database-supabase-test.sh",
   "steps": [
     "Open https://supabase.com/dashboard/new/_ in your browser. Sign in, or create a free account first.",
     "Fill in the new-project form: a project name, a database password (save it in a password manager; it is not one of the two values below), and the region closest to your users. Create the project and wait until it is ready.",

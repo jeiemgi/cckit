@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # layout-fence-test.sh — the layout ratchet refuses a new top-level directory, a file under a
-# retired root, and growth or slack in the scripts/ counts. Network-free; fixtures under mktemp.
+# retired root, growth or slack in the scripts/ counts, and code that is not a forwarding stub there. Network-free; fixtures under mktemp.
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
@@ -10,7 +10,7 @@ r="$tmp/r"; mkdir -p "$r/scripts/lib" "$r/kit" "$r/lib/core"
 git -C "$r" init -q
 cp "$HERE/layout-fence.sh" "$r/lib/core/"
 printf 'bin\nkit\nlib\nscripts\n' > "$r/lib/core/layout-fence.allow"
-: > "$r/scripts/lib/a.sh"; : > "$r/kit/x"
+printf '#!/usr/bin/env bash\n# cckit-forwarding-stub: scripts/lib/a.sh moved to lib/core/a.sh\n' > "$r/scripts/lib/a.sh"; : > "$r/kit/x"
 printf 'scripts-top 0\nscripts-lib 1\n' > "$r/lib/core/layout-fence.baseline"
 git -C "$r" add -A
 run() { bash "$r/lib/core/layout-fence.sh" >/dev/null 2>&1; echo "$?"; }
@@ -25,6 +25,8 @@ git -C "$r" rm -rq --cached templates; rm -rf "$r/templates"
 : > "$r/scripts/new.sh"; git -C "$r" add scripts/new.sh
 t "a new file directly under scripts/ fails" "$(run)" "1"
 git -C "$r" rm -q --cached scripts/new.sh; rm -f "$r/scripts/new.sh"
+printf '#!/usr/bin/env bash\necho real code\n' > "$r/scripts/lib/a.sh"; git -C "$r" add scripts/lib/a.sh
+t "code that is not a forwarding stub fails" "$(run)" "1"
 git -C "$r" rm -q --cached scripts/lib/a.sh
 t "a drop without lowering the baseline fails" "$(run)" "1"
 printf 'scripts-top 0\nscripts-lib 0\n' > "$r/lib/core/layout-fence.baseline"

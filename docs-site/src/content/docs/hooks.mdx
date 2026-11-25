@@ -125,7 +125,7 @@ scripts read (`hook_event_name`, `cwd`, `tool_input.command`) and documents the 
 - **The uninstall script, `lib/verbs/kit-remove.sh`,** deletes the hook scripts it installed and a `hooks.json` it created and you
   never edited. Entries merged into a `hooks.json` of your own stay; delete those by hand.
 
-What is tested: `scripts/hook-adapter-test.sh` feeds each installed hook the event JSON each
+What is tested: `lib/core/hook-adapter-test.sh` feeds each installed hook the event JSON each
 runtime documents and asserts the same result on both — a base-branch commit blocked with a reason,
 a worktree commit passing, `--steer` mail blocking `Stop` once, ordinary mail never blocking it, and
 each message delivered once in a combined install. What is not: no live Codex session has fired

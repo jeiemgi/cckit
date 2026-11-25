@@ -35,7 +35,7 @@ cckit pr <issue> "<summary>" # open the PR
   a private path. The built-in word is always on; your own patterns live in `.cckit/leak-words`
   (local, gitignored, one extended regex per line) or in the `CCKIT_LEAK_WORDS` repository secret
   (CI, `|`-separated). Never commit the list: a public denylist publishes the words it hides. A hit
-  prints `file:line` only. `bash scripts/leak-fence-test.sh` is its selftest. Write a word end as
+  prints `file:line` only. `bash lib/core/leak-fence-test.sh` is its selftest. Write a word end as
   `([^[:alnum:]]|$)`, not `\b`: `\b` matches nothing in `git grep -E` on macOS.
 - The gate ends with `bash lib/core/test.sh`, which runs every `*-test.sh` under `bin/` and
   `scripts/`, several files at a time (the CPU count, capped at 8). `bash lib/core/test.sh <pattern>`
@@ -56,7 +56,7 @@ cckit pr <issue> "<summary>" # open the PR
   `O_EXCL` open. `mkdir "$lock"` is not exclusive everywhere: the `mkdir` of uutils coreutils
   0.10.0 (Ubuntu 26.04, GitHub's `ubuntu-latest`) exits 0 for every process that races to create
   the same directory. A test of a lock races the primitive itself — N processes, one attempt each,
-  exactly one winner — as `scripts/lib/worktree-ports-test.sh` section 7 does.
+  exactly one winner — as `lib/core/worktree-ports-test.sh` section 7 does.
 
 ## A rule declares when it loads
 
@@ -108,7 +108,7 @@ subset by decision, not by accident: `supabase-patterns` has no Supabase to patt
 `plan-output-format` mandates a plans dir cckit does not use (the parent issue is the plan), and so
 on. No agents are installed — `AGENTS.md` plus `cckit brief` is this repo's delegation contract.
 
-`scripts/self-install-test.sh` is the guard, and the manifest lives in it:
+`lib/core/self-install-test.sh` is the guard, and the manifest lives in it:
 
 - Every template under `kit/templates/skills/` and `kit/templates/rules/` must be listed as **installed** or
   **skipped with a reason**. A new template fails the test until someone decides — which is what
@@ -127,7 +127,7 @@ byte-identical check, because byte-identical to a wrong template is exactly the 
 branch is `{{BASE_BRANCH}}` now, resolved by `init.sh` from `github.baseBranch` (falling back to
 `integrationBranch` / `flow` / the repo's GitHub default / `main`, the same precedence as
 `KIT_BASE_BRANCH` in `lib/core/kit-config.sh`) and written back into the generated config so the
-rendered rule and the resolver can never disagree. `scripts/self-install-test.sh` fails if either
+rendered rule and the resolver can never disagree. `lib/core/self-install-test.sh` fails if either
 half regresses.
 
 ## Scope of changes
@@ -135,7 +135,7 @@ half regresses.
 - **bash CLI + lib** → `bin/cckit`, `scripts/lib/*.sh`. A new verb is a row in
   `lib/core/verbs.tsv` (name, question, prompt, usage, needs) plus its `case` label in
   `bin/cckit`; run `bash lib/core/verbs-gen.sh` to refresh the CLI reference block.
-  `scripts/verbs-test.sh` fails when the dispatcher, the help, the catalog, the CLI reference,
+  `lib/core/verbs-test.sh` fails when the dispatcher, the help, the catalog, the CLI reference,
   `kit/skills/routing.yaml` or `lib/core/forge-report.sh` disagree with the table.
   The top level only shrinks: `lib/core/verbs-ratchet.sh` fails the gate when the table holds more
   `verb` rows than `lib/core/verbs.baseline`, so a new command is a subcommand of a verb that exists.
@@ -145,7 +145,7 @@ half regresses.
 - **Claude Code plugin** → `skills/`, `commands/`, `.claude-plugin/`.
 - **Docs** → `docs-site/` (published to [cckit.dev](https://cckit.dev)).
 - **What cckit installs for itself** → `.claude/skills/`, `.claude/rules/`, and the manifest in
-  `scripts/self-install-test.sh`.
+  `lib/core/self-install-test.sh`.
 
 ### Every lib file declares how it fails
 
@@ -166,7 +166,7 @@ line at the end of its header comment:
 | `mixed` | Both, per function — the reason says which half is which. |
 
 The reason after the em dash is required, not decorative: for a `mixed` file it is the only thing
-telling a reader which functions propagate. `scripts/lib/errors-header-test.sh` fails on a missing
+telling a reader which functions propagate. `lib/core/errors-header-test.sh` fails on a missing
 header, a value outside the vocabulary, or a bare value with no reason — so a new lib file cannot
 land without one.
 

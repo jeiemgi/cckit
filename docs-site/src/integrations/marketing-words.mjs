@@ -9,7 +9,7 @@
 // Used two ways:
 //   - as an Astro integration (astro.config.mjs): `astro build` stops before it renders a page;
 //   - from the command line: `node src/integrations/marketing-words.mjs [docs-dir]`, exit 0 clean,
-//     exit 1 with one `file:line: word` row per hit. scripts/docs-marketing-words-test.sh runs
+//     exit 1 with one `file:line: word` row per hit. lib/core/docs-marketing-words-test.sh runs
 //     this form against fixtures.
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';

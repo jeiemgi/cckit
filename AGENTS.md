@@ -73,7 +73,7 @@ copy; `bash lib/core/terms-check.sh` names a drift between the two). A term is a
 
 `.claude/skills/` and `.claude/rules/` here are the subset of `kit/templates/` cckit applies to its own
 work (`concrete`, `karpathy-guidelines`, and the rules). No agents are installed: this file plus
-`cckit brief` is the delegation contract. `scripts/self-install-test.sh` holds the manifest and every
+`cckit brief` is the delegation contract. `lib/core/self-install-test.sh` holds the manifest and every
 skip reason, and fails when an installed copy drifts; edit template and copy in the same commit.
 
 ## Core verbs
@@ -273,13 +273,13 @@ current entry of the top-bar switch (`docs-site/src/lib/tracks.ts`, `docs-site/s
 - **Marketing pages use plain words.** `astro build` fails when a page under `marketing/` or
   `es/marketing/` says "worktree", "branch" or "PR"; `words-you-will-hear.mdx` is the one
   exemption (`docs-site/src/integrations/marketing-words.mjs`, tested by
-  `scripts/docs-marketing-words-test.sh`).
+  `lib/core/docs-marketing-words-test.sh`).
 - **A wide table renders as record cards.** Write a Markdown table as usual. One with three or
   more columns and a cell over 60 characters becomes a list of cards: the first cell is the
   heading, every other cell a labelled line (a leading `#` index column is folded into the
   heading). Smaller tables stay tables. To keep a grid, wrap the table in
   `<div data-table="grid">` (`docs-site/src/lib/rehype-record-tables.mjs`, tested by
-  `scripts/docs-record-tables-test.sh`).
+  `lib/core/docs-record-tables-test.sh`).
 - **`SearchStart.astro` is the search entry** on the home page and on `software.mdx`,
   `marketing/index.mdx` and `es/marketing/index.mdx`. Its chips are defined in that file, one list
   per track and language; every chip is a real link, and a script upgrades the click to open search
