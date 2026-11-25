@@ -229,7 +229,7 @@ kto_compose_pr_body() {
   # A summary that already carries the section (an agent wrote the whole body) keeps its own: the
   # section is added only when absent, so it never prints twice.
   if [ "${KIT_PR_ORCHESTRATOR_SECTION:-false}" = "true" ] \
-     && ! printf '%s\n' "$summary" | grep -q '^## For the orchestrator[[:space:]]*$'; then
+     && ! grep -q '^## For the orchestrator[[:space:]]*$' <<<"$summary"; then
     if [ "$style" = "content" ]; then
       printf '## For the orchestrator\n\n#%s%s\nReview: the summary below and the changed files.\n\n' "$num" "${title:+ · $title}"
     else
