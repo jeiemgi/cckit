@@ -226,7 +226,10 @@ kto_compose_pr_body() {
   local num="$1" summary="$2" role="$3" title="${4:-}" sig="" style
   style="$(kto_pr_body_style)"
   if type role_signature >/dev/null 2>&1; then sig="$(role_signature "$role")"; fi
-  if [ "${KIT_PR_ORCHESTRATOR_SECTION:-false}" = "true" ]; then
+  # A summary that already carries the section (an agent wrote the whole body) keeps its own: the
+  # section is added only when absent, so it never prints twice.
+  if [ "${KIT_PR_ORCHESTRATOR_SECTION:-false}" = "true" ] \
+     && ! grep -q '^## For the orchestrator[[:space:]]*$' <<<"$summary"; then
     if [ "$style" = "content" ]; then
       printf '## For the orchestrator\n\n#%s%s\nReview: the summary below and the changed files.\n\n' "$num" "${title:+ · $title}"
     else

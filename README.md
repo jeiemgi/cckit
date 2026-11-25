@@ -790,7 +790,7 @@ Using cckit in your project? Add a badge (optional, but appreciated):
 [![Built with cckit](https://img.shields.io/badge/built%20with-cckit-0A7E8C.svg)](https://github.com/jeiemgi/cckit)
 ```
 
-More variants (HTML, flat-square): [docs/badge.md](docs/badge.md).
+More variants (HTML, flat-square): [Built with cckit badge](https://cckit.dev/badge/).
 
 ## Contributing
 

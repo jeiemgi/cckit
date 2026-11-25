@@ -155,7 +155,7 @@ branch; after such a merge, run `cckit close <N> "<summary>"`.
 
 | Convention | Where it came from | Wins against |
 | --- | --- | --- |
-| `MERGEABLE` is not safe: bring the branch onto the current base and pass the gate there before merging | a PR cut from a base that had since moved merged clean and reverted a sibling — 7,285 lines removed, no conflict, no failing check | `branch-naming` § *Merge order* decides the order and this rule decides what each PR passes first; it extends that section's lockfile "rebase the others" to every PR |
+| `MERGEABLE` is not safe: bring the branch onto the current base and pass the gate there before merging | a PR cut from a base that had since moved merged clean and reverted a sibling — 7,285 lines removed, no conflict, no failing check | `branch-naming` § *Merge order* decides the order and this rule decides what each PR passes first; it extends that section's lockfile "merge the base into the others" to every PR |
 | A coupled chain ships as ONE PR | the PRs of a chain are siblings cut from one base, each stale once the one before it lands; a single PR has no sibling to revert | `task-management`'s one-PR-per-issue line — its migration/DDL exception becomes any coupled chain — and `branch-naming`'s size guidance, for a chain only |
 | Re-run the gate on the integration branch after the subs merge | the gate had been run on each sub and not again on the branch they merged into | `effort-model` § *Lifecycle*, which lists no gate step between merging the subs and opening the PR |
 

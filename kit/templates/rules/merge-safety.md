@@ -58,8 +58,9 @@ convention.
 
 **Precedence — `branch-naming.md` § *Merge order*.** That section decides the order; this rule
 decides what each PR passes before its turn. They do not conflict on order. Its lockfile rule
-(*merge one, then rebase the others*) is this convention applied to lockfiles; this rule extends it
-to every PR, so where that section is silent about rebasing a non-lockfile PR, this rule wins.
+(*merge one, then merge the base into the others*) is this convention applied to lockfiles; this rule
+extends it to every PR, so where that section is silent about updating a non-lockfile PR, this rule
+wins.
 
 ## 2. A coupled chain ships as ONE PR
 

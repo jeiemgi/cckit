@@ -90,7 +90,7 @@ The integration branch is decided by, in priority:
 1. **Declared dependencies first.** If PR B needs PR A, put `Depends on #A` in B's body. Land A before B.
 2. **`risk:low` before `risk:high`.** Land cheap, safe, reviewed PRs first to shrink the conflict surface.
 3. **Lockfile-touching PRs last, one at a time** (see below).
-4. **Smaller before larger.** Big diffs rebase cleaner onto a moving target than the reverse.
+4. **Smaller before larger.** Merging the moving base into a big diff is cleaner than the reverse.
 
 **Effort relations & session-fit.** At the **effort** level (above PRs), cross-effort dependencies
 are declared as a native GitHub `blocked_by` edge + a `## Relations` line (the board-visible chain) —
@@ -102,7 +102,8 @@ an effort's thread, and a `ctx:*` label drives `kit effort plan`'s session batch
 
 Lockfiles (`pnpm-lock.yaml`, `package-lock.json`, …) and manifest config conflict on almost every parallel merge. So:
 
-- **Merge at most one dependency-changing PR at a time**, then rebase the others.
+- **Merge at most one dependency-changing PR at a time**, then bring each of the others onto the
+  base with `git merge origin/<base>`: never a rebase, never a force push.
 - On a lockfile conflict: take the **base** branch's lockfile, then regenerate (`pnpm install` / `npm install`). Never hand-merge lockfile hunks.
 - Keep a single block per config key (e.g. one `overrides:` in `pnpm-workspace.yaml`). A duplicate key is invalid YAML and breaks CI — a real, recurring incident.
 
