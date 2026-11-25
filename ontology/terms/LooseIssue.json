@@ -1,7 +1,7 @@
 {
   "id": "LooseIssue",
   "label": ["loose issue"],
-  "definition": "An open issue that is not a pull request, not an effort, not a sub-issue, and not on the board with Status = Backlog: work with no home. cckit doctor --loose counts and lists them; --ratchet fails when the count rises above lib/core/loose-issues.baseline.",
+  "definition": "An open issue that is not a pull request, not an effort, not a sub-issue, carries no relation line (Depends on, Blocks, Extends, Parallel-safe with, Sub-issue of, Blocked by #N) and is not on the board with Status = Backlog: work with no home. cckit doctor --loose counts and lists them; --ratchet fails when the count rises above lib/core/loose-issues.baseline, and the captain runs it when it closes a wave.",
   "is_not": [
     "A backlog item: a backlog item sits on the board in Backlog; a loose issue sits nowhere.",
     "An impediment: a loose issue stops nothing by itself; it is unfiled work.",

@@ -29,7 +29,8 @@ export GH_ISSUES='[
   {"number":10,"title":"[Effort] 10 · demo","state":"open","labels":[{"name":"effort"}]},
   {"number":11,"title":"[Effort 10] 1 · a sub","state":"open","labels":[],"parent_issue_url":"https://api.github.com/repos/o/r/issues/10"},
   {"number":12,"title":"Fix the login","state":"open","labels":[{"name":"kind:fix"}],"parent_issue_url":null},
-  {"number":13,"title":"a pull request","state":"open","labels":[],"pull_request":{}}
+  {"number":13,"title":"a pull request","state":"open","labels":[],"pull_request":{}},
+  {"number":14,"title":"Found during the demo","state":"open","labels":[],"body":"Found mid-wave.\n\n## Relations\n- Extends #10"}
 ]'
 
 # project <name> <config-json> -> a throwaway project (git repo, root cckit.config.json); echoes its dir.
@@ -48,6 +49,7 @@ doctor() { local d="$1"; shift; ( cd "$d" && KIT_ASCII=1 NO_COLOR=1 LC_ALL=C bas
 . "$ROOT/lib/core/loose-issues.sh"
 t   "repo: read from github.repo" "$(loose_repo "$off/cckit.config.json")" "o/r"
 t   "board off: projectsV2 false" "$(loose_board_on "$off/cckit.config.json" && echo on || echo off)" "off"
+t   "board off: an issue with a relation line is not loose" "$(loose_issues_list o/r "$off/cckit.config.json")" "$(printf '12\tFix the login')"
 t   "board on: projectsV2 true + a number" "$(loose_board_on "$on/cckit.config.json" && echo on || echo off)" "on"
 out="$(loose_issues_list o/r "$off/cckit.config.json")"
 t   "effort, sub-issue and PR excluded -> the standalone issue alone" "$out" "$(printf '12\tFix the login')"
