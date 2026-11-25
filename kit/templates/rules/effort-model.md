@@ -34,7 +34,8 @@ Every parent issue body uses these five sections (they double as the columns of 
 What outcome, in one or two lines.
 
 ## Spec           → acceptance, checked (`effort new` and `effort close` refuse without it)
-What done means: at least one `- ` or `1. ` item that is not TODO / TBD.
+What done means: at least one `- ` or `1. ` item that is not TODO / TBD. End an item only a
+person can accept with `(needs a yes)`; reports list it under Waiting for a yes.
 
 ## Scope          → plan (the sub-issue DAG; mark each parallel | sequential / dependsOn)
 The decomposition. Sub-issues are linked natively (GitHub parent/child).
@@ -114,9 +115,8 @@ an executable: it is called as `<source> <owner/repo>` from the project root and
 source that is not executable, exits non-zero or prints no rows falls back to GitHub. The plan's
 `source:` line names the source used, its age when reported, and any fallback — a plan built from a
 snapshot says so. L/XL efforts are flagged **"→ delegate subs"**:
-delegating an effort's sub-issues to **sub-agents in their own worktrees** keeps the main session
-light (a sub-agent reads/writes in its own context; only a summary returns) — the lever that lets
-more efforts fit one session (`rules/agent-execution-routing.md`).
+delegating its sub-issues to **sub-agents in their own worktrees** keeps the main session light
+(only a summary returns), so more efforts fit one session (`rules/agent-execution-routing.md`).
 
 Sub-issue bodies: one line is enough (`effort sub --spec` may add a one-line Spec). The parent
 carries the narrative; the **PR** carries the human-facing review write-up + `## For agents`.
@@ -150,8 +150,8 @@ off.
   origin lingers until a prune (the gate would block a start that should be allowed). `ls-remote`
   answers both without writing or pruning a ref. `effort_slug_resolve` keeps reading the cached refs
   because slug lookup is on the hot path of every effort verb — that cached-ref lookup is
-  network-free. Resolution as a whole is not: with no branch matching the slug it falls through to
-  `gh`, so a WIP refusal on a slug input can still make a GitHub read.
+  network-free, but with no branch matching the slug it falls through to `gh`, so a WIP refusal
+  on a slug input can still read GitHub.
 - **At** the limit refuses; only strictly under it starts. `0` refuses every ordinary start of a NEW
   effort — `--force` / `KIT_FORCE=1` still start.
 - Re-running `effort start` on an effort already in progress is never gated — it adds no WIP, so the
