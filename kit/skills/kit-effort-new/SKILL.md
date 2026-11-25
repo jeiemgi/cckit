@@ -50,15 +50,15 @@ The core `effort_new` owns body composition, the `ctx/kind/priority/role/flow` l
 title lint, native sub-issue links, `blocked_by` edges, and the board add.
 
 ```bash
-source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/kit-config.sh" && load_kit_config
+source "${CLAUDE_PLUGIN_ROOT}/lib/core/kit-config.sh" && load_kit_config
 # Board + role helpers must be loaded BEFORE effort_new so its (guarded) board add can run.
 if [[ "$KIT_PROJECTS_V2" == "true" ]]; then
-  source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/gh-project.sh"; load_project_ids
-  source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/role-identity.sh" 2>/dev/null || true
+  source "${CLAUDE_PLUGIN_ROOT}/lib/forge/gh-project.sh"; load_project_ids
+  source "${CLAUDE_PLUGIN_ROOT}/lib/core/role-identity.sh" 2>/dev/null || true
 fi
-source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/effort.sh"
-source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/effort-metrics.sh"   # effort_ctx_bucket
-source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/effort-ops.sh"       # effort_new — the shared creation core
+source "${CLAUDE_PLUGIN_ROOT}/lib/core/effort.sh"
+source "${CLAUDE_PLUGIN_ROOT}/lib/core/effort-metrics.sh"   # effort_ctx_bucket
+source "${CLAUDE_PLUGIN_ROOT}/lib/verbs/effort-ops.sh"       # effort_new — the shared creation core
 
 # TITLE = the human NAME only (no "[E<n>]" prefix). The core files the parent under TITLE, renames it
 # "[E<N>] <TITLE>" once it has a number, fills the five sections, applies labels (the flow goes in the

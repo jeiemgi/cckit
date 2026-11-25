@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+# publish.sh - cut a cckit release and (optionally) publish to the Homebrew tap + npm.
+#
+# SAFE BY DEFAULT: a dry run that changes nothing and prints every step. It only acts when you
+# pass --publish. Built so you can hand it a version later and ship in one command.
+#
+# Usage:
+#   lib/verbs/publish.sh 0.1.0                 # DRY RUN - show the plan, change nothing
+#   lib/verbs/publish.sh 0.1.0 --publish       # execute: tag + GitHub release + formula + npm
+#   lib/verbs/publish.sh 0.1.0 --publish --no-npm     # skip npm (brew only)
+#   lib/verbs/publish.sh 0.1.0 --publish --no-brew    # skip brew (npm only)
+#   lib/verbs/publish.sh 0.1.0 --skip-bench-check     # release despite a missing or lower benchmark
+#
+# Benchmark check (#452): the version needs a recorded checkpoint in benchmarks/runs/<version>.json
+# and its last checkpoint must not score lower than the checkpoint recorded before it, counted over
+# the questions both asked (two checkpoints with no question in common are not compared). Otherwise
+# the release is refused (exit 1), in a dry run as well. --skip-bench-check overrides, and says so.
+# The runs are always read from this repo's benchmarks/ dir. BENCH_DIR is NOT honoured here: it is
+# the variable `cckit bench` reads, and one left exported for another project would move the
+# release check to that project's runs without a word. KIT_RELEASE_BENCH_DIR points the check
+# elsewhere (the tests use it), and the release prints the directory when it is set.
+# Env: TAP_DIR=~/Dev/jeiemgi/homebrew-cckit (where the tap repo is cloned)
+# The forge port (E537): every GitHub call goes through forge_* / gh_rest_* (lib/forge/gh-rest.sh).
+if ! command -v gh_rest_issue_json >/dev/null 2>&1; then
+  # shellcheck source=/dev/null
+  . "$(cd "$(dirname "$0")/.." && pwd)/forge/gh-rest.sh"
+fi
+
+set -euo pipefail
+
+VERSION="${1:-}"; shift || true
+PUBLISH=0; DO_NPM=1; DO_BREW=1; SKIP_BENCH=0
+for a in "$@"; do case "$a" in
+  --publish) PUBLISH=1 ;; --no-npm) DO_NPM=0 ;; --no-brew) DO_BREW=0 ;;
+  --skip-bench-check) SKIP_BENCH=1 ;;
+  *) echo "unknown flag: $a" >&2; exit 2 ;;
+esac; done
+
+[ -n "$VERSION" ] || { echo "usage: lib/verbs/publish.sh <version> [--publish] [--no-npm] [--no-brew] [--skip-bench-check]" >&2; exit 2; }
+grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' <<<"$VERSION" || { echo "version must be X.Y.Z" >&2; exit 2; }
+
+root="$(cd "$(dirname "$0")/../.." && pwd)"
+repo="jeiemgi/cckit"
+tag="v$VERSION"
+tarball="https://github.com/$repo/archive/refs/tags/$tag.tar.gz"
+tap_dir="${TAP_DIR:-$HOME/Dev/jeiemgi/homebrew-cckit}"
+
+run() { if [ "$PUBLISH" = 1 ]; then echo "+ $*"; "$@"; else echo "DRY: $*"; fi; }
+
+mode="DRY-RUN"; [ "$PUBLISH" = 1 ] && mode="PUBLISH"
+echo "== cckit publish $tag  (mode: $mode) =="
+
+# 0. Benchmark check: refuse a version with no recorded checkpoint, or one that scores lower than
+# the checkpoint before it. Runs before anything is written, and in a dry run too.
+[ -z "${KIT_RELEASE_BENCH_DIR:-}" ] || echo "! benchmark runs read from KIT_RELEASE_BENCH_DIR=$KIT_RELEASE_BENCH_DIR"
+bench_out="$(BENCH_DIR="${KIT_RELEASE_BENCH_DIR:-$root/benchmarks}" bash "$root/scripts/benchmark/checkpoint.sh" check "$VERSION" 2>&1)" && bench_rc=0 || bench_rc=$?
+printf '%s\n' "$bench_out"
+if [ "$bench_rc" -ne 0 ]; then
+  if [ "$SKIP_BENCH" = 1 ]; then
+    echo "! benchmark check OVERRIDDEN by --skip-bench-check: releasing $tag anyway"
+  else
+    echo "x release refused by the benchmark check (override: --skip-bench-check)" >&2
+    exit 1
+  fi
+fi
+
+if [ "$PUBLISH" = 1 ]; then
+  [ -z "$(git -C "$root" status --porcelain)" ] || { echo "x working tree not clean" >&2; exit 1; }
+  [ "$(git -C "$root" branch --show-current)" = "main" ] || { echo "x not on main" >&2; exit 1; }
+  ! git -C "$root" rev-parse "$tag" >/dev/null 2>&1 || { echo "x tag $tag already exists" >&2; exit 1; }
+  forge_need release || exit 1
+fi
+
+# 1. Stamp the version on ALL FOUR version surfaces via the ONE shared bumper (#173 — an inline jq
+# here used to write only cckit.config.json.kitVersion, shipping releases whose
+# .claude-plugin/plugin.json and package.json lagged behind and made `cckit update` report a
+# version drift on a fully current install), then tag and cut the GitHub release.
+run bash "$root/lib/core/version-bump.sh" --write "$VERSION"
+run git -C "$root" add -A
+run git -C "$root" commit -m "release: $tag"
+# -m makes the tag annotated, which also satisfies tag.gpgsign=true configs — a bare `git tag`
+# aborts there with "fatal: no tag message?" and kills the publish mid-run (#167).
+run git -C "$root" tag -m "$tag" "$tag"
+run git -C "$root" push origin main "$tag"
+run forge_rest "repos/$repo/releases" -X POST -f "tag_name=$tag" -f "name=$tag" -F generate_release_notes=true
+
+# 2. Compute the tarball sha256 for the stable Homebrew formula.
+if [ "$PUBLISH" = 1 ]; then
+  echo "+ fetching sha256 of $tarball"
+  SHA="$(curl -fsSL "$tarball" | shasum -a 256 | cut -d' ' -f1)"
+  echo "  sha256=$SHA"
+else
+  SHA="<computed-at-publish>"; echo "DRY: curl -fsSL $tarball | shasum -a 256"
+fi
+
+# 3. Inject the stable url+sha256 block into the formula (idempotent).
+formula="$root/Formula/cckit.rb"
+if [ "$PUBLISH" = 1 ]; then
+  if grep -q 'url "https' "$formula"; then
+    perl -0pi -e "s{url \"https[^\"]*\"}{url \"$tarball\"}; s{sha256 \"[^\"]*\"}{sha256 \"$SHA\"}; s{version \"[^\"]*\"}{version \"$VERSION\"}" "$formula"
+  else
+    perl -0pi -e "s{(  homepage[^\n]*\n)}{\$1  url \"$tarball\"\n  sha256 \"$SHA\"\n  version \"$VERSION\"\n}" "$formula"
+  fi
+  echo "+ updated $formula"
+else
+  echo "DRY: inject url=$tarball sha256=$SHA version=$VERSION into Formula/cckit.rb"
+fi
+
+# 4. Homebrew tap: copy the formula into the tap repo and push.
+if [ "$DO_BREW" = 1 ]; then
+  if [ -d "$tap_dir/.git" ]; then
+    run mkdir -p "$tap_dir/Formula"
+    run cp "$formula" "$tap_dir/Formula/cckit.rb"
+    run git -C "$tap_dir" add Formula/cckit.rb
+    run git -C "$tap_dir" commit -m "cckit $VERSION"
+    run git -C "$tap_dir" push
+    echo "   users: brew tap jeiemgi/cckit && brew install cckit"
+  else
+    echo "  ! tap repo not at $tap_dir - create the public repository jeiemgi/homebrew-cckit on GitHub and clone it there"
+  fi
+fi
+
+# 5. npm publish (scoped, public).
+if [ "$DO_NPM" = 1 ]; then
+  run npm publish --access public
+  echo "   users: npm i -g @jeiemgi/cckit"
+fi
+
+done_msg="dry run - nothing changed"; [ "$PUBLISH" = 1 ] && done_msg="published"
+echo "== done ($done_msg) =="

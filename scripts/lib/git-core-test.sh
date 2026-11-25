@@ -9,7 +9,7 @@
 set -u
 LIB="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=/dev/null
-. "$LIB/test-env.sh" && test_env_seal
+. "$LIB/../../lib/core/test-env.sh" && test_env_seal
 unset GH_TOKEN GITHUB_TOKEN CCKIT_FORGE CCKIT_VERB KIT_CONFIG
 fail=0
 t()  { if [ "$2" = "$3" ]; then echo "ok: $1"; else echo "FAIL: $1 -> got '[$2]' want '[$3]'"; fail=1; fi; }
@@ -51,13 +51,13 @@ git push -q origin develop; git branch -q main; git push -q origin main
 export KIT_REPO="o/r" WT_START_REPO="o/r" KIT_BASE_BRANCH="develop" KIT_WT_INSTALL=0 KIT_GC_REPO="o/r" KIT_PROJECTS_V2=false
 
 # shellcheck source=/dev/null
-. "$LIB/forge.sh"
+. "$LIB/../../lib/forge/forge.sh"
 t "no token and no gh: the provider is none"  "$(forge_provider)" "none"
 
 # shellcheck source=/dev/null
-. "$LIB/worktree-start.sh"
+. "$LIB/../../lib/core/worktree-start.sh"
 # shellcheck source=/dev/null
-. "$LIB/kit-task-ops.sh"
+. "$LIB/../../lib/verbs/kit-task-ops.sh"
 
 # ── start ──────────────────────────────────────────────────────────────────────────────────────
 out="$(wt_start 7 the-thing 2>"$tmp/err")"; rc=$?
@@ -102,7 +102,7 @@ t "merge from the base branch is refused"     "$rc" "1"
 
 # ── hotfix: the cherry-pick lands on main and is pushed; no pull request ──────────────────────
 # shellcheck source=/dev/null
-. "$LIB/kit-hotfix.sh"
+. "$LIB/../../lib/verbs/kit-hotfix.sh"
 sha="$(git -C "$tmp/work" rev-parse origin/develop)"
 out="$(cd "$tmp/work" && kto_hotfix "$sha" --base main 2>"$tmp/err")"; rc=$?
 t "hotfix without a forge: rc 0"              "$rc" "0"
@@ -115,7 +115,7 @@ tc "$tmp/err" 'PR #12 cannot be read; pass the merge commit' "hotfix <pr>: the r
 
 # ── gc: every row UNKNOWN and kept; the note is printed once ──────────────────────────────────
 # shellcheck source=/dev/null
-. "$LIB/kit-gc.sh"
+. "$LIB/../../lib/verbs/kit-gc.sh"
 out="$(cd "$tmp/work" && unset _FORGE_NONE_SAID && kit_gc_analyze 2>"$tmp/err")"
 t "gc: the leftover issue branch is UNKNOWN, kept" "$(printf '%s\n' "$out" | grep -c 'task/8-issue-8 .*UNKNOWN')" "1"
 t "gc: nothing is SAFE or LANDED"             "$(printf '%s\n' "$out" | grep -cE 'task/8-issue-8 .*(SAFE|LANDED)')" "0"

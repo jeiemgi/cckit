@@ -15,6 +15,7 @@
   "files": [
     ".claude-plugin",
     "bin",
+    "lib",
     "scripts",
     "kit",
     "cckit.config.json",

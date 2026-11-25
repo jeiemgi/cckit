@@ -16,8 +16,8 @@ set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 # Sealed from the caller's KIT_*/CCKIT_*/EFFORT_* (#369): this suite builds its own fixture.
 # shellcheck source=/dev/null
-. "$ROOT/scripts/lib/test-env.sh" && test_env_seal
-LIB="$ROOT/scripts/lib"
+. "$ROOT/lib/core/test-env.sh" && test_env_seal
+LIB="$ROOT/lib"
 fail=0
 ok()   { echo "ok: $1"; }
 bad()  { echo "FAIL: $1"; fail=1; }
@@ -49,7 +49,7 @@ run_zsh "kit-config.sh :: load_kit_config" \
 
 # kit-gc.sh — the `path` local in kit_gc_analyze's while-read (read-only, safe to run).
 run_zsh "kit-gc.sh :: kit_gc_analyze" \
-  "cd '$ROOT'; export KIT_GC_REPO=jeiemgi/cckit; source scripts/lib/kit-config.sh; load_kit_config >/dev/null 2>&1; source scripts/lib/kit-gc.sh; kit_gc_analyze >/dev/null 2>&1"
+  "cd '$ROOT'; export KIT_GC_REPO=jeiemgi/cckit; source scripts/lib/kit-config.sh; load_kit_config >/dev/null 2>&1; source lib/verbs/kit-gc.sh; kit_gc_analyze >/dev/null 2>&1"
 
 # kit-gc.sh — the sibling-lib load itself (#219). `BASH_SOURCE` is bash-only and an interactive zsh
 # echoes the directory after a `cd`, so both the old `${(%):-%x}` and a bare `$(cd … && pwd)` left
@@ -58,7 +58,7 @@ run_zsh "kit-gc.sh :: kit_gc_analyze" \
 # `wt_protected_reason`, `_kit_gc_load_deps` returns early and the case would pass without ever
 # resolving the dir — the exact thing under test.
 run_zsh "kit-gc.sh :: sibling worktree-issue.sh actually loads" \
-  "cd '$ROOT'; unset -f wt_protected_reason 2>/dev/null; source scripts/lib/kit-gc.sh; _kit_gc_load_deps >/dev/null 2>&1; command -v wt_protected_reason >/dev/null 2>&1"
+  "cd '$ROOT'; unset -f wt_protected_reason 2>/dev/null; source lib/verbs/kit-gc.sh; _kit_gc_load_deps >/dev/null 2>&1; command -v wt_protected_reason >/dev/null 2>&1"
 
 # agent-resolve.sh / stage-receipt.sh / review-stage.sh — the same sibling-load defect as kit-gc
 # above (#346). Both E318 files resolved their lib dir from a bare `${BASH_SOURCE[0]}`, which is
@@ -67,13 +67,13 @@ run_zsh "kit-gc.sh :: sibling worktree-issue.sh actually loads" \
 # `unset -f` first for the same reason kit-gc's case does it — a user init that already defined the
 # symbol would pass the case without resolving anything.
 run_zsh "agent-resolve.sh :: sibling agent-profile.sh actually loads" \
-  "cd '$ROOT'; unset -f ap_profile_validate 2>/dev/null; source scripts/lib/agent-resolve.sh; command -v ap_profile_validate >/dev/null 2>&1"
+  "cd '$ROOT'; unset -f ap_profile_validate 2>/dev/null; source lib/core/agent-resolve.sh; command -v ap_profile_validate >/dev/null 2>&1"
 
 run_zsh "stage-receipt.sh :: sibling kit-state.sh actually loads" \
-  "cd '$ROOT'; unset -f kit_state_dir 2>/dev/null; source scripts/lib/stage-receipt.sh; command -v kit_state_dir >/dev/null 2>&1"
+  "cd '$ROOT'; unset -f kit_state_dir 2>/dev/null; source lib/core/stage-receipt.sh; command -v kit_state_dir >/dev/null 2>&1"
 
 run_zsh "review-stage.sh :: loads both of its dependencies" \
-  "cd '$ROOT'; unset -f ap_resolve_pr sr_record 2>/dev/null; source scripts/lib/review-stage.sh; command -v ap_resolve_pr >/dev/null 2>&1 && command -v sr_record >/dev/null 2>&1"
+  "cd '$ROOT'; unset -f ap_resolve_pr sr_record 2>/dev/null; source lib/core/review-stage.sh; command -v ap_resolve_pr >/dev/null 2>&1 && command -v sr_record >/dev/null 2>&1"
 
 # worktree-start.sh — the `path` local in wt_assign_ports (no-op without .worktree.devPorts).
 run_zsh "worktree-start.sh :: wt_assign_ports" \
@@ -90,13 +90,13 @@ qa_tmp="$(mktemp -d)"
 printf '%s' '{"qa":{"readiness":[{"env":"WEB_PORT","path":"/"},{"env":"API_PORT","path":"health"}]}}' > "$qa_tmp/cfg.json"
 printf 'WEB_PORT=3010\nAPI_PORT=4010\n' > "$qa_tmp/ports"
 run_zsh "qa-lane.sh :: siblings load and one probe row per service" \
-  "cd '$ROOT'; unset -f kit_state_dir wt_port_slot emit_event wt_issue_number 2>/dev/null; source scripts/lib/qa-lane.sh; command -v wt_port_slot >/dev/null 2>&1 && command -v kit_state_dir >/dev/null 2>&1 && command -v emit_event >/dev/null 2>&1 && [ \"\$(qa_probe_urls '$qa_tmp/cfg.json' '$qa_tmp/ports' | cut -f2 | tr '\n' ' ')\" = 'http://localhost:3010/ http://localhost:4010/health ' ]"
+  "cd '$ROOT'; unset -f kit_state_dir wt_port_slot emit_event wt_issue_number 2>/dev/null; source lib/core/qa-lane.sh; command -v wt_port_slot >/dev/null 2>&1 && command -v kit_state_dir >/dev/null 2>&1 && command -v emit_event >/dev/null 2>&1 && [ \"\$(qa_probe_urls '$qa_tmp/cfg.json' '$qa_tmp/ports' | cut -f2 | tr '\n' ' ')\" = 'http://localhost:3010/ http://localhost:4010/health ' ]"
 # The route parser (#297) is a sed -E + grep -E pipeline with the pattern held in a variable. It
 # must read a declared line, and skip a template placeholder, the same way under zsh.
 printf '%s\n' 'intro' '- **QA route:** `/orders/42?tab=items`' > "$qa_tmp/body.md"
 printf '%s\n' 'QA route: <path>' > "$qa_tmp/blank.md"
 run_zsh "qa-lane.sh :: a declared QA route line parses under zsh" \
-  "cd '$ROOT'; source scripts/lib/qa-lane.sh; [ \"\$(qa_route_declared < '$qa_tmp/body.md')\" = '/orders/42?tab=items' ] && ! qa_route_declared < '$qa_tmp/blank.md' >/dev/null && qa_route_valid /a/b && ! qa_route_valid 'a b'"
+  "cd '$ROOT'; source lib/core/qa-lane.sh; [ \"\$(qa_route_declared < '$qa_tmp/body.md')\" = '/orders/42?tab=items' ] && ! qa_route_declared < '$qa_tmp/blank.md' >/dev/null && qa_route_valid /a/b && ! qa_route_valid 'a b'"
 rm -rf "$qa_tmp"
 
 # effort.sh :: effort_snapshot_subs — the work-record collapse (#339). `for sha in $shas` relied on
@@ -124,7 +124,7 @@ snap_tmp="$(mktemp -d)"
 # sources the user's rc, which can print shell-integration escapes into it. The cases above only
 # check exit codes, so they can afford `-i`; this one cannot. Word-splitting — what #339 is about —
 # does not depend on interactivity, so `-f` exercises the same behavior.
-snap_out="$(zsh -fc "cd ${snap_tmp}; source ${LIB}/effort.sh; effort_snapshot_subs 99 effortbase" 2>/dev/null)"
+snap_out="$(zsh -fc "cd ${snap_tmp}; source ${LIB}/core/effort.sh; effort_snapshot_subs 99 effortbase" 2>/dev/null)"
 if [ -z "$snap_out" ] || [ ! -d "$snap_out" ]; then
   bad "effort.sh :: effort_snapshot_subs ran under zsh (no trace dir echoed)"
 else

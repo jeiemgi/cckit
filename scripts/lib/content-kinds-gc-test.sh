@@ -12,18 +12,18 @@
 # errors: strict — a test runner: rc 1 on any failed assertion
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-LIB="$ROOT/scripts/lib"
+LIB="$ROOT/lib"
 fail=0
 t()  { if [ "$2" = "$3" ]; then echo "ok: $1"; else echo "FAIL: $1 -> got '[$2]' want '[$3]'"; fail=1; fi; }
 command -v git >/dev/null 2>&1 || { echo "content-kinds-gc-test: git required" >&2; exit 1; }
 
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 # shellcheck source=/dev/null
-source "$LIB/kinds.sh"
+source "$LIB/core/kinds.sh"
 # shellcheck source=/dev/null
-source "$LIB/worktree-issue.sh"
+source "$LIB/core/worktree-issue.sh"
 # shellcheck source=/dev/null
-source "$LIB/worktree-start.sh"
+source "$LIB/core/worktree-start.sh"
 
 cd "$tmp" || exit 1
 git init -q repo
@@ -51,7 +51,7 @@ pr_json="$pr_json,{\"number\":145,\"head\":{\"ref\":\"task/45-closed-piece\"},\"
 # The forge shim (test-forge-shim.sh) stands in for GitHub: issue 45 is closed, every other issue
 # open; the PR list (GET repos/o/r/pulls) carries one MERGED PR per branch, from a fixture.
 # shellcheck source=/dev/null
-. "$LIB/test-forge-shim.sh"; forge_shim_install "$tmp/bin"
+. "$LIB/forge/test-forge-shim.sh"; forge_shim_install "$tmp/bin"
 export PATH="$tmp/bin:$PATH" GH_TOKEN=test-token CCKIT_FORGE=github
 export GH_LOG="$tmp/gh.log" GH_CLOSED="45" GH_FIXTURE="$tmp/fixture"
 : > "$GH_LOG"
@@ -69,7 +69,7 @@ t "each protection read is GET repos/o/r/issues/<n>" "$(grep -c '^GET repos/o/r/
 
 # The gc report itself: each live content branch is in the protected bucket, none in the safe one.
 # shellcheck source=/dev/null
-source "$LIB/kit-gc.sh"
+source "$LIB/verbs/kit-gc.sh"
 : > "$GH_LOG"
 analysis="$(KIT_GC_REPO="o/r" kit_gc_analyze 2>/dev/null)"
 t "gc reads the PR list once, over REST" "$(grep -c '^GET repos/o/r/pulls?state=all&per_page=100 ' "$GH_LOG")" "1"

@@ -95,7 +95,7 @@ has "campaign waits for approval" "$(cat "$cp")" "Record nothing"
 t "campaign: no task finish line without --all" "$(grep -c 'cckit task finish' "$cp")" "$(grep -c 'cckit task finish <id> "[^"]*" --all' "$cp")"
 has "cckit task has the default verb" "$help" "cckit task default"
 # The effort lane's flags are ones `effort new` parses.
-eo="$(cat "$ROOT/scripts/lib/effort-ops.sh")"
+eo="$(cat "$ROOT/lib/verbs/effort-ops.sh")"
 for fl in --kind --goal --spec --scope --verification; do
   has "effort new parses $fl" "$eo" "      $fl)"
 done
@@ -116,13 +116,13 @@ t "page-design: the order is direction, motion, audit" \
   '## 0 · Find out what is installed, and where you are running|## 1 · The brief, before any code|## 2 · Direction — `impeccable`|## 3 · Interaction and motion — `emil-design-eng`|## 4 · Audit — `web-design-guidelines`|## 5 · Self-review against the brief|'
 has "page-design: no live mode in an unattended run" "$(cat "$pd")" "Never its live mode in an unattended run."
 has "page-design: reads CCKIT_HEADLESS, which autopilot run exports" "$(cat "$pd")" "CCKIT_HEADLESS"
-has "autopilot run exports CCKIT_HEADLESS" "$(cat "$ROOT/scripts/autopilot-run.sh")" "export CCKIT_HEADLESS=1"
+has "autopilot run exports CCKIT_HEADLESS" "$(cat "$ROOT/lib/verbs/autopilot-run.sh")" "export CCKIT_HEADLESS=1"
 has "page-design: an audit with no network is not run" "$(cat "$pd")" "audit: not run (the rules could not be"
 has "page-design: and is never reported as passed" "$(cat "$pd")" "Never write that the audit passed"
 has "page-design: the brief names what the page refuses to look like" "$(cat "$pd")" "Refuses to look like"
 has "page-design: the brief asks for ONE visual idea" "$(cat "$pd")" "The one visual idea"
 has "page-design: the design file path is the one task run names" "$(cat "$pd")" 'docs/design/<task-id>.md'
-has "task run names the same design file path" "$(cat "$ROOT/scripts/lib/light-task.sh")" "printf 'docs/design/%s.md'"
+has "task run names the same design file path" "$(cat "$ROOT/lib/verbs/light-task.sh")" "printf 'docs/design/%s.md'"
 for sec in Direction Motion Audit; do
   has "page-design: minimum rules have a section for $sec" "$(cat "$pdr/minimum-rules.md")" "## $sec — when"
 done
@@ -131,7 +131,7 @@ t "no third-party design skill is vendored" "$(ls -d "$ROOT/kit/templates/skills
 
 # Every kind the skills tell the agent to pass is a kind `--kind` accepts.
 # shellcheck source=/dev/null
-. "$ROOT/scripts/lib/kinds.sh"
+. "$ROOT/lib/core/kinds.sh"
 for k in post campaign brand research; do
   kit_kind_label_valid "$k"; t "kind $k is accepted" "$?" "0"
 done

@@ -5,7 +5,7 @@ The Astro site, its media and the `kit-annotate` reference. The old `docs/` fold
 
 | Rule | Check |
 | --- | --- |
-| The CLI reference lists every verb in `scripts/lib/verbs.tsv` | `scripts/verbs-test.sh` |
+| The CLI reference lists every verb in `lib/core/verbs.tsv` | `scripts/verbs-test.sh` |
 | The site version matches the release | `release-please-config.json` extra-files; `.release-please-manifest.json` |
 | No `docs/` directory comes back | `lib/core/layout-fence.sh` (top-level allowlist) |
-| Nothing private is published | the leak fence in `scripts/check.sh` |
+| Nothing private is published | the leak fence in `lib/core/check.sh` |

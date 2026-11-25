@@ -11,7 +11,7 @@
 set -u
 LIB="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=/dev/null
-. "$LIB/test-env.sh" && test_env_seal
+. "$LIB/../../lib/core/test-env.sh" && test_env_seal
 unset CLAUDE_CODE_REMOTE CCKIT_GH_TRANSPORT CCKIT_GRAPHQL
 fail=0
 t()   { if [ "$2" = "$3" ]; then echo "ok: $1"; else echo "FAIL: $1 -> got '[$2]' want '[$3]'"; fail=1; fi; }
@@ -21,7 +21,7 @@ command -v git >/dev/null 2>&1 || { echo "gh-board-add-test: git required — sk
 
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 # shellcheck source=/dev/null
-. "$LIB/test-forge-shim.sh"; forge_shim_install "$tmp/bin"
+. "$LIB/../../lib/forge/test-forge-shim.sh"; forge_shim_install "$tmp/bin"
 export GH_TOKEN=test-token CCKIT_FORGE=github GH_LOG="$tmp/gh.log" GH_N="$tmp/n"
 
 # Org board acme #3. POST items answers as GH_ADD_MODE says: exists = the documented 422 for content
@@ -55,7 +55,7 @@ export GH_GRAPHQL='{"data":{"addProjectV2ItemById":{"item":{"id":"PVTI_gql"}}}}'
 add() {  # <snippet> — run gh-project.sh functions against the org board, over the shim
   : > "$GH_LOG"
   PATH="$tmp/bin:$PATH" KIT_CONFIG=/nonexistent KIT_REPO=acme/app KIT_OWNER=acme KIT_PROJECT_NUMBER=3 \
-    KIT_PROJECT_OWNER_TYPE=organization PROJECT_ID=PVT_rest bash -c "source '$LIB/gh-project.sh'; $1" 2>"$tmp/add.err"
+    KIT_PROJECT_OWNER_TYPE=organization PROJECT_ID=PVT_rest bash -c "source '$LIB/../../lib/forge/gh-project.sh'; $1" 2>"$tmp/add.err"
 }
 
 # ── the item is already on the board: REST 422 → the existing card ───────────────────────────────
@@ -102,9 +102,9 @@ export GH_REPO_LABELS='[{"name":"kind:task"},{"name":"priority:p2"},{"name":"rol
 export PROJECT_ID=PVT_rest STATUS_FIELD_ID=PVTSSF_status STATUS_OPT_TODO=opt_todo
 unset GH_ADD_MODE GH_ITEMS_EMPTY
 # shellcheck source=/dev/null
-. "$LIB/gh-project.sh"
+. "$LIB/../../lib/forge/gh-project.sh"
 # shellcheck source=/dev/null
-. "$LIB/kit-task-ops.sh"
+. "$LIB/../../lib/verbs/kit-task-ops.sh"
 load_project_ids() { :; }   # the ids are exported above; no captured file in the throwaway repo
 : > "$GH_LOG"
 num="$(kto_task_new "Add a thing" tech-lead task p2 "" "" "" "Body." 2>"$tmp/new.err" | tail -1)"

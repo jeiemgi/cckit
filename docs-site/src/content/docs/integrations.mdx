@@ -77,7 +77,7 @@ gitignored and shared by every worktree of the repo.
 
 | Fact | Detail |
 | --- | --- |
-| What writes the line | `cckit doctor --fix`, a yes at the doctor's terminal prompt, or `bash scripts/lib/integration-install.sh --consent <id>`. |
+| What writes the line | `cckit doctor --fix`, a yes at the doctor's terminal prompt, or `bash lib/core/integration-install.sh --consent <id>`. |
 | What it permits | The shared runner installing and wiring that one integration in that one repo. |
 | What it does not permit | Any other integration, any other repo, or any other change cckit makes. |
 | Without the line | The runner reports `no-consent` and runs nothing. `KIT_ASSUME_YES` is not consent. |
@@ -88,7 +88,7 @@ repo: see [the permission gate](/config-and-permissions/#the-permission-gate-ask
 
 ## How an install runs
 
-`scripts/lib/integration-install.sh` is the one runner. For a missing tool with consent recorded,
+`lib/core/integration-install.sh` is the one runner. For a missing tool with consent recorded,
 it tries the descriptor's install candidates in the order written and skips one whose package
 manager is not on `PATH`. The first candidate that exits 0 **and** leaves the tool detectable wins;
 later candidates never run. If the tool is already detectable, nothing runs, so a second
@@ -225,6 +225,6 @@ affiliated with any of them.
 ## Add a tool of your own
 
 Write `integrations/<id>.json` against `integrations/integration.schema.json`, then run
-`bash scripts/lib/integrations.sh --validate`: it prints one `<id>: <field>: <problem>` line per
+`bash lib/core/integrations.sh --validate`: it prints one `<id>: <field>: <problem>` line per
 problem. The field list is in [Config & permissions → Integrations](/config-and-permissions/#integrations).
 The steps, with a worked descriptor: [Add your own tool as an integration](/development/add-your-own-integration/).

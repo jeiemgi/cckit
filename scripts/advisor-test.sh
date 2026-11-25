@@ -11,7 +11,7 @@ fail=0
 ok()  { echo "ok: $1"; }
 bad() { echo "FAIL: $1"; fail=1; }
 # shellcheck source=/dev/null
-. "$ROOT/scripts/lib/kit-brief.sh"
+. "$ROOT/lib/verbs/kit-brief.sh"
 
 ORDER='Status · Done · Waiting for a yes · Numbers · Failing or risky · Open questions · Next step'
 # flat <file> — the file on one line, whitespace and markdown emphasis collapsed, so a sentence the

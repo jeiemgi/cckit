@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# commitlint-test.sh — the PR-title Conventional Commits gate (scripts/lib/commitlint.sh).
-# Hermetic, no network. Discovered by scripts/test.sh, folded into scripts/check.sh + CI.
+# commitlint-test.sh — the PR-title Conventional Commits gate (lib/core/commitlint.sh).
+# Hermetic, no network. Discovered by lib/core/test.sh, folded into lib/core/check.sh + CI.
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 fail=0
 # shellcheck source=/dev/null
-. "$ROOT/scripts/lib/commitlint.sh"
+. "$ROOT/lib/core/commitlint.sh"
 
 ok()  { if commitlint_check "$1" >/dev/null 2>&1; then echo "ok:   accept '$1'"; else echo "FAIL: should ACCEPT '$1'"; fail=1; fi; }
 bad() { if commitlint_check "$1" >/dev/null 2>&1; then echo "FAIL: should REJECT '$1'"; fail=1; else echo "ok:   reject '$1'"; fi; }
@@ -43,12 +43,12 @@ bad "feat(): empty scope"                  # scope cannot be empty
 bad ""                                     # empty subject
 
 # --- CLI form works and mirrors the function ---
-if bash "$ROOT/scripts/lib/commitlint.sh" "feat: via cli" >/dev/null 2>&1; then
+if bash "$ROOT/lib/core/commitlint.sh" "feat: via cli" >/dev/null 2>&1; then
   echo "ok:   CLI accepts a valid subject"
 else
   echo "FAIL: CLI should accept a valid subject"; fail=1
 fi
-if bash "$ROOT/scripts/lib/commitlint.sh" "nope" >/dev/null 2>&1; then
+if bash "$ROOT/lib/core/commitlint.sh" "nope" >/dev/null 2>&1; then
   echo "FAIL: CLI should reject an invalid subject"; fail=1
 else
   echo "ok:   CLI rejects an invalid subject"

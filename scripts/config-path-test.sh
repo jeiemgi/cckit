@@ -7,7 +7,7 @@ fail=0
 t() { if [ "$2" = "$3" ]; then echo "ok: $1"; else echo "FAIL: $1 -> got '[$2]' want '[$3]'"; fail=1; fi; }
 command -v jq >/dev/null 2>&1 || { echo "config-path-test: jq required" >&2; exit 1; }
 # shellcheck source=/dev/null
-. "$ROOT/scripts/lib/project-scan.sh"
+. "$ROOT/lib/core/project-scan.sh"
 
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 mk() { mkdir -p "$1"; ( cd "$1" && git init -q ); }

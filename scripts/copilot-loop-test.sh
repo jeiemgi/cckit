@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # copilot-loop-test.sh — headless end-to-end of the copilot loop on a FIXTURE board (#80).
-# Hermetic: the forge shim (scripts/lib/test-forge-shim.sh) with a stateful fixture serves issues,
+# Hermetic: the forge shim (lib/forge/test-forge-shim.sh) with a stateful fixture serves issues,
 # PRs, deps and check runs as the REST API would, so the scripts' OWN --jq programs run unmodified
 # and no gh subcommand may run; a throwaway repo with a bare origin takes the branch deletion.
 # Asserts the full cycle:
@@ -12,7 +12,7 @@ set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # Sealed from the caller's KIT_*/CCKIT_*/EFFORT_* (#369): this suite builds its own fixture.
 # shellcheck source=/dev/null
-. "$ROOT/scripts/lib/test-env.sh" && test_env_seal
+. "$ROOT/lib/core/test-env.sh" && test_env_seal
 command -v jq >/dev/null 2>&1 || { echo "copilot-loop-test: jq required" >&2; exit 1; }
 fail=0
 ok() { if [ "$1" = "$2" ]; then echo "ok: $3"; else echo "FAIL: $3 -> got '[$1]' want '[$2]'"; fail=1; fi; }
@@ -52,7 +52,7 @@ JSON
 # commit's check runs, and PUT …/merge, which records the merge and closes the branch's issue.
 BIN="$TMP/bin"
 # shellcheck source=/dev/null
-. "$ROOT/scripts/lib/test-forge-shim.sh"; forge_shim_install "$BIN"
+. "$ROOT/lib/forge/test-forge-shim.sh"; forge_shim_install "$BIN"
 export FX CLOSED MERGEDPR GH_LOG="$TMP/gh.log" GH_FIXTURE="$FX/fixture.sh" GH_TOKEN=test-token CCKIT_FORGE=github
 cat > "$GH_FIXTURE" <<'SH'
 closed_list() { jq -R . "$CLOSED" 2>/dev/null | jq -s 'map(select(length>0)|tonumber)'; }

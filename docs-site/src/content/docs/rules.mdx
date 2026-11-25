@@ -263,8 +263,8 @@ machine has in common: the primary checkout, the first entry of `git worktree li
 | Work in a worktree, always, a one-line fix included | the same incident: the close ops only check out the base, so a primary checkout on a feature branch means a session checked it out there | `branch-naming` § *Parallel work* — its one-agent-one-worktree line is extended to a session working alone |
 | Call a freshly merged verb from a current worktree's `bin/`, not from PATH, when PATH resolves into the primary checkout | two incidents the same day: a verb merged minutes earlier answered "unknown command", and the version check read "ahead of plugin 0.3.0" from the stale branch's files | nothing — no shipped rule says which copy of a tool to run |
 
-The rule forbids hand-run git, not the verbs. `cckit merge` (`scripts/lib/kit-task-ops.sh:424-425`)
-and `cckit effort close` (`scripts/lib/effort-ops.sh:1025-1026`) check out and pull the base in the
+The rule forbids hand-run git, not the verbs. `cckit merge` (`lib/verbs/kit-task-ops.sh:424-425`)
+and `cckit effort close` (`lib/verbs/effort-ops.sh:1025-1026`) check out and pull the base in the
 primary checkout as their last step. With the checkout already on the base and clean, that switches
 nothing and fast-forwards; both lines end in `|| true`, so a dirty or re-parked checkout is left
 stale without a message.

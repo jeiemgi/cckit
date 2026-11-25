@@ -41,7 +41,7 @@ writers in one checkout, which is the corruption a worktree per writer exists to
 
 `cckit orchestrate` creates the worktree for each issue, skips an issue whose `blocked_by` is still
 open, launches at most `--cap` workers, and records how each one ended. On tmux the pane runs the
-agent under `scripts/wave-worker.sh`, which keeps the agent in the foreground of the pane and
+agent under `lib/verbs/wave-worker.sh`, which keeps the agent in the foreground of the pane and
 writes its exit to cckit's shared state directory.
 
 ```sh
@@ -69,7 +69,7 @@ session has no records), and 3 when none failed but some are unfinished.
 Two limits. A result is how the **process** ended, not whether the work is right: an interactive
 agent you quit normally exits 0 whatever it did. What the worker reports about its own work is the
 [stage receipt](/config-and-permissions/#stage-receipts) — a separate record. And the three values
-are produced by `scripts/orchestrate-test.sh` with a stub agent under both launch kinds; no live
+are produced by `lib/verbs/orchestrate-test.sh` with a stub agent under both launch kinds; no live
 Claude Code or Codex session is part of that test.
 
 ## One writer per branch

@@ -28,7 +28,7 @@
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source=/dev/null
-. "$ROOT/scripts/lib/test-env.sh" && test_env_seal
+. "$ROOT/lib/core/test-env.sh" && test_env_seal
 CCKIT="$ROOT/bin/cckit"
 PAGE="$ROOT/docs-site/src/content/docs/getting-started/update.mdx"
 fail=0

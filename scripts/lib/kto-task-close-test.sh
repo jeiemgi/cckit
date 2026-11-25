@@ -14,13 +14,13 @@ command -v jq >/dev/null 2>&1 || { echo "kto-task-close-test: jq required" >&2; 
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 export GH_LOG="$tmp/gh.log" GH_CLOSED=""
 # shellcheck source=/dev/null
-. "$LIB/test-forge-shim.sh"; forge_shim_install "$tmp/bin"
+. "$LIB/../../lib/forge/test-forge-shim.sh"; forge_shim_install "$tmp/bin"
 export PATH="$tmp/bin:$PATH" GH_TOKEN=test-token CCKIT_FORGE=github
 export KIT_REPO="o/r" KIT_PROJECTS_V2="true"
 unset KIT_CONFIG CLAUDE_CODE_REMOTE
 
 # shellcheck source=/dev/null
-. "$LIB/kit-task-ops.sh"
+. "$LIB/../../lib/verbs/kit-task-ops.sh"
 # Board stubs: the close must still move the item to Done whatever the reason.
 BOARD_LOG="$tmp/board.log"
 load_project_ids()           { STATUS_FIELD_ID="SF"; STATUS_OPT_DONE="DONE"; return 0; }

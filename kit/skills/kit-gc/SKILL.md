@@ -34,7 +34,7 @@ branch's remote** (orphan work is surfaced, never auto-deleted).
 > would let gc delete a misnamed live branch.
 > `gc` resolves #N and **refuses to remove anything whose issue is still open, even
 > with no PR yet** — this protects in-progress worktrees that haven't opened a PR.
-> Helper: `${CLAUDE_PLUGIN_ROOT}/scripts/lib/worktree-issue.sh` (`wt_issue_number`, `wt_protected_reason`).
+> Helper: `${CLAUDE_PLUGIN_ROOT}/lib/core/worktree-issue.sh` (`wt_issue_number`, `wt_protected_reason`).
 >
 > **The protection helper is mandatory.** `kit_gc_analyze` / `kit_gc_prune` load it via
 > `_kit_gc_require_deps` and **abort with a FATAL (rc=1) if it cannot be sourced** — without it
@@ -50,8 +50,8 @@ branch's remote** (orphan work is surfaced, never auto-deleted).
 ```bash
 # Read-only analysis lives in the CANONICAL Family-1 home — the skill is a thin caller (#419):
 #   scripts/lib/kit-gc.sh :: kit_gc_analyze   (also what `kit gc` + the kit-ui cockpit run)
-source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/kit-config.sh" && load_kit_config
-KIT_GC_REPO="$KIT_REPO" source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/kit-gc.sh"
+source "${CLAUDE_PLUGIN_ROOT}/lib/core/kit-config.sh" && load_kit_config
+KIT_GC_REPO="$KIT_REPO" source "${CLAUDE_PLUGIN_ROOT}/lib/verbs/kit-gc.sh"
 kit_gc_analyze       # worktrees / branches / stashes, each tagged PROTECTED/SAFE/ACTIVE/LANDED/ORPHAN/UNKNOWN
 ```
 

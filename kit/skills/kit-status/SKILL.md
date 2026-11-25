@@ -32,7 +32,7 @@ when_to_use: |
 # kit-status — where are we?
 
 Plugin-direct skill — a thin caller over `cckit status`. The bucket logic lives in
-`${CLAUDE_PLUGIN_ROOT}/scripts/lib/kit-status.sh` (kit-engine-boundary: the verb logic has one
+`${CLAUDE_PLUGIN_ROOT}/lib/verbs/kit-status.sh` (kit-engine-boundary: the verb logic has one
 home, never inline in a skill).
 
 **Run this before answering any "where are we" question with `git` output.** Plain `git status` and

@@ -14,7 +14,7 @@ tn() { if grep -qE -- "$2" "$1"; then echo "FAIL: $3 (/$2/ in $1)"; fail=1; else
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 export GH_LOG="$tmp/gh.log"; : > "$GH_LOG"
 # shellcheck source=/dev/null
-. "$LIB/test-forge-shim.sh"; forge_shim_install "$tmp/bin"
+. "$LIB/../../lib/forge/test-forge-shim.sh"; forge_shim_install "$tmp/bin"
 export PATH="$tmp/bin:$PATH" GH_TOKEN=test-token CCKIT_FORGE=github
 export KIT_REPO="o/r" KIT_BASE_BRANCH="main" KIT_PROJECTS_V2="false"
 export GH_N="$tmp/n"
@@ -26,7 +26,7 @@ fresh() { : > "$GH_LOG"; echo 49 > "$GH_N"; }
 have() { GH_REPO_LABELS="$(printf '%s\n' "$@" | jq -R . | jq -sc 'map({name:.})')"; export GH_REPO_LABELS; }
 
 # shellcheck source=/dev/null
-. "$LIB/kit-task-ops.sh"
+. "$LIB/../../lib/verbs/kit-task-ops.sh"
 
 # ── a missing label is a warning, not an abort ────────────────────────────────────────────────────
 have kind:task priority:p2 role:backend

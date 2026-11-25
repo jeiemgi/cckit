@@ -8,7 +8,7 @@
 # errors: strict — a test runner: rc 1 on any failed assertion
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-LIB="$ROOT/scripts/lib"
+LIB="$ROOT/lib"
 fail=0
 t() { if [ "$2" = "$3" ]; then echo "ok: $1"; else echo "FAIL: $1 -> got '[$2]' want '[$3]'"; fail=1; fi; }
 command -v jq >/dev/null 2>&1 || { echo "effort-flows-test: jq required — skipping"; exit 0; }
@@ -22,7 +22,7 @@ printf '%s' '{"github":{"repo":"o/r"}}' > "$tmp/noflows.json"
 flows_for() {
   local cfg="$1"; shift
   env -i PATH="$PATH" HOME="${HOME:-/tmp}" KIT_CONFIG="$cfg" KIT_REPO="o/r" "$@" \
-    bash -c "source '$LIB/effort.sh' 2>/dev/null; printf '%s' \"\$EFFORT_FLOWS\""
+    bash -c "source '$LIB/core/effort.sh' 2>/dev/null; printf '%s' \"\$EFFORT_FLOWS\""
 }
 
 # 1. effort.flows[] in the config replaces the built-in default.
@@ -41,7 +41,7 @@ t "exported KIT_EFFORT_FLOWS is honored" \
 # 5. the title lint enforces the CONFIGURED vocabulary.
 lint_rc() {
   env -i PATH="$PATH" HOME="${HOME:-/tmp}" KIT_CONFIG="$tmp/flows.json" KIT_REPO="o/r" \
-    bash -c "source '$LIB/effort.sh' 2>/dev/null; effort_title_lint \"\$1\" >/dev/null 2>&1" _ "$1"
+    bash -c "source '$LIB/core/effort.sh' 2>/dev/null; effort_title_lint \"\$1\" >/dev/null 2>&1" _ "$1"
 }
 lint_rc "[Effort] 9 · [Growth] faster onboarding"; t "lint accepts a config flow" "$?" "0"
 lint_rc "[Effort] 9 · [Core] faster onboarding";   t "lint rejects a flow outside the config vocabulary" "$?" "1"
@@ -49,7 +49,7 @@ lint_rc "[Effort] 9 · [Core] faster onboarding";   t "lint rejects a flow outsi
 # 6. load_kit_config exports KIT_EFFORT_FLOWS (space-joined) for every downstream consumer.
 t "load_kit_config exports KIT_EFFORT_FLOWS" \
   "$(env -i PATH="$PATH" HOME="${HOME:-/tmp}" KIT_CONFIG="$tmp/flows.json" \
-       bash -c "source '$LIB/kit-config.sh'; load_kit_config >/dev/null 2>&1; printf '%s' \"\$KIT_EFFORT_FLOWS\"")" \
+       bash -c "source '$LIB/core/kit-config.sh'; load_kit_config >/dev/null 2>&1; printf '%s' \"\$KIT_EFFORT_FLOWS\"")" \
   "Growth Checkout Platform"
 
 [ "$fail" -eq 0 ] && echo "ALL OK (effort-flows)" || echo "effort-flows: FAILURES"

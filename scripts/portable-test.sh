@@ -10,7 +10,7 @@ set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # Sealed from the caller's KIT_*/CCKIT_*/EFFORT_* (#369): this suite builds its own fixture.
 # shellcheck source=/dev/null
-. "$ROOT/scripts/lib/test-env.sh" && test_env_seal
+. "$ROOT/lib/core/test-env.sh" && test_env_seal
 CCKIT="$ROOT/bin/cckit"
 fail=0
 t()   { if [ "$2" = "$3" ]; then echo "ok: $1"; else echo "FAIL: $1 -> got '[$2]' want '[$3]'"; fail=1; fi; }
@@ -28,7 +28,7 @@ FIX_REPO="octo/fixture-repo"
 # (`repos/<owner>/<name>/…`) and from a GraphQL body's owner/name variables.
 stub="$(mktemp -d)"
 # shellcheck source=/dev/null
-. "$ROOT/scripts/lib/test-forge-shim.sh"
+. "$ROOT/lib/forge/test-forge-shim.sh"
 forge_shim_install "$stub"
 export GH_TOKEN=test-token CCKIT_FORGE=github
 repos_asked() {  # the owner/name of every request in $GH_LOG, one per line
@@ -82,7 +82,7 @@ t "version is the install version, not the project's" "$got_ver" "$(jq -r '.kitV
 # degradation (a project with no scripts/lib of its own falls back to the cckit install, no crash).
 # `add` is here for its no-argument form, the only one this loop can drive: it lists the
 # integrations and modules and writes nothing. `add <name>` mutates the project config and is
-# covered by scripts/kit-add-test.sh.
+# covered by lib/verbs/kit-add-test.sh.
 EXERCISE="sync status next plan plan-next wave gc cleanup scan doctor lib add claims"
 for v in $EXERCISE; do
   : > "$GH_LOG"

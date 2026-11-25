@@ -3,7 +3,7 @@
 # light-task-run-test.sh — `cckit task run <id>` end to end (#496): start, ONE headless objective
 # built from the task record, finish, the review link.
 #
-# Hermetic, in the style of scripts/autopilot-run-test.sh: `claude` and `codex` are one stub script
+# Hermetic, in the style of lib/verbs/autopilot-run-test.sh: `claude` and `codex` are one stub script
 # on PATH whose behaviour STUB_MODE selects, the forge is the shared shim (test-forge-shim.sh) that
 # logs every REST request, origin is a bare
 # repository in the temp dir. It proves what cckit decides around the agent process (which steps
@@ -22,7 +22,7 @@ set -u
 LIB="$(cd "$(dirname "$0")" && pwd)"
 CCKIT="$(cd "$LIB/../.." && pwd)/bin/cckit"
 # shellcheck source=/dev/null
-. "$LIB/test-env.sh" && test_env_seal
+. "$LIB/../../lib/core/test-env.sh" && test_env_seal
 unset CLAUDE_CODE_REMOTE CCKIT_GH_TRANSPORT
 fail=0
 t()   { if [ "$2" = "$3" ]; then echo "ok: $1"; else echo "FAIL: $1 -> got '[$2]' want '[$3]'"; fail=1; fi; }
@@ -74,7 +74,7 @@ cp "$tmp/bin/agent-stub" "$tmp/bin/claude"; cp "$tmp/bin/agent-stub" "$tmp/bin/c
 # The forge shim answers the REST API over a curl stand-in and logs every request; `GET pulls?head=…`
 # (the open-review lookup, GH_OPEN_URL) and `POST pulls` (#77) come from this fixture.
 # shellcheck source=/dev/null
-. "$LIB/test-forge-shim.sh"; forge_shim_install "$tmp/bin"
+. "$LIB/../../lib/forge/test-forge-shim.sh"; forge_shim_install "$tmp/bin"
 export GH_FIXTURE="$tmp/fixture.sh" GH_TOKEN=test-token CCKIT_FORGE=github
 cat > "$GH_FIXTURE" <<'SH'
 case "$method $ep" in

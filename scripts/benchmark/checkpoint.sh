@@ -326,7 +326,7 @@ cp_render_page() {
       "description: The documentation benchmark score recorded at every checkpoint of every release.",
       "---",
       "",
-      "<!-- Generated from benchmarks/runs/*.json by `cckit bench page`. Do not edit by hand: scripts/check.sh fails when this page differs from the run files. -->",
+      "<!-- Generated from benchmarks/runs/*.json by `cckit bench page`. Do not edit by hand: lib/core/check.sh fails when this page differs from the run files. -->",
       "",
       "Each release records the [documentation benchmark](/benchmark/) as one or more checkpoints: a run, the fixes it showed were needed, then another run. A release is refused when its last checkpoint scores lower than the checkpoint recorded before it, counted over the questions both checkpoints asked ([How cckit itself is released](/releasing-cckit/#the-benchmark-check)).",
       "",

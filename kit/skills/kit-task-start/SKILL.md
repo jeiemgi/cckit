@@ -8,7 +8,7 @@ when_to_use: When beginning work on a tracked issue. Always run before editing f
 # kit-task-start
 
 Thin caller over the ONE canonical start mechanic: the `cckit start` verb → `wt_start`
-(`${CLAUDE_PLUGIN_ROOT}/scripts/lib/worktree-start.sh`). The verb logic lives there, never inline
+(`${CLAUDE_PLUGIN_ROOT}/lib/core/worktree-start.sh`). The verb logic lives there, never inline
 here (kit-engine-boundary #1/#2 — same single-implementation principle as the PR title composer,
 #121). The verb owns ALL of the mechanics:
 

@@ -17,7 +17,7 @@ MEDIA="$ROOT/docs-site/media"; COLS=92; ROWS=30
 CAST="$MEDIA/kit-init.cast"; GIF="$MEDIA/kit-init.gif"
 
 # Real scaffold output for the test values (minimal profile, memory off) into a throwaway dir.
-OUT="$(bash "$ROOT/scripts/init.sh" --profile minimal --target "$(mktemp -d)/demo-project" \
+OUT="$(bash "$ROOT/lib/verbs/init.sh" --profile minimal --target "$(mktemp -d)/demo-project" \
         --name "Demo Project" --repo acme/demo --owner-login acme 2>&1)"
 
 esc()  { printf '%s' "$1" | jq -Rs .; }

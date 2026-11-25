@@ -1,5 +1,5 @@
 {
-  "$comment": "Showcase dataset — a small VISUAL teaser of cckit, rendered to fixed-size (920×400) screenshots by scripts/showcase.sh (charmbracelet/freeze). Keep this set SHORT and visual: the full command list lives on the CLI reference page as copyable text, not here. Only short, read-only / dry-run commands whose output fits 400px (so nothing clips). Each entry: name (file slug), group, title, cmd, show (optional display string).",
+  "$comment": "Showcase dataset — a small VISUAL teaser of cckit, rendered to fixed-size (920×400) screenshots by lib/verbs/showcase.sh (charmbracelet/freeze). Keep this set SHORT and visual: the full command list lives on the CLI reference page as copyable text, not here. Only short, read-only / dry-run commands whose output fits 400px (so nothing clips). Each entry: name (file slug), group, title, cmd, show (optional display string).",
   "commands": [
     { "name": "version",        "group": "At a glance",   "title": "The installed version",                      "cmd": "cckit version" },
     { "name": "scan",           "group": "At a glance",   "title": "Detect this repo's stack + kit state",       "cmd": "cckit scan" },

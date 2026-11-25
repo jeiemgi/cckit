@@ -8,7 +8,7 @@ when_to_use: After a PR merges, to finalize the issue ledger. Most issues auto-c
 # kit-task-close
 
 Plugin-direct skill — thin caller over the ONE canonical home
-`${CLAUDE_PLUGIN_ROOT}/scripts/lib/kit-task-ops.sh` (`kto_task_close`) for the issue-close +
+`${CLAUDE_PLUGIN_ROOT}/lib/verbs/kit-task-ops.sh` (`kto_task_close`) for the issue-close +
 board-Done git-mechanic (kit-engine-boundary #1/#2). The optional plan-badge flip stays here (it
 edits a repo file → needs a worktree/PR), wrapping the op. The op respects the `KIT_PROJECTS_V2`
 board toggle.
@@ -30,10 +30,10 @@ If neither holds, **abort** and route to `/kit-task-pr` first.
 ## Execution
 
 ```bash
-source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/kit-config.sh" && load_kit_config
-source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/role-identity.sh"
-source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/gh-project.sh"
-source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/kit-task-ops.sh"
+source "${CLAUDE_PLUGIN_ROOT}/lib/core/kit-config.sh" && load_kit_config
+source "${CLAUDE_PLUGIN_ROOT}/lib/core/role-identity.sh"
+source "${CLAUDE_PLUGIN_ROOT}/lib/forge/gh-project.sh"
+source "${CLAUDE_PLUGIN_ROOT}/lib/verbs/kit-task-ops.sh"
 
 kto_task_close "$NUM" "$SUMMARY"
 ```

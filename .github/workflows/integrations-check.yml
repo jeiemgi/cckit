@@ -1,9 +1,9 @@
 name: integrations-check
 
 # The monthly recipe check (E303.8). Every descriptor in kit/integrations/ hardcodes upstream facts:
-# a package name, an installer's flags, a binary's name. The gate (scripts/check.sh) never installs
+# a package name, an installer's flags, a binary's name. The gate (lib/core/check.sh) never installs
 # anything, so it cannot see one drift. This workflow installs each tool for real on a clean runner
-# through scripts/integrations-check.sh and opens an issue naming the descriptor and the step that
+# through lib/verbs/integrations-check.sh and opens an issue naming the descriptor and the step that
 # broke. `schedule` only fires from the default branch.
 on:
   schedule:
@@ -39,7 +39,7 @@ jobs:
             if command -v "$m" >/dev/null 2>&1; then echo "$m: $("$m" --version 2>&1 | head -1)"; else echo "$m: absent"; fi
           done
       - name: Check every recipe
-        run: bash scripts/integrations-check.sh --yes 2>&1 | tee integrations-check.log
+        run: bash lib/verbs/integrations-check.sh --yes 2>&1 | tee integrations-check.log
       - name: Open an issue on failure
         if: failure()
         env:

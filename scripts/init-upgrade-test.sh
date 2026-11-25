@@ -12,7 +12,7 @@
 
 set -uo pipefail
 PLUGIN_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
-INIT="$PLUGIN_DIR/scripts/init.sh"
+INIT="$PLUGIN_DIR/lib/verbs/init.sh"
 
 fail=0
 t() {  # t <label> <got> <want>
@@ -276,7 +276,7 @@ t "upgrade: kitVersion bumped"           "$(jq -r '.kitVersion' "$fx/x/cckit.con
 t "upgrade: still no .claude tree"       "$(has_path x .claude)" "no"
 t "upgrade: still no CLAUDE.md"          "$(has_path x CLAUDE.md)" "no"
 t "upgrade: hand-edited skill kept"      "$(grep -cF "$X_MARKER" "$fx/x/.agents/skills/concrete/SKILL.md")" "1"
-t "upgrade: edited skill reads modified" "$(cd "$fx/x" && . "$PLUGIN_DIR/scripts/lib/kit-manifest.sh" && kit_manifest_verify .agents/skills/concrete/SKILL.md)" "modified"
+t "upgrade: edited skill reads modified" "$(cd "$fx/x" && . "$PLUGIN_DIR/lib/core/kit-manifest.sh" && kit_manifest_verify .agents/skills/concrete/SKILL.md)" "modified"
 t "upgrade: missing rule restored"       "$(has_path x .agents/rules/branch-naming.md)" "yes"
 t "upgrade: no duplicate manifest entries" "$(jq '.entries | length' "$fx/x/.cckit/kit.manifest.json")" "$x_entries"
 
@@ -321,15 +321,15 @@ t "kept AGENTS.md is not claimed as owned" "$(jq '.entries | has("AGENTS.md")' "
 # 14. doctor reports each SELECTED runtime present / absent (stub binaries; no network)
 mkdir -p "$fx/bin"
 printf '#!/bin/sh\necho "codex-cli 9.9.9"\n' > "$fx/bin/codex"; chmod +x "$fx/bin/codex"
-doc="$(cd "$fx/b" && PATH="$fx/bin:/usr/bin:/bin" KIT_ASCII=1 NO_COLOR=1 bash "$PLUGIN_DIR/scripts/kit-doctor.sh" --agents 2>&1)"; doc_rc=$?
+doc="$(cd "$fx/b" && PATH="$fx/bin:/usr/bin:/bin" KIT_ASCII=1 NO_COLOR=1 bash "$PLUGIN_DIR/lib/verbs/kit-doctor.sh" --agents 2>&1)"; doc_rc=$?
 t "doctor: absent runtime exits 1"       "$doc_rc" "1"
 t "doctor: codex reported present"       "$(printf '%s\n' "$doc" | grep -c 'codex .*codex-cli 9.9.9')" "1"
 t "doctor: claude reported absent"       "$(printf '%s\n' "$doc" | grep -c 'claude .*absent')" "1"
 printf '#!/bin/sh\necho "9.9.9 (Claude Code)"\n' > "$fx/bin/claude"; chmod +x "$fx/bin/claude"
-( cd "$fx/b" && PATH="$fx/bin:/usr/bin:/bin" KIT_ASCII=1 NO_COLOR=1 bash "$PLUGIN_DIR/scripts/kit-doctor.sh" --agents >/dev/null 2>&1 )
+( cd "$fx/b" && PATH="$fx/bin:/usr/bin:/bin" KIT_ASCII=1 NO_COLOR=1 bash "$PLUGIN_DIR/lib/verbs/kit-doctor.sh" --agents >/dev/null 2>&1 )
 t "doctor: both present exits 0"         "$?" "0"
 rm -f "$fx/bin/claude"
-doc="$(cd "$fx/own" && PATH="$fx/bin:/usr/bin:/bin" KIT_ASCII=1 NO_COLOR=1 bash "$PLUGIN_DIR/scripts/kit-doctor.sh" --agents 2>&1)"; doc_rc=$?
+doc="$(cd "$fx/own" && PATH="$fx/bin:/usr/bin:/bin" KIT_ASCII=1 NO_COLOR=1 bash "$PLUGIN_DIR/lib/verbs/kit-doctor.sh" --agents 2>&1)"; doc_rc=$?
 t "doctor: unselected runtime not checked" "$doc_rc$(printf '%s\n' "$doc" | grep -c 'claude')" "00"
 
 # --- E257.5: hooks and session mail on both adapters ------------------------------------
@@ -400,12 +400,12 @@ t "merge: upgrade leaves .codex byte-identical" "$(tree_hash hu .codex)" "$hu_be
 mkdir -p "$fx/hb/.codex" && printf '{ not json\n' > "$fx/hb/.codex/hooks.json"
 fresh hb codex; t "bad hooks.json: init still completes (rc)" "$?" "0"
 t "bad hooks.json: file untouched"         "$(cat "$fx/hb/.codex/hooks.json")" "{ not json"
-doc="$(cd "$fx/hb" && PATH="$fx/bin:$PATH" KIT_ASCII=1 NO_COLOR=1 bash "$PLUGIN_DIR/scripts/kit-doctor.sh" --agents 2>&1)"
+doc="$(cd "$fx/hb" && PATH="$fx/bin:$PATH" KIT_ASCII=1 NO_COLOR=1 bash "$PLUGIN_DIR/lib/verbs/kit-doctor.sh" --agents 2>&1)"
 t "doctor: unregistered codex hooks reported" "$(printf '%s\n' "$doc" | grep -c 'codex hooks .*not registered')" "1"
 printf '{}\n' > "$fx/hb/.codex/hooks.json"; settle hb "fix hooks.json"
 upgrade hb; t "repair: same-version upgrade runs (rc)" "$?" "0"
 t "repair: hooks now registered"           "$(mail_events "$fx/hb/.codex/hooks.json" "$CXMAIL")" "PostToolUse SessionStart Stop UserPromptSubmit"
-doc="$(cd "$fx/hb" && PATH="$fx/bin:$PATH" KIT_ASCII=1 NO_COLOR=1 bash "$PLUGIN_DIR/scripts/kit-doctor.sh" --agents 2>&1)"
+doc="$(cd "$fx/hb" && PATH="$fx/bin:$PATH" KIT_ASCII=1 NO_COLOR=1 bash "$PLUGIN_DIR/lib/verbs/kit-doctor.sh" --agents 2>&1)"
 t "doctor: registered codex hooks reported" "$(printf '%s\n' "$doc" | grep -c 'codex hooks .*registered in .codex/hooks.json')" "1"
 t "doctor: says trust is not readable"     "$(printf '%s\n' "$doc" | grep -c 'trust is not readable')" "1"
 

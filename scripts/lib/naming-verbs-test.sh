@@ -8,8 +8,8 @@
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 # shellcheck source=/dev/null
-. "$ROOT/scripts/lib/test-env.sh" && test_env_seal
-LIB="$ROOT/scripts/lib"
+. "$ROOT/lib/core/test-env.sh" && test_env_seal
+LIB="$ROOT/lib"
 fail=0
 t()  { if [ "$2" = "$3" ]; then echo "ok: $1"; else echo "FAIL: $1 -> got '[$2]' want '[$3]'"; fail=1; fi; }
 tc() { if grep -qE -- "$2" "$1"; then echo "ok: $3"; else echo "FAIL: $3 (no /$2/ in $1)"; fail=1; fi; }
@@ -18,7 +18,7 @@ command -v jq >/dev/null 2>&1 || { echo "naming-verbs-test: jq required" >&2; ex
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 export GH_LOG="$tmp/gh.log" GH_N="$tmp/n"; : > "$GH_LOG"; echo 49 > "$GH_N"
 # shellcheck source=/dev/null
-. "$LIB/test-forge-shim.sh"; forge_shim_install "$tmp/bin"
+. "$LIB/forge/test-forge-shim.sh"; forge_shim_install "$tmp/bin"
 export PATH="$tmp/bin:$PATH" GH_TOKEN=test-token CCKIT_FORGE=github
 export KIT_REPO="o/r" EFFORT_REPO="o/r" KIT_BASE_BRANCH="main" KIT_PROJECTS_V2="false"
 unset KIT_CONFIG CLAUDE_CODE_REMOTE CCKIT_GH_TRANSPORT GH_FAIL_EP KIT_PR_TITLE_STYLE
@@ -34,9 +34,9 @@ writes() { grep -cE '^(POST|PATCH|PUT|DELETE) ' "$GH_LOG" | tr -d ' '; }
 fresh() { : > "$GH_LOG"; echo 49 > "$GH_N"; }
 
 # shellcheck source=/dev/null
-source "$LIB/effort.sh" 2>/dev/null
+source "$LIB/core/effort.sh" 2>/dev/null
 # shellcheck source=/dev/null
-source "$LIB/effort-ops.sh"
+source "$LIB/verbs/effort-ops.sh"
 
 # ── effort new: a bad parent or sub name is refused before any write ─────────────────────────────
 fresh
@@ -87,7 +87,7 @@ t  "retitle --apply: two writes"         "$(writes)" "2"
 # ── start: the token resolves ─────────────────────────────────────────────────────────────────────
 (
   # shellcheck source=/dev/null
-  . "$LIB/worktree-start.sh" >/dev/null 2>&1
+  . "$LIB/core/worktree-start.sh" >/dev/null 2>&1
   export WT_START_REPO="o/r"
   r=0
   [ "$(_wt_resolve_token E545 2>/dev/null)" = 545 ]   || { echo "FAIL: E545 -> 545"; r=1; }
@@ -104,7 +104,7 @@ t  "retitle --apply: two writes"         "$(writes)" "2"
 (
   cd "$tmp" || exit 1
   # shellcheck source=/dev/null
-  . "$LIB/kit-task-ops.sh"
+  . "$LIB/verbs/kit-task-ops.sh"
   r=0
   fresh
   kto_task_new "[E12] an effort title" backend task p2 "" "" "" x >/dev/null 2>&1 && { echo "FAIL: new accepted a prefixed title"; r=1; }

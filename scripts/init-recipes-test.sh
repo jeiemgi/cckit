@@ -15,14 +15,14 @@
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source=/dev/null
-. "$ROOT/scripts/lib/test-env.sh" && test_env_seal
+. "$ROOT/lib/core/test-env.sh" && test_env_seal
 fail=0
 t()      { if [ "$2" = "$3" ]; then echo "ok: $1"; else echo "FAIL: $1 -> got '[$2]' want '[$3]'"; fail=1; fi; }
 yes_if() { if eval "$2"; then echo "ok: $1"; else echo "FAIL: $1 -> not true: $2"; fail=1; fi; }
 
 command -v jq >/dev/null 2>&1 || { echo "init-recipes-test: jq absent — skipping (dependency-light gate)"; exit 0; }
 # shellcheck source=/dev/null
-. "$ROOT/scripts/lib/init-guide.sh"
+. "$ROOT/lib/verbs/init-guide.sh"
 
 # ── recipes ─────────────────────────────────────────────────────────────────────────────────────
 t "there is a recipe to offer" "$([ -n "$(recipes_list)" ] && echo yes)" "yes"

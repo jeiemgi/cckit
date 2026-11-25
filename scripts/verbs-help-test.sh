@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 # verbs-help-test.sh — #556: every verb has help. `cckit <verb> --help` is answered by the dispatcher
-# from scripts/lib/verbs.tsv before the verb runs, so it exits 0, starts with the verb's usage, names
+# from lib/core/verbs.tsv before the verb runs, so it exits 0, starts with the verb's usage, names
 # its question and its prompt, and never reaches a parser that rejects --help. Runs every verb in a
 # throwaway git repo with a stub `gh` that refuses everything, then checks the repo is untouched.
 # No network, no port.
@@ -13,7 +13,7 @@ fail=0
 t()   { if [ "$2" = "$3" ]; then echo "ok: $1"; else echo "FAIL: $1 -> got '[$2]' want '[$3]'"; fail=1; fi; }
 CCKIT="$ROOT/bin/cckit"
 # shellcheck source=/dev/null
-source "$ROOT/scripts/lib/verbs.sh"
+source "$ROOT/lib/core/verbs.sh"
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 mkdir -p "$tmp/stub" "$tmp/repo" "$tmp/home"
 printf '#!/bin/sh\necho "gh $*" >> "%s/gh.log"\nexit 1\n' "$tmp" > "$tmp/stub/gh"; chmod +x "$tmp/stub/gh"

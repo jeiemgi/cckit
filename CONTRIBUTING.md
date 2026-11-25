@@ -27,8 +27,8 @@ cckit pr <issue> "<summary>" # open the PR
   **`cckit pr` builds one for you** (derived from the issue's `kind:` label, `[Effort …]` prefix
   stripped); pass an already-conventional summary — `cckit pr <issue> "fix: guard the empty case"` —
   to set the type yourself. CI (`commitlint`) fails the PR until the title is valid; check one locally
-  with `scripts/lib/commitlint.sh "feat: your summary"`.
-- Run the local gate before opening a PR: `bash scripts/check.sh` (shell syntax, valid manifests,
+  with `lib/core/commitlint.sh "feat: your summary"`.
+- Run the local gate before opening a PR: `bash lib/core/check.sh` (shell syntax, valid manifests,
   the leak fence, the forge fence, the commitlint rules, the skill-listing and instruction-file budgets). A green gate is the bar.
 - **The leak fence.** cckit is public and is developed next to private repositories, so gate step 3
   fails on any tracked line that contains a private word: a product or client name, a person's name,
@@ -37,8 +37,8 @@ cckit pr <issue> "<summary>" # open the PR
   (CI, `|`-separated). Never commit the list: a public denylist publishes the words it hides. A hit
   prints `file:line` only. `bash scripts/leak-fence-test.sh` is its selftest. Write a word end as
   `([^[:alnum:]]|$)`, not `\b`: `\b` matches nothing in `git grep -E` on macOS.
-- The gate ends with `bash scripts/test.sh`, which runs every `*-test.sh` under `bin/` and
-  `scripts/`, several files at a time (the CPU count, capped at 8). `bash scripts/test.sh <pattern>`
+- The gate ends with `bash lib/core/test.sh`, which runs every `*-test.sh` under `bin/` and
+  `scripts/`, several files at a time (the CPU count, capped at 8). `bash lib/core/test.sh <pattern>`
   runs the files whose path matches; `-j <N>` or `TEST_JOBS=<N>` sets how many run at once,
   `--serial` runs one at a time and `--timings` lists wall seconds per file. A new test file keeps
   its fixtures under its own `mktemp -d` and binds no fixed port, because it runs beside others; if
@@ -50,7 +50,7 @@ cckit pr <issue> "<summary>" # open the PR
   at random under load (cckit issue 449: `printf: write error: Broken pipe`, then an assertion that
   read `no` for `yes`). Write `grep -q PAT <<<"$var"`; capture a command first
   (`out="$(cmd)"; grep -q PAT <<<"$out"`); use `sed -n 1p` for `head -1` and an `awk` rule without
-  `exit` for "first match". `scripts/review-lint.sh` fails the gate on a new `| grep -q` or
+  `exit` for "first match". `lib/core/review-lint.sh` fails the gate on a new `| grep -q` or
   `| head -N` under `bin/` or `scripts/` (rule `pipe-into-early-exit-reader`).
 - **A lock is taken with the shell, not with `mkdir`.** `( set -C; : > "$lock" ) 2>/dev/null` is an
   `O_EXCL` open. `mkdir "$lock"` is not exclusive everywhere: the `mkdir` of uutils coreutils
@@ -73,8 +73,8 @@ paths:
 `kit/templates/rules/react-annotate.md` is the shipped example. A cross-cutting rule (branch naming, the
 effort model) stays unscoped, and a behavioural routing rule must: scoped, it would not load until a
 matching file had already been read. A rule that outgrows 200 lines splits into a short rule plus a
-`knowledge/` doc it points at. `scripts/instruction-budget-lint.sh` is the gate — `--report` lists
-every file's cost; `scripts/instruction-budget-baseline.txt` grandfathers `effort-model.md` (209
+`knowledge/` doc it points at. `lib/core/instruction-budget-lint.sh` is the gate — `--report` lists
+every file's cost; `lib/core/instruction-budget-baseline.txt` grandfathers `effort-model.md` (209
 lines) and `naming-and-ids.md` (208), which may shrink but not grow.
 
 ## Durable prose goes through `concrete`
@@ -126,19 +126,19 @@ named `main` as the branch efforts cut from and open their PR against; this repo
 byte-identical check, because byte-identical to a wrong template is exactly the bug. The integration
 branch is `{{BASE_BRANCH}}` now, resolved by `init.sh` from `github.baseBranch` (falling back to
 `integrationBranch` / `flow` / the repo's GitHub default / `main`, the same precedence as
-`KIT_BASE_BRANCH` in `scripts/lib/kit-config.sh`) and written back into the generated config so the
+`KIT_BASE_BRANCH` in `lib/core/kit-config.sh`) and written back into the generated config so the
 rendered rule and the resolver can never disagree. `scripts/self-install-test.sh` fails if either
 half regresses.
 
 ## Scope of changes
 
 - **bash CLI + lib** → `bin/cckit`, `scripts/lib/*.sh`. A new verb is a row in
-  `scripts/lib/verbs.tsv` (name, question, prompt, usage, needs) plus its `case` label in
-  `bin/cckit`; run `bash scripts/verbs-gen.sh` to refresh the CLI reference block.
+  `lib/core/verbs.tsv` (name, question, prompt, usage, needs) plus its `case` label in
+  `bin/cckit`; run `bash lib/core/verbs-gen.sh` to refresh the CLI reference block.
   `scripts/verbs-test.sh` fails when the dispatcher, the help, the catalog, the CLI reference,
-  `kit/skills/routing.yaml` or `scripts/forge-report.sh` disagree with the table.
-  The top level only shrinks: `scripts/verbs-ratchet.sh` fails the gate when the table holds more
-  `verb` rows than `scripts/verbs.baseline`, so a new command is a subcommand of a verb that exists.
+  `kit/skills/routing.yaml` or `lib/core/forge-report.sh` disagree with the table.
+  The top level only shrinks: `lib/core/verbs-ratchet.sh` fails the gate when the table holds more
+  `verb` rows than `lib/core/verbs.baseline`, so a new command is a subcommand of a verb that exists.
   To rename a verb, change its row's name and add an `alias` row for the old name
   (`old<TAB>alias<TAB>new`, the other columns `-`): the old name keeps working and prints a one-line
   notice. To retire one, fold it under another verb and lower the baseline in the same change.

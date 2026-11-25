@@ -1,7 +1,7 @@
 {
   "id": "Gate",
   "label": ["gate"],
-  "definition": "The bar a change must pass before it lands: the project's check command run on the branch's tree with the current base in it. Here it is bash scripts/check.sh; in a scaffolded project it is tasks.check. A red gate is never merged; the captain fixes the cause or reports it.",
+  "definition": "The bar a change must pass before it lands: the project's check command run on the branch's tree with the current base in it. Here it is bash lib/core/check.sh; in a scaffolded project it is tasks.check. A red gate is never merged; the captain fixes the cause or reports it.",
   "is_not": [
     "One check: the gate is the set of checks, run together, with one pass or fail.",
     "CI: CI is the gate's second run, after the PR is up; the first run is local, before the PR opens.",

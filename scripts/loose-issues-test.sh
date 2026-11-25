@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# loose-issues-test.sh — the loose-issue count (E546.2) over the forge shim: scripts/lib/loose-issues.sh
+# loose-issues-test.sh — the loose-issue count (E546.2) over the forge shim: lib/core/loose-issues.sh
 # and `cckit doctor --loose [--ratchet]`. Fixture: an effort, a sub-issue (parent_issue_url), a
 # standalone issue and a pull request -> one loose issue. Then the board marker (Status = Backlog),
 # the ratchet (pass, fail, not judged) and the forge-less run (a skip line, never a silent pass).
@@ -9,8 +9,8 @@
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source=/dev/null
-. "$ROOT/scripts/lib/test-env.sh" && test_env_seal
-DOCTOR="$ROOT/scripts/kit-doctor.sh"
+. "$ROOT/lib/core/test-env.sh" && test_env_seal
+DOCTOR="$ROOT/lib/verbs/kit-doctor.sh"
 fail=0
 t()     { if [ "$2" = "$3" ]; then echo "ok: $1"; else echo "FAIL: $1 -> got '[$2]' want '[$3]'"; fail=1; fi; }
 has()   { if grep -qF -- "$3" <<<"$2"; then echo "ok: $1"; else echo "FAIL: $1 -> '$3' not in: $2"; fail=1; fi; }
@@ -21,7 +21,7 @@ command -v jq >/dev/null 2>&1 || { echo "loose-issues-test: jq absent — skippi
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 tmp="$(cd "$tmp" && pwd -P)"
 # shellcheck source=/dev/null
-. "$ROOT/scripts/lib/test-forge-shim.sh"; forge_shim_install "$tmp/bin"
+. "$ROOT/lib/forge/test-forge-shim.sh"; forge_shim_install "$tmp/bin"
 export PATH="$tmp/bin:$PATH" GH_TOKEN=test-token CCKIT_FORGE=github
 export GH_LOG="$tmp/gh.log"; : > "$GH_LOG"
 export GH_ISSUES='[
@@ -44,7 +44,7 @@ doctor() { local d="$1"; shift; ( cd "$d" && KIT_ASCII=1 NO_COLOR=1 LC_ALL=C bas
 
 # ── the library ───────────────────────────────────────────────────────────────────────────────
 # shellcheck source=/dev/null
-. "$ROOT/scripts/lib/loose-issues.sh"
+. "$ROOT/lib/core/loose-issues.sh"
 t   "repo: read from github.repo" "$(loose_repo "$off/cckit.config.json")" "o/r"
 t   "board off: projectsV2 false" "$(loose_board_on "$off/cckit.config.json" && echo on || echo off)" "off"
 t   "board on: projectsV2 true + a number" "$(loose_board_on "$on/cckit.config.json" && echo on || echo off)" "on"
@@ -87,7 +87,7 @@ out="$(doctor "$off" --ratchet --baseline="$tmp/none")"; rc=$?
 t   "ratchet: no baseline -> exit 2, not judged" "$rc" "2"
 has "ratchet: no baseline -> says so" "$out" "not judged — no number in"
 t   "ratchet: the repo's own baseline file holds a number" \
-    "$(loose_baseline_read "$ROOT/scripts/loose-issues.baseline" | grep -cE '^[0-9]+$')" "1"
+    "$(loose_baseline_read "$ROOT/lib/core/loose-issues.baseline" | grep -cE '^[0-9]+$')" "1"
 
 # ── no forge: skipped, said out loud ──────────────────────────────────────────────────────────
 : > "$GH_LOG"

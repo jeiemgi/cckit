@@ -11,7 +11,7 @@
 # errors: strict — a test runner: rc 1 on any failed assertion
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-LIB="$ROOT/scripts/lib"
+LIB="$ROOT/lib"
 fail=0
 t()  { if [ "$2" = "$3" ]; then echo "ok: $1"; else echo "FAIL: $1 -> got '[$2]' want '[$3]'"; fail=1; fi; }
 tc() { if grep -qE "$2" "$1"; then echo "ok: $3"; else echo "FAIL: $3 (no /$2/ in gh log)"; fail=1; fi; }
@@ -26,17 +26,17 @@ export GH_LOG="$tmp/gh.log"; export GH_N="$tmp/n"; : > "$GH_LOG"
 # the labels of one POST together; plus a `gh` that fails on any subcommand.
 stub="$tmp/bin"
 # shellcheck source=/dev/null
-. "$LIB/test-forge-shim.sh"; forge_shim_install "$stub"
+. "$LIB/forge/test-forge-shim.sh"; forge_shim_install "$stub"
 export PATH="$stub:$PATH" GH_TOKEN=test-token CCKIT_FORGE=github
 printf '0' > "$GH_N"   # the first created issue is #1
 CREATE_RE='^POST repos/o/r/issues '
 export KIT_REPO="o/r" EFFORT_REPO="o/r" KIT_BASE_BRANCH="main" KIT_PROJECTS_V2="false"
 # shellcheck source=/dev/null
-source "$LIB/effort.sh" 2>/dev/null
+source "$LIB/core/effort.sh" 2>/dev/null
 # shellcheck source=/dev/null
-source "$LIB/effort-metrics.sh" 2>/dev/null   # effort_ctx_bucket — so ctx is sized, not the fallback
+source "$LIB/core/effort-metrics.sh" 2>/dev/null   # effort_ctx_bucket — so ctx is sized, not the fallback
 # shellcheck source=/dev/null
-source "$LIB/effort-ops.sh"
+source "$LIB/verbs/effort-ops.sh"
 
 # ── Full skill-shaped inputs through the shared core ─────────────────────────────────────────────
 : > "$GH_LOG"
@@ -44,7 +44,7 @@ parent="$(effort_new \
   --flow Core --role tech-lead --priority p2 \
   --goal "Close the parity gap between the verb and the skill." \
   --scope "1. share core | 2. verb fills body | 3. skill delegates" \
-  --for-agents "scripts/lib/effort-ops.sh and skills/kit-effort-new/SKILL.md" \
+  --for-agents "lib/verbs/effort-ops.sh and skills/kit-effort-new/SKILL.md" \
   --verification "the verb and skill produce identical issues" \
   --spec "the verb and the skill file the same body" \
   "demo parity effort" "share core :: factor the logic" "fill the body :: verb wiring")"
@@ -57,7 +57,7 @@ t  "core ran no gh subcommand"                    "$(grep -c '^GH-SUBCOMMAND' "$
 # Body is FILLED — every section heading present AND the placeholder comments are gone.
 tc "$GH_LOG" 'Close the parity gap between the verb' "body fills ## Goal"
 tc "$GH_LOG" '1\. share core \| 2\. verb fills body' "body fills ## Scope"
-tc "$GH_LOG" 'scripts/lib/effort-ops\.sh and skills' "body fills ## For agents"
+tc "$GH_LOG" 'lib/verbs/effort-ops\.sh and skills' "body fills ## For agents"
 tc "$GH_LOG" 'the verb and skill produce identical'  "body fills ## Verification"
 tc "$GH_LOG" '## Spec\\n- the verb and the skill file' "body fills ## Spec, a plain line made a bullet"
 tn "$GH_LOG" '<!--'                                  "no template placeholder left in a filled body"
@@ -96,7 +96,7 @@ t  "a bare call with no Spec writes nothing"      "$(grep -c . "$GH_LOG")" "0"
 # #237: the composed title is a Conventional Commit subject carrying [#N] — the form the
 # commitlint gate accepts — so `effort pr` never opens a PR its own CI rejects.
 # shellcheck source=/dev/null
-source "$LIB/commitlint.sh"
+source "$LIB/core/commitlint.sh"
 unset KIT_PR_TITLE_STYLE
 t  "effort_pr_title composes type: name [#N]"  "$(effort_pr_title 115 'adoption hardening')"             "feat: adoption hardening [E115]"
 t  "effort_pr_title takes the scope from flow:" "$(effort_pr_title 115 'adoption hardening' 'role:tech-lead,kind:task,flow:core')" "feat(core): adoption hardening [E115]"
@@ -148,7 +148,7 @@ t  "the refusal lists the accepted set"              "$(printf '%s' "$err" | gre
 effort_new --par wide "parallel wide effort" >/dev/null 2>&1 && rc=0 || rc=1
 t  "--par is no longer a flag (rc 1)"                "$rc" "1"
 t  "--par creates nothing"                           "$(grep -c . "$GH_LOG")" "0"
-t  "nothing in effort-ops.sh writes a par: label"    "$(grep -c 'par:' "$LIB/effort-ops.sh" | tr -d ' ')" "0"
+t  "nothing in effort-ops.sh writes a par: label"    "$(grep -c 'par:' "$LIB/verbs/effort-ops.sh" | tr -d ' ')" "0"
 
 # ── #121: flags are position-INDEPENDENT — trailing --flow/--role no longer become junk sub-issues ─
 : > "$GH_LOG"; printf '0' > "$GH_N"

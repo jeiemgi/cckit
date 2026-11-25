@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# test-runner-test.sh — scripts/test.sh runs files in parallel and still reports correctly (#455).
+# test-runner-test.sh — lib/core/test.sh runs files in parallel and still reports correctly (#455).
 #
-# Copies the runner and scripts/lib/test-env.sh into a throwaway tree with fixture `*-test.sh`
+# Copies the runner and lib/core/test-env.sh into a throwaway tree with fixture `*-test.sh`
 # files, then asserts on the copy's exit code and output:
 #   - a failing file fails the run, and its output is printed whole, in one block
 #   - two files really run at the same time under -j 2 (each waits for the other's marker file)
@@ -21,19 +21,19 @@ tmp="$(cd "$(mktemp -d)" && pwd -P)"; trap 'rm -rf "$tmp"' EXIT
 # The caller's own runner settings must not steer the copy under test.
 unset TEST_JOBS TEST_TIMINGS TEST_RUN_DIR
 # shellcheck source=/dev/null
-. "$ROOT/scripts/lib/test-env.sh" && test_env_seal
+. "$ROOT/lib/core/test-env.sh" && test_env_seal
 
 # fixture <name> — a fresh tree holding the runner; echoes its path.
 fixture() {
   local d="$tmp/$1"
-  mkdir -p "$d/scripts/lib" "$d/bin" "$d/shared"
-  cp "$ROOT/scripts/test.sh" "$d/scripts/test.sh"
-  cp "$ROOT/scripts/lib/test-env.sh" "$d/scripts/lib/test-env.sh"
+  mkdir -p "$d/scripts/lib" "$d/lib/core" "$d/bin" "$d/shared"
+  cp "$ROOT/lib/core/test.sh" "$d/lib/core/test.sh"
+  cp "$ROOT/lib/core/test-env.sh" "$d/lib/core/test-env.sh"
   printf '%s' "$d"
 }
 run() { # run <fixture dir> [runner args…] -> OUT (stdout+stderr), RC
   local d="$1"; shift
-  OUT="$(bash "$d/scripts/test.sh" "$@" 2>&1)"; RC=$?
+  OUT="$(bash "$d/lib/core/test.sh" "$@" 2>&1)"; RC=$?
 }
 
 # ── 1. pass, fail, and a failing file's output in one block ────────────────────────────────────
@@ -145,13 +145,13 @@ fi
 exit "$rc"
 EOF
 OUT="$(KIT_CONFIG=/elsewhere KEEP_ME=1 GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=test.kept GIT_CONFIG_VALUE_0=yes \
-       bash "$F/scripts/test.sh" 2>&1)"; RC=$?
+       bash "$F/lib/core/test.sh" 2>&1)"; RC=$?
 t   "a test is sealed, unsigned, and keeps the rest of its environment" "$RC" "0"
 [ "$RC" -eq 0 ] || printf '%s\n' "$OUT"
 has "the runner reports what it sealed" "$OUT" "sealed 1 inherited"
 
 # ── 5. the result directory is removed ─────────────────────────────────────────────────────────
-left="$(TMPDIR="$tmp/td" bash -c 'mkdir -p "$TMPDIR" && bash "$0/scripts/test.sh" >/dev/null 2>&1; ls "$TMPDIR" | wc -l' "$F" | tr -d ' ')"
+left="$(TMPDIR="$tmp/td" bash -c 'mkdir -p "$TMPDIR" && bash "$0/lib/core/test.sh" >/dev/null 2>&1; ls "$TMPDIR" | wc -l' "$F" | tr -d ' ')"
 t "the runner leaves nothing in TMPDIR" "$left" "0"
 
 [ "$fail" -eq 0 ] && echo "test-runner: all passed" || echo "test-runner: FAILURES"

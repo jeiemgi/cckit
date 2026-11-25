@@ -70,7 +70,7 @@ npm install -g @jeiemgi/cckit
 
 ```bash
 git clone https://github.com/jeiemgi/cckit.git
-cd cckit && ./scripts/install.sh    # symlinks bin/cckit onto your PATH
+cd cckit && ./lib/verbs/install.sh    # symlinks bin/cckit onto your PATH
 ```
 
 ### Platforms & requirements
@@ -404,7 +404,7 @@ cckit task run <id> --check "pnpm build"       # start + ONE headless agent roun
   branch = `doing`, that branch saying done = `review`, the base branch saying done = `done`.
 - **One file per task** so two branches that each add a task merge without a conflict.
 - **`cckit gc` keeps a live task's branch**: `PROTECTED: light task <id> still OPEN`.
-- **Sources.** Tasks are read through one interface (`scripts/lib/task-source.sh`). The `file`
+- **Sources.** Tasks are read through one interface (`lib/core/task-source.sh`). The `file`
   source ships; another store plugs in as `scripts/lib/task-source-<name>.sh` plus
   `tasks.source: "<name>"`.
 - **Delegating a task.** `cckit task run <id>` does `start`, one `cckit autopilot run` objective
@@ -572,7 +572,7 @@ and `orchestrate` prints a line naming the override and the config value it repl
 
 **Night mode** runs approved waves unattended under a token budget the Workflow runtime enforces.
 The owner posts one `<!-- night-grant -->` comment on the plan parent — budget, waves, waivers — and
-`/kit-autopilot` reads it with `scripts/night-grant.sh`, then launches `scripts/night-run.mjs`. Only
+`/kit-autopilot` reads it with `lib/verbs/night-grant.sh`, then launches `lib/verbs/night-run.mjs`. Only
 a grant written by the repository owner (or a login in `night.grantors`) counts. The run is no wider
 than `effort.wipLimit`, stops at the first wave that did not fully merge, and finishes on the gate.
 See [Night mode](https://cckit.dev/config-and-permissions/#night-mode).
@@ -643,13 +643,13 @@ cckit orchestrate --results --json # each worker's collected result as JSON
 
 Human output renders as markdown — rich via `glow` in a terminal, native in the Claude Code
 transcript, verbatim when piped. Every human-facing verb (`status`, `status --board`, `plan`, `next`) goes
-through one renderer (`cckit_render`, `scripts/lib/render.sh`), so board tables, wave plans, and the
+through one renderer (`cckit_render`, `lib/core/render.sh`), so board tables, wave plans, and the
 status dashboard read the same in all three and print no escape codes into a pipe (`cckit agent render` exposes
 it for any script).
 
 ### The forge, and cloud sessions
 
-Every GitHub call is REST over `curl` with a token, through one port (`scripts/lib/forge.sh`;
+Every GitHub call is REST over `curl` with a token, through one port (`lib/forge/forge.sh`;
 `forge.provider` in the config, `github` when a token resolves from `GH_TOKEN`, `GITHUB_TOKEN` or a
 signed-in `gh`, else `none`). No verb runs a `gh` subcommand; `gh` is the optional way to sign in.
 With no forge the git core stands alone: `start`, `pr` (commit + push, the compare page printed),
@@ -720,16 +720,16 @@ cckit/
                          #   each declares `# errors:` — see CONTRIBUTING.md
   scripts/lib/forge*.sh  # the forge port: forge.sh selects github (REST over curl) or none (refuses,
                          #   naming the verb); forge.provider in the config, CCKIT_FORGE for one command
-  scripts/forge-report.sh # where cckit needs a forge (gh) and where git alone: per file, per verb,
+  lib/core/forge-report.sh # where cckit needs a forge (gh) and where git alone: per file, per verb,
                          #   and the ratchet (files outside the forge layer that call gh)
-  scripts/forge-fence.sh  # the gate step that fails when a file outside the layer calls gh or the API
+  lib/core/forge-fence.sh  # the gate step that fails when a file outside the layer calls gh or the API
   scripts/benchmark/     # doc-retrieval benchmark harness (cckit bench)
   benchmarks/runs/       # recorded benchmark checkpoints, one file per release (format: its README.md)
   .claude-plugin/        # the Claude Code plugin manifest
   skills/ commands/      # Claude Code skills + slash commands; kit/skills/routing.yaml routes a task to a
                          #   skill and the term it serves (the same table: AGENTS.md)
   ontology/              # the terms: one JSON file per word the CLI, skills and rules share
-                         #   (format: ontology/README.md; checked by scripts/terms-check.sh)
+                         #   (format: ontology/README.md; checked by lib/core/terms-check.sh)
   kit/profiles/ kit/templates/   # init profiles + scaffold templates
   kit/routines/ kit/modules/     # scheduled routines + optional modules
   kit/integrations/          # one JSON descriptor per optional third-party tool + its schema
@@ -737,9 +737,9 @@ cckit/
                          #   by default and never installed unasked; impeccable.json,
                          #   emil-design-eng.json, web-design-guidelines.json — the design skills
                          #   the page-design skill coordinates). `cckit doctor` installs each one the
-                         #   config switches on through scripts/lib/integration-install.sh, only
+                         #   config switches on through lib/core/integration-install.sh, only
                          #   with consent recorded in .cckit/consent (`--fix`, or yes at the prompt)
-                         #   scripts/integrations-check.sh installs each one for real and names the
+                         #   lib/verbs/integrations-check.sh installs each one for real and names the
                          #   step that broke; .github/workflows/integrations-check.yml runs it on
                          #   the 1st of every month and opens an issue on a failure
                          #   user-facing page: https://cckit.dev/integrations/
@@ -750,9 +750,9 @@ cckit/
   cckit.config.json      # project configuration (no hardcoded org/repo)
 ```
 
-Every `skills:` entry in `kit/templates/agents/*.md` has to resolve: `scripts/agent-skills-lint.sh` (a
-step of `bash scripts/check.sh`) fails on a name that is not under `skills/` or `kit/templates/skills/`,
-not a `plugin:skill` reference, and not declared third-party in `scripts/agent-skills-external.txt`.
+Every `skills:` entry in `kit/templates/agents/*.md` has to resolve: `lib/core/agent-skills-lint.sh` (a
+step of `bash lib/core/check.sh`) fails on a name that is not under `skills/` or `kit/templates/skills/`,
+not a `plugin:skill` reference, and not declared third-party in `lib/core/agent-skills-external.txt`.
 See [Codified review gates](https://cckit.dev/review/gates/).
 
 `cckit init` also scaffolds `benchmarks/` — a per-project **documentation benchmark** that scores how

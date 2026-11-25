@@ -6,7 +6,7 @@ allowed-tools: Bash, Read, AskUserQuestion
 
 # /kit-routines — suggested routine catalogue
 
-Plugin-direct command. Engine at `${CLAUDE_PLUGIN_ROOT}/scripts/kit-routines.sh`.
+Plugin-direct command. Engine at `${CLAUDE_PLUGIN_ROOT}/lib/verbs/kit-routines.sh`.
 
 The kit ships a set of **suggested routines** (briefing, board sweep, GC, knowledge-lint,
 kit-wire-check, security-sweep). Each is an OS cron job scoped to this project. Nothing is

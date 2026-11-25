@@ -32,7 +32,7 @@
 set -uo pipefail
 dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 # shellcheck source=/dev/null
-. "$dir/worktree-start.sh"
+. "$dir/../../lib/core/worktree-start.sh"
 
 TMP="$(mktemp -d)" || exit 1
 trap 'rm -rf "$TMP"' EXIT

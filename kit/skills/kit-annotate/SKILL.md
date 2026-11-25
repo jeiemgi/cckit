@@ -18,7 +18,7 @@ vendors none of Agentation's code; it installs it as the project's own dev depen
 but the kit wires and maintains the Claude path only — say so if asked about other agents.
 
 The kit lives at `${CLAUDE_PLUGIN_ROOT}`; the setup engine is
-`${CLAUDE_PLUGIN_ROOT}/scripts/annotate-setup.sh` (which sources `scripts/lib/react-detect.sh`).
+`${CLAUDE_PLUGIN_ROOT}/lib/verbs/annotate-setup.sh` (which sources `scripts/lib/react-detect.sh`).
 
 ## 0. Orient
 
@@ -32,7 +32,7 @@ The kit lives at `${CLAUDE_PLUGIN_ROOT}`; the setup engine is
 
 1. **Detect + preview.** Run the engine in dry-run from the project root and show the plan:
    ```bash
-   "${CLAUDE_PLUGIN_ROOT}/scripts/annotate-setup.sh" --dry-run
+   "${CLAUDE_PLUGIN_ROOT}/lib/verbs/annotate-setup.sh" --dry-run
    ```
    If it reports **No React app detected**, stop — this targets React apps. If the framework is
    `react` (unrecognized: CRA/Gatsby/etc.), tell the user you'll install + register but they must wire

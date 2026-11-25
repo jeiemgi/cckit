@@ -19,8 +19,8 @@
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source=/dev/null
-. "$ROOT/scripts/lib/test-env.sh" && test_env_seal
-INIT="$ROOT/scripts/init.sh"
+. "$ROOT/lib/core/test-env.sh" && test_env_seal
+INIT="$ROOT/lib/verbs/init.sh"
 fail=0
 t()     { if [ "$2" = "$3" ]; then echo "ok: $1"; else echo "FAIL: $1 -> got '[$2]' want '[$3]'"; fail=1; fi; }
 has()   { case "$2" in *"$3"*) echo "ok: $1" ;; *) echo "FAIL: $1 -> output lacks '[$3]'"; fail=1 ;; esac; }
@@ -57,7 +57,7 @@ t "content: the editor agent lists copywriting" "$(sed -n '/^skills:/,/^---/p' "
 t "content: the copywriting skill is installed" "$([ -f "$c/.claude/skills/copywriting/SKILL.md" ] && echo yes)" "yes"
 t "content: roles are unchanged"          "$(cfg "$c" '.roles')" '["PM","Editor","Designer","Researcher"]'
 
-labels="$( cd "$c" && KIT_LABELS_LIST=1 bash "$ROOT/scripts/setup-labels.sh" 2>/dev/null )"
+labels="$( cd "$c" && KIT_LABELS_LIST=1 bash "$ROOT/lib/verbs/setup-labels.sh" 2>/dev/null )"
 for k in post campaign brand research; do
   t "content: label list has kind:$k" "$(printf '%s\n' "$labels" | grep -c "^kind:$k	")" "1"
 done
@@ -218,7 +218,7 @@ s="$tmp/software"; mkdir -p "$s"
 init "$s" --profile software >/dev/null 2>&1; t "software: init exits 0" "$?" "0"
 t "software: no content-work keys" "$(cfg "$s" '[has("kinds"), has("pr"), has("plainLanguage"), has("tasks")]')" "[false,false,false,false]"
 t "software: no plain-language rule" "$([ -e "$s/.claude/rules/plain-language.md" ] && echo yes || echo no)" "no"
-labels="$( cd "$s" && KIT_LABELS_LIST=1 bash "$ROOT/scripts/setup-labels.sh" 2>/dev/null )"
+labels="$( cd "$s" && KIT_LABELS_LIST=1 bash "$ROOT/lib/verbs/setup-labels.sh" 2>/dev/null )"
 t "software: no content kind label" "$(printf '%s\n' "$labels" | grep -c -E '^kind:(post|campaign|brand|research)	')" "0"
 
 [ "$fail" -eq 0 ] && echo "ALL OK (init content)" || echo "init content: FAILURES"

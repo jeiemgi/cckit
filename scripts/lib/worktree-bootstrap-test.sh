@@ -18,7 +18,7 @@
 dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 
 if [ -n "${WBT_INNER:-}" ]; then
-  . "$dir/worktree-start.sh"
+  . "$dir/../../lib/core/worktree-start.sh"
   fail=0
   n=0
   ok()  { n=$((n+1)); }

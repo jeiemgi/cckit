@@ -9,7 +9,7 @@
 # not hide the later ones, and --upgrade staying out of the flow.
 #
 # Hermetic: HOME is a temp dir, `pnpm` is a stub on PATH, GitHub is the forge shim
-# (scripts/lib/test-forge-shim.sh) answering from a fixture — a directory of bare repositories plus
+# (lib/forge/test-forge-shim.sh) answering from a fixture — a directory of bare repositories plus
 # a log of every write it was asked to make — and the recipe is a fixture whose commands are plain
 # shell. No `gh` is installed. Nothing here reaches the network or a real repository.
 # Run:  bash scripts/init-guided-test.sh
@@ -17,8 +17,8 @@
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source=/dev/null
-. "$ROOT/scripts/lib/test-env.sh" && test_env_seal
-INIT="$ROOT/scripts/init.sh"
+. "$ROOT/lib/core/test-env.sh" && test_env_seal
+INIT="$ROOT/lib/verbs/init.sh"
 fail=0
 t()     { if [ "$2" = "$3" ]; then echo "ok: $1"; else echo "FAIL: $1 -> got '[$2]' want '[$3]'"; fail=1; fi; }
 has()   { if grep -qF -- "$3" <<<"$2"; then echo "ok: $1"; else echo "FAIL: $1 -> '$3' not in output:"; printf '%s\n' "$2" | tail -25; fail=1; fi; }
@@ -46,7 +46,7 @@ export GHS="$tmp/github"; mkdir -p "$GHS/git" "$GHS/repos"; : > "$GHS/writes.log
 printf '[url "%s/git/"]\n\tinsteadOf = https://github.com/\n' "$GHS" >> "$HOME/.gitconfig"
 mkdir -p "$tmp/stubs"
 # shellcheck source=/dev/null
-. "$ROOT/scripts/lib/test-forge-shim.sh"
+. "$ROOT/lib/forge/test-forge-shim.sh"
 forge_shim_install "$tmp/stubs"
 export GH_TOKEN=test-token CCKIT_FORGE=github GH_FIXTURE="$tmp/fixture.sh" GH_LOG="$tmp/forge.log"
 : > "$GH_LOG"
@@ -147,7 +147,7 @@ tree_sum() {  # a checksum of every file outside .git
 
 # ── 1. detection ────────────────────────────────────────────────────────────────────────────────
 # shellcheck source=/dev/null
-. "$ROOT/scripts/lib/init-guide.sh"
+. "$ROOT/lib/verbs/init-guide.sh"
 mkdir -p "$tmp/d/empty" "$tmp/d/files" "$tmp/d/proj" "$tmp/d/gitno" "$tmp/d/gitre" "$HOME/Documents"
 echo notes > "$tmp/d/files/notes.txt"; : > "$tmp/d/empty/.DS_Store"
 echo '{}' > "$tmp/d/proj/package.json"
@@ -168,8 +168,8 @@ t "abs path of a missing nested folder" "$(init_abs_path "$tmp/d/a/b")"         
 # remote into a local path, which no forge can name.)
 mkdir -p "$tmp/plainhome" "$tmp/d/renamed"
 git -C "$tmp/d/renamed" init -q; git -C "$tmp/d/renamed" remote add origin "git@github.com:tester/the-real-name.git"
-t "the repository name comes from the origin remote (https)" "$(HOME="$tmp/plainhome" bash -c '. "$1/scripts/lib/forge.sh"; forge_repo_from_git "$2"' _ "$ROOT" "$tmp/d/gitre")" "tester/gitre"
-t "the repository name comes from the origin remote (ssh), not the folder" "$(HOME="$tmp/plainhome" bash -c '. "$1/scripts/lib/forge.sh"; forge_repo_from_git "$2"' _ "$ROOT" "$tmp/d/renamed")" "tester/the-real-name"
+t "the repository name comes from the origin remote (https)" "$(HOME="$tmp/plainhome" bash -c '. "$1/lib/forge/forge.sh"; forge_repo_from_git "$2"' _ "$ROOT" "$tmp/d/gitre")" "tester/gitre"
+t "the repository name comes from the origin remote (ssh), not the folder" "$(HOME="$tmp/plainhome" bash -c '. "$1/lib/forge/forge.sh"; forge_repo_from_git "$2"' _ "$ROOT" "$tmp/d/renamed")" "tester/the-real-name"
 
 # ── 2. home directory ───────────────────────────────────────────────────────────────────────────
 run "$HOME" --profile minimal

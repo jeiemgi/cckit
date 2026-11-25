@@ -15,7 +15,7 @@ set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 command -v jq >/dev/null 2>&1 || { echo "qa-lanes-test: jq absent — skipping"; exit 0; }
 # shellcheck source=/dev/null
-. "$ROOT/scripts/lib/test-env.sh" && test_env_seal
+. "$ROOT/lib/core/test-env.sh" && test_env_seal
 
 TMP="$(cd "$(mktemp -d)" && pwd -P)" || exit 1
 PIDS=""
@@ -57,7 +57,7 @@ KIT_CONFIG="$P/cckit.config.json"; export KIT_CONFIG
 QA_PORT_TOOL=none; export QA_PORT_TOOL
 cd "$P" || exit 1
 # shellcheck source=/dev/null
-. "$ROOT/scripts/lib/qa-lane.sh"
+. "$ROOT/lib/core/qa-lane.sh"
 
 lanes()  { qa_cli lanes 2>/dev/null; }
 jlanes() { CCKIT_OUTPUT=json qa_cli lanes 2>/dev/null; }
@@ -161,9 +161,9 @@ QA_PORT_TOOL=none; export QA_PORT_TOOL
 # ── zsh reads the same table; the verb is wired ────────────────────────────────────────────────
 want="$(jlanes)"
 if command -v zsh >/dev/null 2>&1; then
-  got="$(zsh -c "cd '$P'; . '$ROOT/scripts/lib/qa-lane.sh'; CCKIT_OUTPUT=json qa_cli lanes" 2>&1)"
+  got="$(zsh -c "cd '$P'; . '$ROOT/lib/core/qa-lane.sh'; CCKIT_OUTPUT=json qa_cli lanes" 2>&1)"
   t "zsh: lanes prints the same array" "$got" "$want"
-  t "zsh: the table has the same lines" "$(zsh -c "cd '$P'; . '$ROOT/scripts/lib/qa-lane.sh'; qa_cli lanes" 2>&1)" "$(lanes)"
+  t "zsh: the table has the same lines" "$(zsh -c "cd '$P'; . '$ROOT/lib/core/qa-lane.sh'; qa_cli lanes" 2>&1)" "$(lanes)"
 else
   echo "ok: zsh absent — skipping the zsh lanes pass (dependency-light gate)"
 fi

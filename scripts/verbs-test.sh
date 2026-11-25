@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# verbs-test.sh — #555: scripts/lib/verbs.tsv is the one source for every cckit verb, and nothing that
+# verbs-test.sh — #555: lib/core/verbs.tsv is the one source for every cckit verb, and nothing that
 # lists verbs drifts from it. Checks the table's shape, then compares it with the dispatcher's case
 # labels, `cckit help`, `cckit commands` (human, --llm, --json), the completions, the generated block
-# of the CLI reference page, skills/routing.yaml and scripts/forge-report.sh --verbs. A fixture table
-# checks the readers in scripts/lib/verbs.sh. No network, no port.
+# of the CLI reference page, skills/routing.yaml and lib/core/forge-report.sh --verbs. A fixture table
+# checks the readers in lib/core/verbs.sh. No network, no port.
 # Run:  bash scripts/verbs-test.sh
 # errors: strict — a test runner: rc 1 on any failed assertion
 set -u
@@ -12,11 +12,11 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 fail=0
 t()   { if [ "$2" = "$3" ]; then echo "ok: $1"; else echo "FAIL: $1 -> got '[$2]' want '[$3]'"; fail=1; fi; }
 has() { case "$2" in *"$3"*) echo "ok: $1" ;; *) echo "FAIL: $1 -> missing '$3'"; fail=1 ;; esac; }
-TSV="$ROOT/scripts/lib/verbs.tsv"
+TSV="$ROOT/lib/core/verbs.tsv"
 CCKIT="$ROOT/bin/cckit"
 command -v jq >/dev/null 2>&1 || { echo "verbs-test: jq required" >&2; exit 1; }
 # shellcheck source=/dev/null
-source "$ROOT/scripts/lib/verbs.sh"
+source "$ROOT/lib/core/verbs.sh"
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 
 # ── 1. the table's shape ─────────────────────────────────────────────────────────────────────────
@@ -71,21 +71,21 @@ t "commands --json: a multi-line usage is an array" "$(jq -r '.[] | select(.name
 has "the completions read cckit commands" "$("$CCKIT" completions bash)" 'cckit commands'
 
 # ── 4. the CLI reference page ───────────────────────────────────────────────────────────────────
-out="$(bash "$ROOT/scripts/verbs-gen.sh" --check 2>&1)"; rc=$?
+out="$(bash "$ROOT/lib/core/verbs-gen.sh" --check 2>&1)"; rc=$?
 t "the CLI reference block matches the table" "$rc" "0"
 [ "$rc" -eq 0 ] || printf '%s\n' "$out" | sed -n 1,20p
 page="$ROOT/docs-site/src/content/docs/cli-reference.mdx"
 missing=""; for v in $(verbs_names verb); do grep -qE "\`cckit $v( |\`)" "$page" || missing="$missing $v"; done
 t "the CLI reference names every verb" "$missing" ""
 # The check sees drift: a fixture table with one more verb no longer matches the page.
-mkdir -p "$tmp/fx/scripts/lib" "$tmp/fx/docs-site/src/content/docs"
-cp "$ROOT/scripts/verbs-gen.sh" "$tmp/fx/scripts/"
-cp "$ROOT/scripts/lib/verbs.sh" "$tmp/fx/scripts/lib/"
+mkdir -p "$tmp/fx/lib/core" "$tmp/fx/docs-site/src/content/docs"
+cp "$ROOT/lib/core/verbs-gen.sh" "$tmp/fx/lib/core/"
+cp "$ROOT/lib/core/verbs.sh" "$tmp/fx/lib/core/"
 cp "$page" "$tmp/fx/docs-site/src/content/docs/"
-{ cat "$TSV"; printf 'zzz\tverb\t-\tcatalog\tgit\t-\tno\tA new question?\tA new prompt.\tcckit zzz\n'; } > "$tmp/fx/scripts/lib/verbs.tsv"
-bash "$tmp/fx/scripts/verbs-gen.sh" --check >/dev/null 2>&1; t "a verb added to the table fails the page check" "$?" "1"
-bash "$tmp/fx/scripts/verbs-gen.sh" >/dev/null 2>&1
-bash "$tmp/fx/scripts/verbs-gen.sh" --check >/dev/null 2>&1; t "regenerating the page clears it" "$?" "0"
+{ cat "$TSV"; printf 'zzz\tverb\t-\tcatalog\tgit\t-\tno\tA new question?\tA new prompt.\tcckit zzz\n'; } > "$tmp/fx/lib/core/verbs.tsv"
+bash "$tmp/fx/lib/core/verbs-gen.sh" --check >/dev/null 2>&1; t "a verb added to the table fails the page check" "$?" "1"
+bash "$tmp/fx/lib/core/verbs-gen.sh" >/dev/null 2>&1
+bash "$tmp/fx/lib/core/verbs-gen.sh" --check >/dev/null 2>&1; t "regenerating the page clears it" "$?" "0"
 has "the regenerated page carries the new verb" "$(cat "$tmp/fx/docs-site/src/content/docs/cli-reference.mdx")" '| `cckit zzz` | A new question? |'
 
 # ── 5. skills/routing.yaml ──────────────────────────────────────────────────────────────────────
@@ -96,8 +96,8 @@ bad=""; for s in $(verbs_rows | awk -F'\t' '$6 != "-" && $2 != "group" { print $
 done
 t "every skill the table names exists and is routed in skills/routing.yaml" "$bad" ""
 
-# ── 6. needs matches scripts/forge-report.sh --verbs ────────────────────────────────────────────
-report="$(bash "$ROOT/scripts/forge-report.sh" --verbs | awk 'NR > 1 { print $1 "\t" $2 }')"
+# ── 6. needs matches lib/core/forge-report.sh --verbs ────────────────────────────────────────────
+report="$(bash "$ROOT/lib/core/forge-report.sh" --verbs | awk 'NR > 1 { print $1 "\t" $2 }')"
 bad=""
 while IFS=$'\t' read -r v yn; do
   [ -n "$v" ] || continue

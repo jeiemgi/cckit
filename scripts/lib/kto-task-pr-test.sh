@@ -14,7 +14,7 @@ command -v jq >/dev/null 2>&1 || { echo "kto-task-pr-test: jq required" >&2; exi
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 export GH_LOG="$tmp/gh.log"; : > "$GH_LOG"
 # shellcheck source=/dev/null
-. "$LIB/test-forge-shim.sh"; forge_shim_install "$tmp/bin"
+. "$LIB/../../lib/forge/test-forge-shim.sh"; forge_shim_install "$tmp/bin"
 export PATH="$tmp/bin:$PATH" GH_TOKEN=test-token CCKIT_FORGE=github
 export KIT_REPO="o/r" KIT_BASE_BRANCH="main" KIT_PROJECTS_V2="false"
 export GH_TITLE="Fix the thing" GH_LABELS='[{"name":"kind:fix"},{"name":"role:tech-lead"}]'
@@ -32,7 +32,7 @@ echo two > tracked.txt                      # a tracked change: must be committe
 echo SECRET=x > .env.local                  # untracked, not ignored: must NOT be committed
 
 # shellcheck source=/dev/null
-. "$LIB/kit-task-ops.sh"
+. "$LIB/../../lib/verbs/kit-task-ops.sh"
 KIT_PR_TITLE_STYLE=issue-title KIT_PR_ORCHESTRATOR_SECTION=true \
   kto_task_pr 42 "Did the thing." >/dev/null 2>"$tmp/err"
 t  "kto_task_pr succeeds under set -u"      "$?" "0"
@@ -85,7 +85,7 @@ out="$("$LIB/../../bin/cckit" pr --help 2>/dev/null)"
 t  "cckit pr --help: rc 0"                   "$?" "0"
 case "$out" in *'[--base <branch>]'*) echo "ok: cckit pr --help shows --base" ;; *) echo "FAIL: cckit pr --help -> '$out'"; fail=1 ;; esac
 t  "cckit pr --help: no forge request"       "$(wc -l < "$GH_LOG" | tr -d ' ')" "0"
-grep -qE '^pr	.*	cckit pr <issue> "<summary>" .*\[--base <branch>\]' "$LIB/verbs.tsv" \
+grep -qE '^pr	.*	cckit pr <issue> "<summary>" .*\[--base <branch>\]' "$LIB/../../lib/core/verbs.tsv" \
   && echo "ok: the verb table's pr usage shows --base" || { echo "FAIL: the verb table's pr usage lacks --base"; fail=1; }
 
 # --base (#360): the flag wins over the configured integration branch, and the PR's target reaches a

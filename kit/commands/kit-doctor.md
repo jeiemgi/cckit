@@ -37,12 +37,12 @@ Run the kit-doctor script to check all dependencies and authentication required 
 
 ## Steps
 
-1. Resolve the doctor script path: `${CLAUDE_PLUGIN_ROOT}/scripts/kit-doctor.sh`
+1. Resolve the doctor script path: `${CLAUDE_PLUGIN_ROOT}/lib/verbs/kit-doctor.sh`
 
 2. Pass through any `$ARGUMENTS` (e.g. `--dry-run` or `--no-install`):
 
    ```bash
-   bash "${CLAUDE_PLUGIN_ROOT}/scripts/kit-doctor.sh" $ARGUMENTS
+   bash "${CLAUDE_PLUGIN_ROOT}/lib/verbs/kit-doctor.sh" $ARGUMENTS
    ```
 
 3. If the script exits non-zero (Tier 1 failures remain):

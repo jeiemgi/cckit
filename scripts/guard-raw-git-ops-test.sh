@@ -60,7 +60,7 @@ printf '{"kitVersion":"0.0.1","profile":"software","project":{"name":"G","slug":
 # a project's own PreToolUse hooks must survive the merge
 printf '{"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"own-guard.sh"}]}]}}\n' > "$proj/.claude/settings.json"
 for _ in 1 2; do
-  CLAUDE_PLUGIN_ROOT="$ROOT" bash "$ROOT/scripts/init.sh" --upgrade --target "$proj" --force >/dev/null 2>&1 \
+  CLAUDE_PLUGIN_ROOT="$ROOT" bash "$ROOT/lib/verbs/init.sh" --upgrade --target "$proj" --force >/dev/null 2>&1 \
     || { echo "FAIL: init.sh --upgrade exited non-zero"; fail=1; }
 done
 S="$proj/.claude/settings.json"

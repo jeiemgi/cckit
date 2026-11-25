@@ -72,7 +72,7 @@ knowledge-base :: governs a knowledge/ dir with status/owner/updated frontmatter
 mempalace :: memory.enabled is false in cckit.config.json, so init.sh own rules loop skips this rule for this config
 plan-next :: not in profiles/software.json; it describes the cckit plan-next verb rather than governing work, and its See-also links point at plan-output-format.md, which cckit does not install
 plan-output-format :: mandates that a plan is a file in plans.dir; cckit plans.dir is "" and plans.format is "github" — the parent issue IS the plan (effort-model.md)
-react-annotate :: no React app here; scripts/annotate-setup.sh installs this rule per-project when annotation is wired
+react-annotate :: no React app here; lib/verbs/annotate-setup.sh installs this rule per-project when annotation is wired
 risk-tiered-review :: not in profiles/software.json; it blesses pr-automerge / pr-labeler, and .github/workflows/ has no such workflow and the repo has no risk:* labels
 skill-gaps :: records its anti-repeat state in .claude/kit.config.json under skillPrompts; that file does not exist in this repo
 task-management :: duplicates the ground rules in AGENTS.md, and renders claims this repo contradicts — the software profile milestones (Foundation/MVP/Beta/GA) while the repo has zero milestones, and eight roles while only role:tech-lead and role:docs exist'

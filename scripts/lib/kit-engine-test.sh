@@ -9,9 +9,9 @@ set -u
 dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 
 if [ -n "${KIT_ENGINE_TEST_INNER:-}" ]; then
-  . "$dir/kit-manifest.sh"
-  . "$dir/kit-config-resolve.sh"
-  . "$dir/kit-operate.sh"
+  . "$dir/../../lib/core/kit-manifest.sh"
+  . "$dir/../../lib/core/kit-config-resolve.sh"
+  . "$dir/../../lib/core/kit-operate.sh"
   fail=0
   t() { # t <label> <got> <want>
     if [ "$2" != "$3" ]; then echo "FAIL($KIT_ENGINE_TEST_INNER): $1 -> got '[$2]' want '[$3]'"; fail=1

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# leak-fence-test.sh — selftest of the leak fence (scripts/lib/leak-fence.sh, gate step 3).
+# leak-fence-test.sh — selftest of the leak fence (lib/core/leak-fence.sh, gate step 3).
 # Builds a throwaway git repository under its own mktemp -d and checks:
 #   - a tracked file containing a list word fails the fence; removing the file passes it
 #   - with no list present, the built-in word still fails (fresh clone, fork)
@@ -14,15 +14,15 @@ fail=0
 t() { if [ "$2" = "$3" ]; then echo "ok: $1"; else echo "FAIL: $1 -> got '[$2]' want '[$3]'"; fail=1; fi; }
 
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
-repo="$tmp/repo"; mkdir -p "$repo/scripts/lib" "$repo/.cckit"
-cp "$ROOT/scripts/lib/leak-fence.sh" "$repo/scripts/lib/leak-fence.sh"
+repo="$tmp/repo"; mkdir -p "$repo/lib/core" "$repo/.cckit"
+cp "$ROOT/lib/core/leak-fence.sh" "$repo/lib/core/leak-fence.sh"
 git -C "$repo" init -q
 git -C "$repo" -c user.name=t -c user.email=t@example.com -c commit.gpgsign=false add -A
 git -C "$repo" -c user.name=t -c user.email=t@example.com -c commit.gpgsign=false commit -qm init
 printf '.cckit/\n' > "$repo/.gitignore"
 
 # The fence under test runs inside the fixture repo, with the fixture's own list file.
-fence() { ( cd "$repo" && CCKIT_LEAK_WORDS_FILE="$repo/.cckit/leak-words" bash -c '. scripts/lib/leak-fence.sh; leak_fence_check' 2>&1 ); }
+fence() { ( cd "$repo" && CCKIT_LEAK_WORDS_FILE="$repo/.cckit/leak-words" bash -c '. lib/core/leak-fence.sh; leak_fence_check' 2>&1 ); }
 track() { printf '%s\n' "$2" > "$repo/$1"; git -C "$repo" add "$1"; }
 untrack() { git -C "$repo" rm -q --cached "$repo/$1"; rm -f "$repo/$1"; }
 
@@ -63,21 +63,21 @@ t "untracked list file is not itself a hit" "$rc" "0"
 # 5. CI: CCKIT_LEAK_WORDS, `|`-separated, with no list file
 rm -f "$repo/.cckit/leak-words"
 track "docs/ci.md" "mentions quuxcorp here"
-out="$( cd "$repo" && CCKIT_LEAK_WORDS='frobnic|quuxcorp' bash -c '. scripts/lib/leak-fence.sh; leak_fence_check' 2>&1 )"; rc=$?
+out="$( cd "$repo" && CCKIT_LEAK_WORDS='frobnic|quuxcorp' bash -c '. lib/core/leak-fence.sh; leak_fence_check' 2>&1 )"; rc=$?
 t "CCKIT_LEAK_WORDS hit: fails" "$rc" "1"
 case "$out" in *"quuxcorp"*) echo "FAIL: output echoes the env word: $out"; fail=1 ;; *) echo "ok: output does not echo the env word" ;; esac
-out="$( cd "$repo" && CCKIT_LEAK_WORDS='frobnic' bash -c '. scripts/lib/leak-fence.sh; leak_fence_check' 2>&1 )"; rc=$?
+out="$( cd "$repo" && CCKIT_LEAK_WORDS='frobnic' bash -c '. lib/core/leak-fence.sh; leak_fence_check' 2>&1 )"; rc=$?
 t "CCKIT_LEAK_WORDS without the word: passes" "$rc" "0"
 untrack "docs/ci.md"
 
 # 5b. a secret set from the list file carries its comment lines, one with `|`: comments are dropped
 # before the split, so the scan still runs and still catches the word
 track "docs/ci.md" "mentions quuxcorp here"
-out="$( cd "$repo" && CCKIT_LEAK_WORDS=$'# words (a|b), see docs\nfrobnic|quuxcorp' bash -c '. scripts/lib/leak-fence.sh; leak_fence_check' 2>&1 )"; rc=$?
+out="$( cd "$repo" && CCKIT_LEAK_WORDS=$'# words (a|b), see docs\nfrobnic|quuxcorp' bash -c '. lib/core/leak-fence.sh; leak_fence_check' 2>&1 )"; rc=$?
 t "CCKIT_LEAK_WORDS with a comment line containing |: comment skipped, word caught" "$rc" "1"
 case "$out" in *"docs/ci.md:1"*) echo "ok: hit reported with the comment present" ;; *) echo "FAIL: scan did not run: $out"; fail=1 ;; esac
 # 5c. a pattern that does not compile fails the gate instead of passing on an empty scan
-out="$( cd "$repo" && CCKIT_LEAK_WORDS='(unbalanced' bash -c '. scripts/lib/leak-fence.sh; leak_fence_check' 2>&1 )"; rc=$?
+out="$( cd "$repo" && CCKIT_LEAK_WORDS='(unbalanced' bash -c '. lib/core/leak-fence.sh; leak_fence_check' 2>&1 )"; rc=$?
 t "invalid pattern: the gate fails, it does not pass silently" "$rc" "1"
 case "$out" in *"did not compile"*) echo "ok: names the cause" ;; *) echo "FAIL: cause not named: $out"; fail=1 ;; esac
 untrack "docs/ci.md"

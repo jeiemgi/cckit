@@ -24,7 +24,7 @@ has() { case "$2" in *"$3"*) echo "ok: $1" ;; *) echo "FAIL: $1 -> '[$2]' lacks 
 command -v jq  >/dev/null 2>&1 || { echo "SKIP: jq not available";  exit 0; }
 command -v git >/dev/null 2>&1 || { echo "SKIP: git not available"; exit 0; }
 # shellcheck source=/dev/null
-. "$ROOT/scripts/lib/codex-hooks.sh"
+. "$ROOT/lib/core/codex-hooks.sh"
 
 tmp="$(cd "$(mktemp -d)" && pwd -P)"; trap 'rm -rf "$tmp"' EXIT
 export KIT_MAIL_DIR="$tmp/mail"
@@ -37,7 +37,7 @@ P="$tmp/proj"; W="$tmp/wt"
 mkdir -p "$P" && git -C "$P" init -q -b main \
   && git -C "$P" config user.email kit-test@example.com && git -C "$P" config user.name kit-test \
   && git -C "$P" remote add origin git@github.com:example/fx.git   # the mailbox is keyed by the remote slug
-KIT_INIT_PREFLIGHT=0 KIT_BASE_BRANCH=main CLAUDE_PLUGIN_ROOT="$ROOT" bash "$ROOT/scripts/init.sh" \
+KIT_INIT_PREFLIGHT=0 KIT_BASE_BRANCH=main CLAUDE_PLUGIN_ROOT="$ROOT" bash "$ROOT/lib/verbs/init.sh" \
   --profile minimal --adapter both --target "$P" --repo example/fx --owner-login example >/dev/null 2>&1 </dev/null \
   || { echo "FAIL: init --adapter both exited non-zero"; exit 1; }
 git -C "$P" add -A >/dev/null 2>&1 && git -C "$P" commit -q -m scaffold >/dev/null 2>&1

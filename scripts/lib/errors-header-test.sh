@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# errors-header-test.sh — enforce the `# errors:` header on every scripts/lib helper (#223).
+# errors-header-test.sh — enforce the `# errors:` header on every lib/ helper (#223).
 #
 # The header says whether a helper propagates a failure or swallows it. Both are correct designs,
 # but the difference used to live only in prose, so a caller that mixed a strict helper with a
@@ -10,7 +10,17 @@
 # errors: strict — a test runner: rc 1 on any failed assertion
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-LIB="$ROOT/scripts/lib"
+# The helpers: every lib/<layer>/*.sh but tests and the entry points in lib/core/errors-header.exempt
+# (top-level scripts/ files before #600-#602, which the rule never covered).
+EXEMPT="$ROOT/lib/core/errors-header.exempt"
+lib_files() {
+  local f
+  for f in "$ROOT"/lib/*/*.sh; do
+    case "$f" in *-test.sh|*/test-*.sh) continue ;; esac
+    grep -qxF "${f#"$ROOT"/}" "$EXEMPT" 2>/dev/null && continue
+    printf '%s\n' "$f"
+  done
+}
 fail=0
 t() { if [ "$2" = "$3" ]; then echo "ok: $1"; else echo "FAIL: $1 -> got '[$2]' want '[$3]'"; fail=1; fi; }
 
@@ -34,7 +44,7 @@ errors_header() {
 
 # ── 1. every lib file declares one, and it is in the vocabulary ────────────────────────────────
 missing=0 bad=0 n=0
-for f in "$LIB"/*.sh; do
+while IFS= read -r f; do
   n=$((n + 1))
   v="$(errors_header "$f")"
   if [ -z "$v" ]; then
@@ -44,7 +54,7 @@ for f in "$LIB"/*.sh; do
     echo "FAIL: '$v' is not in the vocabulary ($VOCAB) -> $(basename "$f")"
     bad=$((bad + 1)); fail=1
   fi
-done
+done < <(lib_files)
 [ "$n" -gt 0 ] || { echo "FAIL: found no lib files to check"; fail=1; }
 t "every lib file has a header" "$missing" "0"
 t "every value is in the vocabulary" "$bad" "0"
@@ -53,14 +63,14 @@ t "every value is in the vocabulary" "$bad" "0"
 # A bare "# errors: mixed" tells a reader nothing about WHICH half is which, which is the whole
 # point for a mixed file. Require the em-dash reason.
 noreason=0
-for f in "$LIB"/*.sh; do
+while IFS= read -r f; do
   # `[^[:space:]]` after the dash, not `.+`: `.+` is satisfied by trailing spaces, so a header
   # ending "— " would count as carrying a reason while telling a reader nothing.
   grep -qE '^# errors: (pure|strict|best-effort|mixed) —[[:space:]]*[^[:space:]]' "$f" || {
     echo "FAIL: header has no reason after the em dash -> $(basename "$f")"
     noreason=$((noreason + 1)); fail=1
   }
-done
+done < <(lib_files)
 t "every header carries a reason" "$noreason" "0"
 
 # ── 3. the parser itself, on fixtures (pure; no repo files) ────────────────────────────────────
@@ -76,10 +86,10 @@ if in_vocab "silent"; then t "vocabulary rejects an unknown value" "accepted" "r
 # Cheap consistency check: a file declaring `pure` should not carry a `set -e`, which only matters
 # when the file shells out to something that can fail.
 liars=0
-for f in "$LIB"/*.sh; do
+while IFS= read -r f; do
   [ "$(errors_header "$f")" = "pure" ] || continue
   grep -qE '^set -[a-z]*e' "$f" && { echo "FAIL: declares pure but sets -e -> $(basename "$f")"; liars=$((liars + 1)); fail=1; }
-done
+done < <(lib_files)
 t "no pure file sets -e" "$liars" "0"
 
 if [ "$fail" -eq 0 ]; then echo "errors-header-test: OK ($n lib files)"; else echo "errors-header-test: FAILED"; fi

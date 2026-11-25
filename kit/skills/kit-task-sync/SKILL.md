@@ -11,7 +11,7 @@ Plugin-direct skill — the script resolves from `${CLAUDE_PLUGIN_ROOT}`.
 
 ## What it does
 
-Runs `${CLAUDE_PLUGIN_ROOT}/scripts/task-sync.sh` — pure bash over `gh` CLI + jq. Reads
+Runs `${CLAUDE_PLUGIN_ROOT}/lib/verbs/task-sync.sh` — pure bash over `gh` CLI + jq. Reads
 `.claude/kit.config.json` (from the working directory) for the repo and board. Read-only on
 GitHub — it never mutates the board.
 
@@ -20,7 +20,7 @@ From a shell the same view is `cckit status --board`; `cckit sync`, its old name
 ## Execution
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/task-sync.sh" [--role <Name>] [--milestone <label>] [--plan]
+"${CLAUDE_PLUGIN_ROOT}/lib/verbs/task-sync.sh" [--role <Name>] [--milestone <label>] [--plan]
 ```
 
 `--plan` appends `effort plan` (the session-fit view of open efforts) under the board.
@@ -52,5 +52,5 @@ Markdown table grouped by Role, sorted by Status (In Progress → Blocked → To
 ## Rules
 
 - Pure read — never mutate
-- If `scripts/.project-ids.env` is missing and Projects v2 is enabled, prompt to run `${CLAUDE_PLUGIN_ROOT}/scripts/capture-project-ids.sh`
+- If `scripts/.project-ids.env` is missing and Projects v2 is enabled, prompt to run `${CLAUDE_PLUGIN_ROOT}/lib/verbs/capture-project-ids.sh`
 - bash 3.2+ compatible (macOS system bash)

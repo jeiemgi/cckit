@@ -20,7 +20,7 @@ set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 E2E="${INIT_E2E_NETWORK:-0}"; E2E_DIR="${INIT_E2E_DIR:-}"
 # shellcheck source=/dev/null
-. "$ROOT/scripts/lib/test-env.sh" && test_env_seal
+. "$ROOT/lib/core/test-env.sh" && test_env_seal
 fail=0
 t()      { if [ "$2" = "$3" ]; then echo "ok: $1"; else echo "FAIL: $1 -> got '[$2]' want '[$3]'"; fail=1; fi; }
 has()    { if grep -qF -- "$3" <<<"$2"; then echo "ok: $1"; else echo "FAIL: $1 -> '$3' not in: $2"; fail=1; fi; }
@@ -30,7 +30,7 @@ yes_if() { if eval "$2"; then echo "ok: $1"; else echo "FAIL: $1 -> not true: $2
 command -v jq >/dev/null 2>&1 || { echo "database-supabase-test: jq absent — skipping (dependency-light gate)"; exit 0; }
 
 # shellcheck source=/dev/null
-. "$ROOT/scripts/lib/init-guide.sh"
+. "$ROOT/lib/verbs/init-guide.sh"
 DB="$ROOT/kit/databases/supabase.json"
 ENV_FILE="$(jq -r .envFile "$DB")"
 NAMES="$(jq -r '.env[].name' "$DB")"
@@ -102,7 +102,7 @@ if [ "$E2E" = "1" ]; then
   [ ! -e "$proj" ] || { echo "FAIL: $proj already exists — remove it first"; exit 1; }
   echo "── networked: cckit init $proj --recipe nextjs-shadcn --database supabase --no-github"
   ( cd "$work" && KIT_INIT_PREFLIGHT=0 KIT_INIT_BROWSER=0 KIT_INIT_TTY=0 CLAUDE_PLUGIN_ROOT="$ROOT" \
-      bash "$ROOT/scripts/init.sh" "$proj" --recipe nextjs-shadcn --database supabase --no-github )
+      bash "$ROOT/lib/verbs/init.sh" "$proj" --recipe nextjs-shadcn --database supabase --no-github )
   t "networked: init rc" "$?" "0"
   yes_if "networked: a Next.js app"        'jq -e ".dependencies | has(\"next\")" "$proj/package.json" >/dev/null'
   yes_if "networked: shadcn/ui configured" '[ -f "$proj/components.json" ] && [ -f "$proj/components/ui/button.tsx" ] && [ -f "$proj/components/ui/card.tsx" ]'

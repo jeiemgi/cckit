@@ -13,7 +13,7 @@ set -u
 LIB="$(cd "$(dirname "$0")" && pwd)"
 CCKIT="$(cd "$LIB/../.." && pwd)/bin/cckit"
 # shellcheck source=/dev/null
-. "$LIB/test-env.sh" && test_env_seal
+. "$LIB/../../lib/core/test-env.sh" && test_env_seal
 unset CLAUDE_CODE_REMOTE CCKIT_GH_TRANSPORT
 fail=0
 t()  { if [ "$2" = "$3" ]; then echo "ok: $1"; else echo "FAIL: $1 -> got '[$2]' want '[$3]'"; fail=1; fi; }
@@ -25,7 +25,7 @@ tmp="$(cd "$(mktemp -d)" && pwd -P)"; trap 'rm -rf "$tmp"' EXIT
 export GH_LOG="$tmp/gh.log" GH_SHA="" GH_STATE="MERGED" GH_OPEN_URL="" GH_SUBJECTS="wip"
 : > "$GH_LOG"
 # shellcheck source=/dev/null
-. "$LIB/test-forge-shim.sh"; forge_shim_install "$tmp/bin"
+. "$LIB/../../lib/forge/test-forge-shim.sh"; forge_shim_install "$tmp/bin"
 # The PR fixtures the shim does not know: the source PR (GH_STATE merged or not, its merge commit
 # GH_SHA, its commit subjects GH_SUBJECTS one per line oldest first), the open PR for a head
 # (GH_OPEN_URL, empty = none), and the PR this verb opens (#77).

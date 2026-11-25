@@ -24,7 +24,7 @@
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source=/dev/null
-. "$ROOT/scripts/lib/test-env.sh" && test_env_seal
+. "$ROOT/lib/core/test-env.sh" && test_env_seal
 CCKIT="$ROOT/bin/cckit"
 fail=0
 t()     { if [ "$2" = "$3" ]; then echo "ok: $1"; else echo "FAIL: $1 -> got '[$2]' want '[$3]'"; fail=1; fi; }
@@ -46,7 +46,7 @@ export GH_LOG="$tmp/forge.log"; : > "$GH_LOG"
 # the walkthrough opens. The shim's `gh` fails on any subcommand.
 mkdir -p "$tmp/stubs"
 # shellcheck source=/dev/null
-. "$ROOT/scripts/lib/test-forge-shim.sh"
+. "$ROOT/lib/forge/test-forge-shim.sh"
 forge_shim_install "$tmp/stubs"
 export GH_TOKEN=test-token CCKIT_FORGE=github GH_FIXTURE="$tmp/fixture.sh"
 cat > "$GH_FIXTURE" <<'FIX'
@@ -87,7 +87,7 @@ hasnt "no --yes: no label or milestone script in the next steps" "$out" "setup-l
 t "no --yes: .cckit/ is gitignored" "$(grep -cxF '.cckit/' "$q/.gitignore")" "1"
 t "no --yes: .claude/worktrees/ is gitignored" "$(grep -cxF '.claude/worktrees/' "$q/.gitignore")" "1"
 t "no --yes: the labels come from this project's config" \
-  "$(cd "$q" && KIT_LABELS_LIST=1 bash "$ROOT/scripts/setup-labels.sh" 2>/dev/null | grep -c '^kind:post	')" "1"
+  "$(cd "$q" && KIT_LABELS_LIST=1 bash "$ROOT/lib/verbs/setup-labels.sh" 2>/dev/null | grep -c '^kind:post	')" "1"
 # The second run a reader makes: the same command with --yes commits the files that are there.
 out="$(cd "$q" && "$CCKIT" init --yes 2>&1 < /dev/null)"; t "then --yes: rc 0" "$?" "0"
 has "then --yes: the cckit files are committed" "$out" "[done   ] cckit files commit"

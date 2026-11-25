@@ -1,31 +1,14 @@
 #!/usr/bin/env bash
-# install.sh — put cckit on your PATH. Symlinks bin/cckit into a bin dir (no copy, no build).
-# Usage: ./scripts/install.sh [target-bin-dir]   (default: ~/.local/bin, then /usr/local/bin)
-set -euo pipefail
-
-# git is the one hard dependency of the core: every verb runs on it, and nothing works without it.
-# Refused here, before anything is linked, with the way to get it.
-command -v git >/dev/null 2>&1 || {
-  echo "cckit: git is required and is not on your PATH. Install it (macOS: xcode-select --install, or brew install git; Debian/Ubuntu: apt install git), then run this again." >&2
-  exit 1
-}
-
-root="$(cd "$(dirname "$0")/.." && pwd)"
-src="$root/bin/cckit"
-[ -x "$src" ] || { echo "cckit: $src not found or not executable" >&2; exit 1; }
-
-# Pick a writable bin dir on PATH.
-target="${1:-}"
-if [ -z "$target" ]; then
-  for d in "$HOME/.local/bin" "/usr/local/bin" "$HOME/bin"; do
-    if [ -d "$d" ] && [ -w "$d" ]; then target="$d"; break; fi
-  done
-  [ -z "$target" ] && { mkdir -p "$HOME/.local/bin"; target="$HOME/.local/bin"; }
+# cckit-forwarding-stub: scripts/install.sh moved to lib/verbs/install.sh (#602). Installed projects call this path, so
+# the stub stays until the release after 0.13 (decision 66). Sourced (bash or zsh) or run, it forwards.
+_cckit_self="${BASH_SOURCE[0]:-$0}"
+_cckit_fwd="$(cd "$(dirname "$_cckit_self")" 2>/dev/null && pwd)/../lib/verbs/install.sh"
+_cckit_sourced=0
+if [ -n "${ZSH_VERSION:-}" ]; then
+  case "${ZSH_EVAL_CONTEXT:-}" in *file*) _cckit_sourced=1 ;; esac
+elif [ "$_cckit_self" != "$0" ]; then
+  _cckit_sourced=1
 fi
-
-ln -sf "$src" "$target/cckit"
-echo "cckit: linked $target/cckit -> $src"
-case ":$PATH:" in
-  *":$target:"*) echo "cckit: '$target' is on your PATH. Run: cckit help" ;;
-  *) echo "cckit: add '$target' to your PATH, then run: cckit help" ;;
-esac
+# shellcheck source=/dev/null
+if [ "$_cckit_sourced" = 1 ]; then unset _cckit_self _cckit_sourced; . "$_cckit_fwd" "$@"; return $?; fi
+exec bash "$_cckit_fwd" "$@"

@@ -68,7 +68,7 @@ else
 }
 JSON
   # The --upgrade path is the network-free scaffold (no doctor, no gh) init-upgrade-test.sh uses.
-  CLAUDE_PLUGIN_ROOT="$ROOT" bash "$ROOT/scripts/init.sh" --upgrade --target "$proj" --force >/dev/null 2>&1 \
+  CLAUDE_PLUGIN_ROOT="$ROOT" bash "$ROOT/lib/verbs/init.sh" --upgrade --target "$proj" --force >/dev/null 2>&1 \
     || { echo "FAIL: scaffold exited non-zero"; exit 1; }
 
   rule="$proj/.claude/rules/gate-and-review.md"
@@ -83,7 +83,7 @@ JSON
 
   # The row above the recipe says `cckit lib` lists the helper: that is the directory kit_lib_dir
   # resolves for this project, so the helper has to be in it.
-  libdir="$(cd "$proj" && env -u KIT_LIB_DIR bash -c '. "$1/scripts/lib/kit-lib.sh"; kit_lib_dir "$2"' _ "$ROOT" "$proj")"
+  libdir="$(cd "$proj" && env -u KIT_LIB_DIR bash -c '. "$1/lib/verbs/kit-lib.sh"; kit_lib_dir "$2"' _ "$ROOT" "$proj")"
   t "kit_lib_dir resolves the project's own library" "$libdir" "$proj/scripts/lib"
   t "that library holds pr-evidence.sh"        "$([ -f "$libdir/pr-evidence.sh" ] && echo yes || echo no)" "yes"
 

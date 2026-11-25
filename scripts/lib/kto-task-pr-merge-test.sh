@@ -17,7 +17,7 @@ command -v jq >/dev/null 2>&1 || { echo "kto-task-pr-merge-test: jq required" >&
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 export GH_LOG="$tmp/gh.log" GH_MERGEABLE="true" GH_BASE="develop" GH_HEAD="" GH_CLOSED=""; : > "$GH_LOG"
 # shellcheck source=/dev/null
-. "$LIB/test-forge-shim.sh"; forge_shim_install "$tmp/bin"
+. "$LIB/../../lib/forge/test-forge-shim.sh"; forge_shim_install "$tmp/bin"
 export GH_TOKEN=test-token CCKIT_FORGE=github
 export PATH="$tmp/bin:$PATH" KIT_REPO="o/r" KIT_BASE_BRANCH="develop" KIT_PROJECTS_V2="false"
 unset KIT_CONFIG CLAUDE_CODE_REMOTE
@@ -31,7 +31,7 @@ git config user.email t@t; git config user.name t
 git checkout -q -b develop; git commit -q --allow-empty -m init; git push -q origin develop
 
 # shellcheck source=/dev/null
-. "$LIB/kit-task-ops.sh"
+. "$LIB/../../lib/verbs/kit-task-ops.sh"
 
 kto_task_pr_merge --help >/dev/null 2>&1; rc=$?
 t "a flag is refused as a PR number (rc 2)"      "$rc" "2"

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 # exec-targets-test.sh — #534: every `exec "$ROOT/<path>"` target in bin/cckit is executable in the
-# index. `cckit release --next` failed with Permission denied because scripts/lib/version-bump.sh was
+# index. `cckit release --next` failed with Permission denied because lib/core/version-bump.sh was
 # mode 100644 while bin/cckit:476 exec'd it; the mode is read from the index, so a local chmod that
 # is not committed does not count.
 # Run:  bash scripts/exec-targets-test.sh

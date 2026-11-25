@@ -28,8 +28,8 @@ can never disagree about what is safe to delete.
 ### 1. Show the plan (read-only)
 
 ```bash
-source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/kit-config.sh" && load_kit_config
-KIT_GC_REPO="$KIT_REPO" source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/kit-gc.sh"
+source "${CLAUDE_PLUGIN_ROOT}/lib/core/kit-config.sh" && load_kit_config
+KIT_GC_REPO="$KIT_REPO" source "${CLAUDE_PLUGIN_ROOT}/lib/verbs/kit-gc.sh"
 kit_gc_cleanup          # plan only — deletes no branch, worktree, remote ref or stash
 ```
 

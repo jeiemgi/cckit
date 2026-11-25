@@ -8,7 +8,7 @@ when_to_use: When work on an issue branch is ready to land. Always run after `/k
 # kit-task-pr-merge
 
 Plugin-direct skill — thin caller over the ONE canonical home
-`${CLAUDE_PLUGIN_ROOT}/scripts/lib/kit-task-ops.sh` (`kto_task_pr_merge`). The verb logic lives
+`${CLAUDE_PLUGIN_ROOT}/lib/verbs/kit-task-ops.sh` (`kto_task_pr_merge`). The verb logic lives
 there, never inline here (kit-engine-boundary #1/#2). The op respects `KIT_BASE_BRANCH` (default
 `develop`) and closes the PR's linked issues (native auto-close only fires on the default branch).
 
@@ -21,10 +21,10 @@ there, never inline here (kit-engine-boundary #1/#2). The op respects `KIT_BASE_
 ## Execution
 
 ```bash
-source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/kit-config.sh" && load_kit_config
-source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/role-identity.sh"
-source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/gh-project.sh"
-source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/kit-task-ops.sh"
+source "${CLAUDE_PLUGIN_ROOT}/lib/core/kit-config.sh" && load_kit_config
+source "${CLAUDE_PLUGIN_ROOT}/lib/core/role-identity.sh"
+source "${CLAUDE_PLUGIN_ROOT}/lib/forge/gh-project.sh"
+source "${CLAUDE_PLUGIN_ROOT}/lib/verbs/kit-task-ops.sh"
 
 kto_task_pr_merge            # open PR for the current branch
 # kto_task_pr_merge 845      # an explicit PR number
@@ -36,7 +36,7 @@ the two checks agree. Under `.claude/rules/` it matches only the rule files the 
 (`kit/templates/rules/*.md`); a rule the project wrote itself is not flagged.
 
 ```bash
-source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/effort-ops.sh"   # _EO_KIT_MANAGED_RE
+source "${CLAUDE_PLUGIN_ROOT}/lib/verbs/effort-ops.sh"   # _EO_KIT_MANAGED_RE
 MAIN_WT=$(git worktree list --porcelain | awk '/^worktree /{print $2; exit}')
 KIT_TOUCHED=$(git -C "$MAIN_WT" show --name-only --pretty=format: HEAD 2>/dev/null \
   | grep -E "$_EO_KIT_MANAGED_RE" | sort -u || true)

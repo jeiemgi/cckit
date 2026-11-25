@@ -1,0 +1,182 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+# effort-slug.sh — the effort *slug* layer (Effort #93). The GitHub issue NUMBER stays the canonical
+# key; the slug is a DERIVED human handle that already lives in the branch name `effort/<N>-<slug>`.
+# This file surfaces that handle: derive a slug from a title, render efforts as `slug #N`, and resolve
+# a slug (or a number) back to the canonical effort number so commands can take either.
+#
+# Functions:
+#   _eff_slug <text>                 a short branch-safe slug (mirrors wt_start; shared with effort-ops)
+#   _eff_title_slug <effort title>   slug derived from an effort title — peels the structural prefix
+#                                    ("[Effort] N · " / "[Effort N] M · ") and any leading [Flow] tag so
+#                                    the number/flow are NOT duplicated into the slug (#93 doubling fix)
+#   effort_display <N> [slug]        render an effort as "slug #N" (or "#N" when no slug is known)
+#   effort_branch_rows               TSV `<N>\t<slug>` per effort/<N>-<slug> ref in the LOCAL ref
+#                                    store (refs/heads + cached refs/remotes) — network-free (#244)
+#   effort_branch_rows_local         the same, refs/heads only
+#   effort_branch_rows_origin        the same, from `git ls-remote origin` — what origin has NOW,
+#                                    so a stale or unfetched remote ref cannot skew a count. rc 1
+#                                    when origin is unreachable (#244)
+#   effort_slug_resolve <slug|N>     resolve a slug OR a number to the canonical effort number.
+#                                    pure-digits → passthrough; otherwise match effort/* branches
+#                                    (local + remote), then slug:<slug> labels, then open effort titles.
+#                                    no match → rc 1; ambiguous → rc 1; bad input → rc 2.
+#
+# Number stays canonical: a pure-digits argument is always treated as a number and passed through
+# unchanged, so every existing `<N>` call keeps working. bash 3.2 compatible. Requires: git; gh (only
+# for the issue-based fallback when no local/remote branch matches).
+# errors: mixed — _eff_slug/effort_display are pure; effort_slug_resolve needs gh;
+#         effort_branch_rows_origin reaches the network and returns rc 1 when it cannot
+
+# The GitHub transport switch (#396): rest mode routes the gh calls below through gh-rest.sh.
+# The forge port (E537): every GitHub call goes through forge_* / gh_rest_* (lib/forge/gh-rest.sh).
+if ! command -v gh_rest_issue_json >/dev/null 2>&1; then
+  # shellcheck source=/dev/null
+  . "$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/.." && pwd)/forge/gh-rest.sh"
+fi
+
+if ! command -v cckit_gh_rest >/dev/null 2>&1; then
+  _ghr_lib="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/.." 2>/dev/null && pwd)/forge/gh-rest.sh"
+  # shellcheck source=/dev/null
+  [ -f "$_ghr_lib" ] && . "$_ghr_lib"
+  unset _ghr_lib
+fi
+command -v cckit_gh_rest >/dev/null 2>&1 || cckit_gh_rest() { return 1; }
+
+# Repo for the gh fallback — resolved from the same env effort.sh/kit-config populate.
+_eff_slug_repo() { printf '%s' "${EFFORT_REPO:-${KIT_REPO:-}}"; }
+
+# <text> → a short branch-safe slug (lowercase, [a-z0-9-], ≤40 chars). Mirrors wt_start / effort-ops.
+_eff_slug() {
+  printf '%s' "$1" | sed -E 's/^\[[^]]+\][[:space:]]*//' | tr '[:upper:]' '[:lower:]' \
+    | sed -E 's/[^a-z0-9]+/-/g; s/^-+|-+$//g' | cut -c1-40
+}
+
+# <effort title> → the human slug. Peels the structural prefix and one optional leading [Flow] tag
+# BEFORE slugifying, so `[Effort] 93 · [Core] Slug handles` → `slug-handles` (not `93-core-slug-handles`,
+# the cosmetic doubling that produced branches like `effort/98-98-core-…`). See #93 / sub #96.
+_eff_title_slug() {
+  local t="$1"
+  # structural prefix: "[E<n>] " / "[E<n>.<step>] ", or the legacy "[Effort] N · " (parent) and
+  # "[Effort N] M · " (sub)
+  t="$(printf '%s' "$t" | sed -E -e 's/^\[E[0-9]+(\.[0-9]+)?\] +//' -e 's/^\[Effort( [0-9]+)?\] [0-9]+ ·? ?//')"
+  # one optional leading [Flow] tag
+  t="$(printf '%s' "$t" | sed -E 's/^\[[A-Za-z]+\][[:space:]]*//')"
+  _eff_slug "$t"
+}
+
+# <N> [slug] → "slug #N" for human output (the canonical handle is the number; the slug is the label).
+effort_display() {
+  local n="$1" s="${2:-}"
+  if [ -n "$s" ]; then printf '%s #%s' "$s" "$n"; else printf '#%s' "$n"; fi
+}
+
+# _eff_rows_from_refs — stdin: ref or branch names, one per line (`effort/7-x`,
+# `origin/effort/7-x`, `refs/heads/effort/7-x` all work); stdout: one TSV `<N>\t<slug>` row per name
+# that matches `effort/<N>-<slug>`, others dropped. THE one parser — every effort-branch inventory
+# below funnels through it, so a ref name is decomposed in exactly one place (#244).
+_eff_rows_from_refs() {
+  local ref n s
+  while IFS= read -r ref; do
+    [ -n "$ref" ] || continue
+    n="$(printf '%s' "$ref" | sed -nE 's#^(.*/)?effort/([0-9]+)-(.*)$#\2#p')"
+    s="$(printf '%s' "$ref" | sed -nE 's#^(.*/)?effort/([0-9]+)-(.*)$#\3#p')"
+    [ -n "$n" ] || continue
+    printf '%s\t%s\n' "$n" "$s"
+  done
+}
+
+# effort_branch_rows — one TSV row `<N>\t<slug>` per `effort/<N>-<slug>` ref in the LOCAL ref store:
+# `refs/heads` plus the cached `refs/remotes`. Network-free by contract — the slug resolver below is
+# on the hot path of every effort verb (and of `cckit start <slug>`), so it must never reach the
+# network to answer "which effort is this handle".
+#
+# Cached `refs/remotes` is therefore approximate in BOTH directions: a branch pushed since the last
+# fetch is missing, and a branch deleted on the remote lingers until a prune. That is acceptable for
+# slug lookup, where a wrong hit is caught by the number/ambiguity checks and the gh fallbacks. It is
+# NOT acceptable for counting work in progress, so `effort_wip_rows` (effort-ops.sh) uses
+# effort_branch_rows_origin instead and only falls back here when origin is unreachable (#244).
+#
+# Rows are NOT de-duplicated — one row per matching ref, so `effort/7-a` and `origin/effort/7-b`
+# both appear. The slug resolver needs every distinct slug; a caller that wants distinct EFFORTS
+# de-duplicates on the number column. best-effort: without git, no rows.
+effort_branch_rows() {
+  command -v git >/dev/null 2>&1 || return 0
+  git for-each-ref --format='%(refname:short)' refs/heads refs/remotes 2>/dev/null \
+    | _eff_rows_from_refs
+}
+
+# effort_branch_rows_local — the same rows from `refs/heads` ALONE. The half of the inventory that
+# is always authoritative and always available: a local branch is a fact about this machine, with no
+# cache and no network between the caller and the answer.
+effort_branch_rows_local() {
+  command -v git >/dev/null 2>&1 || return 0
+  git for-each-ref --format='%(refname:short)' 'refs/heads/effort/*' 2>/dev/null \
+    | _eff_rows_from_refs
+}
+
+# effort_branch_rows_origin — the same rows for the effort branches origin ACTUALLY has right now,
+# read with `git ls-remote` instead of the cached `refs/remotes`. This is what makes the WIP count
+# correct in both directions: ls-remote sees a branch pushed one second ago and does not see one
+# deleted one second ago, neither of which the local cache can do without a fetch --prune.
+#
+# rc 1 when origin cannot be reached or does not exist (no remote, offline, auth failure) — the
+# caller decides what to do, and `effort_wip_rows` falls back to the cached refs rather than failing.
+# An EMPTY result with rc 0 is a real answer (origin has no effort branches) and must not be read as
+# a failure. Read-only: no refs are written, nothing is fetched, nothing is pruned.
+effort_branch_rows_origin() {
+  command -v git >/dev/null 2>&1 || return 1
+  local out
+  out="$(git ls-remote --heads origin 'effort/*' 2>/dev/null)" || return 1
+  printf '%s\n' "$out" | awk '{ if (NF >= 2) print $2 }' | _eff_rows_from_refs
+}
+
+# effort_slug_resolve <slug|N> → echo the canonical effort number on stdout (rc 0).
+#   - pure digits → passthrough (number stays canonical; never re-mapped).
+#   - otherwise normalize and match, in order: effort/* branches (local + remote), then (via gh)
+#     slug:<slug> labels, then title-derived slugs of open `[E<n>]` (or legacy `[Effort]`) issues.
+#   - no match → rc 1; >1 distinct match → rc 1 (ambiguous, never a wrong guess); empty/unusable → rc 2.
+effort_slug_resolve() {
+  local input="${1:-}"
+  [ -n "$input" ] || { echo "effort_slug_resolve: <slug|N> required" >&2; return 2; }
+  case "$input" in
+    *[!0-9]*) : ;;                                   # contains a non-digit → treat as a slug
+    *) printf '%s\n' "$input"; return 0 ;;           # all digits → canonical number, passthrough
+  esac
+
+  local norm; norm="$(_eff_slug "$input")"
+  [ -n "$norm" ] || { echo "effort_slug_resolve: '$input' is not a usable slug" >&2; return 2; }
+
+  local matches="" n s tab; tab="$(printf '\t')"
+  # 1. branches (local refs/heads + remote refs/remotes): effort/<N>-<slug>, via the shared scan.
+  while IFS="$tab" read -r n s; do
+    [ -n "$n" ] || continue
+    [ "$s" = "$norm" ] && matches="$matches$n"$'\n'
+  done < <(effort_branch_rows)
+  matches="$(printf '%s' "$matches" | grep -E '^[0-9]+$' | sort -un)"
+
+  # 2. gh fallback (only when no branch matched): slug:<slug> label first, then open effort titles.
+  if [ -z "$matches" ] && forge_available; then
+    local repo; repo="$(_eff_slug_repo)"
+    if [ -n "$repo" ]; then
+      matches="$(gh_rest_issue_numbers_by_label "$repo" "slug:$norm" 2>/dev/null | grep -E '^[0-9]+$' | sort -un)"
+      if [ -z "$matches" ]; then
+        local in it
+        matches="$( { gh_rest_open_issue_titles "$repo" | grep -E "$(printf '\t')"'\[(Effort\]|E[0-9]+\] )'; } 2>/dev/null \
+                   | while IFS="$(printf '\t')" read -r in it; do
+                       [ "$(_eff_title_slug "$it")" = "$norm" ] && printf '%s\n' "$in"
+                     done | grep -E '^[0-9]+$' | sort -un)"
+      fi
+    fi
+  fi
+
+  local count; count="$(printf '%s\n' "$matches" | grep -cE '^[0-9]+$')"
+  if [ "$count" -eq 0 ]; then
+    echo "effort_slug_resolve: no effort matches slug '$norm' (looked in effort/* branches, slug:* labels, open effort titles)" >&2
+    return 1
+  elif [ "$count" -gt 1 ]; then
+    echo "effort_slug_resolve: slug '$norm' is ambiguous — matches efforts $(printf '%s' "$matches" | tr '\n' ' ')— pass the number" >&2
+    return 1
+  fi
+  printf '%s\n' "$matches"
+}

@@ -8,7 +8,7 @@ when_to_use: When work on an issue branch is ready for review. Replaces ad-hoc `
 # kit-task-pr
 
 Plugin-direct skill — thin caller over the ONE canonical home
-`${CLAUDE_PLUGIN_ROOT}/scripts/lib/kit-task-ops.sh` (`kto_task_pr`). The verb logic lives there,
+`${CLAUDE_PLUGIN_ROOT}/lib/verbs/kit-task-ops.sh` (`kto_task_pr`). The verb logic lives there,
 never inline here (kit-engine-boundary #1/#2). The op respects `KIT_BASE_BRANCH` (default `develop`)
 and the `KIT_PROJECTS_V2` board toggle, so the same code serves any project. `--base <branch>`
 targets another branch for one PR — a hotfix to `main` — and the push exports the target to a git
@@ -28,10 +28,10 @@ Ask via `AskUserQuestion` when the Summary is missing — never invent it.
 ## Execution
 
 ```bash
-source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/kit-config.sh" && load_kit_config
-source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/role-identity.sh"
-source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/gh-project.sh"
-source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/kit-task-ops.sh"
+source "${CLAUDE_PLUGIN_ROOT}/lib/core/kit-config.sh" && load_kit_config
+source "${CLAUDE_PLUGIN_ROOT}/lib/core/role-identity.sh"
+source "${CLAUDE_PLUGIN_ROOT}/lib/forge/gh-project.sh"
+source "${CLAUDE_PLUGIN_ROOT}/lib/verbs/kit-task-ops.sh"
 
 kto_task_pr "" "$SUMMARY"            # issue # parsed from the branch
 # kto_task_pr 173 "$SUMMARY" "tech-lead: admin Clerk sign-in"   # explicit

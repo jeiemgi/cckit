@@ -47,7 +47,7 @@ claude --plugin-dir "$PWD/packages/claude-kit-plugin"
 
 ## ship — land it and update the installed kit
 
-1. `"${CLAUDE_PLUGIN_ROOT}/scripts/kit-bump-version.sh" beta` — bumps `version.json`,
+1. `"${CLAUDE_PLUGIN_ROOT}/lib/verbs/kit-bump-version.sh" beta` — bumps `version.json`,
    `plugin.json`, `package.json`, and the marketplace manifest(s) in sync.
    (`patch`/`minor`/explicit semver for releases — a clean release advances the `stable`
    channel, a `-beta.N` build advances `beta`.) NEVER ship a kit change without the bump:
