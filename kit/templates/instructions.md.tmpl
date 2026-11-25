@@ -3,17 +3,7 @@
 > Scaffolded by [cckit](https://github.com/jeiemgi/cckit) — profile `{{PROFILE}}`.
 > Project config lives in `{{CONFIG_REL}}`. Edit freely; this file is yours now.
 
-<!-- IF:ADAPTER_CLAUDE --><!-- IF:MEMORY -->
-## MANDATORY — Session Start Protocol
-
-**Do this before answering anything else:**
-
-1. Call `mempalace_status` — loads the MemPalace overview and recent decisions
-2. If the user's first message mentions a specific topic, call `mempalace_search "<topic>" wing={{WING}}`
-
-Skip only if the message is a pure file lookup with no decision context needed.
-<!-- /IF:MEMORY -->
-
+<!-- IF:ADAPTER_CLAUDE -->
 ## Agents
 
 Spawn the matching agent for any domain task — do not answer domain decisions from the orchestrator level.
@@ -31,10 +21,6 @@ commit to the base branch, a guard that blocks raw `gh`/`git` operations a `ccki
 mail (`cckit agent msg`), and two session-start checks. Codex runs them only after they are trusted
 (`/hooks`), and a hook is fast feedback, not enforcement — the rules below apply whether or not one
 fires.
-<!-- IF:MEMORY -->
-Memory hooks are not installed for Codex: they read Claude Code transcripts. If a MemPalace MCP
-server is configured, call its tools explicitly (wing `{{WING}}`).
-<!-- /IF:MEMORY -->
 
 ## Agents
 
@@ -162,9 +148,6 @@ Create a GitHub issue only when {{OWNER_NAME}} asks for one.
 <!-- IF:PLANS -->
 - Plan output format → `{{ADAPTER_DIR}}/rules/plan-output-format.md`
 <!-- /IF:PLANS -->
-<!-- IF:MEMORY -->
-- Persistent memory protocol → `{{ADAPTER_DIR}}/rules/mempalace.md`
-<!-- /IF:MEMORY -->
 <!-- IF:CODEGRAPH -->
 - Code search → ask the code graph first, fall back to Grep/Glob silently (`{{ADAPTER_DIR}}/rules/code-retrieval.md`)
 <!-- /IF:CODEGRAPH -->

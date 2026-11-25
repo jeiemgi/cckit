@@ -19,7 +19,6 @@
     "communication-style",
     "design-routing",
     "knowledge-base",
-    "mempalace",
     "plan-output-format",
     "issue-lifecycle",
     "merge-safety",
@@ -43,7 +42,6 @@
   ],
   "defaults": {
     "plans_format": "markdown",
-    "memory": "off",
     "content_kinds": "on",
     "pr_body": "content"
   }

@@ -91,8 +91,7 @@ Limits of the Codex adapter today:
 
 - The guards and session mail are installed and fixture-tested against the event JSON Codex
   documents, but no live Codex session has fired them, and Codex runs a project hook only after you
-  trust it (`/hooks`). Until that is verified, treat a Codex guard as unproven. No memory hook is
-  installed: those read Claude Code transcripts.
+  trust it (`/hooks`). Until that is verified, treat a Codex guard as unproven.
 - A Codex agent file is generated and parses as TOML, but no live Codex session has spawned one.
   Three things do not translate, and each is written into the TOML as a comment or a note instead
   of being dropped: the Claude `tools:` allowlist (Codex has no per-agent tool list — its sandbox
@@ -102,9 +101,8 @@ Limits of the Codex adapter today:
   Codex documentation; whether Codex accepts a hyphen is not verified.
 - `.agents/rules/` is a cckit location, not one Codex loads on its own. `AGENTS.md` lists each rule
   file so the agent reads the one that applies.
-- Shared rules still describe Claude-only mechanics in prose — `mempalace.md` names the hooks in
-  `.claude/settings.local.json`, `branch-naming.md` the SessionStart hygiene hook, `design-routing.md`
-  the Designer agent. Those passages describe things a Codex-only project does not have.
+- Shared rules still describe Claude-only mechanics in prose — `branch-naming.md` the SessionStart
+  hygiene hook, `design-routing.md` the Designer agent. Those passages describe things a Codex-only project does not have.
 - Whether a fresh Codex session discovers the installed skills is not verified here; that is the live
   run in [#261](https://github.com/jeiemgi/cckit/issues/261). `.agents/skills` is the directory name
   present in the `codex-cli 0.154.0` binary.

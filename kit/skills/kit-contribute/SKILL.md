@@ -47,12 +47,8 @@ Take a project agent `./.claude/agents/<name>/AGENT.md` and **invert kit-customi
 | ----------------------------------------- | ------------------- |
 | the project's name                        | `{{PROJECT_NAME}}`  |
 | the working language                      | `{{COMMS_LANG}}`    |
-| the project's MemPalace wing              | `{{WING}}`          |
 | the project's slug                        | `{{PROJECT_SLUG}}`  |
 
-- **Re-wrap the `## Memory (MemPalace)` section** in `<!-- IF:MEMORY -->…<!-- /IF:MEMORY -->`. If the
-  project had memory **off** (no Memory section), **add** the block with the standard MemPalace table
-  (wing=`agent-<name>` for diary, `{{WING}}` for shared rooms — match `kit/templates/agents/n8n.md`).
 - **Strip anything project-specific or secret** — concrete repo names, hostnames, IDs, tokens,
   credential names. Read `kit.config.json` to know exactly which literals to swap out.
 - Keep the frontmatter contract intact (`name` = file basename, `description`, `when_to_use`,

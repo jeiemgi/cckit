@@ -162,10 +162,8 @@ No profile installs the UX agent. The skill starts it from the role cckit ships.
 
 ## How it works
 
-The map comes from one of two places. If the project already has a graph built by graphify
-(`graphify-out/graph.json`), the skill uses it. If not, `lib/verbs/ux-graph-scan.sh` builds an
-approximate one by matching patterns in the source. The report says which was used. The skill
-never rebuilds a graphify graph unless you pass `--rebuild-graph`.
+The map comes from `lib/verbs/ux-graph-scan.sh`, which builds an approximate one by matching
+patterns in the source and writes it under `<target>/.ux-audit/`.
 
 The `consistency` and `a11y` lanes read lists produced by `lib/verbs/ux-ds-audit.sh` and
 `lib/verbs/ux-a11y-scan.sh`. Both find candidates and decide nothing.
@@ -178,7 +176,7 @@ it in the report. It needs the app running. Without the flag the audit is text o
 
 - **It reads structure, not pixels.** For a critique of how one screen looks, ask the designer
   agent, or [annotate the running interface](/design/annotate-the-ui/).
-- **The fallback map is approximate.** It is pattern matching over TypeScript, JSX and Vue files,
+- **The map is approximate.** It is pattern matching over TypeScript, JSX and Vue files,
   not a parser. Findings built on it lean on structure and say so in the report.
 - **The accessibility lane is a source check.** It does not replace an axe or Lighthouse run
   against the rendered app. [`cckit debug`](/development/browser-debug/) can run Lighthouse for an
@@ -190,10 +188,6 @@ it in the report. It needs the app running. Without the flag the audit is text o
 
 **"No component front-end found".** The skill found no package with `react`, `next` or `vue` and
 a `dev` script. Point it at the app with `--path <dir>`.
-
-**The report says "graph source: deterministic scan (approximate)".** No graphify graph exists,
-so the fallback ran. The findings stand. For a richer map, build a graphify graph of the app and
-run the audit again.
 
 **The consistency lane found little.** It read the default location for shared components,
 `packages/ui/src/index.ts`. Pass your own with `--primitives`, and the theme file with `--css`.

@@ -8,8 +8,8 @@
 # the real tools it needs, plus STUBS for everything that would reach the machine or the network
 # (uname, brew, node, pnpm, ssh, sysctl, and the package managers pipx / uv), and the forge shim
 # (lib/forge/test-forge-shim.sh) for GitHub: its `curl` answers the REST API from env knobs and
-# its `gh` fails on any subcommand but `gh auth token` (E537). The real descriptors
-# (integrations/mempalace.json, integrations/mlx-lm.json) are the ones under test, so no real pipx,
+# its `gh` fails on any subcommand but `gh auth token` (E537). The real descriptors plus one fixture
+# (fixturetool, pipx-first, switched on by memory.enabled) are the ones under test, so no real pipx,
 # uv or brew is ever run and nothing is installed.
 # Run:  bash lib/verbs/kit-doctor-test.sh
 # errors: strict — a test runner: rc 1 on any failed assertion
@@ -88,7 +88,7 @@ manager() {
 echo "$1 \$*" >> "$log"
 for last in "\$@"; do :; done
 case "\$last" in
-  mempalace) bin=mempalace ;;
+  fixturetool)  bin=fixturetool ;;
   mlx-lm)    bin=mlx_lm.server ;;
   *) exit 1 ;;
 esac
@@ -110,6 +110,30 @@ EOF
 manager pipx; manager uv
 cp "$stubs/pipx" "$tmp/manager-pipx"; cp "$stubs/uv" "$tmp/manager-uv"
 
+# The descriptors: the kit's own, plus a pipx-first fixture so both install orders stay covered.
+idir="$tmp/integrations"; mkdir -p "$idir"; cp "$ROOT"/kit/integrations/*.json "$idir/"
+cat > "$idir/fixturetool.json" <<'EOF'
+{
+  "id": "fixturetool",
+  "label": "fixture CLI",
+  "summary": "A test fixture: a pipx-first command-line tool.",
+  "why": "Covers the pipx-first install order and the brew bootstrap.",
+  "config": { "key": "memory.enabled" },
+  "detect": { "run": "fixturetool --version" },
+  "install": [
+    { "manager": "pipx", "run": "pipx install fixturetool", "bootstrap": { "manager": "brew", "run": "brew install pipx" } },
+    { "manager": "uv", "run": "uv tool install fixturetool" }
+  ],
+  "afterInstall": "run 'fixturetool init' to finish",
+  "verify": { "run": "fixturetool --version", "failsOn": "The CLI is missing." },
+  "uninstall": "pipx uninstall fixturetool",
+  "recheck": { "cadence": "monthly", "drifts": ["the --version flag"] },
+  "docs": "https://example.invalid/fixturetool",
+  "attribution": { "author": "Test", "homepage": "https://example.invalid/fixturetool", "affiliated": false, "notice": "A test fixture." }
+}
+EOF
+export KIT_INTEGRATIONS_DIR="$idir"
+
 calls() { grep -E '^(pipx|uv|brew install) ' "$log" | tr '\n' '|'; }
 
 # project <name> <config-json> -> a throwaway kit project; echoes its dir.
@@ -129,7 +153,7 @@ doctor() {
       bash "$DOCTOR" "$@" </dev/null 2> "$tmp/err" )
 }
 frow() { printf '%s\n' "$1" | grep -E "^ +(ok|FAIL|warn|-) +$2 " | sed -E 's/^ +//; s/ +/ /g'; }
-rows() { printf '%s\n' "$1" | grep -E '^ +(ok|FAIL|warn|-) +(mempalace CLI|mlx-lm) ' | sed -E 's/^ +//; s/ +/ /g'; }
+rows() { printf '%s\n' "$1" | grep -E '^ +(ok|FAIL|warn|-) +(fixture CLI|mlx-lm) ' | sed -E 's/^ +//; s/ +/ /g'; }
 
 # ── 0. the doctor holds no tool's recipe (the sub's acceptance, verbatim) ──────────────────────
 t "no installer recipe or per-tool finder is left in kit-doctor.sh" \
@@ -144,7 +168,6 @@ t "no keys -> exit 0 on a healthy machine" "$rc_bare" "0"
 t "both keys false -> the same exit code as with no keys" "$rc_off" "$rc_bare"
 t "both keys false -> no integration row" "$(rows "$out_off")" ""
 hasnt "both keys false -> no Integrations section" "$out_off" "Integrations"
-hasnt "both keys false -> no Memory section" "$out_off" "Memory (MemPalace)"
 hasnt "both keys false -> no Local section" "$out_off" "Local model layer"
 t "both keys false -> no manager was called" "$(calls)" ""
 
@@ -218,7 +241,7 @@ on="$(project on '{"memory":{"enabled":true},"local":{"enabled":true}}')"
 out="$(doctor "$tmp/h2" "$on" --dry-run)"; r=$?
 has "dry-run -> Integrations section" "$out" "Integrations (optional tools that are on in this project)"
 t "dry-run -> one row per descriptor, each naming its FIRST candidate" "$(rows "$out" | tr '\n' '|')" \
-  "FAIL mempalace CLI missing — pipx install mempalace|FAIL mlx-lm missing — uv tool install mlx-lm|"
+  "FAIL fixture CLI missing — pipx install fixturetool|FAIL mlx-lm missing — uv tool install mlx-lm|"
 has "dry-run -> action names the recipe" "$out" "Install mlx-lm: uv tool install mlx-lm"
 t "dry-run -> exit 1 (an enabled tool is missing)" "$r" "1"
 t "dry-run -> no manager was called" "$(calls)" ""
@@ -226,11 +249,11 @@ t "dry-run -> no binary" "$(ls "$tmp/h2/.local/bin" 2>/dev/null)" ""
 t "dry-run -> no consent recorded" "$(cat "$on/.cckit/consent" 2>/dev/null)" ""
 out="$(doctor "$tmp/h2" "$on" --no-install)"
 t "--no-install -> the same two rows, nothing installed" "$(rows "$out" | tr '\n' '|')|$(calls)" \
-  "FAIL mempalace CLI missing — pipx install mempalace|FAIL mlx-lm missing — uv tool install mlx-lm||"
+  "FAIL fixture CLI missing — pipx install fixturetool|FAIL mlx-lm missing — uv tool install mlx-lm||"
 
 # ── 3. nobody approved (no terminal, no --fix): nothing installs ───────────────────────────────
 out="$(doctor "$tmp/h2" "$on")"; r=$?
-has "unapproved run -> the row says why" "$(rows "$out")" "mempalace CLI missing — nothing installs without your yes: cckit doctor --fix"
+has "unapproved run -> the row says why" "$(rows "$out")" "fixture CLI missing — nothing installs without your yes: cckit doctor --fix"
 t "unapproved run -> no manager was called, no consent recorded" "$(calls)|$(cat "$on/.cckit/consent" 2>/dev/null)" "|"
 t "unapproved run -> exit 1" "$r" "1"
 has "unapproved run -> the runner said where consent lives" "$(cat "$tmp/err")" "$on/.cckit/consent"
@@ -239,34 +262,33 @@ has "unapproved run -> the runner said where consent lives" "$(cat "$tmp/err")" 
 printf '0\n' > "$tmp/curl-rc"   # the model server answers, so the doctor does not try to start one
 : > "$log"
 out="$(doctor "$tmp/h4" "$on" --yes)"; r=$?
-t "--yes -> each tool installed by its FIRST candidate" "$(calls)" "pipx install mempalace|uv tool install mlx-lm|"
+t "--yes -> each tool installed by its FIRST candidate" "$(calls)" "pipx install fixturetool|uv tool install mlx-lm|"
 t "--yes -> rows name the winning manager and the off-PATH binary" "$(rows "$out" | tr '\n' '|')" \
-  "ok mempalace CLI installed via pipx ($tmp/h4/.local/bin/mempalace)|ok mlx-lm installed via uv ($tmp/h4/.local/bin/mlx_lm.server)|"
-has "--yes -> the descriptor's afterInstall line is reported" "$out" "Installed mempalace CLI via pipx — run 'mempalace mcp' to wire the MCP server"
-t "--yes -> consent recorded, one line per integration" "$(sort "$on/.cckit/consent" | tr '\n' '|')" "install:mempalace|install:mlx-lm|"
+  "ok fixture CLI installed via pipx ($tmp/h4/.local/bin/fixturetool)|ok mlx-lm installed via uv ($tmp/h4/.local/bin/mlx_lm.server)|"
+has "--yes -> the descriptor's afterInstall line is reported" "$out" "Installed fixture CLI via pipx — run 'fixturetool init' to finish"
+t "--yes -> consent recorded, one line per integration" "$(sort "$on/.cckit/consent" | tr '\n' '|')" "install:fixturetool|install:mlx-lm|"
 t "--yes -> exit 0" "$r" "0"
-has "--yes -> the memory section's non-install checks still run" "$out" "identity header"
 has "--yes -> the local section still checks the server" "$out" "alive @ :8080"
 
 # a second run is a no-op
 : > "$log"
 out="$(doctor "$tmp/h4" "$on" --yes)"; r=$?
 t "second run -> present, no manager called, exit 0" "$(rows "$out" | tr '\n' '|')|$(calls)|$r" \
-  "ok mempalace CLI installed ($tmp/h4/.local/bin/mempalace)|ok mlx-lm installed ($tmp/h4/.local/bin/mlx_lm.server)|||0"
+  "ok fixture CLI installed ($tmp/h4/.local/bin/fixturetool)|ok mlx-lm installed ($tmp/h4/.local/bin/mlx_lm.server)|||0"
 
-# ── 5. the fallback candidate: no pipx on the machine -> mempalace installs with uv ────────────
+# ── 5. the fallback candidate: no pipx on the machine -> fixturetool installs with uv ────────────
 rm -f "$stubs/pipx"; : > "$log"; on5="$(project on5 '{"memory":{"enabled":true}}')"
 out="$(doctor "$tmp/h5" "$on5" --fix)"
 t "pipx absent -> uv, and no bootstrap (a manager was already there)" "$(calls)|$(rows "$out")" \
-  "uv tool install mempalace||ok mempalace CLI installed via uv ($tmp/h5/.local/bin/mempalace)"
+  "uv tool install fixturetool||ok fixture CLI installed via uv ($tmp/h5/.local/bin/fixturetool)"
 
 # ── 6. the bootstrap: neither pipx nor uv -> the first candidate's manager is installed first ──
 rm -f "$stubs/pipx" "$stubs/uv"; : > "$log"; on6="$(project on6 '{"memory":{"enabled":true},"local":{"enabled":true}}')"
 out="$(doctor "$tmp/h6" "$on6" --fix)"
-# mempalace is pipx-first, so brew brings pipx; by the time mlx-lm runs a manager exists, so uv is
+# fixturetool is pipx-first, so brew brings pipx; by the time mlx-lm runs a manager exists, so uv is
 # never bootstrapped and its pipx fallback is used.
 t "no manager -> bootstrap the first candidate's manager, once" "$(calls)" \
-  "brew install pipx|pipx install mempalace|pipx install mlx-lm|"
+  "brew install pipx|pipx install fixturetool|pipx install mlx-lm|"
 rm -f "$stubs/pipx" "$stubs/uv"; : > "$log"; on6b="$(project on6b '{"local":{"enabled":true}}')"
 out="$(doctor "$tmp/h6b" "$on6b" --fix)"
 t "mlx-lm alone, no manager -> brew install uv, then uv" "$(calls)|$(rows "$out")" \
@@ -279,20 +301,19 @@ t "no manager, dry-run -> brew is not run either" "$(calls)|$(rows "$out")" "|FA
 manager pipx; manager uv; : > "$log"; printf 'x86_64\n' > "$tmp/arch"
 out="$(doctor "$tmp/h7" "$on" --yes)"
 has "x86_64 -> mlx-lm row is a skip that names the requirement" "$(rows "$out")" "- mlx-lm needs a Darwin arm64 machine — skipping install"
-t "x86_64 -> only mempalace is installed" "$(calls)" "pipx install mempalace|"
-t "x86_64 -> no mlx binary" "$(ls "$tmp/h7/.local/bin")" "mempalace"
+t "x86_64 -> only fixturetool is installed" "$(calls)" "pipx install fixturetool|"
+t "x86_64 -> no mlx binary" "$(ls "$tmp/h7/.local/bin")" "fixturetool"
 printf 'arm64\n' > "$tmp/arch"
 
 # ── 8. no terminal and no --fix: report only — no `pnpm install`, no seeded file (#448) ────────
 # A trial run of the update path called `cckit doctor` with no flag and stdin not a terminal; it ran
-# `pnpm install` in the project and wrote a MemPalace header. Nobody had been asked.
+# `pnpm install` in the project and wrote a file into it. Nobody had been asked.
 pn="$(project pn '{"project":{"name":"x","slug":"pn"},"memory":{"enabled":true}}')"
 printf '{"name":"pn","dependencies":{"left-pad":"1.0.0"}}\n' > "$pn/package.json"
 : > "$log"
 out="$(doctor "$tmp/h8" "$pn")"
 t "no flag, no terminal -> pnpm install is not run" "$(grep -c '^pnpm install' "$log")" "0"
 has "no flag, no terminal -> node_modules is reported, with the command" "$out" "missing — run pnpm install"
-t "no flag, no terminal -> no identity header is written" "$(ls "$pn/.claude" | grep -c mempal-identity)" "0"
 has "no flag, no terminal -> the report says it is report-only and how to install" "$out" "report-only — no terminal and no --fix"
 has "no flag, no terminal -> names the flag" "$out" "cckit doctor --fix"
 t "no flag, no terminal -> no file is added to the project" "$(cd "$pn" && find . -type f | LC_ALL=C sort | tr '\n' ' ')" "./.claude/kit.config.json ./package.json "
@@ -301,7 +322,6 @@ hasnt "--dry-run -> not labelled report-only for want of a terminal" "$out" "no 
 : > "$log"
 out="$(doctor "$tmp/h8" "$pn" --fix)"
 t "--fix -> pnpm install runs" "$(grep -c '^pnpm install' "$log")" "1"
-t "--fix -> the identity header is seeded" "$(ls "$pn/.claude" | grep -c mempal-identity)" "1"
 hasnt "--fix -> not report-only" "$out" "report-only"
 
 # ── 9. page tasks (#504): tasks.design without the page-design skill is a failing row ──────────

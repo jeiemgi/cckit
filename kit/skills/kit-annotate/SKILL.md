@@ -86,8 +86,6 @@ The kit lives at `${CLAUDE_PLUGIN_ROOT}`; the setup engine is
    nearby text) → make the fix per project conventions → `agentation_resolve` with a one-line summary
    (or `agentation_dismiss` with a reason / `agentation_reply` to ask). In hands-free, loop on
    `agentation_watch_annotations` until the user stops.
-5. **On close.** If the project has memory enabled, write a short MemPalace summary to the project wing
-   (resolved annotations, files touched, deferred items) before the closing summary.
 
 ## 3. Status mode
 

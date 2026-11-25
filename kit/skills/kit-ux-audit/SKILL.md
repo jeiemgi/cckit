@@ -1,9 +1,9 @@
 ---
 name: kit-ux-audit
 terms: Check
-description: Expert UX/UI audit of a front-end app, driven by a component/screen graph instead of a screen-by-screen walkthrough. Three lanes over one graph and one report — flows (routes ↔ screens ↔ containers ↔ components ↔ data entities ↔ forms; a UX agent runs 12 heuristics to surface confusing or erratic flows: the same data editable from many screens, deep paths to frequent actions, orphan/dead-end screens, heavy forms, structurally inconsistent patterns, overloaded screens, unguarded deletes, nav-away data loss), consistency (deterministic design-system pass: hand-rolled UI, className overrides on shared primitives, sibling-screen layout drift, variants-in-disguise, dead CSS — the model only classifies), and a11y (semantic-HTML + accessibility: non-semantic interactive elements, missing text alternatives, unlabeled controls, heading/landmark gaps, focus and keyboard problems). Emits a self-contained, accessible HTML report. Use AUTOMATICALLY when the user asks for a UX audit / UX review, to analyze app flows or navigation, to find where a piece of data can be edited, to check form usability, to review information architecture, to find confusing / hard-to-fill screens, for a design-system consistency pass / DS audit / "is this page consistent" / "what should be a variant" / "find hand-rolled solutions", OR for an accessibility / semantic-HTML review / "is this markup accessible" / "find non-semantic divs". Optional graphify integration; falls back to a dependency-free deterministic scan. Visual verification (Playwright / Chrome screenshots) is opt-in via --visual.
+description: Expert UX/UI audit of a front-end app, driven by a component/screen graph instead of a screen-by-screen walkthrough. Three lanes over one graph and one report — flows (routes ↔ screens ↔ containers ↔ components ↔ data entities ↔ forms; a UX agent runs 12 heuristics to surface confusing or erratic flows: the same data editable from many screens, deep paths to frequent actions, orphan/dead-end screens, heavy forms, structurally inconsistent patterns, overloaded screens, unguarded deletes, nav-away data loss), consistency (deterministic design-system pass: hand-rolled UI, className overrides on shared primitives, sibling-screen layout drift, variants-in-disguise, dead CSS — the model only classifies), and a11y (semantic-HTML + accessibility: non-semantic interactive elements, missing text alternatives, unlabeled controls, heading/landmark gaps, focus and keyboard problems). Emits a self-contained, accessible HTML report. Use AUTOMATICALLY when the user asks for a UX audit / UX review, to analyze app flows or navigation, to find where a piece of data can be edited, to check form usability, to review information architecture, to find confusing / hard-to-fill screens, for a design-system consistency pass / DS audit / "is this page consistent" / "what should be a variant" / "find hand-rolled solutions", OR for an accessibility / semantic-HTML review / "is this markup accessible" / "find non-semantic divs". The flows graph comes from a dependency-free deterministic scan. Visual verification (Playwright / Chrome screenshots) is opt-in via --visual.
 when_to_use: Before a redesign, after a feature that added screens or forms, when users report "I can't find where to change X" or "there are too many places to edit this", before scoping a UI refactor effort, or on demand for an IA / flow / consistency / accessibility health check. Targets component front-ends (Next.js, React Router v7, Vite React, Vue). For a purely visual per-screen critique of a running app, use a visual design-critique skill instead — this one reasons over structure. The a11y lane is a source-level check, not a substitute for axe / Lighthouse against the running app.
-argument-hint: "[--lane flows|consistency|a11y|all] [--path <dir>] [--app <name>] [--visual] [--rebuild-graph] [--primitives <index.ts>] [--css <theme.css>] [--css-prefix <p>] [--dry-run]"
+argument-hint: "[--lane flows|consistency|a11y|all] [--path <dir>] [--app <name>] [--visual] [--primitives <index.ts>] [--css <theme.css>] [--css-prefix <p>] [--dry-run]"
 allowed-tools: Bash, Read, Write, Glob, Grep, AskUserQuestion, Task, Skill
 ---
 
@@ -16,7 +16,7 @@ model. Never eyeball a codebase for something a script already finds — run it,
 
 | Lane | What it does | Detector | Judge | Heuristics |
 | --- | --- | --- | --- | --- |
-| `flows` (default) | Confusing / erratic flows, IA, edit surfaces, forms | graph (graphify or fallback scan) | **ux** agent | `references/heuristics.md` (H1–H12) |
+| `flows` (default) | Confusing / erratic flows, IA, edit surfaces, forms | graph (deterministic scan) | **ux** agent | `references/heuristics.md` (H1–H12) |
 | `consistency` | Design-system consistency: hand-rolled UI, primitive className drift, sibling-screen drift, variants-in-disguise, dead CSS | `scripts/ux-ds-audit.sh` | **ux** agent → routes decisions to designer/frontend | `references/consistency.md` (C1–C6) |
 | `a11y` | Semantic HTML + accessibility: non-semantic interactives, missing text alternatives, unlabeled controls, heading/landmark gaps, focus/keyboard | `scripts/ux-a11y-scan.sh` | **ux** agent | `references/a11y.md` (A1–A5) |
 | `all` | All three lanes, merged into one report | all | | all |
@@ -35,8 +35,7 @@ There is **no report renderer**. The report is written by hand from `findings.js
 `kit-docs-writer` skill — see `references/report.md`.
 
 References — load only when you reach the step that needs one:
-- `references/graph-model.md` — normalized node/edge model; how graphify `graph.json` and the
-  fallback scan both map onto it; how to derive click-depth / god-nodes / community bridges /
+- `references/graph-model.md` — normalized node/edge model; how the scan maps onto it; how to derive click-depth / god-nodes / community bridges /
   edit-surface map.
 - `references/heuristics.md` — the 12 `flows` heuristics: graph signal, default severity, whether
   the finding needs visual confirmation. **This is the flows audit.**
@@ -71,19 +70,11 @@ References — load only when you reach the step that needs one:
 
 ## 1. Get the graph  (`flows` / `all`)
 
-Target dir = `$T`. Prefer an existing rich graph; never rebuild silently.
+Target dir = `$T`. Run `bash "${CLAUDE_PLUGIN_ROOT}/lib/verbs/ux-graph-scan.sh" --scan "$T"` →
+writes `$T/.ux-audit/.ux_graph.json` (normalized model). Report "graph source: deterministic scan
+(approximate)". Never prompt for an API key.
 
-1. `$T/graphify-out/graph.json` **or** `./graphify-out/graph.json` exists and **no**
-   `--rebuild-graph` → use it. Report "graph source: graphify".
-2. Else `bash "${CLAUDE_PLUGIN_ROOT}/lib/verbs/ux-graph-scan.sh" --scan "$T"` → writes
-   `$T/graphify-out/.ux_graph.json` (normalized model). Report "graph source: deterministic scan
-   (approximate)".
-3. Say **once**, without blocking: "For a richer semantic graph, run `/graphify $T` first, then
-   re-run." Never wait, never prompt for an API key — the fallback is enough.
-4. `--rebuild-graph` + graphify installed → you MAY run `/graphify "$T" --directed` first (best
-   graph for this skill). Only on the explicit flag.
-
-Normalize to `references/graph-model.md`, persist to `$T/graphify-out/.ux_model.json`, and derive:
+Normalize to `references/graph-model.md`, persist to `$T/.ux-audit/.ux_model.json`, and derive:
 click-depth per screen from each entry route, god-nodes, community bridges, the edit-surface map.
 Keep it compact — you hand slices to the agent, not the whole graph.
 
@@ -109,7 +100,7 @@ group), each briefed with `references/heuristics.md`.
 ```bash
 bash "${CLAUDE_PLUGIN_ROOT}/lib/verbs/ux-ds-audit.sh" "$T/src" \
   [--exclude <re>] --primitives "<ui-barrel>" --css "<theme.css>" [--css-prefix <p>] \
-  > "$T/graphify-out/.ux_ds_audit.txt"
+  > "$T/.ux-audit/.ux_ds_audit.txt"
 ```
 
 Then follow `references/consistency.md`: classify every primitive-with-className row into
@@ -122,7 +113,7 @@ sub-agents by section group for a large scope.
 
 ```bash
 bash "${CLAUDE_PLUGIN_ROOT}/lib/verbs/ux-a11y-scan.sh" "$T/src" [--exclude <re>] \
-  > "$T/graphify-out/.ux_a11y_scan.txt"
+  > "$T/.ux-audit/.ux_a11y_scan.txt"
 ```
 
 Then follow `references/a11y.md`: triage every row DEFECT / OK / NEEDS_VISUAL, map each DEFECT to
@@ -142,7 +133,7 @@ With `--visual`:
    captures, keep the candidate list, say so in the report.
 2. For each `needs_visual` finding of severity `crit`/`p1`, up to a cap (default 8): navigate with
    Playwright or the Chrome MCP, screenshot the screen, save under
-   `$T/graphify-out/ux-audit/shots/`. **Never trigger a native browser dialog.**
+   `$T/.ux-audit/ux-audit/shots/`. **Never trigger a native browser dialog.**
 3. Record each shot's filename on its finding (`"shot": "<id>.png"`) so it renders inline.
 
 ## 4. Write the report
@@ -190,7 +181,7 @@ severity). Then offer one trace:
 > "The most tangled flow this graph shows: **<entity>** is edited from <n> screens (<list>). Want me
 > to trace how they diverge?"
 
-Yes + graphify source → `/graphify path "<screenA>" "<entity>"`. Otherwise walk the `writes`/
+Yes → walk the `writes`/
 `mutates` edges for that entity from the graph JSON and show where the forms differ.
 
 Then `AskUserQuestion` for every open call (effort split, which of two competing treatments wins,
@@ -213,7 +204,6 @@ widths/paddings, anything with a visual value). Label assumed vs decided.
 
 - **Graph / script first, files last.** Never read component source screen-by-screen. Open a file
   only to confirm a specific flagged finding, capped at 12 files, and report the count.
-- **Never rebuild graphify implicitly.** `--rebuild-graph` is the only regenerating path.
 - **No API key, ever.** The fallback scan is deterministic.
 - **`--visual` is the only image-token cost and it is opt-in.** Default runs are text-only.
 - **The agent never invents an edge.** Ambiguous → `needs_visual: true`, not an assertion.
@@ -232,12 +222,3 @@ widths/paddings, anything with a visual value). Label assumed vs decided.
   path conventions beyond the common ones it probes for. Everything project-specific arrives as a
   flag or is read from the project's own `.claude/` rules at run time.
 
-## Optional: seed a graphify graph at install time
-
-A seeded graphify graph is what step 1 uses on every later run, in place of the fallback scan.
-Opt-in, outside the default flow:
-1. `graphify detect` on the app → report corpus size + a token estimate.
-2. Recommend by cost: `--directed` always (this skill wants edge direction); `--mode deep` only if
-   the app carries many docs/specs; `--no-viz` if > 5000 nodes; `--neo4j-push` only if the project
-   already runs Neo4j. Default otherwise.
-3. Build only on explicit confirmation. Never as a side effect of onboarding.

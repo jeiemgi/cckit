@@ -49,18 +49,6 @@
         { "label": "Markdown", "value": "markdown", "recommended": true, "description": "Plain markdown in plans/ — portable, zero build.", "set": [{ "path": "defaults.plans_format", "value": "markdown", "valtype": "string" }] },
         { "label": "None", "value": "none", "description": "No plan files.", "set": [{ "path": "defaults.plans_format", "value": "none", "valtype": "string" }] }
       ]
-    },
-    {
-      "key": "memory",
-      "header": "Memory",
-      "question": "Enable persistent memory (MemPalace) by default on new projects?",
-      "type": "select",
-      "default": "off",
-      "prefillFrom": "profile.defaults.memory",
-      "options": [
-        { "label": "Off", "value": "off", "recommended": true, "description": "No memory layer unless you turn it on per project.", "set": [{ "path": "defaults.memory", "value": "off", "valtype": "string" }] },
-        { "label": "On", "value": "on", "description": "Wire MemPalace + hooks on new projects.", "set": [{ "path": "defaults.memory", "value": "on", "valtype": "string" }] }
-      ]
     }
   ]
 }

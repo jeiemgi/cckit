@@ -3,10 +3,10 @@
 #
 # Two modes, no model call, no API key:
 #   --apps <root>   enumerate app-like packages (react/next/vue + a dev script)  -> JSON array
-#   --scan <dir>    build an APPROXIMATE flows graph of one app                   -> graphify-out/.ux_graph.json
+#   --scan <dir>    build an APPROXIMATE flows graph of one app                   -> .ux-audit/.ux_graph.json
 #
-# The scan is regex over TS/TSX/JSX/Vue, not an AST. It is the fallback for when no
-# graphify-out/graph.json exists; the skill marks the report "graph source: deterministic scan".
+# The scan is regex over TS/TSX/JSX/Vue, not an AST; the skill marks the report
+# "graph source: deterministic scan".
 # macOS-safe (no grep -P). Requires: jq, perl. Sources lib/core/react-detect.sh for --apps.
 set -eu   # no pipefail: many probes end in a grep that legitimately finds nothing
 
@@ -71,7 +71,7 @@ fi
 # ----------------------------------------------------------------------------- scan
 [[ -d "$ARG" ]] || { echo "ux-graph-scan: no such dir: $ARG" >&2; exit 2; }
 TARGET="$ARG"
-OUTDIR="$TARGET/graphify-out"
+OUTDIR="$TARGET/.ux-audit"
 mkdir -p "$OUTDIR"
 OUT="$OUTDIR/.ux_graph.json"
 

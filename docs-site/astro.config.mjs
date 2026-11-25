@@ -92,7 +92,6 @@ export default defineConfig({
     '/tutorials/drive-claude-code-headless-in-ci': '/development/headless-in-ci/',
     '/tutorials/extend-claude-code-with-skills': '/development/extend-with-skills/',
     '/tutorials/find-code-with-a-code-graph': '/development/code-graph/',
-    '/tutorials/give-claude-code-persistent-memory': '/memory/install-mempalace/',
     '/tutorials/have-an-agent-review-before-a-merge': '/review/agent-review/',
     '/tutorials/keep-private-data-out-of-ai-commits': '/review/keep-private-data-out/',
     '/tutorials/run-checks-with-cckit-hooks': '/development/checks-with-hooks/',
@@ -214,7 +213,7 @@ export default defineConfig({
       // middleware keeps only the entries of the track a page belongs to (src/routeData.ts).
       routeMiddleware: './src/routeData.ts',
       // Software: 43 entries. One link to the track's entry page, then the six areas in the order a
-      // team works in, the optional Memory area, then Reference. Every group is collapsed; Starlight opens the group that holds the
+      // team works in, then Reference. Every group is collapsed; Starlight opens the group that holds the
       // current page. A Software page that is not listed here is linked from its area's "More
       // guides" page or from /reference/, and search covers all of them.
       sidebar: [
@@ -265,11 +264,6 @@ export default defineConfig({
           { label: 'Why merging is a decision', slug: 'ship' },
           { label: 'Merge, close and clean up', slug: 'ship/merge-and-close' },
           { label: 'Cut a release', slug: 'ship/releasing' },
-        ]},
-        { label: 'Memory (optional)', collapsed: true, items: [
-          { label: 'Why an agent team needs memory', slug: 'memory' },
-          { label: 'Install MemPalace', slug: 'memory/install-mempalace' },
-          { label: 'How cckit uses memory', slug: 'memory/how-cckit-uses-it' },
         ]},
         { label: 'Reference', collapsed: true, items: [
           { label: 'CLI reference', slug: 'cli-reference' },

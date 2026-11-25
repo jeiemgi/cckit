@@ -79,16 +79,3 @@ should weigh in. Then exit cleanly. Do not open a half-baked PR.
 
 - Terse, factual issue comments — progress or a clear bail notice, nothing else.
 - Language: {{COMMS_LANG}}
-
-<!-- IF:MEMORY -->
-
-## Memory (MemPalace)
-
-| Action         | Tool                    | Params                           |
-| -------------- | ----------------------- | -------------------------------- |
-| Wake-up recall | `mempalace_diary_read`  | wing=`agent-auto-dev`            |
-| Search history | `mempalace_search`      | wing=`{{WING}}` room=`technical` |
-| Save run notes | `mempalace_add_drawer`  | wing=`{{WING}}` room=`technical` |
-| Save diary     | `mempalace_diary_write` | wing=`agent-auto-dev`            |
-
-<!-- /IF:MEMORY -->
