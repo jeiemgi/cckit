@@ -5,6 +5,19 @@ All notable changes to cckit are documented here. New entries below are generate
 [Conventional Commits](https://www.conventionalcommits.org/) and land when the Release PR is
 merged to `main`. Earlier entries follow [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.13.0](https://github.com/jeiemgi/cckit/compare/v0.12.0...v0.13.0) (2026-11-25)
+
+
+### Bug Fixes
+
+* **core:** Release-As footer sets the next version ([#626](https://github.com/jeiemgi/cckit/issues/626)) ([74986a5](https://github.com/jeiemgi/cckit/commit/74986a5be001668626b7015230a1b5ae758be2ca))
+* Fix four small kit defects [[#607](https://github.com/jeiemgi/cckit/issues/607)] ([#608](https://github.com/jeiemgi/cckit/issues/608)) ([f5c003c](https://github.com/jeiemgi/cckit/commit/f5c003c7d74edc348f6761ac9d9a3d35c2cc2fca))
+
+
+### Miscellaneous Chores
+
+* release 0.13.0 ([#628](https://github.com/jeiemgi/cckit/issues/628)) ([3af48e9](https://github.com/jeiemgi/cckit/commit/3af48e9678fec00dd7458a7087a6f35b75f65fc7))
+
 ## [0.12.0](https://github.com/jeiemgi/cckit/compare/v0.11.0...v0.12.0) (2026-11-24)
 
 
