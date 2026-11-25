@@ -13,7 +13,7 @@ to your project. To release your own project, read [Cut a release](/ship/releasi
 cckit follows [Semantic Versioning](https://semver.org/) driven by
 [Conventional Commits](https://www.conventionalcommits.org/). The version number is picked from the
 commit messages since the last tag ([How the version is decided](/ship/releasing/#how-the-version-is-decided));
-the local `cckit release` fallback applies the same rules via `scripts/lib/version-bump.sh`.
+the local `cckit release` fallback applies the same rules via `lib/core/version-bump.sh`.
 
 cckit stays below 1.0: while the major is 0, a breaking change bumps the minor (`bump-minor-pre-major`
 in `release-please-config.json`, and the same rule in `version-bump.sh`), so versions go 0.11, 0.12, …
@@ -22,7 +22,7 @@ Releasing 1.0 is a maintainer's decision, not a commit's.
 Check what the next version would be at any time:
 
 ```bash
-cckit release --next        # or: scripts/lib/version-bump.sh --next
+cckit release --next        # or: lib/core/version-bump.sh --next
 ```
 
 ## Cutting a release (merge the Release PR)
@@ -118,7 +118,7 @@ does not move the release check. `KIT_RELEASE_BENCH_DIR=<dir>` does, and the rel
 
 <Aside type="caution" title="Where the refusal applies">
 The refusal is in `cckit release`, the local path. Merging the Release PR does not run it: the
-release-please workflow has no benchmark step. `bash scripts/check.sh` fails when the results page
+release-please workflow has no benchmark step. `bash lib/core/check.sh` fails when the results page
 differs from the run files, so a recorded checkpoint is always the published one.
 </Aside>
 
@@ -158,7 +158,7 @@ The **Homebrew** channel is still gated on a repo secret and skipped if it's abs
 
 ### Local fallback
 
-`scripts/publish.sh` (aliased as `cckit release`) still cuts a release from your machine if you ever need to bypass CI. It is dry-run by default — nothing changes until you add `--publish`.
+`lib/verbs/publish.sh` (aliased as `cckit release`) still cuts a release from your machine if you ever need to bypass CI. It is dry-run by default — nothing changes until you add `--publish`.
 
 ```bash
 cckit release X.Y.Z              # DRY RUN — prints the full plan, changes nothing
@@ -181,10 +181,10 @@ hand from the repo root: `vercel --prod --archive=tgz`.
 
 ## The title check in CI
 
-`.github/workflows/commitlint.yml` runs on every pull request and **fails the check until the PR title is a Conventional Commit subject** — so a non-conventional title can never merge and under-bump the release. The rule lives in `scripts/lib/commitlint.sh` (the single source of truth), which also runs locally through `scripts/check.sh`, so you can validate a subject before you open the PR:
+`.github/workflows/commitlint.yml` runs on every pull request and **fails the check until the PR title is a Conventional Commit subject** — so a non-conventional title can never merge and under-bump the release. The rule lives in `lib/core/commitlint.sh` (the single source of truth), which also runs locally through `lib/core/check.sh`, so you can validate a subject before you open the PR:
 
 ```bash
-scripts/lib/commitlint.sh "feat(orchestrate): headless launch"   # exit 0 = valid
+lib/core/commitlint.sh "feat(orchestrate): headless launch"   # exit 0 = valid
 ```
 
 Accepted types are the [config-conventional](https://www.conventionalcommits.org/) set — `feat`, `fix`, `perf`, `refactor`, `revert`, `docs`, `chore`, `style`, `test`, `ci`, `build` — a superset of the types that trigger a version bump (see the table above); the rest are valid but release-neutral. Re-titling a PR re-runs the check automatically (the workflow listens for `edited`).

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/jeiemgi/cckit/kit.config.schema.json",
   "title": "claude-kit project config (v2)",
-  "description": "Identity layer of a kit project. Resolved in cascade workspace -> project -> island by scripts/lib/kit-config-resolve.sh; the nearest layer wins. The $schema reference in kit.config.json points here so editors validate + autocomplete.",
+  "description": "Identity layer of a kit project. Resolved in cascade workspace -> project -> island by lib/core/kit-config-resolve.sh; the nearest layer wins. The $schema reference in kit.config.json points here so editors validate + autocomplete.",
   "type": "object",
   "additionalProperties": true,
   "properties": {
@@ -154,7 +154,7 @@
       "type": "object",
       "additionalProperties": true,
       "properties": {
-        "content": { "type": "boolean", "default": false, "description": "When true, `scripts/setup-labels.sh` (and the label step of `cckit init`) provisions the content kind labels `kind:post`, `kind:campaign`, `kind:brand` and `kind:research`. The content and marketing profiles set it. The kinds are accepted by `--kind` with or without this key: a content kind starts on a branch prefix from the closed set (post and brand: `task/`, campaign: `plan/`, research: `spike/`) and titles its PR `docs:`." }
+        "content": { "type": "boolean", "default": false, "description": "When true, `lib/verbs/setup-labels.sh` (and the label step of `cckit init`) provisions the content kind labels `kind:post`, `kind:campaign`, `kind:brand` and `kind:research`. The content and marketing profiles set it. The kinds are accepted by `--kind` with or without this key: a content kind starts on a branch prefix from the closed set (post and brand: `task/`, campaign: `plan/`, research: `spike/`) and titles its PR `docs:`." }
       }
     },
     "pr": {
@@ -190,7 +190,7 @@
     "night": {
       "type": "object",
       "additionalProperties": true,
-      "description": "Night mode (`kit-autopilot` § Mode: night): what `scripts/night-grant.sh` adds to the owner's night grant before it launches `scripts/night-run.mjs`. Every key is optional; without the object a night run uses the base floors, the delegation brief's gate, and accepts a grant only from `github.owner` or a commenter GitHub reports as OWNER.",
+      "description": "Night mode (`kit-autopilot` § Mode: night): what `lib/verbs/night-grant.sh` adds to the owner's night grant before it launches `lib/verbs/night-run.mjs`. Every key is optional; without the object a night run uses the base floors, the delegation brief's gate, and accepts a grant only from `github.owner` or a commenter GitHub reports as OWNER.",
       "properties": {
         "floors": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Extra always-human floors, name -> what a diff must touch to trip it. Added to the base floors (lockfile, auth, security-code, security-prose, workflows, cost, secret). A tripped floor parks the effort unless that night's grant waives it by its exact name." },
         "neverWaivable": { "type": "array", "items": { "type": "string" }, "description": "Floor names no grant may waive, added to the base list (workflows, cost, secret). A grant that waives one is refused when it is read; the engine refuses it again at merge time." },

@@ -8,7 +8,7 @@ when_to_use: When the owner or a sub-agent identifies a new piece of work to tra
 # kit-task-new
 
 Plugin-direct skill — thin caller over the ONE canonical home
-`${CLAUDE_PLUGIN_ROOT}/scripts/lib/kit-task-ops.sh` (`kto_task_new`). The verb logic lives there,
+`${CLAUDE_PLUGIN_ROOT}/lib/verbs/kit-task-ops.sh` (`kto_task_new`). The verb logic lives there,
 never inline here (kit-engine-boundary #1/#2). The op respects `KIT_BASE_BRANCH` (for the Plan blob
 link) and the `KIT_PROJECTS_V2` board toggle.
 
@@ -34,10 +34,10 @@ Validate Kind/Priority/Role against the project's closed sets before dispatching
 ## Execution
 
 ```bash
-source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/kit-config.sh" && load_kit_config
-source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/role-identity.sh"
-source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/gh-project.sh"
-source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/kit-task-ops.sh"
+source "${CLAUDE_PLUGIN_ROOT}/lib/core/kit-config.sh" && load_kit_config
+source "${CLAUDE_PLUGIN_ROOT}/lib/core/role-identity.sh"
+source "${CLAUDE_PLUGIN_ROOT}/lib/forge/gh-project.sh"
+source "${CLAUDE_PLUGIN_ROOT}/lib/verbs/kit-task-ops.sh"
 
 kto_task_new "$TITLE" "$ROLE" "$KIND" "$PRIORITY" "$MILESTONE" "$PLAN_LINK" "$BLOCKED_BY" "$USER_BODY"
 ```

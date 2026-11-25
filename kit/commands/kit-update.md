@@ -89,7 +89,7 @@ _plug="$(jq -r '.version // "0.0.0"' "${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugi
 
 1. **Check versions.** Run:
    ```bash
-   "${CLAUDE_PLUGIN_ROOT}/scripts/kit-version-check.sh" --target "$PWD" --plugin-root "${CLAUDE_PLUGIN_ROOT}"
+   "${CLAUDE_PLUGIN_ROOT}/lib/verbs/kit-version-check.sh" --target "$PWD" --plugin-root "${CLAUDE_PLUGIN_ROOT}"
    ```
    Compare the project's `.claude/kit.config.json` `.kitVersion` with the installed
    `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json` `.version`. If equal, say "you're up to date" and
@@ -102,7 +102,7 @@ _plug="$(jq -r '.version // "0.0.0"' "${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugi
 
 3. **Preview the upgrade (always).** Run:
    ```bash
-   "${CLAUDE_PLUGIN_ROOT}/scripts/init.sh" --upgrade --target "$PWD" --dry-run
+   "${CLAUDE_PLUGIN_ROOT}/lib/verbs/init.sh" --upgrade --target "$PWD" --dry-run
    ```
    It runs the upgrade on a temporary copy and prints `Would change (N added, M modified)` with one
    `A`/`M` row per file — the same rows the real run prints as `Changed on disk` (step 4). Show the
@@ -118,7 +118,7 @@ _plug="$(jq -r '.version // "0.0.0"' "${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugi
    Per the CLI-style preference, when the delta is purely additive (only new files, nothing preserved
    would conflict) you may offer to **apply automatically**. On apply:
    ```bash
-   "${CLAUDE_PLUGIN_ROOT}/scripts/init.sh" --upgrade --target "$PWD"
+   "${CLAUDE_PLUGIN_ROOT}/lib/verbs/init.sh" --upgrade --target "$PWD"
    ```
 
 5. **Report + onboard.** Echo the `Changed on disk` list (added and modified files), what was

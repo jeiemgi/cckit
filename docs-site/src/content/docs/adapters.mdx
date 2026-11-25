@@ -74,15 +74,15 @@ install writes — is in the
 - **One role source.** A specialist is written once, in `templates/agents/<role>.md`. Claude Code
   gets that file as `AGENT.md`. Codex gets the same rendered role translated to a custom-agent
   TOML file with `name`, `description` (the role's `description` plus `when_to_use`) and
-  `developer_instructions` (the role body). `scripts/lib/agent-def.sh` is the one translation, and
-  `scripts/init-upgrade-test.sh` asserts the two definitions carry the same description and body.
+  `developer_instructions` (the role body). `lib/core/agent-def.sh` is the one translation, and
+  `lib/verbs/init-upgrade-test.sh` asserts the two definitions carry the same description and body.
 - **Stored selection.** The config's `adapters` array records the choice. `cckit init --upgrade`
   reads it and never drops an adapter; `--upgrade --adapter codex` adds one, and the adapter already
   installed keeps its files byte for byte. Config and manifest stay where the first install put them.
 - **Ownership.** Every adapter file init writes is recorded in the manifest with its hash. An edited
-  file reads as modified and is preserved by an upgrade and kept by the uninstall script, `scripts/kit-remove.sh`.
+  file reads as modified and is preserved by an upgrade and kept by the uninstall script, `lib/verbs/kit-remove.sh`.
 - **Portable Codex output.** A Codex-only config carries no absolute path, and no generated file
-  under `.agents/` or `AGENTS.md` references `CLAUDE_PLUGIN_ROOT`. `scripts/init-upgrade-test.sh`
+  under `.agents/` or `AGENTS.md` references `CLAUDE_PLUGIN_ROOT`. `lib/verbs/init-upgrade-test.sh`
   asserts both on the `minimal` profile.
 - **Doctor.** `cckit doctor` reports the CLI of each selected adapter present or absent;
   `cckit doctor --agents` prints only that, offline, and exits 1 when one is absent.

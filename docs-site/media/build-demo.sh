@@ -46,18 +46,18 @@ echo "→ Building demos into $MEDIA"
 # 1. Preview a scaffold without writing anything.
 make_gif "kit-dry-run" \
   'init.sh --profile automation --name "Acme Bot" --memory on --dry-run' \
-  "$(bash "$ROOT/scripts/init.sh" --profile automation --target "$(mktemp -d)/acme-bot" \
+  "$(bash "$ROOT/lib/verbs/init.sh" --profile automation --target "$(mktemp -d)/acme-bot" \
        --name "Acme Bot" --repo acme/bot --owner-login acme --memory on --dry-run 2>&1)"
 
 # 2. Scaffold a real project from the `software` profile.
 make_gif "kit-init" \
   'init.sh --profile software --name "Acme" --repo acme/acme' \
-  "$(bash "$ROOT/scripts/init.sh" --profile software --target "$(mktemp -d)/acme" \
+  "$(bash "$ROOT/lib/verbs/init.sh" --profile software --target "$(mktemp -d)/acme" \
        --name "Acme" --repo acme/acme --owner-login acme 2>&1)"
 
 # 3. Show every flag.
 make_gif "kit-help" \
   'init.sh --help' \
-  "$(bash "$ROOT/scripts/init.sh" --help 2>&1)"
+  "$(bash "$ROOT/lib/verbs/init.sh" --help 2>&1)"
 
 echo "✓ done"

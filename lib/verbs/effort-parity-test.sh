@@ -1,0 +1,162 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+# effort-parity-test.sh — effort #98: the verb (`cckit effort new`) and the skill (/kit-effort-new)
+# create structurally IDENTICAL efforts because both call the one shared core `effort_new`. This test
+# drives that core with the full skill-shaped inputs and asserts the parity contract:
+#   - the five body sections are FILLED (no `<!--` template placeholder left)
+#   - the ctx/kind/priority/role/flow label set is applied to the parent
+#   - sub-issues carry kind/priority/role labels and are native-linked
+#   - every sub title is linted UP FRONT (a bad sub name aborts before anything is created)
+# Hermetic: the forge shim answers over a curl stand-in. Run:  bash lib/verbs/effort-parity-test.sh
+# errors: strict — a test runner: rc 1 on any failed assertion
+set -u
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+LIB="$ROOT/lib"
+fail=0
+t()  { if [ "$2" = "$3" ]; then echo "ok: $1"; else echo "FAIL: $1 -> got '[$2]' want '[$3]'"; fail=1; fi; }
+tc() { if grep -qE "$2" "$1"; then echo "ok: $3"; else echo "FAIL: $3 (no /$2/ in gh log)"; fail=1; fi; }
+tn() { if grep -qE "$2" "$1"; then echo "FAIL: $3 (unexpected /$2/ in gh log)"; fail=1; else echo "ok: $3"; fi; }
+command -v jq  >/dev/null 2>&1 || { echo "effort-parity-test: jq required"  >&2; exit 1; }
+
+tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
+export GH_LOG="$tmp/gh.log"; export GH_N="$tmp/n"; : > "$GH_LOG"
+
+# The forge shim (test-forge-shim.sh): a `curl` that answers like the REST API and logs ONE line
+# per request — `METHOD path {compact-json}` — so a single-line grep sees the title, the body and
+# the labels of one POST together; plus a `gh` that fails on any subcommand.
+stub="$tmp/bin"
+# shellcheck source=/dev/null
+. "$LIB/forge/test-forge-shim.sh"; forge_shim_install "$stub"
+export PATH="$stub:$PATH" GH_TOKEN=test-token CCKIT_FORGE=github
+printf '0' > "$GH_N"   # the first created issue is #1
+CREATE_RE='^POST repos/o/r/issues '
+export KIT_REPO="o/r" EFFORT_REPO="o/r" KIT_BASE_BRANCH="main" KIT_PROJECTS_V2="false"
+# shellcheck source=/dev/null
+source "$LIB/core/effort.sh" 2>/dev/null
+# shellcheck source=/dev/null
+source "$LIB/core/effort-metrics.sh" 2>/dev/null   # effort_ctx_bucket — so ctx is sized, not the fallback
+# shellcheck source=/dev/null
+source "$LIB/verbs/effort-ops.sh"
+
+# ── Full skill-shaped inputs through the shared core ─────────────────────────────────────────────
+: > "$GH_LOG"
+parent="$(effort_new \
+  --flow Core --role tech-lead --priority p2 \
+  --goal "Close the parity gap between the verb and the skill." \
+  --scope "1. share core | 2. verb fills body | 3. skill delegates" \
+  --for-agents "lib/verbs/effort-ops.sh and skills/kit-effort-new/SKILL.md" \
+  --verification "the verb and skill produce identical issues" \
+  --spec "the verb and the skill file the same body" \
+  "demo parity effort" "share core :: factor the logic" "fill the body :: verb wiring")"
+
+t  "core returns the parent number"               "$parent" "1"
+t  "core creates parent + 2 subs (3 issues)"      "$(grep -cE "$CREATE_RE" "$GH_LOG")" "3"
+t  "core links 2 native sub-issues"               "$(grep -c '^POST repos/o/r/issues/1/sub_issues ' "$GH_LOG")" "2"
+t  "core ran no gh subcommand"                    "$(grep -c '^GH-SUBCOMMAND' "$GH_LOG")" "0"
+
+# Body is FILLED — every section heading present AND the placeholder comments are gone.
+tc "$GH_LOG" 'Close the parity gap between the verb' "body fills ## Goal"
+tc "$GH_LOG" '1\. share core \| 2\. verb fills body' "body fills ## Scope"
+tc "$GH_LOG" 'lib/verbs/effort-ops\.sh and skills' "body fills ## For agents"
+tc "$GH_LOG" 'the verb and skill produce identical'  "body fills ## Verification"
+tc "$GH_LOG" '## Spec\\n- the verb and the skill file' "body fills ## Spec, a plain line made a bullet"
+tn "$GH_LOG" '<!--'                                  "no template placeholder left in a filled body"
+
+# Label set on the parent: effort + ctx + kind + priority + role + flow (flow lowercased).
+# `effort` leads: it is the one `effort_plan` queries, and it was read by that verb while nothing
+# wrote it — so `cckit effort plan` answered "no open efforts found" on every repo.
+tc "$GH_LOG" '^POST repos/o/r/issues \{"title":"[^[].*"labels":\["effort","ctx:[SMLX]+","kind:task","priority:p2","role:tech-lead","flow:core"\]' \
+   "parent carries effort/ctx/kind/priority/role/flow labels"
+# Flow tag on the composed title.
+tc "$GH_LOG" '^PATCH repos/o/r/issues/1 \{"title":"\[E1\] demo parity effort"\}$' \
+   "parent title carries the [Core] flow tag + injected number"
+# Sub labels: kind/priority/role (no ctx/flow on subs — those are parent-level).
+tc "$GH_LOG" '^POST repos/o/r/issues \{"title":"\[E1\.1\] share core".*"labels":\["kind:task","priority:p2","role:tech-lead"\]' \
+   "sub #1 carries kind/priority/role labels + a proper [E<n>.<step>] title"
+
+# ── A bad sub title aborts the whole op BEFORE anything is created (parity contract) ─────────────
+: > "$GH_LOG"; printf '0' > "$GH_N"
+effort_new --role tech-lead --goal G --scope S --for-agents A --verification V --spec "it ships" \
+  "clean parent name" "refactor the whole wiring layer thing now" >/dev/null 2>&1 && rc=0 || rc=1
+t  "core rejects a bad sub title"                 "$rc" "1"
+t  "core creates nothing on a bad sub title"      "$(grep -cE "$CREATE_RE" "$GH_LOG")" "0"
+
+# ── A call with only --spec still yields the 5-section scaffold; with no Spec it refuses (E546.5) ─
+: > "$GH_LOG"; printf '0' > "$GH_N"
+effort_new --spec "it ships" "minimal effort name" >/dev/null 2>&1
+tc "$GH_LOG" '## Goal'         "spec-only call still emits ## Goal"
+tc "$GH_LOG" '## Verification' "spec-only call still emits ## Verification"
+tc "$GH_LOG" '<!--'            "spec-only call leaves the template placeholders (nothing to fill)"
+: > "$GH_LOG"; printf '0' > "$GH_N"
+effort_new "minimal effort name" >/dev/null 2>&1 && rc=0 || rc=1
+t  "a bare call with no Spec refuses"             "$rc" "1"
+t  "a bare call with no Spec writes nothing"      "$(grep -c . "$GH_LOG")" "0"
+
+# ── #121: the ONE shared effort-PR title composer + the mandatory-[#N] check ─────────────────────
+# #237: the composed title is a Conventional Commit subject carrying [#N] — the form the
+# commitlint gate accepts — so `effort pr` never opens a PR its own CI rejects.
+# shellcheck source=/dev/null
+source "$LIB/core/commitlint.sh"
+unset KIT_PR_TITLE_STYLE
+t  "effort_pr_title composes type: name [#N]"  "$(effort_pr_title 115 'adoption hardening')"             "feat: adoption hardening [E115]"
+t  "effort_pr_title takes the scope from flow:" "$(effort_pr_title 115 'adoption hardening' 'role:tech-lead,kind:task,flow:core')" "feat(core): adoption hardening [E115]"
+t  "effort_pr_title peels [Effort] + uses [Flow] as scope" "$(effort_pr_title 115 '[Effort] 115 · [Core] adoption hardening')" "feat(core): adoption hardening [E115]"
+t  "effort_pr_title flow: label wins over the [Flow] tag" "$(effort_pr_title 115 '[Effort] 115 · [Core] adoption hardening' 'flow:docs')" "feat(docs): adoption hardening [E115]"
+t  "effort_pr_title drops a tag that is no valid scope" "$(effort_pr_title 115 '[¡Hola!] adoption hardening')" "feat: adoption hardening [E115]"
+t  "effort_pr_title tolerates a #-prefixed num" "$(effort_pr_title '#42' 'x')"                           "feat: x [E42]"
+t  "effort_pr_title derives the type from kind:" "$(effort_pr_title 115 'x' 'kind:chore,flow:core')"     "chore(core): x [E115]"
+t  "effort_pr_title maps a bug label to fix"   "$(effort_pr_title 115 'x' 'bug,kind:task')"              "fix: x [E115]"
+t  "effort_pr_title explicit type wins"        "$(effort_pr_title 115 'x' 'kind:chore' fix)"             "fix: x [E115]"
+t  "effort_pr_title issue-title style keeps [Role] [#N] name" "$(KIT_PR_TITLE_STYLE=issue-title effort_pr_title 115 '[Effort] 115 · [Core] adoption hardening' 'flow:core' '' 'Tech Lead')" "[Tech Lead] [#115] [Core] adoption hardening"
+t  "effort_pr_title issue-title style without a role" "$(KIT_PR_TITLE_STYLE=issue-title effort_pr_title 115 'adoption hardening')" "[#115] adoption hardening"
+_t237="$(effort_pr_title 220 '[Effort] 220 · [Core] agents cannot see what cckit provides' 'flow:core,kind:task,role:tech-lead')"
+t  "the #237 reproduction composes the conventional form" "$_t237" "feat(core): agents cannot see what cckit provides [E220]"
+commitlint_check "$_t237" 2>/dev/null; t "the generated title passes commitlint_check" "$?" "0"
+effort_pr_title_check "$_t237" 220 2>/dev/null; t "the generated title carries the [#N] id" "$?" "0"
+effort_pr_title_check "[Tech Lead] [#115] adoption hardening" 115; t "check accepts a title carrying [#N]" "$?" "0"
+effort_pr_title_check "[Effort] 115 · adoption hardening" 115 2>/dev/null; t "check refuses a title lacking [#N]" "$?" "1"
+effort_pr_title_check "[#7] anything" 2>/dev/null; t "check accepts any [#N] when no num given" "$?" "0"
+
+# ── #277: --kind picks the kind: label (parent + subs) from the closed set; --par is gone ──────────
+: > "$GH_LOG"; printf '0' > "$GH_N"
+effort_new --spec "it ships" --flow Core --kind fix "kind fix effort" "a :: x" >/dev/null 2>&1
+tc "$GH_LOG" '^POST repos/o/r/issues \{"title":"[^[].*"labels":\["effort","ctx:[SMLX]+","kind:fix",' "--kind fix labels the parent kind:fix"
+tc "$GH_LOG" '^POST repos/o/r/issues \{"title":"\[E1\.1\] a".*"labels":\["kind:fix",'              "--kind fix labels every sub kind:fix"
+tc "$GH_LOG" '^POST repos/o/r/labels \{"name":"kind:fix"'                                                   "--kind ensures the kind label exists"
+tn "$GH_LOG" 'kind:task'                                                                  "--kind fix leaves no kind:task behind"
+: > "$GH_LOG"; printf '0' > "$GH_N"
+effort_new --spec "it ships" --kind=chore "kind chore effort" >/dev/null 2>&1
+tc "$GH_LOG" '^POST repos/o/r/issues \{.*"labels":\["effort","ctx:[SMLX]+","kind:chore",' "--kind=chore (equals form) is accepted"
+for k in $KIT_KINDS; do
+  : > "$GH_LOG"; printf '0' > "$GH_N"
+  effort_new --spec "it ships" --kind "$k" "kind vocabulary effort" >/dev/null 2>&1 && rc=0 || rc=1
+  t "--kind $k is accepted" "$rc" "0"
+done
+for k in $KIT_CONTENT_KINDS; do
+  : > "$GH_LOG"; printf '0' > "$GH_N"
+  effort_new --spec "it ships" --kind "$k" "content kind effort" >/dev/null 2>&1 && rc=0 || rc=1
+  t "--kind $k (content kind) is accepted" "$rc" "0"
+  tc "$GH_LOG" "^POST repos/o/r/issues \\{.*\"labels\":\\[\"effort\",\"ctx:[SMLX]+\",\"kind:$k\"," "--kind $k labels the parent kind:$k"
+done
+t  "effort_pr_title: a content kind titles as docs" "$(effort_pr_title 115 'spring launch' 'kind:campaign')" "docs: spring launch [E115]"
+: > "$GH_LOG"; printf '0' > "$GH_N"
+err="$(effort_new --kind bug "bad kind effort" 2>&1 >/dev/null)" && rc=0 || rc=1
+t  "--kind rejects a value outside the closed set"   "$rc" "1"
+t  "--kind creates nothing on a bad value"           "$(grep -cE "$CREATE_RE" "$GH_LOG")" "0"
+t  "the refusal lists the accepted set"              "$(printf '%s' "$err" | grep -c "must be one of: $KIT_KINDS")" "1"
+: > "$GH_LOG"; printf '0' > "$GH_N"
+effort_new --par wide "parallel wide effort" >/dev/null 2>&1 && rc=0 || rc=1
+t  "--par is no longer a flag (rc 1)"                "$rc" "1"
+t  "--par creates nothing"                           "$(grep -c . "$GH_LOG")" "0"
+t  "nothing in effort-ops.sh writes a par: label"    "$(grep -c 'par:' "$LIB/verbs/effort-ops.sh" | tr -d ' ')" "0"
+
+# ── #121: flags are position-INDEPENDENT — trailing --flow/--role no longer become junk sub-issues ─
+: > "$GH_LOG"; printf '0' > "$GH_N"
+effort_new "flags after title effort" "real sub :: desc" --flow Docs --role docs --spec "it ships" >/dev/null 2>&1
+t  "trailing flags do NOT create junk subs (parent + 1 real sub)" "$(grep -cE "$CREATE_RE" "$GH_LOG")" "2"
+tc "$GH_LOG" '^POST repos/o/r/issues \{.*"labels":\[[^]]*"flow:docs"\]'  "trailing --flow is honored (flow:docs label)"
+tc "$GH_LOG" '^POST repos/o/r/issues \{"title":"\[E1\.1\] real sub"' "the one real sub is created from the positional"
+tn "$GH_LOG" '^POST repos/o/r/issues \{"title":"\[E1\.[0-9]+\] --flow' "no '--flow' junk sub-issue created"
+
+[ "$fail" -eq 0 ] && echo "ALL OK (effort-parity)" || echo "effort-parity: FAILURES"
+exit "$fail"

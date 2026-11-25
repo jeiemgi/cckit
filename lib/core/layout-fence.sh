@@ -6,6 +6,9 @@
 #   3. Ratchet counts in lib/core/layout-fence.baseline: the files directly under scripts/ and directly
 #      under scripts/lib/ may not grow. A drop must lower the baseline in the same change, so the
 #      ratchet never goes slack.
+#   4. Every counted file is a forwarding stub (the `cckit-forwarding-stub` marker in its first lines)
+#      or a symlink to the moved file (#610). Code lives under lib/; scripts/ only forwards old paths
+#      installed projects call, until the release after 0.13 (decision 66).
 # Counts read tracked files (git ls-files), so the check matches CI. Run from anywhere in the repo.
 #   bash lib/core/layout-fence.sh [--root <dir>]
 set -uo pipefail
@@ -39,5 +42,9 @@ check() { # <key> <now>
 }
 check scripts-top "$(count scripts 2)"
 check scripts-lib "$(count scripts/lib 3)"
+while IFS= read -r f; do
+  [ -L "$f" ] && continue
+  head -n 3 -- "$f" 2>/dev/null | grep -q 'cckit-forwarding-stub' || x "$f is not a forwarding stub — code goes under a lib/ layer"
+done < <(git ls-files -- scripts | awk -F/ '(NF==2 || ($2=="lib" && NF==3)) && $NF!="PROMPTS.md"')
 [ "$fail" -eq 0 ] && echo "ok layout: $(echo "$allowed" | wc -l | tr -d ' ') allowed top-level directories"
 exit "$fail"

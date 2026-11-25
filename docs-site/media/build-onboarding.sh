@@ -22,7 +22,7 @@ SHOWN='claude -p '\''run init.sh --profile automation --name "Acme Bot" --memory
 # 1. Capture a real claude run (skipped if ONB_CAST points at an existing capture).
 if [[ -z "${ONB_CAST:-}" || ! -s "$CAP" ]]; then
   tmp="$(mktemp -d)"
-  asciinema rec --overwrite -c "cd '$tmp' && claude -p 'Run exactly this shell command and show me its raw output verbatim, then stop: bash $ROOT/scripts/init.sh --profile automation --name \"Acme Bot\" --repo acme/bot --owner-login acme --memory on --dry-run' --allowedTools Bash" "$CAP"
+  asciinema rec --overwrite -c "cd '$tmp' && claude -p 'Run exactly this shell command and show me its raw output verbatim, then stop: bash $ROOT/lib/verbs/init.sh --profile automation --name \"Acme Bot\" --repo acme/bot --owner-login acme --memory on --dry-run' --allowedTools Bash" "$CAP"
 fi
 
 # 2. Pull claude's real text out of the capture, strip terminal-reset escapes + ``` fences.

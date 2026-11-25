@@ -11,15 +11,15 @@ Plugin-direct skill — the script + local-model helper resolve from `${CLAUDE_P
 
 ## What it does
 
-Delegates to `${CLAUDE_PLUGIN_ROOT}/scripts/kit-digest.sh` — acquires the text (file, URL, or
+Delegates to `${CLAUDE_PLUGIN_ROOT}/lib/verbs/kit-digest.sh` — acquires the text (file, URL, or
 YouTube video via yt-dlp subtitles), chunks it (~2500 words), digests each chunk on the **local
-model** (`${CLAUDE_PLUGIN_ROOT}/scripts/lib/kit-local.sh` → mlx_lm.server, $0 API), merges, and
+model** (`${CLAUDE_PLUGIN_ROOT}/lib/core/kit-local.sh` → mlx_lm.server, $0 API), merges, and
 prints a digest of at most ~1500 tokens plus a pointer to the original for selective deep-dives.
 
 ## Execution
 
 ```bash
-"${CLAUDE_PLUGIN_ROOT}/scripts/kit-digest.sh" <path|url> [--focus "<topic>"] [--lang es|en]
+"${CLAUDE_PLUGIN_ROOT}/lib/verbs/kit-digest.sh" <path|url> [--focus "<topic>"] [--lang es|en]
 ```
 
 | Flag | Description |

@@ -163,12 +163,12 @@ No profile installs the UX agent. The skill starts it from the role cckit ships.
 ## How it works
 
 The map comes from one of two places. If the project already has a graph built by graphify
-(`graphify-out/graph.json`), the skill uses it. If not, `scripts/ux-graph-scan.sh` builds an
+(`graphify-out/graph.json`), the skill uses it. If not, `lib/verbs/ux-graph-scan.sh` builds an
 approximate one by matching patterns in the source. The report says which was used. The skill
 never rebuilds a graphify graph unless you pass `--rebuild-graph`.
 
-The `consistency` and `a11y` lanes read lists produced by `scripts/ux-ds-audit.sh` and
-`scripts/ux-a11y-scan.sh`. Both find candidates and decide nothing.
+The `consistency` and `a11y` lanes read lists produced by `lib/verbs/ux-ds-audit.sh` and
+`lib/verbs/ux-a11y-scan.sh`. Both find candidates and decide nothing.
 
 `--visual` is the one option that looks at the running app. For the `crit` and `p1` findings
 marked for visual review, up to 8, it opens the screen in a browser, takes a screenshot and places

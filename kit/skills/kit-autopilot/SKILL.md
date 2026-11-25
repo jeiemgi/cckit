@@ -27,7 +27,7 @@ token budget does not enforce that budget. The full table, including what no liv
 confirmed, is in the docs site's agent-compatibility page under "Unattended run limits".
 
 **Exception — night mode.** The Workflow runtime does enforce a token budget, so an approved plan
-can run unattended through `${CLAUDE_PLUGIN_ROOT}/scripts/night-run.mjs` (see _Mode: night_ below). The CLI still
+can run unattended through `${CLAUDE_PLUGIN_ROOT}/lib/verbs/night-run.mjs` (see _Mode: night_ below). The CLI still
 refuses `--plan` and `--notify`.
 
 One skill, two modes — both delegate work that runs **autonomously to a verifiable stop, under hard
@@ -124,7 +124,7 @@ kit autopilot --plan            # read the plan and launch the planned set
 
 ## Mode: night (an approved plan, unattended, through a Workflow)
 
-The one mode whose caps a runtime enforces. `${CLAUDE_PLUGIN_ROOT}/scripts/night-run.mjs` is a
+The one mode whose caps a runtime enforces. `${CLAUDE_PLUGIN_ROOT}/lib/verbs/night-run.mjs` is a
 Workflow script: the Workflow runtime throws once the `+N` budget is spent, and the script holds the
 rest of the caps in code. Both night scripts ship in the plugin, so every path below starts at
 `${CLAUDE_PLUGIN_ROOT}` — a consuming project has no copy of them in its own checkout.
@@ -152,13 +152,13 @@ Tonight: run the two approved waves. I accept the lockfile floor.
 **Launch** — from anywhere inside the project (the kit config is found by `kit_config_path`:
 `$KIT_CONFIG`, else a walk up from the current directory):
 
-1. `bash "${CLAUDE_PLUGIN_ROOT}/scripts/night-grant.sh" preflight` — exit 1 names the allowlist
+1. `bash "${CLAUDE_PLUGIN_ROOT}/lib/verbs/night-grant.sh" preflight` — exit 1 names the allowlist
    entries an unattended run lacks in the tracked `.claude/settings.json` (merge, push, issue
    comment/edit/close, `gh api`). Stop and tell the owner; it never edits the file.
-2. `bash "${CLAUDE_PLUGIN_ROOT}/scripts/night-grant.sh" read <parent>` — prints the engine args
+2. `bash "${CLAUDE_PLUGIN_ROOT}/lib/verbs/night-grant.sh" read <parent>` — prints the engine args
    (line 1) and `budget=+N` (line 2), or refuses: no grant by the owner, a malformed grant, a
    waiver that is not exactly one floor name, a never-waivable waiver, or a WIP limit of 0.
-3. Launch the Workflow script `${CLAUDE_PLUGIN_ROOT}/scripts/night-run.mjs` with line 1 as `args`
+3. Launch the Workflow script `${CLAUDE_PLUGIN_ROOT}/lib/verbs/night-run.mjs` with line 1 as `args`
    and the budget as the `+N` directive. The runtime counts the **whole turn**, the captain's own
    output included, so size `+N` with headroom.
 

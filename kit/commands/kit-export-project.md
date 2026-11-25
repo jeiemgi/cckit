@@ -38,7 +38,7 @@ two artifacts, and checks the project is portable.
 1. Run the export (pass through `$ARGUMENTS`):
 
    ```bash
-   bash "${CLAUDE_PLUGIN_ROOT}/scripts/kit-export-project.sh" $ARGUMENTS
+   bash "${CLAUDE_PLUGIN_ROOT}/lib/verbs/kit-export-project.sh" $ARGUMENTS
    ```
 
 2. For a full export, tell the user the two manual steps claude.ai needs:

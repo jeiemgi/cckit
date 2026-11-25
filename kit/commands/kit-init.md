@@ -8,7 +8,7 @@ allowed-tools: Bash, Read, AskUserQuestion, Edit
 
 You are initializing the current project with the **claude-kit** setup. The kit lives at
 `${CLAUDE_PLUGIN_ROOT}` (the installed plugin root). The engine is
-`${CLAUDE_PLUGIN_ROOT}/scripts/init.sh`.
+`${CLAUDE_PLUGIN_ROOT}/lib/verbs/init.sh`.
 
 ## Steps
 
@@ -49,7 +49,7 @@ You are initializing the current project with the **claude-kit** setup. The kit 
 2. **Run the engine** from the project root:
 
    ```bash
-   "${CLAUDE_PLUGIN_ROOT}/scripts/init.sh" \
+   "${CLAUDE_PLUGIN_ROOT}/lib/verbs/init.sh" \
      --profile <profile> \
      --target "$PWD" \
      --name "<Project Name>" \
@@ -112,8 +112,8 @@ You are initializing the current project with the **claude-kit** setup. The kit 
    the user the plan first, then run it on their go-ahead:
 
    ```bash
-   "${CLAUDE_PLUGIN_ROOT}/scripts/init.sh" --target "$PWD" --dry-run   # the steps, nothing written
-   "${CLAUDE_PLUGIN_ROOT}/scripts/init.sh" --target "$PWD" --yes       # run them; finished steps are skipped
+   "${CLAUDE_PLUGIN_ROOT}/lib/verbs/init.sh" --target "$PWD" --dry-run   # the steps, nothing written
+   "${CLAUDE_PLUGIN_ROOT}/lib/verbs/init.sh" --target "$PWD" --yes       # run them; finished steps are skipped
    ```
 
    Each step prints `done`, `skipped` or `failed`; relay the failed ones with their reason. Pass

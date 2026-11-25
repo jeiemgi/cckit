@@ -56,7 +56,7 @@ References — load only when you reach the step that needs one:
    otherwise `flows`. If ambiguous, `AskUserQuestion` (flows / consistency / a11y / all).
 3. **Target app:**
    - `--path <dir>` → that directory. Skip enumeration.
-   - Else `bash "${CLAUDE_PLUGIN_ROOT}/scripts/ux-graph-scan.sh" --apps <root>` — lists every
+   - Else `bash "${CLAUDE_PLUGIN_ROOT}/lib/verbs/ux-graph-scan.sh" --apps <root>` — lists every
      app-like package (has `react`/`next`/`vue` + a `dev` script) with framework + router.
      0 → stop ("No component front-end found under <root>."). 1 → use it, say which. 2+ →
      `AskUserQuestion` which to audit (honor `--app <name>`).
@@ -75,7 +75,7 @@ Target dir = `$T`. Prefer an existing rich graph; never rebuild silently.
 
 1. `$T/graphify-out/graph.json` **or** `./graphify-out/graph.json` exists and **no**
    `--rebuild-graph` → use it. Report "graph source: graphify".
-2. Else `bash "${CLAUDE_PLUGIN_ROOT}/scripts/ux-graph-scan.sh" --scan "$T"` → writes
+2. Else `bash "${CLAUDE_PLUGIN_ROOT}/lib/verbs/ux-graph-scan.sh" --scan "$T"` → writes
    `$T/graphify-out/.ux_graph.json` (normalized model). Report "graph source: deterministic scan
    (approximate)".
 3. Say **once**, without blocking: "For a richer semantic graph, run `/graphify $T` first, then
@@ -107,7 +107,7 @@ group), each briefed with `references/heuristics.md`.
 ### Lane `consistency`
 
 ```bash
-bash "${CLAUDE_PLUGIN_ROOT}/scripts/ux-ds-audit.sh" "$T/src" \
+bash "${CLAUDE_PLUGIN_ROOT}/lib/verbs/ux-ds-audit.sh" "$T/src" \
   [--exclude <re>] --primitives "<ui-barrel>" --css "<theme.css>" [--css-prefix <p>] \
   > "$T/graphify-out/.ux_ds_audit.txt"
 ```
@@ -121,7 +121,7 @@ sub-agents by section group for a large scope.
 ### Lane `a11y`
 
 ```bash
-bash "${CLAUDE_PLUGIN_ROOT}/scripts/ux-a11y-scan.sh" "$T/src" [--exclude <re>] \
+bash "${CLAUDE_PLUGIN_ROOT}/lib/verbs/ux-a11y-scan.sh" "$T/src" [--exclude <re>] \
   > "$T/graphify-out/.ux_a11y_scan.txt"
 ```
 

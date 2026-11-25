@@ -1,0 +1,5 @@
+# verbs.baseline — the top-level verb count lib/core/verbs-ratchet.sh holds the line at (#557).
+# The number of `verb` rows in lib/core/verbs.tsv may only go down. A rename keeps the old name
+# as an `alias` row, which does not count. When a verb is retired or folded under another, lower
+# this number in the same change; the gate fails until you do.
+38

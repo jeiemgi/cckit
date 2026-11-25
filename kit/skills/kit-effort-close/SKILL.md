@@ -77,9 +77,9 @@ exists anywhere (a **wave-driven** effort — subs merged as individual task PRs
 sub is closed with a merged PR, traces from the merged PR diffs, and runs the same close tail.
 
 ```bash
-source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/kit-config.sh" && load_kit_config
-source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/effort.sh"
-source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/effort-ops.sh"   # effort_close — the single close op
+source "${CLAUDE_PLUGIN_ROOT}/lib/core/kit-config.sh" && load_kit_config
+source "${CLAUDE_PLUGIN_ROOT}/lib/core/effort.sh"
+source "${CLAUDE_PLUGIN_ROOT}/lib/verbs/effort-ops.sh"   # effort_close — the single close op
 
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 

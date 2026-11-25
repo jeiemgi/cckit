@@ -8,7 +8,7 @@ when_to_use: After `/kit-effort-new`, to begin building an effort. The effort br
 # kit-effort-start
 
 Thin caller over the ONE canonical effort-start mechanic: the `cckit effort start` verb →
-`effort_start` (`${CLAUDE_PLUGIN_ROOT}/scripts/lib/effort-ops.sh`). The verb logic lives there,
+`effort_start` (`${CLAUDE_PLUGIN_ROOT}/lib/verbs/effort-ops.sh`). The verb logic lives there,
 never inline here (kit-engine-boundary #1/#2 — same single-implementation principle as the PR
 title composer, #121). The dispatcher loads the project config first (#151), so `KIT_REPO` /
 `KIT_BASE_BRANCH` come from `.claude/kit.config.json` of the project you're standing in — unless
@@ -89,9 +89,9 @@ Mark the parent effort In Progress when Projects v2 is enabled:
 
 ```bash
 NUM=<parent-issue>   # third field of the verb's machine-readable line
-source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/kit-config.sh" && load_kit_config
+source "${CLAUDE_PLUGIN_ROOT}/lib/core/kit-config.sh" && load_kit_config
 if [[ "$KIT_PROJECTS_V2" == "true" ]]; then
-  source "${CLAUDE_PLUGIN_ROOT}/scripts/lib/gh-project.sh"; load_project_ids
+  source "${CLAUDE_PLUGIN_ROOT}/lib/forge/gh-project.sh"; load_project_ids
   ITEM_ID=$(project_find_item_by_issue "$NUM")
   [[ -n "$ITEM_ID" ]] && project_set_single_select "$ITEM_ID" "$STATUS_FIELD_ID" "$STATUS_OPT_IN_PROGRESS"
 fi

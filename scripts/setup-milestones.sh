@@ -1,23 +1,14 @@
 #!/usr/bin/env bash
-# Create the project's milestones on the repo. Idempotent.
-# Reads repo + milestones from .claude/kit.config.json. Run from project root.
-# The forge port (E537): every GitHub call goes through forge_* / gh_rest_* (scripts/lib/gh-rest.sh).
-if ! command -v gh_rest_issue_json >/dev/null 2>&1; then
-  # shellcheck source=/dev/null
-  . "$(cd "$(dirname "$0")" && pwd)/lib/gh-rest.sh"
+# cckit-forwarding-stub: scripts/setup-milestones.sh moved to lib/verbs/setup-milestones.sh (#602). Installed projects call this path, so
+# the stub stays until the release after 0.13 (decision 66). Sourced (bash or zsh) or run, it forwards.
+_cckit_self="${BASH_SOURCE[0]:-$0}"
+_cckit_fwd="$(cd "$(dirname "$_cckit_self")" 2>/dev/null && pwd)/../lib/verbs/setup-milestones.sh"
+_cckit_sourced=0
+if [ -n "${ZSH_VERSION:-}" ]; then
+  case "${ZSH_EVAL_CONTEXT:-}" in *file*) _cckit_sourced=1 ;; esac
+elif [ "$_cckit_self" != "$0" ]; then
+  _cckit_sourced=1
 fi
-
-set -euo pipefail
-source "$(dirname "$0")/lib/kit-config.sh" && load_kit_config
-
-echo "→ Milestones on $KIT_REPO"
-existing=$(forge_rest "repos/$KIT_REPO/milestones?state=all" --jq '.[].title' 2>/dev/null || echo "")
-while IFS= read -r m; do
-  [[ -z "$m" ]] && continue
-  if grep -qxF "$m" <<<"$existing"; then
-    echo "  • $m (exists)"
-  else
-    forge_rest "repos/$KIT_REPO/milestones" -f title="$m" >/dev/null && echo "  ✓ $m"
-  fi
-done <<< "$KIT_MILESTONES"
-echo "✓ done"
+# shellcheck source=/dev/null
+if [ "$_cckit_sourced" = 1 ]; then unset _cckit_self _cckit_sourced; . "$_cckit_fwd" "$@"; return $?; fi
+exec bash "$_cckit_fwd" "$@"

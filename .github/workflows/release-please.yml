@@ -11,7 +11,7 @@ name: release-please
 # GitHub Release, which then triggers the publish job below.
 #
 # The version number itself comes from the commits (feat -> minor, fix/perf/refactor/revert ->
-# patch, feat!/BREAKING CHANGE -> major) — the same rules as scripts/lib/version-bump.sh.
+# patch, feat!/BREAKING CHANGE -> major) — the same rules as lib/core/version-bump.sh.
 #
 # npm publishing uses OIDC "trusted publishing" (GA mid-2025) — NO long-lived token. GitHub Actions
 # mints a short-lived OIDC token per run that npm exchanges for publish rights, and the publish is
