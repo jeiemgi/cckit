@@ -64,9 +64,13 @@ got_root="$(cd "$fix" && "$CCKIT" scan --llm 2>/dev/null | jq -r .root)"
 t "scan root is the invoking dir" "$got_root" "$(cd "$fix" && pwd -P)"
 own_repo="$(jq -r '.github.repo' "$ROOT/cckit.config.json")"
 : > "$GH_LOG"
-( cd "$ROOT" && PATH="$stub:$PATH" "$CCKIT" sync --llm >/dev/null 2>&1 )
+# The board snapshot goes to the temp dir: by default it lands in the real checkout's .cckit/ and
+# leaves the shim's fixture issue (#99 · demo effort) in the developer's board.md (#607).
+own_snap="$fix/own-board.md"
+( cd "$ROOT" && CCKIT_BOARD_SNAPSHOT="$own_snap" PATH="$stub:$PATH" "$CCKIT" sync --llm >/dev/null 2>&1 )
 got_own="$(repos_asked | sort -u | tr '\n' ' ')"
 t "self-host sync targets cckit's repo" "$got_own" "$own_repo "
+yes "self-host sync writes its snapshot to the temp dir" "$(cat "$own_snap" 2>/dev/null)" "# Board snapshot — $own_repo"
 got_ver="$(cd "$fix" && "$CCKIT" version | awk '{print $2}')"
 t "version is the install version, not the project's" "$got_ver" "$(jq -r '.kitVersion' "$ROOT/cckit.config.json")"
 

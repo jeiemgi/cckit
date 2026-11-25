@@ -103,6 +103,12 @@ if [ -n "${KTO_TEST_INNER:-}" ]; then
   eq "orchestrator line 1 = id + title"   "$(printf '%s\n' "$ob" | sed -n 3p)" "#42 · Fix the thing"
   eq "orchestrator line 2 = what to review" "$(printf '%s\n' "$ob" | sed -n 4p)" "Review: the summary below and the diff."
   case "$ob" in *"Closes #42"*) ;; *) echo "FAIL($KTO_TEST_INNER): Closes line lost with the section on"; fail=1 ;; esac
+  # A summary that already holds the section (an agent's own body) gets no second copy.
+  own=$'## For the orchestrator\n\n#42 · Fix the thing\nReview: the parser change.\n\nDid the thing.'
+  ob="$(KIT_PR_ORCHESTRATOR_SECTION=true kto_compose_pr_body 42 "$own" 'tech-lead' 'Fix the thing')"
+  eq "orchestrator section printed once when the summary has it" \
+     "$(printf '%s\n' "$ob" | grep -c '^## For the orchestrator$')" "1"
+  case "$ob" in *"Review: the parser change."*) ;; *) echo "FAIL($KTO_TEST_INNER): the summary's own section was dropped"; fail=1 ;; esac
 
   # kto_compose_pr_body must carry Closes #N and the Summary
   body="$(kto_compose_pr_body 42 'Did the thing.' 'tech-lead')"
