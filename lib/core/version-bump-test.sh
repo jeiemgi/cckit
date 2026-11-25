@@ -54,6 +54,27 @@ t "feat at 0.10.0 -> 0.11.0"    "$(vb_fixture_next 0.10.0 "feat: a")"  "0.11.0"
 t "feat! at 0.10.0 -> 0.11.0"   "$(vb_fixture_next 0.10.0 "feat!: a")" "0.11.0"
 t "feat! at 1.2.3 -> 2.0.0"     "$(vb_fixture_next 1.2.3 "feat!: a")"  "2.0.0"
 
+# (4b) #625: a `Release-As: x.y.z` footer overrides the computed version, as in release-please;
+# with several footers in the range the highest wins. Each extra argument is one more commit.
+vb_fixture_next_many() { # <tag> <message>... -> what --next prints
+  local r m; r="$(mktemp -d)"
+  mkdir -p "$r/lib/core"; cp "$ROOT/lib/core/version-bump.sh" "$r/lib/core/"
+  git -C "$r" init -q; git -C "$r" -c user.name=t -c user.email=t@t -c commit.gpgsign=false commit -q --allow-empty -m "chore: seed"
+  git -C "$r" -c tag.gpgsign=false -c commit.gpgsign=false tag "v$1"; shift
+  for m in "$@"; do git -C "$r" -c user.name=t -c user.email=t@t -c commit.gpgsign=false commit -q --allow-empty -m "$m"; done
+  (cd "$r" && bash lib/core/version-bump.sh --next); rm -rf "$r"
+}
+t "Release-As footer at 0.12.0 -> 0.13.0" \
+  "$(vb_fixture_next_many 0.12.0 "fix: a" $'chore: release 0.13.0\n\nRelease-As: 0.13.0')" "0.13.0"
+t "highest of two Release-As footers wins" \
+  "$(vb_fixture_next_many 0.12.0 $'chore: r\n\nRelease-As: 0.14.0' $'chore: r\n\nRelease-As: 0.13.5')" "0.14.0"
+t "Release-As on a chore-only range still releases" \
+  "$(vb_fixture_next_many 0.12.0 $'chore: r\n\nRelease-As: 0.13.0')" "0.13.0"
+t "Release-As in a subject is not a footer" \
+  "$(vb_fixture_next_many 0.12.0 "fix: mention Release-As: 9.9.9")" "0.12.1"
+t "no footer keeps the computed bump" \
+  "$(vb_fixture_next_many 0.12.0 "fix: a" "docs: b")" "0.12.1"
+
 # (5) the script and release-please agree: the config says bump-minor-pre-major, so a drift either
 # way (config flag dropped, or the script going back to major below 1.0) fails here.
 t "release-please-config.json has bump-minor-pre-major: true" \

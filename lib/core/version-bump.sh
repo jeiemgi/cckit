@@ -13,6 +13,8 @@
 # `feat:` -> minor; `fix|perf|refactor|revert:` -> patch; non-functional types
 # (`docs|chore|style|test|ci|build`) and anything else -> none (no release).
 # no commits -> none (no release).
+# A `Release-As: x.y.z` footer in the range overrides the computed version, as release-please
+# does; with several, the highest wins. `--next` and `--emit`'s `next=` print it.
 # errors: strict — set -e; a bad manifest or missing tag propagates
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -28,6 +30,12 @@ vb_level() {
   if grep -qE '^(fix|perf|refactor|revert)(\([^)]*\))?:' <<<"$log"; then echo patch; return; fi
   # Only non-functional commits (docs/chore/style/test/ci/build, or untyped) -> no release.
   echo none
+}
+
+vb_release_as() { # <range> -> the highest `Release-As: x.y.z` footer version, or nothing
+  git -C "$ROOT" log --format='%b' "$1" 2>/dev/null \
+    | sed -nE 's/^[Rr][Ee][Ll][Ee][Aa][Ss][Ee]-[Aa][Ss]:[[:space:]]*v?([0-9]+\.[0-9]+\.[0-9]+)[[:space:]]*$/\1/p' \
+    | sort -t. -k1,1n -k2,2n -k3,3n | tail -n 1
 }
 
 vb_next() {
@@ -54,9 +62,14 @@ vb_write() {
 
 _range() { local cur; cur="$(vb_current)"; if [ -n "$cur" ]; then echo "v$cur..HEAD"; else echo "HEAD"; fi; }
 
+_next() { # the Release-As footer if the range has one, else the computed bump
+  local ra; ra="$(vb_release_as "$(_range)")"
+  if [ -n "$ra" ]; then echo "$ra"; else vb_next "$(vb_current)" "$(vb_level "$(_range)")"; fi
+}
+
 case "${1:-}" in
-  --next)  vb_next "$(vb_current)" "$(vb_level "$(_range)")" ;;
-  --emit)  printf 'bump=%s\n' "$(vb_level "$(_range)")"; printf 'next=%s\n' "$(vb_next "$(vb_current)" "$(vb_level "$(_range)")")" ;;
+  --next)  _next ;;
+  --emit)  printf 'bump=%s\n' "$(vb_level "$(_range)")"; printf 'next=%s\n' "$(_next)" ;;
   --write) vb_write "${2:?usage: --write <version>}" ;;
   *) echo "usage: version-bump.sh --next | --emit | --write <version>" >&2; exit 2 ;;
 esac
