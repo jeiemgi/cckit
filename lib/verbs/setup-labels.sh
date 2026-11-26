@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Create the agent:/ctx:/flow:/kind:/priority:/role: label families on the repo. Idempotent.
+# Create the agent:/ctx:/flow:/kind:/priority:/role: label families, plus the single labels
+# `effort` and `backlog`, on the repo. Idempotent.
 # Holds no label list of its own (#639): every set is read from the kit file that owns it —
 #   kind:     KIT_KINDS, KIT_CONTENT_KINDS   kinds.sh
 #   priority: KIT_PRIORITIES                 kinds.sh
@@ -74,6 +75,10 @@ say "→ Labels on $KIT_REPO"
 # and never provisioned, so `cckit effort plan` found nothing on every repo.
 say "effort:"
 ensure_label "effort" "$(kit_label_color effort)" "$(kit_label_desc effort)"
+# `backlog` marks a standalone issue parked on purpose (#647): loose_issues_list skips it when the
+# project has no board (github.projectsV2 false). With the board on, Status = Backlog is the marker.
+say "backlog:"
+ensure_label "backlog" "$(kit_label_color backlog)" "$(kit_label_desc backlog)"
 say "kinds:"
 # The closed set of rules/branch-naming.md — a kind is also the branch prefix `cckit start` cuts, so
 # the two lists are one list.

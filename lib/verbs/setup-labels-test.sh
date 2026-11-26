@@ -58,6 +58,7 @@ for f in $default_flows; do
   has "lists flow:$f_lc" " $got " " flow:$f_lc "
 done
 has "lists effort"            " $got " " effort "
+has "lists backlog (#647)"     " $got " " backlog "
 has "lists the config roles"  " $got " " role:backend role:tech-lead "
 has "lists the agent profile" " $got " " agent:review "
 hasnt "content kinds stay off by default" " $got " " kind:post "
@@ -72,6 +73,8 @@ t "flow says what it is" "$(row flow:core)"   "Flow: an area of the product"
 t "role description"     "$(row role:backend)" "$(kit_label_desc role backend)"
 t "priority p0 description" "$(row priority:p0)" "Drop everything"
 t "ctx description"      "$(row ctx:XL)"      "$(kit_label_desc ctx XL)"
+t "backlog description"  "$(row backlog)"     "$(kit_label_desc backlog)"
+t "backlog description names the no-board case" "$(row backlog | grep -c "no board")" "1"
 t "effort-ops describes labels through kit_label_desc" \
   "$(grep -c '_eff_ensure_label .*"\$(kit_label_desc ' "$ROOT/lib/verbs/effort-ops.sh" | tr -d ' ')" "8"
 t "effort-ops has no retired lane wording" \

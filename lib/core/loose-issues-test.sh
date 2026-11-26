@@ -2,7 +2,9 @@
 # shellcheck shell=bash
 # loose-issues-test.sh — the loose-issue count (E546.2) over the forge shim: lib/core/loose-issues.sh
 # and `cckit doctor --loose [--ratchet]`. Fixture: an effort, a sub-issue (parent_issue_url), a
-# standalone issue and a pull request -> one loose issue. Then the board marker (Status = Backlog),
+# standalone issue, a pull request and a standalone issue labelled `backlog` -> one loose issue with
+# the board off (the label parks it, #647). Then the board marker (Status = Backlog; the label is
+# ignored with the board on),
 # the ratchet (pass, fail, not judged), the forge-less run (a skip line, never a silent pass), the
 # `cckit doctor` plumbing and the captain's wave close (captain_wave_close: over -> open, else advance).
 # Run: bash lib/core/loose-issues-test.sh
@@ -30,7 +32,8 @@ export GH_ISSUES='[
   {"number":11,"title":"[Effort 10] 1 · a sub","state":"open","labels":[],"parent_issue_url":"https://api.github.com/repos/o/r/issues/10"},
   {"number":12,"title":"Fix the login","state":"open","labels":[{"name":"kind:fix"}],"parent_issue_url":null},
   {"number":13,"title":"a pull request","state":"open","labels":[],"pull_request":{}},
-  {"number":14,"title":"Found during the demo","state":"open","labels":[],"body":"Found mid-wave.\n\n## Relations\n- Extends #10"}
+  {"number":14,"title":"Found during the demo","state":"open","labels":[],"body":"Found mid-wave.\n\n## Relations\n- Extends #10"},
+  {"number":15,"title":"Parked for later","state":"open","labels":[{"name":"backlog"}],"parent_issue_url":null}
 ]'
 
 # project <name> <config-json> -> a throwaway project (git repo, root cckit.config.json); echoes its dir.
@@ -52,7 +55,8 @@ t   "board off: projectsV2 false" "$(loose_board_on "$off/cckit.config.json" && 
 t   "board off: an issue with a relation line is not loose" "$(loose_issues_list o/r "$off/cckit.config.json")" "$(printf '12\tFix the login')"
 t   "board on: projectsV2 true + a number" "$(loose_board_on "$on/cckit.config.json" && echo on || echo off)" "on"
 out="$(loose_issues_list o/r "$off/cckit.config.json")"
-t   "effort, sub-issue and PR excluded -> the standalone issue alone" "$out" "$(printf '12\tFix the login')"
+t   "effort, sub-issue, PR and backlog-labelled issue excluded -> the standalone issue alone" "$out" "$(printf '12\tFix the login')"
+hasnt "board off: the backlog label parks #15" "$out" "15"
 has "the read is GET repos/o/r/issues (open)" "$(cat "$GH_LOG")" "GET repos/o/r/issues?state=open&per_page=100"
 t   "a read only: no write request" "$(grep -cvE '^GET ' "$GH_LOG")" "0"
 GH_FAIL_EP='repos/o/r/issues' loose_issues_list o/r "$off/cckit.config.json" >/dev/null 2>&1; rc=$?
@@ -62,18 +66,23 @@ t   "a failed read -> rc 1, never zero loose" "$rc" "1"
 backlog='{"data":{"repository":{"issue":{"projectItems":{"nodes":[{"project":{"number":3},"fieldValueByName":{"name":"Backlog"}}]}}}}}'
 todo='{"data":{"repository":{"issue":{"projectItems":{"nodes":[{"project":{"number":3},"fieldValueByName":{"name":"Todo"}}]}}}}}'
 t   "board on, Status Backlog -> not loose" "$(GH_GRAPHQL="$backlog" loose_issues_list o/r "$on/cckit.config.json")" ""
-t   "board on, Status Todo -> loose" "$(GH_GRAPHQL="$todo" loose_issues_list o/r "$on/cckit.config.json")" "$(printf '12\tFix the login')"
+t   "board on, Status Todo -> loose; the backlog label is ignored, #15 counts too" \
+    "$(GH_GRAPHQL="$todo" loose_issues_list o/r "$on/cckit.config.json")" "$(printf '12\tFix the login\n15\tParked for later')"
 
 # ── cckit doctor --loose ──────────────────────────────────────────────────────────────────────
 out="$(doctor "$off" --loose)"; rc=$?
 has "--loose: one row with the count" "$out" "warn  loose issues"
 has "--loose: the count is 1" "$out" "1 in o/r"
-has "--loose, board off: every standalone issue counts, and why" "$out" "no issue can carry the Backlog marker"
+has "--loose, board off: the label is the marker, and says so" "$out" "the Backlog marker is the backlog label"
+hasnt "--loose, board off: the backlog-labelled issue is not listed" "$out" "#15 "
 has "--loose: the list names #N title" "$out" "#12 Fix the login"
 hasnt "--loose: the sub-issue is not listed" "$out" "#11 "
 t   "--loose: exit 0 (a count, not a gate)" "$rc" "0"
 out="$(GH_GRAPHQL="$backlog" doctor "$on" --loose)"
 has "--loose, board on + Backlog: zero" "$out" "ok   loose issues                 0 in o/r"
+out="$(GH_GRAPHQL="$todo" doctor "$on" --loose)"
+has "--loose, board on + Todo: the backlog label does not park #15" "$out" "#15 Parked for later"
+has "--loose, board on + Todo: the count is 2" "$out" "2 in o/r"
 
 # ── the ratchet ───────────────────────────────────────────────────────────────────────────────
 printf '# notes\n1\n' > "$tmp/at1"; printf '0\n' > "$tmp/at0"; printf '3\n' > "$tmp/at3"
