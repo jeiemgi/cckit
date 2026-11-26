@@ -120,7 +120,10 @@ The slug is a *derived* convenience, not a second source of truth. `--slug` only
   to develop` line each — if a re-target fails, or those PRs cannot be listed, the close refuses,
   names the PR and merges nothing), squash-merges,
   closes the parent and every sub and sets the board **Status=Done** for each, garbage-collects the
-  worktree/branch, runs an optional, config-gated knowledge-ingest hook
+  worktree/branch — the effort branch on origin, then every `sub/<N><letter>-*` branch origin
+  holds (read with `git ls-remote`, one `✓ deleted remote branch` line each; a failed delete warns
+  and never fails the close, #651), then the effort worktree, its local branch and the LANDED
+  `sub/<N>…` worktrees + local branches — runs an optional, config-gated knowledge-ingest hook
   (`effort.knowledgeIngestHook`), and finishes with an advisory **kit-sync drift check** that flags
   any kit-managed files the effort touched (they belong upstream via `/kit-contribute`). Kit-managed
   means `scripts/lib/`, `scripts/kit*`, `.claude/{skills,hooks,lib,agents}/`, and the rule files the

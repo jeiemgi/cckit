@@ -49,8 +49,10 @@ The effort lifecycle's terminal op. Board state, issue state, and the work recor
    squash just put their work on base, so they classify **LANDED** (no PR of their own, content or
    lineage on base) and go under the same recover-before-prune guards as `cckit cleanup` (a dirty
    sub worktree, or a sub ahead of its remote, stays and is reported). Then the effort worktree is
-   removed, its local branch deleted, pruned (the remote branch is deleted by the merge). A sub
-   that fails both LANDED checks is left for `cckit gc` to show as ORPHAN.
+   removed, its local branch deleted, pruned. A sub that fails both LANDED checks is left for
+   `cckit gc` to show as ORPHAN. On origin, the effort branch and every `sub/<N><letter>-*` branch
+   are deleted right after the squash (read with `git ls-remote`, one `push --delete` each, #651); a
+   failed delete warns and never fails the close.
 7. **Knowledge-ingest hook** (optional, config-gated via `effort.knowledgeIngestHook`).
 8. **Kit-sync drift check** — advisory warning when the effort touched kit-managed files that
    belong upstream (/kit-contribute). Under `.claude/rules/` only the rule files the kit ships
@@ -107,7 +109,7 @@ effort_close "$NUM"
 - Unfinished subs still open, still linked, listed as `⚠ left open: sub #N` and in the final report
 - Every PR that was based on the effort branch is still OPEN, now based on the base branch
 - Board Status=Done for the parent + every finished sub (if Projects v2 is on)
-- Main checkout on the base branch, up to date; effort worktree + local/remote branch removed and pruned, and every LANDED `sub/<N>…` worktree + branch with them (`✓ sub gc:` lines)
+- Main checkout on the base branch, up to date; effort worktree + local/remote branch removed and pruned, every `sub/<N><letter>-*` branch deleted on origin (`✓ deleted remote branch sub/…` lines), and every LANDED `sub/<N>…` worktree + local branch with them (`✓ sub gc:` lines)
 - Knowledge-ingest hook ran (if configured); a kit-sync warning if the effort touched kit-managed files
 
 ## Rules
