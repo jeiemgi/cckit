@@ -252,6 +252,7 @@ The limits it holds the agent to:
 | An unattended run | never `impeccable`'s live mode (`live`, `generate`): it opens a browser session and can start the agent CLI with permission checks off |
 | No network, or the rules cannot be fetched | `audit: not run`, never passed. `web-design-guidelines` fetches its rules from GitHub on every run |
 | One of the three is not installed | `<skill>: not installed` in the design file, then cckit's own minimum rules for that step (`references/minimum-rules.md`). The missing skill is never written as used |
+| Any page, whichever skill decides direction | the interface rules the skill ships (`references/interface-rules.md`): a 4px grid for every size, radius tokens with a nested-corner rule, one table pattern (sticky head, body scrolls inside, pager always visible, named empty, error and pending states) and one job per error surface. A value that breaks one is listed in the design file with its reason, or fixed |
 
 The skill's instructions are not the check. For a page task, [`cckit task run`](/cli-reference/)
 reads which skills the run loaded from the events the agent CLI prints and puts that list in the
