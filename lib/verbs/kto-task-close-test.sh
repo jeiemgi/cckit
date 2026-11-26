@@ -78,6 +78,28 @@ t  "it is not closed again"                      "$(grep -cE '^(PATCH|POST) ' "$
 t  "no gh subcommand ran"                        "$(grep -c '^GH-SUBCOMMAND' "$GH_LOG")" 0
 tc "$BOARD_LOG" '^ITEM-11 SF DONE$'               "but the board still goes to Done"
 
+# a parent with native sub-issues (#650): every OPEN sub closes with the parent's reason and one
+# comment naming the parent; a sub already closed is not written to.
+export GH_FIXTURE="$tmp/fixture.sh"
+cat > "$GH_FIXTURE" <<'SH'
+case "$method $ep" in
+  "GET repos/o/r/issues/20/sub_issues")
+    out='[{"number":201,"state":"closed","title":"[E20.1] first"},
+          {"number":202,"state":"open","title":"[E20.2] second"},
+          {"number":203,"state":"open","title":"[E20.3] third"}]' ;;
+esac
+SH
+t  "closing a parent succeeds"                   "$(run 20 "Folded." --reason not-planned)" 0
+tc "$GH_LOG" "${CLOSE}20 \{\"state\":\"closed\",\"state_reason\":\"not_planned\"\}$" "the parent closes with its reason"
+tc "$GH_LOG" "${CLOSE}202 \{\"state\":\"closed\",\"state_reason\":\"not_planned\"\}$" "an open sub closes with the parent's reason"
+tc "$GH_LOG" "${CLOSE}203 \{\"state\":\"closed\",\"state_reason\":\"not_planned\"\}$" "every open sub closes, the first included"
+tc "$GH_LOG" "${COMMENT}202/comments \{\"body\":\"Closed with its parent #20 \(not planned\)\.\"\}$" "the sub's comment names the parent and the reason"
+t  "the already-closed sub is not written to"    "$(grep -cE '^(PATCH|POST) repos/o/r/issues/201' "$GH_LOG")" 0
+t  "the subs close after the parent" \
+   "$(grep -nE '^PATCH repos/o/r/issues/(20|202) ' "$GH_LOG" | sed -E 's/^[0-9]+:PATCH repos\/o\/r\/issues\/([0-9]+) .*/\1/' | tr '\n' ' ')" "20 202 "
+case "$(cat "$tmp/err"; kto_task_close 20 "Folded." --reason not-planned 2>/dev/null)" in *"#202"*"#203"*) echo "ok: the output names the subs it closed" ;; *) echo "FAIL: the output does not name the closed subs"; fail=1 ;; esac
+unset GH_FIXTURE
+
 t  "the dispatcher answers --help"               "$("$ROOT/bin/cckit" close --help | sed -n 1p | cut -c1-19)" "cckit close <issue>"
 
 [ "$fail" -eq 0 ] && echo "kto-task-close: all passed" || echo "kto-task-close: FAILURES"

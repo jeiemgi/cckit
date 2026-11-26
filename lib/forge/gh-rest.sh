@@ -41,6 +41,7 @@
 #   gh_rest_pr_closing_issues <repo> <pr>
 #   gh_rest_pr_diff <repo> <pr>
 #   gh_rest_sub_issue_numbers <repo> <n>
+#   gh_rest_close_open_subs <repo> <parent> <reason> [comment]   close every OPEN sub with the parent's reason (#650); prints each closed number
 #   gh_rest_issue_numbers_by_label <repo> <label>   open issues only
 #   gh_rest_open_issue_titles <repo>      "<n>\t<title>" for every open issue
 #   gh_rest_issue_closing_prs <repo> <n>  merged PRs that close <n> by keyword (timeline)
@@ -270,6 +271,29 @@ gh_rest_user_login() { _ghr_read user --jq '.login // empty'; }
 
 gh_rest_sub_issue_numbers() {
   _ghr_read "repos/$1/issues/$2/sub_issues" -X GET -f per_page=100 --jq '.[].number'
+}
+
+# gh_rest_close_open_subs <repo> <parent> <reason> [comment] — the ONE sub-closing step (#650):
+# close every OPEN native sub-issue of <parent> with <reason> (completed · not planned · duplicate,
+# any spelling gh_rest_issue_close takes) and one comment, default
+# `Closed with its parent #<parent> (<reason>).`. A sub already closed is not written to. Prints
+# the number of each sub it closed, one per line. Callers: `cckit close` and `cckit effort close`,
+# after the parent closes; the abandon flow (#624) reuses it with `not planned`.
+# rc 0 when every open sub closed (or none was open) · 1 when the read or any close failed (the
+# others are still attempted).
+gh_rest_close_open_subs() {
+  local repo="$1" parent="$2" reason="${3:-completed}" comment="${4:-}" open_subs sub rc=0 shown
+  shown="$(printf '%s' "$reason" | tr '_-' '  ')"
+  [ -n "$comment" ] || comment="Closed with its parent #$parent ($shown)."
+  open_subs="$(_ghr_read "repos/$repo/issues/$parent/sub_issues" -X GET -f per_page=100     --jq '.[] | select((.state | ascii_downcase) == "open") | .number')" || return 1
+  # while-read, not `for sub in $open_subs`: zsh does not word-split an unquoted variable.
+  while IFS= read -r sub; do
+    [ -n "$sub" ] || continue
+    if gh_rest_issue_close "$repo" "$sub" "$reason" "$comment"; then printf '%s\n' "$sub"; else rc=1; fi
+  done <<EOF_SUBS
+$open_subs
+EOF_SUBS
+  return "$rc"
 }
 
 gh_rest_issue_numbers_by_label() {
