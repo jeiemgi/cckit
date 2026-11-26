@@ -2,4 +2,7 @@
 # (E546.2). A loose issue is open, not an effort, not a sub-issue, has no relation line, and is not in Backlog.
 # The number may only go down: when an issue is closed or filed under an effort, lower it in the
 # same change. Not run by lib/core/check.sh (the gate stays offline); measured 2026-11-25 with a GET.
-10
+# Raised 10 → 12 on 2026-11-25 (#645): closing PR 517 detached #520, #521 and #522 from #512. cckit has
+# no Projects board, so none can carry Backlog; #520 and #521 get their relation when the docs effort
+# (.cckit/briefs/docs-one-story.md) is filed — lower this to 10 in that change.
+12
