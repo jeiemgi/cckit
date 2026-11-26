@@ -31,7 +31,7 @@ skipped).
 scripts/ux-ds-audit.sh <path> [--exclude <re>] --primitives <ui-barrel> --css <theme.css> [--css-prefix <p>] > /tmp/ux-ds.txt
 ```
 
-Ten sections, each `(N hits)` + `file:line` rows:
+Eleven sections, each `(N hits)` + `file:line` rows:
 
 1. **PRIMITIVE_CLASSNAME** — shared-UI primitives rendered with a `className` (the variant-candidate pool)
 2. **HEADINGS** — `<h1-3>` carrying a display/`type-*` role outside a heading primitive
@@ -44,6 +44,13 @@ Ten sections, each `(N hits)` + `file:line` rows:
    reach into a primitive's `data-slot`
 9. **ICON_PROPS** — repeated `<XxxIcon size={N} strokeWidth={S}>` tuples
 10. **REPEATED_CLASSNAMES** — identical multi-utility `className` literals appearing 3+ times
+11. **OFF_GRID_RADII** — the `C7` and `C8` rows: `C7 OFF_GRID` for a px or rem size, radius, gap,
+    font size or line height off the 4px grid (rem read at a 16px root; type must be even px), each
+    with the nearest value on the grid in the same unit; `C8 RAW_RADIUS` for a radius typed as a
+    literal (`rounded-[Npx]`, `borderRadius: Npx`, `border-radius: Npx` outside a `--radius-*`
+    token definition); `C8 NESTED_EQUAL` for two tags on one line carrying the same `rounded-*`
+    class. Reads the TSX/JSX set (arbitrary Tailwind values, inline `style`) and every `--css`
+    file. 0 and the 1px hairline are never rows
 
 For a large scope, fan classification out to read-only `Explore` sub-agents (one per section
 group), each briefed with this file.
@@ -91,13 +98,21 @@ Emit the `findings.json` schema (`report.md`) with heuristic ids `C1`…`C8`:
 | `C7` | Off-grid value — a px or rem size, radius, gap, font size or line height that is not on the 4px grid (`interface-rules.md` § 1, § 2), with the nearest value on the grid |
 | `C8` | Raw radius — a radius typed as a value instead of a token, a nested corner equal to its parent, siblings with different radii, or a table / code block above the smallest token (`interface-rules.md` § 2) |
 
-`C7` and `C8` come from the interface rules in
+`C7` and `C8` apply the interface rules in
 `kit/templates/skills/page-design/references/interface-rules.md` (under `${CLAUDE_PLUGIN_ROOT}`; in a
-project with `page-design` installed, `.claude/skills/page-design/references/`). `ux-ds-audit.sh`
-does not find them yet: run `grep -nE '\b[0-9]+(\.[0-9]+)?(px|rem)'` over the scope's CSS, tokens
-and TSX, keep the values off the grid (px not a multiple of 4, rem × 16 not a multiple of 4, odd
-font sizes), and every `rounded-\[` / `border-radius:` with a literal value. A value the project
-lists as an exception is not a finding.
+project with `page-design` installed, `.claude/skills/page-design/references/`). Their rows come
+from §11 of `ux-ds-audit.sh`: one row per value, `file:line`, the context it sits in, the value and
+(for `C7`) the nearest value on the grid. Do not grep for them again. What the model still judges:
+
+- A `C7` or `C8` row whose value the project lists as an exception (the design file, a UI
+  conventions rule) is not a finding. Drop it and say which exception covers it.
+- `C8 NESTED_EQUAL` is approximate: the script pairs two tags on one line. Confirm the second tag
+  sits inside the first and inside padding (§ 2: nested corner = outer − gap, floor 4px).
+- Siblings with different radii (elements in one row or list) and a table, `pre` or data grid above
+  the smallest radius token need layout knowledge the script does not have: read the §1 rows and
+  the component files for those and file them as `C8`.
+- A `C7` row for a token definition (`--radius-md: 0.375rem`) is one finding for every use of the
+  token, not one per use: fix it at the definition.
 
 `severity`: `crit` never (consistency is not a blocker) · `p1` core component or ≥ 2 screens
 diverge · `p2` localized · `p3` single-site polish. `needs_visual: true` when the verdict depends
@@ -113,4 +128,4 @@ on how it *looks* rendered (re-skin vs coincidence).
   rule + its barrel export, same PR.
 - **Verification** = re-run `ux-ds-audit.sh` on the same scope and re-classify the refreshed §1
   rows: none may classify VISUAL; §4/§7 are zero outside the UI package; §8 shows no rule reaching
-  into a `data-slot`.
+  into a `data-slot`; §11 lists only the values the project's exceptions cover.

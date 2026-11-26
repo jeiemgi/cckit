@@ -42,6 +42,9 @@ content, and the visual identity.
 ```
 
 `heuristic` is `H1`–`H12` (`heuristics.md`), `C1`–`C8` (`consistency.md`), or `A1`–`A5` (`a11y.md`).
+For `C7` and `C8` the `evidence` entries are the §11 rows of `ux-ds-audit.sh` as printed (`file:line`,
+value, nearest grid value); the agent adds only the exception check and the sibling / table
+judgement `consistency.md` § 4 leaves to it.
 `severity`: `crit` blocks a core task or risks data loss · `p1` frequent friction · `p2` localized
 · `p3` polish. `needs_visual: true` → the agent could not confirm from structure; it goes on the
 "look at this" list, and if a screenshot was captured it goes inline.
