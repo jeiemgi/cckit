@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # kto-task-pr-test.sh — kto_task_pr end to end against the forge shim and a bare remote (#361, E537):
-# it commits tracked changes only (never an untracked .env.local), and it honours
+# it commits the tracked edits and the new files that are not ignored, never a gitignored
+# .env.local (#649), and it honours
 # pr.titleStyle + pr.orchestratorSection when it opens the PR over REST (POST repos/o/r/pulls).
 # Run: bash lib/verbs/kto-task-pr-test.sh
 # errors: strict — a test runner: rc 1 on any failed assertion
@@ -26,10 +27,12 @@ git init -q --bare "$tmp/remote.git"
 git clone -q "$tmp/remote.git" "$tmp/work" 2>/dev/null
 cd "$tmp/work" || exit 1
 git config user.email t@t; git config user.name t
-echo one > tracked.txt; git add tracked.txt; git commit -q -m init; git push -q origin HEAD:main
+echo one > tracked.txt; echo .env.local > .gitignore
+git add tracked.txt .gitignore; git commit -q -m init; git push -q origin HEAD:main
 git checkout -q -b fix/42-the-thing
 echo two > tracked.txt                      # a tracked change: must be committed
-echo SECRET=x > .env.local                  # untracked, not ignored: must NOT be committed
+echo new > brand-new.txt                    # a new file, not ignored: must be committed (#649)
+echo SECRET=x > .env.local                  # gitignored: must NOT be committed
 
 # shellcheck source=/dev/null
 . "$LIB/kit-task-ops.sh"
@@ -37,10 +40,11 @@ KIT_PR_TITLE_STYLE=issue-title KIT_PR_ORCHESTRATOR_SECTION=true \
   kto_task_pr 42 "Did the thing." >/dev/null 2>"$tmp/err"
 t  "kto_task_pr succeeds under set -u"      "$?" "0"
 
-t  "the tracked change is committed"        "$(git show --name-only --format= HEAD)" "tracked.txt"
-t  "the untracked .env.local is not"        "$(git ls-files .env.local)" ""
+t  "the tracked change and the new file are committed" "$(git show --name-only --format= HEAD | sort | tr '\n' ' ')" "brand-new.txt tracked.txt "
+t  "the gitignored .env.local is not"       "$(git ls-files .env.local)" ""
 t  ".env.local is still on disk"            "$(cat .env.local)" "SECRET=x"
-grep -q '.env.local' "$tmp/err" && echo "ok: the untracked file is reported" || { echo "FAIL: untracked file not reported"; fail=1; }
+grep -q 'brand-new.txt' "$tmp/err" && echo "ok: the new file is named as committed" || { echo "FAIL: new file not named"; fail=1; }
+grep -q '.env.local' "$tmp/err" && { echo "FAIL: the ignored file is listed"; fail=1; } || echo "ok: the ignored file is not listed"
 tc "$GH_LOG" "${PR_POST}\"title\":\"Fix the thing\"," "issue-title: the PR title is the issue title"
 tc "$GH_LOG" "${PR_POST}.*\"body\":\"## For the orchestrator\\\\n" "orchestratorSection: the body opens with the section"
 tc "$GH_LOG" "${PR_POST}.*## For the orchestrator\\\\n\\\\n#42 · Fix the thing\\\\n" "orchestratorSection: id + title line"
