@@ -12,8 +12,9 @@
 #   effort_chain <a> <b> [<c> …]          wire N issues into a linear blocked_by chain (#243)
 #   effort_start [--force] <slug|N> [<slug>]  effort/<N> branch + worktree from base, WIP-limited (#244)
 #   effort_pr [<slug|N>]                  open the ONE PR effort/<N> → base branch
-#   effort_close <slug|N> [--no-spec-check]  check the Spec, snapshot sub-diffs, squash-merge, close the
-#                                         parent + finished subs (unfinished stay open, listed)
+#   effort_close <slug|N> [--no-spec-check]  check the Spec, snapshot sub-diffs, squash-merge, delete the
+#                                         effort branch and every sub/<N><letter>-* branch on origin,
+#                                         close the parent + its subs, GC the worktrees + local branches
 #
 # effort_new is the SHARED creation core (effort #98): both `cckit effort new` (the verb) and
 # /kit-effort-new (the skill) call it, so they produce structurally identical efforts — one source of
@@ -1100,6 +1101,31 @@ _eo_source_board() {
 # _eo_issue_close_completed <repo> <n> — close as completed on the chosen transport (#396), quietly.
 _eo_issue_close_completed() { gh_rest_issue_close "$1" "$2" completed >/dev/null 2>&1; }
 
+# _eo_delete_remote_subs <effort#> <dir> — delete every `sub/<N><letter>-*` branch origin has right
+# now (#651), one `✓ deleted remote branch` line each on stderr. Read with `git ls-remote --heads`,
+# filtered to one trailing letter, so another effort's `sub/<N>0a-…` is never matched. In a cloud
+# session the proxy rejects branch deletion (#396): the branches are listed as kept. A failed
+# delete warns; the function always returns 0, because the merge has already landed.
+_eo_delete_remote_subs() {
+  local num="$1" dir="${2:-.}" refs ref sub
+  refs="$(git -C "$dir" ls-remote --heads origin "refs/heads/sub/${num}*" 2>/dev/null \
+    | awk '{print $2}' | sed 's|^refs/heads/||' | grep -E "^sub/${num}[a-z]-" || true)"
+  [ -n "$refs" ] || return 0
+  while IFS= read -r sub; do
+    [ -n "$sub" ] || continue
+    if cckit_in_cloud; then
+      echo "  (remote branch $sub kept — branch deletion is unavailable here; delete it on GitHub)" >&2
+    elif git -C "$dir" push origin --delete "$sub" >/dev/null 2>&1; then
+      echo "  ✓ deleted remote branch $sub" >&2
+    else
+      echo "  ⚠ remote branch $sub not deleted — delete it on GitHub" >&2
+    fi
+  done <<EOF_SUBS
+$refs
+EOF_SUBS
+  return 0
+}
+
 # _eo_board_done <issue #> — set the board Status=Done for one issue. Guarded like _eff_board_add:
 # a no-op unless Projects v2 is on AND the board helpers + field ids are loaded. Best-effort — a
 # board hiccup never fails the close (the merge already landed).
@@ -1374,6 +1400,10 @@ effort_close() {
     git -C "${root:-.}" push origin --delete "$branch" >/dev/null 2>&1 && echo "  ✓ deleted remote branch $branch" >&2 \
       || echo "  (remote branch $branch not deleted — delete it on GitHub)" >&2
   fi
+  # (c2) the effort's sub branches on origin, `sub/<N><letter>-*` (#651): the squash just put their
+  # work on base, and step (f2) prunes only what has a local head. Read from origin (ls-remote, not
+  # the cached refs), one `push --delete` each; a failed delete warns and never fails the close.
+  _eo_delete_remote_subs "$num" "${root:-.}"
 
   # (d) judge the metrics (reads the durable trace dir; the record stays in the local buffer).
   command -v judge_effort_metrics >/dev/null 2>&1 && judge_effort_metrics "$num" "origin/$base" || true

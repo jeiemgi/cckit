@@ -74,11 +74,19 @@ c() { git -c user.email=t@t -c user.name=t commit -q --allow-empty -m "$1"; }
 c "$(printf 'feat: second step [E66.2]\n\nCloses #602')"
 c "feat: third step [E66.3]"
 c "docs: mention #604 is follow-up work (#602)"   # names #604, but its last #ref is #602
+# Two sub branches live on origin (#651): one a parallel sub pushed from its own worktree, one on a
+# second letter. Neither has a local head here, so kit_gc_prune never sees them.
+git push -q origin HEAD:refs/heads/sub/66a-parser HEAD:refs/heads/sub/66b-render 2>/dev/null
+git push -q origin HEAD:refs/heads/sub/660a-other 2>/dev/null     # another effort's sub: must stay
+t "fixture: the sub branches are on origin" "$(git ls-remote --heads origin 'sub/66*' | wc -l | tr -d ' ')" "3"
 
 : > "$GH_LOG"
 out="$(effort_close 66 2>&1)"; rc=$?
 cd "$tmp/work" || exit 1
 t  "close succeeds with an open sub (rc 0)" "$rc" "0"
+t  "close deletes every sub/66<letter>-* branch on origin (#651)" "$(git ls-remote --heads origin 'sub/66[a-z]-*' | wc -l | tr -d ' ')" "0"
+t  "close leaves another effort's sub branch on origin" "$(git ls-remote --heads origin 'sub/660a-other' | wc -l | tr -d ' ')" "1"
+case "$out" in *"deleted remote branch sub/66a-parser"*"deleted remote branch sub/66b-render"*) echo "ok: the output names each deleted sub branch" ;; *) echo "FAIL: deleted sub branches not named: $out"; fail=1 ;; esac
 tc "$GH_LOG" '^PUT repos/o/r/pulls/[0-9]+/merge ' "close squash-merges the effort PR"
 tc "$GH_LOG" '^PATCH repos/o/r/issues/66 \{"state":"closed","state_reason":"completed"\}$' "close closes the parent"
 tc "$GH_LOG" '^PATCH repos/o/r/issues/602 \{"state":"closed","state_reason":"completed"\}$' "close closes the sub a commit closes"
