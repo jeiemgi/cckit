@@ -57,8 +57,10 @@ The effort lifecycle's terminal op. Board state, issue state, and the work recor
    failed delete warns and never fails the close.
 7. **Knowledge-ingest hook** (optional, config-gated via `effort.knowledgeIngestHook`).
 8. **Kit-sync drift check** — advisory warning when the effort touched kit-managed files that
-   belong upstream (/kit-contribute). Under `.claude/rules/` only the rule files the kit ships
-   (`kit/templates/rules/*.md`) count; a rule the project wrote itself is never flagged.
+   belong upstream (/kit-contribute). Kit-managed = listed in the project's `kit.manifest.json`
+   (`_eo_kit_managed_filter`, #652), so a project's own file under `.claude/skills/` is never
+   flagged. With no manifest the path pattern `_EO_KIT_MANAGED_RE` decides and the warning says so;
+   under `.claude/rules/` it matches only the rule files the kit ships (`kit/templates/rules/*.md`).
 
 ## Preconditions
 
