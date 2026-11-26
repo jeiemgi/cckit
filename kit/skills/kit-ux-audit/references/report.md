@@ -41,7 +41,7 @@ content, and the visual identity.
 }
 ```
 
-`heuristic` is `H1`–`H12` (`heuristics.md`), `C1`–`C6` (`consistency.md`), or `A1`–`A5` (`a11y.md`).
+`heuristic` is `H1`–`H12` (`heuristics.md`), `C1`–`C8` (`consistency.md`), or `A1`–`A5` (`a11y.md`).
 `severity`: `crit` blocks a core task or risks data loss · `p1` frequent friction · `p2` localized
 · `p3` polish. `needs_visual: true` → the agent could not confirm from structure; it goes on the
 "look at this" list, and if a screenshot was captured it goes inline.

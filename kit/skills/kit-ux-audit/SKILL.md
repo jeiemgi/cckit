@@ -17,7 +17,7 @@ model. Never eyeball a codebase for something a script already finds — run it,
 | Lane | What it does | Detector | Judge | Heuristics |
 | --- | --- | --- | --- | --- |
 | `flows` (default) | Confusing / erratic flows, IA, edit surfaces, forms | graph (deterministic scan) | **ux** agent | `references/heuristics.md` (H1–H12) |
-| `consistency` | Design-system consistency: hand-rolled UI, primitive className drift, sibling-screen drift, variants-in-disguise, dead CSS | `scripts/ux-ds-audit.sh` | **ux** agent → routes decisions to designer/frontend | `references/consistency.md` (C1–C6) |
+| `consistency` | Design-system consistency: hand-rolled UI, primitive className drift, sibling-screen drift, variants-in-disguise, dead CSS | `scripts/ux-ds-audit.sh` | **ux** agent → routes decisions to designer/frontend | `references/consistency.md` (C1–C8) |
 | `a11y` | Semantic HTML + accessibility: non-semantic interactives, missing text alternatives, unlabeled controls, heading/landmark gaps, focus/keyboard | `scripts/ux-a11y-scan.sh` | **ux** agent | `references/a11y.md` (A1–A5) |
 | `all` | All three lanes, merged into one report | all | | all |
 
@@ -40,7 +40,9 @@ References — load only when you reach the step that needs one:
 - `references/heuristics.md` — the 12 `flows` heuristics: graph signal, default severity, whether
   the finding needs visual confirmation. **This is the flows audit.**
 - `references/consistency.md` — the `consistency` lane: the `ux-ds-audit.sh` sections, the
-  LAYOUT / VISUAL / BEHAVIOR classification, sibling-screen comparison, variant proposals.
+  LAYOUT / VISUAL / BEHAVIOR classification, sibling-screen comparison, variant proposals. Its `C7`
+  and `C8` read `kit/templates/skills/page-design/references/interface-rules.md`: the 4px grid, the
+  radius rules, the table pattern and the error surfaces every interface built with cckit keeps.
 - `references/a11y.md` — the `a11y` lane: the `ux-a11y-scan.sh` groups, DEFECT / OK / NEEDS_VISUAL
   triage, and the fix each smell maps to.
 - `references/report.md` — how to **write** the report: the `findings.json` schema, the section
@@ -106,7 +108,7 @@ bash "${CLAUDE_PLUGIN_ROOT}/lib/verbs/ux-ds-audit.sh" "$T/src" \
 Then follow `references/consistency.md`: classify every primitive-with-className row into
 LAYOUT / VISUAL / BEHAVIOR, run the sibling-screen comparison for a page scope, map hand-rolled
 recipes to the primitive that should own them, judge custom CSS (variant-in-disguise vs layout vs
-dead). Emit the same `findings.json` schema (heuristic ids `C1`…`C6`). Fan out to `Explore`
+dead). Emit the same `findings.json` schema (heuristic ids `C1`…`C8`; `C7` off-grid value and `C8` raw radius check the scope against `kit/templates/skills/page-design/references/interface-rules.md`). Fan out to `Explore`
 sub-agents by section group for a large scope.
 
 ### Lane `a11y`

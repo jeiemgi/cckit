@@ -78,7 +78,7 @@ parallax, art direction) stays. Zero-reference classes are dead → delete.
 
 ## 4 · Findings
 
-Emit the `findings.json` schema (`report.md`) with heuristic ids `C1`…`C6`:
+Emit the `findings.json` schema (`report.md`) with heuristic ids `C1`…`C8`:
 
 | id | finding |
 | --- | --- |
@@ -88,6 +88,16 @@ Emit the `findings.json` schema (`report.md`) with heuristic ids `C1`…`C6`:
 | `C4` | Custom CSS verdict — variant-in-disguise / layout-keep / dead-delete |
 | `C5` | Repeated className literal → component or variant, with locations |
 | `C6` | Card-in-Card / structural nesting bug |
+| `C7` | Off-grid value — a px or rem size, radius, gap, font size or line height that is not on the 4px grid (`interface-rules.md` § 1, § 2), with the nearest value on the grid |
+| `C8` | Raw radius — a radius typed as a value instead of a token, a nested corner equal to its parent, siblings with different radii, or a table / code block above the smallest token (`interface-rules.md` § 2) |
+
+`C7` and `C8` come from the interface rules in
+`kit/templates/skills/page-design/references/interface-rules.md` (under `${CLAUDE_PLUGIN_ROOT}`; in a
+project with `page-design` installed, `.claude/skills/page-design/references/`). `ux-ds-audit.sh`
+does not find them yet: run `grep -nE '\b[0-9]+(\.[0-9]+)?(px|rem)'` over the scope's CSS, tokens
+and TSX, keep the values off the grid (px not a multiple of 4, rem × 16 not a multiple of 4, odd
+font sizes), and every `rounded-\[` / `border-radius:` with a literal value. A value the project
+lists as an exception is not a finding.
 
 `severity`: `crit` never (consistency is not a blocker) · `p1` core component or ≥ 2 screens
 diverge · `p2` localized · `p3` single-site polish. `needs_visual: true` when the verdict depends
