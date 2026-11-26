@@ -94,5 +94,7 @@ not on the § 2 blocker list.
   (`cckit new --milestone <sprint> "<title>"`).
 - **Otherwise:** a new backlog item (`cckit new "<title>"`) with a `flow:` label and a
   `## Relations` line naming the effort it came from (`Extends #<effort>`).
+- **Parked for later:** an open issue under no effort, with no relation, goes in Backlog so
+  `cckit doctor --loose` skips it: board Status, or the `backlog` label when there is no board.
 - **Ask only** when it needs a product, legal, cost or secrets decision: file it, link it, then ask
   that one question.

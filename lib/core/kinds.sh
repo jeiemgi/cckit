@@ -25,7 +25,7 @@
 #   kit_label_desc <family> [value]   echo the ONE description a kit label carries (#639). Both
 #                             writers of kit labels — setup-labels.sh and `cckit effort new|sub` —
 #                             call it, so a label reads the same whichever created it. Families:
-#                             effort kind priority ctx flow role agent.
+#                             effort backlog kind priority ctx flow role agent.
 #   kit_label_color <family> [value]  echo the hex colour setup-labels.sh gives that label.
 #
 # Sourced by bash AND zsh (no arrays, no glob held in a variable). Requires: nothing.
@@ -75,6 +75,7 @@ kit_kind_commit_type() {
 kit_label_desc() {
   case "${1:-}" in
     effort) printf 'An effort parent issue\n' ;;
+    backlog) printf 'Parked on purpose; not loose when the project has no board (#647)\n' ;;
     kind)
       if kit_kind_content "${2:-}"; then printf 'Kind: %s (content)\n' "$2"; else printf 'Kind: %s\n' "${2:-}"; fi ;;
     priority)
@@ -100,6 +101,7 @@ kit_label_color() {
     ctx)  printf 'c5def5\n' ;;
     flow) printf '0e8a16\n' ;;
     role) printf '1d76db\n' ;;
+    backlog) printf 'ededed\n' ;;
     *)    printf '5319e7\n' ;;   # effort, kind, agent
   esac
 }
