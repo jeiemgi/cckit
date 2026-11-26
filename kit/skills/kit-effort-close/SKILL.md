@@ -1,7 +1,7 @@
 ---
 name: kit-effort-close
 terms: Effort
-description: Close an effort in ONE op — snapshot each sub-issue's diff BEFORE squash (work record), capture and judge effort metrics, squash-merge the effort PR, close the parent + finished subs, then every sub still open with the parent (same reason, one comment naming it), board Done for each, GC the worktree/branch, run the optional knowledge-ingest hook, and finish with the kit-sync drift check.
+description: Close an effort in ONE op — snapshot each sub-issue's diff BEFORE squash (work record), capture and judge effort metrics, squash-merge the effort PR, close the parent + every sub, undelivered ones with it, board Done for each, GC the worktree/branch, run the optional knowledge-ingest hook, and finish with the kit-sync drift check.
 when_to_use: When the effort PR has been reviewed and is ready to land. This is the single close op for the effort lifecycle (effort-model.md) — board + record state are correct by construction. Replaces the separate merge / close / mark-done / gc steps.
 ---
 
