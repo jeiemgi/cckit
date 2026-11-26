@@ -5,7 +5,8 @@
 # parameters (--primitives / --css-prefix / --css), so it runs against any design system.
 #
 # Emits RAW occurrence lists the `kit-ux-audit` skill classifies (LAYOUT / VISUAL / BEHAVIOR,
-# variant proposals, sibling-screen comparison). Pure grep/perl ($0, no model call, no grep -P),
+# variant proposals, sibling-screen comparison). Section 11 emits the C7 (off-grid value, with the
+# nearest grid value) and C8 (raw radius) rows against the 4px grid of interface-rules.md. Pure grep/perl ($0, no model call, no grep -P),
 # scoped to a path, macOS-safe. This script never decides — it only finds.
 #
 # usage: lib/verbs/ux-ds-audit.sh <path> [--exclude <regex>] [--primitives <index.ts>]
@@ -15,7 +16,8 @@
 #   --primitives  the shared UI barrel to read primitive names from (default packages/ui/src/index.ts)
 #   --css-prefix  custom-class prefix to hunt in TSX/JSX (no default; section 8's TSX hunt is
 #                 skipped when omitted — the data-* and dead-CSS probes still run)
-#   --css         theme css file(s) to cross-check custom classes against (repeatable)
+#   --css         theme css file(s) to cross-check custom classes against and to read for off-grid
+#                 values and raw radii in section 11 (repeatable)
 set -eu   # no pipefail: many probes end in a grep that legitimately finds nothing
 
 USAGE="usage: ux-ds-audit.sh <path> [--exclude re] [--primitives index.ts] [--css-prefix p] [--css file]"
@@ -142,5 +144,76 @@ printf '%s\n' "$REPEATED" | cut -f2 | while IFS= read -r lit; do
   printf '  %s\n' "$lit"
   printf '%s\n' "$FILES" | xargs grep -nF -- "$lit" 2>/dev/null | cut -d: -f1,2 | sed 's|^|    |'
 done
+
+# 11. Off-grid values and raw radii — the C7 / C8 rows (interface-rules.md § 1, § 2).
+# Perl, no model: each row is file:line, the id, the context it was found in, the value, and for C7
+# the nearest value on the grid in the same unit. Sizes (padding, gap, margin, width, height,
+# radius, icon) must be a multiple of 4px; type (font size, line height) must be even px; rem is
+# read at a 16px root. 0 and the 1px hairline (a standing exception in § 1) are never rows.
+# C8 covers a radius typed as a literal (`rounded-[Npx]`, `borderRadius: Npx`, `border-radius: Npx`
+# outside a `--radius-*` token definition) and, approximately, two tags on ONE line carrying the same
+# `rounded-*` class (nested corner = parent's, § 2). Siblings with different radii and the
+# table / code-block ceiling need layout knowledge the script does not have: the model judges those.
+section "11 OFF_GRID_RADII — C7 off-grid px/rem values (with the nearest grid value) and C8 raw radii; siblings and the table rule stay with the model"
+GRID_PERL='
+  sub px  { my ($v,$u)=@_; return $u eq "rem" ? $v*16 : $v+0; }
+  sub fmt { my ($p,$u)=@_; return $u eq "rem" ? sprintf("%grem",$p/16) : sprintf("%gpx",$p); }
+  sub c7 {                                   # ($ctx,$value,$unit,$is_type)
+    my ($ctx,$v,$u,$type)=@_; my $p=px($v,$u);
+    return if $p==0 || $p==1;                # on the grid / the hairline exception
+    my $step = $type ? 2 : 4;
+    my $int  = abs($p-int($p+0.5)) < 1e-6;
+    my $ok   = $int && (int($p+0.5) % $step)==0;
+    my $small = $type && $ctx =~ /font|text-\[/ && $p < 12;
+    return if $ok && !$small;
+    my $near = $step*int($p/$step+0.5); $near=$step if $near==0;   # a tie rounds up
+    my $why  = $ok ? "below 12px" : "nearest ".fmt($near,$u);
+    print "$ARGV:$.\tC7 OFF_GRID\t$ctx\t$v$u\t$why\n";
+  }
+  sub c8 { my ($ctx,$v,$u)=@_; print "$ARGV:$.\tC8 RAW_RADIUS\t$ctx\t$v$u\n"; }
+  my $line=$_;
+  if ($ENV{GRID_MODE} eq "tsx") {
+    # arbitrary Tailwind values: p-[13px] gap-[0.8rem] text-[13px] leading-[18px] rounded-[6px] md:w-[50px]
+    while ($line =~ /((?:[a-z]+:)*(-?[a-z]+(?:-[a-z]+)*)-\[(\d*\.?\d+)(px|rem)\])/g) {
+      my ($ctx,$util,$v,$u)=($1,$2,$3,$4); $util =~ s/^-//;
+      c7($ctx,$v,$u, ($util =~ /^(text|leading)$/ ? 1 : 0));
+      c8($ctx,$v,$u) if $util =~ /^rounded(-|$)/;
+    }
+    # inline style values: style={{ padding: 13, gap: "13px", borderRadius: "6px" }} — camelCase or kebab
+    if ($line =~ /style=/) {
+      while ($line =~ /([A-Za-z-]+)\s*:\s*["\x27]?(\d*\.?\d+)(px|rem)/g) {
+        my ($prop,$v,$u)=($1,$2,$3);
+        c7("$prop: $v$u",$v,$u, ($prop =~ /^(fontSize|lineHeight|font-size|line-height)$/ ? 1 : 0));
+        c8("$prop: $v$u",$v,$u) if $prop =~ /[rR]adius/;
+      }
+    }
+    # two tags on one line with the same rounded-* class (rounded-full nests rounded-full by rule)
+    my @r;
+    while ($line =~ /<[A-Za-z][\w.]*\b[^>]*?className="([^"]*)"/g) {
+      my $c=$1; my ($rad) = $c =~ /(?:^|\s)(rounded(?:-[a-z]+)*(?:-\[[^\]]+\])?)(?=\s|$)/; push @r, defined $rad ? $rad : "";
+    }
+    for my $i (1..$#r) {
+      next if $r[$i] eq "" || $r[$i] ne $r[$i-1] || $r[$i] =~ /full/;
+      print "$ARGV:$.\tC8 NESTED_EQUAL\t$r[$i] on a tag and the tag inside it\t$r[$i]\n";
+    }
+  } else {
+    # every css declaration on the line: `prop: v1 v2;` or a token `--radius-md: 0.375rem;`
+    while ($line =~ /(?:^|[;{])\s*(--[\w-]+|[a-z-]+)\s*:\s*([^;{}]*)/g) {
+      my ($prop,$val)=($1,$2);
+      my $type = $prop =~ /^(font-size|line-height|--(font-size|text|leading|line-height)[\w-]*)$/ ? 1 : 0;
+      while ($val =~ /(?<![\w.])(\d*\.?\d+)(px|rem)\b/g) { c7("$prop: $1$2",$1,$2,$type); }
+      if ($prop =~ /^border(-[a-z]+)*-radius$/ && $val =~ /(\d*\.?\d+)(px|rem)/) { c8("$prop: $1$2",$1,$2); }
+    }
+  }
+  close ARGV if eof;
+'
+OUT=$(printf '%s\n' "$FILES" | GRID_MODE=tsx xargs perl -ne "$GRID_PERL" 2>/dev/null || true)
+if [[ ${#CSS_FILES[@]} -gt 0 ]]; then
+  CSS_OUT=$(for css in "${CSS_FILES[@]}"; do [[ -f "$css" ]] && printf '%s\n' "$css"; done | GRID_MODE=css xargs perl -ne "$GRID_PERL" 2>/dev/null || true)
+  OUT=$(printf '%s\n%s\n' "$OUT" "$CSS_OUT" | grep . || true)
+fi
+printf 'C7 '; tally "$(printf '%s\n' "$OUT" | grep -F $'\tC7 ' || true)"
+printf 'C8 '; tally "$(printf '%s\n' "$OUT" | grep -F $'\tC8 ' || true)"
+printf '%s\n' "$OUT"
 
 echo; echo "# end — classify with kit/skills/kit-ux-audit/references/consistency.md"
