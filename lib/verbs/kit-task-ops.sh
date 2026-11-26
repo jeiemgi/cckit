@@ -392,14 +392,17 @@ kto_task_pr() {
   fi
   [[ -z "$commit_msg" ]] && commit_msg="$pr_title"
 
-  # TRACKED changes only: `git add -A` would sweep an untracked .env.local (copied into every worktree)
-  # into the PR. Untracked files are listed, never committed — `git add` them yourself if they belong.
-  if [[ -n "$(git ls-files --others --exclude-standard 2>/dev/null)" ]]; then
-    echo "kto_task_pr: untracked files NOT committed (git add them first if they belong):" >&2
-    git ls-files --others --exclude-standard 2>/dev/null | sed 's/^/  /' >&2
+  # Every file the local gate saw goes into the commit (#649): tracked edits AND new files that are
+  # not ignored. `git add -A` honours .gitignore, so an ignored .env.local copied into the worktree
+  # never reaches the PR; a new file that must stay out of a PR belongs in .gitignore, not on a list
+  # the op prints. New files are named on stderr so the commit is never silently larger either.
+  local new_files; new_files="$(git ls-files --others --exclude-standard 2>/dev/null)"
+  if [[ -n "$new_files" ]]; then
+    echo "kto_task_pr: new files committed with the tracked changes (add them to .gitignore to keep them out):" >&2
+    printf '%s\n' "$new_files" | sed 's/^/  /' >&2
   fi
-  if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
-    git add -u
+  if [[ -n "$(git status --porcelain)" ]]; then
+    git add -A
     if type role_git_author >/dev/null 2>&1; then author="$(role_git_author "$role")"; fi
     if [[ -n "$author" ]]; then
       git commit -m "$commit_msg" -m "Co-authored-by: ${author%%|*} <${author##*|}>"
