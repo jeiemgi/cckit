@@ -98,6 +98,7 @@ kind_labels() { sed -n 's/^POST repos\/[^ ]*\/labels {"name":"kind:\([a-z]*\)".*
 ( cd "$root" && PATH="$tmp/bin:$PATH" KIT_CONFIG="$root/cckit.config.json" bash scripts/setup-labels.sh ) >/dev/null 2>&1
 t "setup-labels ran" "$?" "0"
 t "setup-labels provisions exactly the kind set" "$(kind_labels "$GH_LOG")" "$want"
+t "setup-labels provisions the backlog label (#647)" "$(grep -c '^POST repos/[^ ]*/labels {"name":"backlog"' "$GH_LOG")" "1"
 t "setup-labels runs no gh subcommand" "$(grep -c '^GH-SUBCOMMAND' "$GH_LOG")" "0"
 # 4b. with kinds.content on, the content kind labels are provisioned too.
 : > "$GH_LOG"
