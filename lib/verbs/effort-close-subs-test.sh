@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# effort-close-subs-test.sh — `cckit effort close` closes only the finished subs (#565, decision 52).
+# effort-close-subs-test.sh — `cckit effort close` closes the finished subs as delivered and every other
+# open sub with the parent (#565 partition, #650 close-with-parent).
 # Hermetic: the forge shim (test-forge-shim.sh) answers like the REST API and logs `METHOD path {json}`;
 # a throwaway git repo with a bare remote. Run:  bash lib/verbs/effort-close-subs-test.sh
 # errors: strict — a test runner: rc 1 on any failed assertion
@@ -26,7 +27,7 @@ export GH_HEAD="effort/66-demo" GH_BASE="main" GH_MERGEABLE=true
 export GH_BODY='## Goal\nship it\n\n## Spec\n- it ships'
 # Effort #66 has four subs: 601 already closed, 602 open but delivered by a `Closes #602` commit,
 # 603 open but delivered by a commit tagged with its step id [E66.3], 604 open and delivered by
-# nothing — the one that must stay open.
+# nothing — the one that closes with the parent (#650).
 export GH_FIXTURE="$tmp/fixture.sh"
 cat > "$GH_FIXTURE" <<'SH'
 case "$method $ep" in
@@ -83,14 +84,18 @@ tc "$GH_LOG" '^PATCH repos/o/r/issues/66 \{"state":"closed","state_reason":"comp
 tc "$GH_LOG" '^PATCH repos/o/r/issues/602 \{"state":"closed","state_reason":"completed"\}$' "close closes the sub a commit closes"
 tc "$GH_LOG" '^PATCH repos/o/r/issues/603 \{"state":"closed","state_reason":"completed"\}$' "close closes the sub a step tag delivers"
 t  "close does not re-close the already-closed sub" "$(grep -c '^PATCH repos/o/r/issues/601 ' "$GH_LOG")" "0"
-t  "close leaves the unfinished sub open (no write to #604)" "$(grep -cE '^(PATCH|POST|PUT|DELETE) repos/o/r/issues/604' "$GH_LOG")" "0"
+tc "$GH_LOG" '^PATCH repos/o/r/issues/604 \{"state":"closed","state_reason":"completed"\}$' "close closes the undelivered sub with the parent (#650)"
+tc "$GH_LOG" '^POST repos/o/r/issues/604/comments \{"body":"Closed with its parent #66 \(completed\)\."\}$' "the undelivered sub's comment names the parent"
+t  "the undelivered sub closes after the parent" \
+   "$(grep -nE '^PATCH repos/o/r/issues/(66|604) ' "$GH_LOG" | sed -E 's/^[0-9]+:PATCH repos\/o\/r\/issues\/([0-9]+) .*/\1/' | tr '\n' ' ')" "66 604 "
 t  "close detaches nothing (no DELETE of any kind)" "$(grep -c '^DELETE ' "$GH_LOG")" "0"
 tc "$GH_LOG" '^POST repos/o/r/issues/66/comments .*Finished sub-issues: #601, #602, #603' "the close comment lists the finished subs"
-tc "$GH_LOG" '^POST repos/o/r/issues/66/comments .*Left open, still linked.*- #604 \[E66\.4\] release later' "the close comment lists the open sub"
+tc "$GH_LOG" '^POST repos/o/r/issues/66/comments .*Closed with the parent, no commit on the effort branch delivers them.*- #604 \[E66\.4\] release later' "the close comment lists the sub closed with the parent"
 t  "the comment is posted before the parent closes" \
    "$(grep -nE '^POST repos/o/r/issues/66/comments |^PATCH repos/o/r/issues/66 ' "$GH_LOG" | sed -E 's/^[0-9]+:(POST|PATCH).*/\1/' | tr '\n' ' ')" "POST PATCH "
-case "$out" in *"left open: sub #604"*) echo "ok: the output flags the open sub as it closes" ;; *) echo "FAIL: no left-open line: $out"; fail=1 ;; esac
-case "$out" in *"closed with unfinished sub-issues still open"*"#604"*) echo "ok: the report ends with the open sub" ;; *) echo "FAIL: no closing report of the open sub: $out"; fail=1 ;; esac
+case "$out" in *"closed sub #604 with its parent"*) echo "ok: the output names the sub closed with the parent" ;; *) echo "FAIL: no closed-with-parent line: $out"; fail=1 ;; esac
+case "$out" in *"closed with sub-issues no commit delivered"*"#604"*) echo "ok: the report ends with the undelivered sub" ;; *) echo "FAIL: no closing report of the undelivered sub: $out"; fail=1 ;; esac
+case "$out" in *"left open"*) echo "FAIL: the output still says a sub was left open"; fail=1 ;; *) echo "ok: nothing is reported left open" ;; esac
 t  "no gh subcommand ran" "$(grep -c '^GH-SUBCOMMAND' "$GH_LOG")" "0"
 
 [ "$fail" = 0 ] && echo "ALL OK (effort-close-subs)" || { echo "effort-close-subs: FAILURES"; exit 1; }

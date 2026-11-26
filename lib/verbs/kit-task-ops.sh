@@ -23,7 +23,7 @@
 #   kto_task_pr   <num> <summary> [commit-msg] [--base <branch>]   commit+push+open PR (board → In Review)
 #   kto_task_pr_merge [pr-num] [--squash|--merge|--rebase]   merge (squash default) + close issues + GC + update the PR base; refuses an effort/* head
 #   kto_task_new  <title> <role> <kind> <prio> [ms] [plan] [blocked] <body>   lint the title and the body's effort relations (KIT_FORCE=1 skips the latter), create issue + board fields (ms may be empty)
-#   kto_task_close <num> <summary> [pr-num] [--reason R] [--duplicate-of N] [--superseded-by N]   close + reason + board → Done
+#   kto_task_close <num> <summary> [pr-num] [--reason R] [--duplicate-of N] [--superseded-by N]   close + reason + board → Done; open subs close with it (#650)
 # errors: mixed — git/gh ops propagate; board + label side effects are best-effort
 
 # --- repo resolution -----------------------------------------------------------------------------
@@ -798,4 +798,15 @@ kto_task_close() {
   else
     echo "  issue #$num already $state — board status updated only"
   fi
+  # Its open native sub-issues close with it, same reason (#650): the one shared step both close
+  # verbs call. Runs on an already-closed parent too, so a re-run finishes a close that left subs.
+  local closed_subs sub
+  closed_subs="$(gh_rest_close_open_subs "$repo" "$num" "$gh_reason")" || echo "  ⚠ could not close every sub-issue of #$num — check them on the forge" >&2
+  while IFS= read -r sub; do
+    [[ -n "$sub" ]] || continue
+    echo "✓ Closed sub #$sub with its parent ($gh_reason)"
+  done <<EOF_SUBS
+$closed_subs
+EOF_SUBS
+  return 0
 }

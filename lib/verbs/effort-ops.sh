@@ -1323,8 +1323,8 @@ effort_close() {
 
   # (b3) which subs are finished (#565, decision 52), read PRE-squash while the effort branch's
   # commits still exist. A sub is finished when it is already closed, or a commit on this branch
-  # delivers it (_eo_delivered_refs). Unfinished subs are NOT closed and NOT detached: they stay
-  # open under the parent and are listed in the close comment and in this command's output.
+  # delivers it (_eo_delivered_refs). A sub no commit delivers is not detached: it closes WITH the
+  # parent in step (e) (#650) and is listed as such in the close comment and in this output.
   local sub_rows delivered sub_split done_subs="" open_subs="" open_lines=""
   sub_rows="$(forge_rest "repos/$repo/issues/$num/sub_issues" \
     --jq '.[] | "\(.number)|\(.state)|\(.title // "")"' 2>/dev/null)" || sub_rows=""
@@ -1349,11 +1349,12 @@ effort_close() {
   # (d) judge the metrics (reads the durable trace dir; the record stays in the local buffer).
   command -v judge_effort_metrics >/dev/null 2>&1 && judge_effort_metrics "$num" "origin/$base" || true
 
-  # (e) close the FINISHED sub-issues (#565), then the parent — and set the board Status=Done for
-  # each (guarded: a no-op when Projects v2 is off or the board helpers/ids are unavailable). A sub
-  # already closed keeps its own close reason (no second PATCH). An unfinished sub stays open and
-  # linked; the close comment on the parent lists it. Board + issue + record state are owned by
-  # this ONE op (effort-model.md) — never a separate "mark done".
+  # (e) close the FINISHED sub-issues (#565), then the parent, then every sub still open — with the
+  # parent's reason and one comment naming it, through the shared gh_rest_close_open_subs (#650) —
+  # and set the board Status=Done for each (guarded: a no-op when Projects v2 is off or the board
+  # helpers/ids are unavailable). A sub already closed keeps its own close reason (no second
+  # PATCH). Board + issue + record state are owned by this ONE op (effort-model.md) — never a
+  # separate "mark done".
   _eo_source_board
   local sub sstate done_list="" comment
   while IFS='|' read -r sub sstate; do
@@ -1368,14 +1369,21 @@ effort_close() {
   done <<EOF_DONE
 $done_subs
 EOF_DONE
-  while IFS= read -r sub; do
-    [ -n "$sub" ] && echo "  ⚠ left open: sub #$sub — unfinished, still linked under #$num" >&2
-  done <<EOF_OPEN
-$open_subs
-EOF_OPEN
   comment="$(_eo_close_comment "$branch" "$done_list" "$open_lines")"
   gh_rest_issue_close "$repo" "$num" completed "$comment" >/dev/null 2>&1 && echo "  ✓ closed effort #$num" >&2
   _eo_board_done "$num"
+  if [ -n "$open_subs" ]; then
+    local closed_with
+    closed_with="$(gh_rest_close_open_subs "$repo" "$num" completed 2>/dev/null)" \
+      || echo "  ⚠ could not close every sub-issue of #$num — check them on the forge" >&2
+    while IFS= read -r sub; do
+      [ -n "$sub" ] || continue
+      echo "  ✓ closed sub #$sub with its parent (no commit on the effort branch delivers it)" >&2
+      _eo_board_done "$sub"
+    done <<EOF_WITH
+$closed_with
+EOF_WITH
+  fi
 
   # (f) GC: switch the main checkout to base, remove the effort worktree, delete the local branch,
   # prune. The remote branch was deleted in step (c). All via `git -C "$root"` so the
@@ -1408,10 +1416,10 @@ EOF_OPEN
   # (h) kit-sync drift check — kit ⇄ project stay in sync (#148, moved here from the skill).
   _eo_kit_sync_warn "$kit_touched"
 
-  # (i) the report's last word: the subs this close left open (#565).
+  # (i) the report's last word: the subs that closed with the parent, undelivered (#565, #650).
   if [ -n "$open_lines" ]; then
     echo "" >&2
-    echo "  ⚠ #$num closed with unfinished sub-issues still open (linked under it):" >&2
+    echo "  ⚠ #$num closed with sub-issues no commit delivered (closed with it, same reason):" >&2
     printf '%s\n' "$open_lines" | sed 's/^/     /' >&2
   fi
   return 0
@@ -1456,7 +1464,7 @@ _eo_close_comment() {
   printf 'Closed by `cckit effort close` (merged `%s`).\n\n' "$1"
   printf 'Finished sub-issues: %s\n' "${2:-none}"
   if [ -n "${3:-}" ]; then
-    printf '\nLeft open, still linked under this effort (no commit on the effort branch delivers them):\n%s\n' "$3"
+    printf '\nClosed with the parent, no commit on the effort branch delivers them:\n%s\n' "$3"
   fi
 }
 
