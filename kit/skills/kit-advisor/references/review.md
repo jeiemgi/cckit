@@ -37,7 +37,8 @@ gate must be green on its head commit.
 ## 4. Report
 
 Write the step report in the order Status · Done · Waiting for a yes · Numbers · Failing or risky ·
-Open questions · Next step (`references/step-report.md`), then post its trail comment:
+Open questions · Next step (`references/step-report.md`). A Spec item ending `(needs a yes)` stays
+under Waiting for a yes until the person accepts it. Then post the trail comment:
 
 ```bash
 cckit agent receipt <N> --report .cckit/reports/<file>.md

@@ -311,23 +311,23 @@ EOF_SB
   command -v effort_ctx_bucket >/dev/null 2>&1 && ctx="$(effort_ctx_bucket 1 "$subcount")"
   # Every kit-defined label is ensured before use — `gh issue create --label` fails hard on a
   # missing label, which aborted the whole parent create on repos without the ctx:* set (#153).
-  _eff_ensure_label "$ctx" bfd4f2 "effort session weight"
-  _eff_ensure_label "kind:$kind" d4c5f9 "kit issue kind"
-  _eff_ensure_label "priority:$priority" e99695 "kit priority"
+  _eff_ensure_label "$ctx" bfd4f2 "$(kit_label_desc ctx "${ctx#ctx:}")"
+  _eff_ensure_label "kind:$kind" d4c5f9 "$(kit_label_desc kind "$kind")"
+  _eff_ensure_label "priority:$priority" e99695 "$(kit_label_desc priority "$priority")"
   # `effort` is what marks the parent AS an effort, and it is the label `effort_plan` queries
   # (`gh issue list --label effort`, effort-plan.sh). It was read and never written: the label did
   # not exist in this repo at all, so `cckit effort plan` answered "no open efforts found" for
   # every effort ever created here. A label something reads and nothing writes is the same defect
   # as one something writes and nothing reads — see rules/naming-and-ids.md § Labels.
-  _eff_ensure_label "effort" 5319e7 "an effort parent issue"
+  _eff_ensure_label "effort" 5319e7 "$(kit_label_desc effort)"
   local labels="effort,$ctx,kind:$kind,priority:$priority"
   if [ -n "$role" ]; then
-    _eff_ensure_label "role:$role" 0e8a16 "kit role lane"
+    _eff_ensure_label "role:$role" 0e8a16 "$(kit_label_desc role "$role")"
     labels="$labels,role:$role"
   fi
   if [ -n "$flow" ]; then
     local flow_lc; flow_lc="$(printf '%s' "$flow" | tr '[:upper:]' '[:lower:]')"
-    _eff_ensure_label "flow:$flow_lc" 1d76db "kit flow lane"
+    _eff_ensure_label "flow:$flow_lc" 1d76db "$(kit_label_desc flow "$flow_lc")"
     labels="$labels,flow:$flow_lc"
   fi
 
@@ -437,8 +437,8 @@ effort_sub() {
   step=$(( ${count:-0} + 1 ))
   title="$(naming_sub_title "$num" "$step" "$name")"
   naming_title_lint sub "$title" || return 1
-  _eff_ensure_label "kind:$kind" d4c5f9 "kit issue kind"
-  _eff_ensure_label "priority:$priority" e99695 "kit priority"
+  _eff_ensure_label "kind:$kind" d4c5f9 "$(kit_label_desc kind "$kind")"
+  _eff_ensure_label "priority:$priority" e99695 "$(kit_label_desc priority "$priority")"
   sub_labels="kind:$kind,priority:$priority"
   [ -n "$role" ] && sub_labels="$sub_labels,role:$role"
   child="$(gh_rest_issue_create "$repo" "$title" \

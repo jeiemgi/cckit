@@ -109,4 +109,28 @@ t "a plain title is kept"   "$(naming_strip_prefix 'plain issue title')"        
   exit "$r"
 ) || fail=1
 
+# --- body relations (E632.4): a body that cites an effort carries a relation to it ---
+nl='
+'
+t "body tokens: none"            "$(naming_body_effort_numbers 'plain body, no token')"           ""
+t "body tokens: effort and sub"  "$(naming_body_effort_numbers "see [E632] and [E632.4] and [E7.1]")" "632${nl}7"
+t "body tokens: bare E632 is not a token" "$(naming_body_effort_numbers 'E632 in prose')"         ""
+rel() { if naming_body_has_relation "$1" "$2"; then echo "ok   relation to #$2: $1"; else echo "FAIL should see a relation to #$2: $1"; fail=1; fi; }
+norel() { if naming_body_has_relation "$1" "$2"; then echo "FAIL should see no relation to #$2: $1"; fail=1; else echo "ok   no relation to #$2: $1"; fi; }
+rel   "- Depends on #632"           632
+rel   "Blocks #632"                 632
+rel   "- extends #632"              632
+rel   "- Parallel-safe with #632"   632
+rel   "Sub-issue of #632"           632
+rel   "**Blocked by:** #1, #632"    632
+norel "- Depends on #6320"          632
+norel "- Depends on #63"            632
+norel "mentions #632 in prose"      632
+naming_body_relation_lint "Part of [E632.4].${nl}${nl}## Relations${nl}- Depends on #632" 2>/dev/null; t "lint: a cited effort with a relation passes" "$?" "0"
+naming_body_relation_lint "no token here" 2>/dev/null;                                         t "lint: a body with no token passes"           "$?" "0"
+err="$(naming_body_relation_lint "Part of [E632.4]." 2>&1 >/dev/null)"; rc=$?
+t "lint: a cited effort with no relation fails" "$rc" "1"
+case "$err" in *"[E632]"*"#632"*"--force"*) echo "ok   lint: the refusal names the token, the fix and --force" ;; *) echo "FAIL lint message: $err"; fail=1 ;; esac
+naming_body_relation_lint "[E632] and [E7]${nl}- Depends on #632" 2>/dev/null; t "lint: every cited effort needs its own relation" "$?" "1"
+
 exit "$fail"

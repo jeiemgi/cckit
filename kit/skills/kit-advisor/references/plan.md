@@ -21,8 +21,9 @@ An effort planned for next week passes a day of that week: `--sprint=2026-11-30`
 - **Vertical slices.** Every sub is demoable on its own, through every layer it needs.
 - **Expand–contract** for a wide refactor: add beside, move the callers, remove. The effort stays
   mergeable after every sub.
-- **Each sub has a Spec:** what done means, as a checkable list. A sub nobody can check is not cut
-  small enough.
+- **Each sub has a Spec:** what done means, as a checkable list. A sub nobody can check is
+  not cut small enough. End an item only a person can accept with `(needs a yes)`; every report
+  lists it under Waiting for a yes.
 - **Waves.** Subs that touch disjoint files and block nothing run in the same wave; a sub that
   needs another's output goes in a later wave. Sequential subs are one wave each.
 

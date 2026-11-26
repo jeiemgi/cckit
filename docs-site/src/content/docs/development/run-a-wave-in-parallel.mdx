@@ -100,6 +100,12 @@ You don't assign waves by hand. cckit reads the *blocked-by* links and computes 
 **A PR didn't merge.** The captain merges only PRs that pass the gate. Read the gate output on that
 PR, fix the finding, and re-run `cckit watch --merge` — the rest of the wave isn't held up.
 
+**The wave stayed open.** After it merges, `cckit watch --merge` runs `cckit doctor --loose --ratchet`.
+More loose issues than the baseline (open issues under no effort, not sub-issues, not in Backlog)
+leave the wave open: it lists them and shows no next wave. File each one as a sub-issue
+(`cckit effort sub`), as a new issue with its relation (`cckit new --blocked-by`), or in Backlog, then
+re-run.
+
 **Two subagents edited the same file.** Those issues shouldn't be in the same wave. Add a *blocked-by*
 link so the dependent one lands in a later wave, then re-run.
 

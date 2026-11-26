@@ -34,7 +34,8 @@ Every parent issue body uses these five sections (they double as the columns of 
 What outcome, in one or two lines.
 
 ## Spec           → acceptance, checked (`effort new` and `effort close` refuse without it)
-What done means: at least one `- ` or `1. ` item that is not TODO / TBD.
+What done means: at least one `- ` or `1. ` item that is not TODO / TBD. End an item only a
+person can accept with `(needs a yes)`; reports list it under Waiting for a yes.
 
 ## Scope          → plan (the sub-issue DAG; mark each parallel | sequential / dependsOn)
 The decomposition. Sub-issues are linked natively (GitHub parent/child).
@@ -84,7 +85,7 @@ plain-language **outcome**:
   anything if one fails. Bad→good: `operator chrome — Settings ▾ dropdown + fixes` →
   **`[E12] operator navigation`** with the `flow:ui` label.
 
-**Flow (`flow:<flow>` label).** A **flow** is a named thread of efforts toward one outcome.
+**Flow (`flow:<flow>` label).** A **flow** is an area of the product: where work lands, not when.
 Controlled vocabulary (`EFFORT_FLOWS` in `effort.sh`; a project overrides it). The `flow:<flow>`
 label carries membership and makes it filterable; the title no longer carries a `[Flow]` tag.
 
@@ -114,9 +115,8 @@ an executable: it is called as `<source> <owner/repo>` from the project root and
 source that is not executable, exits non-zero or prints no rows falls back to GitHub. The plan's
 `source:` line names the source used, its age when reported, and any fallback — a plan built from a
 snapshot says so. L/XL efforts are flagged **"→ delegate subs"**:
-delegating an effort's sub-issues to **sub-agents in their own worktrees** keeps the main session
-light (a sub-agent reads/writes in its own context; only a summary returns) — the lever that lets
-more efforts fit one session (`rules/agent-execution-routing.md`).
+delegating its sub-issues to **sub-agents in their own worktrees** keeps the main session light
+(only a summary returns), so more efforts fit one session (`rules/agent-execution-routing.md`).
 
 Sub-issue bodies: one line is enough (`effort sub --spec` may add a one-line Spec). The parent
 carries the narrative; the **PR** carries the human-facing review write-up + `## For agents`.
@@ -150,8 +150,8 @@ off.
   origin lingers until a prune (the gate would block a start that should be allowed). `ls-remote`
   answers both without writing or pruning a ref. `effort_slug_resolve` keeps reading the cached refs
   because slug lookup is on the hot path of every effort verb — that cached-ref lookup is
-  network-free. Resolution as a whole is not: with no branch matching the slug it falls through to
-  `gh`, so a WIP refusal on a slug input can still make a GitHub read.
+  network-free, but with no branch matching the slug it falls through to `gh`, so a WIP refusal
+  on a slug input can still read GitHub.
 - **At** the limit refuses; only strictly under it starts. `0` refuses every ordinary start of a NEW
   effort — `--force` / `KIT_FORCE=1` still start.
 - Re-running `effort start` on an effort already in progress is never gated — it adds no WIP, so the
@@ -167,22 +167,22 @@ off.
   An unreachable origin does the same and warns on stderr; the start proceeds. A gate that
   hard-failed without network would be worse than one that miscounts.
 
-## Wave close — the final sub of every effort
+## Arc close — the final sub of an arc effort
 
 When efforts are planned as an **arc** (a chain of `blocked_by` efforts toward one outcome), the
 downstream efforts start as **thin placeholders** — a parent with a Goal + a one-line scope, *not*
-yet decomposed. Every effort's **last sub-issue is a wave-close task** that keeps the arc moving:
+yet decomposed. Every effort's **last sub-issue is an arc-close task** that keeps the arc moving:
 
 1. **Fill the next effort's sub-issues** — decompose the next placeholder into its real deliverables
    on the now-clean base, so each plan is scoped **just-in-time** with an accurate `## For agents`
    retrieval context, never guessed up front. (Speculative sub-issues rot; stale sub-issues hide
    unfinished work.)
-2. **Compact the wave** — write a compact summary of what shipped (to the knowledge base + a memory
-   drawer) and run `/compact`, so the next wave starts on clean context.
+2. **Compact the effort** — write a compact summary of what shipped (to the knowledge base + a memory
+   drawer) and run `/compact`, so the next effort starts on clean context.
 
-This makes the arc **self-propelling**: finishing wave N produces wave N+1's issues. The final effort
-in an arc has nothing to fill next — its wave-close task is compact-and-close only. A single,
-standalone effort needs no wave-close sub.
+This makes the arc **self-propelling**: each effort fills the next one's issues. The final effort
+in an arc has nothing to fill next — its arc-close task is compact-and-close only. A single,
+standalone effort needs no arc-close sub.
 
 ## Slug handles (number stays canonical)
 

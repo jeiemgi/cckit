@@ -33,7 +33,7 @@ visible until its own work is done.
 
 <Chat
   title="asking what is ready on the Bakery site's board"
-  say="Sync the board and show me what is ready, and I will pick."
+  say="Read the board and show me what is ready, and I will pick."
   ran={["cckit status --board", "cckit next"]}
   means="Both only read. The board is the open issues, or a GitHub Projects board if you use one."
 >
@@ -50,6 +50,7 @@ for them.
 | Scrum | In cckit | How close |
 | --- | --- | --- |
 | Backlog | The open issues on the board, read with `cckit status --board` and `cckit next` | Close |
+| Sprint backlog | The effort's sub-issues and the issues on the sprint milestone. Work that emerges during the sprint joins it: the captain files and links it without asking | Close |
 | Story | One issue, or one sub-issue of an effort | Close |
 | Epic | An effort: a parent issue with sub-issues | Loose |
 | Sprint | One week, Monday to Monday, as a milestone: `cckit effort sprint open` and `close` | Close |

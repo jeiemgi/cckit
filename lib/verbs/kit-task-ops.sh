@@ -22,7 +22,7 @@
 #   kto_closing_issue_numbers <pr-num>                echo the issue #s a merged PR closes
 #   kto_task_pr   <num> <summary> [commit-msg] [--base <branch>]   commit+push+open PR (board → In Review)
 #   kto_task_pr_merge [pr-num] [--squash|--merge|--rebase]   merge (squash default) + close issues + GC + update the PR base; refuses an effort/* head
-#   kto_task_new  <title> <role> <kind> <prio> [ms] [plan] [blocked] <body>   lint the title, create issue + board fields (ms may be empty)
+#   kto_task_new  <title> <role> <kind> <prio> [ms] [plan] [blocked] <body>   lint the title and the body's effort relations (KIT_FORCE=1 skips the latter), create issue + board fields (ms may be empty)
 #   kto_task_close <num> <summary> [pr-num] [--reason R] [--duplicate-of N] [--superseded-by N]   close + reason + board → Done
 # errors: mixed — git/gh ops propagate; board + label side effects are best-effort
 
@@ -688,6 +688,14 @@ kto_task_new() {
   role_slug="$(printf '%s' "$role" | tr 'A-Z ' 'a-z-')"
   labels="kind:${kind},priority:${prio},role:${role_slug}"
   body="$(kto_compose_issue_body "$body_user" "$plan" "$blocked" "$role_slug")"
+
+  # An issue that cites an effort ([E<n>] / [E<n>.<step>]) carries a relation to #<n>, or it is a
+  # loose issue (E632.4). Checked on the composed body, so --blocked-by counts, before any forge
+  # call; --force / KIT_FORCE=1 files it anyway.
+  if [[ "${KIT_FORCE:-0}" != 1 ]] && type naming_body_relation_lint >/dev/null 2>&1; then
+    naming_body_relation_lint "$body" || { echo "✗ kto_task_new: add the relation and retry — nothing was filed" >&2; return 1; }
+  fi
+
   labels="$(_kto_existing_labels "$repo" "$labels")"
 
   url=$(gh_rest_issue_create "$repo" "$title" "$body" "$labels" "$milestone") || return 1

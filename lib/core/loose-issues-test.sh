@@ -3,7 +3,8 @@
 # loose-issues-test.sh — the loose-issue count (E546.2) over the forge shim: lib/core/loose-issues.sh
 # and `cckit doctor --loose [--ratchet]`. Fixture: an effort, a sub-issue (parent_issue_url), a
 # standalone issue and a pull request -> one loose issue. Then the board marker (Status = Backlog),
-# the ratchet (pass, fail, not judged) and the forge-less run (a skip line, never a silent pass).
+# the ratchet (pass, fail, not judged), the forge-less run (a skip line, never a silent pass), the
+# `cckit doctor` plumbing and the captain's wave close (captain_wave_close: over -> open, else advance).
 # Run: bash lib/core/loose-issues-test.sh
 # errors: strict — a test runner: rc 1 on any failed assertion
 set -u
@@ -28,7 +29,8 @@ export GH_ISSUES='[
   {"number":10,"title":"[Effort] 10 · demo","state":"open","labels":[{"name":"effort"}]},
   {"number":11,"title":"[Effort 10] 1 · a sub","state":"open","labels":[],"parent_issue_url":"https://api.github.com/repos/o/r/issues/10"},
   {"number":12,"title":"Fix the login","state":"open","labels":[{"name":"kind:fix"}],"parent_issue_url":null},
-  {"number":13,"title":"a pull request","state":"open","labels":[],"pull_request":{}}
+  {"number":13,"title":"a pull request","state":"open","labels":[],"pull_request":{}},
+  {"number":14,"title":"Found during the demo","state":"open","labels":[],"body":"Found mid-wave.\n\n## Relations\n- Extends #10"}
 ]'
 
 # project <name> <config-json> -> a throwaway project (git repo, root cckit.config.json); echoes its dir.
@@ -47,6 +49,7 @@ doctor() { local d="$1"; shift; ( cd "$d" && KIT_ASCII=1 NO_COLOR=1 LC_ALL=C bas
 . "$ROOT/lib/core/loose-issues.sh"
 t   "repo: read from github.repo" "$(loose_repo "$off/cckit.config.json")" "o/r"
 t   "board off: projectsV2 false" "$(loose_board_on "$off/cckit.config.json" && echo on || echo off)" "off"
+t   "board off: an issue with a relation line is not loose" "$(loose_issues_list o/r "$off/cckit.config.json")" "$(printf '12\tFix the login')"
 t   "board on: projectsV2 true + a number" "$(loose_board_on "$on/cckit.config.json" && echo on || echo off)" "on"
 out="$(loose_issues_list o/r "$off/cckit.config.json")"
 t   "effort, sub-issue and PR excluded -> the standalone issue alone" "$out" "$(printf '12\tFix the login')"
@@ -98,5 +101,31 @@ t   "no forge, --loose: exit 0" "$rc" "0"
 out="$(CCKIT_FORGE=none GH_TOKEN= doctor "$off" --ratchet --baseline="$tmp/at1")"; rc=$?
 t   "no forge, --ratchet: exit 2, never a pass" "$rc" "2"
 has "no forge, --ratchet: not judged" "$out" "not judged — the count was not read"
+
+# ── bin/cckit plumbing: the flags reach kit-doctor.sh, and the default baseline is the repo's own ──
+mkdir -p "$off/lib/core"; printf '# notes\n0\n' > "$off/lib/core/loose-issues.baseline"
+out="$( cd "$off" && KIT_ASCII=1 NO_COLOR=1 LC_ALL=C bash "$ROOT/bin/cckit" doctor --loose --ratchet </dev/null 2>"$tmp/err" )"; rc=$?
+t   "cckit doctor --loose --ratchet: default baseline lib/core/loose-issues.baseline -> exit 1" "$rc" "1"
+has "cckit doctor --loose --ratchet: reads the default baseline" "$out" "1 loose > baseline 0"
+out="$( cd "$off" && KIT_ASCII=1 NO_COLOR=1 LC_ALL=C bash "$ROOT/bin/cckit" doctor --loose --ratchet --baseline="$tmp/at1" </dev/null 2>"$tmp/err" )"; rc=$?
+t   "cckit doctor --baseline=FILE reaches kit-doctor.sh -> exit 0" "$rc" "0"
+rm -rf "$off/lib"
+
+# ── the captain closes a wave through the ratchet (E632.5) ───────────────────────────────────
+# captain_wave_close runs the real doctor over the shim: rc 1 = the wave stays open, rc 0 = advance.
+close() { ( cd "$off" && . "$ROOT/lib/verbs/captain.sh" && KIT_ASCII=1 NO_COLOR=1 LC_ALL=C captain_wave_close ); }
+out="$(CAPTAIN_LOOSE_BASELINE="$tmp/at0" close)"; rc=$?
+t   "wave close: over the baseline -> rc 1, the wave stays open" "$rc" "1"
+has "wave close: over -> says the wave stays open" "$out" "the wave stays open"
+has "wave close: over -> lists the loose issue" "$out" "#12 Fix the login"
+has "wave close: over -> says how to file it" "$out" "cckit effort sub"
+out="$(CAPTAIN_LOOSE_BASELINE="$tmp/at1" close)"; rc=$?
+t   "wave close: at the baseline -> rc 0, advances" "$rc" "0"
+hasnt "wave close: at -> silent" "$out" "stays open"
+out="$(CAPTAIN_LOOSE_BASELINE="$tmp/at3" close)"; rc=$?
+t   "wave close: under the baseline -> rc 0, advances" "$rc" "0"
+out="$(CCKIT_FORGE=none GH_TOKEN= CAPTAIN_LOOSE_BASELINE="$tmp/at0" close)"; rc=$?
+t   "wave close: not judged (no forge) -> rc 0, advances" "$rc" "0"
+has "wave close: not judged -> a note" "$out" "loose ratchet not judged"
 
 [ "$fail" = "0" ] && echo "ALL OK (loose-issues)" || { echo "loose-issues: FAILURES"; exit 1; }

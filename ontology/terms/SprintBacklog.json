@@ -1,13 +1,13 @@
 {
   "id": "SprintBacklog",
   "label": ["sprint backlog"],
-  "definition": "What one sprint took from the backlog and how it will be done: the issues on the sprint's GitHub milestone, with the sub-issues of each effort as its tasks. The sprint goal says why it holds these; the builders may add or split tasks during the sprint.",
+  "definition": "What one sprint took from the backlog and how it will be done: the issues on the sprint's GitHub milestone, with the sub-issues of each effort as its tasks. As the Scrum Guide says, it emerges during the sprint: work found mid-sprint that the sprint goal needs joins it, as a sub-issue of the effort or an issue on the milestone; other work found mid-sprint is a backlog item. There is no separate word for emerging work.",
   "is_not": [
     "The backlog: the backlog is all the work not yet taken; the sprint backlog is this week's share.",
     "A wave: a wave is one parallel batch of the sprint backlog; a sprint usually runs several.",
     "A checklist in an issue body: the sprint backlog is issues on a milestone, each with its own state."
   ],
-  "avoid": ["sprint scope", "commitment", "todo list"],
+  "avoid": ["sprint scope", "commitment", "todo list", "follow-up", "side issue", "discovered work"],
   "home": {
     "cli": "effort sprint"
   },

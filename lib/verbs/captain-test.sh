@@ -1,7 +1,8 @@
 #!/bin/sh
 # captain-test.sh — self-test for captain.sh pure gate policy under bash AND zsh.
-# Network-free: covers cap_checks_summary / cap_classify / cap_action and the branch parser only
-# (the gh-driven captain_gate/pass/loop are not exercised).
+# Network-free: covers cap_checks_summary / cap_classify / cap_action, the branch parser, the wave
+# close (captain_wave_close over a stubbed ratchet) and captain_loop over a stubbed captain_pass
+# (the gh-driven captain_gate/pass are not exercised).
 # Run:  bash lib/verbs/captain-test.sh
 # errors: strict — a test runner: rc 1 on any failed assertion
 
@@ -315,6 +316,28 @@ if [ -n "${CAP_TEST_INNER:-}" ]; then
     eq "bridge: env labels beat config"     "$(qabridge "$q1" "" "kind:bug")" "unset|kind:bug|0"
     rm -f "$q1" "$q2" "$q3" "$q4"
   fi
+
+  # captain_wave_close (E632.5): the ratchet's rc decides whether a wave closes. Stubbed command, so
+  # this runs under zsh too; lib/core/loose-issues-test.sh runs the real doctor over the forge shim.
+  eq "wave close: ratchet rc 0 -> advance" "$(CAPTAIN_LOOSE_CMD='true' captain_wave_close >/dev/null; echo $?)" "0"
+  eq "wave close: ratchet rc 1 -> open"    "$(CAPTAIN_LOOSE_CMD='echo "#7 a loose one"; exit 1' captain_wave_close >/dev/null; echo $?)" "1"
+  eq "wave close: open prints the list"    "$(CAPTAIN_LOOSE_CMD='echo "#7 a loose one"; exit 1' captain_wave_close | grep -c '#7 a loose one')" "1"
+  eq "wave close: rc 2 -> advance"         "$(CAPTAIN_LOOSE_CMD='exit 2' captain_wave_close >/dev/null; echo $?)" "0"
+  eq "wave close: rc 2 -> a note"          "$(CAPTAIN_LOOSE_CMD='exit 2' captain_wave_close | grep -c 'not judged')" "1"
+
+  # captain_loop stops at a pass whose wave stayed open (rc 3) and does not start another pass.
+  ( captain_pass() { echo pass >> "$lp"; CAPTAIN_MERGED=1; return 3; }
+    lp="$(mktemp)"
+    captain_loop --max-passes 5 >/dev/null; rc=$?
+    eq "loop: open wave -> rc 3"           "$rc" "3"
+    eq "loop: open wave -> one pass only"  "$(grep -c pass "$lp")" "1"
+    rm -f "$lp"; exit "$fail" ) || fail=1
+  ( captain_pass() { echo pass >> "$lp"; n=$(grep -c pass "$lp"); CAPTAIN_MERGED=$((n < 2 ? 1 : 0)); return 0; }
+    lp="$(mktemp)"
+    captain_loop --max-passes 5 >/dev/null; rc=$?
+    eq "loop: closed wave -> advances, rc 0" "$rc" "0"
+    eq "loop: closed wave -> next pass runs" "$(grep -c pass "$lp")" "2"
+    rm -f "$lp"; exit "$fail" ) || fail=1
 
   if [ "$fail" -eq 0 ]; then echo "PASS($CAP_TEST_INNER): captain gate policy"; fi
   exit "$fail"

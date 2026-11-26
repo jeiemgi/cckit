@@ -52,8 +52,8 @@ number.
 - **Origin:** a correction. Tutorial prompts shipped with literal numbers, of the form
   `cckit orchestrate 46 47 48`. Those numbers were issues in the author's repository on the day the
   page was written; in the reader's repository they are other issues, closed ones, or nothing.
-- **Write instead:** *sync the board, show me what is ready, and I will pick.* The agent runs
-  `cckit status --board`, presents what is unblocked, and the person chooses. Which lane the choice goes to —
+- **Write instead:** *read the board, show me what is ready, and I will pick.* The agent runs
+  `cckit status --board`, presents what is unblocked, and the person chooses. What the choice starts —
   one issue, an effort, a wave, an unattended run — depends on what was picked, so the prompt does
   not fix that either.
 - **In a command line:** a placeholder (`cckit start <issue>`, `cckit orchestrate <issues…>`) or a
@@ -83,9 +83,8 @@ the name of the work and its outcome.** Two parts:
   form `effort_display` prints in the kit's own listings. A bare `#42` makes the reader look the
   issue up to learn what it is.
 
-- **Origin:** a correction. Recaps carried `cckit … --json` beside each verb they mentioned, and the
-  maintainer's response was that the tags said nothing and were not visually useful. The same
-  correction asked for efforts to be named `slug #N` and not by number alone.
+- **Origin:** a correction. Recaps carried `cckit … --json` beside each verb they mentioned; the
+  maintainer said the tags told him nothing, and asked for efforts named `slug #N`, not by number.
 - **A command still belongs in a summary when the reader runs it next.** Then it is written
   exactly as it should be typed, flags included. The test is whether the reader will execute the
   line; a command listed to show what the agent ran is decoration.
@@ -93,8 +92,9 @@ the name of the work and its outcome.** Two parts:
   machine-read lines `naming-and-ids.md` lists (`- Depends on #N`, `Closes #N`) are not summaries.
 - **A step report also goes on its issue.** A report saved under `.cckit/reports/` uses the
   sections Status · Done · Waiting for a yes · Numbers · Failing or risky · Open questions · Next
-  step. `cckit agent receipt <issue> --report <file>` posts its short trail comment on the issue, so other
-  agents read the trail there; the full report stays local.
+  step. Every Spec item ending `(needs a yes)` gets its own Waiting for a yes line naming what the
+  person must look at. `cckit agent receipt <issue> --report <file>` posts the short trail comment
+  on the issue; the full report stays local.
 
 **Precedence — `naming-and-ids.md`.** That rule writes an effort as `E241`, a pull request as
 `PR 268` and a standalone issue as `#209`, and forbids a bare `#241` for an effort. Where it is

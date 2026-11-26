@@ -41,7 +41,7 @@ copy; `bash lib/core/terms-check.sh` names a drift between the two). A term is a
 | What you want | Skill | Term |
 | --- | --- | --- |
 | know where we are: local undone work, PRs waiting, cleanup | `kit-status` | Report |
-| read the board by role, see what is blocked | `kit-task-sync` | Sync |
+| read the board by role, see what is blocked | `kit-task-sync` | Backlog |
 | pick up the next unblocked issue · fan the unblocked wave out to builders | `kit-next` | Task, Wave |
 | decide what to build next from what the kit already does | `kit-plan-next` | Effort |
 | run an approved plan unattended, waves merged as they go | `kit-autopilot` | Captain |

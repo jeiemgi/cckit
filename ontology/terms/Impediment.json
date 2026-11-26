@@ -1,0 +1,16 @@
+{
+  "id": "Impediment",
+  "label": ["impediment"],
+  "definition": "Anything that stops a wave: a red gate, a merge conflict, a missing label, a failing check, a question the plan does not answer. The captain removes every impediment itself. Only the four genuine blockers of issue-lifecycle.md section 2 reach the owner; a red gate is an impediment, not a blocker.",
+  "is_not": [
+    "A genuine blocker: a blocker is one of the four impediments that need the owner; every other impediment the captain removes.",
+    "A loose issue: a loose issue is an open issue with no home; it may cause no stop at all.",
+    "A risk: a risk may stop the wave later; an impediment stops it now."
+  ],
+  "avoid": ["blocker (for any impediment)", "issue (for a stop)", "problem", "snag"],
+  "home": {
+    "skill": "kit-autopilot",
+    "rule": ".claude/rules/issue-lifecycle.md"
+  },
+  "status": "sapling"
+}

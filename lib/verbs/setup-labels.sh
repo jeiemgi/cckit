@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
 # Create the agent:/ctx:/flow:/kind:/priority:/role: label families on the repo. Idempotent.
-# Reads repo + roles from .claude/kit.config.json; the flow vocabulary from effort.sh (EFFORT_FLOWS).
+# Holds no label list of its own (#639): every set is read from the kit file that owns it —
+#   kind:     KIT_KINDS, KIT_CONTENT_KINDS   kinds.sh
+#   priority: KIT_PRIORITIES                 kinds.sh
+#   ctx:      EFFORT_CTX_BUCKETS             effort-metrics.sh (beside effort_ctx_bucket)
+#   flow:     EFFORT_FLOWS, lowercased       effort.sh (config effort.flows[] overrides)
+#   role:     KIT_ROLES                      the project config
+#   agent:    agents.profiles                the project config
+# and every description from kit_label_desc (kinds.sh), the one `cckit effort new|sub` uses too.
+# Usage: setup-labels.sh [--dry-run]   --dry-run prints `name<TAB>color<TAB>description` per label
+#        and writes nothing (the same list KIT_LABELS_LIST=1 gives `cckit init`).
 # These are exactly the labels `cckit effort new` / /kit-effort-new apply — provision them here so a
 # fresh repo can create a fully-labeled effort with no manual label creation. Run from project root.
 # The families are the ones rules/naming-and-ids.md § Labels documents, each with a reader; `slug:`
@@ -23,11 +32,29 @@ if ! command -v gh_rest_issue_json >/dev/null 2>&1; then
 fi
 
 set -euo pipefail
+case "${1:-}" in
+  --dry-run) KIT_LABELS_LIST=1 ;;
+  -h|--help) sed -n '2,15p' "$0"; exit 0 ;;
+  "") : ;;
+  *) echo "setup-labels: unknown argument '$1' (usage: setup-labels.sh [--dry-run])" >&2; exit 2 ;;
+esac
+# shellcheck source=/dev/null
 source "$(_kit_lib kit-config.sh)" && load_kit_config
 # shellcheck source=/dev/null
-source "$(_kit_lib effort.sh)" 2>/dev/null || true   # for EFFORT_FLOWS (the flow:* vocabulary)
+source "$(_kit_lib effort.sh)" 2>/dev/null || true          # EFFORT_FLOWS (flow:*)
 # shellcheck source=/dev/null
-source "$(_kit_lib kinds.sh)" 2>/dev/null || true    # for KIT_KINDS (the kind:* vocabulary)
+source "$(_kit_lib kinds.sh)" 2>/dev/null || true           # KIT_KINDS, KIT_PRIORITIES, kit_label_desc
+# shellcheck source=/dev/null
+source "$(_kit_lib effort-metrics.sh)" 2>/dev/null || true  # EFFORT_CTX_BUCKETS (ctx:*)
+for _sl_need in KIT_KINDS KIT_PRIORITIES EFFORT_CTX_BUCKETS EFFORT_FLOWS; do
+  if [ -z "${!_sl_need:-}" ]; then
+    echo "setup-labels: $_sl_need is unset — kinds.sh, effort.sh or effort-metrics.sh is missing beside this script" >&2
+    exit 1
+  fi
+done
+if ! command -v kit_label_desc >/dev/null 2>&1 || ! command -v kit_label_color >/dev/null 2>&1; then
+  echo "setup-labels: kit_label_desc / kit_label_color missing — kinds.sh is out of date" >&2; exit 1
+fi
 
 # In list mode (KIT_LABELS_LIST=1) stdout is the TSV list alone: the section headers go to stderr,
 # or `cckit init` would POST them as labels.
@@ -46,36 +73,33 @@ say "→ Labels on $KIT_REPO"
 # The one label that marks a parent AS an effort, and the one `effort_plan` queries. It was read
 # and never provisioned, so `cckit effort plan` found nothing on every repo.
 say "effort:"
-ensure_label "effort" "5319e7" "An effort parent issue"
+ensure_label "effort" "$(kit_label_color effort)" "$(kit_label_desc effort)"
 say "kinds:"
 # The closed set of rules/branch-naming.md — a kind is also the branch prefix `cckit start` cuts, so
-# the two lists are one list. The literal is the fallback for a project without lib/kinds.sh;
-# scripts/lib/kinds-test.sh fails if it drifts from KIT_KINDS.
-for k in ${KIT_KINDS:-feat fix task chore security scaffold ci adr spike plan}; do ensure_label "kind:$k" "5319e7" "Kind: $k"; done
+# the two lists are one list.
+for k in $KIT_KINDS; do ensure_label "kind:$k" "$(kit_label_color kind)" "$(kit_label_desc kind "$k")"; done
 # Content kinds (#417) — post, campaign, brand, research — are provisioned only for a project whose
 # config sets `kinds.content: true` (the content and marketing profiles do). A software project
-# would carry four labels that never vary. The literal is the fallback for a project without
-# lib/kinds.sh; scripts/lib/kinds-test.sh fails if it drifts from KIT_CONTENT_KINDS.
+# would carry four labels that never vary.
 if [ "${KIT_CONTENT_KINDS_ON:-false}" = "true" ]; then
-  for k in ${KIT_CONTENT_KINDS:-post campaign brand research}; do ensure_label "kind:$k" "5319e7" "Kind: $k (content)"; done
+  for k in ${KIT_CONTENT_KINDS:-}; do ensure_label "kind:$k" "$(kit_label_color kind)" "$(kit_label_desc kind "$k")"; done
 fi
 say "priorities:"
-ensure_label "priority:p0" "8b0000" "Drop everything"
-ensure_label "priority:p1" "b60205" "Now / blocking"
-ensure_label "priority:p2" "fbca04" "Next"
-ensure_label "priority:p3" "0e8a16" "Later"
+for p in $KIT_PRIORITIES; do
+  ensure_label "priority:$p" "$(kit_label_color priority "$p")" "$(kit_label_desc priority "$p")"
+done
 say "ctx (session weight):"
-for c in S M L XL; do ensure_label "ctx:$c" "c5def5" "Session weight: $c"; done
+for c in $EFFORT_CTX_BUCKETS; do ensure_label "ctx:$c" "$(kit_label_color ctx)" "$(kit_label_desc ctx "$c")"; done
 say "flows:"
-for f in ${EFFORT_FLOWS:-Core UI API Docs Infra Auth Data Web App}; do
+for f in $EFFORT_FLOWS; do
   slug=$(echo "$f" | tr '[:upper:]' '[:lower:]')
-  ensure_label "flow:$slug" "0e8a16" "Flow: $f"
+  ensure_label "flow:$slug" "$(kit_label_color flow)" "$(kit_label_desc flow "$slug")"
 done
 say "roles:"
 while IFS= read -r role; do
   [[ -z "$role" ]] && continue
   slug=$(echo "$role" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
-  ensure_label "role:$slug" "1d76db" "Role: $role"
+  ensure_label "role:$slug" "$(kit_label_color role)" "$(kit_label_desc role "$slug")"
 done <<< "$KIT_ROLES"
 
 # agent:<profile> — which agent profile a piece of work runs under (#319). Driven by the profiles
@@ -88,7 +112,7 @@ if command -v kit_config_path >/dev/null 2>&1; then _al_cfg="$(kit_config_path 2
 if [ -n "$_al_cfg" ] && [ -f "$_al_cfg" ] && command -v jq >/dev/null 2>&1; then
   while IFS= read -r p; do
     [ -z "$p" ] && continue
-    ensure_label "agent:$p" "5319e7" "Agent profile: $p"
+    ensure_label "agent:$p" "$(kit_label_color agent)" "$(kit_label_desc agent "$p")"
   done <<< "$(jq -r '(.agents.profiles // {}) | keys[]' "$_al_cfg" 2>/dev/null)"
 else
   say "  • no agents.profiles declared — skipping"
