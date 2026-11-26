@@ -1125,6 +1125,34 @@ _eo_board_done() {
 # touch it. The list is the kit/templates/rules basenames; effort-ops-test.sh fails when they differ.
 _EO_KIT_MANAGED_RE='^(scripts/(lib/|kit$|kit-)|\.claude/(skills|hooks|lib|agents)/|\.claude/rules/(authoring|branch-naming|code-retrieval|communication-style|delegation-brief|design-routing|effort-model|gate-and-review|issue-lifecycle|knowledge-base|merge-safety|naming-and-ids|plain-language|plan-next|plan-output-format|react-annotate|review-pages|risk-tiered-review|shared-checkout|skill-gaps|task-management)\.md$)'
 
+# _eo_kit_manifest_file [<dir>] — the project's ownership manifest (kit-manifest.sh), or nothing:
+# `$KIT_MANIFEST` when it names a file, else <dir>/.claude/kit.manifest.json, else the Codex-only
+# <dir>/.cckit/kit.manifest.json. Needs jq to be readable; without jq it prints nothing, so the
+# caller falls back to the pattern.
+_eo_kit_manifest_file() {
+  local dir="${1:-.}" mf
+  command -v jq >/dev/null 2>&1 || return 0
+  for mf in "${KIT_MANIFEST:-}" "$dir/.claude/kit.manifest.json" "$dir/.cckit/kit.manifest.json"; do
+    [ -n "$mf" ] && [ -f "$mf" ] && { printf '%s\n' "$mf"; return 0; }
+  done
+  return 0
+}
+
+# _eo_kit_managed_filter [<dir>] — stdin: changed paths, one per line (relative to the project
+# root). stdout: the ones the kit manages (#652, decision 96). The manifest is the source: a path
+# is kit-managed when it is an entry of <dir>'s kit.manifest.json, which is what `init --upgrade`
+# writes and `kit_op_remove` refuses to go beyond — a project's own file under `.claude/skills/` is
+# not flagged. With no manifest (a project scaffolded before manifests, or cckit itself) the path
+# pattern _EO_KIT_MANAGED_RE decides, and _eo_kit_sync_warn says so.
+_eo_kit_managed_filter() {
+  local mf; mf="$(_eo_kit_manifest_file "${1:-.}")"
+  if [ -n "$mf" ]; then
+    grep -xF -f <(jq -r '.entries | keys[]' "$mf" 2>/dev/null; echo '//never//') || true
+  else
+    grep -E "$_EO_KIT_MANAGED_RE" || true
+  fi
+}
+
 # _eo_knowledge_ingest <num> <trace_dir> <root> — optional post-close knowledge-ingest hook. Runs a
 # project-configured command (github/effort.knowledgeIngestHook, or KIT_EFFORT_KNOWLEDGE_HOOK) with
 # the effort number + trace dir, so a project can fold the closed effort's work record into its
@@ -1235,7 +1263,7 @@ _EO_CLOSE_USAGE='cckit effort close <slug|N> [--no-spec-check]   squash-merge th
 effort_close() {
   case "${1:-}" in -h|--help) echo "$_EO_CLOSE_USAGE"; return 0 ;; esac
   _eff_forge || return 1; _eff_need jq || return 1
-  local raw="" spec_check=1 num repo base branch root self_wt trace_dir kit_touched
+  local raw="" spec_check=1 num repo base branch root self_wt trace_dir kit_touched kit_manifest
   while [ $# -gt 0 ]; do
     case "$1" in
       -h|--help) echo "$_EO_CLOSE_USAGE"; return 0 ;;
@@ -1319,7 +1347,8 @@ effort_close() {
   # (b2) record which kit-managed files this effort touched, PRE-squash (the branch is GC'd below,
   # so the live-branch diff is the reliable source). The warning itself is emitted last (step h).
   kit_touched="$(git diff --name-only "origin/$base"...HEAD 2>/dev/null \
-    | grep -E "$_EO_KIT_MANAGED_RE" | sort -u || true)"
+    | _eo_kit_managed_filter . | sort -u || true)"
+  kit_manifest="$(_eo_kit_manifest_file .)"
 
   # (b3) which subs are finished (#565, decision 52), read PRE-squash while the effort branch's
   # commits still exist. A sub is finished when it is already closed, or a commit on this branch
@@ -1414,7 +1443,7 @@ EOF_WITH
   _eo_knowledge_ingest "$num" "${trace_dir:-}" "$root"
 
   # (h) kit-sync drift check — kit ⇄ project stay in sync (#148, moved here from the skill).
-  _eo_kit_sync_warn "$kit_touched"
+  _eo_kit_sync_warn "$kit_touched" "$kit_manifest"
 
   # (i) the report's last word: the subs that closed with the parent, undelivered (#565, #650).
   if [ -n "$open_lines" ]; then
@@ -1487,7 +1516,8 @@ _eo_spec_check() {
   return 1
 }
 
-# _eo_kit_sync_warn <files> — the advisory kit-sync drift warning, shared by both close styles
+# _eo_kit_sync_warn <files> [<manifest>] — the advisory kit-sync drift warning, shared by both close
+# styles; with no <manifest> (the path-pattern fallback, #652) it says so in one more line
 # (#148/#164). If an effort changed kit-managed files they likely belong upstream (/kit-contribute);
 # an un-upstreamed change is a latent regression the next /kit-update can clobber. Never blocks.
 _eo_kit_sync_warn() {
@@ -1497,6 +1527,9 @@ _eo_kit_sync_warn() {
     echo "  ⚠ kit-sync: this effort changed kit-managed files — review for upstream (/kit-contribute):"
     printf '%s\n' "$1" | sed 's/^/     /'
     echo "     kit ⇄ project must stay in sync; an un-upstreamed change can be clobbered by /kit-update."
+    if [ -z "${2:-}" ]; then
+      echo "     (no kit.manifest.json read: matched by path pattern, so a project-owned file under a kit directory may be listed)"
+    fi
   } >&2
 }
 
@@ -1509,7 +1542,7 @@ _eo_kit_sync_warn() {
 # capture_effort_metrics is intentionally skipped — there is no live branch diff to measure; the
 # merged PR diffs in the trace are the work record.
 _eo_close_wave() {
-  local num="$1" repo="$2" base="$3" root rows bad trace_dir kit_touched sub
+  local num="$1" repo="$2" base="$3" root rows bad trace_dir kit_touched kit_manifest sub
   root="$(git worktree list --porcelain 2>/dev/null | awk '/^worktree / && !hit {print $2; hit=1}')"
   _eo_source_metrics
 
@@ -1560,7 +1593,8 @@ _eo_close_wave() {
 
   # (e) kit-sync drift source: the union of files across the merged sub PR diffs.
   kit_touched="$(awk '/^diff --git /{print $3}' "$trace_dir"/*.diff 2>/dev/null | sed 's#^a/##' \
-    | grep -E "$_EO_KIT_MANAGED_RE" | sort -u || true)"
+    | _eo_kit_managed_filter "${root:-.}" | sort -u || true)"
+  kit_manifest="$(_eo_kit_manifest_file "${root:-.}")"
 
   # (f) close the parent + board Status=Done for parent and every sub (subs are already closed).
   _eo_source_board
@@ -1575,5 +1609,5 @@ _eo_close_wave() {
 
   # (h) same optional hook + advisory drift check as the branch path.
   _eo_knowledge_ingest "$num" "${trace_dir:-}" "$root"
-  _eo_kit_sync_warn "$kit_touched"
+  _eo_kit_sync_warn "$kit_touched" "$kit_manifest"
 }

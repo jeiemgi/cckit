@@ -372,6 +372,8 @@ case "$close_out" in *"kit-sync"*".claude/skills/demo.md"*) echo "ok: kit-sync d
 # #218: a rule the project owns (no templates/rules/ file of that name) is never written by init or
 # /kit-update, so the warning must not name it
 case "$close_out" in *"project-owned.md"*) echo "FAIL: kit-sync warning names a project-owned rule"; fail=1 ;; *) echo "ok: kit-sync drift check skips a project-owned rule" ;; esac
+# #652: this fixture has no kit.manifest.json, so the check fell back to the path pattern and says so
+case "$close_out" in *"kit-sync"*"no kit.manifest.json"*) echo "ok: kit-sync warning says it matched by path pattern (no manifest)" ;; *) echo "FAIL: kit-sync warning does not say it fell back to the path pattern: $close_out"; fail=1 ;; esac
 t  "effort_close GC removed the effort worktree" \
    "$(git -C "$tmp/work" worktree list --porcelain | grep -c 'effort+99-demo')" "0"
 t  "effort_close GC deleted the local branch" \
@@ -486,6 +488,28 @@ re_rules="$(printf '%s\n' "$_EO_KIT_MANAGED_RE" | sed -n 's/.*rules\/(\([^)]*\))
 tpl_rules="$(find "$ROOT/kit/templates/rules" -maxdepth 1 -type f -name '*.md' -exec basename {} .md \; | sort)"
 t "the regex lists exactly the templates/rules basenames" "$re_rules" "$tpl_rules"
 case "$tpl_rules" in "") echo "FAIL: no templates/rules/*.md found — the sync assertion compared nothing"; fail=1 ;; esac
+
+# ── #652 · _eo_kit_managed_filter — the manifest is the source; the regex is the fallback ─────────
+# A project's own file under a kit-managed directory is flagged by the regex but never written by
+# `init --upgrade` (kit_op_remove refuses what the manifest does not list), so the warning must list
+# only the manifest's files when a manifest exists.
+mdir="$(mktemp -d)"; mkdir -p "$mdir/.claude"
+printf '{"schema":1,"entries":{".claude/skills/kit-one/SKILL.md":{"hash":"x","tier":"A"},".claude/rules/effort-model.md":{"hash":"y","tier":"A"}}}' > "$mdir/.claude/kit.manifest.json"
+changed="$(printf '.claude/skills/kit-one/SKILL.md\n.claude/skills/mine/SKILL.md\n.claude/rules/effort-model.md\nsrc/app.ts\n')"
+t "manifest: only the listed files are kit-managed" \
+  "$(printf '%s\n' "$changed" | _eo_kit_managed_filter "$mdir" | tr '\n' ' ')" ".claude/skills/kit-one/SKILL.md .claude/rules/effort-model.md "
+t "manifest: the source is the manifest file" "$(_eo_kit_manifest_file "$mdir")" "$mdir/.claude/kit.manifest.json"
+mkdir -p "$mdir/codex/.cckit"; printf '{"schema":1,"entries":{"AGENTS.md":{"hash":"z","tier":"A"}}}' > "$mdir/codex/.cckit/kit.manifest.json"
+t "manifest: a Codex-only project's .cckit manifest is found" "$(printf 'AGENTS.md\n.claude/skills/x/SKILL.md\n' | _eo_kit_managed_filter "$mdir/codex" | tr '\n' ' ')" "AGENTS.md "
+ndir="$(mktemp -d)"
+t "no manifest: the path pattern decides" \
+  "$(printf '%s\n' "$changed" | _eo_kit_managed_filter "$ndir" | tr '\n' ' ')" ".claude/skills/kit-one/SKILL.md .claude/skills/mine/SKILL.md .claude/rules/effort-model.md "
+t "no manifest: no source" "$(_eo_kit_manifest_file "$ndir")" ""
+wm="$(_eo_kit_sync_warn ".claude/skills/kit-one/SKILL.md" "$mdir/.claude/kit.manifest.json" 2>&1)"
+case "$wm" in *"no kit.manifest.json"*) echo "FAIL: manifest-backed warning claims a fallback"; fail=1 ;; *"kit-one/SKILL.md"*) echo "ok: manifest-backed warning lists the file, no fallback note" ;; *) echo "FAIL: warning lost the file: $wm"; fail=1 ;; esac
+wn="$(_eo_kit_sync_warn ".claude/skills/mine/SKILL.md" "" 2>&1)"
+case "$wn" in *"no kit.manifest.json"*"path pattern"*) echo "ok: fallback warning says it matched by path pattern" ;; *) echo "FAIL: fallback warning does not say so: $wn"; fail=1 ;; esac
+rm -rf "$mdir" "$ndir"
 
 # ── #243 · _eff_relations_add — the ONE `Depends on` formatter (pure: no gh, no network) ──────────
 rel_body="$(printf '## Verification\nV\n')"

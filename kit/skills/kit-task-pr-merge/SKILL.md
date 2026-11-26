@@ -31,21 +31,18 @@ kto_task_pr_merge            # open PR for the current branch
 ```
 
 After it returns on the base branch, run the kit-sync drift check (advisory; never blocks). The
-pattern is `_EO_KIT_MANAGED_RE` from `effort-ops.sh` — the same one `cckit effort close` uses, so
-the two checks agree. Under `.claude/rules/` it matches only the rule files the kit ships
-(`kit/templates/rules/*.md`); a rule the project wrote itself is not flagged.
+filter is `_eo_kit_managed_filter` from `effort-ops.sh` — the same one `cckit effort close` uses,
+so the two checks agree (#652). A file is kit-managed when the project's `kit.manifest.json` lists
+it, so a project's own file under `.claude/skills/` is not flagged; with no manifest the path
+pattern `_EO_KIT_MANAGED_RE` decides (under `.claude/rules/` only the rule files the kit ships,
+`kit/templates/rules/*.md`), and `_eo_kit_sync_warn` says so.
 
 ```bash
-source "${CLAUDE_PLUGIN_ROOT}/lib/verbs/effort-ops.sh"   # _EO_KIT_MANAGED_RE
+source "${CLAUDE_PLUGIN_ROOT}/lib/verbs/effort-ops.sh"   # _eo_kit_managed_filter, _eo_kit_sync_warn
 MAIN_WT=$(git worktree list --porcelain | awk '/^worktree /{print $2; exit}')
 KIT_TOUCHED=$(git -C "$MAIN_WT" show --name-only --pretty=format: HEAD 2>/dev/null \
-  | grep -E "$_EO_KIT_MANAGED_RE" | sort -u || true)
-if [[ -n "$KIT_TOUCHED" ]]; then
-  echo ""
-  echo "⚠ kit-sync: this change touched kit-managed files — review for upstream (/kit-contribute):"
-  printf '   %s\n' $KIT_TOUCHED
-  echo "   kit ⇄ project must stay in sync; an un-upstreamed change can be clobbered by /kit-update."
-fi
+  | _eo_kit_managed_filter "$MAIN_WT" | sort -u || true)
+_eo_kit_sync_warn "$KIT_TOUCHED" "$(_eo_kit_manifest_file "$MAIN_WT")"
 ```
 
 ## Rules
