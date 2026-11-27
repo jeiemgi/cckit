@@ -124,8 +124,9 @@ The slug is a *derived* convenience, not a second source of truth. `--slug` only
   names the PR and merges nothing), squash-merges,
   closes the parent and every sub — a sub a commit on the effort branch delivers (its last `#N`, a
   `Closes #N`, or its `[E<n>.<k>]` step tag) closes as finished; a sub no commit delivers closes with
-  the parent, same reason, with the comment `Closed with its parent #N (completed).` and a line in
-  the parent's close comment (#650); none is left open — and sets the board **Status=Done** for each, garbage-collects the
+  the parent as `not planned`, with the comment `Closed as not planned with its parent #N: no commit
+  delivered it.` followed by `#M carries what is left.` (`cckit effort close <N> --carried-by M`) or
+  `Nothing is left to carry.`, and a line in the parent's close comment (#650, #663); none is left open — and sets the board **Status=Done** for each, garbage-collects the
   worktree/branch — the effort branch on origin, then every `sub/<N><letter>-*` branch origin
   holds (read with `git ls-remote`, one `✓ deleted remote branch` line each; a failed delete warns
   and never fails the close, #651), then the effort worktree, its local branch and the LANDED
