@@ -1,0 +1,16 @@
+{
+  "id": "Session",
+  "label": ["session", "captain session", "advisor session", "builder session"],
+  "definition": "One Claude Code conversation in one role. The role names it: the captain session drives an approved plan, the advisor session grills the owner and writes the brief, a builder session implements one issue in its worktree. A session ends when its conversation ends; what outlives it is an issue, a commit or a report.",
+  "is_not": [
+    "A role: the captain, the advisor and a builder are roles; a session is one conversation that plays one of them.",
+    "A worktree: a worktree is a checkout on disk; one session may work in it, and it stays after the session ends.",
+    "A sprint or a wave: those are units of work; a session is a unit of conversation."
+  ],
+  "avoid": ["agent (for the conversation)", "chat", "thread", "run (for the conversation)"],
+  "home": {
+    "skill": "kit-autopilot",
+    "rule": ".claude/rules/delegation-brief.md"
+  },
+  "status": "sapling"
+}

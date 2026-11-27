@@ -130,6 +130,11 @@ _em_difficulty() {
   printf '%s' "$d"
 }
 
+# EFFORT_CTX_BUCKETS — the closed session-weight scale effort_ctx_bucket picks from, lightest first.
+# setup-labels.sh provisions one ctx:<b> label per entry (#639).
+# shellcheck disable=SC2034  # read by setup-labels.sh
+EFFORT_CTX_BUCKETS="S M L XL"
+
 # effort_ctx_bucket <difficulty-1-5> [subcount] — map the estimate to a session-weight bucket.
 # ctx:S fits inline with others; ctx:L / ctx:XL want their subs delegated to sub-agents so the main
 # session stays light (the lever that widens a session — rules/agent-execution-routing.md). Echoes

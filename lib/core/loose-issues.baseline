@@ -1,5 +1,9 @@
 # loose-issues.baseline — the loose-issue count `cckit doctor --loose --ratchet` holds the line at
-# (E546.2). A loose issue is open, not an effort, not a sub-issue, and not in Backlog on the board.
-# The number may only go down: when an issue is closed or filed under an effort, lower it in the
-# same change. Not run by lib/core/check.sh (the gate stays offline); measured 2026-11-24 with a GET.
-11
+# (E546.2). A loose issue is open, not an effort, not a sub-issue, has no relation line, and carries no
+# Backlog marker: the board Status when the project has a board, the `backlog` label when it has none (#647).
+# The number may only go down: when an issue is closed, filed under an effort or parked with the
+# marker, lower it in the same change. Not run by lib/core/check.sh (the gate stays offline).
+# Lowered 12 → 0 on 2026-11-26 (#658): #520, #521, #522 and #507 hang off E654 (the docs effort), every
+# other standalone issue carries `backlog`, and the three issues still counted that day (#648, #651,
+# #652) close with the PRs of the same run.
+0

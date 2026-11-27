@@ -13,7 +13,8 @@ skill was `not installed`. Apply only the section for the missing skill.
 4. Body text: 16px or more, lines of 45 to 75 characters, left-aligned.
 5. One colour carries meaning (the action); the rest of the palette is neutral. Use the values in
    the brief, not the framework's defaults.
-6. Spacing comes from one scale. Sections do not all get the same height and padding.
+6. Spacing comes from one scale: the 4px grid in `interface-rules.md` § 1, with radii, tables and
+   error surfaces from its other sections. Sections do not all get the same height and padding.
 7. No pattern from the brief's "Refuses to look like" list.
 8. No invented content: no customer name, quote, logo or number the task did not supply.
 

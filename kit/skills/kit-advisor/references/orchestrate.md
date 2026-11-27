@@ -42,6 +42,9 @@ report and trail comment on its sub.
 As each worker reports, read its trail comment, check the sub's commit is on the effort branch,
 and start the next wave from `cckit effort plan --wave --effort <N>`. A worker that stopped on a
 decision goes to the owner; a worker that stopped on a broken verb is a kit defect to file.
+Work a worker found outside its sub is filed and linked, not asked about (`issue-lifecycle.md`
+§ 4): a sub-issue of the effort if the sprint goal needs it, otherwise a backlog item with a
+`flow:` label and a relation to the effort.
 
 ## 5. Report
 

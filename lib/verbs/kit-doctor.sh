@@ -14,6 +14,7 @@
 #                                         # present or absent; exit 1 if one is absent. No network.
 #   lib/verbs/kit-doctor.sh --loose         # only the loose-issue count + the list (#N title): open
 #                                         # issues that are no effort, no sub-issue, not in Backlog
+#                                         # (board Status; with no board, the `backlog` label)
 #   lib/verbs/kit-doctor.sh --loose --ratchet [--baseline=FILE]
 #                                         # exit 1 when the count rose above the baseline
 #                                         # (default lib/core/loose-issues.baseline); 2 = not judged
@@ -222,8 +223,9 @@ if [[ $AGENTS_ONLY -eq 1 ]]; then
 fi
 
 # ---- loose issues (E546.2) ---------------------------------------------------
-# A loose issue is open, not a pull request, not an effort, not a sub-issue, and not on the board
-# with Status = Backlog (lib/core/loose-issues.sh). One row with the count; `list` adds one
+# A loose issue is open, not a pull request, not an effort, not a sub-issue, carries no relation
+# line, and is not parked in Backlog: board Status with the board on, the `backlog` label with it off
+# (lib/core/loose-issues.sh). One row with the count; `list` adds one
 # `#N title` line per issue. Sets LOOSE_STATE (read | skipped | failed) and LOOSE_COUNT. Read-only.
 LOOSE_STATE=skipped; LOOSE_COUNT=""
 doctor_loose() {
@@ -246,9 +248,9 @@ doctor_loose() {
   _n="$(printf '%s' "$_out" | grep -c . || true)"
   LOOSE_STATE=read; LOOSE_COUNT="$_n"
   if loose_board_on "$_cfg"; then
-    _why="open issues that are no effort, no sub-issue, and not in Backlog on the board"
+    _why="open issues that are no effort, no sub-issue, have no relation line and are not in Backlog on the board"
   else
-    _why="the board is off (projectsV2 false), so no issue can carry the Backlog marker and every standalone issue counts"
+    _why="the board is off (projectsV2 false), so the Backlog marker is the backlog label and every standalone issue with no relation line and no backlog label counts"
   fi
   if [[ "$_n" -eq 0 ]]; then
     row "$MARK_OK" "loose issues" "0 in $_repo — $_why"
@@ -275,7 +277,7 @@ if [[ $LOOSE_ONLY -eq 1 ]]; then
   if [[ $LOOSE_RATCHET -eq 1 ]]; then
     if [[ -z "$LOOSE_BASELINE" ]]; then
       _lroot="$(git -C "${TARGET:-$PWD}" rev-parse --show-toplevel 2>/dev/null || printf '%s' "${TARGET:-$PWD}")"
-      LOOSE_BASELINE="$_lroot/scripts/loose-issues.baseline"
+      LOOSE_BASELINE="$_lroot/lib/core/loose-issues.baseline"
     fi
     if [[ "$LOOSE_STATE" != read ]]; then
       row "$MARK_FAIL" "loose ratchet" "not judged — the count was not read"
@@ -287,7 +289,7 @@ if [[ $LOOSE_ONLY -eq 1 ]]; then
       exit 2
     fi
     if [[ "$LOOSE_COUNT" -gt "$_lbase" ]]; then
-      row "$MARK_FAIL" "loose ratchet" "$LOOSE_COUNT loose > baseline $_lbase — put each new one under an effort, as a sub-issue, or in Backlog"
+      row "$MARK_FAIL" "loose ratchet" "$LOOSE_COUNT loose > baseline $_lbase — put each new one under an effort, as a sub-issue, or in Backlog (board Status, or the backlog label with no board)"
       exit 1
     elif [[ "$LOOSE_COUNT" -lt "$_lbase" ]]; then
       row "$MARK_OK" "loose ratchet" "$LOOSE_COUNT loose < baseline $_lbase — lower the number in $LOOSE_BASELINE to $LOOSE_COUNT"

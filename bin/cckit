@@ -213,7 +213,7 @@ case "$cmd" in
     # shellcheck source=/dev/null
     source "$LIB/core/role-identity.sh"; source "$LIB/forge/gh-project.sh"; source "$LIB/verbs/kit-task-ops.sh"
     if [ "$cmd" = close ]; then case "${1:-}" in -h|--help)
-      echo 'cckit close <issue> ["<summary>"] [--reason completed|not-planned|duplicate] [--duplicate-of N] [--superseded-by N]'; exit 0 ;; esac; fi
+      echo 'cckit close <issue> ["<summary>"] [--reason completed|not-planned|duplicate] [--duplicate-of N] [--superseded-by N] [--carried-by N]'; exit 0 ;; esac; fi
     if cckit_is_json; then
       case "$cmd" in
         pr)    out="$(kto_task_pr    "$@" 2>&1)"; rc=$? ;;
@@ -255,7 +255,8 @@ case "$cmd" in
   new)
     # File ONE issue through kto_task_new (labels + board add + Role/Status fields). This verb is why
     # an agent never needs raw `gh issue create`, which skips the board (#361). Multi-part work is
-    # `cckit effort new`. Defaults: kind task, priority p2; role from --role or KIT_DEFAULT_ROLE.
+    # `cckit effort new`. Defaults: kind task, priority p2; role from --role or KIT_DEFAULT_ROLE. A body
+    # that cites [E<n>] with no relation to #<n> is refused; --force (KIT_FORCE=1) files it anyway.
     # shellcheck source=/dev/null
     source "$LIB/core/kit-config.sh" && load_kit_config
     # shellcheck source=/dev/null
@@ -271,7 +272,8 @@ case "$cmd" in
         --blocked-by) n_blocked="${2:-}"; shift 2 ;;
         --body)       n_body="${2:-}"; shift 2 ;;
         --body-file)  n_body="$(cat "${2:-/dev/null}")"; shift 2 ;;
-        -h|--help)    echo 'cckit new [--role R --kind K --priority P --milestone M --plan L --blocked-by "#1" --body B|--body-file F] "<title>"'; exit 0 ;;
+        --force)      export KIT_FORCE=1; shift ;;
+        -h|--help)    echo 'cckit new [--role R --kind K --priority P --milestone M --plan L --blocked-by "#1" --body B|--body-file F] [--force] "<title>"'; exit 0 ;;
         --)           shift; n_title="${n_title:+$n_title }$*"; break ;;
         -*)           echo "cckit new: unknown flag $1" >&2; exit 2 ;;
         *)            n_title="${n_title:+$n_title }$1"; shift ;;

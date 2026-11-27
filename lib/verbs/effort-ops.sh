@@ -12,8 +12,9 @@
 #   effort_chain <a> <b> [<c> …]          wire N issues into a linear blocked_by chain (#243)
 #   effort_start [--force] <slug|N> [<slug>]  effort/<N> branch + worktree from base, WIP-limited (#244)
 #   effort_pr [<slug|N>]                  open the ONE PR effort/<N> → base branch
-#   effort_close <slug|N> [--no-spec-check]  check the Spec, snapshot sub-diffs, squash-merge, close the
-#                                         parent + finished subs (unfinished stay open, listed)
+#   effort_close <slug|N> [--no-spec-check]  check the Spec, snapshot sub-diffs, squash-merge, delete the
+#                                         effort branch and every sub/<N><letter>-* branch on origin,
+#                                         close the parent + its subs, GC the worktrees + local branches
 #
 # effort_new is the SHARED creation core (effort #98): both `cckit effort new` (the verb) and
 # /kit-effort-new (the skill) call it, so they produce structurally identical efforts — one source of
@@ -311,23 +312,23 @@ EOF_SB
   command -v effort_ctx_bucket >/dev/null 2>&1 && ctx="$(effort_ctx_bucket 1 "$subcount")"
   # Every kit-defined label is ensured before use — `gh issue create --label` fails hard on a
   # missing label, which aborted the whole parent create on repos without the ctx:* set (#153).
-  _eff_ensure_label "$ctx" bfd4f2 "effort session weight"
-  _eff_ensure_label "kind:$kind" d4c5f9 "kit issue kind"
-  _eff_ensure_label "priority:$priority" e99695 "kit priority"
+  _eff_ensure_label "$ctx" bfd4f2 "$(kit_label_desc ctx "${ctx#ctx:}")"
+  _eff_ensure_label "kind:$kind" d4c5f9 "$(kit_label_desc kind "$kind")"
+  _eff_ensure_label "priority:$priority" e99695 "$(kit_label_desc priority "$priority")"
   # `effort` is what marks the parent AS an effort, and it is the label `effort_plan` queries
   # (`gh issue list --label effort`, effort-plan.sh). It was read and never written: the label did
   # not exist in this repo at all, so `cckit effort plan` answered "no open efforts found" for
   # every effort ever created here. A label something reads and nothing writes is the same defect
   # as one something writes and nothing reads — see rules/naming-and-ids.md § Labels.
-  _eff_ensure_label "effort" 5319e7 "an effort parent issue"
+  _eff_ensure_label "effort" 5319e7 "$(kit_label_desc effort)"
   local labels="effort,$ctx,kind:$kind,priority:$priority"
   if [ -n "$role" ]; then
-    _eff_ensure_label "role:$role" 0e8a16 "kit role lane"
+    _eff_ensure_label "role:$role" 0e8a16 "$(kit_label_desc role "$role")"
     labels="$labels,role:$role"
   fi
   if [ -n "$flow" ]; then
     local flow_lc; flow_lc="$(printf '%s' "$flow" | tr '[:upper:]' '[:lower:]')"
-    _eff_ensure_label "flow:$flow_lc" 1d76db "kit flow lane"
+    _eff_ensure_label "flow:$flow_lc" 1d76db "$(kit_label_desc flow "$flow_lc")"
     labels="$labels,flow:$flow_lc"
   fi
 
@@ -437,8 +438,8 @@ effort_sub() {
   step=$(( ${count:-0} + 1 ))
   title="$(naming_sub_title "$num" "$step" "$name")"
   naming_title_lint sub "$title" || return 1
-  _eff_ensure_label "kind:$kind" d4c5f9 "kit issue kind"
-  _eff_ensure_label "priority:$priority" e99695 "kit priority"
+  _eff_ensure_label "kind:$kind" d4c5f9 "$(kit_label_desc kind "$kind")"
+  _eff_ensure_label "priority:$priority" e99695 "$(kit_label_desc priority "$priority")"
   sub_labels="kind:$kind,priority:$priority"
   [ -n "$role" ] && sub_labels="$sub_labels,role:$role"
   child="$(gh_rest_issue_create "$repo" "$title" \
@@ -975,16 +976,19 @@ effort_pr() {
   naming_title_lint pr "$pr_title" || { echo "effort_pr: refusing to open a PR whose title breaks the naming rule (pass --type <type> or --title, or set pr.titleStyle to issue-title)" >&2; return 1; }
 
   # Commit pending changes. Role identity is a Co-authored-by TRAILER, never the git author (some
-  # deploy providers refuse commits whose author email matches no account). TRACKED changes only:
-  # `git add -A` here would sweep a copied .env.local into the PR. Untracked files are listed, not
-  # committed — an effort's new files land in its per-sub commits.
-  if [ -n "$(git ls-files --others --exclude-standard 2>/dev/null)" ]; then
-    echo "effort_pr: untracked files NOT committed (commit them in their sub's commit if they belong):" >&2
-    git ls-files --others --exclude-standard 2>/dev/null | sed 's/^/  /' >&2
+  # deploy providers refuse commits whose author email matches no account). Every file the local
+  # gate saw goes into the commit, as in kto_task_pr (#649, #664): tracked edits AND new files that
+  # are not ignored. `git add -A` honours .gitignore, so an ignored .env.local copied into the
+  # worktree never reaches the PR; a new file that must stay out belongs in .gitignore. New files
+  # are named on stderr, so the commit is never silently larger either.
+  local new_files; new_files="$(git ls-files --others --exclude-standard 2>/dev/null)"
+  if [ -n "$new_files" ]; then
+    echo "effort_pr: new files committed with the tracked changes (add them to .gitignore to keep them out):" >&2
+    printf '%s\n' "$new_files" | sed 's/^/  /' >&2
   fi
-  if [ -n "$(git status --porcelain --untracked-files=no 2>/dev/null)" ]; then
+  if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
     author=""
-    git add -u
+    git add -A
     if [ -n "$role" ] && command -v role_git_author >/dev/null 2>&1; then
       author="$(role_git_author "$role" 2>/dev/null || true)"
     fi
@@ -1100,6 +1104,31 @@ _eo_source_board() {
 # _eo_issue_close_completed <repo> <n> — close as completed on the chosen transport (#396), quietly.
 _eo_issue_close_completed() { gh_rest_issue_close "$1" "$2" completed >/dev/null 2>&1; }
 
+# _eo_delete_remote_subs <effort#> <dir> — delete every `sub/<N><letter>-*` branch origin has right
+# now (#651), one `✓ deleted remote branch` line each on stderr. Read with `git ls-remote --heads`,
+# filtered to one trailing letter, so another effort's `sub/<N>0a-…` is never matched. In a cloud
+# session the proxy rejects branch deletion (#396): the branches are listed as kept. A failed
+# delete warns; the function always returns 0, because the merge has already landed.
+_eo_delete_remote_subs() {
+  local num="$1" dir="${2:-.}" refs ref sub
+  refs="$(git -C "$dir" ls-remote --heads origin "refs/heads/sub/${num}*" 2>/dev/null \
+    | awk '{print $2}' | sed 's|^refs/heads/||' | grep -E "^sub/${num}[a-z]-" || true)"
+  [ -n "$refs" ] || return 0
+  while IFS= read -r sub; do
+    [ -n "$sub" ] || continue
+    if cckit_in_cloud; then
+      echo "  (remote branch $sub kept — branch deletion is unavailable here; delete it on GitHub)" >&2
+    elif git -C "$dir" push origin --delete "$sub" >/dev/null 2>&1; then
+      echo "  ✓ deleted remote branch $sub" >&2
+    else
+      echo "  ⚠ remote branch $sub not deleted — delete it on GitHub" >&2
+    fi
+  done <<EOF_SUBS
+$refs
+EOF_SUBS
+  return 0
+}
+
 # _eo_board_done <issue #> — set the board Status=Done for one issue. Guarded like _eff_board_add:
 # a no-op unless Projects v2 is on AND the board helpers + field ids are loaded. Best-effort — a
 # board hiccup never fails the close (the merge already landed).
@@ -1124,6 +1153,34 @@ _eo_board_done() {
 # kit/templates/rules/<name>.md, so any other file there is the project's own and no /kit-update can
 # touch it. The list is the kit/templates/rules basenames; effort-ops-test.sh fails when they differ.
 _EO_KIT_MANAGED_RE='^(scripts/(lib/|kit$|kit-)|\.claude/(skills|hooks|lib|agents)/|\.claude/rules/(authoring|branch-naming|code-retrieval|communication-style|delegation-brief|design-routing|effort-model|gate-and-review|issue-lifecycle|knowledge-base|merge-safety|naming-and-ids|plain-language|plan-next|plan-output-format|react-annotate|review-pages|risk-tiered-review|shared-checkout|skill-gaps|task-management)\.md$)'
+
+# _eo_kit_manifest_file [<dir>] — the project's ownership manifest (kit-manifest.sh), or nothing:
+# `$KIT_MANIFEST` when it names a file, else <dir>/.claude/kit.manifest.json, else the Codex-only
+# <dir>/.cckit/kit.manifest.json. Needs jq to be readable; without jq it prints nothing, so the
+# caller falls back to the pattern.
+_eo_kit_manifest_file() {
+  local dir="${1:-.}" mf
+  command -v jq >/dev/null 2>&1 || return 0
+  for mf in "${KIT_MANIFEST:-}" "$dir/.claude/kit.manifest.json" "$dir/.cckit/kit.manifest.json"; do
+    [ -n "$mf" ] && [ -f "$mf" ] && { printf '%s\n' "$mf"; return 0; }
+  done
+  return 0
+}
+
+# _eo_kit_managed_filter [<dir>] — stdin: changed paths, one per line (relative to the project
+# root). stdout: the ones the kit manages (#652, decision 96). The manifest is the source: a path
+# is kit-managed when it is an entry of <dir>'s kit.manifest.json, which is what `init --upgrade`
+# writes and `kit_op_remove` refuses to go beyond — a project's own file under `.claude/skills/` is
+# not flagged. With no manifest (a project scaffolded before manifests, or cckit itself) the path
+# pattern _EO_KIT_MANAGED_RE decides, and _eo_kit_sync_warn says so.
+_eo_kit_managed_filter() {
+  local mf; mf="$(_eo_kit_manifest_file "${1:-.}")"
+  if [ -n "$mf" ]; then
+    grep -xF -f <(jq -r '.entries | keys[]' "$mf" 2>/dev/null; echo '//never//') || true
+  else
+    grep -E "$_EO_KIT_MANAGED_RE" || true
+  fi
+}
 
 # _eo_knowledge_ingest <num> <trace_dir> <root> — optional post-close knowledge-ingest hook. Runs a
 # project-configured command (github/effort.knowledgeIngestHook, or KIT_EFFORT_KNOWLEDGE_HOOK) with
@@ -1231,20 +1288,26 @@ EOF_SUBS
 # and finish with the advisory kit-sync drift check. Destructive: it merges, closes, and prunes.
 # First of all it re-reads the parent body and refuses an effort whose `## Spec` fails spec_lint
 # (E546.5); --no-spec-check skips that one check and says so on stderr.
-_EO_CLOSE_USAGE='cckit effort close <slug|N> [--no-spec-check]   squash-merge the effort PR, close the parent and its finished subs (unfinished subs stay open, linked, and are listed), GC'
+_EO_CLOSE_USAGE='cckit effort close <slug|N> [--no-spec-check] [--carried-by <N>]   squash-merge the effort PR, close the parent and its finished subs, close the subs no commit delivered as not planned (the comment names #N as the issue that carries what is left, or says nothing is left), GC'
 effort_close() {
   case "${1:-}" in -h|--help) echo "$_EO_CLOSE_USAGE"; return 0 ;; esac
   _eff_forge || return 1; _eff_need jq || return 1
-  local raw="" spec_check=1 num repo base branch root self_wt trace_dir kit_touched
+  local raw="" spec_check=1 carry="" carry_set=0 num repo base branch root self_wt trace_dir kit_touched kit_manifest
   while [ $# -gt 0 ]; do
     case "$1" in
       -h|--help) echo "$_EO_CLOSE_USAGE"; return 0 ;;
       --no-spec-check) spec_check=0; shift ;;
+      --carried-by)    carry="${2:-}"; carry_set=1; [ $# -ge 2 ] && shift 2 || shift ;;
+      --carried-by=*)  carry="${1#--carried-by=}"; carry_set=1; shift ;;
       -*) echo "effort_close: unknown flag $1" >&2; return 2 ;;
       *)  [ -z "$raw" ] && raw="$1"; shift ;;
     esac
   done
   [ -n "$raw" ] || { echo "effort_close: <slug|effort issue #> required" >&2; return 1; }
+  carry="${carry#\#}"
+  if [ "$carry_set" = 1 ]; then
+    case "$carry" in ""|*[!0-9]*) echo "effort_close: --carried-by needs an issue number (nothing was written)" >&2; return 2 ;; esac
+  fi
   num="$(effort_slug_resolve "$raw")" || { echo "effort_close: could not resolve '$raw' to an effort" >&2; return 1; }
   repo="$(_eff_repo)"; base="$(_eff_base)"
   _eo_spec_check "$repo" "$num" "$spec_check" || return 1
@@ -1319,12 +1382,14 @@ effort_close() {
   # (b2) record which kit-managed files this effort touched, PRE-squash (the branch is GC'd below,
   # so the live-branch diff is the reliable source). The warning itself is emitted last (step h).
   kit_touched="$(git diff --name-only "origin/$base"...HEAD 2>/dev/null \
-    | grep -E "$_EO_KIT_MANAGED_RE" | sort -u || true)"
+    | _eo_kit_managed_filter . | sort -u || true)"
+  kit_manifest="$(_eo_kit_manifest_file .)"
 
   # (b3) which subs are finished (#565, decision 52), read PRE-squash while the effort branch's
   # commits still exist. A sub is finished when it is already closed, or a commit on this branch
-  # delivers it (_eo_delivered_refs). Unfinished subs are NOT closed and NOT detached: they stay
-  # open under the parent and are listed in the close comment and in this command's output.
+  # delivers it (_eo_delivered_refs). A sub no commit delivers is not detached: it closes WITH the
+  # parent in step (e) (#650), as not planned (#663), and is listed as such in the close comment and
+  # in this output.
   local sub_rows delivered sub_split done_subs="" open_subs="" open_lines=""
   sub_rows="$(forge_rest "repos/$repo/issues/$num/sub_issues" \
     --jq '.[] | "\(.number)|\(.state)|\(.title // "")"' 2>/dev/null)" || sub_rows=""
@@ -1345,15 +1410,21 @@ effort_close() {
     git -C "${root:-.}" push origin --delete "$branch" >/dev/null 2>&1 && echo "  ✓ deleted remote branch $branch" >&2 \
       || echo "  (remote branch $branch not deleted — delete it on GitHub)" >&2
   fi
+  # (c2) the effort's sub branches on origin, `sub/<N><letter>-*` (#651): the squash just put their
+  # work on base, and step (f2) prunes only what has a local head. Read from origin (ls-remote, not
+  # the cached refs), one `push --delete` each; a failed delete warns and never fails the close.
+  _eo_delete_remote_subs "$num" "${root:-.}"
 
   # (d) judge the metrics (reads the durable trace dir; the record stays in the local buffer).
   command -v judge_effort_metrics >/dev/null 2>&1 && judge_effort_metrics "$num" "origin/$base" || true
 
-  # (e) close the FINISHED sub-issues (#565), then the parent — and set the board Status=Done for
-  # each (guarded: a no-op when Projects v2 is off or the board helpers/ids are unavailable). A sub
-  # already closed keeps its own close reason (no second PATCH). An unfinished sub stays open and
-  # linked; the close comment on the parent lists it. Board + issue + record state are owned by
-  # this ONE op (effort-model.md) — never a separate "mark done".
+  # (e) close the FINISHED sub-issues (#565), then the parent, then every sub still open — as not
+  # planned, with one comment naming the parent and the issue that carries what is left
+  # (--carried-by) or saying nothing is left, through the shared gh_rest_close_open_subs (#650,
+  # #663) — and set the board Status=Done for each (guarded: a no-op when Projects v2 is off or the board
+  # helpers/ids are unavailable). A sub already closed keeps its own close reason (no second
+  # PATCH). Board + issue + record state are owned by this ONE op (effort-model.md) — never a
+  # separate "mark done".
   _eo_source_board
   local sub sstate done_list="" comment
   while IFS='|' read -r sub sstate; do
@@ -1368,14 +1439,21 @@ effort_close() {
   done <<EOF_DONE
 $done_subs
 EOF_DONE
-  while IFS= read -r sub; do
-    [ -n "$sub" ] && echo "  ⚠ left open: sub #$sub — unfinished, still linked under #$num" >&2
-  done <<EOF_OPEN
-$open_subs
-EOF_OPEN
-  comment="$(_eo_close_comment "$branch" "$done_list" "$open_lines")"
+  comment="$(_eo_close_comment "$branch" "$done_list" "$open_lines" "$carry")"
   gh_rest_issue_close "$repo" "$num" completed "$comment" >/dev/null 2>&1 && echo "  ✓ closed effort #$num" >&2
   _eo_board_done "$num"
+  if [ -n "$open_subs" ]; then
+    local closed_with
+    closed_with="$(gh_rest_close_open_subs "$repo" "$num" "not planned" "$carry" 2>/dev/null)" \
+      || echo "  ⚠ could not close every sub-issue of #$num — check them on the forge" >&2
+    while IFS= read -r sub; do
+      [ -n "$sub" ] || continue
+      echo "  ✓ closed sub #$sub with its parent as not planned (no commit on the effort branch delivers it)" >&2
+      _eo_board_done "$sub"
+    done <<EOF_WITH
+$closed_with
+EOF_WITH
+  fi
 
   # (f) GC: switch the main checkout to base, remove the effort worktree, delete the local branch,
   # prune. The remote branch was deleted in step (c). All via `git -C "$root"` so the
@@ -1406,13 +1484,15 @@ EOF_OPEN
   _eo_knowledge_ingest "$num" "${trace_dir:-}" "$root"
 
   # (h) kit-sync drift check — kit ⇄ project stay in sync (#148, moved here from the skill).
-  _eo_kit_sync_warn "$kit_touched"
+  _eo_kit_sync_warn "$kit_touched" "$kit_manifest"
 
-  # (i) the report's last word: the subs this close left open (#565).
+  # (i) the report's last word: the subs that closed with the parent, undelivered (#565, #650).
   if [ -n "$open_lines" ]; then
     echo "" >&2
-    echo "  ⚠ #$num closed with unfinished sub-issues still open (linked under it):" >&2
+    echo "  ⚠ #$num closed with sub-issues no commit delivered (closed as not planned):" >&2
     printf '%s\n' "$open_lines" | sed 's/^/     /' >&2
+    if [ -n "$carry" ]; then echo "     #$carry carries what is left." >&2
+    else echo "     Their comment says nothing is left (no --carried-by <N> named an issue that carries it)." >&2; fi
   fi
   return 0
 }
@@ -1450,13 +1530,16 @@ _eo_partition_subs() {
   done
 }
 
-# _eo_close_comment <branch> <done-list> <open-lines> — the comment effort_close posts on the parent
-# as it closes it: which subs closed with it and which stay open, linked (#565).
+# _eo_close_comment <branch> <done-list> <open-lines> [carrier] — the comment effort_close posts on
+# the parent as it closes it: which subs finished (#565) and which closed with it as not planned,
+# with the issue that carries what is left, or that nothing is left (#663).
 _eo_close_comment() {
   printf 'Closed by `cckit effort close` (merged `%s`).\n\n' "$1"
   printf 'Finished sub-issues: %s\n' "${2:-none}"
   if [ -n "${3:-}" ]; then
-    printf '\nLeft open, still linked under this effort (no commit on the effort branch delivers them):\n%s\n' "$3"
+    printf '\nClosed as not planned, no commit on the effort branch delivers them:\n%s\n' "$3"
+    if [ -n "${4:-}" ]; then printf '\n#%s carries what is left.\n' "$4"
+    else printf '\nNothing is left to carry.\n'; fi
   fi
 }
 
@@ -1479,7 +1562,8 @@ _eo_spec_check() {
   return 1
 }
 
-# _eo_kit_sync_warn <files> — the advisory kit-sync drift warning, shared by both close styles
+# _eo_kit_sync_warn <files> [<manifest>] — the advisory kit-sync drift warning, shared by both close
+# styles; with no <manifest> (the path-pattern fallback, #652) it says so in one more line
 # (#148/#164). If an effort changed kit-managed files they likely belong upstream (/kit-contribute);
 # an un-upstreamed change is a latent regression the next /kit-update can clobber. Never blocks.
 _eo_kit_sync_warn() {
@@ -1489,6 +1573,9 @@ _eo_kit_sync_warn() {
     echo "  ⚠ kit-sync: this effort changed kit-managed files — review for upstream (/kit-contribute):"
     printf '%s\n' "$1" | sed 's/^/     /'
     echo "     kit ⇄ project must stay in sync; an un-upstreamed change can be clobbered by /kit-update."
+    if [ -z "${2:-}" ]; then
+      echo "     (no kit.manifest.json read: matched by path pattern, so a project-owned file under a kit directory may be listed)"
+    fi
   } >&2
 }
 
@@ -1501,7 +1588,7 @@ _eo_kit_sync_warn() {
 # capture_effort_metrics is intentionally skipped — there is no live branch diff to measure; the
 # merged PR diffs in the trace are the work record.
 _eo_close_wave() {
-  local num="$1" repo="$2" base="$3" root rows bad trace_dir kit_touched sub
+  local num="$1" repo="$2" base="$3" root rows bad trace_dir kit_touched kit_manifest sub
   root="$(git worktree list --porcelain 2>/dev/null | awk '/^worktree / && !hit {print $2; hit=1}')"
   _eo_source_metrics
 
@@ -1552,7 +1639,8 @@ _eo_close_wave() {
 
   # (e) kit-sync drift source: the union of files across the merged sub PR diffs.
   kit_touched="$(awk '/^diff --git /{print $3}' "$trace_dir"/*.diff 2>/dev/null | sed 's#^a/##' \
-    | grep -E "$_EO_KIT_MANAGED_RE" | sort -u || true)"
+    | _eo_kit_managed_filter "${root:-.}" | sort -u || true)"
+  kit_manifest="$(_eo_kit_manifest_file "${root:-.}")"
 
   # (f) close the parent + board Status=Done for parent and every sub (subs are already closed).
   _eo_source_board
@@ -1567,5 +1655,5 @@ _eo_close_wave() {
 
   # (h) same optional hook + advisory drift check as the branch path.
   _eo_knowledge_ingest "$num" "${trace_dir:-}" "$root"
-  _eo_kit_sync_warn "$kit_touched"
+  _eo_kit_sync_warn "$kit_touched" "$kit_manifest"
 }

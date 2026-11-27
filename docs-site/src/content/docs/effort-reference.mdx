@@ -110,7 +110,10 @@ The slug is a *derived* convenience, not a second source of truth. `--slug` only
   `kind:` label (`kind:task` → `feat`, a `bug` label → `fix`). A title that fails the commitlint
   check — a bad `--type`, or a non-conventional `--title` — is refused before any PR is opened.
   With [`pr.titleStyle: issue-title`](/config-and-permissions/) the title is `[Role] [#N] <name>`
-  and the commitlint check is skipped.
+  and the commitlint check is skipped. Changes still pending on the effort branch are committed
+  first, as `cckit pr` commits them: tracked edits and new files that are not ignored, the new
+  files named on stderr. A gitignored file (the copied `.env.local`) never enters the commit; a new
+  file that must stay out of the pull request belongs in `.gitignore`.
 - **`cckit effort close`** is the single close implementation — the `/kit-effort-close` skill is a
   thin caller of the same function, so the two can never drift apart. It snapshots each sub-issue's
   diff and captures effort metrics **before** the squash, **refuses to squash-merge when no work
@@ -119,13 +122,25 @@ The slug is a *derived* convenience, not a second source of truth. `--slug` only
   branch (GitHub closes a PR, unmerged, when its base branch is deleted; one `↻ PR <n> re-targeted
   to develop` line each — if a re-target fails, or those PRs cannot be listed, the close refuses,
   names the PR and merges nothing), squash-merges,
-  closes the parent and every sub and sets the board **Status=Done** for each, garbage-collects the
-  worktree/branch, runs an optional, config-gated knowledge-ingest hook
+  closes the parent and every sub — a sub a commit on the effort branch delivers (its last `#N`, a
+  `Closes #N`, or its `[E<n>.<k>]` step tag) closes as finished; a sub no commit delivers closes with
+  the parent as `not planned`, with the comment `Closed as not planned with its parent #N: no commit
+  delivered it.` followed by `#M carries what is left.` (`cckit effort close <N> --carried-by M`) or
+  `Nothing is left to carry.`, and a line in the parent's close comment (#650, #663); none is left open — and sets the board **Status=Done** for each, garbage-collects the
+  worktree/branch — the effort branch on origin, then every `sub/<N><letter>-*` branch origin
+  holds (read with `git ls-remote`, one `✓ deleted remote branch` line each; a failed delete warns
+  and never fails the close, #651), then the effort worktree, its local branch and the LANDED
+  `sub/<N>…` worktrees + local branches — runs an optional, config-gated knowledge-ingest hook
   (`effort.knowledgeIngestHook`), and finishes with an advisory **kit-sync drift check** that flags
-  any kit-managed files the effort touched (they belong upstream via `/kit-contribute`). Kit-managed
-  means `scripts/lib/`, `scripts/kit*`, `.claude/{skills,hooks,lib,agents}/`, and the rule files the
-  kit ships under `.claude/rules/`. A rule the project wrote itself is not flagged: `cckit init`
-  and `/kit-update` only write rules that have a template, so they cannot overwrite it.
+  any kit-managed files the effort touched (they belong upstream via `/kit-contribute`). The source
+  is the project's ownership manifest, `.claude/kit.manifest.json` (`.cckit/kit.manifest.json` in a
+  Codex-only project): a file is kit-managed when the manifest lists it, which is exactly what
+  `cckit init --upgrade` writes and refuses to go beyond, so a project's own file under
+  `.claude/skills/` is never flagged (#652). With no manifest — a project scaffolded before
+  manifests, or cckit itself — the check falls back to a path pattern (`scripts/lib/`,
+  `scripts/kit*`, `.claude/{skills,hooks,lib,agents}/`, and the rule files the kit ships under
+  `.claude/rules/`) and the warning says so in one more line. A rule the project wrote itself is
+  not flagged either way: `cckit init` and `/kit-update` only write rules that have a template.
 - **The metrics record.** The close appends one JSON line per effort to
   `<git-common-dir>/effort-metrics/records.jsonl`. Each measured field names its source, and a
   field with no source is `null`, never an estimate.

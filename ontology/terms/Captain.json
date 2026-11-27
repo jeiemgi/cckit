@@ -1,7 +1,7 @@
 {
   "id": "Captain",
   "label": ["captain"],
-  "definition": "Whoever drives an approved plan: cckit watch --merge, /kit-autopilot, or an orchestrating session. It gates the open PRs, squash-merges the CLEAN ones, closes their issues, advances the wave, and pings a person only on a genuine blocker.",
+  "definition": "Whoever drives an approved plan: the captain session (a Session in the captain role), cckit watch --merge, or /kit-autopilot. It gates the open PRs, squash-merges the CLEAN ones, closes their issues, advances the wave, and files and links work that emerges mid-wave. It removes every impediment itself; only the four genuine blockers of issue-lifecycle.md section 2 reach the owner.",
   "is_not": [
     "A builder: a builder implements one issue in its worktree and never merges.",
     "A reviewer: the captain reads the gate and the review verdicts, it does not review the code.",

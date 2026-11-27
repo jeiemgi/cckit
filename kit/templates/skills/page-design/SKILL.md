@@ -73,6 +73,10 @@ them: `init` once when the project has no `PRODUCT.md`, `shape` to plan the page
 then `typeset`, `layout` and `colorize` on what was built. Give each command the brief as its
 input: the audience, the one idea and the refusals are already decided.
 
+Whatever decides direction, the page keeps `references/interface-rules.md`: the 4px grid, the
+radius rules, the table pattern and one job per error surface. A value that breaks one is listed in
+the design file with its reason, or fixed before the self-review.
+
 - **Never its live mode in an unattended run.** `live` and `generate` open a browser session and
   can start the agent CLI with permission checks off. With `CCKIT_HEADLESS` set, do not run
   either. In an attended run, run them only when the person asks.

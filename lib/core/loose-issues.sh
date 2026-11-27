@@ -2,9 +2,13 @@
 # shellcheck shell=bash
 # loose-issues.sh — count the open issues that belong to no unit of work (E546.2). A loose issue is
 # an open issue (not a pull request) that is not an effort (`effort` label), not a sub-issue (the
-# REST field `parent_issue_url` is set), and not on the board with Status = Backlog. The Backlog
-# marker is the board's Status column; with the board off (`github.projectsV2: false`) no issue can
-# carry it, so every standalone issue counts.
+# REST field `parent_issue_url` is set), carries no relation line (`Depends on #N`, `Blocks #N`,
+# `Extends #N`, `Parallel-safe with #N`, `Sub-issue of #N`, `Blocked by: #N`; the forms
+# `naming_body_has_relation` accepts), and is not parked in Backlog. The Backlog marker depends on
+# the board (#647): with the board on (`github.projectsV2: true` + a number) it is the Status column
+# alone, and the `backlog` label is ignored; with the board off it is the `backlog` label, which
+# `setup-labels.sh` provisions. So with the board off, a standalone issue with no relation line and
+# no `backlog` label counts.
 #
 #   loose_board_on [cfg]            rc 0 iff the config turns the board on (projectsV2 true + a number)
 #   loose_repo [cfg]                owner/name: .github.repo, else the origin remote; rc 1 when neither
@@ -38,15 +42,22 @@ loose_repo() {
 }
 
 loose_issues_list() {
-  local repo="$1" cfg="${2:-}" raw n title st pnum=""
+  local repo="$1" cfg="${2:-}" raw n title st pnum="" board=0 label_filter=""
+  if loose_board_on "$cfg"; then board=1; else
+    # No board: the `backlog` label is the marker, so a labelled issue is not loose.
+    label_filter='| select(([.labels[]?.name] | index("backlog")) | not)'
+  fi
   raw="$(forge_rest "repos/$repo/issues?state=open&per_page=100" --paginate \
     --jq '.[] | select(.pull_request == null)
               | select(([.labels[]?.name] | index("effort")) | not)
+              '"$label_filter"'
               | select((.parent_issue_url // "") == "")
+              | select((.body // "" | gsub("[*]"; "") | test("(?im)^[ \\t]*([-+][ \\t]+)?(depends on|blocks|extends|parallel-safe with|sub-issue of|blocked by:?)[ \\t]+(.*[^0-9])?#[0-9]+")) | not)
               | "\(.number)\t\(.title)"')" || return 1
   [ -n "$raw" ] || return 0
-  if loose_board_on "$cfg"; then
-    # The board holds the Backlog marker: one cheap issue.projectItems read per standalone issue.
+  if [ "$board" = 1 ]; then
+    # The board holds the Backlog marker (the label is ignored here): one cheap issue.projectItems
+    # read per standalone issue.
     command -v project_issue_status >/dev/null 2>&1 || . "$LOOSE_LIB/../forge/gh-project.sh"
     pnum="$(jq -r '.github.projectNumber' "$(_loose_cfg "$cfg")")"
     printf '%s\n' "$raw" | while IFS="$(printf '\t')" read -r n title; do

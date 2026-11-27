@@ -1,7 +1,7 @@
 {
   "id": "Check",
   "label": ["check"],
-  "definition": "One verification with a pass or fail answer and a named subject: a test file, a lint, a JSON validation, a QA verdict on a lane, a doctor row. The gate is made of checks; a check that fails names the file and the reason.",
+  "definition": "One verification with a pass or fail answer and a named subject: a test file, a lint, a JSON validation, a QA verdict, a doctor row. The gate is made of checks; a check that fails names the file and the reason.",
   "is_not": [
     "The gate: the gate is the whole set a change must pass; a check is one member of it.",
     "A review: a review is a person's or a reviewer agent's reading, a check is a command's answer.",

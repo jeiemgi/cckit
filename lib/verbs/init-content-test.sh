@@ -122,7 +122,7 @@ for s in copywriting brand-voice campaign page-design concrete; do
   t "marketing: skill $s" "$([ -f "$m/.claude/skills/$s/SKILL.md" ] && echo yes)" "yes"
 done
 t "marketing: brand-voice ships its template" "$([ -f "$m/.claude/skills/brand-voice/references/voice-template.md" ] && echo yes)" "yes"
-t "marketing: page-design ships its references" "$(ls "$m/.claude/skills/page-design/references" 2>/dev/null | tr '\n' ' ')" "design-file-template.md generic-page-patterns.md minimum-rules.md "
+t "marketing: page-design ships its references" "$(ls "$m/.claude/skills/page-design/references" 2>/dev/null | tr '\n' ' ')" "design-file-template.md generic-page-patterns.md interface-rules.md minimum-rules.md "
 has "marketing: the three design integrations are offered" "$out" "cckit add impeccable && cckit add emil-design-eng && cckit add web-design-guidelines && cckit doctor --fix"
 for s in impeccable emil-design-eng web-design-guidelines; do
   t "marketing: init installs no third-party skill ($s)" "$([ -e "$m/.claude/skills/$s" ] && echo yes || echo no)" "no"

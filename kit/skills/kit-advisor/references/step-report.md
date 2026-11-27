@@ -24,7 +24,8 @@ One to three lines: what is true now. The trail comment quotes this section.
 What this stage changed, one row per artifact (issue, commit, page, file).
 
 ## Waiting for a yes
-The decisions only the owner can make, numbered, each with the recommendation first.
+The decisions only the owner can make, numbered, each with the recommendation first. Then one
+line per Spec item ending `(needs a yes)`, naming what the person must look at.
 
 ## Numbers
 | Measure | Before | After | Command |
@@ -57,5 +58,9 @@ repo.
   Failing or risky.
 - Waiting for a yes lists decisions, not mechanics. Merging a PR whose content was decided is
   mechanics.
+- A Spec item a person must accept ends `(needs a yes)` (`rules/effort-model.md`). Every such item
+  in the effort's Spec gets its own line under Waiting for a yes until the person says yes, for
+  example `- Spec: the new sign-in page reads well on a phone — open the preview on a phone`. An
+  item that is missing reads as accepted.
 - One report per stage run. A re-run of the same stage rewrites its file, and the trail comment is
   edited in place, not posted twice.

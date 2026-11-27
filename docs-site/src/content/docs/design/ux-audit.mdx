@@ -44,14 +44,15 @@ The audit has three lanes. Run one, or all three into the same report.
 | Lane | Question it answers | Checks |
 | --- | --- | --- |
 | `flows` | Where is the app confusing to move through? | 12 |
-| `consistency` | Where does the interface ignore its own design system? | 6 |
+| `consistency` | Where does the interface ignore its own design system? | 8 |
 | `a11y` | Where is the markup inaccessible? | 5 |
 
 - **`flows`** looks for the same data editable from several screens, a deep path to a frequent
   action, a screen nothing links to, a heavy form, a create form that differs from its edit form,
   an unguarded delete, and the risk of losing data when you navigate away.
 - **`consistency`** looks for hand-made versions of shared components, shared components
-  restyled in place, sibling screens whose layouts drift apart, and CSS nothing uses.
+  restyled in place, sibling screens whose layouts drift apart, CSS nothing uses, sizes off the
+  4px grid and radii typed as a value instead of a token.
 - **`a11y`** looks for click handlers on non-interactive elements, images and icons with no text
   alternative, controls with no label, missing headings and landmarks, and focus or keyboard
   problems.
@@ -102,6 +103,13 @@ Pass them, or let it ask:
 >
   The consistency lane ran against the barrel and the theme file you named.
 </Chat>
+
+The lane also checks every size and radius against the interface rules `page-design` ships
+(`interface-rules.md`: a 4px grid, radius tokens, one table pattern, one job per error surface). A
+value off the grid is finding `C7`; a radius typed as a value instead of a token is `C8`. The
+script finds both, in the TSX and in the theme file you name with `--css`, and prints the nearest
+value on the grid beside each; the agent only decides whether a listed exception covers it, and
+reads sibling radii and table frames itself.
 
 ## 3. Read the report
 
@@ -165,8 +173,9 @@ No profile installs the UX agent. The skill starts it from the role cckit ships.
 The map comes from `lib/verbs/ux-graph-scan.sh`, which builds an approximate one by matching
 patterns in the source and writes it under `<target>/.ux-audit/`.
 
-The `consistency` and `a11y` lanes read lists produced by `lib/verbs/ux-ds-audit.sh` and
-`lib/verbs/ux-a11y-scan.sh`. Both find candidates and decide nothing.
+The `consistency` and `a11y` lanes read lists produced by `lib/verbs/ux-ds-audit.sh` (eleven
+sections; the last one holds the off-grid values and raw radii) and `lib/verbs/ux-a11y-scan.sh`.
+Both find candidates and decide nothing.
 
 `--visual` is the one option that looks at the running app. For the `crit` and `p1` findings
 marked for visual review, up to 8, it opens the screen in a browser, takes a screenshot and places

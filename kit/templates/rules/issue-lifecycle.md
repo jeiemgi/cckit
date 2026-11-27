@@ -1,25 +1,21 @@
-# Issue lifecycle — deliverables, planned merges, explicit closes
+# Issue lifecycle — deliverables, planned merges, explicit closes, emerging work
 
-Three conventions about when an issue is open, who merges, and what closes it. Each was a
-correction the kit's maintainer repeated across projects before it was written down; they were
-recorded as cckit effort `E231` on 2026-09-07.
+When an issue is open, who merges, what closes it, and who files new work. §§ 1–3 are corrections
+the maintainer repeated across projects, recorded as cckit effort `E231` on 2026-09-07.
 
-Complements `task-management.md` (the loop), `effort-model.md` (the unit of work),
-`plan-output-format.md` (plans as files) and `risk-tiered-review.md` (who reviews). A profile may
-install only some of those; the precedence stated under each convention applies to whichever are
-present.
+Complements `task-management.md`, `effort-model.md`, `plan-output-format.md` and
+`risk-tiered-review.md`; each precedence below applies to whichever of them a profile installs.
 
 ## 1. A deliverable is a native sub-issue, never a body checkbox
 
 **Every deliverable of a multi-part issue is its own GitHub issue, linked as a native sub-issue of
 the parent.** A `- [ ]` list in an issue body is not tracking.
 
-- **Origin:** issues whose deliverables were body checkboxes were closed with boxes still
-  unchecked. A closed issue leaves every open-issue view, so the unfinished items left with it and
-  the work was lost until someone re-read the closed body.
+- **Origin:** issues whose deliverables were body checkboxes were closed with boxes unchecked. A
+  closed issue leaves every open-issue view, so the unfinished items were lost with it.
 - **Why a sub-issue fixes it:** an open sub-issue stays in every open-issue list and on the board
-  after its parent closes, and the parent shows a completed count (`2/5`) that GitHub computes. A
-  checkbox has no state outside the body that contains it.
+  after its parent closes, and the parent shows a count GitHub computes (`2/5`). A checkbox has no
+  state outside its body.
 - **How:** `cckit effort new "<name>" "sub :: desc" …` creates the parent and links each sub
   natively. `cckit effort close` closes the parent and every native sub-issue in one op.
 - **Not covered:** a checklist that is not a deliverable — the `## Verification` checklist in a PR
@@ -36,8 +32,8 @@ wins — re-read it from `gh`, then correct the table.
 pings the human only on a genuine blocker.** The captain is whoever drives the plan: `cckit watch
 --merge`, `/kit-autopilot`, or an orchestrating session.
 
-- **Origin:** an approved plan stalled because the agent stopped to ask "merge or review?" for a
-  routine planned merge. The owner had already answered that question by approving the plan.
+- **Origin:** an approved plan stalled because the agent asked "merge or review?" for a routine
+  planned merge, which the owner had answered by approving the plan.
 - **An approved plan is** an explicit instruction to run named efforts, an approved
   `cckit effort plan`, or a wave the owner told the captain to drive. A plan the agent proposed and
   nobody approved is not one.
@@ -68,8 +64,8 @@ the GitHub default branch, a merged PR leaves its issue open, and nothing report
 
 - **Origin:** projects integrating on a non-default branch accumulated issues that stayed open
   after their PR merged, so the board showed finished work as open.
-- **What it costs beyond the board:** `cckit gc` keeps a branch whose issue is still open as
-  PROTECTED, so a merged branch with an unclosed issue is never offered for cleanup.
+- **Beyond the board:** `cckit gc` keeps a branch whose issue is open as PROTECTED, so a merged
+  branch with an unclosed issue is never offered for cleanup.
 - **Close with the kit's verbs, which close explicitly:**
 
   | Merged with | What closes the issue |
@@ -84,5 +80,21 @@ the GitHub default branch, a merged PR leaves its issue open, and nothing report
 
 **Precedence — `task-management.md`** (*PR title = issue title · body includes `Closes #N`*).
 Keep writing `Closes #N`: GitHub uses it to link the PR to the issue, and the kit's merge op reads
-it to find which issues to close. On the question of whether an issue is closed, this rule wins —
-the keyword is a link, and the close is an explicit op.
+it to find the issues to close. On whether an issue is closed, this rule wins: the keyword is a
+link, the close is an explicit op.
+
+## 4. Emerging work is filed and linked, not asked about
+
+**Work that emerges during a sprint is filed and linked by the captain, without asking.** Filing is
+not on the § 2 blocker list.
+
+- **Origin:** captains stopped a wave to ask the owner whether to file work they had found.
+- **Needed for the sprint goal:** it joins the sprint backlog — a sub-issue of the effort
+  (`cckit effort sub <effort> "<name>"`) or an issue on the sprint milestone
+  (`cckit new --milestone <sprint> "<title>"`).
+- **Otherwise:** a new backlog item (`cckit new "<title>"`) with a `flow:` label and a
+  `## Relations` line naming the effort it came from (`Extends #<effort>`).
+- **Parked for later:** an open issue under no effort, with no relation, goes in Backlog so
+  `cckit doctor --loose` skips it: board Status, or the `backlog` label when there is no board.
+- **Ask only** when it needs a product, legal, cost or secrets decision: file it, link it, then ask
+  that one question.

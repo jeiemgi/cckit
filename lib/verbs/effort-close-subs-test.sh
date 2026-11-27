@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# effort-close-subs-test.sh — `cckit effort close` closes only the finished subs (#565, decision 52).
+# effort-close-subs-test.sh — `cckit effort close` closes the finished subs as delivered and every other
+# open sub with the parent, as not planned (#565 partition, #650 close-with-parent, #663 reason).
 # Hermetic: the forge shim (test-forge-shim.sh) answers like the REST API and logs `METHOD path {json}`;
 # a throwaway git repo with a bare remote. Run:  bash lib/verbs/effort-close-subs-test.sh
 # errors: strict — a test runner: rc 1 on any failed assertion
@@ -26,7 +27,7 @@ export GH_HEAD="effort/66-demo" GH_BASE="main" GH_MERGEABLE=true
 export GH_BODY='## Goal\nship it\n\n## Spec\n- it ships'
 # Effort #66 has four subs: 601 already closed, 602 open but delivered by a `Closes #602` commit,
 # 603 open but delivered by a commit tagged with its step id [E66.3], 604 open and delivered by
-# nothing — the one that must stay open.
+# nothing — the one that closes with the parent, as not planned (#650, #663).
 export GH_FIXTURE="$tmp/fixture.sh"
 cat > "$GH_FIXTURE" <<'SH'
 case "$method $ep" in
@@ -73,24 +74,42 @@ c() { git -c user.email=t@t -c user.name=t commit -q --allow-empty -m "$1"; }
 c "$(printf 'feat: second step [E66.2]\n\nCloses #602')"
 c "feat: third step [E66.3]"
 c "docs: mention #604 is follow-up work (#602)"   # names #604, but its last #ref is #602
+# Two sub branches live on origin (#651): one a parallel sub pushed from its own worktree, one on a
+# second letter. Neither has a local head here, so kit_gc_prune never sees them.
+git push -q origin HEAD:refs/heads/sub/66a-parser HEAD:refs/heads/sub/66b-render 2>/dev/null
+git push -q origin HEAD:refs/heads/sub/660a-other 2>/dev/null     # another effort's sub: must stay
+t "fixture: the sub branches are on origin" "$(git ls-remote --heads origin 'sub/66*' | wc -l | tr -d ' ')" "3"
 
 : > "$GH_LOG"
-out="$(effort_close 66 2>&1)"; rc=$?
+bad="$(effort_close 66 --carried-by nope 2>&1)"; rc=$?
+t  "a non-number --carried-by is refused (rc 2)" "$rc" "2"
+t  "the refusal made no forge call" "$(grep -c . "$GH_LOG")" "0"
+out="$(effort_close 66 --carried-by 700 2>&1)"; rc=$?
 cd "$tmp/work" || exit 1
 t  "close succeeds with an open sub (rc 0)" "$rc" "0"
+t  "close deletes every sub/66<letter>-* branch on origin (#651)" "$(git ls-remote --heads origin 'sub/66[a-z]-*' | wc -l | tr -d ' ')" "0"
+t  "close leaves another effort's sub branch on origin" "$(git ls-remote --heads origin 'sub/660a-other' | wc -l | tr -d ' ')" "1"
+case "$out" in *"deleted remote branch sub/66a-parser"*"deleted remote branch sub/66b-render"*) echo "ok: the output names each deleted sub branch" ;; *) echo "FAIL: deleted sub branches not named: $out"; fail=1 ;; esac
 tc "$GH_LOG" '^PUT repos/o/r/pulls/[0-9]+/merge ' "close squash-merges the effort PR"
 tc "$GH_LOG" '^PATCH repos/o/r/issues/66 \{"state":"closed","state_reason":"completed"\}$' "close closes the parent"
 tc "$GH_LOG" '^PATCH repos/o/r/issues/602 \{"state":"closed","state_reason":"completed"\}$' "close closes the sub a commit closes"
 tc "$GH_LOG" '^PATCH repos/o/r/issues/603 \{"state":"closed","state_reason":"completed"\}$' "close closes the sub a step tag delivers"
 t  "close does not re-close the already-closed sub" "$(grep -c '^PATCH repos/o/r/issues/601 ' "$GH_LOG")" "0"
-t  "close leaves the unfinished sub open (no write to #604)" "$(grep -cE '^(PATCH|POST|PUT|DELETE) repos/o/r/issues/604' "$GH_LOG")" "0"
+tc "$GH_LOG" '^PATCH repos/o/r/issues/604 \{"state":"closed","state_reason":"not_planned"\}$' "a completed parent closes its undelivered sub as not planned (#663)"
+t  "the undelivered sub is never closed as completed" "$(grep -c '^PATCH repos/o/r/issues/604 .*completed' "$GH_LOG")" "0"
+tc "$GH_LOG" '^POST repos/o/r/issues/604/comments \{"body":"Closed as not planned with its parent #66: no commit delivered it\. #700 carries what is left\."\}$' "the undelivered sub's comment names the parent and the carrying issue"
+t  "one comment on the undelivered sub" "$(grep -c '^POST repos/o/r/issues/604/comments ' "$GH_LOG")" "1"
+t  "the undelivered sub closes after the parent" \
+   "$(grep -nE '^PATCH repos/o/r/issues/(66|604) ' "$GH_LOG" | sed -E 's/^[0-9]+:PATCH repos\/o\/r\/issues\/([0-9]+) .*/\1/' | tr '\n' ' ')" "66 604 "
 t  "close detaches nothing (no DELETE of any kind)" "$(grep -c '^DELETE ' "$GH_LOG")" "0"
 tc "$GH_LOG" '^POST repos/o/r/issues/66/comments .*Finished sub-issues: #601, #602, #603' "the close comment lists the finished subs"
-tc "$GH_LOG" '^POST repos/o/r/issues/66/comments .*Left open, still linked.*- #604 \[E66\.4\] release later' "the close comment lists the open sub"
+tc "$GH_LOG" '^POST repos/o/r/issues/66/comments .*Closed as not planned, no commit on the effort branch delivers them.*- #604 \[E66\.4\] release later.*#700 carries what is left' "the close comment lists the sub closed as not planned and the carrying issue"
 t  "the comment is posted before the parent closes" \
    "$(grep -nE '^POST repos/o/r/issues/66/comments |^PATCH repos/o/r/issues/66 ' "$GH_LOG" | sed -E 's/^[0-9]+:(POST|PATCH).*/\1/' | tr '\n' ' ')" "POST PATCH "
-case "$out" in *"left open: sub #604"*) echo "ok: the output flags the open sub as it closes" ;; *) echo "FAIL: no left-open line: $out"; fail=1 ;; esac
-case "$out" in *"closed with unfinished sub-issues still open"*"#604"*) echo "ok: the report ends with the open sub" ;; *) echo "FAIL: no closing report of the open sub: $out"; fail=1 ;; esac
+case "$out" in *"closed sub #604 with its parent"*) echo "ok: the output names the sub closed with the parent" ;; *) echo "FAIL: no closed-with-parent line: $out"; fail=1 ;; esac
+case "$out" in *"closed sub #604 with its parent as not planned"*) echo "ok: the per-sub line names the reason" ;; *) echo "FAIL: no not-planned line: $out"; fail=1 ;; esac
+case "$out" in *"closed with sub-issues no commit delivered (closed as not planned"*"#604"*) echo "ok: the report ends with the undelivered sub" ;; *) echo "FAIL: no closing report of the undelivered sub: $out"; fail=1 ;; esac
+case "$out" in *"left open"*) echo "FAIL: the output still says a sub was left open"; fail=1 ;; *) echo "ok: nothing is reported left open" ;; esac
 t  "no gh subcommand ran" "$(grep -c '^GH-SUBCOMMAND' "$GH_LOG")" "0"
 
 [ "$fail" = 0 ] && echo "ALL OK (effort-close-subs)" || { echo "effort-close-subs: FAILURES"; exit 1; }

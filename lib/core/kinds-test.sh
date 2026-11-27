@@ -74,14 +74,10 @@ want="$(sorted "$KIT_KINDS")"
 hook="$(sed -n 's/.*=~ \^(\([a-z|]*\))\/\[0-9\]+-.*/\1/p' "$root/kit/templates/hooks/repo-hygiene.sh.tmpl" | sed -n 1p | tr '|' ' ')"
 t "hygiene hook prefixes == KIT_KINDS" "$(sorted "$hook")" "$want"
 
-# 2. setup-labels.sh's built-in fallback (used where kinds.sh is not installed) == the kind set.
-fb="$(sed -n 's/.*\${KIT_KINDS:-\([a-z ]*\)}.*/\1/p' "$root/lib/verbs/setup-labels.sh" | sed -n 1p)"
-t "setup-labels fallback kinds == KIT_KINDS" "$(sorted "$fb")" "$want"
-
-# 2b. the content-kind fallback in setup-labels.sh == KIT_CONTENT_KINDS, and no content kind is a
-#     branch prefix the hygiene hook would have to learn.
-fbc="$(sed -n 's/.*\${KIT_CONTENT_KINDS:-\([a-z ]*\)}.*/\1/p' "$root/lib/verbs/setup-labels.sh" | sed -n 1p)"
-t "setup-labels fallback content kinds == KIT_CONTENT_KINDS" "$(sorted "$fbc")" "$(sorted "$KIT_CONTENT_KINDS")"
+# 2. setup-labels.sh holds no kind list of its own (#639): it reads KIT_KINDS / KIT_CONTENT_KINDS
+#    from kinds.sh, so there is no fallback literal to drift.
+t "setup-labels has no fallback kind list" \
+  "$(grep -cE 'KIT_(CONTENT_)?KINDS:-[a-z]' "$root/lib/verbs/setup-labels.sh" | tr -d ' ')" "0"
 both="$(printf '%s\n' $KIT_KINDS $KIT_CONTENT_KINDS | sort | uniq -d | tr '\n' ' ')"
 t "no kind is in both sets" "$both" ""
 
@@ -102,6 +98,7 @@ kind_labels() { sed -n 's/^POST repos\/[^ ]*\/labels {"name":"kind:\([a-z]*\)".*
 ( cd "$root" && PATH="$tmp/bin:$PATH" KIT_CONFIG="$root/cckit.config.json" bash scripts/setup-labels.sh ) >/dev/null 2>&1
 t "setup-labels ran" "$?" "0"
 t "setup-labels provisions exactly the kind set" "$(kind_labels "$GH_LOG")" "$want"
+t "setup-labels provisions the backlog label (#647)" "$(grep -c '^POST repos/[^ ]*/labels {"name":"backlog"' "$GH_LOG")" "1"
 t "setup-labels runs no gh subcommand" "$(grep -c '^GH-SUBCOMMAND' "$GH_LOG")" "0"
 # 4b. with kinds.content on, the content kind labels are provisioned too.
 : > "$GH_LOG"

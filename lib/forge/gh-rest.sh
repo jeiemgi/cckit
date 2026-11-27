@@ -41,6 +41,7 @@
 #   gh_rest_pr_closing_issues <repo> <pr>
 #   gh_rest_pr_diff <repo> <pr>
 #   gh_rest_sub_issue_numbers <repo> <n>
+#   gh_rest_close_open_subs <repo> <parent> [reason] [carrier] [comment]   close every OPEN sub, default not planned (#650, #663); prints each closed number
 #   gh_rest_issue_numbers_by_label <repo> <label>   open issues only
 #   gh_rest_open_issue_titles <repo>      "<n>\t<title>" for every open issue
 #   gh_rest_issue_closing_prs <repo> <n>  merged PRs that close <n> by keyword (timeline)
@@ -270,6 +271,41 @@ gh_rest_user_login() { _ghr_read user --jq '.login // empty'; }
 
 gh_rest_sub_issue_numbers() {
   _ghr_read "repos/$1/issues/$2/sub_issues" -X GET -f per_page=100 --jq '.[].number'
+}
+
+# gh_rest_close_open_subs <repo> <parent> [reason] [carrier] [comment] — the ONE sub-closing step
+# (#650): close every OPEN native sub-issue of <parent> with <reason> and one comment. A sub still
+# open when its parent closes was delivered by no commit, so <reason> defaults to `not planned`
+# (#663); it stays an argument (completed · not planned · duplicate, any spelling
+# gh_rest_issue_close takes). The default comment names the parent and <carrier>, the issue that
+# carries what is left: `Closed as not planned with its parent #<parent>: no commit delivered it.
+# #<carrier> carries what is left.`, or `… Nothing is left to carry.` with no carrier. With another
+# reason it opens `Closed with its parent #<parent> (<reason>).`. <comment> replaces all of it.
+# A sub already closed is not written to. Prints the number of each sub it closed, one per line.
+# Callers: `cckit close` and `cckit effort close`, after the parent closes; the abandon flow (#624)
+# reuses it.
+# rc 0 when every open sub closed (or none was open) · 1 when the read or any close failed (the
+# others are still attempted).
+gh_rest_close_open_subs() {
+  local repo="$1" parent="$2" reason="${3:-not planned}" carrier="${4:-}" comment="${5:-}" open_subs sub rc=0 shown left
+  shown="$(printf '%s' "$reason" | tr '_-' '  ')"
+  carrier="${carrier#\#}"
+  if [ -z "$comment" ]; then
+    left="Nothing is left to carry."
+    [ -z "$carrier" ] || left="#$carrier carries what is left."
+    if [ "$shown" = "not planned" ]; then comment="Closed as not planned with its parent #$parent: no commit delivered it. $left"
+    else comment="Closed with its parent #$parent ($shown). $left"; fi
+  fi
+  open_subs="$(_ghr_read "repos/$repo/issues/$parent/sub_issues" -X GET -f per_page=100 \
+    --jq '.[] | select((.state | ascii_downcase) == "open") | .number')" || return 1
+  # while-read, not `for sub in $open_subs`: zsh does not word-split an unquoted variable.
+  while IFS= read -r sub; do
+    [ -n "$sub" ] || continue
+    if gh_rest_issue_close "$repo" "$sub" "$reason" "$comment"; then printf '%s\n' "$sub"; else rc=1; fi
+  done <<EOF_SUBS
+$open_subs
+EOF_SUBS
+  return "$rc"
 }
 
 gh_rest_issue_numbers_by_label() {

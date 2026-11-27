@@ -165,6 +165,7 @@ nobody consumes.
 | `kind:` | `feat` `fix` `task` `chore` `security` `scaffold` `ci` `adr` `spike` `plan`; content kinds `post` `campaign` `brand` `research` | `wt_start` (branch prefix), `kto_pr_title` (commit type) | what sort of work it is |
 | `agent:` | one per declared profile | `ap_profile_from_labels` | which agent profile runs the work |
 | `slug:` | one per effort | `effort_slug_resolve` | resolve a name to an effort |
+| `backlog` | none | `loose_issues_list` | parked on purpose; not loose when the project has no board |
 
 ### Rules
 

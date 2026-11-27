@@ -1,6 +1,6 @@
 #!/bin/sh
 # kit-task-ops-test.sh — self-test for kit-task-ops.sh pure helpers under bash AND zsh.
-# Network-free: covers the parsers + body composers only (the gh-calling ops are not exercised).
+# Network-free: the parsers + body composers, and kto_task_pr against a bare origin with no forge.
 # Run:  bash lib/verbs/kit-task-ops-test.sh
 # errors: strict — a test runner: rc 1 on any failed assertion
 
@@ -148,6 +148,35 @@ if [ -n "${KTO_TEST_INNER:-}" ]; then
   eq "role option: slug the display map lacks"           "$(_kto_role_option_for_slug backend)"   "opt<backend>"
   role_display() { :; }
   unset -f role_option_id
+
+  # kto_task_pr commits every file the gate saw (#649): a NEW file that is not ignored lands in the
+  # commit beside the tracked edit; a file .gitignore lists (the copied .env.local) never does.
+  # Fixture: a bare origin + a clone on a <kind>/<N>-<slug> branch, no forge (commit + push only).
+  prt="$(mktemp -d)"
+  git init -q --bare "$prt/origin.git"
+  git clone -q "$prt/origin.git" "$prt/work" 2>/dev/null
+  git -C "$prt/work" -c user.name=t -c user.email=t@t checkout -q -b main 2>/dev/null
+  printf 'base\n' > "$prt/work/tracked.txt"
+  printf '.env.local\n' > "$prt/work/.gitignore"
+  git -C "$prt/work" add tracked.txt .gitignore
+  git -C "$prt/work" -c user.name=t -c user.email=t@t -c commit.gpgsign=false commit -q -m base
+  git -C "$prt/work" push -q origin main 2>/dev/null
+  git -C "$prt/work" checkout -q -b fix/7-new-file
+  printf 'edited\n' > "$prt/work/tracked.txt"
+  printf 'new\n' > "$prt/work/brand-new.txt"
+  printf 'SECRET=1\n' > "$prt/work/.env.local"
+  git -C "$prt/work" config commit.gpgsign false
+  git -C "$prt/work" config user.name t
+  git -C "$prt/work" config user.email t@t
+  prout="$(cd "$prt/work" && CCKIT_FORGE=none KIT_BASE_BRANCH=main kto_task_pr 7 "fix: add the new file" 2>&1)"; prrc=$?
+  eq "pr (no forge): rc 0" "$prrc" "0"
+  prfiles="$(git -C "$prt/work" show --name-only --format= HEAD | sort | tr '\n' ' ')"
+  eq "pr commits the tracked edit and the new file" "$prfiles" "brand-new.txt tracked.txt "
+  case "$prout" in *"brand-new.txt"*) ;; *) echo "FAIL($KTO_TEST_INNER): pr output does not name the new file it committed"; fail=1 ;; esac
+  eq "pr leaves the ignored .env.local out of the commit" "$(git -C "$prt/work" ls-files --error-unmatch .env.local 2>/dev/null)" ""
+  eq "pr leaves nothing uncommitted" "$(git -C "$prt/work" status --porcelain)" ""
+  eq "pr pushed the branch" "$(git -C "$prt/origin.git" rev-parse --verify -q refs/heads/fix/7-new-file | wc -c | tr -d ' ')" "41"
+  rm -rf "$prt"
 
   if [ "$fail" -eq 0 ]; then echo "PASS($KTO_TEST_INNER): kit-task-ops helpers"; fi
   exit "$fail"

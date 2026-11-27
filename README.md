@@ -477,6 +477,11 @@ It holds the order and the rules; it contains none of their content.
 - When one of the three is not installed: write `<skill>: not installed` in the design file and
   continue with cckit's own minimum rules for that step. The missing skill is never reported as
   used.
+- Keep the interface rules the skill ships in `references/interface-rules.md`, whichever skill
+  decides direction: a 4px grid for every size, radius tokens with a nested-corner rule, one table
+  pattern (sticky head, body scrolls inside, pager always visible, named empty, error and pending
+  states) and one job per error surface. A value that breaks one is listed in the design file with
+  its reason, or fixed.
 
 **Where it is installed.** `cckit init` installs it with the marketing profile and the
 `nextjs-shadcn` recipe. In a project that already exists:
