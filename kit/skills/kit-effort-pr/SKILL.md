@@ -38,8 +38,10 @@ cckit effort pr <N> --summary-file <summary.md> --for-agents-file <for-agents.md
 # replace the composed title: add --title "<conventional subject carrying [E<n>]>"
 ```
 
-What the verb does, in order: commits pending **tracked** changes (role identity as a
-`Co-authored-by` trailer; untracked files are listed, never swept in) → pushes → reads the parent's
+What the verb does, in order: commits every pending change the local gate saw — tracked edits and
+new files that are not ignored (`git add -A`, as `cckit pr` does; role identity as a
+`Co-authored-by` trailer). New files are named on stderr; a copied `.env.local` stays out because
+it is gitignored, and a new file that must stay out of the PR belongs in `.gitignore` → pushes → reads the parent's
 title, labels and milestone → composes the title with `effort_pr_title` as
 `type(scope): <name> [E<n>]` (scope = the `flow:` label, else a legacy title's `[Flow]` tag; type =
 `--type`, else the `kind:` label, where `kind:task` → `feat` and a `bug` label → `fix`) → refuses,
