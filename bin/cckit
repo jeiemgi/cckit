@@ -213,7 +213,7 @@ case "$cmd" in
     # shellcheck source=/dev/null
     source "$LIB/core/role-identity.sh"; source "$LIB/forge/gh-project.sh"; source "$LIB/verbs/kit-task-ops.sh"
     if [ "$cmd" = close ]; then case "${1:-}" in -h|--help)
-      echo 'cckit close <issue> ["<summary>"] [--reason completed|not-planned|duplicate] [--duplicate-of N] [--superseded-by N]'; exit 0 ;; esac; fi
+      echo 'cckit close <issue> ["<summary>"] [--reason completed|not-planned|duplicate] [--duplicate-of N] [--superseded-by N] [--carried-by N]'; exit 0 ;; esac; fi
     if cckit_is_json; then
       case "$cmd" in
         pr)    out="$(kto_task_pr    "$@" 2>&1)"; rc=$? ;;

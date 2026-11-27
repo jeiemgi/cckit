@@ -23,7 +23,7 @@
 #   kto_task_pr   <num> <summary> [commit-msg] [--base <branch>]   commit+push+open PR (board → In Review)
 #   kto_task_pr_merge [pr-num] [--squash|--merge|--rebase]   merge (squash default) + close issues + GC + update the PR base; refuses an effort/* head
 #   kto_task_new  <title> <role> <kind> <prio> [ms] [plan] [blocked] <body>   lint the title and the body's effort relations (KIT_FORCE=1 skips the latter), create issue + board fields (ms may be empty)
-#   kto_task_close <num> <summary> [pr-num] [--reason R] [--duplicate-of N] [--superseded-by N]   close + reason + board → Done; open subs close with it (#650)
+#   kto_task_close <num> <summary> [pr-num] [--reason R] [--duplicate-of N] [--superseded-by N] [--carried-by N]   close + reason + board → Done; open subs close with it as not planned (#650, #663)
 # errors: mixed — git/gh ops propagate; board + label side effects are best-effort
 
 # --- repo resolution -----------------------------------------------------------------------------
@@ -730,13 +730,15 @@ kto_task_new() {
 # kit task close — set the board Status to Done and close the issue with a summary comment and a
 # close reason (#377). Plan-badge flip stays in the skill (it edits a repo file → needs a worktree/PR).
 # Args: <num> <summary> [pr-num] [--reason completed|not-planned|duplicate] [--duplicate-of <N>]
-#       [--superseded-by <N>]
+#       [--superseded-by <N>] [--carried-by <N>]
 #   --duplicate-of N   GitHub state_reason duplicate, linked to #N (implies --reason duplicate)
 #   --superseded-by N  state_reason not planned + "Superseded by #N" in the comment
+#   --carried-by N     the issue that carries what the open sub-issues leave undone, named in the
+#                      comment on each sub (#663); defaults to the --superseded-by / --duplicate-of issue
 # The summary may be omitted with --duplicate-of / --superseded-by: it defaults to "Duplicate of #N."
 # / "Superseded by #N.". Flags may come anywhere; the closed set is the close-reason vocabulary.
 kto_task_close() {
-  local num="" summary="" reason="" dup="" sup="" a pos=0
+  local num="" summary="" reason="" dup="" sup="" carry="" carry_set=0 a pos=0
   while [[ $# -gt 0 ]]; do
     a="$1"
     case "$a" in
@@ -744,18 +746,21 @@ kto_task_close() {
       --reason=*)      reason="${a#--reason=}"; shift ;;
       --duplicate-of)  dup="${2:-}"; shift 2 ;;
       --superseded-by) sup="${2:-}"; shift 2 ;;
-      -*) echo "✗ kto_task_close: unknown flag '$a' — usage: cckit close <issue> [\"<summary>\"] [--reason completed|not-planned|duplicate] [--duplicate-of N] [--superseded-by N]" >&2; return 2 ;;
+      --carried-by)    carry="${2:-}"; carry_set=1; [[ $# -ge 2 ]] && shift 2 || shift ;;
+      --carried-by=*)  carry="${a#--carried-by=}"; carry_set=1; shift ;;
+      -*) echo "✗ kto_task_close: unknown flag '$a' — usage: cckit close <issue> [\"<summary>\"] [--reason completed|not-planned|duplicate] [--duplicate-of N] [--superseded-by N] [--carried-by N]" >&2; return 2 ;;
       *)
         pos=$((pos+1))
         case "$pos" in 1) num="$a" ;; 2) summary="$a" ;; *) : ;; esac   # 3rd positional = legacy pr-num
         shift ;;
     esac
   done
-  dup="${dup#\#}"; sup="${sup#\#}"
+  dup="${dup#\#}"; sup="${sup#\#}"; carry="${carry#\#}"
   [[ -n "$num" ]] || { echo "✗ kto_task_close: issue number required" >&2; return 1; }
   [[ -z "$dup" || "$dup" =~ ^[0-9]+$ ]] || { echo "✗ kto_task_close: --duplicate-of needs an issue number" >&2; return 2; }
   [[ -z "$sup" || "$sup" =~ ^[0-9]+$ ]] || { echo "✗ kto_task_close: --superseded-by needs an issue number" >&2; return 2; }
   [[ -n "$dup" && -n "$sup" ]] && { echo "✗ kto_task_close: --duplicate-of and --superseded-by are exclusive" >&2; return 2; }
+  [[ "$carry_set" == 0 || "$carry" =~ ^[0-9]+$ ]] || { echo "✗ kto_task_close: --carried-by needs an issue number" >&2; return 2; }
 
   # The close-reason set (completed · not planned · duplicate · superseded) → GitHub's state_reason.
   local gh_reason
@@ -801,13 +806,17 @@ kto_task_close() {
   else
     echo "  issue #$num already $state — board status updated only"
   fi
-  # Its open native sub-issues close with it, same reason (#650): the one shared step both close
-  # verbs call. Runs on an already-closed parent too, so a re-run finishes a close that left subs.
+  # Its open native sub-issues close with it (#650), as not planned whatever the parent's reason
+  # (#663): a delivered sub closes through its own PR, so one still open here was delivered by no
+  # commit. The comment names the issue that carries what is left: --carried-by, else the parent's
+  # successor or original. One shared step, also called by `cckit effort close`. Runs on an
+  # already-closed parent too, so a re-run finishes a close that left subs.
   local closed_subs sub
-  closed_subs="$(gh_rest_close_open_subs "$repo" "$num" "$gh_reason")" || echo "  ⚠ could not close every sub-issue of #$num — check them on the forge" >&2
+  [[ -n "$carry" ]] || carry="${sup:-$dup}"
+  closed_subs="$(gh_rest_close_open_subs "$repo" "$num" "not planned" "$carry")" || echo "  ⚠ could not close every sub-issue of #$num — check them on the forge" >&2
   while IFS= read -r sub; do
     [[ -n "$sub" ]] || continue
-    echo "✓ Closed sub #$sub with its parent ($gh_reason)"
+    echo "✓ Closed sub #$sub with its parent (not planned: no commit delivered it${carry:+, #$carry carries what is left})"
   done <<EOF_SUBS
 $closed_subs
 EOF_SUBS

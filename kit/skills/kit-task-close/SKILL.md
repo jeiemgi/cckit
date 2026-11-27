@@ -1,7 +1,7 @@
 ---
 name: kit-task-close
 terms: Task
-description: Close a GitHub issue after its PR merged. Sets the board Status to Done (if enabled). Every open native sub-issue of it closes with the same reason and a comment naming the parent. If the issue is a plan parent, flips the plan status to Complete once all deliverables are merged (no archive folder — completed plans stay visible).
+description: Close a GitHub issue after its PR merged. Sets the board Status to Done (if enabled). Every open native sub-issue of it closes as not planned, with a comment naming the parent. If the issue is a plan parent, flips the plan status to Complete once all deliverables are merged (no archive folder — completed plans stay visible).
 when_to_use: After a PR merges, to finalize the issue ledger. Most issues auto-close from PR `Closes #N` — use this for issues without a PR or to backfill the plan status.
 ---
 
@@ -38,9 +38,12 @@ source "${CLAUDE_PLUGIN_ROOT}/lib/verbs/kit-task-ops.sh"
 kto_task_close "$NUM" "$SUMMARY"
 ```
 
-After the parent closes, the op closes every OPEN native sub-issue of it with the same reason and
-one comment, `Closed with its parent #N (<reason>).`, printing `✓ Closed sub #M with its parent`
-per sub (#650). A sub already closed is not written to. The step is `gh_rest_close_open_subs`
+After the parent closes, the op closes every OPEN native sub-issue of it as `not planned`,
+whatever the parent's reason: a delivered sub closes through its own PR, so one still open was
+delivered by no commit (#650, #663). Each gets one comment, `Closed as not planned with its parent
+#N: no commit delivered it.` followed by `#M carries what is left.` or `Nothing is left to carry.`;
+M is `--carried-by M`, else the `--superseded-by` / `--duplicate-of` issue. The op prints
+`✓ Closed sub #M with its parent` per sub. A sub already closed is not written to. The step is `gh_rest_close_open_subs`
 (`lib/forge/gh-rest.sh`), shared with `cckit effort close`.
 
 If a plan file is linked and all its deliverable PRs are merged, flip its status badge on a

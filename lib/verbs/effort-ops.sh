@@ -1285,20 +1285,26 @@ EOF_SUBS
 # and finish with the advisory kit-sync drift check. Destructive: it merges, closes, and prunes.
 # First of all it re-reads the parent body and refuses an effort whose `## Spec` fails spec_lint
 # (E546.5); --no-spec-check skips that one check and says so on stderr.
-_EO_CLOSE_USAGE='cckit effort close <slug|N> [--no-spec-check]   squash-merge the effort PR, close the parent and its finished subs (unfinished subs stay open, linked, and are listed), GC'
+_EO_CLOSE_USAGE='cckit effort close <slug|N> [--no-spec-check] [--carried-by <N>]   squash-merge the effort PR, close the parent and its finished subs, close the subs no commit delivered as not planned (the comment names #N as the issue that carries what is left, or says nothing is left), GC'
 effort_close() {
   case "${1:-}" in -h|--help) echo "$_EO_CLOSE_USAGE"; return 0 ;; esac
   _eff_forge || return 1; _eff_need jq || return 1
-  local raw="" spec_check=1 num repo base branch root self_wt trace_dir kit_touched kit_manifest
+  local raw="" spec_check=1 carry="" carry_set=0 num repo base branch root self_wt trace_dir kit_touched kit_manifest
   while [ $# -gt 0 ]; do
     case "$1" in
       -h|--help) echo "$_EO_CLOSE_USAGE"; return 0 ;;
       --no-spec-check) spec_check=0; shift ;;
+      --carried-by)    carry="${2:-}"; carry_set=1; [ $# -ge 2 ] && shift 2 || shift ;;
+      --carried-by=*)  carry="${1#--carried-by=}"; carry_set=1; shift ;;
       -*) echo "effort_close: unknown flag $1" >&2; return 2 ;;
       *)  [ -z "$raw" ] && raw="$1"; shift ;;
     esac
   done
   [ -n "$raw" ] || { echo "effort_close: <slug|effort issue #> required" >&2; return 1; }
+  carry="${carry#\#}"
+  if [ "$carry_set" = 1 ]; then
+    case "$carry" in ""|*[!0-9]*) echo "effort_close: --carried-by needs an issue number (nothing was written)" >&2; return 2 ;; esac
+  fi
   num="$(effort_slug_resolve "$raw")" || { echo "effort_close: could not resolve '$raw' to an effort" >&2; return 1; }
   repo="$(_eff_repo)"; base="$(_eff_base)"
   _eo_spec_check "$repo" "$num" "$spec_check" || return 1
@@ -1379,7 +1385,8 @@ effort_close() {
   # (b3) which subs are finished (#565, decision 52), read PRE-squash while the effort branch's
   # commits still exist. A sub is finished when it is already closed, or a commit on this branch
   # delivers it (_eo_delivered_refs). A sub no commit delivers is not detached: it closes WITH the
-  # parent in step (e) (#650) and is listed as such in the close comment and in this output.
+  # parent in step (e) (#650), as not planned (#663), and is listed as such in the close comment and
+  # in this output.
   local sub_rows delivered sub_split done_subs="" open_subs="" open_lines=""
   sub_rows="$(forge_rest "repos/$repo/issues/$num/sub_issues" \
     --jq '.[] | "\(.number)|\(.state)|\(.title // "")"' 2>/dev/null)" || sub_rows=""
@@ -1408,9 +1415,10 @@ effort_close() {
   # (d) judge the metrics (reads the durable trace dir; the record stays in the local buffer).
   command -v judge_effort_metrics >/dev/null 2>&1 && judge_effort_metrics "$num" "origin/$base" || true
 
-  # (e) close the FINISHED sub-issues (#565), then the parent, then every sub still open — with the
-  # parent's reason and one comment naming it, through the shared gh_rest_close_open_subs (#650) —
-  # and set the board Status=Done for each (guarded: a no-op when Projects v2 is off or the board
+  # (e) close the FINISHED sub-issues (#565), then the parent, then every sub still open — as not
+  # planned, with one comment naming the parent and the issue that carries what is left
+  # (--carried-by) or saying nothing is left, through the shared gh_rest_close_open_subs (#650,
+  # #663) — and set the board Status=Done for each (guarded: a no-op when Projects v2 is off or the board
   # helpers/ids are unavailable). A sub already closed keeps its own close reason (no second
   # PATCH). Board + issue + record state are owned by this ONE op (effort-model.md) — never a
   # separate "mark done".
@@ -1428,16 +1436,16 @@ effort_close() {
   done <<EOF_DONE
 $done_subs
 EOF_DONE
-  comment="$(_eo_close_comment "$branch" "$done_list" "$open_lines")"
+  comment="$(_eo_close_comment "$branch" "$done_list" "$open_lines" "$carry")"
   gh_rest_issue_close "$repo" "$num" completed "$comment" >/dev/null 2>&1 && echo "  ✓ closed effort #$num" >&2
   _eo_board_done "$num"
   if [ -n "$open_subs" ]; then
     local closed_with
-    closed_with="$(gh_rest_close_open_subs "$repo" "$num" completed 2>/dev/null)" \
+    closed_with="$(gh_rest_close_open_subs "$repo" "$num" "not planned" "$carry" 2>/dev/null)" \
       || echo "  ⚠ could not close every sub-issue of #$num — check them on the forge" >&2
     while IFS= read -r sub; do
       [ -n "$sub" ] || continue
-      echo "  ✓ closed sub #$sub with its parent (no commit on the effort branch delivers it)" >&2
+      echo "  ✓ closed sub #$sub with its parent as not planned (no commit on the effort branch delivers it)" >&2
       _eo_board_done "$sub"
     done <<EOF_WITH
 $closed_with
@@ -1478,8 +1486,10 @@ EOF_WITH
   # (i) the report's last word: the subs that closed with the parent, undelivered (#565, #650).
   if [ -n "$open_lines" ]; then
     echo "" >&2
-    echo "  ⚠ #$num closed with sub-issues no commit delivered (closed with it, same reason):" >&2
+    echo "  ⚠ #$num closed with sub-issues no commit delivered (closed as not planned):" >&2
     printf '%s\n' "$open_lines" | sed 's/^/     /' >&2
+    if [ -n "$carry" ]; then echo "     #$carry carries what is left." >&2
+    else echo "     Their comment says nothing is left (no --carried-by <N> named an issue that carries it)." >&2; fi
   fi
   return 0
 }
@@ -1517,13 +1527,16 @@ _eo_partition_subs() {
   done
 }
 
-# _eo_close_comment <branch> <done-list> <open-lines> — the comment effort_close posts on the parent
-# as it closes it: which subs closed with it and which stay open, linked (#565).
+# _eo_close_comment <branch> <done-list> <open-lines> [carrier] — the comment effort_close posts on
+# the parent as it closes it: which subs finished (#565) and which closed with it as not planned,
+# with the issue that carries what is left, or that nothing is left (#663).
 _eo_close_comment() {
   printf 'Closed by `cckit effort close` (merged `%s`).\n\n' "$1"
   printf 'Finished sub-issues: %s\n' "${2:-none}"
   if [ -n "${3:-}" ]; then
-    printf '\nClosed with the parent, no commit on the effort branch delivers them:\n%s\n' "$3"
+    printf '\nClosed as not planned, no commit on the effort branch delivers them:\n%s\n' "$3"
+    if [ -n "${4:-}" ]; then printf '\n#%s carries what is left.\n' "$4"
+    else printf '\nNothing is left to carry.\n'; fi
   fi
 }
 

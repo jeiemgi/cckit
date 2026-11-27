@@ -1,7 +1,7 @@
 ---
 name: kit-effort-close
 terms: Effort
-description: Close an effort in ONE op — snapshot each sub-issue's diff BEFORE squash (work record), capture and judge effort metrics, squash-merge the effort PR, close the parent + every sub, undelivered ones with it, board Done for each, GC the worktree/branch, run the optional knowledge-ingest hook, and finish with the kit-sync drift check.
+description: Close an effort in ONE op — snapshot each sub-issue's diff BEFORE squash (work record), capture and judge effort metrics, squash-merge the effort PR, close the parent + every sub, undelivered ones with it as not planned, board Done for each, GC the worktree/branch, run the optional knowledge-ingest hook, and finish with the kit-sync drift check.
 when_to_use: When the effort PR has been reviewed and is ready to land. This is the single close op for the effort lifecycle (effort-model.md) — board + record state are correct by construction. Replaces the separate merge / close / mark-done / gc steps.
 ---
 
@@ -42,9 +42,10 @@ The effort lifecycle's terminal op. Board state, issue state, and the work recor
    (guarded — a no-op when Projects v2 is off). A sub is **finished** when it is already closed
    (its close reason is kept, no second write) or a commit on the effort branch delivers it: the
    commit's last `#N`, a `Closes|Fixes|Resolves #N`, or the sub's `[E<N>.<k>]` step tag (#565).
-   A sub **no commit delivers** closes with the parent after it, same reason, with the comment
-   `Closed with its parent #N (completed).` (`gh_rest_close_open_subs`, the step `cckit close`
-   shares, #650) — never detached, never refused on — and is listed in the close comment on the
+   A sub **no commit delivers** closes with the parent after it, as `not planned`, with the comment
+   `Closed as not planned with its parent #N: no commit delivered it.` followed by `#M carries what
+   is left.` (`cckit effort close <N> --carried-by M`) or `Nothing is left to carry.`
+   (`gh_rest_close_open_subs`, the step `cckit close` shares, #650, #663) — never detached, never refused on — and is listed in the close comment on the
    parent and at the end of the output. No sub is left open.
 6. **GC**: base branch checked out + pulled in the main checkout; then the effort's **`sub/<N>…`
    worktrees and branches** are collected through `kit_gc_prune --only '^sub/<N>[a-z]-'` — the
@@ -110,7 +111,7 @@ effort_close "$NUM"
 
 - Pre-squash trace dir (`<git-common-dir>/traces/effort-<N>/` + `index.jsonl`) + captured metrics
 - PR squash-merged; parent + every sub-issue closed; a close comment on the parent listing the finished subs and the ones closed with it
-- Subs no commit delivered: closed with the parent, each with a comment naming it, listed as `✓ closed sub #N with its parent` and in the final report
+- Subs no commit delivered: closed with the parent as not planned, each with a comment naming it and the issue that carries what is left (or saying nothing is left), listed as `✓ closed sub #N with its parent as not planned` and in the final report
 - Every PR that was based on the effort branch is still OPEN, now based on the base branch
 - Board Status=Done for the parent + every sub (if Projects v2 is on)
 - Main checkout on the base branch, up to date; effort worktree + local/remote branch removed and pruned, every `sub/<N><letter>-*` branch deleted on origin (`✓ deleted remote branch sub/…` lines), and every LANDED `sub/<N>…` worktree + local branch with them (`✓ sub gc:` lines)
@@ -124,7 +125,7 @@ effort_close "$NUM"
   the per-unit work record; the core refuses to squash when no trace was captured (`KIT_FORCE=1`
   overrides). The trace lives under the **shared git-common-dir** so it survives the worktree prune.
 - **One op owns board + issue + record state** — never rely on a separate, skippable "mark done"
-  (effort-model.md). Finished subs go Done in the core; one no commit delivers closes with the parent, named.
+  (effort-model.md). Finished subs go Done in the core; one no commit delivers closes with the parent as not planned, named.
 - recover-before-prune (branch-naming.md): never remove a worktree with a staged-but-uncommitted
   delta — the working tree must be clean (precondition) before this op proceeds.
 - Scrub secrets from the trace if any commit diff could contain them (trace hygiene).
