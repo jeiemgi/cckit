@@ -5,6 +5,26 @@ All notable changes to cckit are documented here. New entries below are generate
 [Conventional Commits](https://www.conventionalcommits.org/) and land when the Release PR is
 merged to `main`. Earlier entries follow [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.14.0](https://github.com/jeiemgi/cckit/compare/v0.13.0...v0.14.0) (2026-11-27)
+
+
+### Features
+
+* **core:** One vocabulary for agent work [E632] ([#642](https://github.com/jeiemgi/cckit/issues/642)) ([93e1e79](https://github.com/jeiemgi/cckit/commit/93e1e79207bce87d911e53cff48faf5df561df84))
+* Interface rules in design skills [[#643](https://github.com/jeiemgi/cckit/issues/643)] ([#644](https://github.com/jeiemgi/cckit/issues/644)) ([e05a6b7](https://github.com/jeiemgi/cckit/commit/e05a6b74b63b9db5237fa22391bd4c9192b11f3f))
+* **labels:** backlog label marks parked issues [[#647](https://github.com/jeiemgi/cckit/issues/647)] ([#657](https://github.com/jeiemgi/cckit/issues/657)) ([4d88741](https://github.com/jeiemgi/cckit/commit/4d88741b06e83c5d7a14e99e69cf8ea21b5fdb75))
+* **ux-audit:** section 11 finds off-grid values and raw radii ([#656](https://github.com/jeiemgi/cckit/issues/656)) ([6450069](https://github.com/jeiemgi/cckit/commit/645006905cca52c6627affa924ca02257a871cd7))
+
+
+### Bug Fixes
+
+* **close:** closing a parent closes its open sub-issues [[#650](https://github.com/jeiemgi/cckit/issues/650)] ([#660](https://github.com/jeiemgi/cckit/issues/660)) ([2945926](https://github.com/jeiemgi/cckit/commit/2945926043ff9aa0fec0dc2c674f7955827bd98e))
+* **close:** undelivered subs close as not planned [[#663](https://github.com/jeiemgi/cckit/issues/663)] ([#666](https://github.com/jeiemgi/cckit/issues/666)) ([43cb42b](https://github.com/jeiemgi/cckit/commit/43cb42b791e4343eabe843ca5477488ba5570c6d))
+* **effort-close:** delete the sub branches on origin [[#651](https://github.com/jeiemgi/cckit/issues/651)] ([#661](https://github.com/jeiemgi/cckit/issues/661)) ([4b7f7f6](https://github.com/jeiemgi/cckit/commit/4b7f7f679666a8082cafa7924a7952f5ed9d4cc7))
+* **effort-close:** kit-sync warning reads the manifest [[#652](https://github.com/jeiemgi/cckit/issues/652)] ([#662](https://github.com/jeiemgi/cckit/issues/662)) ([763dae3](https://github.com/jeiemgi/cckit/commit/763dae3da581b4df44778f2dce104e478cf438db))
+* **effort:** commit new files with the tracked changes [[#664](https://github.com/jeiemgi/cckit/issues/664)] ([#665](https://github.com/jeiemgi/cckit/issues/665)) ([574a6ac](https://github.com/jeiemgi/cckit/commit/574a6ac1176805e137c85b80875a8bb5eca72d77))
+* **pr:** commit new files with the tracked changes [[#649](https://github.com/jeiemgi/cckit/issues/649)] ([#655](https://github.com/jeiemgi/cckit/issues/655)) ([f4ebc73](https://github.com/jeiemgi/cckit/commit/f4ebc73eee7044a5865a4a85bd781a09649b6b73))
+
 ## [0.13.0](https://github.com/jeiemgi/cckit/compare/v0.12.0...v0.13.0) (2026-11-25)
 
 
