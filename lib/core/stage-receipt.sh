@@ -284,7 +284,8 @@ CCKIT_RECEIPT_REMOTE=0) writes the file and posts nothing; a remote failure only
 --report posts the trail comment for a step report (sections: Status · Done · Waiting for a
 yes · Numbers · Failing or risky · Open questions · Next step): the Status head, the report's
 URLs, the Waiting for a yes items and the report's file name, capped at 1500 characters. It
-is refused when it would carry a private leak-list word or a home path. --dry-run prints it.
+is refused when it would carry a private leak-list word or a home path; a link to the issue's
+own repository is not a leak. --dry-run prints it.
 EOF
       return 2
       ;;
@@ -484,12 +485,15 @@ sr_mirror() {
 # Nothing private reaches GitHub. The comment is checked against the leak fence's own word list
 # (lib/core/leak-fence.sh: the built-in word, `.cckit/leak-words`, `CCKIT_LEAK_WORDS`) and
 # against absolute home paths, and refused whole on a hit — the matched text is never printed.
+# One exemption (#672): the destination repository's own `owner/repo` inside a URL or an
+# `owner/repo#N` reference, since the comment is posted to that very repository. The same word in
+# prose still refuses.
 #
 # UPSERT keyed by the report's file name, on the same marker pattern as the receipt mirror: posting
 # one report twice edits its comment instead of appending a second.
 #
 #   sr_trail_body <report> <shown-path>    the comment, marker first (pure; no forge)
-#   sr_trail_check <file>                  rc 1 naming the reason when the comment must not be posted
+#   sr_trail_check <file> [<owner/repo>]   rc 1 naming the reason when the comment must not be posted
 #   sr_trail_post <issue> <report> [--dry-run]   build, check, upsert; rc 0 posted or printed
 
 SR_TRAIL_MAX="${SR_TRAIL_MAX:-1500}"
@@ -572,13 +576,44 @@ S
   printf '%s\n\n%s\n' "$body" "$footer"
 }
 
-# sr_trail_check <file> — rc 0 when the comment may be posted. rc 1 names the reason on stderr and
-# never the matched text: the leak fence's patterns, an absolute home path, or a pattern set that
-# does not compile (a check that cannot run is not a clean check).
+# _sr_ci_literal <text> — <text> as a case-insensitive extended regex matching it literally: each
+# letter becomes `[xX]`, every character outside `[0-9/_-]` is escaped. Portable: no GNU `\L`, no
+# bash 4 `${c^}` (macOS ships bash 3.2), so it runs under the same shells as the rest of this file.
+_sr_ci_literal() {
+  printf '%s' "$1" | awk '{
+    for (i = 1; i <= length($0); i++) {
+      c = substr($0, i, 1)
+      if (c ~ /[A-Za-z]/) printf "[%s%s]", tolower(c), toupper(c)
+      else if (c ~ /[0-9\/_-]/) printf "%s", c
+      else printf "\\%s", c
+    }
+  }'
+}
+
+# _sr_trail_mask_own_repo <file> <owner/repo> — the comment with the DESTINATION repository's own
+# `owner/repo` masked where it is a reference, and nowhere else: at the end of a URL's `owner/repo`
+# segment (`https://…/owner/repo`, followed by `/`, `#`, `?` or the URL's end) and as an
+# `owner/repo#N` reference. The comment is posted to that repository, so the link reveals nothing
+# the destination does not already hold (#672). The same word in prose, in another repository's
+# URL, or in a path segment after `owner/repo` stays in place for the leak check to see. Matched
+# case-insensitively, as the forge names repositories. With no destination, nothing is masked. A sed
+# that fails falls back to the unmasked text, so a broken mask only makes the check stricter.
+_sr_trail_mask_own_repo() {
+  local f="$1" repo="$2" pat
+  [ -n "$repo" ] || { cat "$f"; return 0; }
+  pat="$(_sr_ci_literal "$repo")"
+  sed -E -e "s@(https?://[^[:space:]]*/)${pat}([^[:alnum:]_.-]|\$)@\\1<own-repo>\\2@g" \
+         -e "s@(^|[^[:alnum:]_/.-])${pat}(#[0-9]+)@\\1<own-repo>\\2@g" "$f" || cat "$f"
+}
+
+# sr_trail_check <file> [<owner/repo>] — rc 0 when the comment may be posted. rc 1 names the reason
+# on stderr and never the matched text: the leak fence's patterns, an absolute home path, or a
+# pattern set that does not compile (a check that cannot run is not a clean check). The destination
+# repository's own `owner/repo` is exempt where it is a link (`_sr_trail_mask_own_repo`).
 sr_trail_check() {
-  local f="$1" pat rc
+  local f="$1" repo="${2:-}" pat rc
   pat="$(leak_fence_patterns | paste -sd'|' -)"
-  grep -iqE "$pat" "$f" 2>/dev/null; rc=$?
+  _sr_trail_mask_own_repo "$f" "$repo" | grep -iqE "$pat" 2>/dev/null; rc=$?
   if [ "$rc" -eq 0 ]; then
     echo "cckit receipt: refused — the comment would carry a word from the private leak list (the word is not shown)" >&2
     return 1
@@ -602,7 +637,10 @@ sr_trail_post() {
   local n="$1" f="$2" dry="${3:-}" tmp repo marker listing ids id rc
   tmp="$(mktemp 2>/dev/null)" || { echo "cckit receipt: no temp file" >&2; return 1; }
   sr_trail_body "$f" "$(_sr_trail_shown_path "$f")" > "$tmp" || { rc=$?; rm -f "$tmp"; return "$rc"; }
-  sr_trail_check "$tmp" || { rm -f "$tmp"; echo "cckit receipt: nothing was posted to #$n" >&2; return 1; }
+  # The destination is resolved BEFORE the check, so a dry run exempts the same links a post does.
+  repo="$(_sr_repo)"
+  [ -n "$repo" ] || ! command -v forge_repo_from_git >/dev/null 2>&1 || repo="$(forge_repo_from_git 2>/dev/null)" || repo=""
+  sr_trail_check "$tmp" "$repo" || { rm -f "$tmp"; echo "cckit receipt: nothing was posted to #$n" >&2; return 1; }
 
   if [ "$dry" = "--dry-run" ]; then
     echo "cckit receipt: dry run — the comment for #$n, not posted:" >&2
@@ -618,7 +656,6 @@ sr_trail_post() {
     cat "$tmp"; rm -f "$tmp"; return 0
   fi
 
-  repo="$(_sr_repo)"; [ -n "$repo" ] || repo="$(forge_repo_from_git 2>/dev/null)" || repo=""
   [ -n "$repo" ] || { rm -f "$tmp"; echo "cckit receipt: no repo (set github.repo or an origin remote) — nothing posted" >&2; return 1; }
   marker="$(_sr_trail_marker "$(basename "$f")")"
   listing="$(_sr_mirror_list "$repo" "$n")" || {

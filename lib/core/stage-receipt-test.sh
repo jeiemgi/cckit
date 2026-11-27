@@ -374,6 +374,39 @@ case "$out" in *[Qq]uux[Cc]orp*) t "the refusal does not echo the word" "echoed"
 t "a refused comment posts nothing" "$(wc -l < "$GH_LOG" | tr -d ' ')" "0"
 sr_cli 77 --report "$LEAK" --dry-run >/dev/null 2>&1; t "dry run refuses a leak word too" "$?" "1"
 
+# A link to the DESTINATION repository is not a leak, even when its owner/repo carries a leak-list
+# word: the comment lands on that repository, so the link reveals nothing it does not hold (#672).
+# Synthetic destination `o/zorblaxian`; the exemption covers a URL and an `owner/repo#N` reference,
+# and nothing else — the same word in prose, in another repository's URL or in a path segment
+# after `owner/repo` still refuses.
+OWN="$trtmp/own.md"
+printf '## Status\nShipped; see https://github.com/o/Zorblaxian/pull/12 and o/zorblaxian#5.\n' > "$OWN"
+: > "$GH_LOG"
+out="$(SR_REPO=o/zorblaxian sr_cli 77 --report "$OWN" --dry-run 2>&1)"; rc=$?
+t "a link to the destination repo is not refused" "$rc" "0"
+yes "the comment carries the destination repo URL" "$out" "- https://github.com/o/Zorblaxian/pull/12"
+yes "the comment carries the destination repo ref" "$out" "o/zorblaxian#5"
+OWNER="$trtmp/owner.md"; printf '## Status\nSee https://github.com/quuxcorp/r/issues/3\n' > "$OWNER"
+SR_REPO=quuxcorp/r sr_cli 77 --report "$OWNER" --dry-run >/dev/null 2>&1
+t "a leak word as the destination OWNER is not refused" "$?" "0"
+out="$(SR_REPO=o/r sr_cli 77 --report "$OWN" 2>&1)"; rc=$?
+t "the same link to ANOTHER repo is refused" "$rc" "1"
+yes "and the refusal names the leak list" "$out" "private leak list"
+t "and it posts nothing" "$(wc -l < "$GH_LOG" | tr -d ' ')" "0"
+PROSE="$trtmp/prose.md"
+printf '## Status\nzorblaxian shipped; see https://github.com/o/zorblaxian/pull/12\n' > "$PROSE"
+out="$(SR_REPO=o/zorblaxian sr_cli 77 --report "$PROSE" 2>&1)"; rc=$?
+t "the destination repo word in prose is refused" "$rc" "1"
+case "$out" in *[Zz]orblaxian*) t "the prose refusal does not echo the word" "echoed" "hidden" ;;
+  *) t "the prose refusal does not echo the word" "hidden" "hidden" ;; esac
+t "the prose refusal posts nothing" "$(wc -l < "$GH_LOG" | tr -d ' ')" "0"
+SEG="$trtmp/segment.md"; printf '## Status\nSee https://github.com/o/r/blob/main/zorblaxian.md\n' > "$SEG"
+SR_REPO=o/r sr_cli 77 --report "$SEG" --dry-run >/dev/null 2>&1
+t "the word in a path segment after owner/repo is refused" "$?" "1"
+GLUED="$trtmp/glued.md"; printf '## Status\nSee https://github.com/o/zorblaxian-private/pull/1\n' > "$GLUED"
+SR_REPO=o/zorblaxian sr_cli 77 --report "$GLUED" --dry-run >/dev/null 2>&1
+t "a repo whose name merely starts with the destination is refused" "$?" "1"
+
 # An absolute home path is refused the same way.
 HOMEP="$trtmp/home.md"; printf '## Status\nlog at /Users/alice/work/log.txt\n' > "$HOMEP"
 out="$(sr_cli 77 --report "$HOMEP" 2>&1)"; rc=$?
