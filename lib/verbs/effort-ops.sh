@@ -976,16 +976,19 @@ effort_pr() {
   naming_title_lint pr "$pr_title" || { echo "effort_pr: refusing to open a PR whose title breaks the naming rule (pass --type <type> or --title, or set pr.titleStyle to issue-title)" >&2; return 1; }
 
   # Commit pending changes. Role identity is a Co-authored-by TRAILER, never the git author (some
-  # deploy providers refuse commits whose author email matches no account). TRACKED changes only:
-  # `git add -A` here would sweep a copied .env.local into the PR. Untracked files are listed, not
-  # committed — an effort's new files land in its per-sub commits.
-  if [ -n "$(git ls-files --others --exclude-standard 2>/dev/null)" ]; then
-    echo "effort_pr: untracked files NOT committed (commit them in their sub's commit if they belong):" >&2
-    git ls-files --others --exclude-standard 2>/dev/null | sed 's/^/  /' >&2
+  # deploy providers refuse commits whose author email matches no account). Every file the local
+  # gate saw goes into the commit, as in kto_task_pr (#649, #664): tracked edits AND new files that
+  # are not ignored. `git add -A` honours .gitignore, so an ignored .env.local copied into the
+  # worktree never reaches the PR; a new file that must stay out belongs in .gitignore. New files
+  # are named on stderr, so the commit is never silently larger either.
+  local new_files; new_files="$(git ls-files --others --exclude-standard 2>/dev/null)"
+  if [ -n "$new_files" ]; then
+    echo "effort_pr: new files committed with the tracked changes (add them to .gitignore to keep them out):" >&2
+    printf '%s\n' "$new_files" | sed 's/^/  /' >&2
   fi
-  if [ -n "$(git status --porcelain --untracked-files=no 2>/dev/null)" ]; then
+  if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
     author=""
-    git add -u
+    git add -A
     if [ -n "$role" ] && command -v role_git_author >/dev/null 2>&1; then
       author="$(role_git_author "$role" 2>/dev/null || true)"
     fi
