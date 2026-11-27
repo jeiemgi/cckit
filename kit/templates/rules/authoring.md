@@ -15,8 +15,8 @@ of those; the precedence stated under each convention applies to whichever are p
 The unit is whatever lands as one reviewed diff: a task PR, or one sub-issue's commit on an effort
 branch.
 
-- **Origin:** a stated rule, not an incident — the maintainer made it mandatory that every proposed
-  or shipped unit of work updates the docs and the README, small changes included. Until this rule
+- **Origin:** a stated rule, not an incident — the maintainer made it mandatory that every unit of
+  work updates the docs and the README, small changes included. Until this rule
   it was written down only for `plan-next` output (`plan-next.md` § *The mandatory docs + README
   step*), a rule no profile ships.
 - **What "the docs" means:** every place that states the behaviour the change alters. In most
@@ -27,8 +27,7 @@ branch.
   updates. An issue that omits them still owes them.
 - **In review:** a behaviour change whose diff touches no doc is incomplete. The fix is the doc
   edit in that PR, not a new issue.
-- **What does not count:** "docs to follow" in a PR body, and a docs issue filed to be picked up
-  later. Both leave the base branch describing behaviour it no longer has.
+- **What does not count:** "docs to follow" in a PR body, and a docs issue filed for later. Both leave the base branch describing behaviour it no longer has.
 - **When there is nothing to update:** a change with no user-visible or agent-visible behaviour
   (an internal rename, a test) owes no doc edit. Say so in the PR body in one line, so the reviewer
   reads a decision and not an omission.
@@ -90,11 +89,11 @@ the name of the work and its outcome.** Two parts:
   line; a command listed to show what the agent ran is decoration.
 - **Scope:** text a person reads. Output an agent parses, a brief handed to a sub-agent, and the
   machine-read lines `naming-and-ids.md` lists (`- Depends on #N`, `Closes #N`) are not summaries.
-- **A step report also goes on its issue.** A report saved under `.cckit/reports/` uses the
-  sections Status · Done · Waiting for a yes · Numbers · Failing or risky · Open questions · Next
-  step. Every Spec item ending `(needs a yes)` gets its own Waiting for a yes line naming what the
-  person must look at. `cckit agent receipt <issue> --report <file>` posts the short trail comment
-  on the issue; the full report stays local.
+- **A step report also goes on its issue.** A report under `.cckit/reports/` uses the sections
+  Status · Done · Waiting for a yes · Numbers · Failing or risky · Open questions · Next step. Every
+  Spec item ending `(needs a yes)` gets a Waiting for a yes line naming what the person must look
+  at. `cckit agent receipt <issue> --report <file>` posts the short trail comment; the full report
+  stays local. A link to the issue's own repository is no leak.
 
 **Precedence — `naming-and-ids.md`.** That rule writes an effort as `E241`, a pull request as
 `PR 268` and a standalone issue as `#209`, and forbids a bare `#241` for an effort. Where it is
