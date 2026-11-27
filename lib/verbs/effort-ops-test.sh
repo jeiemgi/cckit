@@ -140,8 +140,11 @@ t  "effort_new writes nothing on that refusal"            "$(grep -c . "$GH_LOG"
 
 # ── effort_start / effort_pr / effort_close (real git + bare remote) ───────────────────────────
 ( cd "$tmp" && git init -q --bare remote.git )
+# The base commit tracks one file and ignores .env.local, as a project that keeps a local env does.
 ( cd "$tmp" && git clone -q remote.git work \
-  && cd work && git -c user.email=t@t -c user.name=t commit -q --allow-empty -m init \
+  && cd work && printf 'base\n' > tracked.txt && printf '.env.local\n' > .gitignore \
+  && git add tracked.txt .gitignore \
+  && git -c user.email=t@t -c user.name=t -c commit.gpgsign=false commit -q -m init \
   && git push -q origin HEAD:main )
 cd "$tmp/work"
 
@@ -179,7 +182,7 @@ tc "$GH_LOG" '^POST repos/o/r/pulls \{.*SUMMARY-MARKER'       "effort_pr puts --
 tc "$GH_LOG" '^POST repos/o/r/pulls \{.*AGENTS-MARKER'        "effort_pr puts --for-agents in the body"
 tc "$GH_LOG" '^POST repos/o/r/pulls \{.*\\nCloses #99(\\n|")' "effort_pr body closes the parent"
 no_gh "effort_pr"
-t  "effort_pr never commits an untracked .env.local" "$(git ls-files .env.local)" ""
+t  "effort_pr never commits the gitignored .env.local" "$(git ls-files .env.local)" ""
 # #418: pr.bodyStyle = content swaps the Verification checklist for a Review one; the machine line,
 # the summary and the For agents block stay.
 eb="$(_eff_pr_body 99 "S-MARK" "A-MARK")"
@@ -913,6 +916,36 @@ case "$out" in
   *"could not read the PR for effort/801-effort"*"nothing was written"*) echo "ok: #330: the refusal says nothing was written" ;;
   *) echo "FAIL: #330: effort_close gave no reason -> '$out'"; fail=1 ;; esac
 no_gh "the whole wip + #330 section"
+
+# ── effort_pr #664: the commit holds every file the gate saw ─────────────────────────────────────
+# As cckit pr does since #649: a NEW file that is not ignored lands in the commit beside the tracked
+# edit; a gitignored .env.local never does. Own fixture (a bare origin + a clone on effort/99-…), so
+# the commit it makes is on no branch the sections above read.
+nf="$(mktemp -d)"
+git init -q --bare "$nf/origin.git"
+git clone -q "$nf/origin.git" "$nf/work" 2>/dev/null
+cd "$nf/work" || exit 1
+git config user.email t@t; git config user.name t; git config commit.gpgsign false
+printf 'base\n' > tracked.txt; printf '.env.local\n' > .gitignore
+git add tracked.txt .gitignore; git commit -q -m init; git push -q origin HEAD:main
+git checkout -q -b effort/99-new-files
+printf 'edited\n' > tracked.txt        # a tracked change: committed
+printf 'new\n' > brand-new.txt         # a new file, not ignored: committed (#664)
+printf 'SECRET=x\n' > .env.local       # gitignored: never committed
+: > "$GH_LOG"
+effort_pr 99 --summary "S" --for-agents "A" >/dev/null 2>"$nf/err"
+t  "#664: effort_pr succeeds" "$?" "0"
+t  "#664: effort_pr commits the tracked edit and the new file" \
+   "$(git show --name-only --format= HEAD | sort | tr '\n' ' ')" "brand-new.txt tracked.txt "
+grep -q 'new files committed' "$nf/err" && grep -q 'brand-new.txt' "$nf/err" && echo "ok: #664: the new file is named as committed" || { echo "FAIL: #664: new file not named as committed"; fail=1; }
+grep -q '\.env\.local' "$nf/err" && { echo "FAIL: #664: the ignored file is listed"; fail=1; } || echo "ok: #664: the ignored file is not listed"
+t  "#664: the gitignored .env.local is not committed" "$(git ls-files .env.local)" ""
+t  "#664: .env.local is still on disk" "$(cat .env.local)" "SECRET=x"
+t  "#664: effort_pr leaves nothing uncommitted" "$(git status --porcelain)" ""
+t  "#664: effort_pr pushed the commit" "$(git -C "$nf/origin.git" rev-parse -q --verify refs/heads/effort/99-new-files)" "$(git rev-parse HEAD)"
+tc "$GH_LOG" '^POST repos/o/r/pulls \{"title":"[^"]*","head":"effort/99-new-files","base":"main"' "#664: effort_pr opened the PR"
+no_gh "#664"
+cd "$tmp" || exit 1; rm -rf "$nf"
 
 [ "$fail" -eq 0 ] && echo "ALL OK (effort-ops)" || echo "effort-ops: FAILURES"
 exit "$fail"

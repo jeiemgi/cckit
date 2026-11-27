@@ -110,7 +110,10 @@ The slug is a *derived* convenience, not a second source of truth. `--slug` only
   `kind:` label (`kind:task` → `feat`, a `bug` label → `fix`). A title that fails the commitlint
   check — a bad `--type`, or a non-conventional `--title` — is refused before any PR is opened.
   With [`pr.titleStyle: issue-title`](/config-and-permissions/) the title is `[Role] [#N] <name>`
-  and the commitlint check is skipped.
+  and the commitlint check is skipped. Changes still pending on the effort branch are committed
+  first, as `cckit pr` commits them: tracked edits and new files that are not ignored, the new
+  files named on stderr. A gitignored file (the copied `.env.local`) never enters the commit; a new
+  file that must stay out of the pull request belongs in `.gitignore`.
 - **`cckit effort close`** is the single close implementation — the `/kit-effort-close` skill is a
   thin caller of the same function, so the two can never drift apart. It snapshots each sub-issue's
   diff and captures effort metrics **before** the squash, **refuses to squash-merge when no work
